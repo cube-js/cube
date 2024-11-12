@@ -3087,10 +3087,17 @@ pub fn create_cube_regclass_cast_udf() -> ScalarUDF {
                         Some(as_str) => {
                             match PgType::get_all().iter().find(|e| e.typname == as_str) {
                                 None => {
-                                    return Err(DataFusionError::Execution(format!(
-                                        "Unable to cast expression to Regclass: Unknown type: {}",
-                                        as_str
-                                    )))
+                                    // If the type name contains a dot, it's a schema-qualified name
+                                    // and we should return return the approprate RegClass to be converted to OID
+                                    // For now, we'll return 0 so metabase can sync without failing
+                                    if as_str.contains('.') {
+                                        builder.append_value(0)?;
+                                    } else {
+                                        return Err(DataFusionError::Execution(format!(
+                                            "Unable to cast expression to Regclass: Unknown type: {}",
+                                            as_str
+                                        )));
+                                    }
                                 }
                                 Some(ty) => {
                                     builder.append_value(ty.oid as i64)?;
@@ -3147,6 +3154,157 @@ pub fn create_pg_get_serial_sequence_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+// Return a NOOP for this so metabase can sync without failing
+// TODO: Implement this
+pub fn create_col_description_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        // Ensure the output array has the same length as the input
+        let input_length = args[0].len();
+        let mut builder = StringBuilder::new(input_length);
+
+        for _ in 0..input_length {
+            builder.append_null()?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "col_description",
+        &Signature::one_of(vec![
+            TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+        ], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_format_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        // Ensure at least one argument is provided
+        if args.is_empty() {
+            return Err(DataFusionError::Execution(
+                "format() requires at least one argument".to_string(),
+            ));
+        }
+
+        // Ensure the first argument is a Utf8 (string)
+        if args[0].data_type() != &DataType::Utf8 {
+            return Err(DataFusionError::Execution(
+                "format() first argument must be a string".to_string(),
+            ));
+        }
+
+        let format_strings = downcast_string_arg!(&args[0], "format_str", i32);
+        let mut builder = StringBuilder::new(format_strings.len());
+
+        for i in 0..format_strings.len() {
+            if format_strings.is_null(i) {
+                builder.append_null()?;
+                continue;
+            }
+
+            let format_str = format_strings.value(i);
+            let mut result = String::new();
+            let mut format_chars = format_str.chars().peekable();
+            let mut arg_index = 1; // Start from first argument after format string
+
+            while let Some(c) = format_chars.next() {
+                if c != '%' {
+                    result.push(c);
+                    continue;
+                }
+
+                match format_chars.next() {
+                    Some('I') => {
+                        // Handle %I - SQL identifier
+                        if arg_index >= args.len() {
+                            return Err(DataFusionError::Execution(
+                                "Not enough arguments for format string".to_string(),
+                            ));
+                        }
+
+                        let arg = &args[arg_index];
+                        let value = match arg.data_type() {
+                            DataType::Utf8 => {
+                                let str_arr = downcast_string_arg!(arg, "arg", i32);
+                                if str_arr.is_null(i) {
+                                    return Err(DataFusionError::Execution(
+                                        "NULL values cannot be formatted as identifiers".to_string(),
+                                    ));
+                                }
+                                str_arr.value(i).to_string()
+                            }
+                            _ => {
+                                // For other types, try to convert to string
+                                let str_arr = cast(&arg, &DataType::Utf8)?;
+                                let str_arr = str_arr
+                                    .as_any()
+                                    .downcast_ref::<StringArray>()
+                                    .unwrap();
+                                if str_arr.is_null(i) {
+                                    return Err(DataFusionError::Execution(
+                                        "NULL values cannot be formatted as identifiers".to_string(),
+                                    ));
+                                }
+                                str_arr.value(i).to_string()
+                            }
+                        };
+
+                        // Quote identifier if necessary
+                        let needs_quoting = !value.chars().all(|c| {
+                            c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'
+                        }) || value.is_empty();
+
+                        if needs_quoting {
+                            result.push('"');
+                            result.push_str(&value.replace('"', "\"\""));
+                            result.push('"');
+                        } else {
+                            result.push_str(&value);
+                        }
+                        arg_index += 1;
+                    }
+                    Some('%') => {
+                        // %% is escaped to single %
+                        result.push('%');
+                    }
+                    Some(c) => {
+                        return Err(DataFusionError::Execution(format!(
+                            "Unsupported format specifier %{}",
+                            c
+                        )));
+                    }
+                    None => {
+                        return Err(DataFusionError::Execution(
+                            "Invalid format string - ends with %".to_string(),
+                        ));
+                    }
+                }
+            }
+
+            builder.append_value(result)?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "format",
+        &Signature::variadic(
+            vec![DataType::Utf8],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 
 pub fn create_json_build_object_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
@@ -3768,13 +3926,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         argc = 0,
         rettyp = TimestampTz,
         vol = Volatile
-    );
-    register_fun_stub!(
-        udf,
-        "col_description",
-        tsig = [Oid, Int32],
-        rettyp = Utf8,
-        vol = Stable
     );
     register_fun_stub!(udf, "convert", tsig = [Binary, Utf8, Utf8], rettyp = Binary);
     register_fun_stub!(udf, "convert_from", tsig = [Binary, Utf8], rettyp = Utf8);
