@@ -329,7 +329,7 @@ impl WorkerProcessing for WorkerProcessor {
                 };
                 let span = trace_id_and_span_id.map(|(t, s)| {
                     tracing::info_span!(
-                        "Process on selec worker",
+                        "Process on select worker",
                         cube_dd_trace_id = t,
                         cube_dd_parent_span_id = s
                     )
