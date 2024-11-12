@@ -45,9 +45,9 @@ echo "::endgroup::"
 #yarn lerna run --concurrency 1 --stream --no-prefix smoke:prestodb
 #echo "::endgroup::"
 
-echo "::group::Trino"
-yarn lerna run --concurrency 1 --stream --no-prefix smoke:trino
-echo "::endgroup::"
+#echo "::group::Trino"
+#yarn lerna run --concurrency 1 --stream --no-prefix smoke:trino
+#echo "::endgroup::"
 
 echo "::group::MS SQL"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:mssql

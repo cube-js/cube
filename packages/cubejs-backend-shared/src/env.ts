@@ -66,8 +66,7 @@ export function assertDataSource(dataSource = 'default'): string {
     return dataSource;
   } else {
     throw new Error(
-      `The ${
-        dataSource
+      `The ${dataSource
       } data source is missing in the declared CUBEJS_DATASOURCES.`
     );
   }
@@ -90,10 +89,8 @@ export function keyByDataSource(origin: string, dataSource?: string): string {
       return `CUBEJS_DS_${dataSource.toUpperCase()}_${s[1]}`;
     } else {
       throw new Error(
-        `The ${
-          origin
-        } environment variable can not be converted for the ${
-          dataSource
+        `The ${origin
+        } environment variable can not be converted for the ${dataSource
         } data source.`
       );
     }
@@ -237,8 +234,7 @@ const variables: Record<string, (...args: any) => any> = {
       return false;
     } else {
       throw new TypeError(
-        `The ${
-          keyByDataSource('CUBEJS_DB_SSL', dataSource)
+        `The ${keyByDataSource('CUBEJS_DB_SSL', dataSource)
         } must be either 'true' or 'false'.`
       );
     }
@@ -261,8 +257,7 @@ const variables: Record<string, (...args: any) => any> = {
       return false;
     } else {
       throw new TypeError(
-        `The ${
-          keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
+        `The ${keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
         } must be either 'true' or 'false'.`
       );
     }
@@ -353,8 +348,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)]
       ? parseInt(
-        `${
-          process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)]
+        `${process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)]
         }`,
         10,
       )
@@ -409,8 +403,7 @@ const variables: Record<string, (...args: any) => any> = {
     ];
     if (required && !val) {
       throw new Error(
-        `The ${
-          keyByDataSource('CUBEJS_DB_NAME', dataSource)
+        `The ${keyByDataSource('CUBEJS_DB_NAME', dataSource)
         } is required and missing.`
       );
     }
@@ -429,10 +422,8 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
   }) => {
     console.warn(
-      `The ${
-        keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
-      } is deprecated. Please, use the ${
-        keyByDataSource('CUBEJS_DB_NAME', dataSource)
+      `The ${keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+      } is deprecated. Please, use the ${keyByDataSource('CUBEJS_DB_NAME', dataSource)
       } instead.`
     );
     const val = process.env[
@@ -440,8 +431,7 @@ const variables: Record<string, (...args: any) => any> = {
     ];
     if (required && !val) {
       throw new Error(
-        `The ${
-          keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+        `The ${keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
         } is required and missing.`
       );
     }
@@ -460,10 +450,8 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
   }) => {
     console.warn(
-      `The ${
-        keyByDataSource('CUBEJS_DATABASE', dataSource)
-      } is deprecated. Please, use the ${
-        keyByDataSource('CUBEJS_DB_NAME', dataSource)
+      `The ${keyByDataSource('CUBEJS_DATABASE', dataSource)
+      } is deprecated. Please, use the ${keyByDataSource('CUBEJS_DB_NAME', dataSource)
       } instead.`
     );
     const val = process.env[
@@ -471,8 +459,7 @@ const variables: Record<string, (...args: any) => any> = {
     ];
     if (required && !val) {
       throw new Error(
-        `The ${
-          keyByDataSource('CUBEJS_DATABASE', dataSource)
+        `The ${keyByDataSource('CUBEJS_DATABASE', dataSource)
         } is required and missing.`
       );
     }
@@ -489,10 +476,9 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)]
       ? parseInt(
-        `${
-          process.env[
-            keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)
-          ]
+        `${process.env[
+          keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)
+        ]
         }`,
         10,
       )
@@ -684,8 +670,7 @@ const variables: Record<string, (...args: any) => any> = {
       supported.indexOf(<'s3' | 'gcp' | 'azure'>val) === -1
     ) {
       throw new TypeError(
-        `The ${
-          keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
+        `The ${keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
         } must be one of the [${supported.join(', ')}].`
       );
     }
@@ -878,8 +863,7 @@ const variables: Record<string, (...args: any) => any> = {
     ];
     if (!val) {
       throw new Error(
-        `The ${
-          keyByDataSource('CUBEJS_DB_DATABRICKS_URL', dataSource)
+        `The ${keyByDataSource('CUBEJS_DB_DATABRICKS_URL', dataSource)
         } is required and missing.`
       );
     }
@@ -1387,11 +1371,10 @@ const variables: Record<string, (...args: any) => any> = {
         return false;
       } else {
         throw new TypeError(
-          `The ${
-            keyByDataSource(
-              'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
-              dataSource,
-            )
+          `The ${keyByDataSource(
+            'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
+            dataSource,
+          )
           } must be either 'true' or 'false'.`
         );
       }
@@ -1623,6 +1606,17 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
+    ]
+  ),
+
+  /**
+   * Trino catalog.
+   */
+  trinoCatalog: ({
+    dataSource,
+  }: { dataSource: string }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_TRINO_CATALOG', dataSource)
     ]
   ),
 
