@@ -1066,7 +1066,7 @@ export class QueryCache {
     const resHash = getCacheHash(JSON.stringify(res));
 
     if (prevResHash !== resHash) {
-      console.log(`Emitting Cube Renewed ${options.renewedCube} and ${options.requestContext?.tenantId ?? 'UNKNOWN TENANT'}`);
+      console.log(`Emitting Cube Renewed ${options.renewedCube} with options: ${JSON.stringify(options.requestContext)}`);
       this.eventEmitter.emit('cubeRenewed', {
         renewedCube: options.renewedCube,
         requestContext: options.requestContext,
