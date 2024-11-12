@@ -78,6 +78,14 @@ flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5" }
+tracing-opentelemetry = "0.27.0"
+opentelemetry = "0.26.0"
+# opentelemetry_sdk v0.27 build fails because of Nightly in our toolchain (channel = "nightly-2024-01-29")
+opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.26.0", default-features = false, features = [
+    "trace", "metrics", "logs", "http-proto", "http-json", "reqwest-client", "tokio"
+] }
+opentelemetry-http = { version = "0.26.0", features = ["reqwest"] }
 lru = "0.6.5"
 moka = { version = "0.10.1", features = ["future"]}
 ctor = "0.1.20"
