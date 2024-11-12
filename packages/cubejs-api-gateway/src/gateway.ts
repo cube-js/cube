@@ -423,7 +423,6 @@ class ApiGateway {
       `${this.basePath}/v1/run-scheduled-refresh`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
-        console.log('scheduled refresh requested');
         await this.runScheduledRefresh({
           queryingOptions: req.query.queryingOptions,
           context: req.context,
@@ -546,8 +545,6 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       await this.assertApiScope('jobs', context.securityContext);
-      this.logger('Scheduled Refresh Requested');
-      console.log('Scheduled Refresh Requested');
       const refreshScheduler = this.refreshScheduler();
       res(await refreshScheduler.runScheduledRefresh(context, {
         ...this.parseQueryParam(queryingOptions || {}),
