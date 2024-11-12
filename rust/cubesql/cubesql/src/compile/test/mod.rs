@@ -52,45 +52,34 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             dimensions: vec![
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    description: None,
                     r#type: "time".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.last_mod".to_string(),
-                    description: None,
                     r#type: "time".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     description: Some("Customer gender".to_string()),
                     r#type: "string".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.notes".to_string(),
-                    description: None,
                     r#type: "string".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    description: None,
                     r#type: "number".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.has_subscription".to_string(),
-                    description: None,
                     r#type: "boolean".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
             ],
             measures: vec![
@@ -173,24 +162,18 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             dimensions: vec![
                 CubeMetaDimension {
                     name: "Logs.id".to_string(),
-                    description: None,
                     r#type: "number".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "Logs.read".to_string(),
-                    description: None,
                     r#type: "boolean".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "Logs.content".to_string(),
-                    description: None,
                     r#type: "string".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 },
             ],
             measures: vec![
@@ -244,10 +227,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             dimensions: (0..100)
                 .map(|i| CubeMetaDimension {
                     name: format!("WideCube.dim{}", i),
-                    description: None,
                     r#type: "number".to_string(),
-                    granularities: None,
-                    meta: None,
+                    ..CubeMetaDimension::default()
                 })
                 .collect(),
             measures: (0..100)
@@ -321,22 +302,19 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             name: format!("MultiTypeCube.dim_num{}", i),
                             description: Some(format!("Test numeric dimention {i}")),
                             r#type: "number".to_string(),
-                            granularities: None,
-                            meta: None,
+                            ..CubeMetaDimension::default()
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_str{}", i),
                             description: Some(format!("Test string dimention {i}")),
                             r#type: "string".to_string(),
-                            granularities: None,
-                            meta: None,
+                            ..CubeMetaDimension::default()
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_date{}", i),
                             description: Some(format!("Test time dimention {i}")),
                             r#type: "time".to_string(),
-                            granularities: None,
-                            meta: None,
+                            ..CubeMetaDimension::default()
                         },
                     ]
                 })
