@@ -76,6 +76,11 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+use opentelemetry::trace::{
+    SpanContext, SpanId, TraceContextExt, TraceFlags, TraceId,
+};
+use opentelemetry::{Context as OtelContext};
 
 #[automock]
 #[async_trait]
@@ -327,13 +332,42 @@ impl WorkerProcessing for WorkerProcessor {
                     let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
                     Ok((schema, records, data_loaded_size))
                 };
-                let span = trace_id_and_span_id.map(|(t, s)| {
-                    tracing::info_span!(
-                        "Process on select worker",
-                        cube_dd_trace_id = t,
-                        cube_dd_parent_span_id = s
-                    )
-                });
+
+                let span = match std::env::var("CUBESTORE_TRACING_TYPE")
+                    .unwrap_or("datadog".to_string())
+                    .to_lowercase()
+                    .as_str()
+                {
+                    "otel" => {
+                        trace_id_and_span_id.map(|(t, s)| {
+                            let trace_id = TraceId::from(t);
+                            let span_id = SpanId::from(s);
+                            let span_context = SpanContext::new(
+                                trace_id,
+                                span_id,
+                                TraceFlags::SAMPLED,
+                                true,
+                                Default::default(),
+                            );
+
+                            let context = OtelContext::new().with_remote_span_context(span_context);
+                            let span = tracing::info_span!("Process on select worker");
+
+                            span.set_parent(context);
+                            span
+                        })
+                    },
+                    _ => {
+                        trace_id_and_span_id.map(|(t, s)| {
+                            tracing::info_span!(
+                                "Process on select worker",
+                                cube_dd_trace_id = t,
+                                cube_dd_parent_span_id = s
+                            )
+                        })
+                    }
+                };
+
                 if let Some(span) = span {
                     future.instrument(span).await
                 } else {
