@@ -961,7 +961,7 @@ export class PreAggregations {
         }
       );
       if (referencedPreAggregations.length === 0) {
-        throw new UserError(`rollupLambda '${cube}.${preAggregationName}' should reference at least on rollup`);
+        throw new UserError(`rollupLambda '${cube}.${preAggregationName}' should reference at least one rollup`);
       }
       referencedPreAggregations.forEach((referencedPreAggregation, i) => {
         if (i === referencedPreAggregations.length - 1 && preAggObj.preAggregation.unionWithSourceData && preAggObj.cube !== referencedPreAggregations[i].cube) {
