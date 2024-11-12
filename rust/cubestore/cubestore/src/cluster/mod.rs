@@ -60,6 +60,8 @@ use ingestion::job_runner::JobRunner;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use mockall::automock;
+use opentelemetry::trace::{SpanContext, SpanId, TraceContextExt, TraceFlags, TraceId};
+use opentelemetry::Context as OtelContext;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -77,10 +79,6 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use opentelemetry::trace::{
-    SpanContext, SpanId, TraceContextExt, TraceFlags, TraceId,
-};
-use opentelemetry::{Context as OtelContext};
 
 #[automock]
 #[async_trait]
@@ -338,34 +336,30 @@ impl WorkerProcessing for WorkerProcessor {
                     .to_lowercase()
                     .as_str()
                 {
-                    "otel" => {
-                        trace_id_and_span_id.map(|(t, s)| {
-                            let trace_id = TraceId::from(t);
-                            let span_id = SpanId::from(s);
-                            let span_context = SpanContext::new(
-                                trace_id,
-                                span_id,
-                                TraceFlags::SAMPLED,
-                                true,
-                                Default::default(),
-                            );
+                    "otel" => trace_id_and_span_id.map(|(t, s)| {
+                        let trace_id = TraceId::from(t);
+                        let span_id = SpanId::from(s);
+                        let span_context = SpanContext::new(
+                            trace_id,
+                            span_id,
+                            TraceFlags::SAMPLED,
+                            true,
+                            Default::default(),
+                        );
 
-                            let context = OtelContext::new().with_remote_span_context(span_context);
-                            let span = tracing::info_span!("Process on select worker");
+                        let context = OtelContext::new().with_remote_span_context(span_context);
+                        let span = tracing::info_span!("Process on select worker");
 
-                            span.set_parent(context);
-                            span
-                        })
-                    },
-                    _ => {
-                        trace_id_and_span_id.map(|(t, s)| {
-                            tracing::info_span!(
-                                "Process on select worker",
-                                cube_dd_trace_id = t,
-                                cube_dd_parent_span_id = s
-                            )
-                        })
-                    }
+                        span.set_parent(context);
+                        span
+                    }),
+                    _ => trace_id_and_span_id.map(|(t, s)| {
+                        tracing::info_span!(
+                            "Process on select worker",
+                            cube_dd_trace_id = t,
+                            cube_dd_parent_span_id = s
+                        )
+                    }),
                 };
 
                 if let Some(span) = span {
