@@ -48,7 +48,6 @@ export function isCubeStoreSupported(): boolean {
   }
 
   if (process.arch === 'arm64') {
-    // We mark darwin as supported, but it uses Rosetta 2
     if (process.platform === 'darwin') {
       return true;
     }
