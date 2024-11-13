@@ -763,16 +763,20 @@ impl TransportService for TestConnectionTransport {
         query: TransportLoadRequestQuery,
         _ctx: AuthContextRef,
         meta: LoadRequestMeta,
-        _member_to_alias: Option<HashMap<String, String>>,
+        member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
         let inputs = serde_json::json!({
             "query": query,
             "meta": meta,
+            "member_to_alias": member_to_alias,
         });
         Ok(SqlResponse {
             sql: SqlQuery::new(
-                format!("SELECT * FROM {}", serde_json::to_string(&inputs).unwrap()),
+                format!(
+                    "SELECT * FROM {}",
+                    serde_json::to_string_pretty(&inputs).unwrap()
+                ),
                 expression_params.unwrap_or(Vec::new()),
             ),
         })

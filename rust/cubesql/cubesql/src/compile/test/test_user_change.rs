@@ -271,6 +271,6 @@ GROUP BY 1
     let sql_query = load_calls[0].sql_query.as_ref().unwrap();
     // This should be placed from load meta to query by TestConnectionTransport::sql
     // It would mean that SQL generation used changed user
-    assert!(sql_query.sql.contains(r#""changeUser":"gopher""#));
+    assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
 }
