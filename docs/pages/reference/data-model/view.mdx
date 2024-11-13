@@ -114,7 +114,7 @@ view(`orders`, {
     },
     {
       join_path: base_orders.users,
-      prefix: true
+      prefix: true,
       includes: `*`,
       excludes: [
         `company`
@@ -254,6 +254,69 @@ To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
+### `count_measure`
+
+The `count_measure` parameter is used to explicitly specify the measure that
+should be used to generate the SQL for `SELECT COUNT(*) FROM view` queries via
+the [SQL API][ref-sql-api].
+
+The specified measure should be of one of the following [types][ref-ref-measure-type-count]:
+`count`, `count_distinct`, or `count_distinct_approx`. It should also be included
+into the view in [`cubes`](#cubes).
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: [
+        `status`,
+        `created_date`,
+        `total_amount`,
+        `total_amount_shipped`,
+        `count`,
+        `average_order_value`
+      ]
+    },
+    {
+      join_path: base_orders.users,
+      prefix: true,
+      includes: `*`
+    }
+  ],
+
+  count_measure: base_orders.count
+});
+```
+
+```yaml
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: "*"
+    
+    count_measure: base_orders.count
+```
+
+</CodeTabs>
+
+If this parameter is not set, then the very first measure of [type `count`][ref-ref-measure-type-count]
+from the very first cube defined in [`cubes`](#cubes) will be used.
+
 ### `includes` (deprecated)
 
 <WarningBox>
@@ -313,3 +376,5 @@ view query.
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-ref-measure-type-count]: /reference/data-model/types-and-formats#count
