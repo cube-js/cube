@@ -29,8 +29,7 @@ export function getTarget(): string {
             );
         }
       case 'darwin':
-        // Rosetta 2 is required
-        return 'x86_64-apple-darwin';
+        return 'aarch64-apple-darwin';
       default:
         throw new Error(
           `You are using ${process.env} platform on arm64 which is not supported by Cube Store`,
@@ -49,7 +48,6 @@ export function isCubeStoreSupported(): boolean {
   }
 
   if (process.arch === 'arm64') {
-    // We mark darwin as supported, but it uses Rosetta 2
     if (process.platform === 'darwin') {
       return true;
     }
