@@ -583,6 +583,68 @@ cubes:
 
 </CodeTabs>
 
+### `default_count_measure`
+
+The `default_count_measure` parameter is used to explicitly specify the measure
+that should be used to generate the query for the upstream data source for
+`SELECT COUNT(*) FROM cube` queries via the [SQL API][ref-sql-api].
+
+The specified measure should be of one of the following [types][ref-ref-measure-types]:
+`count`, `count_distinct`, or `count_distinct_approx`.
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql: `
+    SELECT 1 AS transaction_id, 1 AS user_id UNION ALL
+    SELECT 2 AS transaction_id, 1 AS user_id UNION ALL
+    SELECT 3 AS transaction_id, 1 AS user_id UNION ALL
+    SELECT 4 AS transaction_id, 2 AS user_id UNION ALL
+    SELECT 5 AS transaction_id, 2 AS user_id
+  `,
+
+  measures: {
+    transaction_count: {
+      type: `count`
+    },
+
+    user_count: {
+      sql: `user_id`,
+      type: `count_distinct`
+    }
+  },
+
+  default_count_measure: users.user_count
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    sql: >
+      SELECT 1 AS transaction_id, 1 AS user_id UNION ALL
+      SELECT 2 AS transaction_id, 1 AS user_id UNION ALL
+      SELECT 3 AS transaction_id, 1 AS user_id UNION ALL
+      SELECT 4 AS transaction_id, 2 AS user_id UNION ALL
+      SELECT 5 AS transaction_id, 2 AS user_id
+
+    measures:
+      - name: transaction_count
+        type: count
+
+      - name: user_count
+        sql: user_id
+        type: count_distinct
+    
+    default_count_measure: users.user_count
+```
+
+</CodeTabs>
+
+If this parameter is not set, then the very first measure of type `count` from
+this cube will be used.
+
 
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
 [ref-config-ext-ctx]: /reference/configuration/config#extend_context
@@ -602,3 +664,5 @@ cubes:
 [ref-ref-segments]: /reference/data-model/segments
 [ref-ref-joins]: /reference/data-model/joins
 [ref-ref-pre-aggs]: /reference/data-model/pre-aggregations
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-ref-measure-types]: /reference/data-model/types-and-formats

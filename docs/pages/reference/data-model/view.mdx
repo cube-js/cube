@@ -254,13 +254,13 @@ To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
-### `count_measure`
+### `default_count_measure`
 
-The `count_measure` parameter is used to explicitly specify the measure that
-should be used to generate the SQL for `SELECT COUNT(*) FROM view` queries via
-the [SQL API][ref-sql-api].
+The `default_count_measure` parameter is used to explicitly specify the measure
+that should be used to generate the query for the upstream data source for
+`SELECT COUNT(*) FROM view` queries via the [SQL API][ref-sql-api].
 
-The specified measure should be of one of the following [types][ref-ref-measure-type-count]:
+The specified measure should be of one of the following [types][ref-ref-measure-types]:
 `count`, `count_distinct`, or `count_distinct_approx`. It should also be included
 into the view in [`cubes`](#cubes).
 
@@ -287,8 +287,8 @@ view(`orders`, {
     }
   ],
 
-  count_measure: base_orders.count
-});
+  default_count_measure: base_orders.count
+})
 ```
 
 ```yaml
@@ -309,13 +309,13 @@ views:
         prefix: true
         includes: "*"
     
-    count_measure: base_orders.count
+    default_count_measure: base_orders.count
 ```
 
 </CodeTabs>
 
-If this parameter is not set, then the very first measure of [type `count`][ref-ref-measure-type-count]
-from the very first cube defined in [`cubes`](#cubes) will be used.
+If this parameter is not set, then the very first measure of type `count` from
+the very first cube defined in [`cubes`](#cubes) will be used.
 
 ### `includes` (deprecated)
 
@@ -377,4 +377,4 @@ view query.
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
 [ref-sql-api]: /product/apis-integrations/sql-api
-[ref-ref-measure-type-count]: /reference/data-model/types-and-formats#count
+[ref-ref-measure-types]: /reference/data-model/types-and-formats
