@@ -16215,27 +16215,52 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     #[tokio::test]
     async fn test_format_function() -> Result<(), CubeError> {
         // Test: Basic usage with a single identifier
-        let result = execute_query("SELECT format('%I', 'column_name') AS formatted_identifier".to_string(), DatabaseProtocol::PostgreSQL).await?;
+        let result = execute_query(
+            "SELECT format('%I', 'column_name') AS formatted_identifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
         insta::assert_snapshot!("formatted_identifier", result);
 
         // Test: Using multiple identifiers
-        let result = execute_query("SELECT format('%I, %I', 'table_name', 'column_name') AS formatted_identifiers".to_string(), DatabaseProtocol::PostgreSQL).await?;
+        let result = execute_query(
+            "SELECT format('%I, %I', 'table_name', 'column_name') AS formatted_identifiers"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
         insta::assert_snapshot!("formatted_identifiers", result);
 
         // Test: Unsupported format specifier
-        let result = execute_query("SELECT format('%X', 'value') AS unsupported_specifier".to_string(), DatabaseProtocol::PostgreSQL).await;
+        let result = execute_query(
+            "SELECT format('%X', 'value') AS unsupported_specifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
         assert!(result.is_err());
 
         // Test: Format string ending with %
-        let result = execute_query("SELECT format('%', 'value') AS invalid_format".to_string(), DatabaseProtocol::PostgreSQL).await;
+        let result = execute_query(
+            "SELECT format('%', 'value') AS invalid_format".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
         assert!(result.is_err());
 
         // Test: Quoting necessary for special characters
-        let result = execute_query("SELECT format('%I', 'column-name') AS quoted_identifier".to_string(), DatabaseProtocol::PostgreSQL).await?;
+        let result = execute_query(
+            "SELECT format('%I', 'column-name') AS quoted_identifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
         insta::assert_snapshot!("quoted_identifier", result);
 
         // Test: Quoting necessary for reserved keywords
-        let result = execute_query("SELECT format('%I', 'select') AS quoted_keyword".to_string(), DatabaseProtocol::PostgreSQL).await?;
+        let result = execute_query(
+            "SELECT format('%I', 'select') AS quoted_keyword".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
         insta::assert_snapshot!("quoted_keyword", result);
 
         Ok(())
