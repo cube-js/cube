@@ -3174,9 +3174,10 @@ pub fn create_col_description_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "col_description",
-        &Signature::one_of(vec![
-            TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
-        ], Volatility::Immutable),
+        &Signature::one_of(
+            vec![TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8])],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
@@ -3233,7 +3234,8 @@ pub fn create_format_udf() -> ScalarUDF {
                                 let str_arr = downcast_string_arg!(arg, "arg", i32);
                                 if str_arr.is_null(i) {
                                     return Err(DataFusionError::Execution(
-                                        "NULL values cannot be formatted as identifiers".to_string(),
+                                        "NULL values cannot be formatted as identifiers"
+                                            .to_string(),
                                     ));
                                 }
                                 str_arr.value(i).to_string()
@@ -3241,13 +3243,12 @@ pub fn create_format_udf() -> ScalarUDF {
                             _ => {
                                 // For other types, try to convert to string
                                 let str_arr = cast(&arg, &DataType::Utf8)?;
-                                let str_arr = str_arr
-                                    .as_any()
-                                    .downcast_ref::<StringArray>()
-                                    .unwrap();
+                                let str_arr =
+                                    str_arr.as_any().downcast_ref::<StringArray>().unwrap();
                                 if str_arr.is_null(i) {
                                     return Err(DataFusionError::Execution(
-                                        "NULL values cannot be formatted as identifiers".to_string(),
+                                        "NULL values cannot be formatted as identifiers"
+                                            .to_string(),
                                     ));
                                 }
                                 str_arr.value(i).to_string()
@@ -3255,9 +3256,10 @@ pub fn create_format_udf() -> ScalarUDF {
                         };
 
                         // Quote identifier if necessary
-                        let needs_quoting = !value.chars().all(|c| {
-                            c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'
-                        }) || value.is_empty();
+                        let needs_quoting = !value
+                            .chars()
+                            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                            || value.is_empty();
 
                         if needs_quoting {
                             result.push('"');
@@ -3296,15 +3298,11 @@ pub fn create_format_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "format",
-        &Signature::variadic(
-            vec![DataType::Utf8],
-            Volatility::Immutable,
-        ),
+        &Signature::variadic(vec![DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
     )
 }
-
 
 pub fn create_json_build_object_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
