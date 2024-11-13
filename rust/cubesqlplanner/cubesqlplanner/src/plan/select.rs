@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use super::{Cte, Expr, Filter, From, OrderBy, Schema, SchemaColumn};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::sql_templates::{

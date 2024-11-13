@@ -1,9 +1,9 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::visitor::EvaluatorVisitor;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
+use std::any::Any;
 use std::rc::Rc;
 
 pub struct EvaluateSqlNode {}
@@ -20,8 +20,9 @@ impl SqlNode for EvaluateSqlNode {
         visitor: &mut SqlEvaluatorVisitor,
         node: &Rc<EvaluationNode>,
         _query_tools: Rc<QueryTools>,
+        node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let args = visitor.evaluate_deps(node)?;
+        let args = visitor.evaluate_deps(node, node_processor.clone())?;
         match node.symbol() {
             MemberSymbolType::Dimension(ev) => ev.evaluate_sql(args),
             MemberSymbolType::Measure(ev) => ev.evaluate_sql(args),
@@ -29,5 +30,13 @@ impl SqlNode for EvaluateSqlNode {
             MemberSymbolType::CubeName(ev) => ev.evaluate_sql(args),
             MemberSymbolType::SimpleSql(ev) => ev.evaluate_sql(args),
         }
+    }
+
+    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+        self.clone()
+    }
+
+    fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
+        vec![]
     }
 }
