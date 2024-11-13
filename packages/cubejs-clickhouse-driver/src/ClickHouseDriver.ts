@@ -23,10 +23,11 @@ import {
 } from '@cubejs-backend/base-driver';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
-import sqlstring from 'sqlstring';
+import { formatQueryParams } from '@clickhouse/client-common';
 
 import { HydrationStream, transformRow } from './HydrationStream';
 
+// TODO migrate to `@clickhouse/client`, upstream clickhouse client
 const ClickHouse = require('@cubejs-backend/apla-clickhouse');
 
 const ClickhouseTypeToGeneric: Record<string, string> = {
@@ -222,14 +223,47 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       true;
   }
 
-  public async query(query: string, values: unknown[]) {
-    return this.queryResponse(query, values).then((res: any) => this.normaliseResponse(res));
+  public async query(query: string, values?: unknown[]) {
+    return this.queryResponse(query, values).then((res: any) => this.normaliseResponse(res)).catch((err: unknown) => {
+      // TODO drop this log, or make it shorter
+      throw new Error(`Failed during query; query: ${query}; values: ${values}`, { cause: err });
+    });
   }
 
-  protected queryResponse(query: string, values: unknown[]) {
-    const formattedQuery = sqlstring.format(query, values);
+  // TODO make static, use somewhere in tests
+  protected prepareParams(values: unknown[]): Record<string, string> {
+    // apla-clickhouse allows to add query params via querystring.stringify and `queryOptions` object
+    // https://github.com/cube-js/apla-node-clickhouse/blob/5a6577fc97ba6911171753fc65b2cd2f6170f2f7/src/clickhouse.js#L347-L348
+    // https://github.com/cube-js/apla-node-clickhouse/blob/5a6577fc97ba6911171753fc65b2cd2f6170f2f7/src/clickhouse.js#L265-L266
+    // https://github.com/cube-js/apla-node-clickhouse/blob/5a6577fc97ba6911171753fc65b2cd2f6170f2f7/src/clickhouse.js#L336-L338
+    // https://github.com/cube-js/apla-node-clickhouse/blob/5a6577fc97ba6911171753fc65b2cd2f6170f2f7/src/clickhouse.js#L173-L175
 
-    return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
+    // We can use `toSearchParams` or `formatQueryParams` from `@clickhouse/client-common` to prepare params
+    // Beware - these functions marked as "For implementations usage only - should not be re-exported", so, probably, they could be moved or disappear completely
+    // https://github.com/ClickHouse/clickhouse-js/blob/a15cce93545c792852e34c05ce31954c75d11486/packages/client-common/src/utils/url.ts#L57-L61
+
+    // HTTP interface itself is documented, so it should be mostly fine
+    // https://clickhouse.com/docs/en/interfaces/cli#cli-queries-with-parameters
+    // https://clickhouse.com/docs/en/interfaces/http#cli-queries-with-parameters
+
+    return Object.fromEntries(values.map((value, idx) => {
+      const paramName = this.paramName(idx);
+      const paramKey = `param_${paramName}`;
+      const preparedValue = formatQueryParams(value);
+      return [paramKey, preparedValue];
+    }));
+  }
+
+  protected queryResponse(query: string, values?: unknown[]) {
+    // todo drop this
+    console.log('queryResponse call', query, values);
+
+    const paramsValues = this.prepareParams(values ?? []);
+
+    // todo drop this
+    console.log('queryResponse prepared', query, paramsValues);
+
+    return this.withConnection((connection, queryId) => connection.querying(query, {
       dataObjects: true,
       queryOptions: {
         query_id: queryId,
@@ -241,6 +275,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         //
         //
         ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+
+        // Add parameter values to query string
+        ...paramsValues,
       }
     }));
   }
@@ -309,17 +346,34 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return [{ schema_name: this.config.queryOptions.database }];
   }
 
+  // TODO make static
+  protected paramName(paramIndex: number): string {
+    return `p${paramIndex}`;
+  }
+
+  // TODO make static
+  public param(paramIndex: number): string {
+    // TODO not always string
+    return `{${this.paramName(paramIndex)}:String}`;
+  }
+
   public async stream(
     query: string,
     values: unknown[],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
+    // todo drop this
+    console.log('stream call', query, values);
+
     // eslint-disable-next-line no-underscore-dangle
     const conn = await (<any> this.pool)._factory.create();
 
     try {
-      const formattedQuery = sqlstring.format(query, values);
+      const paramsValues = this.prepareParams(values ?? []);
+
+      // todo drop this
+      console.log('stream prepared', query, paramsValues);
 
       return await new Promise((resolve, reject) => {
         const options = {
@@ -333,12 +387,16 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
             //
             //
             ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+
+            // Add parameter values to query string
+            ...paramsValues,
           }
         };
 
-        const originalStream = conn.query(formattedQuery, options, (err: Error | null, result: any) => {
+        const originalStream = conn.query(query, options, (err: Error | null, result: any) => {
           if (err) {
-            reject(err);
+            // TODO remove message, or make it shorter
+            reject(new Error(`Failed during stream createion; query: ${query}; values: ${values}`, { cause: err }));
           } else {
             const rowStream = new HydrationStream(result.meta);
             originalStream.pipe(rowStream);
@@ -416,7 +474,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public getTablesQuery(schemaName: string) {
-    return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+    return this.query('SELECT name as table_name FROM system.tables WHERE database = {p0:String}', [schemaName]);
   }
 
   protected getExportBucket(

@@ -3,6 +3,7 @@ import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import { ParamAllocator } from './ParamAllocator';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'Day',
@@ -13,6 +14,13 @@ const GRANULARITY_TO_INTERVAL = {
   quarter: 'Quarter',
   year: 'Year',
 };
+
+class ClickHouseParamAllocator extends ParamAllocator {
+  public paramPlaceHolder(paramIndex: number): string {
+    // TODO not always string
+    return `{p${paramIndex}:String}`;
+  }
+}
 
 class ClickHouseFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type) {
@@ -31,6 +39,10 @@ class ClickHouseFilter extends BaseFilter {
 }
 
 export class ClickHouseQuery extends BaseQuery {
+  public newParamAllocator(expressionParams) {
+    return new ClickHouseParamAllocator(expressionParams);
+  }
+
   public newFilter(filter) {
     return new ClickHouseFilter(this, filter);
   }
@@ -268,6 +280,8 @@ export class ClickHouseQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // TODO not every param is a string
+    templates.params.param = '{p{{ param_index }}:String}';
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
