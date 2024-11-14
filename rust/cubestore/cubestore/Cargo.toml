@@ -27,6 +27,7 @@ cuberockstore = { path = "../cuberockstore" }
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
 cubedatasketches = { path = "../cubedatasketches" }
+cubeshared = { path = "../../cubeshared" }
 cuberpc = { path = "../cuberpc" }
 datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube", features = ["default_nulls_last"] }
 csv = "1.1.3"

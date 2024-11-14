@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
-use crate::codegen::{
+use cubeshared::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
     HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
     HttpRowArgs,
@@ -603,10 +603,10 @@ impl HttpMessage {
         let args = HttpMessageArgs {
             message_id: self.message_id,
             command_type: match self.command {
-                HttpCommand::Query { .. } => crate::codegen::HttpCommand::HttpQuery,
-                HttpCommand::ResultSet { .. } => crate::codegen::HttpCommand::HttpResultSet,
+                HttpCommand::Query { .. } => cubeshared::codegen::HttpCommand::HttpQuery,
+                HttpCommand::ResultSet { .. } => cubeshared::codegen::HttpCommand::HttpResultSet,
                 HttpCommand::CloseConnection { .. } | HttpCommand::Error { .. } => {
-                    crate::codegen::HttpCommand::HttpError
+                    cubeshared::codegen::HttpCommand::HttpError
                 }
             },
             command: match &self.command {
@@ -666,7 +666,7 @@ impl HttpMessage {
                 .as_ref()
                 .map(|c| builder.create_string(c)),
         };
-        let message = crate::codegen::HttpMessage::create(&mut builder, &args);
+        let message = cubeshared::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
         builder.finished_data().to_vec() // TODO copy
     }
@@ -762,7 +762,7 @@ impl HttpMessage {
             message_id: http_message.message_id(),
             connection_id: http_message.connection_id().map(|s| s.to_string()),
             command: match http_message.command_type() {
-                crate::codegen::HttpCommand::HttpQuery => {
+                cubeshared::codegen::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
                     let mut inline_tables = Vec::new();
                     if let Some(query_inline_tables) = query.inline_tables() {
@@ -809,7 +809,7 @@ impl HttpMessage {
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
                     }
                 }
-                crate::codegen::HttpCommand::HttpResultSet => {
+                cubeshared::codegen::HttpCommand::HttpResultSet => {
                     let result_set = http_message.command_as_http_result_set().unwrap();
                     let mut result_rows = Vec::new();
                     if let Some(rows) = result_set.rows() {
@@ -857,7 +857,7 @@ impl HttpMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
+    use cubeshared::codegen::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
     use crate::config::{init_test_logger, Config};
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
@@ -973,11 +973,11 @@ mod tests {
         );
         let args = HttpMessageArgs {
             message_id: 1234,
-            command_type: crate::codegen::HttpCommand::HttpQuery,
+            command_type: cubeshared::codegen::HttpCommand::HttpQuery,
             command: Some(query_value.as_union_value()),
             connection_id: Some(connection_id_offset),
         };
-        let message = crate::codegen::HttpMessage::create(&mut builder, &args);
+        let message = cubeshared::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
         let bytes = builder.finished_data().to_vec();
         let message = HttpMessage::read(bytes).await.unwrap();

@@ -1149,6 +1149,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cubeshared"
+version = "0.1.0"
+dependencies = [
+ "flatbuffers 23.1.21",
+]
+
+[[package]]
 name = "cubestore"
 version = "0.1.0"
 dependencies = [
@@ -1173,6 +1180,7 @@ dependencies = [
  "cubehll",
  "cuberockstore",
  "cuberpc",
+ "cubeshared",
  "cubezetasketch",
  "datafusion",
  "deadqueue",
