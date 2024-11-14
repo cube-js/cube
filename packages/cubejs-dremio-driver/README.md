@@ -9,11 +9,24 @@
 
 Pure Javascript Dremio driver.
 
+## Dremio Cloud
+
+To use this driver with [Dremio Cloud](https://docs.dremio.com/cloud/reference/api/), use the following setup:
+
+| Environment Variable | Value                                              |
+| -------------------- | -------------------------------------------------- |
+| CUBEJS_DB_TYPE       | dremio                                             |
+| CUBEJS_DB_URL        | https://api.dremio.cloud/v0/projects/${PROJECT_ID} |
+| CUBEJS_DB_NAME       | ${DB_NAME}                                         |
+| CUBEJS_DB_PASS       | Bearer ${PERSONAL_ACCESS_TOKEN}                    |
+
+> It's important to note that "Bearer" is required for using personal access tokens.
+
 ## Support
 
-This package is **community supported** and should be used at your own risk. 
+This package is **community supported** and should be used at your own risk.
 
-While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube.js Slack. 
+While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube.js Slack.
 
 ## License
 
