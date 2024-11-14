@@ -148,8 +148,7 @@ export class JDBCDriver extends BaseDriver {
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
         return new Connection(await getConnection(this.config.url, this.jdbcProps));
       },
-      // @ts-expect-error Promise<Function> vs Promise<void>
-      destroy: async (connection) => promisify(connection.close.bind(connection)),
+      destroy: async (connection) => promisify(connection.close.bind(connection))(),
       validate: async (connection) => (
         new Promise((resolve) => {
           const isValid = promisify(connection.isValid.bind(connection));
