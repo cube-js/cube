@@ -23,7 +23,7 @@ import path from 'path';
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
-import { QueryStream, nextFn, Row, transformRow } from './QueryStream';
+import { QueryStream, nextFn, transformRow } from './QueryStream';
 
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
