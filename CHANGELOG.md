@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.5](https://github.com/cube-js/cube/compare/v1.1.4...v1.1.5) (2024-11-13)
+
+
+### Bug Fixes
+
+* **schema-compiler:** fix Maximum call stack size exceeded if FILTER_PARAMS are used inside dimensions/measures ([#8867](https://github.com/cube-js/cube/issues/8867)) ([8e7c5c7](https://github.com/cube-js/cube/commit/8e7c5c7d0af0e672f23c8efdab0117121838fa3f))
+
+
+### Features
+
+* **cubesql:** Initial SQL pushdown flattening ([#8888](https://github.com/cube-js/cube/issues/8888)) ([211d1c1](https://github.com/cube-js/cube/commit/211d1c1053dba7ed69c82f489a433602a66d78e7))
+* **cubestore:** Build standalone aarch64-apple-darwin, thanks [@vieira](https://github.com/vieira) ([#8950](https://github.com/cube-js/cube/issues/8950)) ([737fb60](https://github.com/cube-js/cube/commit/737fb60f68c5207001fd982d37413949a7412e28)), closes [#8949](https://github.com/cube-js/cube/issues/8949)
+
+
+
+
+
+## [1.1.4](https://github.com/cube-js/cube/compare/v1.1.3...v1.1.4) (2024-11-12)
+
+
+### Bug Fixes
+
+* **cubesql:** Add checks that projection/filters/fetch in TableScan is empty ([#8883](https://github.com/cube-js/cube/issues/8883)) ([a7bab04](https://github.com/cube-js/cube/commit/a7bab04c2b533d95a9ac2f65fb851b9efa9afde1))
+* **cubesql:** Pass null_equals_null through egraph ([#8776](https://github.com/cube-js/cube/issues/8776)) ([e02f612](https://github.com/cube-js/cube/commit/e02f6126cd274f7a6f212b497b720fbed6dc1131))
+* **schema-compiler:** set missed CUBESQL_SQL_PUSH_DOWN to true by default in convertTzForRawTimeDimension flag ([#8931](https://github.com/cube-js/cube/issues/8931)) ([9482807](https://github.com/cube-js/cube/commit/9482807cdff86949b9142771b9389ee59bd2aae3))
+
+
+### Features
+
+* **api-gateway:** Meta - expose aliasMember for members in View ([#8945](https://github.com/cube-js/cube/issues/8945)) ([c127f36](https://github.com/cube-js/cube/commit/c127f36a124edb24ba31c043760b2883485b79f1))
+
+
+
+
+
+## [1.1.3](https://github.com/cube-js/cube/compare/v1.1.2...v1.1.3) (2024-11-08)
+
+
+### Bug Fixes
+
+* **cubesql:** Don't show meta OLAP queries in query history ([#8336](https://github.com/cube-js/cube/issues/8336)) ([78a5fc3](https://github.com/cube-js/cube/commit/78a5fc332e5e224ba9a00bba8deacf0417edbd34))
+* **cubesql:** Fix `NULLS FIRST`/`LAST` SQL push down for several dialects ([#8895](https://github.com/cube-js/cube/issues/8895)) ([61c5ac6](https://github.com/cube-js/cube/commit/61c5ac618c9b68cf1185625d77420ed4a2c5da54))
+* **fileRepository:** create repositoryPath if not exists ([#8909](https://github.com/cube-js/cube/issues/8909)) ([4153e4d](https://github.com/cube-js/cube/commit/4153e4df4a9e2bb2abe0516eac45711088f3a8d0))
+* patch isVisible when applying member level access policies ([#8921](https://github.com/cube-js/cube/issues/8921)) ([2bb1d21](https://github.com/cube-js/cube/commit/2bb1d2165aa4d9a0ad9a39f936fe6cd2d08253f1))
+
+
+### Reverts
+
+* Revert "chore: release script - push tag and commit manually (#8897)" ([d7dc5fe](https://github.com/cube-js/cube/commit/d7dc5fe901def8fb7aae776c9a8bdac8d01bc0d9)), closes [#8897](https://github.com/cube-js/cube/issues/8897)
+
+
+
+
+
 ## [1.1.2](https://github.com/cube-js/cube/compare/v1.1.1...v1.1.2) (2024-11-01)
 
 
