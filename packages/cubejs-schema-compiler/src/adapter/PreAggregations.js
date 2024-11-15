@@ -170,7 +170,7 @@ export class PreAggregations {
           return true;
         }
 
-        if (td.dimension === preAggregation.rollupLambdaTimeDimensionReference?.[0]?.dimension) {
+        if (td.dimension === foundPreAggregation.preAggregation.rollupLambdaTimeDimensionReference?.[0]?.dimension) {
           return true;
         }
 
