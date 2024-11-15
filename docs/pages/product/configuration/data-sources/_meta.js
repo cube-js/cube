@@ -1,4 +1,5 @@
 module.exports = {
+  "features": "Driver features",
   "aws-athena": "Amazon Athena",
   "aws-redshift": "Amazon Redshift",
   "pinot": "Apache Pinot",
