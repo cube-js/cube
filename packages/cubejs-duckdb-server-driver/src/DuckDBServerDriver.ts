@@ -141,7 +141,7 @@ export class DuckDBServerDriver extends BaseDriver implements DriverInterface {
     for (const row of result) {
       const jsonRow: Record<string, any> = {};
       result.schema.fields.forEach(field => {
-        jsonRow[field.name] = transformValue(row[field.name]);
+        jsonRow[field.name] = transformValue(field, row[field.name]);
       });
       jsonResult.push(jsonRow);
     }
