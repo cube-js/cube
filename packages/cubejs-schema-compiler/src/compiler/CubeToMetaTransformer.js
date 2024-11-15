@@ -80,6 +80,7 @@ export class CubeToMetaTransformer {
               ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
               : false,
             primaryKey: !!nameToDimension[1].primaryKey,
+            aliasMember: nameToDimension[1].aliasMember,
             granularities:
               nameToDimension[1].granularities
                 ? R.compose(R.map((g) => ({

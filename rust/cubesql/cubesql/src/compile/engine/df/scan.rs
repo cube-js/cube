@@ -162,7 +162,15 @@ pub struct WrappedSelectNode {
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
     pub distinct: bool,
-    pub ungrouped: bool,
+
+    /// States if this node actually a query to Cube or not.
+    /// When `false` this node will generate SQL on its own, using its fields and templates.
+    /// When `true` this node will generate SQL with load query to JS side of Cube.
+    /// It expects to be flattened: `from` is expected to be ungrouped CubeScan.
+    /// There's no point in doing this for grouped CubeScan, we can just use load query from that CubeScan and SQL API generation on top.
+    /// Load query generated for this case can be grouped when this node is an aggregation.
+    /// Most fields will be rendered as a member expressions in generated load query.
+    pub push_to_cube: bool,
 }
 
 impl WrappedSelectNode {
@@ -183,7 +191,7 @@ impl WrappedSelectNode {
         order_expr: Vec<Expr>,
         alias: Option<String>,
         distinct: bool,
-        ungrouped: bool,
+        push_to_cube: bool,
     ) -> Self {
         Self {
             schema,
@@ -202,7 +210,7 @@ impl WrappedSelectNode {
             order_expr,
             alias,
             distinct,
-            ungrouped,
+            push_to_cube,
         }
     }
 }
@@ -344,7 +352,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             order_expr,
             alias,
             self.distinct,
-            self.ungrouped,
+            self.push_to_cube,
         ))
     }
 }

@@ -1,0 +1,56 @@
+{
+  "name": "@cubejs-backend/duckdb-server-driver",
+  "description": "Cube DuckDB Server driver",
+  "author": "Alexander Kolov",
+  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luabase/cube.git",
+    "directory": "packages/cubejs-duckdb-server-driver"
+  },
+  "engines": {
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+  },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "integration": "npm run integration:duckdb",
+    "integration:duckdb": "jest --verbose dist/test",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "dependencies": {
+    "@cubejs-backend/base-driver": "1.0.3",
+    "@cubejs-backend/schema-compiler": "1.1.0",
+    "@cubejs-backend/shared": "1.0.3",
+    "agentkeepalive": "^4.5.0",
+    "apache-arrow": "^17.0.0",
+    "axios": "^1.7.7"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@cubejs-backend/linter": "^1.0.0",
+    "@cubejs-backend/testing-shared": "1.1.0",
+    "@types/jest": "^27",
+    "@types/node": "^18",
+    "jest": "^27",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.2.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}

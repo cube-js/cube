@@ -3,9 +3,8 @@
 SQL API runs queries in the Postgres dialect that can
 reference those tables and columns.
 
-By default, the SQL API executes only [regular queries][ref-regular-queries] and
-[queries with post-processing][ref-queries-wpp]. You can also
-[configure][ref-sql-api-conf-query-plan] it to execute [queries with
+By default since 1.0, the SQL API executes [regular queries][ref-regular-queries],
+[queries with post-processing][ref-queries-wpp] and [queries with
 pushdown][ref-queries-wpd]. This page explains their format and details if they
 are handled differently by the SQL API.
 
@@ -100,9 +99,8 @@ on joins.
 
 ## Post-processing and pushdown
 
-By default, the SQL API executes only [regular queries][ref-regular-queries] and
-[queries with post-processing][ref-queries-wpp]. You can also
-[configure][ref-sql-api-conf-query-plan] it to execute [queries with
+Since 1.0 by default, the SQL API executes, [regular queries][ref-regular-queries],
+[queries with post-processing][ref-queries-wpp] and [queries with
 pushdown][ref-queries-wpd].
 
 ### Query post-processing
@@ -208,9 +206,8 @@ queries **not** querying cube tables.
   Query pushdown is currently in public preview, and the API and behavior may
   change in future versions.
   
-  Query pushdown is disabled by default and is controlled by
+  Query pushdown is enabled by default since 1.0 and is controlled by
   `CUBESQL_SQL_PUSH_DOWN` environment variable.
-  In future versions, `CUBESQL_SQL_PUSH_DOWN` will be enabled by default.
 
 </WarningBox>
 
@@ -247,7 +244,7 @@ To balance between SQL guarantees and OLAP requirements, Cube
 <WarningBox>
 
   This behavior is enabled whenever query pushdown is enabled.
-  In future versions it'd become default behavior.
+  It's enabled by default since 1.0.
 
 </WarningBox>
 
@@ -350,7 +347,7 @@ With query pushdown disabled, Cube will still use `GROUP BY` to execute such a q
 
 <WarningBox>
 
-In future versions automatic use of `GROUP BY` for every query would be deprecated and disabled by default.
+Automatic use of `GROUP BY` is disabled by default.
 
 </WarningBox>
 

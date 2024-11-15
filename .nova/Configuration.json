@@ -1,5 +1,5 @@
 {
-  "apexskier.typescript.config.tslibPath" : "node_modules\/typescript\/lib",
-  "eslint.opts.disable" : true,
+  "apexskier.typescript.config.tslibPath" : "\/Users\/alex\/Library\/pnpm\/global\/5\/node_modules\/typescript\/lib",
+  "eslint.opts.disable" : false,
   "tommasonegri.vue.config.extension.languageServer" : "None"
 }

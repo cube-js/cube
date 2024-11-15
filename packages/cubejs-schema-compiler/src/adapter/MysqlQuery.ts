@@ -158,6 +158,8 @@ export class MysqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    // NOTE: this template contains a comma; two order expressions are being generated
+    templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'TINYINT';

@@ -126,6 +126,7 @@ if [[ "$RUST_CHANGES" == "yes" || "$RUST_CHANGES" == "y" ]]; then
                   "@cubejs-backend/query-orchestrator"
                   "@cubejs-backend/athena-driver"
                   "@cubejs-backend/duckdb-driver"
+                  "@cubejs-backend/duckdb-server-driver"
                   "@cubejs-backend/bigquery-driver"
                   "@cubejs-backend/postgres-driver"
                   "@cubejs-backend/databricks-jdbc-driver"

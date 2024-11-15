@@ -191,7 +191,7 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -265,7 +265,7 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -666,6 +666,7 @@ jobs:
         target:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
+          - aarch64-apple-darwin
         include:
           - target: x86_64-pc-windows-msvc
             os: windows-2019
@@ -673,10 +674,18 @@ jobs:
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
-            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
             tar_executable: tar
+            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
           - target: x86_64-apple-darwin
             os: macos-12
+            executable_name: cubestored
+            # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
+            strip: false
+            compress: false
+            # bsd tar has a different format with Sparse files which breaks download script
+            tar_executable: gtar
+          - os: macos-14
+            target: aarch64-apple-darwin
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
@@ -793,26 +802,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Detect branch name
         id: detect_branch
-        env:
-          EVENT_BASE_REF: ${{ github.event.base_ref || 'tag_on_unknown_branch_commit_not_pushed' }}
         run: |
-          BRANCH=${EVENT_BASE_REF#refs/heads/}
-
-          if [ "$BRANCH" == "tag_on_unknown_branch_commit_not_pushed" ]; then
-            echo "Error: Could not detect branch name. Most likely this is that commit for tag is not pushed yet."
-            exit 1
-          fi
-
-          echo "Detected branch: $BRANCH"
-          IS_MASTER=false
-
-          if [ "$BRANCH" == "master" ]; then
-            IS_MASTER=true
-          fi
-          echo "Detected is_master: $IS_MASTER"
-
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "is_master=$IS_MASTER" >> "$GITHUB_OUTPUT"
+          # Git & GitHub (for now) doesn't provide an easy/stable way to detect branch name from tag.
+          echo "branch=master" >> "$GITHUB_OUTPUT"
+          echo "is_master=true" >> "$GITHUB_OUTPUT"
 
   trigger-repo-sync:
     name: Trigger runtime repo
@@ -823,7 +816,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Trigger runtime
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |

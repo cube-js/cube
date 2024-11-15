@@ -2013,5 +2013,17 @@ from
 
       expect(res.rows).toMatchSnapshot('metabase_count_cast_to_float32_from_push_down');
     });
+
+    executePg('SQL API: NULLS FIRST/LAST SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT CASE WHEN "category" > 'G' THEN "category" ELSE NULL END AS "category"
+        FROM "Products"
+        WHERE LOWER("category") != 'invalid'
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST
+        LIMIT 100
+      `);
+      expect(res.rows).toMatchSnapshot('nulls_first_last_sql_push_down');
+    });
   });
 }
