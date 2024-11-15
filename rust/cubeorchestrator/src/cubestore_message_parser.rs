@@ -29,10 +29,10 @@ impl std::fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 pub fn parse_cubestore_ws_result(
-    msg_data: Vec<u8>,
+    msg_data: &[u8],
 ) -> Result<Vec<HashMap<String, String>>, ParseError> {
     let http_message =
-        root_as_http_message(msg_data.as_slice()).map_err(|_| ParseError::FlatBufferError)?;
+        root_as_http_message(msg_data).map_err(|_| ParseError::FlatBufferError)?;
 
     let command_type = http_message.command_type();
 
