@@ -65,6 +65,7 @@
     {
       "name": "ECommerce",
       "extends": "Products",
+      "sqlAlias": "ec",
       "joins": [
         {
           "name": "Customers",
