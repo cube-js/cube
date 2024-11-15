@@ -529,7 +529,6 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsValu
     }
 }
 
-
 pub fn register_module_exports<C: NodeConfiguration + 'static>(
     mut cx: ModuleContext,
 ) -> NeonResult<()> {
@@ -544,7 +543,10 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
 
     //========= sql orchestrator exports =================
-    cx.export_function("parseCubestoreResultMessage", parse_cubestore_ws_result_message)?;
+    cx.export_function(
+        "parseCubestoreResultMessage",
+        parse_cubestore_ws_result_message,
+    )?;
 
     crate::template::template_register_module(&mut cx)?;
 
