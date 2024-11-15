@@ -511,14 +511,14 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
 fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsValue> {
     let msg = cx.argument::<JsBuffer>(0)?;
     let msg_data = msg.as_slice(&cx);
-    match parse_cubestore_ws_result(msg_data.to_vec()) {
+    match parse_cubestore_ws_result(msg_data) {
         Ok(result) => {
             let js_array = JsArray::new(&mut cx, result.len());
             for (i, row) in result.into_iter().enumerate() {
                 let js_row = JsObject::new(&mut cx);
-                for (key, value) in row {
-                    let js_key = cx.string(key);
-                    let js_value = cx.string(value);
+                for (key, value) in row.into_iter() {
+                    let js_key = cx.string(&key);
+                    let js_value = cx.string(&value);
                     js_row.set(&mut cx, js_key, js_value)?;
                 }
                 js_array.set(&mut cx, i as u32, js_row)?;
