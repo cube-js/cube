@@ -348,6 +348,14 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
   return native.buildSqlAndParams(cubeEvaluator);
 };
 
+export type ResultRow = Record<string, string>;
+
+export const parseCubestoreResultMessage = (message: ArrayBuffer): ResultRow[] => {
+  const native = loadNative();
+
+  return native.parseCubestoreResultMessage(message);
+};
+
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,
