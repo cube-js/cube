@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cubesql = { path = "../cubesql/cubesql" }
+cubeshared = { path = "../cubeshared" }
 
 [dependencies.neon]
 version = "=1"
