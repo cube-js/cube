@@ -166,12 +166,16 @@ export class PreAggregations {
           return false;
         }
 
-        if (td.dimension === foundPreAggregation.preAggregation.rollupLambdaTimeDimensionReference?.[0]?.dimension) {
+        const timeDimensionsReferences =
+          foundPreAggregation.preAggregation.rollupLambdaTimeDimensionReference ||
+          foundPreAggregation.references.timeDimensions;
+
+        if (td.dimension === timeDimensionsReferences[0].dimension) {
           return true;
         }
 
         // Handling for views
-        return td.dimension === allBackAliasMembers[foundPreAggregation.references.timeDimensions[0].dimension];
+        return td.dimension === allBackAliasMembers[timeDimensionsReferences[0].dimension];
       });
 
     const filters = preAggregation.partitionGranularity && this.query.filters.filter(td => {
