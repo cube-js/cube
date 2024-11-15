@@ -128,7 +128,7 @@ dependencies = [
  "chrono",
  "comfy-table 5.0.1",
  "csv",
- "flatbuffers",
+ "flatbuffers 2.1.2",
  "half",
  "hex",
  "indexmap 1.9.3",
@@ -738,6 +738,7 @@ dependencies = [
  "bytes",
  "convert_case",
  "cubenativeutils",
+ "cubeorchestrator",
  "cubesql",
  "cubesqlplanner",
  "findshlibs",
@@ -777,6 +778,21 @@ dependencies = [
  "serde_json",
  "tokio",
  "uuid 0.8.2",
+]
+
+[[package]]
+name = "cubeorchestrator"
+version = "0.1.0"
+dependencies = [
+ "cubeshared",
+ "neon",
+]
+
+[[package]]
+name = "cubeshared"
+version = "0.1.0"
+dependencies = [
+ "flatbuffers 23.5.26",
 ]
 
 [[package]]
@@ -1087,6 +1103,16 @@ dependencies = [
  "bitflags 1.3.2",
  "smallvec",
  "thiserror",
+]
+
+[[package]]
+name = "flatbuffers"
+version = "23.5.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dac53e22462d78c16d64a1cd22371b54cc3fe94aa15e7886a2fa6e5d1ab8640"
+dependencies = [
+ "bitflags 1.3.2",
+ "rustc_version",
 ]
 
 [[package]]
@@ -2774,6 +2800,15 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
+name = "rustc_version"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
+dependencies = [
+ "semver",
+]
 
 [[package]]
 name = "rustix"
