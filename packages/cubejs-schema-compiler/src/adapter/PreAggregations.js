@@ -166,7 +166,11 @@ export class PreAggregations {
           return false;
         }
 
-        if (td.dimension?.split('.')[1] === foundPreAggregation.references.timeDimensions[0].dimension?.split('.')[1]) {
+        if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
+          return true;
+        }
+
+        if (td.dimension === preAggregation.rollupLambdaTimeDimensionReference?.[0]?.dimension) {
           return true;
         }
 
@@ -974,6 +978,7 @@ export class PreAggregations {
             unionWithSourceData: i === referencedPreAggregations.length - 1 ? preAggObj.preAggregation.unionWithSourceData : false,
             rollupLambdaId: `${cube}.${preAggregationName}`,
             lastRollupLambda: i === referencedPreAggregations.length - 1,
+            rollupLambdaTimeDimensionReference: preAggObj.references.timeDimensions,
           }
         };
         if (i > 0) {
