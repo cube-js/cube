@@ -80,7 +80,6 @@ export class DuckDBServerDriver extends BaseDriver implements DriverInterface {
     };
 
     this.client = axios.create({ baseURL: url });
-    console.log('+++ INITED SERVER');
   }
 
   public readOnly() {
@@ -88,7 +87,6 @@ export class DuckDBServerDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    console.log('+++ TEST CONNECTION SERVER');
     await this.query('SELECT 1');
   }
 
@@ -101,7 +99,6 @@ export class DuckDBServerDriver extends BaseDriver implements DriverInterface {
   }
 
   public override getSchemasQuery(): string {
-    console.log('+++ GET SCHEMAS SERVER');
     if (this.schema) {
       return `
         SELECT table_schema as ${super.quoteIdentifier('schema_name')}
@@ -118,7 +115,6 @@ export class DuckDBServerDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async fetchAsync(sql: string, args: unknown[], persist: boolean = false): Promise<Table> {
-    console.log('+++ FETCH ASYNC SERVER');
     const data = {
       sql,
       args,
@@ -141,8 +137,6 @@ export class DuckDBServerDriver extends BaseDriver implements DriverInterface {
 
   public async query<R = unknown>(query: string, args: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
     const result = await this.fetchAsync(query, args, false);
-    console.log('+++ RESULT SERVER', result);
-
     const jsonResult = [];
     for (const row of result) {
       const jsonRow: Record<string, any> = {};
@@ -151,8 +145,6 @@ export class DuckDBServerDriver extends BaseDriver implements DriverInterface {
       });
       jsonResult.push(jsonRow);
     }
-
-    console.log('+++ RESULT SERVER JSON', jsonResult);
 
     return jsonResult as R[];
   }
