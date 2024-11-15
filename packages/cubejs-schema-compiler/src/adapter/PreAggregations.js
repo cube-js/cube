@@ -166,10 +166,6 @@ export class PreAggregations {
           return false;
         }
 
-        if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
-          return true;
-        }
-
         if (td.dimension === foundPreAggregation.preAggregation.rollupLambdaTimeDimensionReference?.[0]?.dimension) {
           return true;
         }
