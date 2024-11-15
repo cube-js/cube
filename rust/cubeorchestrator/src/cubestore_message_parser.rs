@@ -50,7 +50,8 @@ pub fn parse_cubestore_ws_result(
                 .ok_or(ParseError::EmptyResultSet)?;
 
             let result_set_columns = result_set.columns().ok_or(ParseError::EmptyResultSet)?;
-            let mut columns = Vec::with_capacity(result_set_columns.len());
+            let columns_len = result_set_columns.len();
+            let mut columns = Vec::with_capacity(columns_len);
 
             for column in result_set_columns.iter() {
                 if column.is_empty() {
@@ -64,7 +65,7 @@ pub fn parse_cubestore_ws_result(
 
             for row in result_set_rows.iter() {
                 let values = row.values().ok_or(ParseError::NullRow)?;
-                let mut row_obj = HashMap::new();
+                let mut row_obj = HashMap::with_capacity(columns_len);
 
                 for (i, val) in values.iter().enumerate() {
                     let value = val.string_value().ok_or(ParseError::ColumnValueMissed)?;
