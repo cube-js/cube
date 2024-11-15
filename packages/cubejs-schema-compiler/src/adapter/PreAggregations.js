@@ -166,7 +166,7 @@ export class PreAggregations {
           return false;
         }
 
-        if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
+        if (td.dimension?.split('.')[1] === foundPreAggregation.references.timeDimensions[0].dimension?.split('.')[1]) {
           return true;
         }
 
