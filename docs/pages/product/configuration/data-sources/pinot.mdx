@@ -5,8 +5,9 @@ redirect_from:
 
 # Pinot
 
-Apache Pinot is a real-time distributed OLAP datastore purpose-built for low-latency, high-throughput analytics,
-and perfect for user-facing analytical workloads.
+[Apache Pinot][link-pinot] is a real-time distributed OLAP datastore purpose-built
+for low-latency, high-throughput analytics, and perfect for user-facing analytical
+workloads.
 
 ## Prerequisites
 
@@ -14,6 +15,14 @@ and perfect for user-facing analytical workloads.
 - The port for the [Pinot][pinot] broker
 
 ## Setup
+
+<ReferenceBox>
+
+Currently, Apache Pinot is not shown in the list of available data sources in the UI.
+However, you can still [configure](https://github.com/cube-js/cube/issues/8579#issuecomment-2453545048)
+it using environment variables.
+
+</ReferenceBox>
 
 ### Manual
 
@@ -80,6 +89,7 @@ Pinot does not support export buckets.
 
 Cube does not require any additional configuration to enable SSL as Pinot connections are made over HTTPS.
 
+[link-pinot]: https://pinot.apache.org/
 [pinot]: https://docs.pinot.apache.org/
 [pinot-docs-approx-agg-fns]:
   https://docs.pinot.apache.org/users/user-guide-query/query-syntax/how-to-handle-unique-counting

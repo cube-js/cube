@@ -232,6 +232,10 @@ cubes:
 
 </CodeTabs>
 
+Note that the `id` dimension is defined as a [primary key][ref-ref-primary-key].
+It is also possible to have more than one primary key dimension in a cube if
+you'd like them all to be parts of a composite key.
+
 [The `line_items` table](#top) also has a couple of dimensions which can be
 represented as follows:
 
@@ -729,5 +733,6 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster
 [ref-ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
 [ref-ref-dimension-granularities]: /reference/data-model/dimensions#granularities
+[ref-ref-primary-key]: /reference/data-model/dimensions#primary_key
 [ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
 [ref-proxy-granularity]: /product/data-modeling/concepts/calculated-members#time-dimension-granularity

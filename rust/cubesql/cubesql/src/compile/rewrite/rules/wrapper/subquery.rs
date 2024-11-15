@@ -5,7 +5,9 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         EmptyRelationDerivedSourceTableName, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerPushToCube, WrapperPushdownReplacerPushToCube,
     },
+    copy_flag,
     transport::MetaContext,
     var, var_iter, var_list_iter,
 };
@@ -22,25 +24,29 @@ impl WrapperRules {
                         wrapper_pullup_replacer(
                             "?cube_scan_input",
                             "?inner_alias_to_cube",
-                            "?nner_ungrouped",
+                            "?nner_push_to_cube",
                             "?inner_in_projection",
                             "?inner_cube_members",
                         ),
                         "CubeScanWrapperFinalized:false",
                     ),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     "?cube_scan_input",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
-                self.transform_check_subquery_wrapped("?cube_scan_input"),
+                self.transform_check_subquery_wrapped(
+                    "?cube_scan_input",
+                    "?push_to_cube",
+                    "?pullup_push_to_cube",
+                ),
             ),
             transforming_rewrite(
                 "wrapper-subqueries-wrap-empty-rel",
@@ -57,7 +63,7 @@ impl WrapperRules {
                             "EmptyRelationIsWrappable:true",
                         ),
                         "?alias_to_cube",
-                        "WrapperPullupReplacerUngrouped:false",
+                        "WrapperPullupReplacerPushToCube:false",
                         "WrapperPullupReplacerInProjection:true",
                         "CubeScanMembers",
                     ),
@@ -138,9 +144,24 @@ impl WrapperRules {
     fn transform_check_subquery_wrapped(
         &self,
         cube_scan_input_var: &'static str,
+        push_to_cube_var: &'static str,
+        pullup_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_scan_input_var = var!(cube_scan_input_var);
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
         move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+
             for _ in var_list_iter!(egraph[subst[cube_scan_input_var]], WrappedSelect).cloned() {
                 return true;
             }

@@ -2247,6 +2247,20 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: NULLS FIRST/LAST SQL push down: nulls_first_last_sql_push_down 1`] = `
+Array [
+  Object {
+    "category": null,
+  },
+  Object {
+    "category": "Office Supplies",
+  },
+  Object {
+    "category": "Technology",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: Nested Rollup over asterisk: nested_rollup_over_asterisk 1`] = `
 Array [
   Object {
