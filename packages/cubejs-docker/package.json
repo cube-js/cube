@@ -18,6 +18,7 @@
     "@cubejs-backend/dremio-driver": "1.1.0",
     "@cubejs-backend/druid-driver": "1.1.0",
     "@cubejs-backend/duckdb-driver": "1.1.0",
+    "@cubejs-backend/duckdb-server-driver": "0.0.1",
     "@cubejs-backend/elasticsearch-driver": "1.0.3",
     "@cubejs-backend/firebolt-driver": "1.1.0",
     "@cubejs-backend/hive-driver": "1.0.3",

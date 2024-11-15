@@ -22,6 +22,7 @@ module.exports = {
   dremio: '@cubejs-backend/dremio-driver',
   druid: '@cubejs-backend/druid-driver',
   duckdb: '@cubejs-backend/duckdb-driver',
+  'duckdb-server': '@cubejs-backend/duckdb-server-driver',
   cubestore: '@cubejs-backend/cubestore-driver',
   ksql: '@cubejs-backend/ksql-driver',
   questdb: '@cubejs-backend/questdb-driver',
