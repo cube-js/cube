@@ -166,16 +166,16 @@ export class PreAggregations {
           return false;
         }
 
-        const timeDimensionsReferences =
-          foundPreAggregation.preAggregation.rollupLambdaTimeDimensionReference ||
+        const timeDimensionsReference =
+          foundPreAggregation.preAggregation.rollupLambdaTimeDimensionsReference ||
           foundPreAggregation.references.timeDimensions;
 
-        if (td.dimension === timeDimensionsReferences[0].dimension) {
+        if (td.dimension === timeDimensionsReference[0].dimension) {
           return true;
         }
 
         // Handling for views
-        return td.dimension === allBackAliasMembers[timeDimensionsReferences[0].dimension];
+        return td.dimension === allBackAliasMembers[timeDimensionsReference[0].dimension];
       });
 
     const filters = preAggregation.partitionGranularity && this.query.filters.filter(td => {
@@ -978,7 +978,7 @@ export class PreAggregations {
             unionWithSourceData: i === referencedPreAggregations.length - 1 ? preAggObj.preAggregation.unionWithSourceData : false,
             rollupLambdaId: `${cube}.${preAggregationName}`,
             lastRollupLambda: i === referencedPreAggregations.length - 1,
-            rollupLambdaTimeDimensionReference: preAggObj.references.timeDimensions,
+            rollupLambdaTimeDimensionsReference: preAggObj.references.timeDimensions,
           }
         };
         if (i > 0) {
