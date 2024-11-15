@@ -32,9 +32,12 @@ use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
 
+use cubeorchestrator::cubestore_message_parser::parse_cubestore_ws_result;
+
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
+use neon::types::buffer::TypedArray;
 
 struct SQLInterface {
     services: Arc<NodeCubeServices>,
@@ -503,6 +506,30 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
+//============ sql orchestrator ===================
+
+fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let msg = cx.argument::<JsBuffer>(0)?;
+    let msg_data = msg.as_slice(&cx);
+    match parse_cubestore_ws_result(msg_data.to_vec()) {
+        Ok(result) => {
+            let js_array = JsArray::new(&mut cx, result.len());
+            for (i, row) in result.into_iter().enumerate() {
+                let js_row = JsObject::new(&mut cx);
+                for (key, value) in row {
+                    let js_key = cx.string(key);
+                    let js_value = cx.string(value);
+                    js_row.set(&mut cx, js_key, js_value)?;
+                }
+                js_array.set(&mut cx, i as u32, js_row)?;
+            }
+            Ok(js_array.upcast())
+        }
+        Err(err) => cx.throw_error(err.to_string()),
+    }
+}
+
+
 pub fn register_module_exports<C: NodeConfiguration + 'static>(
     mut cx: ModuleContext,
 ) -> NeonResult<()> {
@@ -513,7 +540,11 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
+    //============ sql planner exports ===================
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
+
+    //========= sql orchestrator exports =================
+    cx.export_function("parseCubestoreResultMessage", parse_cubestore_ws_result_message)?;
 
     crate::template::template_register_module(&mut cx)?;
 
