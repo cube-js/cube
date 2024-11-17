@@ -153,7 +153,7 @@ exclude this from your PR!)
 ```
 
 [patch.'https://github.com/cube-js/arrow-rs']
-arquet = { path = "../../../arrow-rs/parquet" }
+parquet = { path = "../../../arrow-rs/parquet" }
 arrow = { path = "../../../arrow-rs/arrow" }
 
 [patch.'https://github.com/cube-js/arrow-datafusion']
