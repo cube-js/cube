@@ -30,7 +30,7 @@ impl std::error::Error for ParseError {}
 
 pub fn parse_cubestore_ws_result(
     msg_data: &[u8],
-) -> Result<Vec<HashMap<String, String>>, ParseError> {
+) -> Result<Vec<HashMap<&str, &str>>, ParseError> {
     let http_message =
         root_as_http_message(msg_data).map_err(|_| ParseError::FlatBufferError)?;
 
@@ -57,7 +57,7 @@ pub fn parse_cubestore_ws_result(
                 if column.is_empty() {
                     return Err(ParseError::ColumnNameNotDefined);
                 }
-                columns.push(column.to_string());
+                columns.push(column);
             }
 
             let result_set_rows = result_set.rows().ok_or(ParseError::EmptyResultSet)?;
@@ -69,7 +69,7 @@ pub fn parse_cubestore_ws_result(
 
                 for (i, val) in values.iter().enumerate() {
                     let value = val.string_value().ok_or(ParseError::ColumnValueMissed)?;
-                    row_obj.insert(columns[i].clone(), value.to_string());
+                    row_obj.insert(columns[i], value);
                 }
 
                 result.push(row_obj);
