@@ -6,7 +6,6 @@ pub enum ParseError {
     UnsupportedCommand,
     EmptyResultSet,
     NullRow,
-    ColumnValueMissed,
     ColumnNameNotDefined,
     FlatBufferError,
     ErrorMessage(String),
@@ -18,7 +17,6 @@ impl std::fmt::Display for ParseError {
             ParseError::UnsupportedCommand => write!(f, "Unsupported command"),
             ParseError::EmptyResultSet => write!(f, "Empty resultSet"),
             ParseError::NullRow => write!(f, "Null row"),
-            ParseError::ColumnValueMissed => write!(f, "Column value missed"),
             ParseError::ColumnNameNotDefined => write!(f, "Column name is not defined"),
             ParseError::FlatBufferError => write!(f, "FlatBuffer parsing error"),
             ParseError::ErrorMessage(msg) => write!(f, "Error: {}", msg),
@@ -50,14 +48,9 @@ pub fn parse_cubestore_ws_result(
                 .ok_or(ParseError::EmptyResultSet)?;
 
             let result_set_columns = result_set.columns().ok_or(ParseError::EmptyResultSet)?;
-            let columns_len = result_set_columns.len();
-            let mut columns = Vec::with_capacity(columns_len);
 
-            for column in result_set_columns.iter() {
-                if column.is_empty() {
-                    return Err(ParseError::ColumnNameNotDefined);
-                }
-                columns.push(column);
+            if result_set_columns.iter().any(|c| c.is_empty()) {
+                return Err(ParseError::ColumnNameNotDefined);
             }
 
             let result_set_rows = result_set.rows().ok_or(ParseError::EmptyResultSet)?;
@@ -65,12 +58,14 @@ pub fn parse_cubestore_ws_result(
 
             for row in result_set_rows.iter() {
                 let values = row.values().ok_or(ParseError::NullRow)?;
-                let mut row_obj = HashMap::with_capacity(columns_len);
-
-                for (i, val) in values.iter().enumerate() {
-                    let value = val.string_value().ok_or(ParseError::ColumnValueMissed)?;
-                    row_obj.insert(columns[i], value);
-                }
+                let row_obj: HashMap<_, _> = result_set_columns
+                    .iter()
+                    .zip(values.iter())
+                    .map(|(col, val)| {
+                        let value = val.string_value().unwrap_or("");
+                        (col, value)
+                    })
+                    .collect();
 
                 result.push(row_obj);
             }
