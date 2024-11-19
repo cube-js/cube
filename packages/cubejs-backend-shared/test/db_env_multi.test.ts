@@ -2189,4 +2189,33 @@ describe('Multiple datasources', () => {
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });
+
+  test('getEnv("trinoCatalog")', () => {
+    process.env.CUBEJS_DB_TRINO_CATALOG = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_TRINO_CATALOG = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_TRINO_CATALOG = 'wrong1';
+    expect(getEnv('trinoCatalog', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('trinoCatalog', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('trinoCatalog', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_TRINO_CATALOG = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_TRINO_CATALOG = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_TRINO_CATALOG = 'wrong2';
+    expect(getEnv('trinoCatalog', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('trinoCatalog', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('trinoCatalog', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_TRINO_CATALOG;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_TRINO_CATALOG;
+    delete process.env.CUBEJS_DS_WRONG_DB_TRINO_CATALOG;
+    expect(getEnv('trinoCatalog', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('trinoCatalog', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('trinoCatalog', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
 });
