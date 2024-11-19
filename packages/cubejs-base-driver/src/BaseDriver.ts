@@ -751,7 +751,8 @@ export abstract class BaseDriver implements DriverInterface {
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
-    const parts = bucketName.split('.blob.core.windows.net/');
+    const splitter = bucketName.includes('blob.core') ? '.blob.core.windows.net/' : '.dfs.core.windows.net/';
+    const parts = bucketName.split(splitter);
     const account = parts[0];
     const container = parts[1].split('/')[0];
     let credential: StorageSharedKeyCredential | DefaultAzureCredential;
