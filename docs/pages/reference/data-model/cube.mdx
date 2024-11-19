@@ -279,11 +279,11 @@ cube(`extended_order_facts`, {
 
 <InfoBox>
 
-Prior to v0.33, this property was called `shown`.
+Prior to v0.33, this parameter was called `shown`.
 
 </InfoBox>
 
-The `public` property is used to manage the visibility of a cube. Valid values
+The `public` parameter is used to manage the visibility of a cube. Valid values
 for `public` are `true` and `false`. When set to `false`, this cube **cannot**
 be queried through the API. Defaults to `true`.
 
@@ -323,7 +323,7 @@ The default values for `refresh_key` are
 Refresh key of a query is a concatenation of all cubes refresh keys involved in
 query. For rollup queries pre-aggregation table name is used as a refresh key.
 
-You can set up a custom refresh check SQL by changing `refresh_key` property.
+You can set up a custom refresh check SQL by changing `refresh_key` parameter.
 Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or
 examining a metadata table for whatever system is managing the data to see when
 it last ran. timestamp in that case.
@@ -379,7 +379,7 @@ cubes:
 
 `every` - can be set as an interval with granularities `second`, `minute`,
 `hour`, `day`, and `week` or accept CRON string with some limitations. If you
-set `every` as CRON string, you can use the `timezone` property.
+set `every` as CRON string, you can use the `timezone` parameter.
 
 For example:
 
@@ -503,15 +503,15 @@ cube(`companies`, {
 });
 ```
 
-It is recommended to prefer the [`sql_table`](#parameters-sql-table) property
-over the `sql` property for all cubes that are supposed to use queries like
+It is recommended to prefer the [`sql_table`](#parameters-sql-table) parameter
+over the `sql` parameter for all cubes that are supposed to use queries like
 this: `SELECT * FROM table`.
 
 ### `sql_table`
 
-The `sql_table` property is used as a concise way for defining a cube that uses
+The `sql_table` parameter is used as a concise way for defining a cube that uses
 a query like this: `SELECT * FROM table`. Instead of using the
-[`sql`](#parameters-sql) property, use `sql_table` with the table name that this
+[`sql`](#parameters-sql) parameter, use `sql_table` with the table name that this
 cube will query.
 
 <CodeTabs>
@@ -583,6 +583,10 @@ cubes:
 
 </CodeTabs>
 
+### `access_policy`
+
+The `access_policy` parameter is used to configure [data access policies][ref-ref-dap].
+
 
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
 [ref-config-ext-ctx]: /reference/configuration/config#extend_context
@@ -602,3 +606,4 @@ cubes:
 [ref-ref-segments]: /reference/data-model/segments
 [ref-ref-joins]: /reference/data-model/joins
 [ref-ref-pre-aggs]: /reference/data-model/pre-aggregations
+[ref-ref-dap]: /reference/data-model/data-access-policies

@@ -1,0 +1,46 @@
+# Data access policies
+
+You can use the `access_policy` parameter within [cubes][ref-ref-cubes] and [views][ref-ref-views]
+to configure [data access policies][ref-dap] for them.
+
+## Parameters
+
+The `access_policy` parameter accepts a list of access policies. Each policy can
+be defined using the following parameters:
+
+- [`roles`](#roles) or [`role`](#role) define which [data access roles][ref-dap-roles]
+these policies apply to.
+- [`conditions`](#conditions) can be optionally used to specify when these policies
+take effect.
+- [`member_level`](#member-level) and [`row_level`](#row-level) are used to configure
+[member-level access][ref-dap-mls] and [row-level access][ref-dap-rls].
+
+### `roles`
+
+TODO
+
+### `role`
+
+TODO
+
+### `conditions`
+
+TODO: `if`
+
+### `member_level`
+
+TODO: `excludes`, `includes`
+
+### `row_level`
+
+TODO: `filters`, `or`
+
+
+
+
+[ref-ref-cubes]: /reference/data-model/cube
+[ref-ref-views]: /reference/data-model/view
+[ref-dap]: /product/auth/data-access-policies
+[ref-dap-roles]: /product/auth/data-access-policies#data-access-roles
+[ref-dap-mls]: /product/auth/data-access-policies#member-level-access
+[ref-dap-rls]: /product/auth/data-access-policies#row-level-access
