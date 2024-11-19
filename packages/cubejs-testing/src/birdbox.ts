@@ -263,7 +263,7 @@ export async function startBirdBoxFromContainer(
         if (pid !== null) {
           process.kill(pid, signal);
         } else {
-          process.stdout.write(`[Birdbox] Cannot kill Cube instance running in TEST_CUBE_HOST mode without TEST_CUBE_PID defined\n`);
+          process.stdout.write('[Birdbox] Cannot kill Cube instance running in TEST_CUBE_HOST mode without TEST_CUBE_PID defined\n');
           throw new Error('Attempted to use killCube while running with TEST_CUBE_HOST');
         }
       },
