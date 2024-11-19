@@ -331,36 +331,23 @@ impl WorkerProcessing for WorkerProcessor {
                     Ok((schema, records, data_loaded_size))
                 };
 
-                let span = match std::env::var("CUBESTORE_TRACING_TYPE")
-                    .unwrap_or("datadog".to_string())
-                    .to_lowercase()
-                    .as_str()
-                {
-                    "otel" => trace_id_and_span_id.map(|(t, s)| {
-                        let trace_id = TraceId::from(t);
-                        let span_id = SpanId::from(s);
-                        let span_context = SpanContext::new(
-                            trace_id,
-                            span_id,
-                            TraceFlags::SAMPLED,
-                            true,
-                            Default::default(),
-                        );
+                let span = trace_id_and_span_id.map(|(t, s)| {
+                    let trace_id = TraceId::from(t);
+                    let span_id = SpanId::from(s);
+                    let span_context = SpanContext::new(
+                        trace_id,
+                        span_id,
+                        TraceFlags::SAMPLED,
+                        true,
+                        Default::default(),
+                    );
 
-                        let context = OtelContext::new().with_remote_span_context(span_context);
-                        let span = tracing::info_span!("Process on select worker");
+                    let context = OtelContext::new().with_remote_span_context(span_context);
+                    let span = tracing::info_span!("Process on select worker");
 
-                        span.set_parent(context);
-                        span
-                    }),
-                    _ => trace_id_and_span_id.map(|(t, s)| {
-                        tracing::info_span!(
-                            "Process on select worker",
-                            cube_dd_trace_id = t,
-                            cube_dd_parent_span_id = s
-                        )
-                    }),
-                };
+                    span.set_parent(context);
+                    span
+                });
 
                 if let Some(span) = span {
                     future.instrument(span).await
