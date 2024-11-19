@@ -482,6 +482,70 @@ cubes:
     );
   });
 
+  it('should correctly handle extensions with joins', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+      cubes:
+        - name: base_users
+          sql: "SELECT 1"
+
+          dimensions:
+            - name: time
+              sql: "{CUBE}.timestamp"
+              type: time
+            - name: user_id
+              sql: "user_id"
+              type: number
+              primary_key: true
+              public: true
+
+          joins:
+            - name: base_user_joins
+              sql: "{CUBE}.user_id = {base_user_joins}.user_id"
+              relationship: one_to_one
+
+        - name: base_user_joins
+          sql: "SELECT 1 as user_id, 2 as second_prop"
+
+          dimensions:
+            - name: user_id
+              sql: "user_id"
+              type: number
+              primary_key: true
+            - name: second_prop
+              sql: "second_prop"
+              type: number
+
+        - name: active_users
+          sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
+          extends: base_users
+
+          `, { yamlExtension: true });
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [],
+      dimensions: ['active_users.user_id', 'active_users.second_prop'],
+      timezone: 'UTC'
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+    [
+      {
+        'active_users.user_id': 1,
+        'base_user_joins.second_prop': 2
+      }
+    ];
+    expect(res).toEqual(
+      [{
+        active_users__user_id: 1,
+        base_user_joins__second_prop: 2
+      }]
+    );
+  });
+
   it('COMPILE_CONTEXT', async () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
     cubes:

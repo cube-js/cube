@@ -65,6 +65,7 @@ export class CubeSymbols {
     let measures;
     let dimensions;
     let segments;
+    let joins;
 
     const cubeObject = Object.assign({
       allDefinitions(type) {
@@ -106,7 +107,17 @@ export class CubeSymbols {
       },
       set segments(v) {
         // Dont allow to modify
-      }
+      },
+
+      get joins() {
+        if (!joins) {
+          joins = this.allDefinitions('joins');
+        }
+        return joins;
+      },
+      set joins(v) {
+        // Dont allow to modify
+      },
     }, cubeDefinition);
 
     if (cubeDefinition.extends) {
