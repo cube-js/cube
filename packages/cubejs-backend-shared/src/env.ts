@@ -1427,6 +1427,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake host.
+   */
+  snowflakeHost: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_HOST', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake private key.
    */
   snowflakePrivateKey: ({
@@ -1750,7 +1763,7 @@ const variables: Record<string, (...args: any) => any> = {
   maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
     .default(200000)
     .asInt(),
-  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('false').asBoolStrict(),
+  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
   // Deprecated section
 
   // Support for Redis as queue & cache driver was removed in 0.36

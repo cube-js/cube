@@ -4,9 +4,10 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerPushToCube,
+        WrapperPushdownReplacerPushToCube,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::Subst;
 
@@ -18,7 +19,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     inlist_expr("?expr", "?list", "?negated"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -26,27 +27,31 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?list",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pullup_push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     "?negated",
                 ),
-                self.transform_in_list_only_consts("?list"),
+                self.transform_in_list_only_consts(
+                    "?list",
+                    "?push_to_cube",
+                    "?pullup_push_to_cube",
+                ),
             ),
             rewrite(
                 "wrapper-in-list-push-down",
                 wrapper_pushdown_replacer(
                     inlist_expr("?expr", "?list", "?negated"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -54,14 +59,14 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pushdown_replacer(
                         "?list",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -74,14 +79,14 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?list",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -90,7 +95,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     inlist_expr("?expr", "?list", "?negated"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -132,9 +137,23 @@ impl WrapperRules {
     fn transform_in_list_only_consts(
         &self,
         list_var: &'static str,
+        push_to_cube_var: &'static str,
+        pullup_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let list_var = var!(list_var);
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
         move |egraph: &mut CubeEGraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
             return egraph[subst[list_var]].data.constant_in_list.is_some();
         }
     }

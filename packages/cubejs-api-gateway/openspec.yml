@@ -129,6 +129,9 @@ components:
           type: "string"
         type:
           type: "string"
+        aliasMember:
+          description: "When dimension is defined in View, it keeps the original path: Cube.dimension"
+          type: "string"
         granularities:
           type: array
           items:

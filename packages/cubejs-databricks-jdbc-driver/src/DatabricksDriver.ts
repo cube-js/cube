@@ -15,7 +15,9 @@ import {
   QuerySchemasResult,
   QueryTablesResult,
   UnloadOptions,
-  GenericDataBaseType
+  GenericDataBaseType,
+  TableColumn,
+  DatabaseStructure,
 } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
@@ -392,10 +394,10 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns tables meta data object.
    */
-  public override async tablesSchema(): Promise<Record<string, Record<string, object>>> {
+  public override async tablesSchema(): Promise<DatabaseStructure> {
     const tables = await this.getTables();
 
-    const metadata: Record<string, Record<string, object>> = {};
+    const metadata: DatabaseStructure = {};
 
     await Promise.all(tables.map(async ({ database, tableName }) => {
       if (!(database in metadata)) {
@@ -499,7 +501,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns table columns types.
    */
-  public override async tableColumnTypes(table: string): Promise<{ name: any; type: string; }[]> {
+  public override async tableColumnTypes(table: string): Promise<TableColumn[]> {
     let tableFullName = '';
     const tableArray = table.split('.');
 
@@ -538,6 +540,7 @@ export class DatabricksDriver extends JDBCDriver {
       result.push({
         name: column.col_name,
         type: this.toGenericType(column.data_type),
+        attributes: [],
       });
     }
 

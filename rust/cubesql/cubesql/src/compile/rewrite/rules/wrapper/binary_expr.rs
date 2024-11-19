@@ -4,7 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
@@ -18,7 +18,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     binary_expr("?left", "?op", "?right"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -26,7 +26,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?left",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -34,7 +34,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?right",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -46,7 +46,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?left",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -54,7 +54,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?right",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -62,7 +62,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     binary_expr("?left", "?op", "?right"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
