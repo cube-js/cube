@@ -532,12 +532,7 @@ cubes:
 
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
     console.log(JSON.stringify(res));
-    [
-      {
-        'active_users.user_id': 1,
-        'base_user_joins.second_prop': 2
-      }
-    ];
+
     expect(res).toEqual(
       [{
         active_users__user_id: 1,
