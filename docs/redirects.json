@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/data-modeling/concepts/publicity",
+    "destination": "/product/auth/member-level-security",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/data-modeling/fiscal-year-quarter-dimensions",
     "destination": "/guides/recipes/data-modeling/custom-granularity",
     "permanent": true
