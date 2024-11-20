@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
+
+
+### Bug Fixes
+
+* **cubesql:** Support explicit UTC as timezone in pushdown SQL generation ([#8971](https://github.com/cube-js/cube/issues/8971)) ([85eaa29](https://github.com/cube-js/cube/commit/85eaa29a3e8df520fbdc8b2df0ece4a131c39cdc)), closes [/github.com/cube-js/arrow-datafusion/blob/dcf3e4aa26fd112043ef26fa4a78db5dbd443c86/datafusion/physical-expr/src/datetime_expressions.rs#L357-L367](https://github.com//github.com/cube-js/arrow-datafusion/blob/dcf3e4aa26fd112043ef26fa4a78db5dbd443c86/datafusion/physical-expr/src/datetime_expressions.rs/issues/L357-L367)
+* **databricks-driver:** fix databricks bucket URL parsing. Now driver supports both (legacy and modern urls) ([#8968](https://github.com/cube-js/cube/issues/8968)) ([137de67](https://github.com/cube-js/cube/commit/137de6725b8150cb418b03aa59443525039380c0))
+* **jdbc-driver:** Log errors from connection pool factory ([#8903](https://github.com/cube-js/cube/issues/8903)) ([cfdc2a2](https://github.com/cube-js/cube/commit/cfdc2a28cd9706dc91557f499e3412bab9ff9a07))
+
+
+### Features
+
+* **clickhouse-driver:** Switch from apla-clickhouse to @clickhouse/client ([#8928](https://github.com/cube-js/cube/issues/8928)) ([e25e65f](https://github.com/cube-js/cube/commit/e25e65fd578bef099c351393ae32da751be351dc))
+
+
+
+
+
 ## [1.1.6](https://github.com/cube-js/cube/compare/v1.1.5...v1.1.6) (2024-11-17)
 
 
