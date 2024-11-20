@@ -259,7 +259,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         const results = await resultSet.json<Record<string, unknown>>();
         return results;
       } catch (e) {
-        throw new Error(`Query failed; query id: ${queryId}, SQL: ${query}`, { cause: e });
+        // TODO replace string formatting with proper cause
+        throw new Error(`Query failed; cause: ${e}; query id: ${queryId}; SQL: ${query}`);
       }
     });
   }
@@ -407,7 +408,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       };
     } catch (e) {
       await client.close();
-      throw new Error(`Stream query failed; query id: ${queryId}, SQL: ${query}`, { cause: e });
+      // TODO replace string formatting with proper cause
+      throw new Error(`Stream query failed; cause: ${e}; query id: ${queryId}; SQL: ${query}`);
     }
   }
 
@@ -551,7 +553,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     try {
       await this.command(createTableSql);
     } catch (e) {
-      throw new Error(`Error during create table: ${createTableSql}`, { cause: e });
+      // TODO replace string formatting with proper cause
+      throw new Error(`Create table failed; cause: ${e}; SQL: ${createTableSql}`);
     }
   }
 
