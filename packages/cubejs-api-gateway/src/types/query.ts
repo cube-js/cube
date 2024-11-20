@@ -67,6 +67,15 @@ interface QueryTimeDimension {
   granularity?: QueryTimeDimensionGranularity;
 }
 
+type SubqueryJoins = {
+  sql: string,
+  // TODO This is _always_ a member expression, maybe pass as parsed, without intermediate string?
+  // TODO there are three different types instead of alternatives for this actually
+  on: string | ParsedMemberExpression | MemberExpression,
+  joinType: 'LEFT' | 'INNER',
+  alias: string,
+};
+
 /**
  * Incoming network query data type.
  */
@@ -85,6 +94,9 @@ interface Query {
   renewQuery?: boolean;
   ungrouped?: boolean;
   responseFormat?: ResultType;
+
+  // TODO incoming query, query with parsed exprs and query with evaluated exprs are all different types
+  subqueryJoins?: Array<SubqueryJoins>,
 }
 
 /**
