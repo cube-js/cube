@@ -1135,10 +1135,16 @@ pub fn transform_response<V: ValueObject>(
                                     ))
                                 })?;
                             // TODO switch parsing to microseconds
-                            if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
+                            if timestamp.timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
+                            } else if let Some(nanos) = timestamp.timestamp_nanos_opt() {
+                                builder.append_value(nanos)?;
                             } else {
-                                builder.append_value(timestamp.timestamp_nanos_opt().unwrap())?;
+                                log::error!(
+                                    "Unable to cast timestamp value to nanoseconds: {}",
+                                    timestamp.to_string()
+                                );
+                                builder.append_null()?;
                             }
                         },
                     },
