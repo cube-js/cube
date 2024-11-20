@@ -205,7 +205,7 @@ export class CompilerApi {
         if (typeof b !== 'boolean') {
           throw new Error(`Access policy condition must return boolean, got ${JSON.stringify(b)}`);
         }
-        return a || b;
+        return a && b;
       });
     }
     return true;

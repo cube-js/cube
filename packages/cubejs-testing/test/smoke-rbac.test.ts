@@ -15,9 +15,8 @@ import {
 
 describe('Cube RBAC Engine', () => {
   jest.setTimeout(60 * 5 * 1000);
-
-  let birdbox: BirdBox;
   let db: StartedTestContainer;
+  let birdbox: BirdBox;
 
   const pgPort = 5656;
   let connectionId = 0;
@@ -55,8 +54,8 @@ describe('Cube RBAC Engine', () => {
       'postgres',
       {
         ...DEFAULT_CONFIG,
-        //
-        CUBESQL_LOG_LEVEL: 'trace',
+        CUBEJS_DEV_MODE: 'false',
+        NODE_ENV: 'production',
         //
         CUBEJS_DB_TYPE: 'postgres',
         CUBEJS_DB_HOST: db.getHost(),
@@ -66,8 +65,6 @@ describe('Cube RBAC Engine', () => {
         CUBEJS_DB_PASS: 'test',
         //
         CUBEJS_PG_SQL_PORT: `${pgPort}`,
-        CUBESQL_SQL_PUSH_DOWN: 'true',
-        CUBESQL_STREAM_MODE: 'true',
       },
       {
         schemaDir: 'rbac/model',
@@ -145,6 +142,26 @@ describe('Cube RBAC Engine', () => {
       const res = await connection.query('SELECT * FROM users limit 10');
       // Querying a cube with nested filters and mixed values should not cause any issues
       expect(res.rows).toMatchSnapshot('users');
+    });
+  });
+
+  describe('RBAC via SQL API manager', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('manager', 'manager_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT * from line_items', async () => {
+      const res = await connection.query('SELECT * FROM line_items limit 10');
+      // This query should return rows allowed by the default policy
+      // because the manager security context has a wrong city and should not match
+      // two conditions defined on the manager policy
+      expect(res.rows).toMatchSnapshot('line_items_manager');
     });
   });
 
