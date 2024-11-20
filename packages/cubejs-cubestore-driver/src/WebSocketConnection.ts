@@ -6,8 +6,10 @@ import { getEnv } from '@cubejs-backend/shared';
 import { parseCubestoreResultMessage } from '@cubejs-backend/native';
 import {
   HttpCommand,
+  HttpError,
   HttpMessage,
   HttpQuery,
+  HttpResultSet,
   HttpTable
 } from '../codegen';
 
@@ -116,11 +118,58 @@ export class WebSocketConnection {
             throw new Error(`Cube Store missed message id: ${httpMessage.messageId()}`); // logging
           }
 
-          try {
-            const nativeResMsg = parseCubestoreResultMessage(msg);
-            resolvers.resolve(nativeResMsg);
-          } catch (e) {
-            resolvers.reject(e);
+          if (getEnv('nativeOrchestrator')) {
+            try {
+              const nativeResMsg = parseCubestoreResultMessage(msg);
+              resolvers.resolve(nativeResMsg);
+            } catch (e) {
+              resolvers.reject(e);
+            }
+          } else {
+            const commandType = httpMessage.commandType();
+
+            if (commandType === HttpCommand.HttpError) {
+              resolvers.reject(new Error(`${httpMessage.command(new HttpError())?.error()}`));
+            } else if (commandType === HttpCommand.HttpResultSet) {
+              const resultSet = httpMessage.command(new HttpResultSet());
+
+              if (!resultSet) {
+                resolvers.reject(new Error('Empty resultSet'));
+                return;
+              }
+
+              const columnsLen = resultSet.columnsLength();
+              const columns: Array<string> = [];
+              for (let i = 0; i < columnsLen; i++) {
+                const columnName = resultSet.columns(i);
+                if (!columnName) {
+                  resolvers.reject(new Error('Column name is not defined'));
+                  return;
+                }
+                columns.push(columnName);
+              }
+
+              const rowLen = resultSet.rowsLength();
+              const result: any[] = [];
+              for (let i = 0; i < rowLen; i++) {
+                const row = resultSet.rows(i);
+                if (!row) {
+                  resolvers.reject(new Error('Null row'));
+                  return;
+                }
+                const valueLen = row.valuesLength();
+                const rowObj = {};
+                for (let j = 0; j < valueLen; j++) {
+                  const value = row.values(j);
+                  rowObj[columns[j]] = value?.stringValue();
+                }
+                result.push(rowObj);
+              }
+
+              resolvers.resolve(result);
+            } else {
+              resolvers.reject(new Error('Unsupported command'));
+            }
           }
         });
       });
