@@ -1,28 +1,37 @@
 /* eslint-disable */
+// @ts-ignore
 import ClickHouse from '@cubejs-backend/apla-clickhouse';
 import { GenericContainer } from 'testcontainers';
+import type { StartedTestContainer } from 'testcontainers';
 import { format as formatSql } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { BaseDbRunner } from "../utils/BaseDbRunner";
 
+// Just a placeholder for now
+type ClickHouseClient = any;
+
 process.env.TZ = 'GMT';
 
 export class ClickHouseDbRunner extends BaseDbRunner {
-  adapter = 'clickhouse';
-  container = null;
-  clickHouseVersion = process.env.TEST_CLICKHOUSE_VERSION || '23.11';
-  supportsExtendedDateTimeResults = this.clickHouseVersion >= '22.9';
-  allowExperimentalJoinCondition = this.clickHouseVersion >= '24.5';
+  public adapter: string = 'clickhouse';
 
-  tearDown = async () => {
+  protected container: StartedTestContainer | null = null;
+
+  protected clickHouseVersion: string = process.env.TEST_CLICKHOUSE_VERSION || '23.11';
+
+  public supportsExtendedDateTimeResults: boolean = this.clickHouseVersion >= '22.9';
+
+  protected allowExperimentalJoinCondition: boolean = this.clickHouseVersion >= '24.5';
+
+  public override async tearDown(): Promise<void> {
     if (this.container) {
       await this.container.stop();
       this.container = null;
     }
   }
 
-  gutterDataSet = async function (clickHouse) {
+  protected async gutterDataSet(clickHouse: ClickHouseClient): Promise<void> {
     // let engine = 'MergeTree PARTITION BY id ORDER BY (id) SETTINGS index_granularity = 8192'
     const engine = 'Memory';
 
@@ -100,9 +109,9 @@ export class ClickHouseDbRunner extends BaseDbRunner {
       (40), (41), (42), (43), (44), (45), (46), (47), (48), (49),
       (50), (51), (52), (53), (54), (55), (56), (57), (58), (59)
     `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } });
-  };
+  }
 
-  testQueries = async (queries, prepareDataSet) => {
+  public override async testQueries(queries: Array<[string, Array<unknown>]>, prepareDataSet?: ((client: ClickHouseClient) => Promise<void>) | null): Promise<Array<Array<Record<string, unknown>>>> {
     let host;
     let port;
     if (process.env.TEST_CLICKHOUSE_HOST) {
@@ -128,7 +137,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     prepareDataSet = prepareDataSet || this.gutterDataSet;
     await prepareDataSet(clickHouse);
 
-    const requests = [];
+    const requests: Array<unknown> = [];
 
     // Controls whether functions return results with extended date and time ranges.
     //
@@ -158,16 +167,18 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     const results = await Promise.all(requests);
 
     return results.map(_normaliseResponse);
-  };
+  }
 
-  testQuery = async (queryAndParams, prepareDataSet) => this.testQueries([queryAndParams], prepareDataSet)
-    .then(res => res[0]);
+  public async testQuery(queryAndParams: [string, Array<unknown>], prepareDataSet?: ((client: ClickHouseClient) => Promise<void>) | null): Promise<Array<Record<string, unknown>>> {
+    const res = await this.testQueries([queryAndParams], prepareDataSet);
+    return res[0];
+  }
 
-  port() {
+  public override port(): number {
     return 8123;
   }
 
-  newTestQuery(compilers, query) {
+  protected override newTestQuery(compilers: unknown, query: unknown): ClickHouseQuery {
     return new ClickHouseQuery(compilers, query);
   }
 }
@@ -179,7 +190,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
 //
 //  https://github.com/statsbotco/cube.js/pull/98#discussion_r279698399
 //
-function _normaliseResponse(res) {
+function _normaliseResponse(res: any): Array<Record<string, unknown>> {
   if (process.env.DEBUG_LOG === 'true') console.log(res);
   if (res.data) {
     res.data.forEach(row => {
