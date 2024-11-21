@@ -577,9 +577,9 @@ export class BaseQuery {
   }
 
   /**
-   * Returns an array of SQL query strings for the query.
+   * Returns a pair of SQL query string and parameter values for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
-   * @returns {Array<string>}
+   * @returns {[string, Array<unknown>]}
    */
   buildSqlAndParams(exportAnnotatedSql) {
     if (getEnv('nativeSqlPlanner')) {
