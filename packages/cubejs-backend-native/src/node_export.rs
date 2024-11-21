@@ -520,9 +520,8 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsValu
                     let js_row = cx.execute_scoped(|mut cx| {
                         let js_row = JsObject::new(&mut cx);
                         for (key, value) in row.into_iter() {
-                            let js_key = cx.string(key);
                             let js_value = cx.string(value);
-                            js_row.set(&mut cx, js_key, js_value)?;
+                            js_row.set(&mut cx, key, js_value)?;
                         }
                         Ok(js_row)
                     })?;
