@@ -103,15 +103,24 @@ export class ClickHouseDbRunner extends BaseDbRunner {
   };
 
   testQueries = async (queries, prepareDataSet) => {
-    if (!this.container && !process.env.TEST_CLICKHOUSE_HOST) {
-      this.container = await new GenericContainer(`clickhouse/clickhouse-server:${this.clickHouseVersion}`)
-        .withExposedPorts(this.port())
-        .start();
+    let host;
+    let port;
+    if (process.env.TEST_CLICKHOUSE_HOST) {
+      host = process.env.TEST_CLICKHOUSE_HOST;
+      port = 8123;
+    } else {
+      if (!this.container) {
+        this.container = await new GenericContainer(`clickhouse/clickhouse-server:${this.clickHouseVersion}`)
+          .withExposedPorts(this.port())
+          .start();
+      }
+      host = 'localhost';
+      port = this.container.getMappedPort(8123);
     }
 
     const clickHouse = new ClickHouse({
-      host: 'localhost',
-      port: process.env.TEST_CLICKHOUSE_HOST ? 8123 : this.container.getMappedPort(8123),
+      host,
+      port,
     });
 
     clickHouse.sessionId = uuidv4(); // needed for tests to use temporary tables
