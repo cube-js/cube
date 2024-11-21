@@ -166,7 +166,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
 
     const results = await Promise.all(requests);
 
-    return results.map(_normaliseResponse);
+    return results.map(ClickHouseDbRunner._normaliseResponse);
   }
 
   public async testQuery(queryAndParams: [string, Array<unknown>], prepareDataSet?: ((client: ClickHouseClient) => Promise<void>) | null): Promise<Array<Record<string, unknown>>> {
@@ -181,34 +181,34 @@ export class ClickHouseDbRunner extends BaseDbRunner {
   protected override newTestQuery(compilers: unknown, query: unknown): ClickHouseQuery {
     return new ClickHouseQuery(compilers, query);
   }
-}
 
-//
-//
-//  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
-//  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
-//
-//  https://github.com/statsbotco/cube.js/pull/98#discussion_r279698399
-//
-function _normaliseResponse(res: any): Array<Record<string, unknown>> {
-  if (process.env.DEBUG_LOG === 'true') console.log(res);
-  if (res.data) {
-    res.data.forEach(row => {
-      for (const field in row) {
-        const value = row[field];
-        if (value !== null) {
-          const meta = res.meta.find(m => m.name == field);
-          if (meta.type.includes('DateTime')) {
-            row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
-          } else if (meta.type.includes('Date')) {
-            row[field] = `${value}T00:00:00.000`;
-          } else if (meta.type.includes('Int') || meta.type.includes('Float')) {
-            // convert all numbers into strings
-            row[field] = `${value}`;
+  //
+  //
+  //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
+  //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
+  //
+  //  https://github.com/statsbotco/cube.js/pull/98#discussion_r279698399
+  //
+  protected static _normaliseResponse(res: any): Array<Record<string, unknown>> {
+    if (process.env.DEBUG_LOG === 'true') console.log(res);
+    if (res.data) {
+      res.data.forEach(row => {
+        for (const field in row) {
+          const value = row[field];
+          if (value !== null) {
+            const meta = res.meta.find(m => m.name == field);
+            if (meta.type.includes('DateTime')) {
+              row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
+            } else if (meta.type.includes('Date')) {
+              row[field] = `${value}T00:00:00.000`;
+            } else if (meta.type.includes('Int') || meta.type.includes('Float')) {
+              // convert all numbers into strings
+              row[field] = `${value}`;
+            }
           }
         }
-      }
-    });
+      });
+    }
+    return res.data;
   }
-  return res.data;
 }
