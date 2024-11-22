@@ -24,5 +24,6 @@ module.exports = {
   "singlestore": "SingleStore",
   "snowflake": "Snowflake",
   "sqlite": "SQLite",
-  "trino": "Trino"
+  "trino": "Trino",
+  "vertica": "Vertica"
 }
