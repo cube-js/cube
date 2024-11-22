@@ -33,7 +33,9 @@ db_types=()
 for package in packages/cubejs-*-driver; do
     if [ -d "$package" ]; then
         db_name=$(basename "$package" | sed 's/cubejs-\(.*\)-driver/\1/')
-        db_types+=("$db_name")
+        if [ "$db_name" != "base" ]; then
+            db_types+=("$db_name")
+        fi
     fi
 done
 
