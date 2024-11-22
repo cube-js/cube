@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 6629
 expression: "execute_query(\"SELECT * FROM svv_tables ORDER BY table_name DESC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------------+--------------+---------------------------+------------+---------+
@@ -7,6 +8,7 @@ expression: "execute_query(\"SELECT * FROM svv_tables ORDER BY table_name DESC\"
 +---------------+--------------+---------------------------+------------+---------+
 | cubedb        | public       | WideCube                  | BASE TABLE | NULL    |
 | cubedb        | public       | NumberCube                | BASE TABLE | NULL    |
+| cubedb        | public       | MultiTypeCube             | BASE TABLE | NULL    |
 | cubedb        | public       | Logs                      | BASE TABLE | NULL    |
 | cubedb        | public       | KibanaSampleDataEcommerce | BASE TABLE | NULL    |
 +---------------+--------------+---------------------------+------------+---------+

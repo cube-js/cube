@@ -1,17 +1,10 @@
-use std::{
-    any::Any,
-    fmt,
-    sync::Arc,
-    task::{Context, Poll},
-};
-
 use async_trait::async_trait;
 use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotation};
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int16Builder,
-            Int32Builder, Int64Builder, NullArray, StringBuilder,
+            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
+            Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -27,12 +20,19 @@ pub use datafusion::{
 };
 use futures::Stream;
 use log::warn;
+use std::{
+    any::Any,
+    borrow::Cow,
+    fmt,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use crate::{
     compile::{
         engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
-        find_cube_scans_deep_search,
         rewrite::WrappedSelectType,
+        test::find_cube_scans_deep_search,
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -42,8 +42,11 @@ use crate::{
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
-        array::{TimestampMillisecondBuilder, TimestampNanosecondBuilder},
-        datatypes::TimeUnit,
+        array::{
+            IntervalDayTimeBuilder, IntervalMonthDayNanoBuilder, IntervalYearMonthBuilder,
+            TimestampMillisecondBuilder, TimestampNanosecondBuilder,
+        },
+        datatypes::{IntervalUnit, TimeUnit},
     },
     execution::context::TaskContext,
     logical_plan::JoinType,
@@ -159,7 +162,15 @@ pub struct WrappedSelectNode {
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
     pub distinct: bool,
-    pub ungrouped: bool,
+
+    /// States if this node actually a query to Cube or not.
+    /// When `false` this node will generate SQL on its own, using its fields and templates.
+    /// When `true` this node will generate SQL with load query to JS side of Cube.
+    /// It expects to be flattened: `from` is expected to be ungrouped CubeScan.
+    /// There's no point in doing this for grouped CubeScan, we can just use load query from that CubeScan and SQL API generation on top.
+    /// Load query generated for this case can be grouped when this node is an aggregation.
+    /// Most fields will be rendered as a member expressions in generated load query.
+    pub push_to_cube: bool,
 }
 
 impl WrappedSelectNode {
@@ -180,7 +191,7 @@ impl WrappedSelectNode {
         order_expr: Vec<Expr>,
         alias: Option<String>,
         distinct: bool,
-        ungrouped: bool,
+        push_to_cube: bool,
     ) -> Self {
         Self {
             schema,
@@ -199,7 +210,7 @@ impl WrappedSelectNode {
             order_expr,
             alias,
             distinct,
-            ungrouped,
+            push_to_cube,
         }
     }
 }
@@ -341,7 +352,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             order_expr,
             alias,
             self.distinct,
-            self.ungrouped,
+            self.push_to_cube,
         ))
     }
 }
@@ -443,8 +454,12 @@ struct CubeScanExecutionPlan {
 }
 
 #[derive(Debug)]
-pub enum FieldValue {
-    String(String),
+pub enum FieldValue<'a> {
+    // Why Cow?
+    // We use N-API via Neon (only for streaming), which doesn't allow us to build string reference,
+    // because V8 uses UTF-16 It allocates/converts a new strings while doing JsString.value()
+    // @see v8 WriteUtf8 for more details. Cow::Owned is used for this variant
+    String(Cow<'a, str>),
     Number(f64),
     Bool(bool),
     Null,
@@ -472,31 +487,26 @@ impl ValueObject for JsonValueObject {
         Ok(self.rows.len())
     }
 
-    fn get<'a>(
-        &'a mut self,
+    fn get(
+        &mut self,
         index: usize,
         field_name: &str,
     ) -> std::result::Result<FieldValue, CubeError> {
-        let option = self.rows[index].as_object_mut();
-        let as_object = if let Some(as_object) = option {
-            as_object
-        } else {
+        let Some(as_object) = self.rows[index].as_object() else {
             return Err(CubeError::user(format!(
                 "Unexpected response from Cube, row is not an object: {:?}",
                 self.rows[index]
             )));
         };
-        let value = as_object
-            .get(field_name)
-            .unwrap_or(&Value::Null)
-            // TODO expose strings as references to avoid clonning
-            .clone();
+
+        let value = as_object.get(field_name).unwrap_or(&Value::Null);
+
         Ok(match value {
-            Value::String(s) => FieldValue::String(s),
+            Value::String(s) => FieldValue::String(Cow::Borrowed(s)),
             Value::Number(n) => FieldValue::Number(n.as_f64().ok_or(
                 DataFusionError::Execution(format!("Can't convert {:?} to float", n)),
             )?),
-            Value::Bool(b) => FieldValue::Bool(b),
+            Value::Bool(b) => FieldValue::Bool(*b),
             Value::Null => FieldValue::Null,
             x => {
                 return Err(CubeError::user(format!(
@@ -848,12 +858,15 @@ async fn load_data(
             .map(|v| v.iter().filter(|d| d.granularity.is_some()).count())
             .unwrap_or(0)
             == 0;
+
     let result = if no_members_query {
         let limit = request.limit.unwrap_or(1);
         let mut data = Vec::new();
+
         for _ in 0..limit {
             data.push(serde_json::Value::Null)
         }
+
         V1LoadResult::new(
             V1LoadResultAnnotation {
                 measures: json!(Vec::<serde_json::Value>::new()),
@@ -878,9 +891,9 @@ async fn load_data(
 
             data
         } else {
-            return Err(ArrowError::ComputeError(format!(
-                "Unable to extract result from Cube.js response",
-            )));
+            return Err(ArrowError::ComputeError(
+                "Unable to extract results from response: results is empty".to_string(),
+            ));
         }
     };
 
@@ -1008,7 +1021,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64)?,
-                        (FieldValue::String(s), builder) => match s.parse::<i64>() {
+                        (FieldValue::String(s), builder)  => match s.parse::<i64>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1022,6 +1035,31 @@ pub fn transform_response<V: ValueObject>(
                     },
                     {
                         (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Float32 => {
+                build_column!(
+                    DataType::Float32,
+                    Float32Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
+                        (FieldValue::String(s), builder) => match s.parse::<f32>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as f32: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Float32(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }
@@ -1058,7 +1096,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Bool(v), builder) => builder.append_value(v)?,
-                        (FieldValue::String(v), builder) => match v.as_str() {
+                        (FieldValue::String(v), builder)  => match v.as_ref() {
                             "true" | "1" => builder.append_value(true)?,
                             "false" | "0" => builder.append_value(false)?,
                             _ => {
@@ -1081,12 +1119,12 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%d %H:%M:%S%.f"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.fZ"))
                                 .or_else(|_| {
-                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                    NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d").map(|date| {
                                         date.and_hms_opt(0, 0, 0).unwrap()
                                     })
                                 })
@@ -1097,10 +1135,16 @@ pub fn transform_response<V: ValueObject>(
                                     ))
                                 })?;
                             // TODO switch parsing to microseconds
-                            if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
+                            if timestamp.timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
+                            } else if let Some(nanos) = timestamp.timestamp_nanos_opt() {
+                                builder.append_value(nanos)?;
                             } else {
-                                builder.append_value(timestamp.timestamp_nanos_opt().unwrap())?;
+                                log::error!(
+                                    "Unable to cast timestamp value to nanoseconds: {}",
+                                    timestamp.to_string()
+                                );
+                                builder.append_null()?;
                             }
                         },
                     },
@@ -1117,12 +1161,12 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%d %H:%M:%S%.f"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.fZ"))
                                 .or_else(|_| {
-                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                    NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d").map(|date| {
                                         date.and_hms_opt(0, 0, 0).unwrap()
                                     })
                                 })
@@ -1153,10 +1197,10 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let date = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
+                            let date = NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d")
                                 // FIXME: temporary solution for cases when expected type is Date32
                                 // but underlying data is a Timestamp
-                                .or_else(|_| NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%dT00:00:00.000"))
+                                .or_else(|_| NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%dT00:00:00.000"))
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse date: '{}': {}",
@@ -1233,6 +1277,48 @@ pub fn transform_response<V: ValueObject>(
                     }
                 )
             }
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    IntervalYearMonthBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::DayTime),
+                    IntervalDayTimeBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::MonthDayNano) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    IntervalMonthDayNanoBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
             DataType::Null => {
                 let len = response.len()?;
                 let array = NullArray::new(len);
@@ -1256,9 +1342,9 @@ pub fn transform_response<V: ValueObject>(
 mod tests {
     use super::*;
     use crate::{
-        compile::{engine::df::wrapper::SqlQuery, MetaContext},
-        sql::{session::DatabaseProtocol, HttpAuthContext},
-        transport::SqlResponse,
+        compile::{engine::df::wrapper::SqlQuery, DatabaseProtocol, DatabaseProtocolDetails},
+        sql::HttpAuthContext,
+        transport::{MetaContext, SqlResponse},
         CubeError,
     };
     use cubeclient::models::V1LoadResponse;
@@ -1278,7 +1364,7 @@ mod tests {
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
-            protocol.to_string(),
+            protocol.get_name().to_string(),
             "sql".to_string(),
             Some("SQL API Unit Testing".to_string()),
         )
@@ -1325,11 +1411,11 @@ mod tests {
                             "timeDimensions": []
                         },
                         "data": [
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderDate": null},
-                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderDate": "2022-01-01 00:00:00.000"},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderDate": "2023-01-01 00:00:00.000"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null}
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
+                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderDate": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 2"},
+                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderDate": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 3"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 4"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
                         ]
                     }
                 "#;
@@ -1386,6 +1472,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_df_cube_scan_execute() {
+        assert_eq!(std::mem::size_of::<FieldValue>(), 24);
+
         let schema = Arc::new(Schema::new(vec![
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
@@ -1405,6 +1493,7 @@ mod tests {
                 DataType::Boolean,
                 false,
             ),
+            Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, false),
         ]));
 
         let scan_node = CubeScanExecutionPlan {
@@ -1428,14 +1517,9 @@ mod tests {
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.isBool".to_string(),
                     "KibanaSampleDataEcommerce.orderDate".to_string(),
+                    "KibanaSampleDataEcommerce.city".to_string(),
                 ]),
-                segments: None,
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             },
             wrapped_sql: None,
             auth_context: Arc::new(HttpAuthContext {
@@ -1507,6 +1591,13 @@ mod tests {
                         Some(false)
                     ])) as ArrayRef,
                     Arc::new(BooleanArray::from(vec![None, None, None, None, None,])) as ArrayRef,
+                    Arc::new(StringArray::from(vec![
+                        Some("City 1"),
+                        Some("City 2"),
+                        Some("City 3"),
+                        Some("City 4"),
+                        None
+                    ])) as ArrayRef,
                 ],
             )
             .unwrap()

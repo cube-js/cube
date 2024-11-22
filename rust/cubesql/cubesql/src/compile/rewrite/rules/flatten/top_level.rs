@@ -1,21 +1,17 @@
 use crate::{
     compile::rewrite::{
-        aggregate,
-        analysis::LogicalPlanAnalysis,
-        cube_scan, flatten_pushdown_replacer, projection,
+        aggregate, cube_scan, flatten_pushdown_replacer, projection,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::{flatten::FlattenRules, replacer_flat_push_down_node, replacer_push_down_node},
         transforming_chain_rewrite_with_root, FlattenPushdownReplacerInnerAlias, ListType,
         LogicalPlanLanguage, ProjectionAlias,
     },
     var, var_iter,
 };
-use egg::{Id, Rewrite};
+use egg::Id;
 
 impl FlattenRules {
-    pub fn top_level_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn top_level_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO use root instead for performance
         rules.extend(vec![transforming_chain_rewrite_with_root(
             "flatten-projection-pushdown",
@@ -70,7 +66,7 @@ impl FlattenRules {
                     "CubeScanWrapped:false",
                     "?ungrouped",
                 ),
-                "?outer_projection_alias",
+                "?new_projection_alias",
                 "ProjectionSplit:false",
             ),
             self.flatten_projection(
@@ -80,6 +76,8 @@ impl FlattenRules {
                 "?inner_projection_expr",
                 "?outer_projection_expr",
                 "?inner_projection_alias",
+                "?outer_projection_alias",
+                "?new_projection_alias",
                 "?inner_alias",
             ),
         )]);
@@ -188,15 +186,18 @@ impl FlattenRules {
         inner_projection_expr_var: &'static str,
         outer_projection_expr_var: &'static str,
         inner_projection_alias_var: &'static str,
+        outer_projection_alias_var: &'static str,
+        new_projection_alias_var: &'static str,
         inner_alias_var: &'static str,
-    ) -> impl Fn(&mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut egg::Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut egg::Subst) -> bool {
         let inner_projection_var = var!(inner_projection_var);
         let cube_scan_var = var!(cube_scan_var);
         let members_var = var!(members_var);
         let inner_projection_expr_var = var!(inner_projection_expr_var);
         let outer_projection_expr_var = var!(outer_projection_expr_var);
         let inner_projection_alias_var = var!(inner_projection_alias_var);
+        let outer_projection_alias_var = var!(outer_projection_alias_var);
+        let new_projection_alias_var = var!(new_projection_alias_var);
         let inner_alias_var = var!(inner_alias_var);
         move |egraph, root, subst| {
             if root == subst[inner_projection_var]
@@ -209,16 +210,28 @@ impl FlattenRules {
                     if let Some(_) = egraph[subst[outer_projection_expr_var]].data.expr_to_alias {
                         for inner_projection_alias in
                             var_iter!(egraph[subst[inner_projection_alias_var]], ProjectionAlias)
-                                .cloned()
                         {
-                            let inner_alias =
-                                egraph.add(LogicalPlanLanguage::FlattenPushdownReplacerInnerAlias(
-                                    FlattenPushdownReplacerInnerAlias(
-                                        inner_projection_alias.clone(),
+                            for outer_projection_alias in var_iter!(
+                                egraph[subst[outer_projection_alias_var]],
+                                ProjectionAlias
+                            ) {
+                                let new_projection_alias_id = if outer_projection_alias.is_none() {
+                                    subst[inner_projection_alias_var]
+                                } else {
+                                    subst[outer_projection_alias_var]
+                                };
+                                subst.insert(new_projection_alias_var, new_projection_alias_id);
+
+                                let inner_alias = egraph.add(
+                                    LogicalPlanLanguage::FlattenPushdownReplacerInnerAlias(
+                                        FlattenPushdownReplacerInnerAlias(
+                                            inner_projection_alias.clone(),
+                                        ),
                                     ),
-                                ));
-                            subst.insert(inner_alias_var, inner_alias);
-                            return true;
+                                );
+                                subst.insert(inner_alias_var, inner_alias);
+                                return true;
+                            }
                         }
                     }
                 }
@@ -238,8 +251,7 @@ impl FlattenRules {
         outer_aggregate_expr_var: &'static str,
         inner_projection_alias_var: &'static str,
         inner_alias_var: &'static str,
-    ) -> impl Fn(&mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut egg::Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut egg::Subst) -> bool {
         let inner_projection_var = var!(inner_projection_var);
         let cube_scan_var = var!(cube_scan_var);
         let members_var = var!(members_var);
@@ -288,11 +300,7 @@ impl FlattenRules {
         }
     }
 
-    fn list_pushdown_rules(
-        name: &str,
-        list_node: &str,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    fn list_pushdown_rules(name: &str, list_node: &str, rules: &mut Vec<CubeRewrite>) {
         rules.extend(replacer_push_down_node(
             name,
             list_node,
@@ -301,11 +309,7 @@ impl FlattenRules {
         ));
     }
 
-    fn flat_list_pushdown_rules(
-        name: &str,
-        list_type: ListType,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    fn flat_list_pushdown_rules(name: &str, list_type: ListType, rules: &mut Vec<CubeRewrite>) {
         rules.extend(replacer_flat_push_down_node(
             name,
             list_type,

@@ -219,8 +219,8 @@ impl From<Box<bincode::ErrorKind>> for CubeError {
     }
 }
 
-impl From<tokio::sync::watch::error::SendError<bool>> for CubeError {
-    fn from(v: tokio::sync::watch::error::SendError<bool>) -> Self {
+impl<T> From<tokio::sync::watch::error::SendError<T>> for CubeError {
+    fn from(v: tokio::sync::watch::error::SendError<T>) -> Self {
         CubeError::internal(v.to_string())
     }
 }
@@ -232,12 +232,6 @@ impl From<tokio::sync::watch::error::RecvError> for CubeError {
 }
 impl From<ParseIntError> for CubeError {
     fn from(v: ParseIntError) -> Self {
-        CubeError::internal(v.to_string())
-    }
-}
-
-impl From<reqwest::Error> for CubeError {
-    fn from(v: reqwest::Error) -> Self {
         CubeError::internal(v.to_string())
     }
 }

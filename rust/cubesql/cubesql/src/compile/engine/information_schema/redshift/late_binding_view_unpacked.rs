@@ -33,12 +33,13 @@ impl RedshiftLateBindingViewUnpackedBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.tablename.finish()));
-        columns.push(Arc::new(self.columnname.finish()));
-        columns.push(Arc::new(self.columntype.finish()));
-        columns.push(Arc::new(self.columnnum.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.tablename.finish()),
+            Arc::new(self.columnname.finish()),
+            Arc::new(self.columntype.finish()),
+            Arc::new(self.columnnum.finish()),
+        ];
 
         columns
     }

@@ -149,8 +149,6 @@ describe('SQLInterface', () => {
     const { checkAuth, meta } = methods;
 
     const instance = await native.registerInterface({
-      // nonce: '12345678910111213141516'.substring(0, 20),
-      port: 4545,
       pgPort: 5555,
       ...methods,
       canSwitchUserForSession: (_payload) => true,
@@ -298,14 +296,13 @@ describe('SQLInterface', () => {
 
       await connection.end();
     } finally {
-      await native.shutdownInterface(instance);
+      await native.shutdownInterface(instance, 'fast');
     }
   });
 
   it('streams cube sql over http', async () => {
     if (process.env.CUBESQL_STREAM_MODE === 'true') {
       const instance = await native.registerInterface({
-        port: 4545,
         pgPort: 5555,
         ...interfaceMethods(),
         canSwitchUserForSession: (_payload) => true,
@@ -343,13 +340,13 @@ describe('SQLInterface', () => {
 
       await native.execSql(
         instance,
-        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 100000;',
+        'SELECT order_date FROM KibanaSampleDataEcommerce ORDER BY order_date DESC LIMIT 100000;',
         cubeSqlStream
       );
 
       expect(rows).toBe(100000);
 
-      await native.shutdownInterface(instance);
+      await native.shutdownInterface(instance, 'fast');
     } else {
       expect(process.env.CUBESQL_STREAM_MODE).toBeFalsy();
     }

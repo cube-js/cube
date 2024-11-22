@@ -1,5 +1,4 @@
 import chokidar from 'chokidar';
-import { FSWatcher } from 'fs';
 
 import { internalExceptions } from '@cubejs-backend/shared';
 
@@ -7,7 +6,7 @@ import { CubeCloudClient, AuthObject } from './cloud';
 import { DeployController } from './deploy';
 
 export class LivePreviewWatcher {
-  private watcher: FSWatcher | null = null;
+  private watcher: chokidar.FSWatcher | null = null;
 
   private handleQueueTimeout: NodeJS.Timeout | null = null;
 

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "incremental": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "allowJs": true,
+    "checkJs": false,
+    "noImplicitAny": true,
+    "jsx": "react-jsx",
+    "target": "ES2020",
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "ES2020",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "downlevelIteration": true,
+    "useUnknownInCatchVariables": false,
+    "typeRoots": ["./types.d.ts"]
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

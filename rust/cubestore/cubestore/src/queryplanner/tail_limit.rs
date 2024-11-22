@@ -1,7 +1,7 @@
-use arrow::datatypes::SchemaRef;
-use arrow::error::{ArrowError, Result as ArrowResult};
-use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::error::{ArrowError, Result as ArrowResult};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::common::{collect, combine_batches};
@@ -182,8 +182,8 @@ impl RecordBatchStream for TailLimitStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::Int64Array;
-    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::array::Int64Array;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::physical_plan::collect as result_collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use itertools::Itertools;

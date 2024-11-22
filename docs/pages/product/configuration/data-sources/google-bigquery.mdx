@@ -11,7 +11,9 @@ redirect_from:
 
 In order to connect Google BigQuery to Cube, you need to provide service account
 credentials. Cube requires the service account to have **BigQuery Data Viewer**
-and **BigQuery Job User** roles enabled. You can learn more about acquiring
+and **BigQuery Job User** roles enabled. If you plan to use pre-aggregations, 
+the account will need the **BigQuery Data Editor** role instead of **BigQuery Data Viewer**. 
+You can learn more about acquiring
 Google BigQuery credentials [here][bq-docs-getting-started].
 
 </InfoBox>
@@ -60,20 +62,11 @@ The following fields are required when creating a BigQuery connection:
   src="https://ucarecdn.com/9fdfbd5d-5556-48b3-aa6e-fff0f24b30e9/"
 />
 
-Cube Cloud also supports connecting to data sources within private VPCs. If you
-already have VPCs enabled in your account, check out the [VPC
-documentation][ref-cloud-conf-vpc] to learn how to get started.
+Cube Cloud also supports connecting to data sources within private VPCs
+if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
+[VPC connectivity guide][ref-cloud-conf-vpc] for details.
 
-<SuccessBox>
-
-VPC connectivity is available in Cube Cloud on
-[Enterprise](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
-details.
-
-</SuccessBox>
-
-[cube-pricing]: https://cube.dev/pricing/
-[cube-contact]: https://cube.dev/contact/
+[ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /product/deployment/cloud/vpc
 
 ## Environment Variables

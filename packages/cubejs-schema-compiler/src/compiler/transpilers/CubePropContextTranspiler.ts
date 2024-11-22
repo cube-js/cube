@@ -19,11 +19,15 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|time_dimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensions|time_dimensions)\.\d+\.dimension$/,
+  /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(outputColumnTypes|output_column_types)\.\d+\.member$/,
   /^contextMembers$/,
   /^includes$/,
   /^excludes$/,
   /^hierarchies\.[0-9]+\.levels$/,
   /^cubes\.[0-9]+\.(joinPath|join_path)$/,
+  /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.member$/,
+  /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.values$/,
+  /^(accessPolicy|access_policy)\.[0-9]+\.conditions.[0-9]+\.if$/,
 ];
 
 export const transpiledFields: Set<String> = new Set<String>();

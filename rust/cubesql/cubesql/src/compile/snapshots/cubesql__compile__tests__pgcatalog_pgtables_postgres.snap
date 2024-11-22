@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 8960
 expression: "execute_query(\"SELECT * FROM pg_catalog.pg_tables\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
@@ -9,4 +10,5 @@ expression: "execute_query(\"SELECT * FROM pg_catalog.pg_tables\".to_string(),\n
 | public     | Logs                      | ovr        |            | true       | false    | false       | false       |
 | public     | NumberCube                | ovr        |            | true       | false    | false       | false       |
 | public     | WideCube                  | ovr        |            | true       | false    | false       | false       |
+| public     | MultiTypeCube             | ovr        |            | true       | false    | false       | false       |
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+

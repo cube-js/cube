@@ -74,8 +74,9 @@ class Configuration:
     repository_factory: Callable
     schema_version: Union[str, Callable[[RequestContext], str]]
     semantic_layer_sync: Union[Dict, Callable[[], Dict]]
-    pre_aggregations_schema: Union[Callable[[RequestContext], str]]
+    pre_aggregations_schema: Union[Callable[[RequestContext], str], str]
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
+    context_to_roles: Callable[[RequestContext], list[str]]
 
     def __init__(self):
         self.web_sockets = None
@@ -123,6 +124,7 @@ class Configuration:
         self.semantic_layer_sync = None
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
+        self.context_to_roles = None
 
     def __call__(self, func):
         if isinstance(func, str):

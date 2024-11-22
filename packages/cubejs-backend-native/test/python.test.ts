@@ -46,16 +46,33 @@ suite('Python Config', () => {
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
+      contextToRoles: expect.any(Function),
     });
 
     if (!config.checkAuth) {
       throw new Error('checkAuth was not defined in config.py');
     }
 
-    await config.checkAuth(
+    const result = await config.checkAuth(
       { requestId: 'test' },
       'MY_SECRET_TOKEN'
     );
+
+    expect(result).toEqual({
+      security_context: {
+        sub: '1234567890',
+        iat: 1516239022,
+        user_id: 42
+      },
+    });
+  });
+
+  test('context_to_roles', async () => {
+    if (!config.contextToRoles) {
+      throw new Error('contextToRoles was not defined in config.py');
+    }
+
+    expect(await config.contextToRoles({})).toEqual(['admin']);
   });
 
   test('context_to_api_scopes', async () => {

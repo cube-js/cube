@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::{sql::Session, CubeError};
-
-use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
+use super::{convert_sql_to_cube_query, CompilationResult, QueryPlan};
+use crate::{sql::Session, transport::MetaContext, CubeError};
 
 #[async_trait]
 pub trait SqlService: Send + Sync {

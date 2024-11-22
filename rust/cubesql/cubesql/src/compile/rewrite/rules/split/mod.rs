@@ -11,11 +11,10 @@ pub mod top_level;
 
 use crate::{
     compile::rewrite::{
-        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr,
-        analysis::LogicalPlanAnalysis,
-        fun_expr, list_rewrite_with_lists_and_vars, original_expr_name,
+        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr, fun_expr,
+        fun_expr_var_arg, list_rewrite_with_lists_and_vars, original_expr_name,
         projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::{members::MemberRules, replacer_flat_push_down_node, replacer_push_down_node},
         transforming_chain_rewrite, AliasExprAlias, ListApplierListPattern, ListPattern, ListType,
         LogicalPlanLanguage,
@@ -24,7 +23,6 @@ use crate::{
     transport::MetaContext,
     var,
 };
-use egg::Rewrite;
 use std::{fmt::Display, sync::Arc};
 
 pub struct SplitRules {
@@ -34,7 +32,7 @@ pub struct SplitRules {
 }
 
 impl RewriteRules for SplitRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = Vec::new();
 
         self.top_level_rules(&mut rules);
@@ -69,7 +67,7 @@ impl SplitRules {
         name: &str,
         node: impl Fn(String) -> String,
         projection_rules: bool,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         rules.extend(vec![
             rewrite(
@@ -136,23 +134,127 @@ impl SplitRules {
         }
     }
 
+    pub fn scalar_fn_args_pass_through_rules(
+        &self,
+        fun_name: &(impl Display + ?Sized),
+        projection_rules: bool,
+        rules: &mut Vec<CubeRewrite>,
+    ) {
+        rules.extend(vec![
+            rewrite(
+                &format!("split-{fun_name}-args-push-down-aggregate"),
+                aggregate_split_pushdown_replacer(
+                    fun_expr_var_arg(fun_name, "?args"),
+                    "?list_node",
+                    "?alias_to_cube",
+                ),
+                fun_expr_var_arg(
+                    fun_name,
+                    aggregate_split_pushdown_replacer("?args", "?list_node", "?alias_to_cube"),
+                ),
+            ),
+            rewrite(
+                &format!("split-{fun_name}-args-pull-up-aggregate"),
+                fun_expr_var_arg(
+                    fun_name,
+                    aggregate_split_pullup_replacer(
+                        "?inner_expr",
+                        "?outer_expr",
+                        "?list_node",
+                        "?alias_to_cube",
+                    ),
+                ),
+                aggregate_split_pullup_replacer(
+                    "?inner_expr",
+                    fun_expr_var_arg(fun_name, "?outer_expr"),
+                    "?list_node",
+                    "?alias_to_cube",
+                ),
+            ),
+        ]);
+
+        if projection_rules {
+            rules.extend(vec![
+                rewrite(
+                    &format!("split-{fun_name}-args-push-down-projection"),
+                    projection_split_pushdown_replacer(
+                        fun_expr_var_arg(fun_name, "?args"),
+                        "?list_node",
+                        "?alias_to_cube",
+                    ),
+                    fun_expr_var_arg(
+                        fun_name,
+                        projection_split_pushdown_replacer("?args", "?list_node", "?alias_to_cube"),
+                    ),
+                ),
+                rewrite(
+                    &format!("split-{fun_name}-args-pull-up-projection"),
+                    fun_expr_var_arg(
+                        fun_name,
+                        projection_split_pullup_replacer(
+                            "?inner_expr",
+                            "?outer_expr",
+                            "?list_node",
+                            "?alias_to_cube",
+                        ),
+                    ),
+                    projection_split_pullup_replacer(
+                        "?inner_expr",
+                        fun_expr_var_arg(fun_name, "?outer_expr"),
+                        "?list_node",
+                        "?alias_to_cube",
+                    ),
+                ),
+            ]);
+        }
+    }
+
     pub fn single_arg_split_point_rules(
         &self,
         name: &str,
-        match_rule: impl Fn() -> String,
-        inner_rule: impl Fn() -> String,
-        outer_rule: impl Fn(String) -> String,
-        transform_fn: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
+        match_rule: impl Fn() -> String + Clone,
+        inner_rule: impl Fn() -> String + Clone,
+        outer_rule: impl Fn(String) -> String + Clone,
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
             + Sync
             + Send
             + Clone
             + 'static,
         projection_rules: bool,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
+    ) {
+        if projection_rules {
+            self.single_arg_split_point_rules_projection(
+                name,
+                match_rule.clone(),
+                inner_rule.clone(),
+                outer_rule.clone(),
+                transform_fn.clone(),
+                rules,
+            );
+        }
+        self.single_arg_split_point_rules_aggregate(
+            name,
+            match_rule,
+            inner_rule,
+            outer_rule,
+            transform_fn,
+            rules,
+        );
+    }
+
+    pub fn single_arg_split_point_rules_aggregate(
+        &self,
+        name: &str,
+        match_rule: impl Fn() -> String,
+        inner_rule: impl Fn() -> String,
+        outer_rule: impl Fn(String) -> String,
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
+            + Sync
+            + Send
+            + Clone
+            + 'static,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         rules.push(transforming_chain_rewrite(
             &format!("split-{}-point-aggregate", name),
@@ -175,29 +277,42 @@ impl SplitRules {
                 transform_fn.clone(),
             ),
         ));
-        if projection_rules {
-            rules.push(transforming_chain_rewrite(
-                &format!("split-{}-point-projection", name),
-                projection_split_pushdown_replacer("?match_expr", "?list_node", "?alias_to_cube"),
-                vec![("?match_expr", match_rule())],
-                projection_split_pullup_replacer(
-                    alias_expr(inner_rule(), "?inner_alias"),
-                    alias_expr(
-                        outer_rule("?outer_alias_column".to_string()),
-                        "?inner_alias",
-                    ),
-                    "?list_node",
-                    "?alias_to_cube",
-                ),
-                self.transform_single_arg_split_point(
-                    "?match_expr",
+    }
+
+    pub fn single_arg_split_point_rules_projection(
+        &self,
+        name: &str,
+        match_rule: impl Fn() -> String,
+        inner_rule: impl Fn() -> String,
+        outer_rule: impl Fn(String) -> String,
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
+            + Sync
+            + Send
+            + Clone
+            + 'static,
+        rules: &mut Vec<CubeRewrite>,
+    ) {
+        rules.push(transforming_chain_rewrite(
+            &format!("split-{}-point-projection", name),
+            projection_split_pushdown_replacer("?match_expr", "?list_node", "?alias_to_cube"),
+            vec![("?match_expr", match_rule())],
+            projection_split_pullup_replacer(
+                alias_expr(inner_rule(), "?inner_alias"),
+                alias_expr(
+                    outer_rule("?outer_alias_column".to_string()),
                     "?inner_alias",
-                    "?outer_alias_column",
-                    true,
-                    transform_fn.clone(),
                 ),
-            ));
-        }
+                "?list_node",
+                "?alias_to_cube",
+            ),
+            self.transform_single_arg_split_point(
+                "?match_expr",
+                "?inner_alias",
+                "?outer_alias_column",
+                true,
+                transform_fn.clone(),
+            ),
+        ));
     }
 
     fn transform_single_arg_split_point(
@@ -206,18 +321,8 @@ impl SplitRules {
         inner_alias_var: &str,
         outer_alias_column_var: &str,
         is_projection: bool,
-        transform_fn: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
-            + Clone
-            + Send
-            + Sync,
-    ) -> impl Fn(&mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut egg::Subst) -> bool
-           + Sync
-           + Send
-           + Clone {
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Clone + Send + Sync,
+    ) -> impl Fn(&mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let match_expr_var = var!(match_expr_var);
         let inner_alias_var = var!(inner_alias_var);
         let outer_alias_column_var = var!(outer_alias_column_var);
@@ -242,11 +347,7 @@ impl SplitRules {
         }
     }
 
-    fn list_pushdown_pullup_rules(
-        name: &str,
-        list_node: &str,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    fn list_pushdown_pullup_rules(name: &str, list_node: &str, rules: &mut Vec<CubeRewrite>) {
         let possible_inner_list_nodes = Self::possible_inner_list_nodes();
 
         // Aggregate split replacer
@@ -321,7 +422,7 @@ impl SplitRules {
     fn flat_list_pushdown_pullup_rules(
         name: &str,
         list_type: ListType,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         let possible_inner_list_types = Self::possible_inner_flat_list_types();
 
@@ -418,7 +519,7 @@ impl SplitRules {
         substitute_list_node: &str,
         replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_nodes: &Vec<String>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_nodes
             .iter()
             .map(|inner_list_node| {
@@ -455,7 +556,7 @@ impl SplitRules {
         replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_types: &Vec<ListType>,
         top_level_elem_vars: &[&str],
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_types
             .iter()
             .map(|inner_list_type| {
@@ -501,7 +602,7 @@ impl SplitRules {
         push_down_replacer_node: impl Fn(String, String) -> String,
         pull_up_replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_nodes: &Vec<String>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_nodes
             .iter()
             .map(|inner_list_node| {
@@ -525,7 +626,7 @@ impl SplitRules {
         push_down_replacer_node: impl Fn(String, String) -> String,
         pull_up_replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_types: &Vec<ListType>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_types
             .iter()
             .map(|inner_list_type| {

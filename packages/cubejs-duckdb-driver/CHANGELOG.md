@@ -3,6 +3,471 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.1.6](https://github.com/cube-js/cube/compare/v1.1.5...v1.1.6) (2024-11-17)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.1.5](https://github.com/cube-js/cube/compare/v1.1.4...v1.1.5) (2024-11-13)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.1.4](https://github.com/cube-js/cube/compare/v1.1.3...v1.1.4) (2024-11-12)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.1.3](https://github.com/cube-js/cube/compare/v1.1.2...v1.1.3) (2024-11-08)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.1.2](https://github.com/cube-js/cube/compare/v1.1.1...v1.1.2) (2024-11-01)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.1.1](https://github.com/cube-js/cube/compare/v1.1.0...v1.1.1) (2024-10-31)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+# [1.1.0](https://github.com/cube-js/cube/compare/v1.0.4...v1.1.0) (2024-10-24)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.0.4](https://github.com/cube-js/cube/compare/v1.0.3...v1.0.4) (2024-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.0.3](https://github.com/cube-js/cube/compare/v1.0.2...v1.0.3) (2024-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.0.2](https://github.com/cube-js/cube/compare/v1.0.1...v1.0.2) (2024-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [1.0.1](https://github.com/cube-js/cube/compare/v1.0.0...v1.0.1) (2024-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+# [1.0.0](https://github.com/cube-js/cube/compare/v0.36.11...v1.0.0) (2024-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.11](https://github.com/cube-js/cube/compare/v0.36.10...v0.36.11) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.10](https://github.com/cube-js/cube/compare/v0.36.9...v0.36.10) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.9](https://github.com/cube-js/cube/compare/v0.36.8...v0.36.9) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.8](https://github.com/cube-js/cube/compare/v0.36.7...v0.36.8) (2024-10-11)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.7](https://github.com/cube-js/cube/compare/v0.36.6...v0.36.7) (2024-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.6](https://github.com/cube-js/cube/compare/v0.36.5...v0.36.6) (2024-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.5](https://github.com/cube-js/cube/compare/v0.36.4...v0.36.5) (2024-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.4](https://github.com/cube-js/cube/compare/v0.36.3...v0.36.4) (2024-09-27)
+
+
+### Bug Fixes
+
+* **duckdb-driver:** fix timeStampCast and dateBin ([#8748](https://github.com/cube-js/cube/issues/8748)) ([a292c3f](https://github.com/cube-js/cube/commit/a292c3faea4abce13a527233df59a22be0577408))
+
+
+
+
+
+## [0.36.3](https://github.com/cube-js/cube/compare/v0.36.2...v0.36.3) (2024-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.2](https://github.com/cube-js/cube/compare/v0.36.1...v0.36.2) (2024-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.36.1](https://github.com/cube-js/cube/compare/v0.36.0...v0.36.1) (2024-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+# [0.36.0](https://github.com/cube-js/cube/compare/v0.35.81...v0.36.0) (2024-09-13)
+
+
+* chore!: Support for Node.js 16 was removed ([8b83021](https://github.com/cube-js/cube/commit/8b830214ab3d16ebfadc65cb9587a08b0496fb93))
+
+
+### Features
+
+* **schema-compiler:** custom granularity support ([#8537](https://github.com/cube-js/cube/issues/8537)) ([2109849](https://github.com/cube-js/cube/commit/21098494353b9b6274b534b6c656154cb8451c7b))
+
+
+### BREAKING CHANGES
+
+* Node.js is EOL, it was deprecated in v0.35.0
+
+
+
+
+
+## [0.35.81](https://github.com/cube-js/cube/compare/v0.35.80...v0.35.81) (2024-09-12)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.80](https://github.com/cube-js/cube/compare/v0.35.79...v0.35.80) (2024-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.77](https://github.com/cube-js/cube/compare/v0.35.76...v0.35.77) (2024-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.76](https://github.com/cube-js/cube/compare/v0.35.75...v0.35.76) (2024-08-24)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.75](https://github.com/cube-js/cube/compare/v0.35.74...v0.35.75) (2024-08-22)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.74](https://github.com/cube-js/cube/compare/v0.35.73...v0.35.74) (2024-08-22)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.73](https://github.com/cube-js/cube/compare/v0.35.72...v0.35.73) (2024-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.72](https://github.com/cube-js/cube/compare/v0.35.71...v0.35.72) (2024-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.71](https://github.com/cube-js/cube/compare/v0.35.70...v0.35.71) (2024-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.70](https://github.com/cube-js/cube/compare/v0.35.69...v0.35.70) (2024-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.69](https://github.com/cube-js/cube/compare/v0.35.68...v0.35.69) (2024-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.68](https://github.com/cube-js/cube/compare/v0.35.67...v0.35.68) (2024-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.67](https://github.com/cube-js/cube/compare/v0.35.66...v0.35.67) (2024-08-07)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.66](https://github.com/cube-js/cube/compare/v0.35.65...v0.35.66) (2024-08-06)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.65](https://github.com/cube-js/cube/compare/v0.35.64...v0.35.65) (2024-07-26)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.64](https://github.com/cube-js/cube/compare/v0.35.63...v0.35.64) (2024-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.63](https://github.com/cube-js/cube/compare/v0.35.62...v0.35.63) (2024-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.61](https://github.com/cube-js/cube/compare/v0.35.60...v0.35.61) (2024-07-19)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.58](https://github.com/cube-js/cube/compare/v0.35.57...v0.35.58) (2024-07-10)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.57](https://github.com/cube-js/cube/compare/v0.35.56...v0.35.57) (2024-07-05)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.56](https://github.com/cube-js/cube/compare/v0.35.55...v0.35.56) (2024-07-03)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.55](https://github.com/cube-js/cube/compare/v0.35.54...v0.35.55) (2024-06-28)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.54](https://github.com/cube-js/cube/compare/v0.35.53...v0.35.54) (2024-06-26)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.53](https://github.com/cube-js/cube/compare/v0.35.52...v0.35.53) (2024-06-26)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.52](https://github.com/cube-js/cube/compare/v0.35.51...v0.35.52) (2024-06-20)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.35.51](https://github.com/cube-js/cube/compare/v0.35.50...v0.35.51) (2024-06-20)
+
+
+### Features
+
+* **duckdb-driver:** Upgrade to DuckDB 1.0.0 ([#8373](https://github.com/cube-js/cube/issues/8373)) ([e41fa9f](https://github.com/cube-js/cube/commit/e41fa9fda7a4a593baf8e514aa9083e4ee1edb6a))
+
+
+
+
+
 ## [0.35.50](https://github.com/cube-js/cube/compare/v0.35.49...v0.35.50) (2024-06-17)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

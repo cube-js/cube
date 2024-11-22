@@ -29,7 +29,7 @@ impl CLReprPython for CLRepr {
             return Ok(Self::Null);
         }
 
-        return Ok(if v.get_type().is_subclass_of::<PyString>()? {
+        Ok(if v.get_type().is_subclass_of::<PyString>()? {
             let string_type = if v.hasattr("is_safe")? {
                 StringType::Safe
             } else {
@@ -123,7 +123,7 @@ impl CLReprPython for CLRepr {
             }
 
             Self::PythonRef(PythonRef::PyObject(v.into()))
-        });
+        })
     }
 
     fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr> {

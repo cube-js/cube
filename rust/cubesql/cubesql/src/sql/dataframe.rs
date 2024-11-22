@@ -422,9 +422,9 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     }
 }
 
-pub fn batch_to_dataframe(
+pub fn batches_to_dataframe(
     schema: &Schema,
-    batches: &Vec<RecordBatch>,
+    batches: Vec<RecordBatch>,
 ) -> Result<DataFrame, CubeError> {
     let mut cols = Vec::with_capacity(schema.fields().len());
     let mut all_rows = vec![];
@@ -437,7 +437,7 @@ pub fn batch_to_dataframe(
         ));
     }
 
-    for batch in batches.iter() {
+    for batch in batches.into_iter() {
         if batch.num_rows() == 0 {
             continue;
         }

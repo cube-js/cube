@@ -1,10 +1,10 @@
 use crate::queryplanner::serialized_plan::{RowFilter, RowRange};
 use crate::table::data::cmp_partition_key;
-use arrow::array::ArrayRef;
-use arrow::datatypes::SchemaRef;
-use arrow::error::ArrowError;
-use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::error::ArrowError;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext::stream::StreamWithSchema;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::{

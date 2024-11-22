@@ -15,6 +15,10 @@ describe('ScaffoldingSchema', () => {
         name: 'customer_id',
         type: 'integer',
         attributes: []
+      }, {
+        name: 'bool_value',
+        type: 'boolean',
+        attributes: []
       }],
       customers: [{
         name: 'id',
@@ -301,6 +305,14 @@ describe('ScaffoldingSchema', () => {
             ],
             title: 'Id',
             isPrimaryKey: true
+          },
+          {
+            isPrimaryKey: false,
+            name: 'bool_value',
+            title: 'Bool Value',
+            types: [
+              'boolean'
+            ],
           }
         ],
         joins: [
@@ -433,6 +445,14 @@ describe('ScaffoldingSchema', () => {
             ],
             title: 'Id',
             isPrimaryKey: true
+          },
+          {
+            isPrimaryKey: false,
+            name: 'bool_value',
+            title: 'Bool Value',
+            types: [
+              'boolean'
+            ],
           }
         ],
         joins: [

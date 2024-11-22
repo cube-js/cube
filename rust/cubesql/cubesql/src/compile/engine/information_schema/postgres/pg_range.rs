@@ -62,15 +62,15 @@ impl PgCatalogRangeBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.rngtypid.finish()));
-        columns.push(Arc::new(self.rngsubtype.finish()));
-        columns.push(Arc::new(self.rngmultitypid.finish()));
-        columns.push(Arc::new(self.rngcollation.finish()));
-        columns.push(Arc::new(self.rngsubopc.finish()));
-        columns.push(Arc::new(self.rngcanonical.finish()));
-        columns.push(Arc::new(self.rngsubdiff.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.rngtypid.finish()),
+            Arc::new(self.rngsubtype.finish()),
+            Arc::new(self.rngmultitypid.finish()),
+            Arc::new(self.rngcollation.finish()),
+            Arc::new(self.rngsubopc.finish()),
+            Arc::new(self.rngcanonical.finish()),
+            Arc::new(self.rngsubdiff.finish()),
+        ];
 
         columns
     }

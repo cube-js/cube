@@ -6,24 +6,21 @@ redirect_from:
 # Bubble
 
 [Bubble](https://bubble.io/) is one of the oldest and most comprehensive
-low-code app-building platforms on the market. You can connect a Cube deployment
-to Bubble using Cube’s [REST API](/reference/rest-api).
+low-code app-building platforms on the market.
 
 Here's a short video guide on how to connect Bubble to Cube.
 
 <LoomVideo url="https://www.loom.com/embed/554bee2daa7e42529b8eb4d0494e6674" />
 
-## Use REST API in Cube
+## Connect from Cube Cloud
 
-### Cube Cloud
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Bubble</Btn> to get
+detailed instructions.
 
-Click the "How to connect" link on the Overview page, navigate to the REST API
-tab. You will see your connection credentials, the REST API URL and the
-authorization token:
+## Connect from Cube Core
 
-<Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
-
-### Self-hosted Cube
+You can connect a Cube deployment to Bubble using the [REST API](/reference/rest-api).
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
@@ -36,11 +33,13 @@ Please check the [Security page](/product/auth#generating-json-web-tokens-jwt)
 to learn how to generate a token. We suggest generating a long-lived JWT that
 won't expire soon.
 
-## Add an API connector plugin to your Bubble app
+## Connecting from Bubble
+
+### Add an API connector plugin
 
 Navigate to the plugins. Select and install the API connector plugin.
 
-## Create a new API in Bubble
+### Create a new API
 
 Click "Add another API".
 
@@ -52,7 +51,7 @@ all calls by setting `content-type` to `application/json`.
 
 <Screenshot src="https://ucarecdn.com/8bf3d936-1886-4bc0-b6c4-10bb76adb21f/" />
 
-## Create a POST request in Bubble
+### Create a POST request
 
 Click "Add another call".
 
@@ -73,7 +72,7 @@ your JSON query.
 
 Next, hit "Initialize / Reinitialize call".
 
-## Create a workflow in Bubble
+### Create a workflow
 
 First, add a "Page is loaded" event. Add an action that uses the API connector
 plugin. Next, add another action to set the state of an element. Select the
@@ -84,7 +83,7 @@ state's value you will need to select "Result of step 1" and the `data` field.
 
 <Screenshot src="https://ucarecdn.com/9f7a98e2-6ba8-463b-bbee-059fd29da4ab/" />
 
-## Display the data in Bubble
+### Display the data
 
 Bubble has an amazing feature where you can drag and drop UI components into the
 design dashboard.

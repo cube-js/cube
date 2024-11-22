@@ -146,7 +146,20 @@ export class YamlCompiler {
             return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
           } else if (Array.isArray(obj)) {
             const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
-              const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+              let ast: t.Program | t.NullLiteral | t.BooleanLiteral | t.NumericLiteral | null = null;
+              // Special case for accessPolicy.rowLevel.filter.values and other values-like fields
+              if (propertyPath[propertyPath.length - 1] === 'values') {
+                if (typeof code === 'string') {
+                  ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code)}"`, errorsReport);
+                } else if (typeof code === 'boolean') {
+                  ast = t.booleanLiteral(code);
+                } else if (typeof code === 'number') {
+                  ast = t.numericLiteral(code);
+                }
+              }
+              if (ast === null) {
+                ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+              }
               return this.extractProgramBodyIfNeeded(ast);
             }).filter(ast => !!ast)))]);
             return this.astIntoArrowFunction(resultAst, '', cubeName);
@@ -294,19 +307,25 @@ export class YamlCompiler {
       return {};
     }
 
-    const remapped = yamlArray.map(({ name, indexes, ...rest }) => {
-      if (memberType === 'preAggregation' && indexes) {
-        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
-      }
-
+    const remapped = yamlArray.map(({ name, indexes, granularities, ...rest }) => {
       if (!name) {
         errorsReport.error(`name isn't defined for ${memberType}: ${JSON.stringify(rest)}`);
         return {};
-      } else if (indexes) {
-        return { [name]: { indexes, ...rest } };
-      } else {
-        return { [name]: rest };
       }
+
+      const res = { [name]: {} };
+      if (memberType === 'preAggregation' && indexes) {
+        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
+        res[name] = { indexes, ...res[name] };
+      }
+
+      if (memberType === 'dimension' && granularities) {
+        granularities = this.yamlArrayToObj(granularities || [], `${memberType}.granularity`, errorsReport);
+        res[name] = { granularities, ...res[name] };
+      }
+
+      res[name] = { ...res[name], ...rest };
+      return res;
     });
 
     return remapped.reduce((a, b) => ({ ...a, ...b }), {});

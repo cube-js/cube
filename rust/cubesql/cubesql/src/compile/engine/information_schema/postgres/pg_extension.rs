@@ -42,16 +42,16 @@ impl PgCatalogExtensionBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.extname.finish()));
-        columns.push(Arc::new(self.extowner.finish()));
-        columns.push(Arc::new(self.extnamespace.finish()));
-        columns.push(Arc::new(self.extrelocatable.finish()));
-        columns.push(Arc::new(self.extversion.finish()));
-        columns.push(Arc::new(self.extconfig.finish()));
-        columns.push(Arc::new(self.extcondition.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.extname.finish()),
+            Arc::new(self.extowner.finish()),
+            Arc::new(self.extnamespace.finish()),
+            Arc::new(self.extrelocatable.finish()),
+            Arc::new(self.extversion.finish()),
+            Arc::new(self.extconfig.finish()),
+            Arc::new(self.extcondition.finish()),
+        ];
 
         columns
     }

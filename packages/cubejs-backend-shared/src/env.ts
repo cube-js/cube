@@ -9,7 +9,7 @@ export class InvalidConfiguration extends Error {
   }
 }
 
-export function convertTimeStrToMs(
+export function convertTimeStrToSeconds(
   input: string,
   envName: string,
   description: string = 'Must be a number in seconds or duration string (1s, 1m, 1h).',
@@ -126,16 +126,12 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
     return false;
   }
 
-  return convertTimeStrToMs(
+  return convertTimeStrToSeconds(
     input,
     envName,
     'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
   );
 }
-
-let legacyRedisPasswordAlerted: boolean = false;
-let legacyRedisUrlAlerted: boolean = false;
-let legacyRedisTlsAlerted: boolean = false;
 
 const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
@@ -196,6 +192,7 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
+  nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').asBool(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -503,7 +500,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Max polling interval. Currenly used in BigQuery and Databricks.
+   * Max polling interval. Currently used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
   dbPollMaxInterval: ({
@@ -513,11 +510,11 @@ const variables: Record<string, (...args: any) => any> = {
   }) => {
     const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
     const value = process.env[key] || '5s';
-    return convertTimeStrToMs(value, key);
+    return convertTimeStrToSeconds(value, key);
   },
 
   /**
-   * Polling timeout. Currenly used in BigQuery, Dremio and Athena.
+   * Polling timeout. Currently used in BigQuery, Dremio and Athena.
    * TODO: clarify this env.
    */
   dbPollTimeout: ({
@@ -528,14 +525,14 @@ const variables: Record<string, (...args: any) => any> = {
     const key = keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource);
     const value = process.env[key];
     if (value) {
-      return convertTimeStrToMs(value, key);
+      return convertTimeStrToSeconds(value, key);
     } else {
       return null;
     }
   },
 
   /**
-   * Query timeout. Currenly used in BigQuery, Dremio, Postgres, Snowflake
+   * Query timeout. Currently used in BigQuery, ClickHouse, Dremio, Postgres, Snowflake
    * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *
@@ -549,7 +546,7 @@ const variables: Record<string, (...args: any) => any> = {
   } = {}) => {
     const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
     const value = process.env[key] || '10m';
-    return convertTimeStrToMs(value, key);
+    return convertTimeStrToSeconds(value, key);
   },
 
   /**
@@ -721,7 +718,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * AWS Key for the AWS based export bucket srorage.
+   * AWS Key for the AWS based export bucket storage.
    */
   dbExportBucketAwsKey: ({
     dataSource,
@@ -734,7 +731,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * AWS Secret for the AWS based export bucket srorage.
+   * AWS Secret for the AWS based export bucket storage.
    */
   dbExportBucketAwsSecret: ({
     dataSource,
@@ -747,7 +744,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * AWS Region for the AWS based export bucket srorage.
+   * AWS Region for the AWS based export bucket storage.
    */
   dbExportBucketAwsRegion: ({
     dataSource,
@@ -760,7 +757,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Azure Key for the Azure based export bucket srorage.
+   * Azure Key for the Azure based export bucket storage.
    */
   dbExportBucketAzureKey: ({
     dataSource,
@@ -769,6 +766,58 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure SAS Token for the Azure based export bucket storage.
+   */
+  dbExportAzureSasToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Client ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureClientId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Federated Token File Path for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTokenFilePAth: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_FEDERATED_TOKEN_FILE', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Tenant ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTenantId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID', dataSource)
     ]
   ),
 
@@ -1365,6 +1414,32 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake OAuth token path.
+   */
+  snowflakeOAuthTokenPath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake host.
+   */
+  snowflakeHost: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_HOST', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake private key.
    */
   snowflakePrivateKey: ({
@@ -1437,7 +1512,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN', dataSource)
     ]
   ),
-  
+
   duckdbDatabasePath: ({
     dataSource
   }: {
@@ -1457,7 +1532,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_REGION', dataSource)
     ]
   ),
-  
+
   duckdbS3AccessKeyId: ({
     dataSource
   }: {
@@ -1467,7 +1542,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID', dataSource)
     ]
   ),
-  
+
   duckdbS3SecretAccessKeyId: ({
     dataSource
   }: {
@@ -1477,7 +1552,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY', dataSource)
     ]
   ),
-  
+
   duckdbS3Endpoint: ({
     dataSource
   }: {
@@ -1537,7 +1612,11 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN', dataSource)
     ]
   ),
-  
+
+  /** ***************************************************************
+   * Presto Driver                                                  *
+   **************************************************************** */
+
   /**
    * Presto catalog.
    */
@@ -1548,6 +1627,23 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
+    ]
+  ),
+
+  /** ***************************************************************
+   * Pinot Driver                                                  *
+   **************************************************************** */
+
+  /**
+   * Pinot / Startree Auth Token
+   */
+  pinotAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PINOT_AUTH_TOKEN', dataSource)
     ]
   ),
 
@@ -1570,85 +1666,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('30')
     .asInt(),
 
-  // Redis
-  redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
-    .default('2')
-    .asInt(),
-  redisPoolMax: () => get('CUBEJS_REDIS_POOL_MAX')
-    .default('1000')
-    .asInt(),
-  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
-    .default('false')
-    .asBoolStrict(),
-  redisAcquireTimeout: () => get('CUBEJS_REDIS_ACQUIRE_TIMEOUT')
-    .default('5000')
-    .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
-  redisPassword: () => {
-    const redisPassword = get('CUBEJS_REDIS_PASSWORD')
-      .asString();
-    if (redisPassword) {
-      return redisPassword;
-    }
-
-    const legacyRedisPassword = get('REDIS_PASSWORD')
-      .asString();
-    if (legacyRedisPassword) {
-      if (!legacyRedisPasswordAlerted) {
-        displayCLIWarning('REDIS_PASSWORD is deprecated and will be removed, please use CUBEJS_REDIS_PASSWORD.');
-
-        legacyRedisPasswordAlerted = true;
-      }
-
-      return legacyRedisPassword;
-    }
-
-    return undefined;
-  },
-  redisUrl: () => {
-    const redisUrl = get('CUBEJS_REDIS_URL')
-      .asString();
-    if (redisUrl) {
-      return redisUrl;
-    }
-
-    const legacyRedisUrl = get('REDIS_URL')
-      .asString();
-    if (legacyRedisUrl) {
-      if (!legacyRedisUrlAlerted) {
-        displayCLIWarning('REDIS_URL is deprecated and will be removed, please use CUBEJS_REDIS_URL.');
-
-        legacyRedisUrlAlerted = true;
-      }
-
-      return legacyRedisUrl;
-    }
-
-    return undefined;
-  },
-  redisTls: () => {
-    const redisTls = get('CUBEJS_REDIS_TLS')
-      .asBoolStrict();
-    if (redisTls) {
-      return redisTls;
-    }
-
-    const legacyRedisTls = get('REDIS_TLS')
-      .asBoolStrict();
-    if (legacyRedisTls) {
-      if (!legacyRedisTlsAlerted) {
-        displayCLIWarning('REDIS_TLS is deprecated and will be removed, please use CUBEJS_REDIS_TLS.');
-
-        legacyRedisTlsAlerted = true;
-      }
-
-      return legacyRedisTls;
-    }
-
-    return false;
-  },
   nodeEnv: () => get('NODE_ENV')
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
@@ -1696,11 +1716,23 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
+  nativeApiGatewayPort: () => {
+    if (process.env.CUBEJS_NATIVE_API_GATEWAY_PORT === 'false') {
+      return undefined;
+    }
+
+    const port = asFalseOrPort(process.env.CUBEJS_NATIVE_API_GATEWAY_PORT || 'false', 'CUBEJS_NATIVE_API_GATEWAY_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
   pgSqlPort: () => {
     if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
       return undefined;
     }
-    
+
     const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;
@@ -1724,20 +1756,12 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  sqlNonce: () => {
-    if (process.env.CUBEJS_SQL_NONCE) {
-      if (process.env.CUBEJS_SQL_NONCE.length < 14) {
-        throw new InvalidConfiguration('CUBEJS_SQL_NONCE', process.env.CUBEJS_SQL_NONCE, 'Is too short. It should be 14 chars at least.');
-      }
-
-      return process.env.CUBEJS_SQL_NONCE;
-    }
-
-    return undefined;
-  },
   sqlUser: () => get('CUBEJS_SQL_USER').asString(),
   sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
   sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
+  // Internal testing, please don't enable it. It's not ready for public preview
+  nativeApiGateway: () => get('CUBE_JS_NATIVE_API_GATEWAY_INTERNAL')
+    .asBool(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
@@ -1760,7 +1784,31 @@ const variables: Record<string, (...args: any) => any> = {
   maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
     .default(200000)
     .asInt(),
-  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('false').asBoolStrict(),
+  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  // Deprecated section
+
+  // Support for Redis as queue & cache driver was removed in 0.36
+  // This code is used to detect Redis and throw an error
+  // TODO(ovr): Remove in after 1.0 + LTS
+  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
+    .default('false')
+    .asBoolStrict(),
+  // TODO(ovr): Remove in after 1.0 + LTS
+  redisUrl: () => {
+    const redisUrl = get('CUBEJS_REDIS_URL')
+      .asString();
+    if (redisUrl) {
+      return redisUrl;
+    }
+
+    const legacyRedisUrl = get('REDIS_URL')
+      .asString();
+    if (legacyRedisUrl) {
+      return legacyRedisUrl;
+    }
+
+    return undefined;
+  },
 };
 
 type Vars = typeof variables;

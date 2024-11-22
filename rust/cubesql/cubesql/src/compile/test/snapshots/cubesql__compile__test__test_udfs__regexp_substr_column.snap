@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT r.a as input, regexp_substr(r.a, '@[^.]*') as result FROM (\n                    SELECT 'test@test.com' as a\n                    UNION ALL\n                    SELECT 'test'\n                ) as r\n                \".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------------+--------+
+| input         | result |
++---------------+--------+
+| test@test.com | @test  |
+| test          |        |
++---------------+--------+

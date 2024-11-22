@@ -50,19 +50,20 @@ impl RedshiftStlQueryBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.userids.finish()));
-        columns.push(Arc::new(self.queries.finish()));
-        columns.push(Arc::new(self.labels.finish()));
-        columns.push(Arc::new(self.xids.finish()));
-        columns.push(Arc::new(self.pids.finish()));
-        columns.push(Arc::new(self.databases.finish()));
-        columns.push(Arc::new(self.querytxts.finish()));
-        columns.push(Arc::new(self.starttimes.finish()));
-        columns.push(Arc::new(self.endtimes.finish()));
-        columns.push(Arc::new(self.aborted.finish()));
-        columns.push(Arc::new(self.insert_pristine.finish()));
-        columns.push(Arc::new(self.concurrency_scaling_statuses.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.userids.finish()),
+            Arc::new(self.queries.finish()),
+            Arc::new(self.labels.finish()),
+            Arc::new(self.xids.finish()),
+            Arc::new(self.pids.finish()),
+            Arc::new(self.databases.finish()),
+            Arc::new(self.querytxts.finish()),
+            Arc::new(self.starttimes.finish()),
+            Arc::new(self.endtimes.finish()),
+            Arc::new(self.aborted.finish()),
+            Arc::new(self.insert_pristine.finish()),
+            Arc::new(self.concurrency_scaling_statuses.finish()),
+        ];
 
         columns
     }

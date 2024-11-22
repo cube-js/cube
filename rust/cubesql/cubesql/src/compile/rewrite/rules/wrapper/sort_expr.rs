@@ -1,21 +1,17 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules, sort_expr,
-    wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
+    rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules, sort_expr,
+    wrapper_pullup_replacer, wrapper_pushdown_replacer,
 };
-use egg::Rewrite;
 
 impl WrapperRules {
-    pub fn sort_expr_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn sort_expr_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-sort-expr",
                 wrapper_pushdown_replacer(
                     sort_expr("?expr", "?asc", "?nulls_first"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -23,7 +19,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -37,7 +33,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -47,7 +43,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     sort_expr("?expr", "?asc", "?nulls_first"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),

@@ -1,11 +1,11 @@
 use crate::queryplanner::topk::SortColumn;
 use crate::queryplanner::udfs::read_sketch;
-use arrow::array::ArrayRef;
-use arrow::compute::SortOptions;
-use arrow::datatypes::SchemaRef;
-use arrow::error::ArrowError;
-use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::compute::SortOptions;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::error::ArrowError;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 
@@ -857,10 +857,10 @@ fn to_empty_sketch(s: &mut ScalarValue) {
 mod tests {
     use super::*;
     use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
-    use arrow::array::{Array, ArrayRef, Int64Array};
-    use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-    use arrow::error::ArrowError;
-    use arrow::record_batch::RecordBatch;
+    use datafusion::arrow::array::{Array, ArrayRef, Int64Array};
+    use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+    use datafusion::arrow::error::ArrowError;
+    use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::catalog::catalog::MemoryCatalogList;
     use datafusion::error::DataFusionError;
     use datafusion::execution::context::{ExecutionConfig, ExecutionContextState, ExecutionProps};

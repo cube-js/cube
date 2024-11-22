@@ -16,15 +16,34 @@ into one of [query types](#query-types).
 
 The following defaults apply to all queries run by Cube.
 
+### Order
+
+By default, for [REST API][ref-rest-api] and [GraphQL API][ref-graphql-api]
+queries, Cube will apply ordering to [any query](#query-types) that does not
+set it explicitly. The default heuristics are to sort the result set by a time
+dimension, if any; otherwise, sort it by the first measure, if any; otherwise,
+sort it by the first dimension, if any. These heuristics provide a result set
+that works great for most data visualization purposes. You can opt out from
+default ordering by passing an empty array (`[]`) object as `order`.
+
+[SQL API][ref-sql-api] queries do not get a default ordering in case there's no
+`ORDER BY` clause in the query. You can opt in for default ordering for SQL API
+queries (except for [ungrouped](#ungrouped-query) ones) by setting
+`CUBESQL_SQL_NO_IMPLICIT_ORDER` to `false`.
+
 ### Row limit
 
-By default, [any query](#query-types) will return no more than 10,000 rows
-in the result set. It serves as a safeguard against data scraping and
-denial-of-service (DoS) attacks if Cube is exposed to untrusted environments.
+By default, [any query](#query-types) that does not explicitly specify the row
+limit, will return no more than 10,000 rows in the result set. You can use the
+`CUBEJS_DB_QUERY_DEFAULT_LIMIT` environment variable to override it. This serves
+as a safeguard against data scraping and denial-of-service (DoS) attacks if Cube
+is exposed to untrusted environments.
 
 The maximum allowed limit is 50,000 rows. You can use the `CUBEJS_DB_QUERY_LIMIT`
 environment variable to override it. You can also implement
 [pagination][ref-pagination-recipe] to fetch more rows than the maximum limit.
+Finally, if you're using the [SQL API][ref-sql-api], you can enable the
+[streaming mode][ref-sql-api-streaming] to ignore the maximum row limit.
 
 ### Time zone
 
@@ -148,13 +167,14 @@ ORDER BY ...
 To execute the *regular query* part, Cube will generate the SQL for an upstream
 [data source][ref-data-sources]. Then, Cube will do *post-processing* by
 executing the rest of the query using an internal SQL execution engine.
+Learn more in the [SQL API documentation][ref-sql-api-qpp].
 
 Queries with post-processing, since they include regular queries, benefit from
 [in-memory cache and pre-aggregations][ref-caching]. They can also be modified
 before execution with [`query_rewrite`][ref-query-rewrite].
 
 However, the trade-off is that queries with post-processing support only a
-limited set of SQL functions and operators. 
+limited set of SQL functions and operators.
 
 #### Example
 
@@ -236,6 +256,7 @@ Thus, queries with pushdown are not reducible to [regular
 queries](#regular-query) and post-processing on top of them. To execute a query
 with pushdown, Cube will need to transform it and generate the SQL for an
 upstream [data source][ref-data-sources].
+Learn more in the [SQL API documentation][ref-sql-api-qpd].
 
 <InfoBox>
 
@@ -272,21 +293,51 @@ GROUP BY 1, 2;
 ### Compare date range query
 
 **Compare date range queries are special cases of regular queries.**
-Similarly to [regular queries](#regular-queries), they include lists of
+Similarly to [regular queries](#regular-query), they include lists of
 dimensions and measures, filters, etc. and return a result set.
 
 However, unlike regular queries, they provide a convenient way to retrieve
-measure values for *more than one date range* for a time dimension. See [this
-blog post][blog-compare-date-range] for more details and examples.
+measure values for *more than one date range* for a time dimension.
 
 You can make a compare date range query by using the `compareDateRange`
-option with the [REST API][ref-rest-api-query-format-options-tdf]. For the SQL
-API, you can write an equivalent query using the `UNION ALL` statement.
+option with the [REST API][ref-rest-api-query-format-options-tdf]. Note that
+you also need to set the `queryType` parameter of the [`/v1/load`
+endpoint][ref-rest-api-load] to `multi`.
+
+#### Example
+
+```json
+{
+  "dimensions": ["orders.city"],
+  "measures": ["orders.amount"],
+  "filters": [
+    {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": ["shipped"]
+    }
+  ],
+  "timeDimensions": [{
+    "dimension": "orders.created_at",
+    "compareDateRange": [
+      ["2024-01-01", "2024-12-31"],
+      ["2023-01-01", "2023-12-31"],
+      ["2022-01-01", "2022-12-31"],
+    ],
+    "granularity": "year",
+  }],
+  "limit": 100
+}
+```
+
+See [this blog post][blog-compare-date-range] for more details and examples.
+
+For the SQL API, you can write an equivalent query using the `UNION ALL` statement.
 
 ### Total query
 
 **Total queries are special cases of regular queries.**
-Similarly to [regular queries](#regular-queries), they include lists of
+Similarly to [regular queries](#regular-query), they include lists of
 dimensions and measures, filters, etc. and return a result set.
 
 In addition to that, they provide a convenient way to retrieve the total number
@@ -300,7 +351,7 @@ equivalent query using the `UNION ALL` statement.
 
 ### Ungrouped query
 
-Similarly to [regular queries](#regular-queries), ungrouped queries include
+Similarly to [regular queries](#regular-query), ungrouped queries include
 lists of dimensions and measures, filters, etc. and return a result set.
 
 However, unlike for regular queries, Cube will not add the
@@ -328,7 +379,10 @@ Additionally, note that ungrouped queries have additional requirements for
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-sql-api-qpp]: /product/apis-integrations/sql-api/query-format#query-post-processing
+[ref-sql-api-qpd]: /product/apis-integrations/sql-api/query-format#query-pushdown
 [ref-rest-api]: /product/apis-integrations/rest-api
+[ref-rest-api-load]: /reference/rest-api#v1load
 [ref-graphql-api]: /product/apis-integrations/graphql-api
 [ref-data-sources]: /product/configuration/data-sources
 [ref-rest-api-query-format-options]: /product/apis-integrations/rest-api/query-format#query-properties
@@ -344,3 +398,4 @@ Additionally, note that ungrouped queries have additional requirements for
 [ref-query-rewrite]: /reference/configuration/config#query_rewrite
 [ref-ref-sql-api]: /reference/sql-api
 [blog-compare-date-range]: https://cube.dev/blog/comparing-data-over-different-time-periods
+[ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming

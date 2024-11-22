@@ -247,14 +247,6 @@ association in the database, we need to create an associative cube
 `post_topics`, and declare the relationships from it to `topics` cube and from
 `posts` to `post_topics`.
 
-<InfoBox>
-
-The following example uses the `one_to_many` relationship on the `post_topics`
-cube; this causes the direction of joins to be `posts → post_topics → topics`.
-[Read more about direction of joins here][self-join-direction].
-
-</InfoBox>
-
 <CodeTabs>
 
 ```javascript
@@ -263,7 +255,7 @@ cube(`posts`, {
 
   joins: {
     post_topics: {
-      relationship: `many_to_one`,
+      relationship: `one_to_many`,
       sql: `${CUBE}.id = ${post_topics.post_id}`,
     },
   },
@@ -286,7 +278,7 @@ cube(`post_topics`, {
 
   joins: {
     topic: {
-      relationship: `one_to_many`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.topic_id = ${topics.id}`,
     },
   },
@@ -307,7 +299,7 @@ cubes:
 
     joins:
       - name: post_topics
-        relationship: many_to_one
+        relationship: one_to_many
         sql: "{CUBE}.id = {post_topics.post_id}"
 
   - name: topics
@@ -324,7 +316,7 @@ cubes:
 
     joins:
       - name: topic
-        relationship: one_to_many
+        relationship: many_to_one
         sql: "{CUBE}.topic_id = {topics.id}"
 
     dimensions:
@@ -334,6 +326,14 @@ cubes:
 ```
 
 </CodeTabs>
+
+<InfoBox>
+
+The following example uses the `many_to_one` relationship on the `post_topics`
+cube; this causes the direction of joins to be `posts → post_topics → topics`.
+[Read more about direction of joins here][self-join-direction].
+
+</InfoBox>
 
 In scenarios where a table doesn't define a primary key, one can be generated
 using SQL:

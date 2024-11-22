@@ -18,6 +18,12 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>);
 
+impl Default for CLReprObject {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CLReprObject {
     pub fn new() -> Self {
         Self(HashMap::new())
@@ -31,16 +37,21 @@ impl CLReprObject {
         self.0.insert(key, value)
     }
 
-    pub fn into_iter(self) -> IntoIter<String, CLRepr> {
-        self.0.into_iter()
-    }
-
     pub fn iter(&self) -> Iter<String, CLRepr> {
         self.0.iter()
     }
 
     pub fn keys(&self) -> Keys<'_, String, CLRepr> {
         self.0.keys()
+    }
+}
+
+impl IntoIterator for CLReprObject {
+    type Item = (String, CLRepr);
+    type IntoIter = IntoIter<String, CLRepr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 

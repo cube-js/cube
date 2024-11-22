@@ -1,27 +1,25 @@
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules,
+        agg_fun_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        AggregateFunctionExprDistinct, AggregateFunctionExprFun, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        AggregateFunctionExprDistinct, AggregateFunctionExprFun, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn window_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn window_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-aggregate-function",
                 wrapper_pushdown_replacer(
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -30,7 +28,7 @@ impl WrapperRules {
                     vec![wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     )],
@@ -44,7 +42,7 @@ impl WrapperRules {
                     vec![wrapper_pullup_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     )],
@@ -53,7 +51,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -67,7 +65,7 @@ impl WrapperRules {
         fun_var: &'static str,
         distinct_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
         let distinct_var = var!(distinct_var);
         let alias_to_cube_var = var!(alias_to_cube_var);

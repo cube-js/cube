@@ -426,7 +426,7 @@ export class CubejsServerCore {
 
   public initSQLServer() {
     const apiGateway = this.apiGateway();
-    return apiGateway.initSQLServer();
+    return apiGateway.getSQLServer();
   }
 
   protected apiGateway(): ApiGateway {
@@ -443,7 +443,6 @@ export class CubejsServerCore {
         standalone: this.standalone,
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
-        checkAuthMiddleware: this.options.checkAuthMiddleware,
         contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
         wsContextAcceptor: this.contextAcceptor.shouldAcceptWs.bind(this.contextAcceptor),
         checkAuth: this.options.checkAuth,
@@ -457,6 +456,7 @@ export class CubejsServerCore {
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
         contextToApiScopes: this.options.contextToApiScopes,
+        gatewayPort: this.options.gatewayPort,
         event: this.event,
       }
     ));
@@ -506,6 +506,7 @@ export class CubejsServerCore {
           ),
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
+          contextToRoles: this.options.contextToRoles,
           preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
@@ -530,7 +531,7 @@ export class CubejsServerCore {
 
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
-    
+
     this.startScheduledRefreshTimer();
   }
 
@@ -667,6 +668,7 @@ export class CubejsServerCore {
       options.dbType || this.options.dbType,
       {
         schemaVersion: options.schemaVersion || this.options.schemaVersion,
+        contextToRoles: this.options.contextToRoles,
         devServer: this.options.devServer,
         logger: this.logger,
         externalDbType: options.externalDbType,

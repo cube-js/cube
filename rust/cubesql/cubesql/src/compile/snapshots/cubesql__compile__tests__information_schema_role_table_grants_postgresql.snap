@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 6534
 expression: "execute_query(\"SELECT * FROM information_schema.role_table_grants\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+
@@ -9,4 +10,5 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_table_grants\
 | ovr     | ovr     | cubedb        | public       | Logs                      | SELECT         | YES          | YES            |
 | ovr     | ovr     | cubedb        | public       | NumberCube                | SELECT         | YES          | YES            |
 | ovr     | ovr     | cubedb        | public       | WideCube                  | SELECT         | YES          | YES            |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | SELECT         | YES          | YES            |
 +---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+

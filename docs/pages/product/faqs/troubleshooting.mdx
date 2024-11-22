@@ -19,7 +19,7 @@ This error happens when a query remains queued for an excessive amount of time.
 To troubleshoot, try increasing concurrency and/or timeout limits. The default
 concurrency is 4 for most data warehouses and the default timeout is 10 minutes.
 You can increase these values by adjusting the `CUBEJS_CONCURRENCY` or
-`CUBEJS_DB_TIMEOUT` environment variables in **Settings > Configuration**. If
+`CUBEJS_DB_QUERY_TIMEOUT` environment variables in **Settings > Configuration**. If
 your timeout limit is already high, we recommend either adding a pre-aggregation
 or refactoring your SQL for better efficiency.
 

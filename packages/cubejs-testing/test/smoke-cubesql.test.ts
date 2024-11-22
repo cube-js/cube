@@ -33,7 +33,7 @@ describe('SQL API', () => {
     const conn = new PgClient({
       database: 'db',
       port: pgPort,
-      host: 'localhost',
+      host: '127.0.0.1',
       user,
       password,
       ssl: false,
@@ -328,7 +328,7 @@ describe('SQL API', () => {
       expect(res.rows).toMatchSnapshot('metabase max number');
     });
 
-    test('power bi post aggregate measure wrap', async () => {
+    test('power bi multi stage measure wrap', async () => {
       const res = await connection.query(`
   select
     "_"."createdAt",
@@ -390,6 +390,13 @@ describe('SQL API', () => {
       expect(res.rows).toEqual([]);
     });
 
+    test('zero limited dimension aggregated queries through wrapper', async () => {
+      // Attempts to trigger query generation from SQL templates, not from Cube
+      const query = 'SELECT MIN(t.maxval) FROM (SELECT MAX(createdAt) as maxval FROM Orders LIMIT 10) t LIMIT 0';
+      const res = await connection.query(query);
+      expect(res.rows).toEqual([]);
+    });
+
     test('select dimension agg where false', async () => {
       const query =
           'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
@@ -399,9 +406,70 @@ describe('SQL API', () => {
 
     test('where segment is false', async () => {
       const query =
-        'SELECT value AS val FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
+        'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
       const res = await connection.query(query);
       expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
+    });
+
+    test('select null in subquery with streaming', async () => {
+      const query = `
+      SELECT * FROM (
+        SELECT NULL AS "usr",
+        value AS val
+        FROM "SegmentTest" WHERE segment_eq_1 IS FALSE
+        ORDER BY value
+      ) "y";`;
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot();
+    });
+
+    test('tableau bi fiscal year query', async () => {
+      const query = `
+      SELECT
+        CAST("orders"."status" AS TEXT) AS "status",
+        CAST(TRUNC(EXTRACT(YEAR FROM ("orders"."createdAt" + 11 * INTERVAL '1 MONTH'))) AS INT) AS "yr:created_at:ok"
+      FROM
+        "public"."Orders" AS "orders"
+      GROUP BY 1, 2 ORDER BY status`;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('result');
+    });
+
+    test('query with intervals', async () => {
+      const query = `
+      SELECT
+        "orders"."createdAt" AS "timestamp",
+        "orders"."createdAt" + 11 * INTERVAL '1 YEAR' AS "c0",
+        "orders"."createdAt" + 11 * INTERVAL '2 MONTH' AS "c1",
+        "orders"."createdAt" + 11 * INTERVAL '321 DAYS' AS "c2",
+        "orders"."createdAt" + 11 * INTERVAL '43210 SECONDS' AS "c3",
+        "orders"."createdAt" + 11 * INTERVAL '1 MON 12345 MS' + 10 * INTERVAL '1 MON 12345 MS' AS "c4"
+      FROM
+        "public"."Orders" AS "orders" ORDER BY createdAt`;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('timestamps');
+    });
+
+    test('query with intervals (SQL PUSH DOWN)', async () => {
+      const query = `
+      SELECT
+        CONCAT(DATE(createdAt), ' :') AS d,
+        "orders"."createdAt" + 11 * INTERVAL '1 YEAR' AS "c0",
+        "orders"."createdAt" + 11 * INTERVAL '2 MONTH' AS "c1",
+        "orders"."createdAt" + 11 * INTERVAL '321 DAYS' AS "c2",
+        "orders"."createdAt" + 11 * INTERVAL '43210 SECONDS' AS "c3",
+        "orders"."createdAt" + 11 * INTERVAL '32 DAYS 20 HOURS' AS "c4",
+        "orders"."createdAt" + 11 * INTERVAL '1 MON 12345 MS' + 10 * INTERVAL '1 MON 12345 MS' AS "c5",
+        "orders"."createdAt" + 11 * INTERVAL '12345 MS' AS "c6",
+        "orders"."createdAt" + 11 * INTERVAL '2 DAY 12345 MS' AS "c7",
+        "orders"."createdAt" + 11 * INTERVAL '3 MON 2 DAY 12345 MS' AS "c8"
+      FROM
+        "public"."Orders" AS "orders" ORDER BY createdAt`;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('timestamps');
     });
   });
 });

@@ -3,35 +3,30 @@ redirect_from:
   - /config/downstream/thoughtspot
 ---
 
-# Thoughtspot
+# ThoughtSpot
 
-You can connect to Cube from [Thoughtspot][thoughtspot] using the [Cube SQL
-API][ref-sql-api].
+[ThoughtSpot][thoughtspot] is an analytics platform that allows users to search and
+analyze data using a search interface.
 
-## Enable Cube SQL API
+## Connect from Cube Cloud
 
-### Cube Cloud
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>ThoughtSpot</Btn> to get
+detailed instructions.
 
-Click **How to connect your BI tool** link on the Overview page, navigate to the
-SQL API tab and enable it. Once enabled, you should see the screen like the one
-below with your connection credentials:
+## Connect from Cube Core
 
-<Screenshot src="https://ucarecdn.com/fc74ee91-b8a9-4c46-81ed-cb3daeef6b83/" />
+You can connect a Cube deployment to ThoughtSpot using the [SQL API][ref-sql-api].
 
-### Self-hosted Cube
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to ThoughtSpot.
 
-You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Thoughtspot later.
+## Connecting from ThoughtSpot
 
-```dotenv
-CUBEJS_PG_SQL_PORT=5432
-CUBEJS_SQL_USER=myusername
-CUBEJS_SQL_PASSWORD=mypassword
-```
+ThoughtSpot connects to Cube as a Postgres database.
 
-## Connecting from Thoughtspot
-
-Thoughtspot connects to Cube as a Postgres database.
+### Creating a connection
 
 In Thoughtspot, go to the Setup tab, then click <Btn>Connect now</Btn> to add a new
 data source:
@@ -50,7 +45,7 @@ next screen:
 
 <Screenshot src="https://ucarecdn.com/95692c63-e620-42a5-9355-b4df27d6b3c4/" />
 
-## Querying data
+### Querying data
 
 Your cubes will be exposed as tables, where both your measures and dimensions
 are columns.

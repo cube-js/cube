@@ -35,13 +35,14 @@ impl RedshiftSvvExternalSchemasBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.esoid.finish()));
-        columns.push(Arc::new(self.eskind.finish()));
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.esowner.finish()));
-        columns.push(Arc::new(self.databasename.finish()));
-        columns.push(Arc::new(self.esoptions.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.esoid.finish()),
+            Arc::new(self.eskind.finish()),
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.esowner.finish()),
+            Arc::new(self.databasename.finish()),
+            Arc::new(self.esoptions.finish()),
+        ];
 
         columns
     }

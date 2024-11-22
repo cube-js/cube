@@ -18,6 +18,7 @@ import {
   VarargslistContext,
   LambdefContext,
   Single_string_template_atomContext,
+  ArglistContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import { Python3ParserVisitor } from './Python3ParserVisitor';
@@ -178,7 +179,9 @@ export class PythonParser {
           const name = node.NAME();
           const argsList = node.arglist();
           if (argsList) {
-            return { call: children };
+            // trailer with arglist have a single child: arguments _list_
+            const args = children[0];
+            return { call: args };
           } else if (name) {
             return { identifier: t.identifier(name.text) };
           } else {
@@ -195,6 +198,8 @@ export class PythonParser {
           return { args: children };
         } else if (node instanceof LambdefContext) {
           return t.arrowFunctionExpression(children[0].args, children[1]);
+        } else if (node instanceof ArglistContext) {
+          return children;
         } else {
           return singleNodeReturn();
         }

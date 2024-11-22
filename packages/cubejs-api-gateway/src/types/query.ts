@@ -10,7 +10,6 @@ import {
   TimeMember,
   FilterOperator,
   QueryTimeDimensionGranularity,
-  QueryOrderType,
 } from './strings';
 import { ResultType } from './enums';
 
@@ -45,8 +44,8 @@ type GroupingSet = {
     subId?: null | number
 };
 
-type MemberExpression = {
-  expression: Function;
+type ParsedMemberExpression = {
+  expression: string[];
   cubeName: string;
   name: string;
   expressionName: string;
@@ -54,12 +53,17 @@ type MemberExpression = {
   groupingSet?: GroupingSet
 };
 
+type MemberExpression = Omit<ParsedMemberExpression, 'expression'> & {
+  expression: Function;
+};
+
 /**
- * Query datetime dimention interface.
+ * Query datetime dimension interface.
  */
 interface QueryTimeDimension {
   dimension: Member;
   dateRange?: string[] | string;
+  compareDateRange?: string[];
   granularity?: QueryTimeDimensionGranularity;
 }
 
@@ -67,11 +71,11 @@ interface QueryTimeDimension {
  * Incoming network query data type.
  */
 interface Query {
-  measures: (Member | MemberExpression)[];
-  dimensions?: (Member | TimeMember | MemberExpression)[];
+  measures: (Member | MemberExpression | ParsedMemberExpression)[];
+  dimensions?: (Member | TimeMember | MemberExpression | ParsedMemberExpression)[];
   filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
   timeDimensions?: QueryTimeDimension[];
-  segments?: (Member | MemberExpression)[];
+  segments?: (Member | MemberExpression | ParsedMemberExpression)[];
   limit?: null | number;
   offset?: number;
   total?: boolean;
@@ -96,7 +100,7 @@ interface NormalizedQueryFilter extends QueryFilter {
 interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: null | number;
-  order?: [{ id: string; desc: boolean }];
+  order?: { id: string; desc: boolean }[];
 }
 
 export {
@@ -108,4 +112,5 @@ export {
   NormalizedQueryFilter,
   NormalizedQuery,
   MemberExpression,
+  ParsedMemberExpression,
 };

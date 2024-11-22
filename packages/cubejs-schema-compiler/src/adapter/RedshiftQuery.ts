@@ -20,6 +20,7 @@ export class RedshiftQuery extends PostgresQuery {
     delete templates.functions.COVAR_SAMP;
     delete templates.window_frame_types.range;
     delete templates.window_frame_types.groups;
+    templates.types.binary = 'VARBINARY';
     return templates;
   }
 }

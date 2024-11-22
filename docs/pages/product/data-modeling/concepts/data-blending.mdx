@@ -10,14 +10,20 @@ redirect_from:
 In case you want to plot two measures from different cubes on a single chart, or
 create a calculated measure based on it, you need to create a join between these
 two cubes. If there's no way to join two cubes other than by time dimension, you
-need to use the data blending approach.
+can consider using the data blending approach.
 
 Data blending is a pattern that allows creating a cube based on two or more
 existing cubes, and contains a union of the underlying cubes' date to query it
 together.
 
-For an example omnichannel store which has both online and offline sales, let's
-calculate summary metrics for revenue, customer count, etc. We have
+Data blending could be faster than joining on date when the record count is very large, 
+because with this pattern, aggregation happens before joining, which can be more 
+efficient for large volumes of data.
+The other situation in which data blending could be a better approach than joining 
+on date is when the two tables have mostly the same columns, such as in the example below.
+
+For an example, consider an omnichannel store which has both online and offline sales. Let's
+calculate summary metrics for revenue, customer count, etc. We have a
 `retail_orders` cube for offline sales:
 
 <CodeTabs>
@@ -187,6 +193,17 @@ cube(`all_sales`, {
 });
 ```
 
+<ReferenceBox>
+
+Currently, [`{cube.sql()}` function][ref-cube-sql-func] is not supported in YAML data models.
+Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+
+As a workaround, you can use JavaScript data models, put a SQL query in a
+[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
+the [template context](/reference/python/cube#templatecontext-class).
+
+</ReferenceBox>
+
 Another use case of the Data Blending approach would be when you want to chart
 some measures (business related) together and see how they correlate.
 
@@ -230,3 +247,5 @@ const queries = [
 
 const resultSet = await cubeApi.load(queries);
 ```
+
+[ref-cube-sql-func]: /product/data-modeling/syntax#cubesql-function
