@@ -1197,7 +1197,7 @@ export class PreAggregations {
     const targetMeasuresReferences = this.measureAliasesRenderedReference(preAggregationForQuery);
 
     const columnsFor = (targetReferences, references, preAggregation) => Object.keys(targetReferences).map(
-      member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.split('.')[1]])]} ${targetReferences[member]}`
+      member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.replace(/^[^.]*\./, '')])]} ${targetReferences[member]}`
     );
 
     const tables = preAggregationForQuery.referencedPreAggregations.map(preAggregation => {
@@ -1214,6 +1214,14 @@ export class PreAggregations {
         columns: columnsFor(targetDimensionsReferences, dimensionsReferences, preAggregation)
           .concat(columnsFor(targetTimeDimensionsReferences, timeDimensionsReferences, preAggregation))
           .concat(columnsFor(targetMeasuresReferences, measuresReferences, preAggregation))
+          // Deduplicate columns, for case when targetTimeDimensionsReferences has the same column as targetDimensionsReferences
+          // Concat order is important, targetDimensionsReferences must override targetTimeDimensionsReferences
+          .reduce((acc, v) => {
+            if (!acc.includes(v)) {
+              acc.push(v);
+            }
+            return acc;
+          }, []),
       };
     });
     if (tables.length === 1) {
@@ -1280,8 +1288,9 @@ export class PreAggregations {
 
     const renderedReference = {
       ...(this.measuresRenderedReference(preAggregationForQuery)),
-      ...(this.dimensionsRenderedReference(preAggregationForQuery)),
+      // Merge order is important, dimensionsRenderedReference must override timeDimensionsRenderedReference
       ...(this.timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery)),
+      ...(this.dimensionsRenderedReference(preAggregationForQuery)),
     };
 
     return this.query.evaluateSymbolSqlWithContext(
@@ -1347,16 +1356,31 @@ export class PreAggregations {
   }
 
   timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery) {
+    // We have to support 2 time dimensions references
+    // In the case where the original time column was added as a dimension in the rollup - the engine will use the original value overridden using dimension references
+    // Otherwise, the cube will use a truncated time representation, but with the original column name
+    const rollupTimeDimensions = this.rollupTimeDimensions(preAggregationForQuery).flatMap(td => {
+      const timeDimension = this.query.newTimeDimension(td);
+      return [
+        { td, timeDimension },
+        { td, timeDimension, withPostfix: true }
+      ];
+    });
+
     return R.pipe(
-      R.map((td) => {
-        const timeDimension = this.query.newTimeDimension(td);
-        return [
+      R.map(({ td, timeDimension, withPostfix }) => {
+        const dimension = [
           td.dimension,
+          ...(withPostfix ? [td.granularity] : [])
+        ].join('.');
+
+        return [
+          dimension,
           this.query.escapeColumnName(timeDimension.unescapedAliasName(rollupGranularity)),
         ];
       }),
       R.fromPairs,
-    )(this.rollupTimeDimensions(preAggregationForQuery));
+    )(rollupTimeDimensions);
   }
 
   rollupMembers(preAggregationForQuery, type) {
