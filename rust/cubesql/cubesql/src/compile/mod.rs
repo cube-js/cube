@@ -11643,12 +11643,8 @@ ORDER BY "source"."str0" ASC
                         "grouping_set": null,
                     }).to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
