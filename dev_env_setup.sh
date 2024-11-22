@@ -11,20 +11,8 @@ cd "$SCRIPT_DIR"
 # Step 1: Run yarn install in the root directory
 echo "Running 'yarn install' in the root directory..."
 yarn install
-
-# Step 2: Build all packages in packages directory
 echo "Building all packages..."
-for package in packages/*; do
-    if [ -d "$package" ]; then
-        echo "Building $package..."
-        cd "$package"
-        if ! yarn build; then
-            echo "yarn build failed for $package, trying yarn tsc..."
-            yarn tsc || true  # Continue even if tsc fails
-        fi
-        cd "$SCRIPT_DIR"
-    fi
-done
+yarn build
 
 # Step 3: Link all packages
 echo "Linking all packages..."
