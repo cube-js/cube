@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/druid-driver",
   "description": "Cube.js Druid database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.1.2",
+  "version": "1.1.7",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -28,9 +28,9 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.1.2",
-    "@cubejs-backend/schema-compiler": "1.1.2",
-    "@cubejs-backend/shared": "1.1.2",
+    "@cubejs-backend/base-driver": "1.1.7",
+    "@cubejs-backend/schema-compiler": "1.1.7",
+    "@cubejs-backend/shared": "1.1.7",
     "axios": "^0.21.1",
     "moment-timezone": "^0.5.31"
   },

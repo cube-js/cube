@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/trino-driver",
   "description": "Cube.js Trino database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.1.2",
+  "version": "1.1.7",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -25,10 +25,10 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.1.2",
-    "@cubejs-backend/prestodb-driver": "1.1.2",
-    "@cubejs-backend/schema-compiler": "1.1.2",
-    "@cubejs-backend/shared": "1.1.2",
+    "@cubejs-backend/base-driver": "1.1.7",
+    "@cubejs-backend/prestodb-driver": "1.1.7",
+    "@cubejs-backend/schema-compiler": "1.1.7",
+    "@cubejs-backend/shared": "1.1.7",
     "presto-client": "^0.12.2",
     "sqlstring": "^2.3.1"
   },

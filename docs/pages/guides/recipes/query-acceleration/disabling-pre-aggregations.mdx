@@ -47,7 +47,7 @@ following file structure:
 
 ```javascript filename="env.js"
 module.exports = {
-  pre_aggregations_enabled: process.env.PRE_AGGREGATIONS_ENABLED || true
+  pre_aggregations_enabled: process.env.PRE_AGGREGATIONS_ENABLED !== 'false'
 }
 ```
 

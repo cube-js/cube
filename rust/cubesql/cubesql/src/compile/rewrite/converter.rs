@@ -16,19 +16,20 @@ use crate::{
             DimensionName, EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
-            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn,
-            LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, QueryParamIndex,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            SubqueryTypes, TableScanFetch, TableScanProjection, TableScanSourceTableName,
-            TableScanTableName, TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, TryCastExprDataType, UnionAlias, WindowFunctionExprFun,
-            WindowFunctionExprWindowFrame, WrappedSelectAlias, WrappedSelectDistinct,
-            WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
-            WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
+            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
+            JoinNullEqualsNull, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
+            LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
+            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
+            ProjectionSplit, QueryParamIndex, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
+            WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
+            WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
+            WrappedSelectType,
         },
         CubeContext,
     },
@@ -654,6 +655,8 @@ impl LogicalPlanToLanguageConverter {
                 let join_type = add_data_node!(self, node.join_type, JoinJoinType);
                 let join_constraint =
                     add_data_node!(self, node.join_constraint, JoinJoinConstraint);
+                let null_equals_null =
+                    add_data_node!(self, node.null_equals_null, JoinNullEqualsNull);
                 self.graph.add(LogicalPlanLanguage::Join([
                     left,
                     right,
@@ -661,6 +664,7 @@ impl LogicalPlanToLanguageConverter {
                     right_on,
                     join_type,
                     join_constraint,
+                    null_equals_null,
                 ]))
             }
             LogicalPlan::CrossJoin(node) => {
@@ -1382,6 +1386,8 @@ impl LanguageToLogicalPlanConverter {
                     &join_type,
                 )?);
 
+                let null_equals_null = match_data_node!(node_by_id, params[6], JoinNullEqualsNull);
+
                 LogicalPlan::Join(Join {
                     left,
                     right,
@@ -1389,8 +1395,7 @@ impl LanguageToLogicalPlanConverter {
                     join_type,
                     join_constraint,
                     schema,
-                    // TODO: Pass to Graph
-                    null_equals_null: true,
+                    null_equals_null,
                 })
             }
             LogicalPlanLanguage::CrossJoin(params) => {
@@ -2141,7 +2146,8 @@ impl LanguageToLogicalPlanConverter {
                     match_expr_list_node!(node_by_id, to_expr, params[12], WrappedSelectOrderExpr);
                 let alias = match_data_node!(node_by_id, params[13], WrappedSelectAlias);
                 let distinct = match_data_node!(node_by_id, params[14], WrappedSelectDistinct);
-                let ungrouped = match_data_node!(node_by_id, params[15], WrappedSelectUngrouped);
+                let push_to_cube =
+                    match_data_node!(node_by_id, params[15], WrappedSelectPushToCube);
 
                 let filter_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(
@@ -2307,7 +2313,7 @@ impl LanguageToLogicalPlanConverter {
                         order_expr_rebased,
                         alias,
                         distinct,
-                        ungrouped,
+                        push_to_cube,
                     )),
                 })
             }

@@ -72,5 +72,23 @@ cube('line_items', {
         excludes: ['created_at'],
       },
     },
+    {
+      role: 'manager',
+      conditions: [
+        {
+          if: security_context.auth?.userAttributes?.region === 'CA',
+        },
+        {
+          // This condition should not match the one defined in the "manager" mock context
+          if: security_context.auth?.userAttributes?.region === 'San Francisco',
+        },
+      ],
+      rowLevel: {
+        allowAll: true,
+      },
+      memberLevel: {
+        excludes: ['created_at'],
+      },
+    },
   ],
 });

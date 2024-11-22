@@ -4,7 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, CubeScanAliasToCube, CubeScanUngrouped,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
+        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube, WrapperPullupReplacerPushToCube,
     },
     var, var_iter,
 };
@@ -42,7 +42,7 @@ impl WrapperRules {
                             "?ungrouped",
                         ),
                         "?alias_to_cube_out",
-                        "?ungrouped_out",
+                        "?push_to_cube_out",
                         "WrapperPullupReplacerInProjection:false",
                         "?members",
                     ),
@@ -53,7 +53,7 @@ impl WrapperRules {
                     "?alias_to_cube",
                     "?ungrouped",
                     "?alias_to_cube_out",
-                    "?ungrouped_out",
+                    "?push_to_cube_out",
                 ),
             ),
             rewrite(
@@ -62,7 +62,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?cube_scan_input",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -79,13 +79,13 @@ impl WrapperRules {
         alias_to_cube_var: &'static str,
         ungrouped_cube_var: &'static str,
         alias_to_cube_var_out: &'static str,
-        ungrouped_cube_var_out: &'static str,
+        push_to_cube_out_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let members_var = var!(members_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let ungrouped_cube_var = var!(ungrouped_cube_var);
         let alias_to_cube_var_out = var!(alias_to_cube_var_out);
-        let ungrouped_cube_var_out = var!(ungrouped_cube_var_out);
+        let push_to_cube_out_var = var!(push_to_cube_out_var);
         move |egraph, subst| {
             if let Some(_) = egraph[subst[members_var]].data.member_name_to_expr {
                 for alias_to_cube in
@@ -95,9 +95,9 @@ impl WrapperRules {
                         var_iter!(egraph[subst[ungrouped_cube_var]], CubeScanUngrouped).cloned()
                     {
                         subst.insert(
-                            ungrouped_cube_var_out,
-                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerUngrouped(
-                                WrapperPullupReplacerUngrouped(ungrouped),
+                            push_to_cube_out_var,
+                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerPushToCube(
+                                WrapperPullupReplacerPushToCube(ungrouped),
                             )),
                         );
                         subst.insert(

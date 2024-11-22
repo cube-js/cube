@@ -191,7 +191,7 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -265,7 +265,7 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -666,6 +666,7 @@ jobs:
         target:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
+          - aarch64-apple-darwin
         include:
           - target: x86_64-pc-windows-msvc
             os: windows-2019
@@ -673,10 +674,18 @@ jobs:
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
-            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
             tar_executable: tar
+            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
           - target: x86_64-apple-darwin
             os: macos-12
+            executable_name: cubestored
+            # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
+            strip: false
+            compress: false
+            # bsd tar has a different format with Sparse files which breaks download script
+            tar_executable: gtar
+          - os: macos-14
+            target: aarch64-apple-darwin
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
@@ -807,7 +816,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Trigger runtime
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
