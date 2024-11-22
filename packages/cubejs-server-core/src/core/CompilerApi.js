@@ -473,7 +473,8 @@ export class CompilerApi {
       }
       return (item) => ({
         ...item,
-        isVisible: item.isVisible && isMemberVisibleInContext[item.name]
+        isVisible: item.isVisible && isMemberVisibleInContext[item.name],
+        public: item.public && isMemberVisibleInContext[item.name]
       });
     };
 

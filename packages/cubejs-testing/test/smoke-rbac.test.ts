@@ -264,3 +264,66 @@ describe('Cube RBAC Engine', () => {
     });
   });
 });
+
+describe('Cube RBAC Engine [dev mode]', () => {
+  jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
+  let birdbox: BirdBox;
+  let client: CubeApi;
+
+  const DEFAULT_API_TOKEN = sign({
+    auth: {
+      username: 'nobody',
+      userAttributes: {},
+      roles: [],
+    },
+  }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+    expiresIn: '2 days'
+  });
+
+  const pgPort = 5656;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    await PostgresDBRunner.loadEcom(db);
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DEV_MODE: 'true',
+        NODE_ENV: 'dev',
+        //
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        //
+        CUBEJS_PG_SQL_PORT: `${pgPort}`,
+      },
+      {
+        schemaDir: 'rbac/model',
+        cubejsConfig: 'rbac/cube.js',
+      }
+    );
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
+      apiUrl: birdbox.configuration.apiUrl,
+    });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  test('line_items hidden created_at', async () => {
+    const meta = await client.meta();
+    const dimensions = meta.meta.cubes.find(c => c.name === 'orders')?.dimensions;
+    expect(dimensions?.length).toBe(2);
+    for (const dim of dimensions || []) {
+      expect(dim.isVisible).toBe(false);
+      expect(dim.public).toBe(false);
+    }
+  });
+});
