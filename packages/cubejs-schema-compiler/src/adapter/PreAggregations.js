@@ -1193,20 +1193,21 @@ export class PreAggregations {
 
     const columnsFor = (targetReferences, references, preAggregation) => Object.keys(targetReferences).map(
       member => {
-        const [memberCube, memberProp] = member.split('.');
-        let refKey = references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, memberProp])];
+        const [, memberProp] = member.split('.');
+
+        let refKey = references[member];
 
         if (refKey) {
           return `${refKey} ${targetReferences[member]}`;
         }
 
-        // Preaggregation may reference the joined cube dimensions/measures
-        if (this.query.cubeEvaluator.cubeFromPath(preAggregation.cube).joins[memberCube]) {
-          refKey = references[this.query.cubeEvaluator.pathFromArray([memberCube, memberProp])];
+        refKey = references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, memberProp])];
+
+        if (refKey) {
           return `${refKey} ${targetReferences[member]}`;
         }
 
-        throw new Error(`Preaggregation "${preAggregation.preAggregationName}" referenced property "${memberCube}.${memberProp}" not found in cube "${preAggregation.cube}"`);
+        throw new Error(`Preaggregation "${preAggregation.preAggregationName}" referenced property "${member}" not found in cube "${preAggregation.cube}"`);
       }
     );
 
