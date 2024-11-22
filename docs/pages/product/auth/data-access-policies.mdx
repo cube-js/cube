@@ -10,6 +10,42 @@ TODO
 
 TODO
 
+
+```
+Привет! Можешь проверить, что я правильно мыслю? Снова access policies.
+
+Вот есть такие политики. Для пользователя с ролью status_checker_2_3_4 она ожидаемо делает доступным куб и все его мемберы.
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+      
+      - role: status_checker_2_3_4
+        member_level:
+          includes: '*'
+
+А вот такие политики (поменял includes на excludes) для пользователя с ролью status_checker_2_3_4 
+    access_policy:
+      - role: "*"
+        member_level:
+          excludes: '*'
+      
+      - role: status_checker_2_3_4
+        member_level:
+          includes: '*'
+```
+
+
+
+написать, что public takes preference
+
+
+написать, что вьюшки не наследуют mls от кубов
+
+When evaluating Cube and View level policies:
+- member level policy at the view always wins (you can expose a hidden
+  member of a Cube on a View)
+
 ## Row-level access
 
 TODO
