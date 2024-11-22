@@ -1,9 +1,79 @@
-use super::{Schema, SingleAliasedSource};
+use super::{time_seria, Schema, SingleAliasedSource};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 
 use std::rc::Rc;
+
+pub struct RollingWindowJoinCondition {
+    tailing_interval: Option<String>,
+    leading_interval: Option<String>,
+    offset: String,
+    is_from_start_to_end: bool,
+    time_dimension: Vec<Rc<BaseMember>>,
+}
+
+impl RollingWindowJoinCondition {
+    pub fn new(
+        trailing_interval: Option<String>,
+        leading_interval: Option<String>,
+        offset: String,
+        is_from_start_to_end: bool,
+        dimensions: Vec<Rc<BaseMember>>,
+    ) -> Self {
+        Self {
+            tailing_interval,
+            leading_interval,
+            offset,
+            is_from_start_to_end,
+            time_dimension,
+        }
+    }
+
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
+        let result = if self.dimensions.is_empty() {
+            format!("1 = 1")
+        } else {
+            let conditions = vec![];
+            self.dimensions
+                .iter()
+                .map(|dim| -> Result<String, CubeError> {
+                    if let Some(trailing_interval) = self.trailing_interval {
+                        if tailing_interval == "unbounded" {
+                            let seria_column = "date_from",
+                        }
+                    }
+
+
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .join(" AND ")
+        };
+        Ok(result)
+    }
+
+    fn resolve_member_alias(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+        source: &String,
+        dimension: &Rc<dyn BaseMember>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
+        let schema = schema.extract_source_schema(source);
+        let source = Some(source.clone());
+        if let Some(column) = schema.find_column_for_member(&dimension.full_name(), &source) {
+            templates.column_reference(&source, &column.alias.clone())
+        } else {
+            dimension.to_sql(context.clone(), schema.clone())
+        }
+    }
+}
 
 pub struct DimensionJoinCondition {
     left_source: String,

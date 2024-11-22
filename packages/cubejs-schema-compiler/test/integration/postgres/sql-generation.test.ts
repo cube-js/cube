@@ -538,7 +538,7 @@ describe('SQL Generation', () => {
     });
     `);
 
-  it('simple join 1', async () => {
+  it('simple join', async () => {
     await compiler.compile();
 
     console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
@@ -704,7 +704,7 @@ describe('SQL Generation', () => {
     });
   });
 
-  it('rolling', async () => runQueryTest({
+  it('rolling 1', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling'
     ],
@@ -730,7 +730,7 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
   ]));
 
-  it('rolling multiplied', async () => runQueryTest({
+  it('rolling multiplied 1', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling',
       'visitor_checkins.visitor_checkins_count'
@@ -915,6 +915,7 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__running_revenue_per_count: '300' }
   ]));
+
 
   it('hll rolling (BigQuery)', async () => {
     await compiler.compile();

@@ -1,6 +1,8 @@
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
+use crate::cube_bridge::measure_definition::{
+    MeasureDefinition, RollingWindow, TimeShiftReference,
+};
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
 use cubenativeutils::CubeError;
@@ -81,6 +83,14 @@ impl MeasureSymbol {
 
     pub fn measure_type(&self) -> &String {
         &self.definition.static_data().measure_type
+    }
+
+    pub fn rolling_window(&self) -> &Option<RollingWindow> {
+        &self.definition.static_data().rolling_window
+    }
+
+    pub fn is_rolling_window(&self) -> bool {
+        self.rolling_window().is_some()
     }
 
     pub fn measure_filters(&self) -> &Vec<Rc<EvaluationNode>> {

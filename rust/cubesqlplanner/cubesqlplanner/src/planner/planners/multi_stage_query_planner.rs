@@ -1,5 +1,8 @@
-use super::multi_stage::MultiStageMemberQueryPlanner;
-use super::multi_stage::{MultiStageAppliedState, MultiStageQueryDescription};
+use super::multi_stage::{
+    MultiStageAppliedState, MultiStageInodeMember, MultiStageInodeMemberType,
+    MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
+    MultiStageQueryDescription, MultiStageTimeShift,
+};
 use crate::plan::{Cte, From, Schema, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
@@ -31,7 +34,7 @@ impl MultiStageQueryPlanner {
             .all_members(false)
             .into_iter()
             .filter_map(|memb| -> Option<Result<_, CubeError>> {
-                match has_multi_stage_members(&memb.member_evaluator()) {
+                match has_multi_stage_members(&memb.member_evaluator(), false) {
                     Ok(true) => Some(Ok(memb)),
                     Ok(false) => None,
                     Err(e) => Some(Err(e)),
@@ -99,6 +102,150 @@ impl MultiStageQueryPlanner {
         Rc::new(select_builder.build())
     }
 
+    fn create_multi_stage_inode_member(
+        &self,
+        base_member: Rc<EvaluationNode>,
+    ) -> Result<MultiStageInodeMember, CubeError> {
+        let inode = if let Some(measure) =
+            BaseMeasure::try_new(base_member.clone(), self.query_tools.clone())?
+        {
+            let member_type = if measure.measure_type() == "rank" {
+                MultiStageInodeMemberType::Rank
+            } else if !measure.is_calculated() {
+                MultiStageInodeMemberType::Aggregate
+            } else {
+                MultiStageInodeMemberType::Calculate
+            };
+
+            let time_shifts = if let Some(refs) = measure.time_shift_references() {
+                let time_shifts = refs
+                    .iter()
+                    .map(|r| MultiStageTimeShift::try_from_reference(r))
+                    .collect::<Result<Vec<_>, _>>()?;
+                time_shifts
+            } else {
+                vec![]
+            };
+            let is_ungrupped = match &member_type {
+                MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
+                _ => false,
+            };
+            MultiStageInodeMember::new(
+                member_type,
+                measure.reduce_by().clone().unwrap_or_default(),
+                measure.add_group_by().clone().unwrap_or_default(),
+                measure.group_by().clone(),
+                time_shifts,
+                is_ungrupped,
+            )
+        } else {
+            MultiStageInodeMember::new(
+                MultiStageInodeMemberType::Calculate,
+                vec![],
+                vec![],
+                None,
+                vec![],
+                false,
+            )
+        };
+        Ok(inode)
+    }
+
+    fn add_time_seria(
+        &self,
+        state: Rc<MultiStageAppliedState>,
+        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+    ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        let description =
+            if let Some(description) = descriptions.iter().find(|d| d.alias() == "time_seria") {
+                description.clone()
+            } else {
+                let time_dimensions = self.query_properties.time_dimensions();
+                if time_dimensions.len() != 1 {
+                    return Err(CubeError::internal(
+                        "Rolling window requires one time dimension".to_string(),
+                    ));
+                }
+                let time_dimension = time_dimensions[0].clone();
+                let time_seria_node = MultiStageQueryDescription::new(
+                    MultiStageMember::new(
+                        MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeria(
+                            time_dimension.clone(),
+                        )),
+                        time_dimension.member_evaluator(),
+                    ),
+                    state.clone(),
+                    vec![],
+                    "time_seria".to_string(),
+                );
+                descriptions.push(time_seria_node.clone());
+                time_seria_node
+            };
+        Ok(description)
+    }
+
+    fn add_rolling_window_base(
+        &self,
+        member: Rc<EvaluationNode>,
+        state: Rc<MultiStageAppliedState>,
+        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+    ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        let alias = format!("cte_{}", descriptions.len());
+        let description = MultiStageQueryDescription::new(
+            MultiStageMember::new(
+                MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
+                member.clone(),
+            ),
+            state.clone(),
+            vec![],
+            alias.clone(),
+        );
+        descriptions.push(description.clone());
+        Ok(description)
+    }
+
+    fn try_make_rolling_window(
+        &self,
+        member: Rc<EvaluationNode>,
+        state: Rc<MultiStageAppliedState>,
+        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+    ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
+        if let Some(measure) = BaseMeasure::try_new(member.clone(), self.query_tools.clone())? {
+            if let Some(rolling_window) = measure.rolling_window() {
+                self.add_time_seria(state.clone(), descriptions)?;
+                let input = vec![self.add_rolling_window_base(
+                    member.clone(),
+                    state.clone(),
+                    descriptions,
+                )?];
+
+                let alias = format!("cte_{}", descriptions.len());
+
+                let inode_member = MultiStageInodeMember::new(
+                    MultiStageInodeMemberType::RollingWindow,
+                    vec![],
+                    vec![],
+                    None,
+                    vec![],
+                    false,
+                );
+
+                let description = MultiStageQueryDescription::new(
+                    MultiStageMember::new(MultiStageMemberType::Inode(inode_member), member),
+                    state.clone(),
+                    input,
+                    alias.clone(),
+                );
+                descriptions.push(description.clone());
+                Ok(Some(description))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
     fn make_queries_descriptions(
         &self,
         member: Rc<EvaluationNode>,
@@ -113,54 +260,77 @@ impl MultiStageQueryPlanner {
             return Ok(exists.clone());
         };
 
-        let (dimensions_to_add, time_shifts) = if let Some(measure) =
-            BaseMeasure::try_new(member.clone(), self.query_tools.clone())?
+        if let Some(rolling_window_query) =
+            self.try_make_rolling_window(member.clone(), state.clone(), descriptions)?
         {
-            let dimensions_to_add = if let Some(add_group_by) = measure.add_group_by() {
-                add_group_by
-                    .iter()
-                    .map(|name| self.compile_dimension(name))
-                    .collect::<Result<Vec<_>, _>>()?
-            } else {
-                vec![]
-            };
-
-            (dimensions_to_add, measure.time_shifts().clone())
-        } else {
-            (vec![], vec![])
-        };
-
-        let new_state = if !dimensions_to_add.is_empty()
-            || !time_shifts.is_empty()
-            || state.is_filter_allowed(&member_name)
-        {
-            let mut new_state = state.clone_state();
-            if !dimensions_to_add.is_empty() {
-                new_state.add_dimensions(dimensions_to_add);
-            }
-            if !time_shifts.is_empty() {
-                new_state.add_time_shifts(time_shifts);
-            }
-            if state.is_filter_allowed(&member_name) {
-                new_state.disallow_filter(&member_name);
-            }
-            Rc::new(new_state)
-        } else {
-            state.clone()
-        };
+            return Ok(rolling_window_query);
+        }
 
         let childs = member_childs(&member)?;
-        let input = childs
-            .into_iter()
-            .map(
-                |child| -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-                    self.make_queries_descriptions(child, new_state.clone(), descriptions)
-                },
+
+        let description = if childs.is_empty() {
+            if has_multi_stage_members(&member, false)? {
+                return Err(CubeError::internal(format!(
+                    "Leaf multi stage query cannot contain multi stage member"
+                )));
+            }
+
+            let alias = format!("cte_{}", descriptions.len());
+            MultiStageQueryDescription::new(
+                MultiStageMember::new(
+                    MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
+                    member.clone(),
+                ),
+                state.clone(),
+                vec![],
+                alias.clone(),
             )
-            .collect::<Result<Vec<_>, _>>()?;
-        let alias = format!("cte_{}", descriptions.len());
-        let description =
-            MultiStageQueryDescription::new(member, state.clone(), input, alias.clone());
+        } else {
+            let multi_stage_member = self.create_multi_stage_inode_member(member.clone())?;
+
+            let dimensions_to_add = multi_stage_member
+                .add_group_by()
+                .iter()
+                .map(|name| self.compile_dimension(name))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let new_state = if !dimensions_to_add.is_empty()
+                || !multi_stage_member.time_shifts().is_empty()
+                || state.is_filter_allowed(&member_name)
+            {
+                let mut new_state = state.clone_state();
+                if !dimensions_to_add.is_empty() {
+                    new_state.add_dimensions(dimensions_to_add);
+                }
+                if !multi_stage_member.time_shifts().is_empty() {
+                    new_state.add_time_shifts(multi_stage_member.time_shifts().clone());
+                }
+                if state.is_filter_allowed(&member_name) {
+                    new_state.disallow_filter(&member_name);
+                }
+                Rc::new(new_state)
+            } else {
+                state.clone()
+            };
+
+            let input = childs
+                .into_iter()
+                .map(
+                    |child| -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+                        self.make_queries_descriptions(child, new_state.clone(), descriptions)
+                    },
+                )
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let alias = format!("cte_{}", descriptions.len());
+            MultiStageQueryDescription::new(
+                MultiStageMember::new(MultiStageMemberType::Inode(multi_stage_member), member),
+                state.clone(),
+                input,
+                alias.clone(),
+            )
+        };
+
         descriptions.push(description.clone());
         Ok(description)
     }

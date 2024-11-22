@@ -121,6 +121,22 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn time_seria_select(
+        &self,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        seria: Vec<Vec<String>>,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/time_seria_select",
+            context! {
+                from_date => from_date,
+                to_date => to_date,
+                seria => seria
+            },
+        )
+    }
+
     pub fn select(
         &self,
         ctes: Vec<String>,
@@ -151,59 +167,6 @@ impl PlanSqlTemplates {
             },
         )
     }
-
-    /* pub fn select(
-        &self,
-        from: String,
-        projection: Vec<AliasedColumn>,
-        group_by: Vec<AliasedColumn>,
-        group_descs: Vec<Option<GroupingSetDesc>>,
-        aggregate: Vec<AliasedColumn>,
-        alias: String,
-        filter: Option<String>,
-        _having: Option<String>,
-        order_by: Vec<AliasedColumn>,
-        limit: Option<usize>,
-        offset: Option<usize>,
-        distinct: bool,
-    ) -> Result<String, CubeError> {
-        let group_by = self.to_template_columns(group_by)?;
-        let aggregate = self.to_template_columns(aggregate)?;
-        let projection = self.to_template_columns(projection)?;
-        let order_by = self.to_template_columns(order_by)?;
-        let select_concat = group_by
-            .iter()
-            .chain(aggregate.iter())
-            .chain(projection.iter())
-            .map(|c| c.clone())
-            .collect::<Vec<_>>();
-        let quoted_from_alias = self.quote_identifier(&alias)?;
-        let has_grouping_sets = group_descs.iter().any(|d| d.is_some());
-        let group_by_expr = if has_grouping_sets {
-            self.group_by_with_grouping_sets(&group_by, &group_descs)?
-        } else {
-            self.render_template(
-                "statements/group_by_exprs",
-                context! { group_by => group_by },
-            )?
-        };
-        self.render.render_template(
-            "statements/select",
-            context! {
-                from => from,
-                select_concat => select_concat,
-                group_by => group_by_expr,
-                aggregate => aggregate,
-                projection => projection,
-                order_by => order_by,
-                filter => filter,
-                from_alias => quoted_from_alias,
-                limit => limit,
-                offset => offset,
-                distinct => distinct,
-            },
-        )
-    } */
 
     pub fn join(&self, source: &str, condition: &str, is_inner: bool) -> Result<String, CubeError> {
         let join_type = if is_inner {

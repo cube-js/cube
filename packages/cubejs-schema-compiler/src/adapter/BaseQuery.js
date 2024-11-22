@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv, timeSeries } from '@cubejs-backend/shared';
 
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
@@ -576,6 +576,29 @@ export class BaseQuery {
     return false;
   }
 
+  buildSqlAndParamsTest(exportAnnotatedSql) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      if (this.externalPreAggregationQuery()) { // TODO performance
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+      }
+    }
+    const js_res = this.compilers.compiler.withQuery(
+      this,
+      () => this.cacheValue(
+        ['buildSqlAndParams', exportAnnotatedSql],
+        () => this.paramAllocator.buildSqlAndParams(
+          this.buildParamAnnotatedSql(),
+          exportAnnotatedSql,
+          this.shouldReuseParams
+        ),
+        { cache: this.queryCache }
+      )
+    );
+    const rust = this.buildSqlAndParamsRust(exportAnnotatedSql);
+    console.log('js result: ', js_res[0]);
+    console.log('rust result: ', rust[0]);
+    return js_res;
+  }
   /**
    * Returns a pair of SQL query string and parameter values for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
@@ -628,6 +651,10 @@ export class BaseQuery {
     return res;
   }
 
+  //FIXME helper for native generator, maybe should be moved entire to rust
+  generateTimeSeries(granularity, dateRange) {
+      return timeSeries(granularity, dateRange);
+  }
   get shouldReuseParams() {
     return false;
   }
@@ -1381,6 +1408,7 @@ export class BaseQuery {
       ) || undefined
     );
     const baseQueryAlias = this.cubeAlias('base');
+    console.log("!!! date join contdition: ", dateJoinCondition);
     const dateJoinConditionSql =
       dateJoinCondition.map(
         ([d, f]) => f(
@@ -1391,6 +1419,8 @@ export class BaseQuery {
           `'${d.dateToFormatted()}'`
         )
       ).join(' AND ');
+
+    console.log("!!! date join contdition sql: ", dateJoinConditionSql);
 
     return this.overTimeSeriesSelect(
       cumulativeMeasures,
@@ -3232,7 +3262,16 @@ export class BaseQuery {
           '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
         join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
-        cte: '{{ alias }} AS ({{ query | indent(2, true) }})'
+        cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
+        time_seria_select: 'SELECT date_from::timestamp AS "date_from",\n' +
+        'date_to::timestamp AS "date_to" \n' +
+        'FROM(\n' +
+        '    VALUES ' +
+        '{% for time_item in seria  %}' +
+        '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
+        '{% if not loop.last %}, {% endif %}' +
+        '{% endfor %}' +
+        ') AS dates (date_from, date_to)'
       },
       expressions: {
         column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',

@@ -8,6 +8,7 @@ pub mod order;
 pub mod query_plan;
 pub mod schema;
 pub mod select;
+pub mod time_seria;
 pub mod union;
 
 pub use builder::{JoinBuilder, SelectBuilder};
@@ -20,4 +21,6 @@ pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use schema::{Schema, SchemaColumn, SchemaCube};
 pub use select::{AliasedExpr, Select};
+pub use time_seria::TimeSeria;
 pub use union::Union;
+

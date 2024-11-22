@@ -1,4 +1,4 @@
-use crate::planner::base_measure::MeasureTimeShift;
+use crate::planner::planners::multi_stage::MultiStageTimeShift;
 use crate::planner::BaseDimension;
 use itertools::Itertools;
 use std::cmp::PartialEq;
@@ -43,7 +43,7 @@ impl MultiStageAppliedState {
             .collect_vec();
     }
 
-    pub fn add_time_shifts(&mut self, time_shifts: Vec<MeasureTimeShift>) {
+    pub fn add_time_shifts(&mut self, time_shifts: Vec<MultiStageTimeShift>) {
         for ts in time_shifts.into_iter() {
             self.time_shifts
                 .insert(ts.time_dimension.clone(), ts.interval.clone());
