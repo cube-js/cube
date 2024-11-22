@@ -789,9 +789,6 @@ export class BaseQuery {
    * @returns {string}
    */
   fullKeyQueryAggregate() {
-    if (this.from) {
-      return this.simpleQuery();
-    }
     const {
       multipliedMeasures,
       regularMeasures,
@@ -1426,16 +1423,17 @@ export class BaseQuery {
   }
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
+    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures, baseQueryAlias);
     return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
       this.groupByClause();
   }
 
-  overTimeSeriesForSelect(cumulativeMeasures) {
-    return this.dimensions.map(s => s.cumulativeSelectColumns()).concat(this.dateSeriesSelect()).concat(
-      cumulativeMeasures.map(s => s.cumulativeSelectColumns()),
-    ).filter(c => !!c)
+  overTimeSeriesForSelect(cumulativeMeasures, baseQueryAlias) {
+    return this.dimensions.map(s => s.cumulativeSelectColumns(baseQueryAlias))
+      .concat(this.dateSeriesSelect())
+      .concat(cumulativeMeasures.map(s => s.cumulativeSelectColumns(baseQueryAlias)))
+      .filter(c => !!c)
       .join(', ');
   }
 
@@ -1792,16 +1790,16 @@ export class BaseQuery {
       }));
   }
 
-  groupedUngroupedSelect(select, ungrouped, granularityOverride) {
+  groupedUngroupedSelect(selectFn, ungrouped, granularityOverride) {
     return this.evaluateSymbolSqlWithContext(
-      select,
+      selectFn,
       { ungrouped, granularityOverride, overTimeSeriesAggregate: true }
     );
   }
 
-  ungroupedMeasureSelect(select) {
+  ungroupedMeasureSelect(selectFn) {
     return this.evaluateSymbolSqlWithContext(
-      select,
+      selectFn,
       { ungrouped: true }
     );
   }
@@ -2266,17 +2264,28 @@ export class BaseQuery {
             this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
           }
         }
-        const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+
         let sql;
-        if (symbol.type !== 'rank') {
-          sql = symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
-            primaryKeys.length && (
-              primaryKeys.length > 1 ?
-                this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
-                : this.primaryKeySql(primaryKeys[0], cubeName)
-            ) || '*';
+        let orderBySql = [];
+
+        if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[memberPath]) {
+          sql = this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative[memberPath];
+          if (this.safeEvaluateSymbolContext().ungroupedBaseQueryAliasForCumulative) {
+            sql = `${this.safeEvaluateSymbolContext().ungroupedBaseQueryAliasForCumulative}.${sql}`;
+          }
+        } else {
+          const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
+          orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+          if (symbol.type !== 'rank') {
+            sql = symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
+              primaryKeys.length && (
+                primaryKeys.length > 1 ?
+                  this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
+                  : this.primaryKeySql(primaryKeys[0], cubeName)
+              ) || '*';
+          }
         }
+
         const result = this.renderSqlMeasure(
           name,
           sql && this.applyMeasureFilters(
@@ -2293,6 +2302,7 @@ export class BaseQuery {
           parentMeasure,
           orderBySql,
         );
+
         if (
           this.safeEvaluateSymbolContext().compositeCubeMeasures ||
           this.safeEvaluateSymbolContext().leafMeasures

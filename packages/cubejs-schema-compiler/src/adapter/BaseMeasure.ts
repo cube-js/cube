@@ -35,15 +35,16 @@ export class BaseMeasure {
     return this.measureSql() === this.aliasName();
   }
 
-  public cumulativeSelectColumns() {
-    return [`${this.cumulativeMeasureSql()} ${this.aliasName()}`];
+  public cumulativeSelectColumns(baseQueryAliasName?: string): string[] {
+    return [`${this.cumulativeMeasureSql(baseQueryAliasName)} ${this.aliasName()}`];
   }
 
-  public cumulativeMeasureSql() {
+  public cumulativeMeasureSql(baseQueryAliasName?: string) {
     return this.query.evaluateSymbolSqlWithContext(
       () => this.measureSql(),
       {
-        ungroupedAliasesForCumulative: { [this.measure]: this.aliasName() }
+        ungroupedAliasesForCumulative: { [this.measure]: this.aliasName() },
+        ungroupedBaseQueryAliasForCumulative: baseQueryAliasName
       }
     );
   }
