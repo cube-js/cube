@@ -1448,6 +1448,65 @@ describe('SQL Generation', () => {
     }
   ]));
 
+  it('ungrouped cumulative query', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.visitor_checkins_count',
+        'visitor_checkins.visitorCheckinsRolling',
+      ],
+      dimensions: [
+        'visitor_checkins.id'
+      ],
+      timeDimensions: [{
+        dimension: 'visitor_checkins.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: [{
+        id: 'visitor_checkins.id'
+      }],
+      ungrouped: true
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            visitor_checkins__id: 3,
+            visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitor_checkins__visitor_checkins_count: 1,
+            visitor_checkins__visitor_checkins_rolling: 1
+          },
+          {
+            visitor_checkins__id: 4,
+            visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitor_checkins__visitor_checkins_count: 1,
+            visitor_checkins__visitor_checkins_rolling: 1
+          },
+          {
+            visitor_checkins__id: 5,
+            visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitor_checkins__visitor_checkins_count: 1,
+            visitor_checkins__visitor_checkins_rolling: 1
+          },
+          {
+            visitor_checkins__id: 6,
+            visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitor_checkins__visitor_checkins_count: 1,
+            visitor_checkins__visitor_checkins_rolling: 1
+          }
+        ]
+      );
+    });
+  });
+
   it('join rollup pre-aggregation', async () => {
     await compiler.compile();
 
