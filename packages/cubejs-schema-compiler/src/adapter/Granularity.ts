@@ -99,7 +99,7 @@ export class Granularity {
     // Interval range doesn't take timezone into account and operate in kinda local timezone,
     // but origin is treated as a timestamp in query timezone, so we pass it as the naive timestamp
     // to be in sync with date range during calculation.
-    return timeSeriesFromCustomInterval(this.granularityInterval, dateRange, moment(this.origin.format('YYYY-MM-DDTHH:mm:ss')), options);
+    return timeSeriesFromCustomInterval(this.granularityInterval, dateRange, moment(this.originLocalFormatted()), options);
   }
 
   public resolvedGranularity(): string {
