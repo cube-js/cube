@@ -77,9 +77,35 @@ export class DevServer {
       try {
         await handler(req, res, next);
       } catch (e) {
-        console.error(((e as Error).stack || e).toString());
-        this.cubejsServer.event('Dev Server Error', { error: ((e as Error).stack || e).toString() });
-        res.status(500).json({ error: ((e as Error).stack || e).toString() });
+        const errorString = ((e as Error).stack || e).toString();
+        console.error(errorString);
+        this.cubejsServer.event('Dev Server Error', { error: errorString });
+
+        // We don't know what state response is left at here:
+        // It could be corked, headers could be sent, body could be sent completely or partially
+
+        // Also, because we pass `next` to handler without any wrapper we don't know if it was called or not
+        // Hence, we shouldn't call it for error handling
+
+        try {
+          while (res.writableCorked > 0) {
+            res.uncork();
+          }
+
+          if (res.writableEnded) {
+            // There's nothing we can do for response, error happened after call to end()
+          } else if (res.headersSent) {
+            // If header is already sent, we can't alter any of it, so best we can do is just terminate body
+            res.end();
+          } else {
+            res.status(500).json({ error: errorString });
+          }
+        } catch (send500Error) {
+          const send500ErrorString = ((send500Error as Error).stack || send500Error).toString();
+          console.error(send500ErrorString);
+          this.cubejsServer.event('Dev Server Error', { error: send500ErrorString });
+          res.destroy(send500Error);
+        }
       }
     };
 
@@ -113,7 +139,7 @@ export class DevServer {
       });
 
       const tablesSchema = await driver.tablesSchema();
-      
+
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
         this.cubejsServer.event('Dev Server DB Schema Load Empty');
@@ -164,17 +190,17 @@ export class DevServer {
 
       await fs.emptyDir(path.join(options.schemaPath, 'cubes'));
       await fs.emptyDir(path.join(options.schemaPath, 'views'));
-      
+
       await fs.writeFile(path.join(options.schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
-# You can control which measures and dimensions are exposed to BIs or data apps, 
+# You can control which measures and dimensions are exposed to BIs or data apps,
 # as well as the direction of joins between the exposed cubes.
 # You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
 
 
-# The following example shows a view defined on top of orders and customers cubes. 
-# Both orders and customers cubes are exposed using the "includes" parameter to 
+# The following example shows a view defined on top of orders and customers cubes.
+# Both orders and customers cubes are exposed using the "includes" parameter to
 # control which measures and dimensions are exposed.
-# Prefixes can also be applied when exposing measures or dimensions. 
+# Prefixes can also be applied when exposing measures or dimensions.
 # In this case, the customers' city dimension is prefixed with the cube name,
 # resulting in "customers_city" when querying the view.
 
@@ -189,10 +215,10 @@ export class DevServer {
 #
 #           - total_amount
 #           - count
-#      
+#
 #       - join_path: orders.customers
 #         prefix: true
-#         includes: 
+#         includes:
 #           - city`);
       await Promise.all(files.map(file => fs.writeFile(path.join(options.schemaPath, 'cubes', file.fileName), file.content)));
 
@@ -530,15 +556,15 @@ export class DevServer {
       if (!variables.CUBEJS_API_SECRET) {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
-      
+
       let envs: Record<string, string> = {};
       const envPath = path.join(process.cwd(), '.env');
       if (fs.existsSync(envPath)) {
         envs = dotenv.parse(fs.readFileSync(envPath));
       }
-      
+
       const schemaPath = envs.CUBEJS_SCHEMA_PATH || process.env.CUBEJS_SCHEMA_PATH || 'model';
-      
+
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
@@ -596,7 +622,7 @@ export class DevServer {
       try {
         await schemaConverter.generate();
       } catch (error) {
-        res.status(400).json({ error: (error as Error).message || error });
+        return res.status(400).json({ error: (error as Error).message || error });
       }
 
       schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
@@ -605,7 +631,7 @@ export class DevServer {
         }
       });
 
-      res.json('ok');
+      return res.json('ok');
     }));
   }
 

@@ -1,31 +1,32 @@
 use crate::{
     compile::rewrite::{
-        analysis::{LogicalPlanAnalysis, Member},
+        analysis::Member,
         column_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ColumnExprColumn,
         LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn column_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn column_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-column",
                 wrapper_pushdown_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    "WrapperPushdownReplacerPushToCube:false",
                     "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    "WrapperPullupReplacerPushToCube:false",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -37,14 +38,14 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:true",
+                    "WrapperPushdownReplacerPushToCube:true",
                     "WrapperPullupReplacerInProjection:true",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:true",
+                    "WrapperPullupReplacerPushToCube:true",
                     "WrapperPullupReplacerInProjection:true",
                     "?cube_members",
                 ),
@@ -56,14 +57,14 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:true",
+                    "WrapperPushdownReplacerPushToCube:true",
                     "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     "?dimension",
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:true",
+                    "WrapperPullupReplacerPushToCube:true",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -78,13 +79,16 @@ impl WrapperRules {
         column_name_var: &'static str,
         members_var: &'static str,
         dimension_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
         let dimension_var = var!(dimension_var);
         move |egraph, subst| {
-            for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
+            let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
+                .cloned()
+                .collect();
+            for column in columns.iter() {
                 for alias_to_cube in var_iter!(
                     egraph[subst[alias_to_cube_var]],
                     WrapperPullupReplacerAliasToCube
@@ -110,7 +114,7 @@ impl WrapperRules {
                 }
                 if let Some((member, _)) = &egraph[subst[members_var]]
                     .data
-                    .find_member(|_, cn| cn == &column.name)
+                    .find_member_by_alias(&column.name)
                 {
                     if matches!(
                         member.1,
@@ -140,15 +144,18 @@ impl WrapperRules {
         &self,
         column_name_var: &'static str,
         members_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
+            let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
+                .cloned()
+                .collect();
+            for column in columns {
                 if let Some(((Some(member), _, _), _)) = egraph[subst[members_var]]
                     .data
-                    .find_member(|_, cn| cn == &column.name)
+                    .find_member_by_alias(&column.name)
                 {
                     if let Some(measure) = meta.find_measure_with_name(member.to_string()) {
                         if measure.agg_type != Some("number".to_string()) {

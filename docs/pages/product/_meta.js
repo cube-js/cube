@@ -8,6 +8,6 @@ module.exports = {
   "apis-integrations": "APIs & integrations",
   "workspace": "Workspace",
   "deployment": "Deployment",
-  "monitoring": "Monitoring",
+  "distribution": "Distribution",
   "faqs": "FAQs"
 }

@@ -1,21 +1,21 @@
 use crate::{
     compile::rewrite::{
-        analysis::{LogicalPlanAnalysis, OriginalExpr},
+        analysis::OriginalExpr,
         column_name_to_member_vec, cube_scan, cube_scan_order, cube_scan_order_empty_tail,
         expr_column_name, order, order_replacer, referenced_columns, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         sort, sort_exp, sort_exp_empty_tail, sort_expr, transforming_rewrite, LogicalPlanLanguage,
         OrderAsc, OrderMember, OrderReplacerColumnNameToMember, SortExprAsc,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
-use std::ops::Index;
+use egg::Subst;
+use std::ops::{Index, IndexMut};
 
 pub struct OrderRules {}
 
 impl RewriteRules for OrderRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         vec![
             transforming_rewrite(
                 "push-down-sort",
@@ -82,31 +82,39 @@ impl OrderRules {
         sort_exp_var: &'static str,
         members_var: &'static str,
         aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let sort_exp_var = var!(sort_exp_var);
         let members_var = var!(members_var);
         let aliases_var = var!(aliases_var);
         move |egraph, subst| {
             if let Some(referenced_expr) = &egraph.index(subst[sort_exp_var]).data.referenced_expr {
-                if let Some(member_name_to_expr) = egraph
+                if egraph
                     .index(subst[members_var])
                     .data
                     .member_name_to_expr
-                    .clone()
+                    .is_some()
                 {
-                    let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
                     let referenced_columns = referenced_columns(referenced_expr);
-                    if referenced_columns
-                        .iter()
-                        .all(|c| column_name_to_member_name.iter().any(|(cn, _)| cn == c))
+                    if let Some(member_name_to_expr) = &mut egraph
+                        .index_mut(subst[members_var])
+                        .data
+                        .member_name_to_expr
                     {
-                        subst.insert(
-                            aliases_var,
-                            egraph.add(LogicalPlanLanguage::OrderReplacerColumnNameToMember(
-                                OrderReplacerColumnNameToMember(column_name_to_member_name),
-                            )),
-                        );
-                        return true;
+                        let column_name_to_member_name =
+                            column_name_to_member_vec(member_name_to_expr);
+
+                        if referenced_columns
+                            .iter()
+                            .all(|c| column_name_to_member_name.iter().any(|(cn, _)| cn == c))
+                        {
+                            subst.insert(
+                                aliases_var,
+                                egraph.add(LogicalPlanLanguage::OrderReplacerColumnNameToMember(
+                                    OrderReplacerColumnNameToMember(column_name_to_member_name),
+                                )),
+                            );
+                            return true;
+                        }
                     }
                 }
             }
@@ -121,7 +129,7 @@ impl OrderRules {
         column_name_to_member_var: &'static str,
         order_member_var: &'static str,
         order_asc_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = expr_var.parse().unwrap();
         let asc_var = asc_var.parse().unwrap();
         let column_name_to_member_var = column_name_to_member_var.parse().unwrap();

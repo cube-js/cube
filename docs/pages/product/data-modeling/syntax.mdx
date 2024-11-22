@@ -37,7 +37,8 @@ model
 
 Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
 JavaScript syntax. YAML data model files should have the `.yml` extension,
-whereas JavaScript data model files should end with `.js`.
+whereas JavaScript data model files should end with `.js`. You can mix YAML and
+JavaScript files within a single data model. 
 
 <CodeTabs>
 
@@ -63,10 +64,14 @@ cubes:
 
 </CodeTabs>
 
-You define the data model statically or build [dynamic data
+You can define the data model statically or build [dynamic data
 models][ref-dynamic-data-models] programmatically. YAML data models use
 [Jinja and Python][ref-dynamic-data-models-jinja] whereas JavaScript data
 models use [JavaScript][ref-dynamic-data-models-js].
+
+It is [recommended][ref-style-guide] to default to YAML syntax because of its
+simplicity and readability. However, JavaScript might provide more flexibility
+for dynamic data modeling.
 
 ## Naming
 
@@ -111,10 +116,6 @@ cubes:
       - name: status
         sql: "UPPER(status)"
         type: string
-
-
-
-
 ```
 
 ```javascript
@@ -137,7 +138,22 @@ cube(`orders`, {
 });
 ```
 
+<ReferenceBox>
+
+Currently, Cube does not wrap your SQL snippets in parentheses during SQL
+generation. In case of non-trivial snippets, this may lead to unexpected results.
+Please [track this issue](https://github.com/cube-js/cube/issues/6373).
+
+</ReferenceBox>
+
 </CodeTabs>
+
+### User-defined functions
+
+If you have created a [user-defined function][link-sql-udf] (UDF) in your data
+source, you can use it in the `sql` parameter as well.
+
+### Case sensitivity
 
 If your database uses case-sensitive identifiers, make sure to properly
 quote table and column names. For example, here's how you can reference
@@ -161,7 +177,7 @@ cube(`orders`, {
 
 ## References
 
-To write reusable data models, it is important to be able to reference
+To write versatile data models, it is important to be able to reference
 members of cubes and views, such as measures or dimensions, as well as
 table columns. Cube supports the following syntax for references.
 
@@ -182,8 +198,6 @@ cubes:
       - name: name
         sql: name
         type: string
-
-
 ```
 
 ```javascript
@@ -231,10 +245,6 @@ cubes:
       - name: full_name
         sql: "CONCAT({name}, ' ', {surname})"
         type: string
-
-
-
-
 ```
 
 ```javascript
@@ -265,6 +275,71 @@ cube(`users`, {
 This syntax works great for simple use cases. However, there are cases
 (like [subquery][ref-subquery]) when you'd like to reference members of
 other cubes. See below how to do that.
+
+### `{time_dimension.granularity}`
+
+When referencing a [time dimension][ref-time-dimension], you can specificy a
+granularity to refer to a time value with that specific granularity. It can be
+one of the [default granularities][ref-default-granularities] (e.g., `year` or
+`week`) or a [custom granularity][ref-custom-granularities]:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+
+        granularities:
+          - name: sunday_week
+            interval: 1 week
+            offset: -1 day
+
+      - name: created_at__year
+        sql: "{created_at.year}"
+        type: time
+
+      - name: created_at__sunday_week
+        sql: "{created_at.sunday_week}"
+        type: time
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+
+      granularities: {
+        sunday_week: {
+          interval: `1 week`,
+          offset: `-1 day`
+        }
+      }
+    },
+
+    created_at__year: {
+      sql: `${created_at.year}`,
+      type: `time`
+    },
+
+    created_at__sunday_week: {
+      sql: `${created_at.sunday_week}`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeTabs>
 
 ### `{cube}.column`, `{cube.member}`
 
@@ -305,15 +380,6 @@ cubes:
       - name: name
         sql: "{contacts}.name"
         type: string
-
-
-
-
-
-
-
-
-
 ```
 
 ```javascript
@@ -450,15 +516,6 @@ cubes:
       - name: name
         sql: "{CUBE}.name"
         type: string
-
-
-
-
-
-
-
-
-
 ```
 
 </CodeTabs>
@@ -482,10 +539,73 @@ LEFT JOIN contacts "contacts"
   ON "users".contact_id = "contacts".id
 ```
 
+### `{cube.sql()}` function
+
+When defining a cube, you can reference the `sql` parameter of another cube,
+effectively reusing the SQL query it's defined on. This is particularly useful
+when defining [polymorphic cubes][ref-polymorphism] or using [data blending][ref-data-blending].
+
+Consider the following data model:
+
+```javascript
+cube(`organisms`, {
+  sql_table: `organisms`
+})
+
+cube(`animals`, {
+  sql: `
+    SELECT *
+    FROM ${organisms.sql()}
+    WHERE kingdom = 'animals'
+  `
+})
+
+cube(`dogs`, {
+  sql: `
+    SELECT *
+    FROM ${animals.sql()}
+    WHERE species = 'dogs' 
+  `,
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+If you query for `dogs.count`, Cube will generate the following SQL:
+
+```sql
+SELECT count(*) "dogs__count"
+FROM (
+  SELECT *
+  FROM (
+    SELECT *
+    FROM organisms
+    WHERE kingdom = 'animals'
+  )
+  WHERE species = 'dogs'
+) AS "dogs"
+```
+
+<ReferenceBox>
+
+Currently, `{cube.sql()}` function is only supported in JavaScript data models.
+It is not supported in YAML data models.
+Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+
+As a workaround, you can use JavaScript data models, put a SQL query in a
+[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
+the [template context](/reference/python/cube#templatecontext-class).
+
+</ReferenceBox>
+
 ### Non-SQL references
 
 Outside [SQL expressions][self-sql-expressions], `column` is not recognized
-as a column name; it is rather regonized as a member name. It means that,
+as a column name; it is rather recognized as a member name. It means that,
 outside `sql` and `sql_table` parameters, you can skip the curly braces and
 reference members by their names directly: `member`, `cube_name.member`, or
 `CUBE.member`.
@@ -513,10 +633,6 @@ cubes:
           - CUBE.status
         measures:
           - CUBE.count
-
-
-
-
 ```
 
 ```javascript
@@ -566,8 +682,15 @@ defining dynamic data models.
 [ref-config-model-path]: /reference/configuration/config#schemapath
 [ref-config-repository-factory]:
   /reference/configuration/config#repositoryfactory
-[ref-subquery]: /product/data-modeling/concepts/subquery-dimensions
+[ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML
 [link-snowflake-listagg]: https://docs.snowflake.com/en/sql-reference/functions/listagg
 [link-bigquery-stringagg]: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#string_agg
+[link-sql-udf]: https://en.wikipedia.org/wiki/User-defined_function#Databases
+[ref-time-dimension]: /reference/data-model/types-and-formats#time-1
+[ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
+[ref-custom-granularities]: /reference/data-model/dimensions#granularities
+[ref-style-guide]: /guides/style-guide
+[ref-polymorphism]: /product/data-modeling/concepts/polymorphic-cubes
+[ref-data-blending]: /product/data-modeling/concepts/data-blending

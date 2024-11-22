@@ -1,15 +1,10 @@
 use crate::compile::rewrite::{
-    aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
-    analysis::LogicalPlanAnalysis, binary_expr, rewrite, rules::split::SplitRules,
-    LogicalPlanLanguage,
+    aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, binary_expr, rewrite,
+    rewriter::CubeRewrite, rules::split::SplitRules,
 };
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn binary_expr_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn binary_expr_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "split-binary-push-down-aggregate",

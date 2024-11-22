@@ -5,39 +5,31 @@ redirect_from:
 
 # Hex
 
-You can connect to Cube from Hex, a collaborative data platform, using the [Cube
-SQL API][ref-sql-api].
+Hex is a collaborative, AI-powered workspace.
 
 Here's a short video guide on how to connect Hex to Cube.
 
 <LoomVideo url="https://www.loom.com/embed/8a35dfd4713947ddbfd4b7e0aa6142a1" />
 
-## Enable Cube SQL API
+## Connect from Cube Cloud
 
-### Cube Cloud
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Hex</Btn> to get
+detailed instructions.
 
-Click **How to connect your BI tool** link on the Overview page, navigate to the
-SQL API tab and enable it. Once enabled, you should see the screen like the one
-below with your connection credentials:
+## Connect from Cube Core
 
-<Screenshot src="https://ucarecdn.com/fc74ee91-b8a9-4c46-81ed-cb3daeef6b83/" />
+You can connect a Cube deployment to Hex using the [SQL API][ref-sql-api].
 
-### Self-hosted Cube
-
-You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Hex later.
-
-```dotenv
-CUBEJS_PG_SQL_PORT=5432
-CUBEJS_SQL_USER=myusername
-CUBEJS_SQL_PASSWORD=mypassword
-```
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Hex.
 
 ## Connecting from Hex
 
 Hex connects to Cube as to a Postgres database.
 
-## Querying data
+### Querying data
 
 Your cubes will be exposed as tables, where both your measures and dimensions
 are columns.

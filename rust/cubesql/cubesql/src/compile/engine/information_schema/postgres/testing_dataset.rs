@@ -36,9 +36,10 @@ impl InfoSchemaTestingDatasetProviderBuilder {
             self.random_str.append_value("test".to_string()).unwrap();
         }
 
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.id.finish()));
-        columns.push(Arc::new(self.random_str.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.id.finish()),
+            Arc::new(self.random_str.finish()),
+        ];
 
         columns
     }

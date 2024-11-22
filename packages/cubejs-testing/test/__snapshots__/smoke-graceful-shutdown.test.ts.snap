@@ -1,0 +1,52 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`graceful shutdown PgClient Graceful Shutdown Finishing Transaction: sql_orders 1`] = `
+Array [
+  Object {
+    "cn": "2",
+    "status": "processed",
+  },
+  Object {
+    "cn": "2",
+    "status": "new",
+  },
+  Object {
+    "cn": "1",
+    "status": "shipped",
+  },
+]
+`;
+
+exports[`graceful shutdown PgClient Graceful Shutdown SIGINT: sql_orders 1`] = `
+Array [
+  Object {
+    "cn": "2",
+    "status": "processed",
+  },
+  Object {
+    "cn": "2",
+    "status": "new",
+  },
+  Object {
+    "cn": "1",
+    "status": "shipped",
+  },
+]
+`;
+
+exports[`graceful shutdown PgClient Graceful Shutdown SIGTERM: sql_orders 1`] = `
+Array [
+  Object {
+    "cn": "2",
+    "status": "processed",
+  },
+  Object {
+    "cn": "2",
+    "status": "new",
+  },
+  Object {
+    "cn": "1",
+    "status": "shipped",
+  },
+]
+`;

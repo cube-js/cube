@@ -14,9 +14,9 @@ import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public readonly optsHandler: OptsHandler;
+  public declare optsHandler: OptsHandler;
 
-  public readonly options: ServerCoreInitializedOptions;
+  public declare options: ServerCoreInitializedOptions;
 
   public getRefreshScheduler = super.getRefreshScheduler;
 
@@ -225,12 +225,11 @@ describe('index.test', () => {
         release: () => {}
       },
       externalDialectFactory: () => {},
-      cacheAndQueueDriver: 'redis',
+      cacheAndQueueDriver: 'cubestore',
       contextToAppId: () => 'STANDALONE',
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
       checkAuth: () => {},
-      checkAuthMiddleware: () => {},
       queryTransformer: () => {},
       preAggregationsSchema: () => {},
       schemaVersion: () => {},
@@ -313,7 +312,7 @@ describe('index.test', () => {
     expect(createOrchestratorApiSpy.mock.calls[0]).toEqual([
       expect.any(Function),
       {
-        cacheAndQueueDriver: 'redis',
+        cacheAndQueueDriver: 'cubestore',
         contextToDbType: expect.any(Function),
         contextToExternalDbType: expect.any(Function),
         continueWaitTimeout: 10,
@@ -350,7 +349,7 @@ describe('index.test', () => {
     const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
 
     test('CompilerApi metaConfig', async () => {
-      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
       expect((<any[]>metaConfig)?.length).toBeGreaterThan(0);
       expect(metaConfig[0]).toHaveProperty('config');
       expect(metaConfig[0].config.hasOwnProperty('sql')).toBe(false);
@@ -359,7 +358,7 @@ describe('index.test', () => {
     });
 
     test('CompilerApi metaConfigExtended', async () => {
-      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
       expect(metaConfigExtended.metaConfig.length).toBeGreaterThan(0);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
@@ -379,14 +378,14 @@ describe('index.test', () => {
     const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
 
     test('CompilerApi metaConfig', async () => {
-      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfig).toEqual([]);
       expect(metaConfigSpy).toHaveBeenCalled();
       metaConfigSpy.mockClear();
     });
 
     test('CompilerApi metaConfigExtended', async () => {
-      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
       expect(metaConfigExtended.metaConfig).toEqual([]);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
@@ -424,7 +423,7 @@ describe('index.test', () => {
         dataSource: 'main',
         dbType: 'mysql',
       }]);
-      
+
       expect(dataSourcesSpy).toHaveBeenCalled();
       dataSourcesSpy.mockClear();
     });

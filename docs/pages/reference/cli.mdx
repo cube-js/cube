@@ -5,17 +5,22 @@ redirect_from:
 
 # CLI command reference
 
-## create
+With this CLI utility, you can [create](#create) a barebones Cube app,
+[generate](#generate) a data model, [validate](#validate) it, or
+[generate](#token) a JSON web token.
 
-The `create` command generates barebones Cube app.
+You can also use the CLI utility to [deploy](#deploy) your Cube application to
+Cube Cloud. This is one of supported ways of [continuous deployment][ref-ci].
+
+## `create`
+
+The `create` command generates a barebones Cube app.
 
 ### Usage
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli create APP-NAME -d DB-TYPE [-t TEMPLATE]
 ```
-
-### Flags
 
 | Parameter                   | Description                                  | Values                                                                                                                  |
 | --------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -27,46 +32,17 @@ npx cubejs-cli create APP-NAME -d DB-TYPE [-t TEMPLATE]
 Create app called `demo-app` using default (`docker`) template and `mysql`
 database:
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli create demo-app -d mysql
 ```
 
 Create app called `demo-app` using `express` template and `mysql` database:
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli create demo-app -t express -d mysql
 ```
 
-## server
-
-<WarningBox>
-
-To define configuration you should use `cube.js` configuration file. See
-[available options](/reference/configuration/config).
-
-</WarningBox>
-
-The `server` command starts Cube in production mode.
-
-Default start:
-
-```bash{promptUser: user}
-npx cubejs-cli server
-```
-
-With debug information:
-
-```bash{promptUser: user}
-npx cubejs-cli server --debug
-```
-
-### Usage
-
-```bash{promptUser: user}
-npx cubejs-cli server
-```
-
-## generate
+## `generate`
 
 The `generate` command helps to build data models for existing database tables.
 You can only run `generate` from the Cube app directory. This command requires
@@ -74,11 +50,9 @@ an active [database connection](/product/configuration/data-sources).
 
 ### Usage
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli generate -t TABLE-NAMES
 ```
-
-### Flags
 
 | Parameter               | Description                                                 | Values                      |
 | ----------------------- | ----------------------------------------------------------- | --------------------------- |
@@ -88,50 +62,17 @@ npx cubejs-cli generate -t TABLE-NAMES
 
 Generate data model files for tables `orders` and `customers`:
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli generate -t orders,customers
 ```
 
-## token
-
-The `token` command generates a JWT Cube token. It either uses the value of the
-`CUBEJS_API_SECRET` environment variable or provided value with `-s` flag. You
-can only run `token` command from the Cube app directory.
-
-_Use these manually generated tokens in production with caution._ <br/> _Please
-refer to the [Security Guide](/product/auth) for production security best
-practices._
-
-### Usage
-
-```bash{promptUser: user}
-npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
-```
-
-### Flags
-
-| Parameter              | Description                                                                   | Example                    |
-| ---------------------- | ----------------------------------------------------------------------------- | -------------------------- |
-| -e, --expiry           | Token expiry. Set to 0 for no expiry (default: "30 days")                     | `1 day`, `30 days`         |
-| -s, --secret           | Cube app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | -                          |
-| -p, --payload          | Token Payload                                                                 | `foo=bar`, `userId=2`      |
-| -u, --user-context     | Token USER_CONTEXT Payload                                                    | `baz=qux`, `companyId=5`   |
-
-### Example
-
-Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
-
-```bash{promptUser: user}
-npx cubejs-cli token -e "1 day" -p appId=1 -p userId=2
-```
-
-## validate
+## `validate`
 
 The `validate` command checks models in a Cube project for validation errors.
 
 ### Usage
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli validate
 ```
 
@@ -157,3 +98,61 @@ Need some help? -------------------------------------
   Ask this question in Cube Slack: https://slack.cube.dev
   Post an issue: https://github.com/cube-js/cube/issues
 ```
+
+## `token`
+
+The `token` command generates a JWT Cube token. It either uses the value of the
+`CUBEJS_API_SECRET` environment variable or provided value with `-s` flag. You
+can only run `token` command from the Cube app directory.
+
+_Use these manually generated tokens in production with caution._ <br/> _Please
+refer to the [Security Guide](/product/auth) for production security best
+practices._
+
+### Usage
+
+```bash
+npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
+```
+
+| Parameter              | Description                                                                   | Example                    |
+| ---------------------- | ----------------------------------------------------------------------------- | -------------------------- |
+| -e, --expiry           | Token expiry. Set to 0 for no expiry (default: "30 days")                     | `1 day`, `30 days`         |
+| -s, --secret           | Cube app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | -                          |
+| -p, --payload          | Token Payload                                                                 | `foo=bar`, `userId=2`      |
+
+### Example
+
+Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
+
+```bash
+npx cubejs-cli token -e "1 day" -p appId=1 -p userId=2
+```
+
+## `deploy`
+
+The `deploy` command uploads your Cube application to Cube Cloud. You can only
+run this command from the Cube app directory.
+
+### Usage
+
+```bash
+npx cubejs-cli deploy --upload-env --directory PATH --token TOKEN
+```
+
+| Parameter            | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| `--upload-env`       | Optional. Upload the `.env` file to Cube Cloud |
+| `--token <token>`    | Authentication token for Cube Cloud            |
+| `--directory <path>` | Path to the Cube application directory         |
+
+### Example
+
+Upload a Cube application from the current directory to Cube Cloud and pass its
+`.env` file as well:
+
+```bash
+npx cubejs-cli deploy --upload-env --directory ./ --token 56e2636272ffc9cd8c19e9d1e9ffb52f
+```
+
+[ref-ci]: /product/deployment/cloud/continuous-deployment#deploy-with-cli

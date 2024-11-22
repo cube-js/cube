@@ -813,6 +813,14 @@ module.exports = {
 
 </CodeTabs>
 
+<ReferenceBox>
+
+Currently, there's no built-in way to access the data model metadata in
+`query_rewrite`. Please [track this issue](https://github.com/cube-js/cube/issues/4118)
+and read about a [workaround](https://github.com/cube-js/cube/issues/4118#issuecomment-2317925444).
+
+</ReferenceBox>
+
 ### `allow_ungrouped_without_primary_key`
 
 Setting `allow_ungrouped_without_primary_key` to `True` disables the primary
@@ -983,84 +991,110 @@ module.exports = {
 
 ### `extend_context`
 
-Option to extend the `RequestContext` with custom values. This method is called
-on each request.
+This function is used to extend the security context with additional data.
 
-The function should return an object which gets appended to the
-[`RequestContext`][self-opts-req-ctx]. Make sure to register your value using
-[`context_to_app_id`][self-opts-ctx-to-appid] to use cache context for all possible
-values that your extendContext object key can have.
+Called on each request.
 
-<WarningBox>
+It should return an object which gets appended to the *request context*,
+an object that contains `securityContext` and that is passed as an argument to
+other functions like `context_to_app_id` or `repository_factory`.
 
-`extend_context` is applied only to requests that go through API. It isn't
-applied to refresh worker execution. If you're looking for a way to provide
-global environment variables for your data model, please see [Execution
-environment docs][ref-exec-environment-globals].
+<InfoBox>
 
-</WarningBox>
+When using `extend_context`, you should also define [`context_to_app_id`][self-opts-ctx-to-appid]
+so that all possible values of the extended context are reflected in the app id.
+
+</InfoBox>
 
 <CodeTabs>
 
 ```python
 from cube import config
-
+ 
 @config('extend_context')
 def extend_context(req: dict) -> dict:
-  return {
-    active_organization: req['headers']['active_organization']
-  }
-
+  req.setdefault('securityContext', {}).update({'active_organization': 123})
+  # req.setdefault('securityContext', {}).update({'active_organization': req['headers']['active_organization']})
+  return req
+ 
 @config('context_to_app_id')
 def context_to_app_id(ctx: dict) -> dict:
-  return f"CUBE_APP_{ctx['active_organization']}"
+  return f"CUBE_APP_{ctx['securityContext']['active_organization']}"
+ 
+ 
+ 
+
 ```
 
 ```javascript
 module.exports = {
   extendContext: (req) => {
     return {
-      active_organization: req.headers.active_organization
-    };
+      securityContext: {
+        ...req.securityContext,
+        active_organization: 123
+        // active_organization: req.headers.active_organization
+      }
+    }
   },
 
-  contextToAppId: (ctx) => {
-    return `CUBE_APP_${ctx.active_organization}`;
+  contextToAppId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.active_organization}`
   }
-};
+}
 ```
 
 </CodeTabs>
 
 You can use the custom value from extend context in your data model like this:
 
-```javascript
-const { activeOrganization } = COMPILE_CONTEXT;
+<CodeTabs>
 
-cube(`Users`, {
-  sql: `SELECT * FROM users where organization_id=${activeOrganization}`,
-});
+```yaml
+{% set securityContext = COMPILE_CONTEXT['securityContext'] %}
+
+cubes:
+  - name: users
+    sql: >
+      SELECT *
+      FROM users
+      WHERE organization_id={{ securityContext['active_organization'] }}
+
 ```
+
+```javascript
+const { securityContext } = COMPILE_CONTEXT
+
+cube(`users`, {
+  sql: `
+    SELECT *
+    FROM users
+    WHERE organization_id=${securityContext.active_organization}
+  `
+})
+```
+
+</CodeTabs>
+
+<InfoBox>
+
+`extend_context` is applied only to requests that go through APIs. It isn't
+applied to refresh worker execution. If you're looking for a way to provide
+global environment variables for your data model, please see the [execution
+environment documentation][ref-exec-environment-globals].
+
+</InfoBox>
 
 ### `check_auth`
 
-Used in both REST and WebSockets API.
+Used in the [REST API][ref-rest-api]. Default implementation parses the [JSON
+Web Token][link-jwt] in the `Authorization` header, verifies it, and sets its
+payload to the `securityContext`. [Read more][ref-sec-ctx] about JWT generation.
 
 Called on each request.
 
-Default implementation parses [JSON Web Token (JWT)][link-jwt] in `Authorization`
-header and sets payload to `securityContext` if it's verified. More
-information on how to generate these tokens is [here][ref-sec-ctx].
-
-You can set `securityContext = userContextObj` inside the middleware if you
-want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
-
-<ReferenceBox>
-
-Currently, assigning to security context doesn't work in Python.
-Please [track this issue](https://github.com/cube-js/cube/issues/8133).
-
-</ReferenceBox>
+You can return an object with the `security_context` field if you want to
+customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
 
 You can use empty `check_auth` function to disable built-in security or
 raise an exception to fail the authentication check.
@@ -1072,19 +1106,25 @@ from cube import config
 
 @config('check_auth')
 def check_auth(ctx: dict, token: str) -> None:
-  context = ctx['securityContext']
-
   if token == 'my_secret_token':
-    return
+    return {
+      'security_context': {
+        'user_id': 42
+      }
+    }
 
   raise Exception('Access denied')
 ```
 
 ```javascript
 module.exports = {
-  checkAuth: ({ securityContext }, token) => {
+  checkAuth: (ctx, token) => {
     if (token === 'my_secret_token') {
-      return;
+      return {
+        security_context: {
+          user_id: 42
+        }
+      }
     }
 
     throw new Error('Access denied');
@@ -1349,7 +1389,6 @@ If not defined, Cube will lookup for environment variable
   /reference/data-model/pre-aggregations#rollup
 [ref-sec]: /product/auth
 [ref-sec-ctx]: /product/auth/context
-[self-opts-req-ctx]: #requestcontext
 [self-opts-checkauth]: #checkauth
 [self-pre-aggregations-schema]: #pre_aggregations_schema
 [self-opts-ctx-to-appid]: #context_to_app_id

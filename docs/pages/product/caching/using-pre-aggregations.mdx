@@ -5,10 +5,22 @@ redirect_from:
 
 # Using pre-aggregations
 
+Pre-aggregations is an implementation of aggregate awareness in Cube.
+Pre-aggregation tables are materialized query results. 
+Cube can analyze queries against a defined set of pre-aggregation rules to 
+choose the optimal one that will be used to serve a given Cube query instead of going to the data source.
+
+If Cube finds a suitable pre-aggregation rule, database querying becomes a
+multi-stage process:
+
+1.  Cube checks if an up-to-date copy of the pre-aggregation exists.
+
+2.  Cube will execute a query against the pre-aggregated tables instead of the
+    raw data.
+
 Pre-aggregations is a powerful way to speed up your Cube queries. There are many
-configuration options to consider. Please make sure to also check [the
-Pre-Aggregations reference in the data modeling
-section][ref-schema-ref-preaggs].
+configuration options to consider. Please make sure to check the
+[configuration reference][ref-schema-ref-preaggs].
 
 ## Matching queries
 
@@ -251,17 +263,34 @@ Alternatively, if you want to explicitly introduce key partitioning, you can use
 Each orchestrator ID can use a different pre-aggregation schema, so you may define those based on the partitioning key you want to introduce.
 This technique, together with multi-router Cube Store approach, allows you to achieve linear scaling on the partitioning key of your choice.
 
+### Best practices
+
+In general, it's better to lean towards less partitions, as long as you are satisfied with query speed.
+
+For optimal _querying performance_, partitions should be small enough so that the Cube Store workers can process them in less than 100 milliseconds. 
+The best way to optimize this is to start from a relatively large partition (e.g., yearly or no partition at all if data permits), 
+check what the [flame graph][ref-flame-graph] in Query History shows, then iterate as needed.
+
+For optimal pre-aggregation _build performance_, you would optimize partition size together with pre-aggregation build concurrency and build time. Smaller 
+partitions with high concurrency would incur significant overhead. For optimal build performance, having 1 Cube Store worker per partition is ideal. 
+However, Cube Store workers can handle up to 4 partitions per worker conucrrently. Since Cube Store workers often max out at 16, this means you should avoid having more than 64 partitions. 
+Any additional partitions would be queued. Keep in mind that indexes essentially multiply the number of partitions that are created, 
+so for example, if you have two indexes, you would want to avoid having more than 32 partitions to avoid queueing. 
+The best way to optimize this is to make refresh keys as infrequent as possible 
+and then use the [Build History][ref-build-history] tab to check build times, along with the [Performance Insights][ref-perf-insights] page to 
+monitor Cube Store workers load, and iterate as needed.
+
 ## Using indexes
 
 [Indexes][ref-ref-indexes] are sorted copies of pre-aggregation data.
 
 **When you define a pre-aggregation without any explicit indexes, the default
 index is created.** In this index, dimensions come first, time dimensions come
-second, and measures come last.
+second.
 
 When you define additional indexes, you don't incur any additional costs on
 the data warehouse side. However, the pre-aggregation build time for a
-particular pre-aggregation increases with each index.
+particular pre-aggregation increases with each index because all indexes for pre-aggregation are built during ingestion time.
 
 ### When to use indexes?
 
@@ -495,8 +524,12 @@ The data within `category_productname_zipcode_index` would look as follows:
 
 ### Aggregating indexes
 
-Aggregating indexes can be defined as well. Such indexes contain **only**
-dimensions and pre-aggregated measures from the pre-aggregation definition.
+Aggregating indexes should be used when there is a wide rollup pre-aggregation, however, only a subset of its dimensions is queried. 
+For example, you have rollup pre-aggregation with 50 dimensions, but any query is just using only 5 of those dimensions.
+Such a use case would be a sweet spot for the aggregating index.
+Such indexes would persist **only** dimensions from the index definition and pre-aggregated measures from the pre-aggregation definition.
+Cube Store would aggregate over missing dimensions to calculate stored measure values when preparing the aggregating index.
+During querying time, Cube Store will save time on this aggregation over missing dimensions, as it was done during the preparation step.
 
 Queries with the following characteristics can target aggregating indexes:
 
@@ -661,16 +694,14 @@ This query would be optimal as well.
 
 ## Pre-aggregations storage
 
-The default pre-aggregations storage in Cube is its own purpose-built storage
-layer: Cube Store.
+Cube uses its own purpose-built pre-aggregations engine: [Cube Store][ref-cube-store].
 
-Alternatively, you can store pre-aggregations **internally** in the source
-database. To store a pre-aggregation internally, set `external: false` in
-pre-aggregation definition.
+When using Cube Store, pre-aggregation data will be ingested and stored as Parquet files
+on a [blob storage][ref-cube-store-storage]. Then, Cube Store would load that data to
+execute queries using pre-aggregations.
 
-Please note, that [original_sql][ref-original-sql] pre-aggregations are stored
-**internally** by default. It is not recommended to store `original_sql`
-pre-aggregations in Cube Store.
+However, [`original_sql`][ref-original-sql] pre-aggregations are stored in the data source
+by default. It is not recommended to store `original_sql` pre-aggregations in Cube Store.
 
 ## Joins between pre-aggregations
 
@@ -932,13 +963,10 @@ Cube Store in parallel:
   />
 </div>
 
-Enabling the export bucket functionality requires extra configuration; please
-refer to the database-specific documentation for more details:
-
-- [AWS Athena][ref-export-athena]
-- [AWS Redshift][ref-export-redshift]
-- [BigQuery][ref-export-bigquery]
-- [Snowflake][ref-export-snowflake]
+Enabling the export bucket functionality requires extra configuration and is 
+not available for all data sources. Please
+refer to the [database-specific documentation][ref-config-db] for more details. 
+Data sources that support export buckets will have an "Export Bucket" section with more information.
 
 When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube does not
@@ -965,10 +993,36 @@ please [let us know](https://cube.dev/contact) if you are interested in early
 access to any of these drivers or would like Cube to support any other SQL
 streaming engine.
 
-[ref-export-athena]: /product/configuration/data-sources/aws-athena#export-bucket
-[ref-export-redshift]: /product/configuration/data-sources/aws-redshift#export-bucket
-[ref-export-bigquery]: /product/configuration/data-sources/google-bigquery#export-bucket
-[ref-export-snowflake]: /product/configuration/data-sources/snowflake#export-bucket
+## Troubleshooting
+
+### Unused pre-aggregations
+
+You might find that a pre-aggregation is ignored by Cube. Possible reasons:
+
+* A pre-aggregation does not reference any dimensions or measures from a cube
+where this pre-aggreation is [defined][ref-schema-ref-preaggs]. To resolve,
+move it to another cube.
+* A pre-aggregation is defined similarly to another pre-aggregation that has
+more granular [partitions](#partitioning). To resolve, remove one of these
+pre-aggregations.
+
+### Members with unknown types
+
+When building pre-aggregations, you might get an error similar to the this one:
+
+```
+Error during create table: CREATE TABLE <REDACTED>:
+Custom type 'fixed' is not supported
+```
+
+It means that a member of a pre-aggregation has a type in the upstream data
+source that Cube Store can not recognize (e.g., `fixed` in this case).
+
+To resolve, please add a cast to a known type in the [`sql` parameter][ref-member-sql]
+of this member. For numeric types, it will most likely be an integer, a float,
+or a decimal type, depending on the nature of your data.
+
+
 [ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
@@ -1003,4 +1057,10 @@ streaming engine.
 [ref-ref-indexes]: /reference/data-model/pre-aggregations#indexes
 [ref-additivity]: /product/caching/getting-started-pre-aggregations#additivity
 [ref-ref-index-type]: /reference/data-model/pre-aggregations#type-1
+[ref-flame-graph]: /product/workspace/query-history#flame-graph
+[ref-perf-insights]: /product/workspace/performance
+[ref-build-history]: /product/workspace/pre-aggregations#build-history
 [ref-matching-preaggs]: /product/caching/matching-pre-aggregations
+[ref-cube-store]: /product/caching/running-in-production#architecture
+[ref-cube-store-storage]: /product/caching/running-in-production#storage
+[ref-member-sql]: /reference/data-model/dimensions#sql

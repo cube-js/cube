@@ -27,7 +27,7 @@ pub fn bind_method<'a>(
 
 pub fn batch_to_rows(batch: RecordBatch) -> Result<(Value, Vec<Value>), CubeError> {
     let schema = batch.schema();
-    let data_frame = dataframe::batch_to_dataframe(&schema, &vec![batch])?;
+    let data_frame = dataframe::batches_to_dataframe(&schema, vec![batch])?;
 
     let columns = serde_json::to_value(data_frame.get_columns())?;
     let rows = data_frame

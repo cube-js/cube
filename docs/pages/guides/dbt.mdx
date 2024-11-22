@@ -259,10 +259,11 @@ cubes:
   - {{ model.as_cube() }}
 
     dimensions:
-      {% for column in model.columns() %}
+      {% for column in model.columns %}
       - name: "{{ column.name }}"
         sql: "{{ column.sql }}"
         type: "{{ column.type }}"
+        description: "{{ column.description }}"
         meta:
           source: dbt
       {% endfor %}

@@ -2,10 +2,11 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, original_expr_name, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
+        rules::utils::DeltaTimeUnitToken,
         to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
         transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
         LiteralExprValue, LogicalPlanLanguage,
@@ -18,7 +19,7 @@ use datafusion::{
     logical_plan::DFSchema,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Id, Rewrite, Subst};
+use egg::{Id, Subst};
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 pub struct DateRules {
@@ -26,7 +27,7 @@ pub struct DateRules {
 }
 
 impl RewriteRules for DateRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         vec![
             // TODO ?interval
             rewrite(
@@ -385,21 +386,27 @@ impl RewriteRules for DateRules {
                 udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
                 self.transform_to_date_to_timestamp("?format"),
             ),
-            rewrite(
+            // TODO turn this rule into generic DateTrunc merge
+            transforming_rewrite(
                 "datastudio-dates",
                 self.fun_expr(
                     "DateTrunc",
                     vec![
-                        "?granularity".to_string(),
+                        "?outer_granularity".to_string(),
                         self.fun_expr(
                             "DateTrunc",
-                            vec![literal_string("SECOND"), column_expr("?column")],
+                            vec!["?inner_granularity".to_string(), column_expr("?column")],
                         ),
                     ],
                 ),
                 self.fun_expr(
                     "DateTrunc",
-                    vec!["?granularity".to_string(), column_expr("?column")],
+                    vec![literal_expr("?new_granularity"), column_expr("?column")],
+                ),
+                self.transform_datastudio_date_trunc_merge(
+                    "?outer_granularity",
+                    "?inner_granularity",
+                    "?new_granularity",
                 ),
             ),
         ]
@@ -425,8 +432,7 @@ impl DateRules {
         interval_int_var: &'static str,
         interval_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let datepart_var = var!(datepart_var);
         let interval_int_var = var!(interval_int_var);
         let interval_var = var!(interval_var);
@@ -494,7 +500,7 @@ impl DateRules {
     fn transform_to_date_to_timestamp(
         &self,
         format_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let format_var = var!(format_var);
         move |egraph, subst| {
             for format in var_iter!(egraph[subst[format_var]], LiteralExprValue) {
@@ -510,13 +516,66 @@ impl DateRules {
         }
     }
 
+    // TODO turn this transform into generic DateTrunc merge
+    fn transform_datastudio_date_trunc_merge(
+        &self,
+        outer_granularity_var: &'static str,
+        inner_granularity_var: &'static str,
+        new_granularity_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let outer_granularity_var = var!(outer_granularity_var);
+        let inner_granularity_var = var!(inner_granularity_var);
+        let new_granularity_var = var!(new_granularity_var);
+        move |egraph, subst| match (
+            &egraph[subst[outer_granularity_var]].data.constant,
+            &egraph[subst[inner_granularity_var]].data.constant,
+        ) {
+            (
+                Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(outer_granularity)))),
+                Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(inner_granularity)))),
+            ) => {
+                let Ok(outer_granularity) = outer_granularity.parse::<DeltaTimeUnitToken>() else {
+                    return false;
+                };
+                let Ok(inner_granularity) = inner_granularity.parse::<DeltaTimeUnitToken>() else {
+                    return false;
+                };
+
+                use DeltaTimeUnitToken::*;
+
+                if !matches!(inner_granularity, Second) {
+                    return false;
+                }
+
+                let new_granularity = match outer_granularity {
+                    // Outer granularity is finer that inner seconds
+                    Microseconds | Milliseconds => Second,
+
+                    // Outer granularity is coarser, but aligned with inner seconds
+                    Second | Minute | Hour | Day | Week | Month | Quarter | Year | Decade
+                    | Century | Millennium => outer_granularity,
+
+                    // Invalid token for date_trunc
+                    Timezone | TimezoneHour | TimezoneMinute => return false,
+                };
+
+                let new_granularity =
+                    egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                        ScalarValue::Utf8(Some(new_granularity.as_str().to_string())),
+                    )));
+                subst.insert(new_granularity_var, new_granularity);
+                return true;
+            }
+            _ => false,
+        }
+    }
+
     fn unwrap_cast_to_timestamp(
         &self,
         data_type_var: &'static str,
         granularity_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let data_type_var = var!(data_type_var);
         let granularity_var = var!(granularity_var);
         let alias_var = var!(alias_var);
@@ -572,8 +631,7 @@ impl DateRules {
     pub fn transform_root_alias(
         &self,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
             if let Some(OriginalExpr::Expr(original_expr)) =

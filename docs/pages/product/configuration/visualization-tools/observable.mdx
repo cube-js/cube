@@ -5,38 +5,30 @@ redirect_from:
 
 # Observable
 
-You can connect to Cube from Observable, a new kind of collaborative data
-notebook that's built to uncover new insights, answer more questions, and make
-better decisions, using the [Cube SQL API][ref-sql-api] or [Cube REST
-API][ref-rest-api].
+Observable is a collaborative data notebook.
 
 Here's a short video guide on how to connect Observable to Cube.
 
 <LoomVideo url="https://www.loom.com/embed/969ddf03e90e406eb7d63ca4a77ee7c7" />
 
-## Use SQL API in Cube
+## Connect from Cube Cloud
 
-### Cube Cloud
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Observable</Btn> to get
+detailed instructions.
 
-Click **Deploy SQL API** and then the **How to connect your BI tool** link on
-the Overview page of your Cube deployment. Navigate to the **BIs and
-Visualization Tools** tab. You should see the screen like the one below with
-your connection credentials:
+## Connect from Cube Core
 
-<Screenshot src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/" />
+You can connect a Cube deployment to Observable using the [SQL API][ref-sql-api]
+or the [REST API][ref-rest-api].
 
-### Self-hosted Cube
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Observable.
 
-You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Observable later.
+## Connecting from Observable
 
-```dotenv
-CUBEJS_PG_SQL_PORT=5432
-CUBEJS_SQL_USER=myusername
-CUBEJS_SQL_PASSWORD=mypassword
-```
-
-## Connecting Cube SQL API from Observable
+### Connecting via SQL API
 
 Observable connects to Cube as to a Postgres database.
 
@@ -79,17 +71,7 @@ You can also create a visualization of the executed SQL query.
   />
 </div>
 
-## Use REST API in Cube
-
-### Cube Cloud
-
-Click the "How to connect" link on the Overview page, navigate to the REST API
-tab. You will see your connection credentials, the REST API URL and the
-authorization token:
-
-<Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
-
-### Self-hosted Cube
+### Connecting via REST API
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
@@ -101,10 +83,6 @@ authenticate requests to Cube.
 Please check the [Security page](/product/auth#generating-json-web-tokens-jwt)
 to learn how to generate a token. We suggest generating a long-lived JWT that
 won't expire soon.
-
-## Connecting Cube REST API from Observable
-
-Observable connects to Cube through the REST API.
 
 ### Querying data with REST API
 

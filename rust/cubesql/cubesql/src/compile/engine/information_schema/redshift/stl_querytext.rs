@@ -36,13 +36,14 @@ impl RedshiftStlQuerytextBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.userids.finish()));
-        columns.push(Arc::new(self.xids.finish()));
-        columns.push(Arc::new(self.pids.finish()));
-        columns.push(Arc::new(self.queries.finish()));
-        columns.push(Arc::new(self.sequences.finish()));
-        columns.push(Arc::new(self.texts.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.userids.finish()),
+            Arc::new(self.xids.finish()),
+            Arc::new(self.pids.finish()),
+            Arc::new(self.queries.finish()),
+            Arc::new(self.sequences.finish()),
+            Arc::new(self.texts.finish()),
+        ];
 
         columns
     }

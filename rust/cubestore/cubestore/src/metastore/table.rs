@@ -7,10 +7,10 @@ use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
-use arrow::datatypes::Schema as ArrowSchema;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
+use datafusion::arrow::datatypes::Schema as ArrowSchema;
 use datafusion::physical_plan::expressions::{Column as FusionColumn, Max, Min, Sum};
 use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
 use itertools::Itertools;
@@ -153,7 +153,9 @@ pub struct Table {
     #[serde(default)]
     location_download_sizes: Option<Vec<u64>>,
     #[serde(default)]
-    partition_split_threshold: Option<u64>
+    partition_split_threshold: Option<u64>,
+    #[serde(default)]
+    extension: Option<String>  // TODO: Make this an Option<serde_json::Value> or Option<json::JsonValue>?  We have some problems implementing Hash.
 }
 }
 
@@ -190,6 +192,7 @@ impl Table {
         aggregate_column_indices: Vec<AggregateColumnIndex>,
         seq_column_index: Option<u64>,
         partition_split_threshold: Option<u64>,
+        extension: Option<String>,
     ) -> Table {
         let location_download_sizes = locations.as_ref().map(|locations| vec![0; locations.len()]);
         Table {
@@ -212,6 +215,7 @@ impl Table {
             seq_column_index,
             location_download_sizes,
             partition_split_threshold,
+            extension,
         }
     }
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -310,6 +314,10 @@ impl Table {
 
     pub fn select_statement(&self) -> &Option<String> {
         &self.select_statement
+    }
+
+    pub fn extension(&self) -> &Option<String> {
+        &self.extension
     }
 
     pub fn source_columns(&self) -> &Option<Vec<Column>> {

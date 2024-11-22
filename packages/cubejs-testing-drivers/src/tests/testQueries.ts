@@ -13,14 +13,16 @@ import {
   buildPreaggs,
 } from '../helpers';
 import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
+import { redshiftExternalSchemasSuite } from './testExternalSchemas';
 
 type TestQueriesOptions = {
   includeIncrementalSchemaSuite?: boolean,
   includeHLLSuite?: boolean,
   extendedEnv?: string
+  externalSchemaTests?: boolean,
 };
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite }: TestQueriesOptions = {}): void {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
@@ -115,7 +117,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       console.log(`Creating ${queries.length} fixture tables`);
       try {
         for (const q of queries) {
-          await driver.query(q);
+          await driver.createTableRaw(q);
         }
         console.log(`Creating ${queries.length} fixture tables completed`);
       } catch (e: any) {
@@ -123,7 +125,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         throw e;
       }
     });
-  
+
     afterAll(async () => {
       try {
         console.log(`Dropping ${tables.length} fixture tables`);
@@ -150,7 +152,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         preAggregations: ['ECommerce.SAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
-      
+
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['ECommerce.TAExternal'],
@@ -206,7 +208,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Customers: dimentions + order', async () => {
+    execute('querying Customers: dimensions + order', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -219,7 +221,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Customers: dimentions + limit', async () => {
+    execute('querying Customers: dimensions + limit', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -231,7 +233,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData().length).toEqual(10);
     });
 
-    execute('querying Customers: dimentions + total', async () => {
+    execute('querying Customers: dimensions + total', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -245,7 +247,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(41);
     });
 
-    execute('querying Customers: dimentions + order + limit + total', async () => {
+    execute('querying Customers: dimensions + order + limit + total', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -264,7 +266,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(41);
     });
 
-    execute('querying Customers: dimentions + order + total + offset', async () => {
+    execute('querying Customers: dimensions + order + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -283,7 +285,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(41);
     });
 
-    execute('querying Customers: dimentions + order + limit + total + offset', async () => {
+    execute('querying Customers: dimensions + order + limit + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -348,6 +350,22 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
             member: 'Customers.customerName',
             operator: 'contains',
             values: ['non'],
+          },
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('filtering Products: contains with special chars + dimensions', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'contains',
+            values: ['di_Novo'],
           },
         ],
       });
@@ -569,7 +587,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Products: dimentions + order', async () => {
+    execute('querying Products: dimensions + order', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -585,7 +603,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Products: dimentions + order + limit', async () => {
+    execute('querying Products: dimensions + order + limit', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -603,7 +621,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData().length).toEqual(10);
     });
 
-    execute('querying Products: dimentions + order + total', async () => {
+    execute('querying Products: dimensions + order + total', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -623,7 +641,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(28);
     });
 
-    execute('querying Products: dimentions + order + limit + total', async () => {
+    execute('querying Products: dimensions + order + limit + total', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -645,7 +663,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(28);
     });
 
-    execute('filtering Products: contains + dimentions + order, first', async () => {
+    execute('filtering Products: contains + dimensions + order, first', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -668,7 +686,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: contains + dimentions + order, second', async () => {
+    execute('filtering Products: contains + dimensions + order, second', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -691,7 +709,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: contains + dimentions + order, third', async () => {
+    execute('filtering Products: contains + dimensions + order, third', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -714,7 +732,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: startsWith filter + dimentions + order, first', async () => {
+    execute('filtering Products: startsWith filter + dimensions + order, first', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -737,7 +755,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: startsWith filter + dimentions + order, second', async () => {
+    execute('filtering Products: startsWith filter + dimensions + order, second', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -760,7 +778,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: startsWith filter + dimentions + order, third', async () => {
+    execute('filtering Products: startsWith filter + dimensions + order, third', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -783,7 +801,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: endsWith filter + dimentions + order, first', async () => {
+    execute('filtering Products: endsWith filter + dimensions + order, first', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -806,7 +824,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: endsWith filter + dimentions + order, second', async () => {
+    execute('filtering Products: endsWith filter + dimensions + order, second', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -829,7 +847,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: endsWith filter + dimentions + order, third', async () => {
+    execute('filtering Products: endsWith filter + dimensions + order, third', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -873,7 +891,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying ECommerce: dimentions + order', async () => {
+    execute('querying ECommerce: dimensions + order', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -897,7 +915,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying ECommerce: dimentions + limit', async () => {
+    execute('querying ECommerce: dimensions + limit', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -920,7 +938,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData().length).toEqual(10);
     });
 
-    execute('querying ECommerce: dimentions + total', async () => {
+    execute('querying ECommerce: dimensions + total', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -945,7 +963,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(44);
     });
 
-    execute('querying ECommerce: dimentions + order + limit + total', async () => {
+    execute('querying ECommerce: dimensions + order + limit + total', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -975,7 +993,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(44);
     });
 
-    execute('querying ECommerce: dimentions + order + total + offset', async () => {
+    execute('querying ECommerce: dimensions + order + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -1005,7 +1023,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(44);
     });
 
-    execute('querying ECommerce: dimentions + order + limit + total + offset', async () => {
+    execute('querying ECommerce: dimensions + order + limit + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -1593,8 +1611,190 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying custom granularities ECommerce: count by half_year + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year_by_1st_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by three_months_by_march + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'three_months_by_march',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by half_year + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.city'],
+        order: [
+          ['ECommerce.customOrderDateNoPreAgg', 'asc'],
+          ['ECommerce.city', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by half_year_by_1st_april + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year_by_1st_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.city'],
+        order: [
+          ['ECommerce.customOrderDateNoPreAgg', 'asc'],
+          ['ECommerce.city', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by three_months_by_march + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'three_months_by_march',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.city'],
+        order: [
+          ['ECommerce.customOrderDateNoPreAgg', 'asc'],
+          ['ECommerce.city', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.rollingCountByUnbounded',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'two_mo_by_feb',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.rollingCountByTrailing',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'two_mo_by_feb',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.rollingCountByLeading',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'two_mo_by_feb',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.productName'],
+        order: [
+          ['ECommerce.orderDate', 'asc'],
+          ['ECommerce.productName', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     if (includeIncrementalSchemaSuite) {
-      incrementalSchemaLoadingSuite(execute, () => driver, tables);
+      describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
+        incrementalSchemaLoadingSuite(execute, () => driver, tables);
+      });
+    }
+
+    if (externalSchemaTests) {
+      describe(`External schema retrospection with @cubejs-backend/${type}-driver`, () => {
+        redshiftExternalSchemasSuite(execute, () => driver);
+      });
     }
 
     executePg('SQL API: powerbi min max push down', async (connection) => {
@@ -1615,22 +1815,22 @@ from
 
     executePg('SQL API: powerbi min max ungrouped flag', async (connection) => {
       const res = await connection.query(`
-      select 
-  count(distinct("rows"."totalSales")) + max( 
-    case 
-      when "rows"."totalSales" is null then 1 
-      else 0 
-    end 
-  ) as "a0", 
-  min("rows"."totalSales") as "a1", 
-  max("rows"."totalSales") as "a2" 
-from 
-  ( 
-    select 
-      "totalSales" 
-    from 
-      "public"."ECommerce" "$Table" 
-  ) "rows" 
+      select
+  count(distinct("rows"."totalSales")) + max(
+    case
+      when "rows"."totalSales" is null then 1
+      else 0
+    end
+  ) as "a0",
+  min("rows"."totalSales") as "a1",
+  max("rows"."totalSales") as "a2"
+from
+  (
+    select
+      "totalSales"
+    from
+      "public"."ECommerce" "$Table"
+  ) "rows"
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
     });
@@ -1639,9 +1839,9 @@ from
       const res = await connection.query(`
     select
       "productName",
-      "totalSales" 
-    from 
-      "public"."BigECommerce" "$Table" 
+      "totalSales"
+    from
+      "public"."BigECommerce" "$Table"
     order by 2 desc, 1 asc
   `);
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
@@ -1651,7 +1851,7 @@ from
       const res = await connection.query(`
     select
       sum("BigECommerce"."percentageOfTotalForStatus")
-    from 
+    from
       "public"."BigECommerce" "BigECommerce"
   `);
       expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
@@ -1699,7 +1899,7 @@ from
     from
       "ECommerce" as "ECommerce"
     group by
-      ROLLUP(1, 2), 3, ROLLUP(4) 
+      ROLLUP(1, 2), 3, ROLLUP(4)
     order by 1, 2, 3, 4
 
   `);
@@ -1713,7 +1913,7 @@ from
     from
       "ECommerce" as "ECommerce"
     group by
-      ROLLUP(rowId, 2), 3, ROLLUP(4) 
+      ROLLUP(rowId, 2), 3, ROLLUP(4)
     order by 1, 2, 3, 4
 
   `);
@@ -1727,7 +1927,7 @@ from
     from
       "ECommerce" as "ECommerce"
     group by
-      ROLLUP(1, 2, 3) 
+      ROLLUP(1, 2, 3)
     order by 1, 2, 3
 
   `);
@@ -1770,6 +1970,60 @@ from
 
   `);
       expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
+    });
+    executePg('SQL API: Nested Rollup over asterisk', async (connection) => {
+      const res = await connection.query(`
+    select rowId as "row", orderId as "order", orderDate as "date", sum(count)
+    from (
+        select *
+        from
+        "ECommerce" as "ECommerce"
+    ) a
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('nested_rollup_over_asterisk');
+    });
+    executePg('SQL API: Extended nested Rollup over asterisk', async (connection) => {
+      const res = await connection.query(`
+    select * from (
+        select * from (
+            select rowId as "row", orderId as "order", sum(count)
+            from (
+                select *
+                from
+                "ECommerce" as "ECommerce"
+            ) a
+            group by
+            ROLLUP(row, order)
+            ORDER BY "rowId" ASC NULLS FIRST, "orderId" ASC NULLS FIRST OFFSET 0 ROWS FETCH FIRST 100 ROWS ONLY
+        ) q1
+    ) q2 ORDER BY q2.order, q2.row DESC limit 100
+
+  `);
+      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');
+    });
+
+    executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
+      const res = await connection.query(`
+        select cast(count(*) as float) as "a0" from "Customers"
+      `);
+
+      expect(res.rows).toMatchSnapshot('metabase_count_cast_to_float32_from_push_down');
+    });
+
+    executePg('SQL API: NULLS FIRST/LAST SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT CASE WHEN "category" > 'G' THEN "category" ELSE NULL END AS "category"
+        FROM "Products"
+        WHERE LOWER("category") != 'invalid'
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST
+        LIMIT 100
+      `);
+      expect(res.rows).toMatchSnapshot('nulls_first_last_sql_push_down');
     });
   });
 }

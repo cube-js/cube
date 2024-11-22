@@ -11,12 +11,17 @@ describe('ElasticSearchDriver OpenDistro', () => {
   const version = process.env.TEST_ELASTIC_OPENDISTRO_VERSION || '1.13.1';
 
   const startContainer = () => new GenericContainer(`amazon/opendistro-for-elasticsearch:${version}`)
-    .withEnv('discovery.type', 'single-node')
-    .withEnv('bootstrap.memory_lock', 'true')
-    .withEnv('ES_JAVA_OPTS', '-Xms512m -Xmx512m')
+    .withEnvironment({
+      'discovery.type': 'single-node',
+      'bootstrap.memory_lock': 'true',
+      ES_JAVA_OPTS: '-Xms512m -Xmx512m',
+    })
     .withExposedPorts(9200)
     .withHealthCheck({
-      test: 'curl -k -u admin:admin --silent --fail https://localhost:9200/_cluster/health || exit 1',
+      test: [
+        'CMD-SHELL',
+        'curl -k -u admin:admin --silent --fail https://localhost:9200/_cluster/health || exit 1'
+      ],
       interval: 3 * 1000,
       startPeriod: 15 * 1000,
       timeout: 500,

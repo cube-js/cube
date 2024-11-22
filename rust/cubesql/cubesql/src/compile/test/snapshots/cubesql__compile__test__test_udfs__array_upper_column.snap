@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"\n                SELECT\n                    array_upper(t.v) q\n                FROM (\n                    SELECT ARRAY[1,2,3,4,5] as v\n                    UNION ALL\n                    SELECT ARRAY[5,4,3,2] as v\n                    UNION ALL\n                    SELECT ARRAY[5,4,3] as v\n                ) t\n                \".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---+
+| q |
++---+
+| 5 |
+| 4 |
+| 3 |
++---+

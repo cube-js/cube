@@ -5,12 +5,12 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
+use datafusion::arrow::array::{ArrayBuilder, ArrayRef};
 use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
@@ -637,7 +637,16 @@ impl ImportServiceImpl {
             })?
             .into_parts();
         let mut file = File::from_std(file);
-        let mut stream = reqwest::get(location).await?.bytes_stream();
+
+        let res = reqwest::get(location).await?;
+        if !res.status().is_success() {
+            return Err(CubeError::user(format!(
+                "Unable to import from http location, status code: {}",
+                res.status()
+            )));
+        }
+
+        let mut stream = res.bytes_stream();
         let mut size = 0;
         while let Some(bytes) = stream.next().await {
             let bytes = bytes?;
@@ -645,7 +654,9 @@ impl ImportServiceImpl {
             size += slice.len();
             file.write_all(slice).await?;
         }
+
         file.seek(SeekFrom::Start(0)).await?;
+
         Ok((file, size, path))
     }
 
@@ -857,7 +868,20 @@ impl LocationHelper {
     ) -> Result<Option<u64>, CubeError> {
         let res = if location.starts_with("http") {
             let client = reqwest::Client::new();
-            let res = client.head(location).send().await?;
+            let req = client.head(location).build()?;
+
+            // S3 doesn't support HEAD for pre signed urls with GetObject command
+            if req
+                .url()
+                .domain()
+                .map(|v| v.contains("amazonaws.com"))
+                .unwrap_or(false)
+            {
+                return Ok(None);
+            }
+
+            let res = client.execute(req).await?;
+
             let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
 
             if let Some(length) = length {

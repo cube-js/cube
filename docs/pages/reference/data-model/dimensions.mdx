@@ -14,7 +14,7 @@ Any dimension should have the following properties: `name`, `sql` and `type`.
 
 ## Parameters
 
-### name
+### `name`
 
 The `name` parameter serves as the identifier of a dimension. It must be unique
 among all dimensions, measures, and segments within a cube and follow the
@@ -56,7 +56,7 @@ cubes:
 
 </CodeTabs>
 
-### case
+### `case`
 
 The `case` statement is used to define dimensions based on SQL conditions.
 
@@ -152,9 +152,11 @@ cube(`products`, {
 });
 ```
 
-### description
+### `description`
 
-You can add details to a dimension's definition via the `description` property:
+This parameter provides a human-readable description of a dimension.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
 
 <CodeTabs>
 
@@ -186,7 +188,7 @@ cubes:
 
 </CodeTabs>
 
-### format
+### `format`
 
 `format` is an optional parameter. It is used to format the output of dimensions
 in different ways, for example, a link for `external_url`. Please refer to the
@@ -223,7 +225,7 @@ cubes:
 
 </CodeTabs>
 
-### meta
+### `meta`
 
 Custom metadata. Can be used to pass any information to the frontend.
 
@@ -260,19 +262,20 @@ cubes:
 
 </CodeTabs>
 
-### primary_key
+### `primary_key`
 
-Specify which dimension is a primary key for a cube. The default value is
+Specify if a dimension is a primary key for a cube. The default value is
 `false`.
 
 A primary key is used to make [joins][ref-schema-ref-joins] work properly.
 
-<WarningBox>
+<InfoBox>
 
-Setting `primary_key` to `true` will change the default value of `public`
-parameter to `false`. If you still want `public` to be `true`, set it manually.
+Setting `primary_key` to `true` will change the default value of the [`public`
+parameter](#public) to `false`. If you still want `public` to be `true`, set it
+explicitly.
 
-</WarningBox>
+</InfoBox>
 
 <CodeTabs>
 
@@ -304,7 +307,86 @@ cubes:
 
 </CodeTabs>
 
-### propagate_filters_to_sub_query
+It is possible to have more than one primary key dimension in a cube if you'd
+like them all to be parts of a composite key:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  sql: `
+    SELECT 1 AS column_a, 1 AS column_b UNION ALL
+    SELECT 2 AS column_a, 1 AS column_b UNION ALL
+    SELECT 1 AS column_a, 2 AS column_b UNION ALL
+    SELECT 2 AS column_a, 2 AS column_b
+  `,
+
+  dimensions: {
+    composite_key_a: {
+      sql: `column_a`,
+      type: `number`,
+      primary_key: true
+    },
+
+    composite_key_b: {
+      sql: `column_b`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: products
+    sql: >
+      SELECT 1 AS column_a, 1 AS column_b UNION ALL
+      SELECT 2 AS column_a, 1 AS column_b UNION ALL
+      SELECT 1 AS column_a, 2 AS column_b UNION ALL
+      SELECT 2 AS column_a, 2 AS column_b
+
+    dimensions:
+      - name: composite_key_a
+        sql: column_a
+        type: number
+        primary_key: true
+
+      - name: composite_key_b
+        sql: column_b
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
+
+Querying the `count` measure of the cube shown above will generate the following
+SQL to the upstream data source:
+
+```sql
+SELECT
+  count(
+    CAST("product".column_a as TEXT) || CAST("product".column_b as TEXT)
+  ) "product__count"
+FROM (
+  SELECT 1 AS column_a, 1 AS column_b UNION ALL
+  SELECT 2 AS column_a, 1 AS column_b UNION ALL
+  SELECT 1 AS column_a, 2 AS column_b UNION ALL
+  SELECT 2 AS column_a, 2 AS column_b
+) AS "product"
+```
+
+### `propagate_filters_to_sub_query`
 
 When this statement is set to `true`, the filters applied to the query will be
 passed to the [subquery][self-subquery].
@@ -341,7 +423,7 @@ cubes:
 
 </CodeTabs>
 
-### public
+### `public`
 
 <InfoBox>
 
@@ -361,12 +443,12 @@ cube(`products`, {
 
   dimensions: {
     comment: {
-      sql: `comments`,
+      sql: `comment`,
       type: `string`,
-      public: false,
-    },
-  },
-});
+      public: false
+    }
+  }
+})
 ```
 
 ```yaml
@@ -376,14 +458,14 @@ cubes:
 
     dimensions:
       - name: comment
-        sql: comments
+        sql: comment
+        type: string
         public: false
-        shown: false
 ```
 
 </CodeTabs>
 
-### sql
+### `sql`
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
 the `type` of the dimension. Please refer to the [Dimension
@@ -418,7 +500,7 @@ cube(`orders`, {
 
 </CodeTabs>
 
-### sub_query
+### `sub_query`
 
 The `sub_query` statement allows you to reference a measure in a dimension. It's
 an advanced concept and you can learn more about it [here][ref-subquery].
@@ -453,7 +535,7 @@ cubes:
 
 </CodeTabs>
 
-### title
+### `title`
 
 You can use the `title` parameter to change a dimension's displayed name. By
 default, Cube will humanize your dimension key to create a display name. In
@@ -489,7 +571,7 @@ cubes:
 
 </CodeTabs>
 
-### type
+### `type`
 
 `type` is a required parameter. There are various types that can be assigned to
 a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
@@ -523,11 +605,114 @@ cubes:
 
 </CodeTabs>
 
+### `granularities`
+
+By default, the following granularities are available for time dimensions:
+`year`, `quarter`, `month`, `week` (starting on Monday), `day`, `hour`, `minute`,
+`second`.
+
+You can use the `granularities` parameter with any dimension of the [type
+`time`][ref-time-dimensions] to define one or more custom granularities, such as
+a *week starting on Sunday* or a *fiscal year*.
+
+<ReferenceBox>
+
+See [this recipe][ref-custom-granularity-recipe] for more custom granularity
+examples.
+
+</ReferenceBox>
+
+For each custom granularity, the `interval` parameter is required. It specifies
+the duration of the time interval and has the following format:
+`quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`.
+
+Optionally, a custom granularity might use the `offset` parameter to specify how
+the time interval is shifted forward or backward in time. It has the same
+format as `interval`, however, you can also provide negative quantities, e.g.,
+`-1 day` or `1 month -10 days`.
+
+Alternatively, instead of `offset`, you can provide the `origin` parameter.
+When `origin` is provided, time intervals will be shifted in a way that one of
+them will match the provided origin. It accepts an ISO 8601-compliant [date time
+string][link-date-time-string], e.g., `2024-01-02` or `2024-01-02T12:00:00.000Z`.
+
+Optionally, a custom granularity might have the `title` parameter with a
+human-friendly description.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+        granularities:
+          - name: quarter_hour
+            interval: 15 minutes
+
+          - name: week_starting_on_sunday
+            interval: 1 week
+            offset: -1 day
+
+          - name: fiscal_year_starting_on_april_01
+            title: Corporate and government fiscal year in the United Kingdom
+            interval: 1 year
+            origin: "2025-04-01"
+            # You have to use quotes here to make `origin` a valid YAML string 
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+  `,
+
+  dimensions: {
+    time: {
+      sql: `time`,
+      type: `time`,
+      granularities: {
+        quarter_hour: {
+          interval: `15 minutes`
+        },
+        week_starting_on_sunday: {
+          interval: `1 week`,
+          offset: `-1 day`
+        },
+        fiscal_year_starting_on_april_01: {
+          title: `Corporate and government fiscal year in the United Kingdom`,
+          interval: `1 year`,
+          origin: `2025-04-01`
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+
 [ref-schema-ref-joins]: /reference/data-model/joins
-[ref-subquery]: /product/data-modeling/concepts/subquery-dimensions
+[ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [self-subquery]: #sub-query
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-schema-ref-dims-types]:
   /reference/data-model/types-and-formats#dimension-types
 [ref-schema-ref-dims-formats]:
   /reference/data-model/types-and-formats#dimension-formats
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations
+[ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
+[link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
+[ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity

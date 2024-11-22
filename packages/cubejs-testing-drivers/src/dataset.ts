@@ -1,17 +1,4 @@
-export type Cast = {
-  DATE_PREFIX: string,
-  DATE_SUFFIX: string,
-  SELECT_PREFIX: string,
-  SELECT_SUFFIX: string,
-  CREATE_TBL_PREFIX: string,
-  CREATE_TBL_SUFFIX: string,
-  CREATE_SUB_PREFIX: string,
-  CREATE_SUB_SUFFIX: string,
-  USE_SCHEMA: string,
-  GENERATE_BIG_SERIES?: string,
-  TRUE_LITERAL?: string,
-  FALSE_LITERAL?: string,
-};
+import { Cast } from './types/Cast';
 
 function create(table: string, query: string, cast: Cast, suf?: string): string {
   return `
@@ -87,7 +74,7 @@ export const Products = {
     select 'Office Supplies' as category, 'Envelopes' as sub_category, 'Wausau Papers Astrobrights Colored Envelopes' as product_name union all
     select 'Office Supplies' as category, 'Fasteners' as sub_category, 'Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box' as product_name union all
     select 'Office Supplies' as category, 'Fasteners' as sub_category, 'Plymouth Boxed Rubber Bands by Plymouth' as product_name union all
-    select 'Technology' as category, 'Accessories' as sub_category, 'Logitech diNovo Edge Keyboard' as product_name union all
+    select 'Technology' as category, 'Accessories' as sub_category, 'Logitech di_Novo Edge Keyboard' as product_name union all
     select 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.0' as product_name union all
     select 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.1' as product_name union all
     select 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.2' as product_name union all
@@ -137,7 +124,7 @@ export const ECommerce = {
       select 1995 as row_id, 'CA-2017-133648' as order_id, ${DATE_PREFIX}'2020-06-25'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-06-26'${DATE_SUFFIX} as completed_date, 'ML-17755' as customer_id, 'Columbus' as city, 'Office Supplies' as category, 'Fasteners' as sub_category, 'Plymouth Boxed Rubber Bands by Plymouth' as product_name, 11.30400 as sales, 3 as quantity, 0.20000 as discount, -2.11950 as profit union all
       select 7310 as row_id, 'CA-2017-112172' as order_id, ${DATE_PREFIX}'2020-06-10'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-06-11'${DATE_SUFFIX} as completed_date, 'MM-18280' as customer_id, 'New York City' as city, 'Office Supplies' as category, 'Fasteners' as sub_category, 'Plymouth Boxed Rubber Bands by Plymouth' as product_name, 14.13000 as sales, 3 as quantity, 0.00000 as discount, 0.70650 as profit union all
       select 3717 as row_id, 'CA-2017-144568' as order_id, ${DATE_PREFIX}'2020-05-29'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-05-30'${DATE_SUFFIX} as completed_date, 'JO-15550' as customer_id, 'Omaha' as city, 'Office Supplies' as category, 'Fasteners' as sub_category, 'Plymouth Boxed Rubber Bands by Plymouth' as product_name, 23.55000 as sales, 5 as quantity, 0.00000 as discount, 1.17750 as profit union all
-      select 4882 as row_id, 'CA-2017-143567' as order_id, ${DATE_PREFIX}'2020-11-02'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-11-03'${DATE_SUFFIX} as completed_date, 'TB-21175' as customer_id, 'Columbus' as city, 'Technology' as category, 'Accessories' as sub_category, 'Logitech diNovo Edge Keyboard' as product_name, 2249.91000 as sales, 9 as quantity, 0.00000 as discount, 517.47930 as profit union all
+      select 4882 as row_id, 'CA-2017-143567' as order_id, ${DATE_PREFIX}'2020-11-02'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-11-03'${DATE_SUFFIX} as completed_date, 'TB-21175' as customer_id, 'Columbus' as city, 'Technology' as category, 'Accessories' as sub_category, 'Logitech di_Novo Edge Keyboard' as product_name, 2249.91000 as sales, 9 as quantity, 0.00000 as discount, 517.47930 as profit union all
       select 5277 as row_id, 'CA-2017-147333' as order_id, ${DATE_PREFIX}'2020-12-14'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-12-15'${DATE_SUFFIX} as completed_date, 'KL-16555' as customer_id, 'Columbus' as city, 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.0' as product_name, 44.75000 as sales, 5 as quantity, 0.00000 as discount, 8.50250 as profit union all
       select 6125 as row_id, 'CA-2017-145772' as order_id, ${DATE_PREFIX}'2020-06-03'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-06-04'${DATE_SUFFIX} as completed_date, 'SS-20140' as customer_id, 'Los Angeles' as city, 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.1' as product_name, 44.75000 as sales, 5 as quantity, 0.00000 as discount, 8.50250 as profit union all
       select 2455 as row_id, 'CA-2017-140949' as order_id, ${DATE_PREFIX}'2020-03-17'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-03-18'${DATE_SUFFIX} as completed_date, 'DB-13405' as customer_id, 'New York City' as city, 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.2' as product_name, 71.60000 as sales, 8 as quantity, 0.00000 as discount, 13.60400 as profit union all
@@ -192,7 +179,7 @@ export const BigECommerce = {
       select 1995 as row_id, 'CA-2017-133648' as order_id, ${DATE_PREFIX}'2020-06-25'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-06-26'${DATE_SUFFIX} as completed_date, 'ML-17755' as customer_id, 'Columbus' as city, 'Office Supplies' as category, 'Fasteners' as sub_category, 'Plymouth Boxed Rubber Bands by Plymouth' as product_name, 11.30400 as sales, 3 as quantity, 0.20000 as discount, -2.11950 as profit, ${falseLiteral} as is_returning union all
       select 7310 as row_id, 'CA-2017-112172' as order_id, ${DATE_PREFIX}'2020-06-10'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-06-11'${DATE_SUFFIX} as completed_date, 'MM-18280' as customer_id, 'New York City' as city, 'Office Supplies' as category, 'Fasteners' as sub_category, 'Plymouth Boxed Rubber Bands by Plymouth' as product_name, 14.13000 as sales, 3 as quantity, 0.00000 as discount, 0.70650 as profit, ${falseLiteral} as is_returning union all
       select 3717 as row_id, 'CA-2017-144568' as order_id, ${DATE_PREFIX}'2020-05-29'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-05-30'${DATE_SUFFIX} as completed_date, 'JO-15550' as customer_id, 'Omaha' as city, 'Office Supplies' as category, 'Fasteners' as sub_category, 'Plymouth Boxed Rubber Bands by Plymouth' as product_name, 23.55000 as sales, 5 as quantity, 0.00000 as discount, 1.17750 as profit, ${falseLiteral} as is_returning union all
-      select 4882 as row_id, 'CA-2017-143567' as order_id, ${DATE_PREFIX}'2020-11-02'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-11-03'${DATE_SUFFIX} as completed_date, 'TB-21175' as customer_id, 'Columbus' as city, 'Technology' as category, 'Accessories' as sub_category, 'Logitech diNovo Edge Keyboard' as product_name, 2249.91000 as sales, 9 as quantity, 0.00000 as discount, 517.47930 as profit, ${falseLiteral} as is_returning union all
+      select 4882 as row_id, 'CA-2017-143567' as order_id, ${DATE_PREFIX}'2020-11-02'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-11-03'${DATE_SUFFIX} as completed_date, 'TB-21175' as customer_id, 'Columbus' as city, 'Technology' as category, 'Accessories' as sub_category, 'Logitech di_Novo Edge Keyboard' as product_name, 2249.91000 as sales, 9 as quantity, 0.00000 as discount, 517.47930 as profit, ${falseLiteral} as is_returning union all
       select 5277 as row_id, 'CA-2017-147333' as order_id, ${DATE_PREFIX}'2020-12-14'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-12-15'${DATE_SUFFIX} as completed_date, 'KL-16555' as customer_id, 'Columbus' as city, 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.0' as product_name, 44.75000 as sales, 5 as quantity, 0.00000 as discount, 8.50250 as profit, ${falseLiteral} as is_returning union all
       select 6125 as row_id, 'CA-2017-145772' as order_id, ${DATE_PREFIX}'2020-06-03'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-06-04'${DATE_SUFFIX} as completed_date, 'SS-20140' as customer_id, 'Los Angeles' as city, 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.1' as product_name, 44.75000 as sales, 5 as quantity, 0.00000 as discount, 8.50250 as profit, ${falseLiteral} as is_returning union all
       select 2455 as row_id, 'CA-2017-140949' as order_id, ${DATE_PREFIX}'2020-03-17'${DATE_SUFFIX} as order_date, ${DATE_PREFIX}'2020-03-18'${DATE_SUFFIX} as completed_date, 'DB-13405' as customer_id, 'New York City' as city, 'Technology' as category, 'Accessories' as sub_category, 'Kingston Digital DataTraveler 16GB USB 2.2' as product_name, 71.60000 as sales, 8 as quantity, 0.00000 as discount, 13.60400 as profit, ${falseLiteral} as is_returning union all

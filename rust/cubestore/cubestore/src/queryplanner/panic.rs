@@ -1,6 +1,6 @@
 use crate::queryplanner::planning::WorkerExec;
-use arrow::datatypes::{Schema, SchemaRef};
 use async_trait::async_trait;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::error::DataFusionError;
 use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use datafusion::physical_plan::{

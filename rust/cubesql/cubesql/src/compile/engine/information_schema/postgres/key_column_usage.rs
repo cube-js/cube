@@ -43,16 +43,17 @@ impl InfoSchemaKeyColumnUsageBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.constraint_catalog.finish()));
-        columns.push(Arc::new(self.constraint_schema.finish()));
-        columns.push(Arc::new(self.constraint_name.finish()));
-        columns.push(Arc::new(self.table_catalog.finish()));
-        columns.push(Arc::new(self.table_schema.finish()));
-        columns.push(Arc::new(self.table_name.finish()));
-        columns.push(Arc::new(self.column_name.finish()));
-        columns.push(Arc::new(self.ordinal_position.finish()));
-        columns.push(Arc::new(self.position_in_unique_constraint.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.constraint_catalog.finish()),
+            Arc::new(self.constraint_schema.finish()),
+            Arc::new(self.constraint_name.finish()),
+            Arc::new(self.table_catalog.finish()),
+            Arc::new(self.table_schema.finish()),
+            Arc::new(self.table_name.finish()),
+            Arc::new(self.column_name.finish()),
+            Arc::new(self.ordinal_position.finish()),
+            Arc::new(self.position_in_unique_constraint.finish()),
+        ];
 
         columns
     }

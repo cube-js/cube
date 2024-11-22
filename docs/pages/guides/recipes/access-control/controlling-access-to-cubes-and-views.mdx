@@ -20,10 +20,13 @@ module.exports = {
   },
   extendContext: ({ securityContext }) => {
     return {
-      isFinance: securityContext.department === "finance",
-    };
-  },
-};
+      securityContext: {
+        ...securityContext,
+        isFinance: securityContext.department === "finance"
+      }
+    }
+  }
+}
 ```
 
 ## Data modeling
@@ -48,7 +51,7 @@ cubes:
 # total_revenue_per_customer.yml
 views:
   - name: total_revenue_per_customer
-    public: COMPILE_CONTEXT.security_context.isFinance
+    public: {{ COMPILE_CONTEXT['securityContext']['isFinance'] }}
     includes:
       - orders.total_revenue
       - users.company
@@ -74,7 +77,7 @@ cube(`users`, {
 // total_revenue_per_customer.js
 view("total_revenue_per_customer", {
   description: `Total revenue per customer`,
-  public: COMPILE_CONTEXT.security_context.isFinance,
+  public: COMPILE_CONTEXT.securityContext.isFinance,
 
   includes: [orders.total_revenue, users.company],
 });

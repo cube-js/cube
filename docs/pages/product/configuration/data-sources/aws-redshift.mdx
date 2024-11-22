@@ -7,19 +7,19 @@ redirect_from:
 
 ## Prerequisites
 
-<InfoBox>
-
-If the cluster is configured within a [VPC][aws-vpc], then Cube **must** have a
-network route to the cluster.
-
-</InfoBox>
-
 - The [hostname][aws-redshift-docs-connection-string] for the [AWS
   Redshift][aws-redshift] cluster
 - The [username/password][aws-redshift-docs-users] for the [AWS
   Redshift][aws-redshift] cluster
 - The name of the database to use within the [AWS Redshift][aws-redshift]
   cluster
+
+<InfoBox>
+
+If the cluster is configured within a [VPC][aws-vpc], then Cube **must** have a
+network route to the cluster.
+
+</InfoBox>
 
 ## Setup
 
@@ -53,20 +53,11 @@ The following fields are required when creating an AWS Redshift connection:
   src="https://ucarecdn.com/4ccd3485-36fe-4740-9a11-0e8fb23fe8c3/"
 />
 
-Cube Cloud also supports connecting to data sources within private VPCs. If you
-already have VPCs enabled in your account, check out the [VPC
-documentation][ref-cloud-conf-vpc] to learn how to get started.
+Cube Cloud also supports connecting to data sources within private VPCs
+if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
+[VPC connectivity guide][ref-cloud-conf-vpc] for details.
 
-<SuccessBox>
-
-VPC connectivity is available in Cube Cloud on
-[Enterprise](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
-details.
-
-</SuccessBox>
-
-[cube-pricing]: https://cube.dev/pricing/
-[cube-contact]: https://cube.dev/contact/
+[ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /product/deployment/cloud/vpc
 
 ## Environment Variables

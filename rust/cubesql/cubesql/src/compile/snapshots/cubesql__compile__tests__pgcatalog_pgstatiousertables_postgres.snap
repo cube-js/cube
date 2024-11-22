@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8214
+assertion_line: 9270
 expression: "execute_query(\"SELECT * FROM pg_catalog.pg_statio_user_tables ORDER BY relid ASC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+------------+---------------------------+----------------+---------------+---------------+--------------+-----------------+----------------+----------------+---------------+
@@ -10,4 +10,5 @@ expression: "execute_query(\"SELECT * FROM pg_catalog.pg_statio_user_tables ORDE
 | 18019 | public     | Logs                      | 0              | 0             | 0             | 0            | NULL            | NULL           | NULL           | NULL          |
 | 18029 | public     | NumberCube                | 0              | 0             | 0             | 0            | NULL            | NULL           | NULL           | NULL          |
 | 18035 | public     | WideCube                  | 0              | 0             | 0             | 0            | NULL            | NULL           | NULL           | NULL          |
+| 18245 | public     | MultiTypeCube             | 0              | 0             | 0             | 0            | NULL            | NULL           | NULL           | NULL          |
 +-------+------------+---------------------------+----------------+---------------+---------------+--------------+-----------------+----------------+----------------+---------------+

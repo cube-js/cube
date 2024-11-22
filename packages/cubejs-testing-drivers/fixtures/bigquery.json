@@ -143,11 +143,11 @@
     "---------------------------------------",
     "Full tests                             ",
     "---------------------------------------",
-    "querying Customers: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + total + offset",
+    "querying Customers: dimensions + order + total + offset",
+    "querying ECommerce: dimensions + order + total + offset",
 
     "---------------------------------------",
-    "SKIPED FOR ALL                         ",
+    "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
@@ -160,6 +160,8 @@
     "---------------------------------------",
     "SQL API: reuse params",
     "SQL API: Complex Rollup",
-    "SQL API: Rollup with aliases"
+    "SQL API: Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk"
   ]
 }

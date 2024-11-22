@@ -1,0 +1,57 @@
+# Semantic Catalog
+
+Semantic Catalog lets users search, understand, and re-use trusted data products,
+both from Cube and external sources such as cloud data warehouses and business intelligence tools.
+
+<SuccessBox>
+
+Semantic Catalog is available in Cube Cloud on
+[Enterprise and above](https://cube.dev/pricing) product tiers.
+You can also choose a [Semantic Catalog tier](/product/deployment/cloud/pricing#semantic-catalog-tiers).
+
+</SuccessBox>
+
+<Screenshot src="https://ucarecdn.com/d8e09149-7ed2-4f5c-83f6-406734557efb/catalog.jpg" />
+
+## Configuration
+
+### Enabling Semantic Catalog
+
+Navigate to <Btn>Catalog</Btn> in the left sidebar and click a button to get started.
+
+In a few moments, your data model will sync to the Semantic Catalog, and
+you will see cubes, views, and data source tables appear in the Semantic Catalog.
+
+### Connecting downstream tools
+
+In addition to your Cube data model, Semantic Catalog can be used to understand charts and dashboards in downstream business intelligence and data visualization tools.
+These currently include:
+
+- [Tableau][ref-tableau]
+- [Superset][ref-superset]
+- [Preset][ref-superset]
+- Amazon QuickSight
+
+To connect these, navigate to "Settings" in your Cube deployment sidebar, and then choose "Catalog Services."
+Click the "Add Service" button, and a modal will pop up for you to enter credentials, test the connection, and create your service.
+
+<Screenshot src="https://ucarecdn.com/a060a3cb-f5f0-4b5e-90fb-84694d6c32f4/Screenshot20240624at43731PM.png" />
+
+## Usage
+
+### Overview
+
+You can search and filter for data assets such as Cubes, Views, tables, charts, and dashboards.
+Semantic Catalog will show you an overview of each data asset, including information such as name,
+description, the measures and dimensions included (for a Cube or View), and usage information.
+
+### Lineage
+
+Semantic Catalog can be used to explore lineage between your connected data assets.
+For example, for a View, users can see what tables and Cubes flow into it as well as the downstream
+dashboards that query it in tools such as Tableau and Superset.
+
+<Screenshot src="https://ucarecdn.com/9adbeb24-203d-4608-9351-fac348a01f51/Screenshot20240624at44511PM.png" />
+
+[ref-tableau]: /product/configuration/visualization-tools/tableau
+[ref-superset]: /product/configuration/visualization-tools/superset
