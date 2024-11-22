@@ -1356,7 +1356,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIME2) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
+          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
           [
             '__TO_PARTITION_RANGE',
           ],
