@@ -71,7 +71,7 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public timeStampCast(value: string) {
-    return this.dateTimeCast(value);
+    return `CAST(${value} AS DATETIMEOFFSET)`;
   }
 
   public dateTimeCast(value: string) {
