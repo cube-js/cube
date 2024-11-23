@@ -104,7 +104,11 @@ describe('Pre Aggregation by filter match tests', () => {
   ));
 
   it('1 count measure, day, two_weeks_by_1st_feb_00am', () => testPreAggregationMatch(
-    true, ['count'], 'day', 'two_weeks_by_1st_feb_00am'
+    true, ['count'], 'day', 'two_weeks_by_1st_feb_00am', 'UTC'
+  ));
+
+  it('1 count measure, day, two_weeks_by_1st_feb_00am', () => testPreAggregationMatch(
+    false, ['count'], 'day', 'two_weeks_by_1st_feb_00am', 'Europe/Berlin'
   ));
 
   it('1 count measure, day, two_weeks_by_1st_feb_10am', () => testPreAggregationMatch(

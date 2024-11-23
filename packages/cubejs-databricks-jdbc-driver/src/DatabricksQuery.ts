@@ -96,9 +96,9 @@ export class DatabricksQuery extends BaseQuery {
     const [intervalFormatted, timeUnit] = this.formatInterval(interval);
     const beginOfTime = this.dateTimeCast('\'1970-01-01T00:00:00\'');
 
-    return `${this.timeStampCast(`'${origin}'`)} + INTERVAL ${intervalFormatted} *
+    return `${this.dateTimeCast(`'${origin}'`)} + INTERVAL ${intervalFormatted} *
       floor(
-        date_diff(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+        date_diff(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
         date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + INTERVAL ${intervalFormatted})
       )`;
   }
