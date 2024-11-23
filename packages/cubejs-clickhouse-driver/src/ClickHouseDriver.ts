@@ -185,7 +185,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { signal } = abortController;
 
     const promise = (async () => {
-      await this.client.ping();
+      const pingResult = await this.client.ping();
+      if (!pingResult.success) {
+        // TODO replace string formatting with proper cause
+        throw new Error(`Connection check failed: ${pingResult.error}`);
+      }
       signal.throwIfAborted();
       // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
       // TODO should we kill those as well?
