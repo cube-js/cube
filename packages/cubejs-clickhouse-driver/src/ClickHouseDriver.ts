@@ -188,7 +188,12 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       const pingResult = await this.client.ping();
       if (!pingResult.success) {
         // TODO replace string formatting with proper cause
-        throw new Error(`Connection check failed: ${pingResult.error}`);
+        // pingResult.error can be AggregateError when ClickHouse hostname resolves to multiple addresses
+        let errorMessage = pingResult.error.toString();
+        if (pingResult.error instanceof AggregateError) {
+          errorMessage = `Aggregate error: ${pingResult.error.message}; errors: ${pingResult.error.errors.join('; ')}`;
+        }
+        throw new Error(`Connection check failed: ${errorMessage}`);
       }
       signal.throwIfAborted();
       // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
