@@ -8,6 +8,7 @@ pub use planning::PlanningMeta;
 mod check_memory;
 pub mod physical_plan_flags;
 pub mod pretty_printers;
+mod projection_above_limit;
 pub mod query_executor;
 pub mod serialized_plan;
 mod tail_limit;
@@ -40,6 +41,7 @@ use crate::queryplanner::info_schema::{
 };
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
+use crate::queryplanner::projection_above_limit::ProjectionAboveLimit;
 use crate::queryplanner::query_executor::{
     batches_to_dataframe, ClusterSendExec, InlineTableProvider,
 };
@@ -199,7 +201,8 @@ impl QueryPlannerImpl {
             ExecutionConfig::new()
                 .with_metadata_cache_factory(self.metadata_cache_factory.clone())
                 .add_optimizer_rule(Arc::new(MaterializeNow {}))
-                .add_optimizer_rule(Arc::new(FlattenUnion {})),
+                .add_optimizer_rule(Arc::new(FlattenUnion {}))
+                .add_optimizer_rule(Arc::new(ProjectionAboveLimit {})),
         )))
     }
 }
