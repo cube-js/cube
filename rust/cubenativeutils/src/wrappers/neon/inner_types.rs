@@ -1,9 +1,10 @@
-use super::context::ContextHolder;
-use super::object::base_types::*;
-use super::object::neon_array::NeonArray;
-use super::object::neon_function::NeonFunction;
-use super::object::neon_struct::NeonStruct;
-use super::object::NeonObject;
+use super::{
+    context::ContextHolder,
+    object::{
+        base_types::*, neon_array::NeonArray, neon_function::NeonFunction, neon_struct::NeonStruct,
+        NeonObject,
+    },
+};
 use crate::wrappers::inner_types::InnerTypes;
 use neon::prelude::*;
 use std::marker::PhantomData;

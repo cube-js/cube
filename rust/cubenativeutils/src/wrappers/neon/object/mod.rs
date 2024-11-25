@@ -3,13 +3,14 @@ pub mod neon_array;
 pub mod neon_function;
 pub mod neon_struct;
 
-use self::base_types::{NeonBoolean, NeonNumber, NeonString};
-use self::neon_array::NeonArray;
-use self::neon_function::NeonFunction;
-use self::neon_struct::NeonStruct;
+use self::{
+    base_types::{NeonBoolean, NeonNumber, NeonString},
+    neon_array::NeonArray,
+    neon_function::NeonFunction,
+    neon_struct::NeonStruct,
+};
 use super::inner_types::NeonInnerTypes;
-use crate::wrappers::neon::context::ContextHolder;
-use crate::wrappers::object::NativeObject;
+use crate::wrappers::{neon::context::ContextHolder, object::NativeObject};
 use cubesql::CubeError;
 use neon::prelude::*;
 
