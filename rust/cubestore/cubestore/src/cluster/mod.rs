@@ -48,6 +48,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
+use datafusion::error::DataFusionError;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
 use flatbuffers::bitflags::_core::pin::Pin;
 use futures::future::join_all;
@@ -1544,7 +1545,7 @@ impl ClusterImpl {
         }
 
         impl Stream for SelectStream {
-            type Item = Result<RecordBatch, ArrowError>;
+            type Item = Result<RecordBatch, DataFusionError>;
 
             fn poll_next(
                 mut self: Pin<&mut Self>,
@@ -1598,8 +1599,8 @@ impl ClusterImpl {
         impl SelectStream {
             fn on_error<T>(
                 mut self: Pin<&mut Self>,
-                e: ArrowError,
-            ) -> Poll<Option<Result<T, ArrowError>>> {
+                e: DataFusionError,
+            ) -> Poll<Option<Result<T, DataFusionError>>> {
                 self.as_mut().finished = true;
                 return Poll::Ready(Some(Err(e)));
             }

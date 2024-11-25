@@ -1,26 +1,28 @@
 use crate::config::injection::DIService;
 use crate::metastore::table::Table;
 use crate::metastore::{IdRow, Index};
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::ArrayRef;
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
+use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
+use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::parquet::file::properties::{
     WriterProperties, WriterPropertiesBuilder, WriterVersion,
 };
-use datafusion::physical_plan::parquet::{MetadataCacheFactory, ParquetMetadataCache};
 use std::fs::File;
 use std::sync::Arc;
 
 pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {
-    fn cache(self: &Self) -> Arc<dyn ParquetMetadataCache>;
+    fn cache(self: &Self) -> Arc<dyn ParquetFileReaderFactory>;
 }
 
 #[derive(Debug)]
 pub struct CubestoreParquetMetadataCacheImpl {
-    cache: Arc<dyn ParquetMetadataCache>,
+    cache: Arc<dyn ParquetFileReaderFactory>,
 }
 
 crate::di_service!(
@@ -29,13 +31,13 @@ crate::di_service!(
 );
 
 impl CubestoreParquetMetadataCacheImpl {
-    pub fn new(cache: Arc<dyn ParquetMetadataCache>) -> Arc<CubestoreParquetMetadataCacheImpl> {
+    pub fn new(cache: Arc<dyn ParquetFileReaderFactory>) -> Arc<CubestoreParquetMetadataCacheImpl> {
         Arc::new(CubestoreParquetMetadataCacheImpl { cache })
     }
 }
 
 impl CubestoreParquetMetadataCache for CubestoreParquetMetadataCacheImpl {
-    fn cache(self: &Self) -> Arc<dyn ParquetMetadataCache> {
+    fn cache(self: &Self) -> Arc<dyn ParquetFileReaderFactory> {
         self.cache.clone()
     }
 }
@@ -88,14 +90,10 @@ pub struct ParquetTableStore {
 
 impl ParquetTableStore {
     pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
-        let mut r = ParquetFileArrowReader::new(Arc::new(
-            self.metadata_cache_factory
-                .cache_factory()
-                .make_noop_cache()
-                .file_reader(path)?,
-        ));
+        let builder = ParquetRecordBatchReaderBuilder::try_new(File::create_new(path)?)?;
+        let mut r = builder.with_batch_size(self.row_group_size).build()?;
         let mut batches = Vec::new();
-        for b in r.get_record_reader(self.row_group_size)? {
+        for b in r {
             batches.push(b?)
         }
         Ok(batches)
@@ -168,16 +166,15 @@ impl ParquetTableStore {
 }
 
 pub fn arrow_schema(i: &Index) -> Schema {
-    Schema::new(i.columns().iter().map(|c| c.into()).collect())
+    Schema::new(i.columns().iter().map(|c| c.into()).collect::<Vec<Field>>())
 }
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
-
     use crate::assert_eq_columns;
     use crate::metastore::table::Table;
     use crate::metastore::{Column, ColumnType, IdRow, Index};
+    use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
     use crate::store::{compaction, ROW_GROUP_SIZE};
     use crate::table::data::{cmp_row_key_heap, concat_record_batches, rows_to_columns, to_stream};
     use crate::table::parquet::{
@@ -186,15 +183,16 @@ mod tests {
     use crate::table::{Row, TableValue};
     use crate::util::decimal::Decimal;
     use datafusion::arrow::array::{
-        ArrayRef, BooleanArray, Float64Array, Int64Array, Int64Decimal4Array, StringArray,
+        ArrayRef, BooleanArray, Decimal128Array, Float64Array, Int64Array, StringArray,
         TimestampMicrosecondArray,
     };
+    use datafusion::arrow::datatypes::{Int32Type, Int64Type};
     use datafusion::arrow::record_batch::RecordBatch;
-    use datafusion::parquet::data_type::DataType;
+    use datafusion::parquet;
+    use datafusion::parquet::data_type::{BoolType, DataType};
     use datafusion::parquet::file::reader::FileReader;
     use datafusion::parquet::file::reader::SerializedFileReader;
     use datafusion::parquet::file::statistics::{Statistics, TypedStatistics};
-    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
@@ -249,12 +247,7 @@ mod tests {
                 None,
                 Some(5),
             ])),
-            Arc::new(Int64Decimal4Array::from(vec![
-                Some(9),
-                Some(7),
-                Some(8),
-                None,
-            ])),
+            Arc::new(Decimal128Array::from(vec![Some(9), Some(7), Some(8), None])),
             Arc::new(Float64Array::from(vec![
                 Some(3.3),
                 None,
@@ -372,7 +365,7 @@ mod tests {
                     },
                     TableValue::Boolean(i % 5 == 0),
                     if i % 5 != 0 {
-                        TableValue::Decimal(Decimal::new(i * 10000))
+                        TableValue::Decimal(Decimal::new((i * 10000) as i128))
                     } else {
                         TableValue::Null
                     },
@@ -403,7 +396,7 @@ mod tests {
                 TableValue::String(format!("Foo {}", i)),
                 TableValue::String(format!("Boo {}", i)),
                 TableValue::Boolean(false),
-                TableValue::Decimal(Decimal::new(i * 10000)),
+                TableValue::Decimal(Decimal::new((i * 10000) as i128)),
             ]));
         }
         to_split.sort_by(|a, b| cmp_row_key_heap(3, &a.values(), &b.values()));
@@ -412,7 +405,7 @@ mod tests {
         let schema = Arc::new(arrow_schema(&store.table));
         let to_split_batch = RecordBatch::try_new(schema.clone(), to_split_cols.clone()).unwrap();
         let count_min = compaction::write_to_files(
-            to_stream(to_split_batch).await,
+            to_stream(to_split_batch),
             to_split.len(),
             ParquetTableStore::new(
                 store.table.clone(),
@@ -557,7 +550,15 @@ mod tests {
     }
 
     fn print_min_max_typed<T: DataType>(s: &TypedStatistics<T>) -> String {
-        format!("min: {}, max: {}", s.min(), s.max())
+        format!(
+            "min: {}, max: {}",
+            s.min_opt()
+                .map(|v| v.to_string())
+                .unwrap_or("NULL".to_string()),
+            s.max_opt()
+                .map(|v| v.to_string())
+                .unwrap_or("NULL".to_string())
+        )
     }
 
     fn print_min_max(s: Option<&Statistics>) -> String {
@@ -566,14 +567,16 @@ mod tests {
             None => return "<null>".to_string(),
         };
         match s {
-            Statistics::Boolean(t) => print_min_max_typed(t),
-            Statistics::Int32(t) => print_min_max_typed(t),
-            Statistics::Int64(t) => print_min_max_typed(t),
-            Statistics::Int96(t) => print_min_max_typed(t),
-            Statistics::Float(t) => print_min_max_typed(t),
-            Statistics::Double(t) => print_min_max_typed(t),
-            Statistics::ByteArray(t) => print_min_max_typed(t),
-            Statistics::FixedLenByteArray(t) => print_min_max_typed(t),
+            Statistics::Boolean(t) => print_min_max_typed::<parquet::data_type::BoolType>(t),
+            Statistics::Int32(t) => print_min_max_typed::<parquet::data_type::Int32Type>(t),
+            Statistics::Int64(t) => print_min_max_typed::<parquet::data_type::Int64Type>(t),
+            Statistics::Int96(t) => print_min_max_typed::<parquet::data_type::Int96Type>(t),
+            Statistics::Float(t) => print_min_max_typed::<parquet::data_type::FloatType>(t),
+            Statistics::Double(t) => print_min_max_typed::<parquet::data_type::DoubleType>(t),
+            Statistics::ByteArray(t) => print_min_max_typed::<parquet::data_type::ByteArrayType>(t),
+            Statistics::FixedLenByteArray(t) => {
+                print_min_max_typed::<parquet::data_type::FixedLenByteArrayType>(t)
+            }
         }
     }
 }

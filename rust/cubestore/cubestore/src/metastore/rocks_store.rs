@@ -598,7 +598,7 @@ impl WriteBatchIterator for WriteBatchContainer {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct IdRow<T: Clone> {
     pub(crate) id: u64,
     pub(crate) row: T,
