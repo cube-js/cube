@@ -107,7 +107,7 @@ link_project_packages() {
 }
 
 # Main execution function
-wizard() {
+setup() {
     local app_name=$1
     local db_type=$2
     
@@ -144,15 +144,16 @@ show_help() {
     echo "  link           Link all packages and link them to a project"
     echo "                  Usage: ./dev-env.sh link [app_name]"
     echo ""
-    echo "  wizard         Run all steps (install, build, link, create project)"
-    echo "                  Usage: ./dev-env.sh wizard [app_name] [db_type]"
+    echo "  setup          Run all steps (install, build, link, create project)"
+    echo "                  Usage: ./dev-env.sh setup [app_name] [db_type]"
+    echo "                  If arguments are omitted, will ask interactively"
     echo ""
     echo "Options:"
     echo "  -h, --help     Show this help message"
     echo ""
     echo "Examples:"
     echo "  ./dev-env.sh create my-app postgres"
-    echo "  ./dev-env.sh wizard my-app"
+    echo "  ./dev-env.sh setup my-app"
     echo "  ./dev-env.sh link my-app"
 }
 
@@ -181,8 +182,8 @@ case "$command" in
     "create")
         create_project "$1" "$2"
         ;;
-    "wizard")
-        wizard "$1" "$2"
+    "setup")
+        setup "$1" "$2"
         ;;
     "-h"|"--help"|"help")
         show_help
