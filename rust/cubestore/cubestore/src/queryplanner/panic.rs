@@ -1,23 +1,29 @@
 use crate::queryplanner::planning::WorkerExec;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
+use datafusion::execution::TaskContext;
+use datafusion::logical_expr::{Expr, Extension, LogicalPlan, UserDefinedLogicalNode};
+use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::{
-    ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+    DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning, PlanProperties,
+    SendableRecordBatchStream,
 };
 use std::any::Any;
-use std::fmt::Formatter;
+use std::cmp::Ordering;
+use std::fmt::{Formatter, Pointer};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PanicWorkerNode {}
 
 impl PanicWorkerNode {
     pub fn into_plan(self) -> LogicalPlan {
-        LogicalPlan::Extension {
+        LogicalPlan::Extension(Extension {
             node: Arc::new(self),
-        }
+        })
     }
 }
 
@@ -28,6 +34,10 @@ lazy_static! {
 impl UserDefinedLogicalNode for PanicWorkerNode {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn name(&self) -> &str {
+        "PanicWorker"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -46,24 +56,51 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
         write!(f, "Panic")
     }
 
-    fn from_template(
+    fn with_exprs_and_inputs(
         &self,
-        exprs: &[Expr],
-        inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion::common::Result<Arc<dyn UserDefinedLogicalNode>> {
         assert!(exprs.is_empty());
         assert!(inputs.is_empty());
 
-        Arc::new(PanicWorkerNode {})
+        Ok(Arc::new(PanicWorkerNode {}))
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        other
+            .as_any()
+            .downcast_ref()
+            .map(|o| self.eq(o))
+            .unwrap_or(false)
     }
 }
 
 #[derive(Debug)]
-pub struct PanicWorkerExec {}
+pub struct PanicWorkerExec {
+    properties: PlanProperties,
+}
 
 impl PanicWorkerExec {
     pub fn new() -> PanicWorkerExec {
-        PanicWorkerExec {}
+        PanicWorkerExec {
+            properties: PlanProperties::new(
+                EquivalenceProperties::new(Arc::new(Schema::empty())),
+                Partitioning::UnknownPartitioning(1),
+                ExecutionMode::Bounded,
+            ),
+        }
+    }
+}
+
+impl DisplayAs for PanicWorkerExec {
+    fn fmt_as(&self, _: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "PanicWorkerExec")
     }
 }
 
@@ -73,36 +110,33 @@ impl ExecutionPlan for PanicWorkerExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::empty())
-    }
-
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 0);
         Ok(Arc::new(PanicWorkerExec::new()))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
-        OptimizerHints::default()
-    }
-
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        _: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         assert_eq!(partition, 0);
         panic!("worker panic")
+    }
+
+    fn name(&self) -> &str {
+        "PanicWorkerExec"
+    }
+
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
     }
 }
 

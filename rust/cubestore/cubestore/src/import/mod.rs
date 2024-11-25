@@ -27,6 +27,7 @@ use cubehll::HllSketch;
 
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::cube_ext::ordfloat::OrdF64;
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
 use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
@@ -44,7 +45,6 @@ use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
 use cubedatasketches::HLLDataSketch;
-use datafusion::cube_ext::ordfloat::OrdF64;
 use tokio::time::{sleep, Duration};
 
 pub mod limits;
@@ -232,7 +232,7 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         .with_scale(scale as i64)
         .into_bigint_and_exponent()
         .0
-        .to_i64()
+        .to_i128()
     {
         Some(d) => d,
         None => {
@@ -986,8 +986,6 @@ impl Ingestion {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
-
     use crate::import::parse_decimal;
     use crate::metastore::{Column, ColumnType, ImportFormat};
     use crate::table::{Row, TableValue};
