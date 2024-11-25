@@ -41,7 +41,7 @@ use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchSt
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
-use crate::telemetry::tracing::TracingHelper;
+use crate::telemetry::tracing::{TraceIdAndSpanId, TracingHelper};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -60,6 +60,8 @@ use ingestion::job_runner::JobRunner;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use mockall::automock;
+use opentelemetry::trace::{SpanContext, SpanId, TraceContextExt, TraceFlags, TraceId};
+use opentelemetry::Context as OtelContext;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -76,6 +78,7 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[automock]
 #[async_trait]
@@ -215,7 +218,7 @@ pub enum WorkerMessage {
         SerializedPlan,
         HashMap<String, String>,
         HashMap<u64, Vec<SerializedRecordBatchStream>>,
-        Option<(u64, u64)>,
+        Option<TraceIdAndSpanId>,
     ),
 }
 
@@ -250,6 +253,13 @@ impl Configurator for WorkerConfigurator {
             config
         };
         Ok(config)
+    }
+
+    fn teardown() {
+        let teardown = SELECT_WORKER_SHUTDOWN.read().unwrap();
+        if teardown.is_some() {
+            teardown.as_ref().unwrap()();
+        }
     }
 }
 
@@ -320,13 +330,25 @@ impl WorkerProcessing for WorkerProcessor {
                     let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
                     Ok((schema, records, data_loaded_size))
                 };
+
                 let span = trace_id_and_span_id.map(|(t, s)| {
-                    tracing::info_span!(
-                        "Process on selec worker",
-                        cube_dd_trace_id = t,
-                        cube_dd_parent_span_id = s
-                    )
+                    let trace_id = TraceId::from(t);
+                    let span_id = SpanId::from(s);
+                    let span_context = SpanContext::new(
+                        trace_id,
+                        span_id,
+                        TraceFlags::SAMPLED,
+                        true,
+                        Default::default(),
+                    );
+
+                    let context = OtelContext::new().with_remote_span_context(span_context);
+                    let span = tracing::info_span!("Process on select worker");
+
+                    span.set_parent(context);
+                    span
                 });
+
                 if let Some(span) = span {
                     future.instrument(span).await
                 } else {
@@ -369,9 +391,20 @@ lazy_static! {
         std::sync::RwLock::new(None);
 }
 
+lazy_static! {
+    static ref SELECT_WORKER_SHUTDOWN: std::sync::RwLock<Option<Box<dyn Fn() + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
 pub fn register_select_worker_setup(f: fn(&Runtime)) {
     let mut setup = SELECT_WORKER_SETUP.write().unwrap();
     assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
+}
+
+pub fn register_select_worker_teardown(f: fn()) {
+    let mut setup = SELECT_WORKER_SHUTDOWN.write().unwrap();
+    assert!(setup.is_none(), "select worker teardown already registered");
     *setup = Some(Box::new(f));
 }
 

@@ -376,6 +376,14 @@ pub struct WorkerProcessArgs<C: Configurator, P: WorkerProcessing, S: ServicesTr
     timeout: Duration,
 }
 
+struct TeardownGuard<C: Configurator>(PhantomData<C>);
+
+impl<C: Configurator> Drop for TeardownGuard<C> {
+    fn drop(&mut self) {
+        C::teardown();
+    }
+}
+
 pub fn worker_main<C, P, S>(a: WorkerProcessArgs<C, P, S>) -> i32
 where
     C: Configurator,
@@ -399,6 +407,7 @@ where
     tokio_builder.thread_stack_size(stack_size);
     let runtime = tokio_builder.build().unwrap();
     C::setup(&runtime);
+    let _teardown_guard = TeardownGuard::<C>(PhantomData);
     runtime.block_on(async move {
         let services_client = S::connect(services_sender, services_reciever, timeout);
         let config = match C::configure(services_client).await {
@@ -503,6 +512,8 @@ mod tests {
             config.configure_injector().await;
             Ok(config)
         }
+
+        fn teardown() {}
     }
 
     pub struct Processor;
@@ -711,6 +722,8 @@ mod tests {
             let config = TestConfig { services_client };
             Ok(config)
         }
+
+        fn teardown() {}
     }
 
     pub struct ServProcessor;
