@@ -4,11 +4,6 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
-use cubeshared::codegen::{
-    root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
-    HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
-    HttpRowArgs,
-};
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
@@ -17,6 +12,11 @@ use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use async_std::fs::File;
+use cubeshared::codegen::{
+    root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
+    HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
+    HttpRowArgs,
+};
 use datafusion::cube_ext;
 use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
@@ -857,7 +857,6 @@ impl HttpMessage {
 
 #[cfg(test)]
 mod tests {
-    use cubeshared::codegen::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
     use crate::config::{init_test_logger, Config};
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
@@ -867,6 +866,9 @@ mod tests {
     use crate::table::{Row, TableValue};
     use crate::CubeError;
     use async_trait::async_trait;
+    use cubeshared::codegen::{
+        HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
+    };
     use datafusion::cube_ext;
     use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use futures_util::{SinkExt, StreamExt};
