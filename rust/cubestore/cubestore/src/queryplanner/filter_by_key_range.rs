@@ -1,3 +1,4 @@
+use crate::cube_ext::stream::StreamWithSchema;
 use crate::queryplanner::serialized_plan::{RowFilter, RowRange};
 use crate::table::data::cmp_partition_key;
 use async_trait::async_trait;
@@ -5,15 +6,17 @@ use datafusion::arrow::array::ArrayRef;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::cube_ext::stream::StreamWithSchema;
 use datafusion::error::DataFusionError;
+use datafusion::execution::TaskContext;
 use datafusion::physical_plan::{
-    Distribution, ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+    DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, Partitioning, PlanProperties,
+    SendableRecordBatchStream,
 };
 use futures::StreamExt;
 use itertools::Itertools;
 use std::any::Any;
 use std::cmp::Ordering;
+use std::fmt::Formatter;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -41,6 +44,12 @@ impl FilterByKeyRangeExec {
     }
 }
 
+impl DisplayAs for FilterByKeyRangeExec {
+    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "FilterByKeyRangeExec")
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for FilterByKeyRangeExec {
     fn as_any(&self) -> &dyn Any {
@@ -51,20 +60,12 @@ impl ExecutionPlan for FilterByKeyRangeExec {
         self.input.schema()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn required_child_distribution(&self) -> Distribution {
-        self.input.required_child_distribution()
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         mut children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 1);
@@ -75,15 +76,12 @@ impl ExecutionPlan for FilterByKeyRangeExec {
         }))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
-        self.input.output_hints()
-    }
-
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        let i = self.input.execute(partition).await?;
+        let i = self.input.execute(partition, context)?;
         let s = i.schema();
         let f = self.filter.clone();
         let key_len = self.key_len;
@@ -99,13 +97,21 @@ impl ExecutionPlan for FilterByKeyRangeExec {
             }),
         )))
     }
+
+    fn name(&self) -> &str {
+        "FilterByKeyRangeExec"
+    }
+
+    fn properties(&self) -> &PlanProperties {
+        self.input.properties()
+    }
 }
 
 fn apply_row_filter(
     b: RecordBatch,
     key_len: usize,
     f: &RowFilter,
-) -> Vec<Result<RecordBatch, ArrowError>> {
+) -> Vec<Result<RecordBatch, DataFusionError>> {
     let num_rows = b.num_rows();
     if num_rows == 0 {
         return vec![Ok(b)];

@@ -1,15 +1,17 @@
 use crate::util::batch_memory::record_batch_buffer_size;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::arrow::error::Result as ArrowResult;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::error::DataFusionError;
+use datafusion::execution::TaskContext;
 use datafusion::physical_plan::{
-    ExecutionPlan, OptimizerHints, Partitioning, RecordBatchStream, SendableRecordBatchStream,
+    DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties, RecordBatchStream,
+    SendableRecordBatchStream,
 };
 use flatbuffers::bitflags::_core::any::Any;
 use futures::stream::Stream;
 use futures::StreamExt;
+use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -51,8 +53,18 @@ impl TraceDataLoadedExec {
     }
 }
 
+impl DisplayAs for TraceDataLoadedExec {
+    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "TraceDataLoadedExec")
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for TraceDataLoadedExec {
+    fn name(&self) -> &str {
+        "TraceDataLoadedExec"
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -61,16 +73,16 @@ impl ExecutionPlan for TraceDataLoadedExec {
         self.input.schema()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+    fn properties(&self) -> &PlanProperties {
+        self.input.properties()
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 1);
@@ -80,22 +92,19 @@ impl ExecutionPlan for TraceDataLoadedExec {
         }))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
-        self.input.output_hints()
-    }
-
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        if partition >= self.input.output_partitioning().partition_count() {
+        if partition >= self.input.properties().partitioning.partition_count() {
             return Err(DataFusionError::Internal(format!(
                 "ExecutionPlanExec invalid partition {}",
                 partition
             )));
         }
 
-        let input = self.input.execute(partition).await?;
+        let input = self.input.execute(partition, context)?;
         Ok(Box::pin(TraceDataLoadedStream {
             schema: self.schema(),
             data_loaded_size: self.data_loaded_size.clone(),
@@ -111,7 +120,7 @@ struct TraceDataLoadedStream {
 }
 
 impl Stream for TraceDataLoadedStream {
-    type Item = ArrowResult<RecordBatch>;
+    type Item = Result<RecordBatch, DataFusionError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.input.poll_next_unpin(cx).map(|x| match x {

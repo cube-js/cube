@@ -1,53 +1,85 @@
 use crate::metastore::Column;
 use crate::CubeError;
+use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 use chrono_tz::Tz;
 use datafusion::arrow::array::{
     Array, StringArray, StringBuilder, TimestampMicrosecondArray, TimestampMicrosecondBuilder,
 };
-use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
-use datafusion::catalog::TableReference;
-use datafusion::datasource::datasource::Statistics;
-use datafusion::datasource::TableProvider;
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+use datafusion::catalog::Session;
+use datafusion::common::TableReference;
+use datafusion::config::ConfigOptions;
+use datafusion::datasource::{provider_as_source, TableProvider, TableType};
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::Expr as DExpr;
+use datafusion::logical_expr;
+use datafusion::logical_expr::{
+    AggregateUDF, Expr, ScalarUDF, ScalarUDFImpl, Signature, TableSource, TypeSignature,
+    Volatility, WindowUDF,
+};
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::functions::Signature;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::udf::ScalarUDF;
 use datafusion::physical_plan::ColumnarValue;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::planner::ContextProvider;
 use std::any::Any;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct TopicTableProvider {
     topic: String,
     schema: SchemaRef,
+    config_options: ConfigOptions,
 }
 
 impl TopicTableProvider {
     pub fn new(topic: String, columns: &Vec<Column>) -> Self {
         let schema = Arc::new(Schema::new(
-            columns.iter().map(|c| c.clone().into()).collect::<Vec<_>>(),
+            columns
+                .iter()
+                .map(|c| c.clone().into())
+                .collect::<Vec<Field>>(),
         ));
-        Self { topic, schema }
+        Self {
+            topic,
+            schema,
+            config_options: ConfigOptions::default(),
+        }
     }
 
     fn parse_timestamp_meta(&self) -> Arc<ScalarUDF> {
-        let meta = ScalarUDF {
-            name: "PARSE_TIMESTAMP".to_string(),
-            signature: Signature::OneOf(vec![
-                Signature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
-                Signature::Exact(vec![DataType::Utf8, DataType::Utf8]),
-            ]),
-            return_type: Arc::new(|_| {
-                Ok(Arc::new(DataType::Timestamp(TimeUnit::Microsecond, None)))
-            }),
+        struct ParseTimestampFunc {
+            signature: Signature,
+        }
 
-            fun: Arc::new(move |inputs| {
+        impl Debug for ParseTimestampFunc {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f, "ParseTimestampFunc")
+            }
+        }
+
+        impl ScalarUDFImpl for ParseTimestampFunc {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn name(&self) -> &str {
+                "ParseTimestampFunc"
+            }
+
+            fn signature(&self) -> &Signature {
+                &self.signature
+            }
+
+            fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
+                Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
+            }
+
+            fn invoke(
+                &self,
+                inputs: &[ColumnarValue],
+            ) -> datafusion::common::Result<ColumnarValue> {
                 if inputs.len() < 2 || inputs.len() > 3 {
                     return Err(DataFusionError::Execution(
                         "Expected 2 or 3 arguments in PARSE_TIMESTAMP".to_string(),
@@ -75,9 +107,9 @@ impl TopicTableProvider {
                         }
                         _ => {
                             return Err(DataFusionError::Execution(
-                            "Only scalar arguments are supported as timezone in PARSE_TIMESTAMP"
-                                .to_string(),
-                        ));
+                                "Only scalar arguments are supported as timezone in PARSE_TIMESTAMP"
+                                    .to_string(),
+                            ));
                         }
                     }
                 } else {
@@ -97,6 +129,7 @@ impl TopicTableProvider {
                         };
                         Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
                             Some(ts.timestamp_micros()),
+                            None,
                         )))
                     }
                     ColumnarValue::Array(t) if t.as_any().is::<StringArray>() => {
@@ -112,24 +145,52 @@ impl TopicTableProvider {
                         ));
                     }
                 }
-            }),
-        };
-        Arc::new(meta)
+            }
+        }
+
+        Arc::new(ScalarUDF::new_from_impl(ParseTimestampFunc {
+            signature: Signature::one_of(
+                vec![
+                    TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
+                    TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+                ],
+                Volatility::Stable,
+            ),
+        }))
     }
 
     fn convert_tz_meta(&self) -> Arc<ScalarUDF> {
-        let meta = ScalarUDF {
-            name: "CONVERT_TZ".to_string(),
-            signature: Signature::Exact(vec![
-                DataType::Timestamp(TimeUnit::Microsecond, None),
-                DataType::Utf8,
-                DataType::Utf8,
-            ]),
-            return_type: Arc::new(|_| {
-                Ok(Arc::new(DataType::Timestamp(TimeUnit::Microsecond, None)))
-            }),
+        struct ConvertTzFunc {
+            signature: Signature,
+        }
 
-            fun: Arc::new(move |inputs| {
+        impl Debug for ConvertTzFunc {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f, "ConvertTzFunc")
+            }
+        }
+
+        impl ScalarUDFImpl for ConvertTzFunc {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn name(&self) -> &str {
+                "ConvertTzFunc"
+            }
+
+            fn signature(&self) -> &Signature {
+                &self.signature
+            }
+
+            fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
+                Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
+            }
+
+            fn invoke(
+                &self,
+                inputs: &[ColumnarValue],
+            ) -> datafusion::common::Result<ColumnarValue> {
                 if inputs.len() != 3 {
                     return Err(DataFusionError::Execution(
                         "Expected 3 arguments in PARSE_TIMESTAMP".to_string(),
@@ -164,10 +225,11 @@ impl TopicTableProvider {
                     }
                 };
                 match &inputs[0] {
-                    ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t))) => {
+                    ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t), None)) => {
                         if from_tz == to_tz {
                             Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
                                 Some(*t),
+                                None,
                             )))
                         } else {
                             let time = Utc.timestamp_nanos(*t * 1000).naive_local();
@@ -183,6 +245,7 @@ impl TopicTableProvider {
                             let result = from.with_timezone(&to_tz);
                             Ok(ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(
                                 Some(result.naive_local().timestamp_micros()),
+                                None,
                             )))
                         }
                     }
@@ -202,21 +265,53 @@ impl TopicTableProvider {
                         ));
                     }
                 }
-            }),
-        };
-        Arc::new(meta)
+            }
+        }
+
+        Arc::new(ScalarUDF::new_from_impl(ConvertTzFunc {
+            signature: Signature::exact(
+                vec![
+                    DataType::Timestamp(TimeUnit::Microsecond, None),
+                    DataType::Utf8,
+                    DataType::Utf8,
+                ],
+                Volatility::Stable,
+            ),
+        }))
     }
 
     fn format_timestamp_meta(&self) -> Arc<ScalarUDF> {
-        let meta = ScalarUDF {
-            name: "FORMAT_TIMESTAMP".to_string(),
-            signature: Signature::Exact(vec![
-                DataType::Timestamp(TimeUnit::Microsecond, None),
-                DataType::Utf8,
-            ]),
-            return_type: Arc::new(|_| Ok(Arc::new(DataType::Utf8))),
+        struct FormatTimestampFunc {
+            signature: Signature,
+        }
 
-            fun: Arc::new(move |inputs| {
+        impl Debug for FormatTimestampFunc {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f, "FormatTimestampFunc")
+            }
+        }
+
+        impl ScalarUDFImpl for FormatTimestampFunc {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn name(&self) -> &str {
+                "FormatTimestampFunc"
+            }
+
+            fn signature(&self) -> &Signature {
+                &self.signature
+            }
+
+            fn return_type(&self, _: &[DataType]) -> datafusion::common::Result<DataType> {
+                Ok(DataType::Utf8)
+            }
+
+            fn invoke(
+                &self,
+                inputs: &[ColumnarValue],
+            ) -> datafusion::common::Result<ColumnarValue> {
                 if inputs.len() != 2 {
                     return Err(DataFusionError::Execution(
                         "Expected 2 arguments in FORMAT_TIMESTAMP".to_string(),
@@ -227,15 +322,15 @@ impl TopicTableProvider {
                     ColumnarValue::Scalar(ScalarValue::Utf8(Some(v))) => sql_format_to_strformat(v),
                     _ => {
                         return Err(DataFusionError::Execution(
-                            "Only scalar arguments are supported as format in PARSE_TIMESTAMP"
+                            "Only scalar arguments are supported as format in FORMAT_TIMESTAMP"
                                 .to_string(),
                         ));
                     }
                 };
-                match &inputs[0] {
-                    ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t))) => {
-                        let time = Utc.timestamp_nanos(*t * 1000).naive_local();
 
+                match &inputs[0] {
+                    ColumnarValue::Scalar(ScalarValue::TimestampMicrosecond(Some(t), None)) => {
+                        let time = Utc.timestamp_nanos(*t * 1000).naive_local();
                         Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(format!(
                             "{}",
                             time.format(&format)
@@ -252,22 +347,38 @@ impl TopicTableProvider {
                     }
                     _ => {
                         return Err(DataFusionError::Execution(
-                            "First argument in FORMAT_TIMESTAMP must be timestamp or array of timestamps"
-                                .to_string(),
+                            "First argument in FORMAT_TIMESTAMP must be timestamp or array of timestamps".to_string(),
                         ));
                     }
                 }
-            }),
-        };
-        Arc::new(meta)
+            }
+        }
+
+        Arc::new(ScalarUDF::new_from_impl(FormatTimestampFunc {
+            signature: Signature::exact(
+                vec![
+                    DataType::Timestamp(TimeUnit::Microsecond, None),
+                    DataType::Utf8,
+                ],
+                Volatility::Stable,
+            ),
+        }))
     }
 }
 
 impl ContextProvider for TopicTableProvider {
-    fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
+    fn get_table_source(
+        &self,
+        name: TableReference,
+    ) -> Result<Arc<dyn TableSource>, DataFusionError> {
         match name {
-            TableReference::Bare { table } if table == self.topic => Some(Arc::new(self.clone())),
-            _ => None,
+            TableReference::Bare { table } if table.as_ref() == self.topic => {
+                Ok(provider_as_source(Arc::new(self.clone())))
+            }
+            _ => Err(DataFusionError::Plan(format!(
+                "Topic table {} is not found",
+                name
+            ))),
         }
     }
 
@@ -283,8 +394,33 @@ impl ContextProvider for TopicTableProvider {
     fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
         None
     }
+
+    fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
+        None
+    }
+
+    fn get_variable_type(&self, variable_names: &[String]) -> Option<DataType> {
+        None
+    }
+
+    fn options(&self) -> &ConfigOptions {
+        &self.config_options
+    }
+
+    fn udf_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn udaf_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn udwf_names(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
+#[async_trait]
 impl TableProvider for TopicTableProvider {
     fn as_any(&self) -> &dyn Any {
         self
@@ -294,22 +430,18 @@ impl TableProvider for TopicTableProvider {
         self.schema.clone()
     }
 
-    fn scan(
-        &self,
-        _projection: &Option<Vec<usize>>,
-        _batch_size: usize,
-        _filters: &[DExpr],
-        _limit: Option<usize>,
-    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        Ok(Arc::new(EmptyExec::new(false, self.schema())))
+    fn table_type(&self) -> TableType {
+        TableType::Base
     }
 
-    fn statistics(&self) -> Statistics {
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-        }
+    async fn scan(
+        &self,
+        state: &dyn Session,
+        projection: Option<&Vec<usize>>,
+        filters: &[Expr],
+        limit: Option<usize>,
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        Ok(Arc::new(EmptyExec::new(self.schema())))
     }
 }
 
@@ -332,10 +464,10 @@ fn parse_timestamp_array(
     tz: &Tz,
     format: &str,
 ) -> Result<TimestampMicrosecondArray, DataFusionError> {
-    let mut result = TimestampMicrosecondBuilder::new(input.len());
+    let mut result = TimestampMicrosecondBuilder::new();
     for i in 0..input.len() {
         if input.is_null(i) {
-            result.append_null()?;
+            result.append_null();
         } else {
             let ts = match tz.datetime_from_str(input.value(i), &format) {
                 Ok(ts) => ts,
@@ -347,7 +479,7 @@ fn parse_timestamp_array(
                     )));
                 }
             };
-            result.append_value(ts.timestamp_micros())?;
+            result.append_value(ts.timestamp_micros());
         }
     }
     Ok(result.finish())
@@ -357,19 +489,19 @@ fn convert_tz_array(
     from_tz: &Tz,
     to_tz: &Tz,
 ) -> Result<TimestampMicrosecondArray, DataFusionError> {
-    let mut result = TimestampMicrosecondBuilder::new(input.len());
+    let mut result = TimestampMicrosecondBuilder::new();
     if from_tz == to_tz {
         for i in 0..input.len() {
             if input.is_null(i) {
-                result.append_null()?;
+                result.append_null();
             } else {
-                result.append_value(input.value(i))?;
+                result.append_value(input.value(i));
             }
         }
     } else {
         for i in 0..input.len() {
             if input.is_null(i) {
-                result.append_null()?;
+                result.append_null();
             } else {
                 let time = Utc
                     .timestamp_nanos(input.value(i) as i64 * 1000)
@@ -384,7 +516,7 @@ fn convert_tz_array(
                     }
                 };
                 let res = from.with_timezone(to_tz);
-                result.append_value(res.naive_local().timestamp_micros())?;
+                result.append_value(res.naive_local().timestamp_micros());
             }
         }
     }
@@ -394,15 +526,15 @@ fn format_timestamp_array(
     input: &TimestampMicrosecondArray,
     format: &str,
 ) -> Result<StringArray, DataFusionError> {
-    let mut result = StringBuilder::new(input.len());
+    let mut result = StringBuilder::new();
     for i in 0..input.len() {
         if input.is_null(i) {
-            result.append_null()?;
+            result.append_null();
         } else {
             let time = Utc
                 .timestamp_nanos(input.value(i) as i64 * 1000)
                 .naive_local();
-            result.append_value(format!("{}", time.format(format)))?;
+            result.append_value(format!("{}", time.format(format)));
         }
     }
     Ok(result.finish())

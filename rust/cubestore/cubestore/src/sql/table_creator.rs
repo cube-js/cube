@@ -12,6 +12,7 @@ use crate::metastore::{
 };
 use crate::metastore::{Column, ColumnType, MetaStore};
 use crate::sql::cache::SqlResultCache;
+use crate::sql::fully_qualified_or_lower;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef};
 use crate::telemetry::incoming_traffic_agent_event;
 use crate::CubeError;
@@ -228,7 +229,7 @@ impl TableCreator {
                         table
                     ))
                 })
-                .flatten();
+                .and_then(|r| r);
                 match finalize_res {
                     Ok(FinalizeExternalTableResult::Orphaned) => {
                         if let Err(inner) = self.db.drop_table(table.get_id()).await {
@@ -292,12 +293,12 @@ impl TableCreator {
         if let Some(mut p) = partitioned_index {
             let part_index_name = match p.name.0.as_mut_slice() {
                 &mut [ref schema, ref mut name] => {
-                    if schema.value != schema_name {
+                    if fully_qualified_or_lower(&schema) != schema_name {
                         return Err(CubeError::user(format!("CREATE TABLE in schema '{}' cannot reference PARTITIONED INDEX from schema '{}'", schema_name, schema)));
                     }
-                    take(&mut name.value)
+                    take(&mut fully_qualified_or_lower(&name))
                 }
-                &mut [ref mut name] => take(&mut name.value),
+                &mut [ref mut name] => take(&mut fully_qualified_or_lower(&name)),
                 _ => {
                     return Err(CubeError::user(format!(
                         "PARTITIONED INDEX must consist of 1 or 2 identifiers, got '{}'",
@@ -308,7 +309,7 @@ impl TableCreator {
 
             let mut columns = Vec::new();
             for mut c in p.columns {
-                columns.push(take(&mut c.value));
+                columns.push(take(&mut fully_qualified_or_lower(&c)));
             }
 
             indexes_to_create.push(IndexDef {
@@ -320,13 +321,17 @@ impl TableCreator {
         }
 
         for index in indexes.iter() {
-            if let Statement::CreateIndex {
+            if let Statement::CreateIndex(CreateIndex {
                 name,
                 columns,
                 unique,
                 ..
-            } = index
+            }) = index
             {
+                let name = name.as_ref().ok_or(CubeError::user(format!(
+                    "Index name is not defined during index creation for {}.{}",
+                    schema_name, table_name
+                )))?;
                 indexes_to_create.push(IndexDef {
                     name: name.to_string(),
                     multi_index: None,
@@ -334,7 +339,7 @@ impl TableCreator {
                         .iter()
                         .map(|c| {
                             if let Expr::Identifier(ident) = &c.expr {
-                                Ok(ident.value.to_string())
+                                Ok(fully_qualified_or_lower(&ident))
                             } else {
                                 Err(CubeError::internal(format!(
                                     "Unexpected column expression: {:?}",
@@ -395,10 +400,16 @@ impl TableCreator {
                     select_statement,
                     None,
                     stream_offset,
-                    unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                    unique_key
+                        .map(|keys| keys.iter().map(|c| fully_qualified_or_lower(&c)).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
-                            .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                            .map(|c| {
+                                (
+                                    fully_qualified_or_lower(&c.0),
+                                    fully_qualified_or_lower(&c.1),
+                                )
+                            })
                             .collect()
                     }),
                     None,
@@ -476,10 +487,15 @@ impl TableCreator {
                 select_statement,
                 source_columns,
                 stream_offset,
-                unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
+                unique_key.map(|keys| keys.iter().map(|c| fully_qualified_or_lower(&c)).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
-                        .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
+                        .map(|c| {
+                            (
+                                fully_qualified_or_lower(&c.0),
+                                fully_qualified_or_lower(&c.1),
+                            )
+                        })
                         .collect()
                 }),
                 partition_split_threshold,
@@ -563,23 +579,40 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
 
     for (i, col) in columns.iter().enumerate() {
         let cube_col = Column::new(
-            col.name.value.clone(),
+            fully_qualified_or_lower(&col.name),
             match &col.data_type {
                 DataType::Date
-                | DataType::Time
+                | DataType::Time(_, _)
                 | DataType::Char(_)
                 | DataType::Varchar(_)
                 | DataType::Clob(_)
                 | DataType::Text
-                | DataType::String => ColumnType::String,
+                | DataType::String(_)
+                | DataType::Character(_)
+                | DataType::CharacterVarying(_)
+                | DataType::CharVarying(_)
+                | DataType::Nvarchar(_)
+                | DataType::CharacterLargeObject(_)
+                | DataType::CharLargeObject(_)
+                | DataType::FixedString(_) => ColumnType::String,
                 DataType::Uuid
                 | DataType::Binary(_)
                 | DataType::Varbinary(_)
                 | DataType::Blob(_)
                 | DataType::Bytea
-                | DataType::Array(_) => ColumnType::Bytes,
-                DataType::Decimal(precision, scale) => {
-                    let (precision, scale) = proper_decimal_args(precision, scale);
+                | DataType::Array(_)
+                | DataType::Bytes(_) => ColumnType::Bytes,
+                DataType::Decimal(number_info)
+                | DataType::Numeric(number_info)
+                | DataType::BigNumeric(number_info)
+                | DataType::BigDecimal(number_info)
+                | DataType::Dec(number_info) => {
+                    let (precision, scale) = match number_info {
+                        ExactNumberInfo::None => (None, None),
+                        ExactNumberInfo::Precision(p) => (Some(*p), None),
+                        ExactNumberInfo::PrecisionAndScale(p, s) => (Some(*p), Some(*s)),
+                    };
+                    let (precision, scale) = proper_decimal_args(&precision, &scale);
                     if precision > 18 {
                         ColumnType::Decimal96 {
                             precision: precision as i32,
@@ -592,13 +625,50 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                         }
                     }
                 }
-                DataType::SmallInt | DataType::Int | DataType::BigInt | DataType::Interval => {
-                    ColumnType::Int
-                }
-                DataType::Boolean => ColumnType::Boolean,
-                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Float,
-                DataType::Timestamp => ColumnType::Timestamp,
-                DataType::Custom(custom) => {
+                DataType::SmallInt(_)
+                | DataType::Int(_)
+                | DataType::BigInt(_)
+                | DataType::Interval
+                | DataType::TinyInt(_)
+                | DataType::UnsignedTinyInt(_)
+                | DataType::Int2(_)
+                | DataType::UnsignedInt2(_)
+                | DataType::UnsignedSmallInt(_)
+                | DataType::MediumInt(_)
+                | DataType::UnsignedMediumInt(_)
+                | DataType::Int4(_)
+                | DataType::Int8(_)
+                | DataType::Int16
+                | DataType::Int32
+                | DataType::Int64
+                | DataType::Int128
+                | DataType::Int256
+                | DataType::Integer(_)
+                | DataType::UnsignedInt(_)
+                | DataType::UnsignedInt4(_)
+                | DataType::UnsignedInteger(_)
+                | DataType::UInt8
+                | DataType::UInt16
+                | DataType::UInt32
+                | DataType::UInt64
+                | DataType::UInt128
+                | DataType::UInt256
+                | DataType::UnsignedBigInt(_)
+                | DataType::UnsignedInt8(_) => ColumnType::Int,
+                DataType::Boolean | DataType::Bool => ColumnType::Boolean,
+                DataType::Float(_)
+                | DataType::Real
+                | DataType::Double
+                | DataType::Float4
+                | DataType::Float32
+                | DataType::Float64
+                | DataType::Float8
+                | DataType::DoublePrecision => ColumnType::Float,
+                DataType::Timestamp(_, _)
+                | DataType::Date32
+                | DataType::Datetime(_)
+                | DataType::Datetime64(_, _) => ColumnType::Timestamp,
+                DataType::Custom(custom, _) => {
                     let custom_type_name = custom.to_string().to_lowercase();
                     match custom_type_name.as_str() {
                         "tinyint" | "mediumint" => ColumnType::Int,
@@ -622,10 +692,24 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                         }
                     }
                 }
-                DataType::Regclass => {
-                    return Err(CubeError::user(
-                        "Type 'RegClass' is not suppored.".to_string(),
-                    ));
+                DataType::Regclass
+                | DataType::JSON
+                | DataType::JSONB
+                | DataType::Map(_, _)
+                | DataType::Tuple(_)
+                | DataType::Nested(_)
+                | DataType::Enum(_)
+                | DataType::Set(_)
+                | DataType::Struct(_, _)
+                | DataType::Union(_)
+                | DataType::Nullable(_)
+                | DataType::LowCardinality(_)
+                | DataType::Unspecified
+                | DataType::Trigger => {
+                    return Err(CubeError::user(format!(
+                        "Type '{}' is not supported.",
+                        col.data_type
+                    )));
                 }
             },
             i,
@@ -637,12 +721,13 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
 fn proper_decimal_args(precision: &Option<u64>, scale: &Option<u64>) -> (i32, i32) {
     let mut precision = precision.unwrap_or(18);
     let mut scale = scale.unwrap_or(5);
-    if precision > 27 {
-        precision = 27;
-    }
-    if scale > 5 {
-        scale = 10;
-    }
+    // TODO upgrade DF
+    // if precision > 27 {
+    //     precision = 27;
+    // }
+    // if scale > 5 {
+    //     scale = 10;
+    // }
     if scale > precision {
         precision = scale;
     }

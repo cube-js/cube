@@ -1,14 +1,11 @@
 pub mod compaction;
 
 use async_trait::async_trait;
-use datafusion::arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
+use datafusion::arrow::compute::{concat_batches, lexsort_to_indices, SortColumn, SortOptions};
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::common::collect as common_collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column as FusionColumn;
-use datafusion::physical_plan::hash_aggregate::{
-    AggregateMode, AggregateStrategy, HashAggregateExec,
-};
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 use serde::{de, Deserialize, Serialize};
@@ -24,7 +21,7 @@ use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
 use crate::CubeError;
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::datatypes::{Field, Schema, SchemaRef};
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Write},
@@ -41,9 +38,12 @@ use crate::table::data::cmp_partition_key;
 use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
 use compaction::{merge_chunks, merge_replay_handles};
 use datafusion::arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
+use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::row::{RowConverter, SortField};
 use datafusion::cube_ext;
-use datafusion::cube_ext::util::lexcmp_array_rows;
+use datafusion::execution::TaskContext;
+use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
 use deepsize::DeepSizeOf;
 use futures::future::join_all;
 use itertools::Itertools;
@@ -76,7 +76,7 @@ impl DataFrame {
             self.columns
                 .iter()
                 .map(|c| c.clone().into())
-                .collect::<Vec<_>>(),
+                .collect::<Vec<Field>>(),
         ))
     }
 
@@ -101,7 +101,10 @@ impl DataFrame {
         columns: &Vec<Column>,
     ) -> Result<Arc<dyn ExecutionPlan + Send + Sync>, CubeError> {
         let schema = Arc::new(Schema::new(
-            columns.iter().map(|c| c.clone().into()).collect::<Vec<_>>(),
+            columns
+                .iter()
+                .map(|c| c.clone().into())
+                .collect::<Vec<Field>>(),
         ));
 
         let mut column_values: Vec<Arc<dyn Array>> = Vec::with_capacity(schema.fields().len());
@@ -109,11 +112,11 @@ impl DataFrame {
         for c in columns.iter() {
             match c.get_column_type() {
                 ColumnType::String => {
-                    let mut column = StringBuilder::new(self.data.len());
+                    let mut column = StringBuilder::new();
                     for i in 0..self.data.len() {
                         let value = &self.data[i].values()[c.get_index()];
                         if let TableValue::String(v) = value {
-                            column.append_value(v.as_str())?;
+                            column.append_value(v.as_str());
                         } else {
                             panic!("Unexpected value: {:?}", value);
                         }
@@ -121,11 +124,11 @@ impl DataFrame {
                     column_values.push(Arc::new(column.finish()));
                 }
                 ColumnType::Int => {
-                    let mut column = Int64Builder::new(self.data.len());
+                    let mut column = Int64Builder::new();
                     for i in 0..self.data.len() {
                         let value = &self.data[i].values()[c.get_index()];
                         if let TableValue::Int(v) = value {
-                            column.append_value(*v)?;
+                            column.append_value(*v);
                         } else {
                             panic!("Unexpected value: {:?}", value);
                         }
@@ -419,7 +422,7 @@ impl ChunkDataStore for ChunkStore {
         //Merge all partition in memory chunk into one
         let key_size = index.get_row().sort_key_size() as usize;
         let schema = Arc::new(arrow_schema(index.get_row()));
-        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
+        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema.clone()));
         let aggregate_columns = match index.get_row().get_type() {
             IndexType::Regular => None,
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
@@ -523,7 +526,7 @@ impl ChunkDataStore for ChunkStore {
         data_loaded_size.add(columns_vec_buffer_size(&columns));
 
         //There is no data in the chunk, so we just deactivate it
-        if columns.len() == 0 || columns[0].data().len() == 0 {
+        if columns.len() == 0 || columns[0].len() == 0 {
             self.meta_store.deactivate_chunk(chunk_id).await?;
             return Ok(());
         }
@@ -804,13 +807,13 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::Config;
     use crate::metastore::{BaseRocksStoreFs, IndexDef, IndexType, RocksMetaStore};
+    use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
     use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use crate::{metastore::ColumnType, table::TableValue};
     use cuberockstore::rocksdb::{Options, DB};
     use datafusion::arrow::array::{Int64Array, StringArray};
-    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -1133,14 +1136,14 @@ mod tests {
                 async move {
                     let c = mstore.chunk_uploaded(c.get_id()).await.unwrap();
                     let batches = cstore.get_chunk_columns(c).await.unwrap();
-                    RecordBatch::concat(&batches[0].schema(), &batches).unwrap()
+                    concat_batches(&batches[0].schema(), &batches).unwrap()
                 }
             })
             .collect::<Vec<_>>();
 
             let chunks = join_all(chunk_feats).await;
 
-            let res = RecordBatch::concat(&chunks[0].schema(), &chunks).unwrap();
+            let res = concat_batches(&chunks[0].schema(), &chunks).unwrap();
 
             let foos = Arc::new(StringArray::from(vec![
                 "a".to_string(),
@@ -1185,14 +1188,21 @@ impl ChunkStore {
 
         let mut remaining_rows: Vec<u64> = (0..columns[0].len() as u64).collect_vec();
         {
-            let (columns_again, remaining_rows_again) = cube_ext::spawn_blocking(move || {
-                let sort_key = &columns[0..sort_key_size];
-                remaining_rows.sort_unstable_by(|&a, &b| {
-                    lexcmp_array_rows(sort_key.iter(), a as usize, b as usize)
-                });
-                (columns, remaining_rows)
-            })
-            .await?;
+            let (columns_again, remaining_rows_again) =
+                cube_ext::spawn_blocking(move || -> Result<_, ArrowError> {
+                    let sort_key = &columns[0..sort_key_size];
+                    let converter = RowConverter::new(
+                        (0..sort_key_size)
+                            .map(|i| SortField::new(columns[i].data_type().clone()))
+                            .into_iter()
+                            .collect(),
+                    )?;
+                    let rows = converter.convert_columns(sort_key)?;
+                    remaining_rows
+                        .sort_unstable_by(|a, b| rows.row(*a as usize).cmp(&rows.row(*b as usize)));
+                    Ok((columns, remaining_rows))
+                })
+                .await??;
 
             columns = columns_again;
             remaining_rows = remaining_rows_again;
@@ -1319,27 +1329,28 @@ impl ChunkStore {
                     .map(|aggr_col| aggr_col.aggregate_expr(&schema))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let output_sort_order = (0..index.get_row().sort_key_size())
-                    .map(|x| x as usize)
-                    .collect();
+                // TODO upgrade DF
+                // let output_sort_order = (0..index.get_row().sort_key_size())
+                //     .map(|x| x as usize)
+                //     .collect();
 
-                let aggregate = Arc::new(HashAggregateExec::try_new(
-                    AggregateStrategy::InplaceSorted,
-                    Some(output_sort_order),
-                    AggregateMode::Final,
-                    groups,
+                // TODO merge sort
+                let aggregate = Arc::new(AggregateExec::try_new(
+                    AggregateMode::Single,
+                    PhysicalGroupBy::new_single(groups),
                     aggregates,
+                    Vec::new(),
                     input,
                     schema.clone(),
                 )?);
 
-                let batches = collect(aggregate).await?;
+                let batches = collect(aggregate, Arc::new(TaskContext::default())).await?;
                 if batches.is_empty() {
                     Ok(vec![])
                 } else if batches.len() == 1 {
                     Ok(batches[0].columns().to_vec())
                 } else {
-                    let res = RecordBatch::concat(&schema, &batches).unwrap();
+                    let res = concat_batches(&schema, &batches).unwrap();
                     Ok(res.columns().to_vec())
                 }
             }

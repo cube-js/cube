@@ -1,9 +1,9 @@
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::util::memory::MemoryHandler;
+use datafusion::datasource::physical_plan::ParquetExec;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::ExecutionPlan;
 use std::sync::Arc;
 

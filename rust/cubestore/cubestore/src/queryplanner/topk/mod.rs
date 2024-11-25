@@ -1,18 +1,21 @@
 mod execute;
 mod plan;
 
-pub use execute::AggregateTopKExec;
-pub use plan::materialize_topk;
-pub use plan::plan_topk;
+// pub use execute::AggregateTopKExec;
+// pub use plan::materialize_topk;
+// pub use plan::plan_topk;
 
 use crate::queryplanner::planning::Snapshots;
 use datafusion::arrow::compute::SortOptions;
-use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
+use datafusion::common::DFSchemaRef;
+use datafusion::logical_expr::{Expr, Extension, LogicalPlan, UserDefinedLogicalNode};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use std::any::Any;
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
+use std::hash::Hasher;
 use std::sync::Arc;
 
 /// Workers will split their local results into batches of at least this size.
@@ -33,7 +36,7 @@ pub struct ClusterAggregateTopK {
     pub snapshots: Vec<Snapshots>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Hash)]
 pub struct SortColumn {
     /// Index of the column in the output schema.
     pub agg_index: usize,
@@ -65,15 +68,19 @@ impl Display for SortColumn {
 
 impl ClusterAggregateTopK {
     pub fn into_plan(self) -> LogicalPlan {
-        LogicalPlan::Extension {
+        LogicalPlan::Extension(Extension {
             node: Arc::new(self),
-        }
+        })
     }
 }
 
 impl UserDefinedLogicalNode for ClusterAggregateTopK {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn name(&self) -> &str {
+        "ClusterAggregateTopK"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -105,11 +112,11 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
         )
     }
 
-    fn from_template(
+    fn with_exprs_and_inputs(
         &self,
-        exprs: &[Expr],
-        inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        exprs: Vec<Expr>,
+        inputs: Vec<LogicalPlan>,
+    ) -> datafusion::common::Result<Arc<dyn UserDefinedLogicalNode>> {
         let num_groups = self.group_expr.len();
         let num_aggs = self.aggregate_expr.len();
         let num_having = if self.having_expr.is_some() { 1 } else { 0 };
@@ -120,7 +127,7 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
         } else {
             None
         };
-        Arc::new(ClusterAggregateTopK {
+        Ok(Arc::new(ClusterAggregateTopK {
             limit: self.limit,
             input: Arc::new(inputs[0].clone()),
             group_expr: Vec::from(&exprs[0..num_groups]),
@@ -129,6 +136,16 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
             having_expr,
             schema: self.schema.clone(),
             snapshots: self.snapshots.clone(),
-        })
+        }))
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        // TODO upgrade DF
+        todo!()
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        // TODO upgrade DF
+        todo!()
     }
 }

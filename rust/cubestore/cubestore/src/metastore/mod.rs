@@ -567,14 +567,14 @@ impl<'a> Into<Field> for &'a Column {
             match self.column_type {
                 ColumnType::String => DataType::Utf8,
                 ColumnType::Int => DataType::Int64,
-                ColumnType::Int96 => DataType::Int96,
+                ColumnType::Int96 => DataType::Decimal128(38, 0),
                 ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
                 ColumnType::Boolean => DataType::Boolean,
-                ColumnType::Decimal { .. } => {
-                    DataType::Int64Decimal(self.column_type.target_scale() as usize)
+                ColumnType::Decimal { scale, precision } => {
+                    DataType::Decimal128(scale as u8, precision as i8)
                 }
-                ColumnType::Decimal96 { .. } => {
-                    DataType::Int96Decimal(self.column_type.target_scale() as usize)
+                ColumnType::Decimal96 { scale, precision } => {
+                    DataType::Decimal128(scale as u8, precision as i8)
                 }
                 ColumnType::Bytes => DataType::Binary,
                 ColumnType::HyperLogLog(_) => DataType::Binary,
@@ -726,7 +726,7 @@ pub struct IndexDef {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Partition {
     index_id: u64,
     parent_partition_id: Option<u64>,
@@ -755,7 +755,7 @@ pub struct Partition {
 impl RocksEntity for Partition {}
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Chunk {
     partition_id: u64,
     row_count: u64,
@@ -1433,7 +1433,7 @@ impl RocksMetaStore {
             .process(
                 self.clone(),
                 move |_| async move { Ok(Delay::new(Duration::from_secs(upload_interval)).await) },
-                move |m, _| async move { m.store.run_upload().await },
+                async move |m, _| m.store.run_upload().await,
             )
             .await;
     }
@@ -2390,7 +2390,7 @@ impl MetaStore for RocksMetaStore {
                 let tables = Arc::new(schemas.build_path_rows(
                     tables,
                     |t| t.get_row().get_schema_id(),
-                    |table, schema| TablePath { table, schema },
+                    |table, schema| TablePath::new(schema, table),
                 )?);
 
                 Ok(tables)
@@ -2423,7 +2423,7 @@ impl MetaStore for RocksMetaStore {
                 let tables = Arc::new(schemas.build_path_rows(
                     tables,
                     |t| t.get_row().get_schema_id(),
-                    |table, schema| TablePath { table, schema },
+                    |table, schema| TablePath::new(schema, table),
                 )?);
 
                 let to_cache = tables.clone();
