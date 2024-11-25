@@ -1,13 +1,10 @@
-use datafusion::logical_plan::Operator;
+use datafusion::logical_expr::{Operator, UserDefinedLogicalNode};
+use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::expressions::{BinaryExpr, CastExpr, Column, Literal, TryCastExpr};
 use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::hash_aggregate::{
-    AggregateMode, AggregateStrategy, HashAggregateExec,
-};
-use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::MergeSortExec;
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
-
+use datafusion::physical_plan::repartition::RepartitionExec;
+use datafusion::physical_plan::union::UnionExec;
+use datafusion::physical_plan::{ExecutionPlan, InputOrderMode, PhysicalExpr};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -39,23 +36,22 @@ impl PhysicalPlanFlags {
 
     fn physical_plan_flags_fill(p: &dyn ExecutionPlan, flags: &mut PhysicalPlanFlags) {
         let a = p.as_any();
-        if let Some(agg) = a.downcast_ref::<HashAggregateExec>() {
-            let is_final_hash_agg_without_groups = agg.mode() == &AggregateMode::Final
-                && agg.strategy() == AggregateStrategy::Hash
-                && agg.group_expr().len() == 0;
+        if let Some(agg) = a.downcast_ref::<AggregateExec>() {
+            let is_final_hash_agg_without_groups =
+                agg.mode() == &AggregateMode::Final && agg.group_expr().expr().len() == 0;
 
-            let is_full_inplace_agg = agg.mode() == &AggregateMode::Full
-                && agg.strategy() == AggregateStrategy::InplaceSorted;
+            let is_full_inplace_agg = agg.mode() == &AggregateMode::Single
+                && agg.input_order_mode() == &InputOrderMode::Sorted;
 
             let is_final_inplace_agg = agg.mode() == &AggregateMode::Final
-                && agg.strategy() == AggregateStrategy::InplaceSorted;
+                && agg.input_order_mode() == &InputOrderMode::Sorted;
 
             if is_final_hash_agg_without_groups || is_full_inplace_agg || is_final_inplace_agg {
                 flags.merge_sort_plan = true;
             }
 
             // Stop the recursion if we have an optimal plan with groups, otherwise continue to check the children, filters for example
-            if agg.group_expr().len() > 0 && flags.merge_sort_plan {
+            if agg.group_expr().expr().len() > 0 && flags.merge_sort_plan {
                 return;
             }
         } else if let Some(f) = a.downcast_ref::<FilterExec>() {
@@ -70,12 +66,12 @@ impl PhysicalPlanFlags {
 
             let maybe_input_exec = input
                 .as_any()
-                .downcast_ref::<MergeExec>()
+                .downcast_ref::<RepartitionExec>()
                 .map(|exec| exec.input().as_any())
                 .or_else(|| {
                     input
                         .as_any()
-                        .downcast_ref::<MergeSortExec>()
+                        .downcast_ref::<RepartitionExec>()
                         .map(|exec| exec.input().as_any())
                 });
 

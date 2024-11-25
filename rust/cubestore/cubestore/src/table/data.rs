@@ -5,12 +5,15 @@ use crate::util::int96::Int96;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
+use crate::cube_ext::ordfloat::OrdF64;
 use datafusion::arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
+use datafusion::arrow::compute::concat_batches;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::cube_ext::ordfloat::OrdF64;
+use datafusion::execution::TaskContext;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use std::fmt;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum TableValueR<'a> {
@@ -141,31 +144,14 @@ macro_rules! match_column_type {
         match t {
             ColumnType::String => $matcher!(String, StringBuilder, String),
             ColumnType::Int => $matcher!(Int, Int64Builder, Int),
-            ColumnType::Int96 => $matcher!(Int96, Int96Builder, Int96),
+            ColumnType::Int96 => $matcher!(Int96, Decimal128Builder, Int96),
             ColumnType::Bytes => $matcher!(Bytes, BinaryBuilder, Bytes),
             ColumnType::HyperLogLog(_) => $matcher!(HyperLogLog, BinaryBuilder, Bytes),
             ColumnType::Timestamp => $matcher!(Timestamp, TimestampMicrosecondBuilder, Timestamp),
             ColumnType::Boolean => $matcher!(Boolean, BooleanBuilder, Boolean),
-            ColumnType::Decimal { .. } => match t.target_scale() {
-                0 => $matcher!(Decimal, Int64Decimal0Builder, Decimal, 0),
-                1 => $matcher!(Decimal, Int64Decimal1Builder, Decimal, 1),
-                2 => $matcher!(Decimal, Int64Decimal2Builder, Decimal, 2),
-                3 => $matcher!(Decimal, Int64Decimal3Builder, Decimal, 3),
-                4 => $matcher!(Decimal, Int64Decimal4Builder, Decimal, 4),
-                5 => $matcher!(Decimal, Int64Decimal5Builder, Decimal, 5),
-                10 => $matcher!(Decimal, Int64Decimal10Builder, Decimal, 10),
-                n => panic!("unhandled target scale: {}", n),
-            },
-            ColumnType::Decimal96 { .. } => match t.target_scale() {
-                0 => $matcher!(Decimal96, Int96Decimal0Builder, Decimal96, 0),
-                1 => $matcher!(Decimal96, Int96Decimal1Builder, Decimal96, 1),
-                2 => $matcher!(Decimal96, Int96Decimal2Builder, Decimal96, 2),
-                3 => $matcher!(Decimal96, Int96Decimal3Builder, Decimal96, 3),
-                4 => $matcher!(Decimal96, Int96Decimal4Builder, Decimal96, 4),
-                5 => $matcher!(Decimal96, Int96Decimal5Builder, Decimal96, 5),
-                10 => $matcher!(Decimal96, Int96Decimal10Builder, Decimal96, 10),
-                n => panic!("unhandled target scale: {}", n),
-            },
+            // TODO upgrade DF
+            ColumnType::Decimal { .. } => $matcher!(Decimal, Decimal128Builder, Decimal),
+            ColumnType::Decimal96 { .. } => $matcher!(Decimal, Decimal128Builder, Decimal),
             ColumnType::Float => $matcher!(Float, Float64Builder, Float),
         }
     }};
@@ -174,7 +160,7 @@ macro_rules! match_column_type {
 pub fn create_array_builder(t: &ColumnType) -> Box<dyn ArrayBuilder> {
     macro_rules! create_builder {
         ($type: tt, $builder: tt $(,$arg: tt)*) => {
-            Box::new($builder::new(0))
+            Box::new($builder::new())
         };
     }
     match_column_type!(t, create_builder)
@@ -226,14 +212,14 @@ pub fn append_value(b: &mut dyn ArrayBuilder, c: &ColumnType, v: &TableValue) {
         ($type: tt, $builder: tt, $tv_enum: tt $(, $arg:tt)*) => {{
             let b = b.as_any_mut().downcast_mut::<$builder>().unwrap();
             if is_null {
-                b.append_null().unwrap();
+                b.append_null();
                 return;
             }
             let v = match v {
                 TableValue::$tv_enum(v) => convert_value!($tv_enum, v),
                 other => panic!("unexpected value {:?} for type {:?}", other, c),
             };
-            b.append_value(v).unwrap();
+            b.append_value(v);
         }};
     }
     match_column_type!(c, append)
@@ -247,18 +233,17 @@ pub fn rows_to_columns(cols: &[Column], rows: &[Row]) -> Vec<ArrayRef> {
     builders.into_iter().map(|mut b| b.finish()).collect_vec()
 }
 
-pub async fn to_stream(r: RecordBatch) -> SendableRecordBatchStream {
+pub fn to_stream(r: RecordBatch) -> SendableRecordBatchStream {
     let schema = r.schema();
     MemoryExec::try_new(&[vec![r]], schema, None)
         .unwrap()
-        .execute(0)
-        .await
+        .execute(0, Arc::new(TaskContext::default()))
         .unwrap()
 }
 
 pub fn concat_record_batches(rs: &[RecordBatch]) -> RecordBatch {
     assert_ne!(rs.len(), 0);
-    RecordBatch::concat(&rs[0].schema(), rs).unwrap()
+    concat_batches(&rs[0].schema(), rs).unwrap()
 }
 
 #[macro_export]

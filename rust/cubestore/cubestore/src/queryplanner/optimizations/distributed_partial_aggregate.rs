@@ -2,7 +2,7 @@ use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use datafusion::error::DataFusionError;
-use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
+use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::limit::GlobalLimitExec;
 use datafusion::physical_plan::ExecutionPlan;
 use std::sync::Arc;
@@ -21,7 +21,7 @@ pub fn push_aggregate_to_workers(
     p: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     let agg;
-    if let Some(a) = p.as_any().downcast_ref::<HashAggregateExec>() {
+    if let Some(a) = p.as_any().downcast_ref::<AggregateExec>() {
         agg = a;
     } else {
         return Ok(p);
@@ -32,14 +32,17 @@ pub fn push_aggregate_to_workers(
 
     if let Some(cs) = agg.input().as_any().downcast_ref::<ClusterSendExec>() {
         // Router plan, replace partial aggregate with cluster send.
-        Ok(Arc::new(cs.with_changed_schema(
-            agg.schema().clone(),
-            agg.with_new_children(vec![cs.input_for_optimizations.clone()])?,
-        )))
+        Ok(Arc::new(
+            cs.with_changed_schema(
+                agg.schema().clone(),
+                p.clone()
+                    .with_new_children(vec![cs.input_for_optimizations.clone()])?,
+            ),
+        ))
     } else if let Some(w) = agg.input().as_any().downcast_ref::<WorkerExec>() {
         // Worker plan, execute partial aggregate inside the worker.
         Ok(Arc::new(WorkerExec {
-            input: agg.with_new_children(vec![w.input.clone()])?,
+            input: p.clone().with_new_children(vec![w.input.clone()])?,
             schema: agg.schema().clone(),
             max_batch_rows: w.max_batch_rows,
             limit_and_reverse: w.limit_and_reverse.clone(),
@@ -58,10 +61,10 @@ pub fn add_limit_to_workers(
         if let Some((limit, reverse)) = w.limit_and_reverse {
             if reverse {
                 let limit = Arc::new(TailLimitExec::new(w.input.clone(), limit));
-                w.with_new_children(vec![limit])
+                p.with_new_children(vec![limit])
             } else {
-                let limit = Arc::new(GlobalLimitExec::new(w.input.clone(), limit));
-                w.with_new_children(vec![limit])
+                let limit = Arc::new(GlobalLimitExec::new(w.input.clone(), 0, Some(limit)));
+                p.with_new_children(vec![limit])
             }
         } else {
             Ok(p)

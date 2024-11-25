@@ -271,8 +271,10 @@ impl RocksCacheStore {
                     .upload_loop
                     .process(
                         cachestore.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
-                        async move |m, _| m.store.run_upload().await,
+                        move |_| async move {
+                            Ok(Delay::new(Duration::from_secs(upload_interval)).await)
+                        },
+                        move |m, _| async move { m.store.run_upload().await },
                     )
                     .await;
 
@@ -290,8 +292,10 @@ impl RocksCacheStore {
                     .metrics_loop
                     .process(
                         cachestore.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_secs(metrics_interval)).await),
-                        async move |m, _| {
+                        move |_| async move {
+                            Ok(Delay::new(Duration::from_secs(metrics_interval)).await)
+                        },
+                        move |m, _| async move {
                             if let Err(err) = m.submit_metrics().await {
                                 log::error!("Error while submitting cachestore metrics: {}", err)
                             };
