@@ -67,7 +67,6 @@ use crate::{
 };
 use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
-use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use deepsize::DeepSizeOf;
 
 pub mod cache;
@@ -76,6 +75,7 @@ pub mod parser;
 mod table_creator;
 
 use crate::cluster::rate_limiter::ProcessRateLimiter;
+use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
 use mockall::automock;
@@ -262,7 +262,10 @@ impl SqlServiceImpl {
                 IndexDef {
                     name,
                     multi_index: None,
-                    columns: columns.iter().map(|c| c.value.to_string()).collect(),
+                    columns: columns
+                        .iter()
+                        .map(|c| fully_qualified_or_lower(&c))
+                        .collect(),
                     index_type: IndexType::Regular, //TODO realize aggregate index here too
                 },
             )
@@ -286,13 +289,15 @@ impl SqlServiceImpl {
         for column in columns {
             let c = if let Some(item) = table_columns
                 .iter()
-                .find(|voc| *voc.get_name() == column.value)
+                .find(|voc| *voc.get_name() == fully_qualified_or_lower(&column))
             {
                 item
             } else {
                 return Err(CubeError::user(format!(
                     "Column {} is not present in table {}.{}.",
-                    column.value, schema_name, table_name
+                    fully_qualified_or_lower(&column),
+                    schema_name,
+                    table_name
                 )));
             };
             real_col.push(c);
@@ -321,7 +326,7 @@ impl SqlServiceImpl {
         let logical_plan = self
             .query_planner
             .logical_plan(
-                DFStatement::Statement(Statement::Query(q)),
+                DFStatement::Statement(Box::new(Statement::Query(q))),
                 &InlineTables::new(),
                 None,
             )
@@ -394,7 +399,7 @@ impl SqlServiceImpl {
         let query_plan = self
             .query_planner
             .logical_plan(
-                DFStatement::Statement(statement),
+                DFStatement::Statement(Box::new(statement)),
                 &InlineTables::new(),
                 None,
             )
@@ -488,7 +493,7 @@ pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<Stri
         .iter()
         .find(|o| o.name.value == prop_name)
         .and_then(|x| {
-            if let Value::SingleQuotedString(v) = &x.value {
+            if let Expr::Value(Value::SingleQuotedString(v)) = &x.value {
                 Some(v.to_string())
             } else {
                 None
@@ -501,12 +506,20 @@ pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<boo
         .iter()
         .find(|o| o.name.value == prop_name)
         .and_then(|x| {
-            if let Value::Boolean(v) = &x.value {
+            if let Expr::Value(Value::Boolean(v)) = &x.value {
                 Some(*v)
             } else {
                 None
             }
         })
+}
+
+pub fn fully_qualified_or_lower(ident: &Ident) -> String {
+    if ident.quote_style.is_some() {
+        ident.value.to_string()
+    } else {
+        ident.value.to_lowercase()
+    }
 }
 
 #[derive(Debug)]
@@ -667,20 +680,20 @@ impl SqlService for SqlServiceImpl {
                     Some(&vec![metrics::format_tag("command", "create_schema")]),
                 );
 
-                let name = schema_name.to_string();
+                let name = fully_qualified_or_lower(&schema_name.0[0]);
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
             CubeStoreStatement::CreateTable {
                 create_table:
-                    Statement::CreateTable {
+                    Statement::CreateTable(CreateTable {
                         name,
                         columns,
                         external,
                         with_options,
                         if_not_exists,
                         ..
-                    },
+                    }),
                 indexes,
                 aggregates,
                 locations,
@@ -699,14 +712,14 @@ impl SqlService for SqlServiceImpl {
                         name
                     )));
                 }
-                let schema_name = &nv[0].value;
-                let table_name = &nv[1].value;
+                let schema_name = &fully_qualified_or_lower(&nv[0]);
+                let table_name = &fully_qualified_or_lower(&nv[1]);
                 let mut import_format = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "input_format")
                     .map_or(Result::Ok(ImportFormat::CSV), |option| {
                         match &option.value {
-                            Value::SingleQuotedString(input_format) => {
+                            Expr::Value(Value::SingleQuotedString(input_format)) => {
                                 match input_format.as_str() {
                                     "csv" => Result::Ok(ImportFormat::CSV),
                                     "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
@@ -727,14 +740,16 @@ impl SqlService for SqlServiceImpl {
                     .iter()
                     .find(|&opt| opt.name.value == "delimiter")
                     .map_or(Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(delimiter) => match delimiter.as_str() {
-                            "tab" => Ok(Some('\t')),
-                            "^A" => Ok(Some('\u{0001}')),
-                            s if s.len() != 1 => {
-                                Err(CubeError::user(format!("Bad delimiter {}", option.value)))
+                        Expr::Value(Value::SingleQuotedString(delimiter)) => {
+                            match delimiter.as_str() {
+                                "tab" => Ok(Some('\t')),
+                                "^A" => Ok(Some('\u{0001}')),
+                                s if s.len() != 1 => {
+                                    Err(CubeError::user(format!("Bad delimiter {}", option.value)))
+                                }
+                                s => Ok(Some(s.chars().next().unwrap())),
                             }
-                            s => Ok(Some(s.chars().next().unwrap())),
-                        },
+                        }
                         _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
                     })?;
 
@@ -781,8 +796,8 @@ impl SqlService for SqlServiceImpl {
                     .iter()
                     .find(|&opt| opt.name.value == "build_range_end")
                     .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(build_range_end) => {
-                            let ts = timestamp_from_string(build_range_end)?;
+                        Expr::Value(Value::SingleQuotedString(build_range_end)) => {
+                            let ts = timestamp_from_string(build_range_end.as_str())?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
                         }
@@ -796,7 +811,7 @@ impl SqlService for SqlServiceImpl {
                     .iter()
                     .find(|&opt| opt.name.value == "seal_at")
                     .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(seal_at) => {
+                        Expr::Value(Value::SingleQuotedString(seal_at)) => {
                             let ts = timestamp_from_string(seal_at)?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
@@ -807,7 +822,7 @@ impl SqlService for SqlServiceImpl {
                     .iter()
                     .find(|&opt| opt.name.value == "select_statement")
                     .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(select_statement) => {
+                        Expr::Value(Value::SingleQuotedString(select_statement)) => {
                             Result::Ok(Some(select_statement.clone()))
                         }
                         _ => Result::Err(CubeError::user(format!(
@@ -819,7 +834,7 @@ impl SqlService for SqlServiceImpl {
                     .iter()
                     .find(|&opt| opt.name.value == "source_table")
                     .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(source_table) => {
+                        Expr::Value(Value::SingleQuotedString(source_table)) => {
                             Result::Ok(Some(source_table.clone()))
                         }
                         _ => Result::Err(CubeError::user(format!(
@@ -831,7 +846,7 @@ impl SqlService for SqlServiceImpl {
                     .iter()
                     .find(|&opt| opt.name.value == "stream_offset")
                     .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(select_statement) => {
+                        Expr::Value(Value::SingleQuotedString(select_statement)) => {
                             Result::Ok(Some(select_statement.clone()))
                         }
                         _ => Result::Err(CubeError::user(format!(
@@ -865,12 +880,12 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
-            CubeStoreStatement::Statement(Statement::CreateIndex {
+            CubeStoreStatement::Statement(Statement::CreateIndex(CreateIndex {
                 name,
                 table_name,
                 columns,
                 ..
-            }) => {
+            })) => {
                 app_metrics::DATA_QUERIES.add_with_tags(
                     1,
                     Some(&vec![metrics::format_tag("command", "create_index")]),
@@ -882,8 +897,12 @@ impl SqlService for SqlServiceImpl {
                         table_name
                     )));
                 }
-                let schema_name = &table_name.0[0].value;
-                let table_name = &table_name.0[1].value;
+                let schema_name = &fully_qualified_or_lower(&table_name.0[0]);
+                let table_name = &fully_qualified_or_lower(&table_name.0[1]);
+                let name = name.ok_or(CubeError::user(format!(
+                    "Index name is not defined during index creation for {}.{}",
+                    schema_name, table_name
+                )))?;
                 let res = self
                     .create_index(
                         schema_name.to_string(),
@@ -949,7 +968,7 @@ impl SqlService for SqlServiceImpl {
                     };
                     let source = self
                         .db
-                        .create_or_update_source(name.value.to_string(), creds?)
+                        .create_or_update_source(fully_qualified_or_lower(&name), creds?)
                         .await?;
                     Ok(Arc::new(DataFrame::from(vec![source])))
                 } else {
@@ -958,78 +977,83 @@ impl SqlService for SqlServiceImpl {
                     ))
                 }
             }
-            CubeStoreStatement::Statement(Statement::CreatePartitionedIndex {
-                name,
-                columns,
-                if_not_exists,
-            }) => {
-                app_metrics::DATA_QUERIES.add_with_tags(
-                    1,
-                    Some(&vec![metrics::format_tag(
-                        "command",
-                        "create_partitioned_index",
-                    )]),
-                );
-
-                if name.0.len() != 2 {
-                    return Err(CubeError::user(format!(
-                        "Expected name for PARTITIONED INDEX in the form '<SCHEMA>.<INDEX>', found: {}",
-                        name
-                    )));
-                }
-                let schema = &name.0[0].value;
-                let index = &name.0[1].value;
-                let res = self
-                    .create_partitioned_index(
-                        schema.to_string(),
-                        index.to_string(),
-                        columns,
-                        if_not_exists,
-                    )
-                    .await?;
-                Ok(Arc::new(DataFrame::from(vec![res])))
-            }
-            CubeStoreStatement::Statement(Statement::Drop {
-                object_type, names, ..
-            }) => {
-                let command = match object_type {
-                    ObjectType::Schema => {
-                        self.db.delete_schema(names[0].to_string()).await?;
-                        &"drop_schema"
-                    }
-                    ObjectType::Table => {
-                        let table = self
-                            .db
-                            .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
-                            .await?;
-                        self.db.drop_table(table.get_id()).await?;
-                        &"drop_table"
-                    }
-                    ObjectType::PartitionedIndex => {
-                        let schema = names[0].0[0].value.clone();
-                        let name = names[0].0[1].value.clone();
-                        self.db.drop_partitioned_index(schema, name).await?;
-                        &"drop_partitioned_index"
-                    }
-                    _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
-                };
-
-                app_metrics::DATA_QUERIES
-                    .add_with_tags(1, Some(&vec![metrics::format_tag("command", command)]));
-
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            }
-            CubeStoreStatement::Statement(Statement::Insert {
+            // TODO upgrade DF
+            // CubeStoreStatement::Statement(Statement::CreatePartitionedIndex {
+            //     name,
+            //     columns,
+            //     if_not_exists,
+            // }) => {
+            //     app_metrics::DATA_QUERIES.add_with_tags(
+            //         1,
+            //         Some(&vec![metrics::format_tag(
+            //             "command",
+            //             "create_partitioned_index",
+            //         )]),
+            //     );
+            //
+            //     if name.0.len() != 2 {
+            //         return Err(CubeError::user(format!(
+            //             "Expected name for PARTITIONED INDEX in the form '<SCHEMA>.<INDEX>', found: {}",
+            //             name
+            //         )));
+            //     }
+            //     let schema = &name.0[0].value;
+            //     let index = &name.0[1].value;
+            //     let res = self
+            //         .create_partitioned_index(
+            //             schema.to_string(),
+            //             index.to_string(),
+            //             columns,
+            //             if_not_exists,
+            //         )
+            //         .await?;
+            //     Ok(Arc::new(DataFrame::from(vec![res])))
+            // }
+            // CubeStoreStatement::Statement(Statement::Drop {
+            //     object_type, names, ..
+            // }) => {
+            //     let command = match object_type {
+            //         ObjectType::Schema => {
+            //             self.db.delete_schema(names[0].to_string()).await?;
+            //             &"drop_schema"
+            //         }
+            //         ObjectType::Table => {
+            //             let table = self
+            //                 .db
+            //                 .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
+            //                 .await?;
+            //             self.db.drop_table(table.get_id()).await?;
+            //             &"drop_table"
+            //         }
+            //         ObjectType::PartitionedIndex => {
+            //             let schema = names[0].0[0].value.clone();
+            //             let name = names[0].0[1].value.clone();
+            //             self.db.drop_partitioned_index(schema, name).await?;
+            //             &"drop_partitioned_index"
+            //         }
+            //         _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
+            //     };
+            //
+            //     app_metrics::DATA_QUERIES
+            //         .add_with_tags(1, Some(&vec![metrics::format_tag("command", command)]));
+            //
+            //     Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            // }
+            CubeStoreStatement::Statement(Statement::Insert(Insert {
                 table_name,
                 columns,
                 source,
                 ..
-            }) => {
+            })) => {
                 app_metrics::DATA_QUERIES
                     .add_with_tags(1, Some(&vec![metrics::format_tag("command", "insert")]));
 
-                let data = if let SetExpr::Values(Values(data_series)) = &source.body {
-                    data_series
+                let source = source.ok_or(CubeError::user(format!(
+                    "Insert source is required for {}",
+                    table_name
+                )))?;
+                let data = if let SetExpr::Values(values) = source.body.as_ref() {
+                    &values.rows
                 } else {
                     return Err(CubeError::user(format!(
                         "Data should be present in query. Your query was '{}'",
@@ -1041,8 +1065,8 @@ impl SqlService for SqlServiceImpl {
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", query)));
                 }
-                let schema_name = &nv[0].value;
-                let table_name = &nv[1].value;
+                let schema_name = &fully_qualified_or_lower(&nv[0]);
+                let table_name = &fully_qualified_or_lower(&nv[1]);
 
                 self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
                     .await?;
@@ -1062,7 +1086,7 @@ impl SqlService for SqlServiceImpl {
                 let logical_plan = self
                     .query_planner
                     .logical_plan(
-                        DFStatement::Statement(Statement::Query(q)),
+                        DFStatement::Statement(Box::new(Statement::Query(q))),
                         &context.inline_tables,
                         context.trace_obj.clone(),
                     )
@@ -1118,6 +1142,7 @@ impl SqlService for SqlServiceImpl {
                 analyze,
                 verbose: _,
                 statement,
+                ..
             }) => match *statement {
                 Statement::Query(q) => self.explain(Statement::Query(q.clone()), analyze).await,
                 _ => Err(CubeError::user(format!(
@@ -1152,7 +1177,7 @@ impl SqlService for SqlServiceImpl {
                 let logical_plan = self
                     .query_planner
                     .logical_plan(
-                        DFStatement::Statement(Statement::Query(q)),
+                        DFStatement::Statement(Box::new(Statement::Query(q))),
                         &context.inline_tables,
                         None,
                     )
@@ -1336,7 +1361,7 @@ fn extract_data<'a>(
                 .downcast_mut::<StringBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
@@ -1347,12 +1372,12 @@ fn extract_data<'a>(
                     cell
                 )));
             };
-            builder.append_value(val)?;
+            builder.append_value(val);
         }
         ColumnType::Int => {
             let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val_int = match cell {
@@ -1377,12 +1402,15 @@ fn extract_data<'a>(
                     cell, e
                 )));
             }
-            builder.append_value(val_int.unwrap())?;
+            builder.append_value(val_int.unwrap());
         }
         ColumnType::Int96 => {
-            let builder = builder.as_any_mut().downcast_mut::<Int96Builder>().unwrap();
+            let builder = builder
+                .as_any_mut()
+                .downcast_mut::<Decimal128Builder>()
+                .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val_int = match cell {
@@ -1415,7 +1443,7 @@ fn extract_data<'a>(
                     cell, e
                 )));
             }
-            builder.append_value(val_int.unwrap())?;
+            builder.append_value(val_int.unwrap());
         }
         t @ ColumnType::Decimal { .. } => {
             let scale = u8::try_from(t.target_scale()).unwrap();
@@ -1424,44 +1452,11 @@ fn extract_data<'a>(
                 true => None,
             };
             let d = d.map(|d| d.raw_value());
-            match scale {
-                0 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal0Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                1 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal1Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                2 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal2Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                3 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal3Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                4 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal4Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                5 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal5Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                10 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int64Decimal10Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                n => panic!("unhandled target scale: {}", n),
-            }
+            builder
+                .as_any_mut()
+                .downcast_mut::<Decimal128Builder>()
+                .unwrap()
+                .append_option(d)
         }
         t @ ColumnType::Decimal96 { .. } => {
             let scale = u8::try_from(t.target_scale()).unwrap();
@@ -1470,44 +1465,11 @@ fn extract_data<'a>(
                 true => None,
             };
             let d = d.map(|d| d.raw_value());
-            match scale {
-                0 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal0Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                1 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal1Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                2 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal2Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                3 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal3Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                4 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal4Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                5 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal5Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                10 => builder
-                    .as_any_mut()
-                    .downcast_mut::<Int96Decimal10Builder>()
-                    .unwrap()
-                    .append_option(d)?,
-                n => panic!("unhandled target scale: {}", n),
-            }
+            builder
+                .as_any_mut()
+                .downcast_mut::<Decimal128Builder>()
+                .unwrap()
+                .append_option(d)
         }
         ColumnType::Bytes => {
             let builder = builder
@@ -1515,7 +1477,7 @@ fn extract_data<'a>(
                 .downcast_mut::<BinaryBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val;
@@ -1524,7 +1486,7 @@ fn extract_data<'a>(
             } else {
                 return Err(CubeError::user("Corrupted data in query.".to_string()));
             };
-            builder.append_value(val)?;
+            builder.append_value(val);
         }
         &ColumnType::HyperLogLog(f) => {
             let builder = builder
@@ -1532,7 +1494,7 @@ fn extract_data<'a>(
                 .downcast_mut::<BinaryBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let val;
@@ -1545,7 +1507,7 @@ fn extract_data<'a>(
                 .as_any_mut()
                 .downcast_mut::<BinaryBuilder>()
                 .unwrap()
-                .append_value(val)?;
+                .append_value(val);
         }
         ColumnType::Timestamp => {
             let builder = builder
@@ -1553,12 +1515,12 @@ fn extract_data<'a>(
                 .downcast_mut::<TimestampMicrosecondBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             match cell {
                 Expr::Value(Value::SingleQuotedString(v)) => {
-                    builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000)?;
+                    builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000);
                 }
                 x => {
                     return Err(CubeError::user(format!(
@@ -1574,7 +1536,7 @@ fn extract_data<'a>(
                 .downcast_mut::<BooleanBuilder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let v = match cell {
@@ -1587,7 +1549,7 @@ fn extract_data<'a>(
                     )))
                 }
             };
-            builder.append_value(v)?;
+            builder.append_value(v);
         }
         ColumnType::Float => {
             let builder = builder
@@ -1595,11 +1557,11 @@ fn extract_data<'a>(
                 .downcast_mut::<Float64Builder>()
                 .unwrap();
             if is_null {
-                builder.append_null()?;
+                builder.append_null();
                 return Ok(());
             }
             let v = parse_float(cell)?;
-            builder.append_value(v)?;
+            builder.append_value(v);
         }
     }
     Ok(())
@@ -1652,8 +1614,16 @@ fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
-            expr: box Expr::Value(Value::Number(v, _)),
-        } => Ok(crate::import::parse_decimal(v, scale)?.negate()),
+            expr,
+        } => match expr.as_ref() {
+            Expr::Value(Value::Number(v, _)) => {
+                Ok(crate::import::parse_decimal(v, scale)?.negate())
+            }
+            _ => Err(CubeError::user(format!(
+                "Can't parse decimal from, {:?}",
+                cell
+            ))),
+        },
         _ => Err(CubeError::user(format!(
             "Can't parse decimal from, {:?}",
             cell
@@ -1667,8 +1637,16 @@ fn parse_decimal_96(cell: &Expr, scale: u8) -> Result<Decimal96, CubeError> {
         }
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
-            expr: box Expr::Value(Value::Number(v, _)),
-        } => Ok(crate::import::parse_decimal_96(v, scale)?.negate()),
+            expr,
+        } => match expr.as_ref() {
+            Expr::Value(Value::Number(v, _)) => {
+                Ok(crate::import::parse_decimal_96(v, scale)?.negate())
+            }
+            _ => Err(CubeError::user(format!(
+                "Can't parse decimal from, {:?}",
+                cell
+            ))),
+        },
         _ => Err(CubeError::user(format!(
             "Can't parse decimal from, {:?}",
             cell
@@ -1689,7 +1667,6 @@ mod tests {
     use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use async_compression::tokio::write::GzipEncoder;
     use cuberockstore::rocksdb::{Options, DB};
-    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
@@ -1711,6 +1688,7 @@ mod tests {
     use super::*;
     use crate::cachestore::RocksCacheStore;
     use crate::cluster::rate_limiter::BasicProcessRateLimiter;
+    use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
     use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;

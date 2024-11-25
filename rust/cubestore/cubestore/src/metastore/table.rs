@@ -11,12 +11,14 @@ use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema as ArrowSchema;
-use datafusion::physical_plan::expressions::{
-    sum_return_type, Column as FusionColumn, Max, Min, Sum,
-};
-use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
+use datafusion::physical_plan::expressions::Column as FusionColumn;
 use itertools::Itertools;
 
+use datafusion::functions_aggregate::min_max::{Max, Min};
+use datafusion::functions_aggregate::sum::Sum;
+use datafusion::logical_expr::AggregateUDF;
+use datafusion::physical_expr::aggregate::AggregateExprBuilder;
+use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
 use std::sync::Arc;
@@ -68,33 +70,30 @@ impl AggregateColumn {
         &self.function
     }
 
-    pub fn aggregate_expr(
-        &self,
-        schema: &ArrowSchema,
-    ) -> Result<Arc<dyn AggregateExpr>, CubeError> {
+    pub fn aggregate_expr(&self, schema: &ArrowSchema) -> Result<AggregateFunctionExpr, CubeError> {
         let col = Arc::new(FusionColumn::new_with_schema(
             self.column.get_name().as_str(),
             &schema,
         )?);
-        let res: Arc<dyn AggregateExpr> = match self.function {
-            AggregateFunction::SUM => {
-                let input_data_type = col.data_type(schema)?;
-                Arc::new(Sum::new(
-                    col.clone(),
-                    col.name(),
-                    sum_return_type(&input_data_type)?,
-                    &input_data_type,
-                ))
-            }
-            AggregateFunction::MAX => {
-                Arc::new(Max::new(col.clone(), col.name(), col.data_type(schema)?))
-            }
-            AggregateFunction::MIN => {
-                Arc::new(Min::new(col.clone(), col.name(), col.data_type(schema)?))
-            }
+        let res: AggregateFunctionExpr = match self.function {
+            AggregateFunction::SUM => AggregateExprBuilder::new(
+                Arc::new(AggregateUDF::new_from_impl(Sum::new())),
+                vec![col],
+            )
+            .build()?,
+            AggregateFunction::MAX => AggregateExprBuilder::new(
+                Arc::new(AggregateUDF::new_from_impl(Max::new())),
+                vec![col],
+            )
+            .build()?,
+            AggregateFunction::MIN => AggregateExprBuilder::new(
+                Arc::new(AggregateUDF::new_from_impl(Min::new())),
+                vec![col],
+            )
+            .build()?,
             AggregateFunction::MERGE => {
-                let fun = aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll).descriptor();
-                udaf::create_aggregate_expr(&fun, &[col.clone()], schema, col.name())?
+                let fun = aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll);
+                AggregateExprBuilder::new(fun, vec![col]).build()?
             }
         };
         Ok(res)
@@ -169,13 +168,26 @@ pub struct Table {
 
 impl RocksEntity for Table {}
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct TablePath {
     pub table: IdRow<Table>,
     pub schema: Arc<IdRow<Schema>>,
+    pub schema_lower_name: String,
+    pub table_lower_name: String,
 }
 
 impl TablePath {
+    pub fn new(schema: Arc<IdRow<Schema>>, table: IdRow<Table>) -> Self {
+        let schema_lower_name = schema.get_row().get_name().to_lowercase();
+        let table_lower_name = table.get_row().get_table_name().to_lowercase();
+        Self {
+            table,
+            schema,
+            schema_lower_name,
+            table_lower_name,
+        }
+    }
+
     pub fn table_name(&self) -> String {
         let schema_name = self.schema.get_row().get_name();
         let table_name = self.table.get_row().get_table_name();

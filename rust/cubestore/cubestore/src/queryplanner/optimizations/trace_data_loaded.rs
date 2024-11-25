@@ -1,6 +1,6 @@
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
+use datafusion::datasource::physical_plan::ParquetExec;
 use datafusion::error::DataFusionError;
-use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::ExecutionPlan;
 use std::sync::Arc;
 
