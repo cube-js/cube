@@ -298,7 +298,8 @@ mod tests {
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use crate::CubeError;
-    use datafusion::logical_plan::{DFSchema, LogicalPlan};
+    use datafusion::common::DFSchema;
+    use datafusion::logical_expr::{EmptyRelation, LogicalPlan};
     use flatbuffers::bitflags::_core::sync::atomic::AtomicI64;
     use futures::future::join_all;
     use futures_timer::Delay;
@@ -310,12 +311,12 @@ mod tests {
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {
         let cache = SqlResultCache::new(1 << 20, Some(120), 1000);
-        let schema = Arc::new(DFSchema::new(Vec::new())?);
+        let schema = Arc::new(DFSchema::empty());
         let plan = SerializedPlan::try_new(
-            LogicalPlan::EmptyRelation {
+            LogicalPlan::EmptyRelation(EmptyRelation {
                 produce_one_row: false,
                 schema,
-            },
+            }),
             PlanningMeta {
                 indices: Vec::new(),
                 multi_part_subtree: HashMap::new(),

@@ -403,8 +403,8 @@ impl HttpServer {
         let drop_processing_messages_after = self.drop_processing_messages_after.clone();
         let drop_orphaned_messages_loop = self.drop_orphaned_messages_loop.process(
             messages_state,
-            async move |_| Ok(Delay::new(check_orphaned_messages_interval.clone()).await),
-            async move |messages_state, _| {
+            move |_| async move { Ok(Delay::new(check_orphaned_messages_interval.clone()).await) },
+            move |messages_state, _| async move {
                 let mut messages_state = messages_state.lock().await;
                 let mut keys_to_remove = Vec::new();
                 let mut orphaned_complete_results = 0;

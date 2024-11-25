@@ -1,7 +1,7 @@
 use crate::cachestore::{QueueItemStatus, QueueKey};
 use sqlparser::ast::{
-    ColumnDef, HiveDistributionStyle, Ident, ObjectName, Query, SqlOption,
-    Statement as SQLStatement, Value,
+    ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
+    SqlOption, Statement as SQLStatement, Value,
 };
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
@@ -220,12 +220,12 @@ impl<'a> CubeStoreParser<'a> {
         let mut tokenizer = Tokenizer::new(dialect, sql);
         let tokens = tokenizer.tokenize()?;
         Ok(CubeStoreParser {
-            parser: Parser::new(tokens, dialect),
+            parser: Parser::new(dialect).with_tokens(tokens),
         })
     }
 
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
-        match self.parser.peek_token() {
+        match self.parser.peek_token().token {
             Token::Word(w) => match w.keyword {
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
@@ -263,7 +263,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
-        match self.parser.peek_token() {
+        match self.parser.peek_token().token {
             Token::Word(w) => {
                 self.parser.next_token();
 
@@ -294,8 +294,8 @@ impl<'a> CubeStoreParser<'a> {
 
     pub fn parse_streaming_source_table(&mut self) -> Result<Vec<ColumnDef>, ParserError> {
         if self.parser.parse_keyword(Keyword::CREATE) && self.parser.parse_keyword(Keyword::TABLE) {
-            let statement = self.parser.parse_create_table_ext(false, false, false)?;
-            if let SQLStatement::CreateTable { columns, .. } = statement {
+            let statement = self.parser.parse_create_table(false, false, None, false)?;
+            if let SQLStatement::CreateTable(CreateTable { columns, .. }) = statement {
                 Ok(columns)
             } else {
                 Err(ParserError::ParserError(
@@ -310,7 +310,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_cache(&mut self) -> Result<Statement, ParserError> {
-        let method = match self.parser.next_token() {
+        let method = match self.parser.next_token().token {
             Token::Word(w) => w.value.to_ascii_lowercase(),
             other => {
                 return Err(ParserError::ParserError(format!(
@@ -330,23 +330,23 @@ impl<'a> CubeStoreParser<'a> {
                 };
 
                 CacheCommand::Set {
-                    key: self.parser.parse_identifier()?,
+                    key: self.parser.parse_identifier(false)?,
                     value: self.parser.parse_literal_string()?,
                     ttl,
                     nx,
                 }
             }
             "get" => CacheCommand::Get {
-                key: self.parser.parse_identifier()?,
+                key: self.parser.parse_identifier(false)?,
             },
             "keys" => CacheCommand::Keys {
-                prefix: self.parser.parse_identifier()?,
+                prefix: self.parser.parse_identifier(false)?,
             },
             "incr" => CacheCommand::Incr {
-                path: self.parser.parse_identifier()?,
+                path: self.parser.parse_identifier(false)?,
             },
             "remove" => CacheCommand::Remove {
-                key: self.parser.parse_identifier()?,
+                key: self.parser.parse_identifier(false)?,
             },
             "truncate" => CacheCommand::Truncate {},
             other => {
@@ -368,7 +368,7 @@ impl<'a> CubeStoreParser<'a> {
     where
         <R as std::str::FromStr>::Err: std::fmt::Display,
     {
-        let is_negative = match self.parser.peek_token() {
+        let is_negative = match self.parser.peek_token().token {
             Token::Minus => {
                 self.parser.next_token();
                 true
@@ -460,7 +460,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_queue(&mut self) -> Result<Statement, ParserError> {
-        let method = match self.parser.next_token() {
+        let method = match self.parser.next_token().token {
             Token::Word(w) => w.value.to_ascii_lowercase(),
             other => {
                 return Err(ParserError::ParserError(format!(
@@ -487,7 +487,7 @@ impl<'a> CubeStoreParser<'a> {
                 QueueCommand::Add {
                     priority,
                     orphaned,
-                    key: self.parser.parse_identifier()?,
+                    key: self.parser.parse_identifier(false)?,
                     value: self.parser.parse_literal_string()?,
                 }
             }
@@ -518,7 +518,7 @@ impl<'a> CubeStoreParser<'a> {
                 let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);
 
                 QueueCommand::ToCancel {
-                    prefix: self.parser.parse_identifier()?,
+                    prefix: self.parser.parse_identifier(false)?,
                     orphaned_timeout: None,
                     heartbeat_timeout,
                 }
@@ -527,7 +527,7 @@ impl<'a> CubeStoreParser<'a> {
                 let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
 
                 QueueCommand::ToCancel {
-                    prefix: self.parser.parse_identifier()?,
+                    prefix: self.parser.parse_identifier(false)?,
                     heartbeat_timeout: None,
                     orphaned_timeout,
                 }
@@ -537,7 +537,7 @@ impl<'a> CubeStoreParser<'a> {
                 let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
 
                 QueueCommand::ToCancel {
-                    prefix: self.parser.parse_identifier()?,
+                    prefix: self.parser.parse_identifier(false)?,
                     heartbeat_timeout,
                     orphaned_timeout,
                 }
@@ -546,7 +546,7 @@ impl<'a> CubeStoreParser<'a> {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
                 QueueCommand::List {
-                    prefix: self.parser.parse_identifier()?,
+                    prefix: self.parser.parse_identifier(false)?,
                     with_payload,
                     status_filter: Some(QueueItemStatus::Pending),
                     sort_by_priority: true,
@@ -556,7 +556,7 @@ impl<'a> CubeStoreParser<'a> {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
                 QueueCommand::List {
-                    prefix: self.parser.parse_identifier()?,
+                    prefix: self.parser.parse_identifier(false)?,
                     with_payload,
                     status_filter: Some(QueueItemStatus::Active),
                     sort_by_priority: false,
@@ -566,7 +566,7 @@ impl<'a> CubeStoreParser<'a> {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
                 QueueCommand::List {
-                    prefix: self.parser.parse_identifier()?,
+                    prefix: self.parser.parse_identifier(false)?,
                     with_payload,
                     status_filter: None,
                     sort_by_priority: true,
@@ -582,13 +582,13 @@ impl<'a> CubeStoreParser<'a> {
                 };
 
                 QueueCommand::Retrieve {
-                    key: self.parser.parse_identifier()?,
+                    key: self.parser.parse_identifier(false)?,
                     extended,
                     concurrency,
                 }
             }
             "result" => QueueCommand::Result {
-                key: self.parser.parse_identifier()?,
+                key: self.parser.parse_identifier(false)?,
             },
             "result_blocking" => {
                 let timeout = self.parse_integer(&"timeout", false)?;
@@ -636,7 +636,7 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_custom_token(&mut self, token: &str) -> bool {
-        if let Token::Word(w) = self.parser.peek_token() {
+        if let Token::Word(w) = self.parser.peek_token().token {
             if w.value.eq_ignore_ascii_case(token) {
                 self.parser.next_token();
                 true
@@ -650,8 +650,8 @@ impl<'a> CubeStoreParser<'a> {
 
     pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
         // Note that we disable hive extensions as they clash with `location`.
-        let statement = self.parser.parse_create_table_ext(false, false, false)?;
-        if let SQLStatement::CreateTable {
+        let statement = self.parser.parse_create_table(false, false, None, false)?;
+        if let SQLStatement::CreateTable(CreateTable {
             name,
             columns,
             constraints,
@@ -664,13 +664,13 @@ impl<'a> CubeStoreParser<'a> {
             table_properties,
             like,
             ..
-        } = statement
+        }) = statement
         {
             let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
                 self.parser.expect_token(&Token::LParen)?;
                 let res = Some(
                     self.parser
-                        .parse_comma_separated(|p| p.parse_identifier())?,
+                        .parse_comma_separated(|p| p.parse_identifier(false))?,
                 );
                 self.parser.expect_token(&Token::RParen)?;
                 res
@@ -681,9 +681,9 @@ impl<'a> CubeStoreParser<'a> {
             let aggregates = if self.parse_custom_token("aggregations") {
                 self.parser.expect_token(&Token::LParen)?;
                 let res = self.parser.parse_comma_separated(|p| {
-                    let func = p.parse_identifier()?;
+                    let func = p.parse_identifier(true)?;
                     p.expect_token(&Token::LParen)?;
-                    let column = p.parse_identifier()?;
+                    let column = p.parse_identifier(true)?;
                     p.expect_token(&Token::RParen)?;
                     Ok((func, column))
                 })?;
@@ -712,11 +712,11 @@ impl<'a> CubeStoreParser<'a> {
                 Keyword::PARTITIONED,
                 Keyword::INDEX,
             ]) {
-                let name = self.parser.parse_object_name()?;
+                let name = self.parser.parse_object_name(true)?;
                 self.parser.expect_token(&Token::LParen)?;
                 let columns = self
                     .parser
-                    .parse_comma_separated(Parser::parse_identifier)?;
+                    .parse_comma_separated(|t| Parser::parse_identifier(t, true))?;
                 self.parser.expect_token(&Token::RParen)?;
                 Some(PartitionedIndexRef { name, columns })
             } else {
@@ -733,7 +733,7 @@ impl<'a> CubeStoreParser<'a> {
             };
 
             Ok(Statement::CreateTable {
-                create_table: SQLStatement::CreateTable {
+                create_table: SQLStatement::CreateTable(CreateTable {
                     or_replace,
                     name,
                     columns,
@@ -743,6 +743,7 @@ impl<'a> CubeStoreParser<'a> {
                     table_properties,
                     with_options,
                     if_not_exists,
+                    transient: false,
                     external: locations.is_some(),
                     file_format,
                     location: None,
@@ -750,7 +751,32 @@ impl<'a> CubeStoreParser<'a> {
                     without_rowid,
                     temporary: false,
                     like,
-                },
+                    clone: None,
+                    engine: None,
+                    comment: None,
+                    auto_increment_offset: None,
+                    default_charset: None,
+                    collation: None,
+                    on_commit: None,
+                    on_cluster: None,
+                    primary_key: None,
+                    order_by: None,
+                    partition_by: None,
+                    cluster_by: None,
+                    options: None,
+                    strict: false,
+                    copy_grants: false,
+                    enable_schema_evolution: None,
+                    change_tracking: None,
+                    data_retention_time_in_days: None,
+                    max_data_extension_time_in_days: None,
+                    default_ddl_collation: None,
+                    with_aggregation_policy: None,
+                    with_row_access_policy: None,
+                    global: None,
+                    volatile: false,
+                    with_tags: None,
+                }),
                 indexes,
                 aggregates,
                 partitioned_index,
@@ -767,27 +793,32 @@ impl<'a> CubeStoreParser<'a> {
         table_name: ObjectName,
         is_aggregate: bool,
     ) -> Result<SQLStatement, ParserError> {
-        let index_name = self.parser.parse_object_name()?;
+        let index_name = self.parser.parse_object_name(true)?;
         self.parser.expect_token(&Token::LParen)?;
         let columns = self
             .parser
             .parse_comma_separated(Parser::parse_order_by_expr)?;
         self.parser.expect_token(&Token::RParen)?;
         //TODO I use unique flag for aggregate index for reusing CreateIndex struct. When adding another type of index, we will need to parse it into a custom structure
-        Ok(SQLStatement::CreateIndex {
-            name: index_name,
+        Ok(SQLStatement::CreateIndex(CreateIndex {
+            name: Some(index_name),
             table_name,
+            using: None,
             columns,
             unique: is_aggregate,
+            concurrently: false,
             if_not_exists: false,
-        })
+            include: vec![],
+            nulls_distinct: None,
+            predicate: None,
+        }))
     }
 
     fn parse_create_schema(&mut self) -> Result<Statement, ParserError> {
         let if_not_exists =
             self.parser
                 .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
-        let schema_name = self.parser.parse_object_name()?;
+        let schema_name = self.parser.parse_object_name(false)?;
         Ok(Statement::CreateSchema {
             schema_name,
             if_not_exists,
@@ -796,7 +827,7 @@ impl<'a> CubeStoreParser<'a> {
 
     fn parse_create_source(&mut self) -> Result<Statement, ParserError> {
         let or_update = self.parser.parse_keywords(&[Keyword::OR, Keyword::UPDATE]);
-        let name = self.parser.parse_identifier()?;
+        let name = self.parser.parse_identifier(false)?;
         self.parser.expect_keyword(Keyword::AS)?;
         let source_type = self.parser.parse_literal_string()?;
         let credentials = self.parser.parse_options(Keyword::VALUES)?;
@@ -850,9 +881,9 @@ mod tests {
                 assert_eq!(indexes.len(), 3);
 
                 let ind = &indexes[0];
-                if let SQLStatement::CreateIndex {
+                if let SQLStatement::CreateIndex(CreateIndex {
                     columns, unique, ..
-                } = ind
+                }) = ind
                 {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &false);
@@ -861,9 +892,9 @@ mod tests {
                 }
 
                 let ind = &indexes[1];
-                if let SQLStatement::CreateIndex {
+                if let SQLStatement::CreateIndex(CreateIndex {
                     columns, unique, ..
-                } = ind
+                }) = ind
                 {
                     assert_eq!(columns.len(), 2);
                     assert_eq!(unique, &true);

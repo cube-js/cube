@@ -6,10 +6,12 @@ mod traffic_sender;
 mod buffered_stream;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::cube_ext::ordfloat::OrdF64;
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointer, SeqPointerForLocation};
 use crate::metastore::source::SourceCredentials;
 use crate::metastore::table::{StreamOffset, Table};
 use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
@@ -22,8 +24,7 @@ use buffered_stream::BufferedStream;
 use chrono::Utc;
 use datafusion::arrow::array::ArrayBuilder;
 use datafusion::arrow::array::ArrayRef;
-use datafusion::cube_ext::ordfloat::OrdF64;
-use datafusion::physical_plan::parquet::MetadataCacheFactory;
+use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use futures::future::join_all;
 use futures::stream::StreamExt;
 use futures::Stream;
@@ -170,7 +171,7 @@ impl StreamingServiceImpl {
                 *use_ssl,
                 trace_obj,
                 self.metadata_cache_factory.clone(),
-            )?)),
+            ).await?)),
         }
     }
 
@@ -595,6 +596,7 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
         ColumnType::Decimal { scale, .. } => match value {
             JsonValue::Number(v) => Ok(TableValue::Decimal(Decimal::new(
                 v.as_fixed_point_i64(*scale as u16)
+                    .map(|v| v as i128)
                     .ok_or(CubeError::user(format!("Can't convert {:?} to decimal", v)))?,
             ))),
             JsonValue::Null => Ok(TableValue::Null),
@@ -973,7 +975,7 @@ mod tests {
             let dialect = &MySqlDialectWithBackTicks {};
             let mut tokenizer = Tokenizer::new(dialect, query.sql.as_str());
             let tokens = tokenizer.tokenize().unwrap();
-            let statement = Parser::new(tokens, dialect).parse_statement()?;
+            let statement = Parser::new(dialect).with_tokens(tokens).parse_statement()?;
 
             fn find_filter(expr: &Expr, col: &str, binary_op: &BinaryOperator) -> Option<String> {
                 match expr {
@@ -1020,8 +1022,8 @@ mod tests {
             let mut partition = None;
             let mut offset = 0;
             if let Statement::Query(q) = statement {
-                if let SetExpr::Select(s) = q.body {
-                    if let Some(s) = s.selection {
+                if let SetExpr::Select(s) = q.body.as_ref() {
+                    if let Some(s) = &s.selection {
                         if let Some(p) = find_filter(&s, "ROWPARTITION", &BinaryOperator::Eq) {
                             partition = Some(p.parse::<u64>().unwrap());
                         }
