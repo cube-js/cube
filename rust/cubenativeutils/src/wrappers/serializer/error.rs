@@ -1,6 +1,5 @@
 use serde::{de, ser};
-use std::fmt;
-use std::fmt::Display;
+use std::{fmt, fmt::Display};
 #[derive(Debug)]
 pub enum NativeObjSerializerError {
     Message(String),
