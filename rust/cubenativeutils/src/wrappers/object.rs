@@ -1,5 +1,4 @@
-use super::inner_types::InnerTypes;
-use super::object_handle::NativeObjectHandle;
+use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
 use cubesql::CubeError;
 
 pub trait NativeObject<IT: InnerTypes>: Clone {

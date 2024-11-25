@@ -1,5 +1,4 @@
-use super::inner_types::InnerTypes;
-use super::object::NativeObject;
+use super::{inner_types::InnerTypes, object::NativeObject};
 use cubesql::CubeError;
 
 #[derive(Clone)]
