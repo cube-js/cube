@@ -3144,14 +3144,14 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, SUM(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
-           \n    ClusterSend, partitions: [[1, 2]]"
+           \n    ClusterSend, partitions: [[1, 2]], sort_order: [1]"
     );
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
         "Projection, [url, SUM(Data.hits)@1:hits]\
            \n  AggregateTopK, limit: 10, sortBy: [2 desc null last]\
-           \n    Worker\
-           \n      Sort, by: [SUM(hits)@1 desc nulls last]\
+           \n    Worker, sort_order: [1]\
+           \n      Sort, by: [SUM(hits)@1 desc nulls last], sort_order: [1]\
            \n        FullInplaceAggregate, sort_order: [0]\
            \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2]\
            \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2]\
