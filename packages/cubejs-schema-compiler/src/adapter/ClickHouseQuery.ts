@@ -73,10 +73,10 @@ export class ClickHouseQuery extends BaseQuery {
 
     return `date_add(${timeUnit},
         FLOOR(
-          date_diff(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          date_diff(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
           date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted})
         ) * date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted}),
-        ${this.timeStampCast(`'${origin}'`)}
+        ${this.dateTimeCast(`'${origin}'`)}
     )`;
   }
 

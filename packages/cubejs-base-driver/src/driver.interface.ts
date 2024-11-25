@@ -2,9 +2,7 @@
 export type GenericDataBaseType = string;
 
 export interface TableColumn {
-  // eslint-disable-next-line camelcase
   name: string;
-  // eslint-disable-next-line camelcase
   type: GenericDataBaseType;
   attributes?: string[]
 }

@@ -191,7 +191,7 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -265,7 +265,7 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -305,7 +305,7 @@ jobs:
           overwrite: true
 
   docker-default:
-    needs: [npm, cubestore_linux, native_linux]
+    needs: [npm, cubestore_linux, native_linux, detect_branch]
     name: Debian docker image
     runs-on: ${{ matrix.os }}
     strategy:
@@ -345,7 +345,11 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR}"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:latest"
           fi
 
           {
@@ -381,15 +385,11 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
-          # Workaround for yarn v1, it uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-          config-inline: |
-            [worker.oci]
-              max-parallelism = 1
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-debian-jdk:
-    needs: [npm, cubestore_linux, native_linux]
+    needs: [npm, cubestore_linux, native_linux, detect_branch]
     name: Debian with jdk docker image
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -424,9 +424,13 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-jdk,${DOCKER_IMAGE}:${MAJOR}-jdk,${DOCKER_IMAGE}:jdk"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-jdk,${DOCKER_IMAGE}:${MAJOR}-jdk"
           elif [ "${{ github.event_name }}" = "push" ]; then
             TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-jdk"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:jdk"
           fi
 
           {
@@ -468,6 +472,7 @@ jobs:
   docker-cubestore:
     name: Cube Store Docker
     runs-on: ${{ matrix.os }}
+    needs: [detect_branch]
     strategy:
       fail-fast: false
       matrix:
@@ -525,7 +530,11 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${{ matrix.tag }}"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }}"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:${{ matrix.tag }}"
           fi
 
           {
@@ -657,6 +666,7 @@ jobs:
         target:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
+          - aarch64-apple-darwin
         include:
           - target: x86_64-pc-windows-msvc
             os: windows-2019
@@ -664,10 +674,18 @@ jobs:
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
-            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
             tar_executable: tar
+            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
           - target: x86_64-apple-darwin
             os: macos-12
+            executable_name: cubestored
+            # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
+            strip: false
+            compress: false
+            # bsd tar has a different format with Sparse files which breaks download script
+            tar_executable: gtar
+          - os: macos-14
+            target: aarch64-apple-darwin
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
@@ -748,7 +766,7 @@ jobs:
     name: Trigger test suites run
     runs-on: ubuntu-20.04
     needs: [docker-default]
-    timeout-minutes: 60
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -757,12 +775,61 @@ jobs:
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
+            const prUrl = context.payload.pull_request ? context.payload.pull_request.html_url : '';
+            const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
+
             await github.rest.actions.createWorkflowDispatch({
               owner: 'cubedevinc',
               repo: 'sql-api-test-suite',
               workflow_id: 'test_and_run_test_suites.yml',
               ref: 'main',
               inputs: {
-                'cube-image': 'cubejs/cube:latest'
+                'cube-image': 'cubejs/cube:latest',
+                'source-repo': context.repo.repo,
+                'source-pr-url': prUrl,
+                'source-commit-url': commitUrl,
+                'initiator': '${{ github.actor }}'
+              }
+            })
+
+  detect_branch:
+    runs-on: ubuntu-24.04
+    outputs:
+      is_master: ${{ steps.detect_branch.outputs.is_master }}
+      branch: ${{ steps.detect_branch.outputs.branch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Detect branch name
+        id: detect_branch
+        run: |
+          # Git & GitHub (for now) doesn't provide an easy/stable way to detect branch name from tag.
+          echo "branch=master" >> "$GITHUB_OUTPUT"
+          echo "is_master=true" >> "$GITHUB_OUTPUT"
+
+  trigger-repo-sync:
+    name: Trigger runtime repo
+    runs-on: ubuntu-20.04
+    needs: [docker-default, detect_branch]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Trigger runtime
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
+          script: |
+            const tagName = process.env.GITHUB_REF.replace('refs/tags/', '');
+            const branchName = '${{ needs['detect_branch'].outputs.branch }}';
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'cubedevinc',
+              repo: 'cube-runtime',
+              workflow_id: 'sync.yml',
+              ref: 'master',
+              inputs: {
+                'tag': tagName,
+                'branch': branchName,
               }
             })

@@ -75,6 +75,10 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return 'postgres';
   },
 
+  async applyRowLevelSecurity(query: any) {
+    return query;
+  },
+
   async metaConfig() {
     return [
       {
@@ -97,6 +101,18 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
             {
               name: 'Foo.time',
               isVisible: true,
+            },
+            {
+              name: 'Foo.timeGranularities',
+              isVisible: true,
+              granularities: [
+                {
+                  name: 'half_year_by_1st_april',
+                  title: 'Half Year By1 St April',
+                  interval: '6 months',
+                  offset: '3 months'
+                }
+              ]
             },
           ],
           segments: [

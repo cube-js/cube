@@ -29,19 +29,21 @@ mod wrapper_pull_up;
 
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis,
-        fun_expr, rewrite,
-        rewriter::RewriteRules,
+        fun_expr,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::{
             replacer_flat_pull_up_node, replacer_flat_push_down_node, replacer_pull_up_node,
             replacer_push_down_node,
         },
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType, LogicalPlanLanguage,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
+        WrapperPullupReplacerPushToCube, WrapperPushdownReplacerPushToCube,
     },
     config::ConfigObj,
+    copy_flag,
     transport::MetaContext,
+    var,
 };
-use egg::Rewrite;
+use egg::Subst;
 use std::{fmt::Display, sync::Arc};
 
 pub struct WrapperRules {
@@ -50,13 +52,14 @@ pub struct WrapperRules {
 }
 
 impl RewriteRules for WrapperRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = Vec::new();
 
         self.cube_scan_wrapper_rules(&mut rules);
         self.wrapper_pull_up_rules(&mut rules);
         self.aggregate_rules(&mut rules);
         self.aggregate_rules_subquery(&mut rules);
+        self.aggregate_merge_rules(&mut rules);
         self.projection_rules(&mut rules);
         self.projection_rules_subquery(&mut rules);
         self.limit_rules(&mut rules);
@@ -102,7 +105,7 @@ impl WrapperRules {
     }
 
     fn list_pushdown_pullup_rules(
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
         rule_name: &str,
         list_node: &str,
         substitute_list_node: &str,
@@ -114,7 +117,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
@@ -130,34 +133,56 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
             },
         ));
 
-        rules.extend(vec![rewrite(
+        rules.extend(vec![transforming_rewrite(
             &format!("{}-tail", rule_name),
             wrapper_pushdown_replacer(
                 list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
             wrapper_pullup_replacer(
                 substitute_list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?pullup_push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
+            Self::transform_list_tail("?push_to_cube", "?pullup_push_to_cube"),
         )]);
     }
 
+    fn transform_list_tail(
+        push_to_cube_var: &str,
+        pullup_push_to_cube_var: &str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+            true
+        }
+    }
+
     fn flat_list_pushdown_pullup_rules(
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
         rule_name: &str,
         list_type: ListType,
         substitute_list_type: ListType,
@@ -169,7 +194,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
@@ -185,40 +210,62 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
             },
             &[
                 "?alias_to_cube",
-                "?ungrouped",
+                "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ],
         ));
 
-        rules.extend(vec![rewrite(
+        rules.extend(vec![transforming_rewrite(
             &format!("{}-tail", rule_name),
             wrapper_pushdown_replacer(
                 list_type.empty_list(),
                 "?alias_to_cube",
-                "?ungrouped",
+                "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
             wrapper_pullup_replacer(
                 substitute_list_type.empty_list(),
                 "?alias_to_cube",
-                "?ungrouped",
+                "?pullup_push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
+            Self::transform_flat_list_tail("?push_to_cube", "?pullup_push_to_cube"),
         )]);
     }
 
+    fn transform_flat_list_tail(
+        push_to_cube_var: &str,
+        pullup_push_to_cube_var: &str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+            true
+        }
+    }
+
     fn expr_list_pushdown_pullup_rules(
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
         rule_name: &str,
         list_node: &str,
     ) {
@@ -229,7 +276,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
@@ -245,29 +292,51 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
             },
         ));
 
-        rules.extend(vec![rewrite(
+        rules.extend(vec![transforming_rewrite(
             rule_name,
             wrapper_pushdown_replacer(
                 list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
             wrapper_pullup_replacer(
                 list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?pullup_push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
+            Self::transform_expr_list_tail("?push_to_cube", "?pullup_push_to_cube"),
         )]);
+    }
+
+    fn transform_expr_list_tail(
+        push_to_cube_var: &str,
+        pullup_push_to_cube_var: &str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+            true
+        }
     }
 }

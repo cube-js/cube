@@ -2,7 +2,7 @@ use std::{env::set_var, sync::Arc, time::Duration};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
+use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaType};
 use cubesql::{
     compile::test::{
         rewrite_engine::{
@@ -11,7 +11,7 @@ use cubesql::{
         },
         sql_generator,
     },
-    transport::MetaContext,
+    transport::{CubeMetaDimension, MetaContext},
 };
 use egg::StopReason;
 use itertools::Itertools;
@@ -72,31 +72,35 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
         name: cube_name.clone(),
         description: None,
         title: None,
+        r#type: V1CubeMetaType::Cube,
         measures: vec![
             V1CubeMetaMeasure {
                 name: format!("{}.count", cube_name),
                 title: None,
                 description: None,
-                _type: "number".to_string(),
+                r#type: "number".to_string(),
                 agg_type: Some("count".to_string()),
+                meta: None,
             },
             V1CubeMetaMeasure {
                 name: format!("{}.sum", cube_name),
                 title: None,
                 description: None,
-                _type: "number".to_string(),
+                r#type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
+                meta: None,
             },
         ],
         dimensions: (1..=dims)
             .map(|n| V1CubeMetaDimension {
                 name: format!("{}.n{}", cube_name, n),
-                description: None,
-                _type: "number".to_string(),
+                r#type: "number".to_string(),
+                ..CubeMetaDimension::default()
             })
             .collect(),
         segments: vec![],
         joins: None,
+        meta: None,
     }]
 }
 

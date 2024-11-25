@@ -1,18 +1,17 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, cast_expr, rewrite, rules::wrapper::WrapperRules,
-    wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
+    cast_expr, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules,
+    wrapper_pullup_replacer, wrapper_pushdown_replacer,
 };
-use egg::Rewrite;
 
 impl WrapperRules {
-    pub fn cast_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn cast_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-cast",
                 wrapper_pushdown_replacer(
                     cast_expr("?expr", "?data_type"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -20,7 +19,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -33,7 +32,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -42,7 +41,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     cast_expr("?expr", "?data_type"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),

@@ -65,6 +65,7 @@
     {
       "name": "ECommerce",
       "extends": "Products",
+      "sqlAlias": "ec",
       "joins": [
         {
           "name": "Customers",
@@ -361,7 +362,7 @@
           "name": "totalProfitYearAgo",
           "type": "number",
           "sql": "{totalProfit}",
-          "post_aggregate": true,
+          "multi_stage": true,
           "time_shift": [{
             "time_dimension": "orderDate",
             "interval": "366 day",
@@ -372,14 +373,14 @@
           "name": "totalProfitForStatus",
           "type": "sum",
           "sql": "{totalProfit}",
-          "post_aggregate": true,
+          "multi_stage": true,
           "reduce_by": ["category"]
         },
         {
           "name": "percentageOfTotalForStatus",
           "type": "number",
           "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0))",
-          "post_aggregate": true
+          "multi_stage": true
         },
         {
           "name": "hiddenSum",

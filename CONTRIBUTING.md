@@ -34,7 +34,7 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 
 ### Prerequisites
 
-Cube works with Node.js 10+ and uses Yarn as a package manager.
+Cube works with Node.js 20+ and uses Yarn as a package manager.
 
 ### Cube Docker
 

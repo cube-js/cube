@@ -32,12 +32,8 @@ async fn test_change_user_via_filter() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -63,12 +59,8 @@ async fn test_change_user_via_in_filter() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -87,12 +79,8 @@ async fn test_change_user_via_in_filter_thoughtspot() {
         measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
         segments: Some(vec![]),
         dimensions: Some(vec![]),
-        time_dimensions: None,
         order: Some(vec![]),
-        limit: None,
-        offset: None,
-        filters: None,
-        ungrouped: None,
+        ..Default::default()
     };
 
     let cube_scan = query_plan.as_logical_plan().find_cube_scan();
@@ -108,6 +96,32 @@ async fn test_change_user_via_in_filter_thoughtspot() {
     let cube_scan = query_plan.as_logical_plan().find_cube_scan();
     assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
     assert_eq!(cube_scan.request, expected_request);
+}
+
+#[tokio::test]
+async fn test_change_user_via_filter_powerbi() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE NOT __user IS NULL AND __user = 'gopher'".to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+    assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+    assert_eq!(
+        cube_scan.request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    )
 }
 
 #[tokio::test]
@@ -128,10 +142,7 @@ async fn test_change_user_via_filter_and() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
             filters: Some(vec![V1LoadRequestQueryFilterItem {
                 member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                 operator: Some("equals".to_string()),
@@ -139,7 +150,7 @@ async fn test_change_user_via_filter_and() {
                 or: None,
                 and: None,
             }]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -180,16 +191,50 @@ async fn test_user_with_join() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
             dimensions: Some(vec![]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
             ungrouped: Some(true),
+            ..Default::default()
         }
     );
 
     assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
+}
+
+#[tokio::test]
+async fn test_change_user_via_filter_with_alias() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        SELECT "k"."cnt" AS "cnt"
+        FROM (
+            SELECT
+                COUNT(*) AS "cnt",
+                "__user" AS "user"
+            FROM "KibanaSampleDataEcommerce"
+            GROUP BY 2
+        ) AS "k"
+        WHERE "k"."user" = 'gopher'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+    assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+    assert_eq!(
+        cube_scan.request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    )
 }
 
 /// This should test that query with CubeScanWrapper uses proper change_user for both SQL generation and execution calls
@@ -226,6 +271,6 @@ GROUP BY 1
     let sql_query = load_calls[0].sql_query.as_ref().unwrap();
     // This should be placed from load meta to query by TestConnectionTransport::sql
     // It would mean that SQL generation used changed user
-    assert!(sql_query.sql.contains(r#""changeUser":"gopher""#));
+    assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
 }

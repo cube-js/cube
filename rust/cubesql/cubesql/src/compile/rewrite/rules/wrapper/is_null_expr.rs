@@ -1,32 +1,31 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, is_not_null_expr, is_null_expr, rewrite,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        is_not_null_expr, is_null_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn is_null_expr_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn is_null_expr_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-is-null-expr",
                 wrapper_pushdown_replacer(
                     is_null_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 is_null_expr(wrapper_pushdown_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),
@@ -36,14 +35,14 @@ impl WrapperRules {
                 is_null_expr(wrapper_pullup_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),
                 wrapper_pullup_replacer(
                     is_null_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -54,14 +53,14 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     is_not_null_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 is_not_null_expr(wrapper_pushdown_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),
@@ -71,14 +70,14 @@ impl WrapperRules {
                 is_not_null_expr(wrapper_pullup_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),
                 wrapper_pullup_replacer(
                     is_not_null_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -90,7 +89,7 @@ impl WrapperRules {
     fn transform_is_null_expr(
         &self,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {

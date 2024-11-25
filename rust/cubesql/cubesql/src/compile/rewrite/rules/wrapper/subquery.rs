@@ -1,21 +1,21 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, empty_relation,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, EmptyRelationDerivedSourceTableName, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        cube_scan_wrapper, empty_relation,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        EmptyRelationDerivedSourceTableName, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerPushToCube, WrapperPushdownReplacerPushToCube,
     },
+    copy_flag,
     transport::MetaContext,
     var, var_iter, var_list_iter,
 };
-use egg::{EGraph, Rewrite, Subst, Var};
+use egg::{Subst, Var};
 use std::sync::Arc;
 
 impl WrapperRules {
-    pub fn subquery_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn subquery_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-subqueries-wrapped-scan-to-pull",
@@ -24,25 +24,29 @@ impl WrapperRules {
                         wrapper_pullup_replacer(
                             "?cube_scan_input",
                             "?inner_alias_to_cube",
-                            "?nner_ungrouped",
+                            "?nner_push_to_cube",
                             "?inner_in_projection",
                             "?inner_cube_members",
                         ),
                         "CubeScanWrapperFinalized:false",
                     ),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     "?cube_scan_input",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
-                self.transform_check_subquery_wrapped("?cube_scan_input"),
+                self.transform_check_subquery_wrapped(
+                    "?cube_scan_input",
+                    "?push_to_cube",
+                    "?pullup_push_to_cube",
+                ),
             ),
             transforming_rewrite(
                 "wrapper-subqueries-wrap-empty-rel",
@@ -59,7 +63,7 @@ impl WrapperRules {
                             "EmptyRelationIsWrappable:true",
                         ),
                         "?alias_to_cube",
-                        "WrapperPullupReplacerUngrouped:false",
+                        "WrapperPullupReplacerPushToCube:false",
                         "WrapperPullupReplacerInProjection:true",
                         "CubeScanMembers",
                     ),
@@ -79,7 +83,7 @@ impl WrapperRules {
         &self,
         source_table_name_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let source_table_name_var = var!(source_table_name_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta_context = self.meta_context.clone();
@@ -113,7 +117,7 @@ impl WrapperRules {
     }
 
     pub fn transform_check_subquery_allowed(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &mut Subst,
         meta: Arc<MetaContext>,
         alias_to_cube_var: Var,
@@ -140,9 +144,24 @@ impl WrapperRules {
     fn transform_check_subquery_wrapped(
         &self,
         cube_scan_input_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        push_to_cube_var: &'static str,
+        pullup_push_to_cube_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_scan_input_var = var!(cube_scan_input_var);
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
         move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+
             for _ in var_list_iter!(egraph[subst[cube_scan_input_var]], WrappedSelect).cloned() {
                 return true;
             }

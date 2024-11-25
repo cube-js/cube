@@ -1,7 +1,12 @@
-import { ChartType, TimeDimensionGranularity } from '@cubejs-client/core';
+import {
+  ChartType,
+  TimeDimensionGranularity,
+  granularityFor,
+  minGranularityForIntervals,
+  isPredefinedGranularity,
+} from '@cubejs-client/core';
 import { UseCubeQueryResult } from '@cubejs-client/react';
 import { Skeleton, Tag, tasty } from '@cube-dev/ui-kit';
-import formatDate from 'date-fns/format';
 import { ComponentType, memo, useCallback, useMemo } from 'react';
 import { Col, Row, Statistic, Table } from 'antd';
 import {
@@ -28,27 +33,9 @@ import {
   getChartColorByIndex,
   getChartSolidColorByIndex,
 } from '../utils/chart-colors';
+import { formatDateByGranularity, formatDateByPattern } from '../utils/index';
 
 import { LocalError } from './LocalError';
-
-const FORMAT_MAP = {
-  second: 'HH:mm:ss, yyyy-LL-dd',
-  minute: 'HH:mm, yyyy-LL-dd',
-  hour: 'HH:00, yyyy-LL-dd',
-  day: 'yyyy-LL-dd',
-  week: "'W'w yyyy-LL-dd",
-  month: 'LLL yyyy',
-  quarter: 'QQQ yyyy',
-  year: 'yyyy',
-};
-
-export function formatDateByGranularity(timestamp: Date, granularity?: TimeDimensionGranularity) {
-  return formatDate(timestamp, FORMAT_MAP[granularity ?? 'second']);
-}
-
-export function formatDateByPattern(timestamp: Date, format?: string) {
-  return formatDate(timestamp, format ?? FORMAT_MAP['second']);
-}
 
 function CustomDot(props: any) {
   const { cx, cy, fill } = props;
@@ -113,7 +100,18 @@ function CartesianChart({
       return (key as string).split('.').length === 3;
     }
   ) as string;
-  const granularity = granularityField?.split('.')[2];
+  let granularity = granularityField?.split('.')[2];
+
+  if (!isPredefinedGranularity(granularity)) {
+    const granularityInfo =
+      resultSet?.loadResponse.results[0]?.annotation.timeDimensions[granularityField]?.granularity;
+    if (granularityInfo) {
+      granularity = minGranularityForIntervals(
+        granularityInfo.interval,
+        granularityInfo.offset || granularityFor(granularityInfo.origin)
+      );
+    }
+  }
 
   const formatDate = useMemo(() => {
     if (dateFormat) {
@@ -421,7 +419,7 @@ const TypeToChartComponent = {
     });
 
     columnData.forEach((field: any, i: number) => {
-      if (field.key) {
+      if (field.key && typeof field.key === 'string') {
         granularityMap[field.key] = field.key.split('.')[2];
       } else {
         field.key = `key${i}`; // fallback index

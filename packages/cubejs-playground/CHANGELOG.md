@@ -3,6 +3,87 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.6](https://github.com/cube-js/cube/compare/v1.1.5...v1.1.6) (2024-11-17)
+
+
+### Bug Fixes
+
+* **playground:** fix version check for yaml model generation ([#8944](https://github.com/cube-js/cube/issues/8944)) ([ab8ad2b](https://github.com/cube-js/cube/commit/ab8ad2bb0be886934f21c3ddd3be7a370b192a45))
+
+
+
+
+
+## [1.1.3](https://github.com/cube-js/cube/compare/v1.1.2...v1.1.3) (2024-11-08)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [1.1.2](https://github.com/cube-js/cube/compare/v1.1.1...v1.1.2) (2024-11-01)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [1.1.1](https://github.com/cube-js/cube/compare/v1.1.0...v1.1.1) (2024-10-31)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** add missing fonts ([#8866](https://github.com/cube-js/cube/issues/8866)) ([a621b70](https://github.com/cube-js/cube/commit/a621b700b3764e82d54658f5910557ba8347ba0a))
+
+
+
+
+
+## [1.0.2](https://github.com/cube-js/cube/compare/v1.0.1...v1.0.2) (2024-10-21)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** update query builder ([#8827](https://github.com/cube-js/cube/issues/8827)) ([5965e59](https://github.com/cube-js/cube/commit/5965e596e6016b0b11bf4d3ed463b1a8ac2a370f))
+
+
+
+
+
+# [1.0.0](https://github.com/cube-js/cube/compare/v0.36.11...v1.0.0) (2024-10-15)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.36.8](https://github.com/cube-js/cube/compare/v0.36.7...v0.36.8) (2024-10-11)
+
+
+### Bug Fixes
+
+* **playground:** fix not showing granularities for time dimension ([#8794](https://github.com/cube-js/cube/issues/8794)) ([d77a512](https://github.com/cube-js/cube/commit/d77a512bdfef533d56a125ffbcab9f7fdb8483ad))
+
+
+### Features
+
+* **playground:** custom granularities support ([#8743](https://github.com/cube-js/cube/issues/8743)) ([336fad4](https://github.com/cube-js/cube/commit/336fad4bab02ca014b08b14547a285587ad138f3))
+
+
+
+
+
+## [0.36.4](https://github.com/cube-js/cube/compare/v0.36.3...v0.36.4) (2024-09-27)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
 ## [0.36.2](https://github.com/cube-js/cube/compare/v0.36.1...v0.36.2) (2024-09-18)
 
 

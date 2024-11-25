@@ -71,7 +71,7 @@ export class CubeStoreQuery extends BaseQuery {
    * intervals relative to origin timestamp point.
    */
   public dateBin(interval: string, source: string, origin: string): string {
-    return `DATE_BIN(INTERVAL ${this.formatInterval(interval)}, ${this.timeStampCast(source)}, ${this.timeStampCast(`'${origin}'`)})`;
+    return `DATE_BIN(INTERVAL ${this.formatInterval(interval)}, ${this.dateTimeCast(source)}, ${this.dateTimeCast(`'${origin}'`)})`;
   }
 
   /**
@@ -112,10 +112,14 @@ export class CubeStoreQuery extends BaseQuery {
       return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
     } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 4) {
       return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
+    } else if (intervalParsed.hour && intKeys === 1) {
+      return `'${intervalParsed.hour} HOUR'`;
     } else if (intervalParsed.hour && intervalParsed.minute && intKeys === 2) {
       return `'${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
     } else if (intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 3) {
       return `'${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
+    } else if (intervalParsed.minute && intKeys === 1) {
+      return `'${intervalParsed.minute} MINUTE'`;
     } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
       return `'${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
     }

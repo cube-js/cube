@@ -405,7 +405,11 @@ export function QueryBuilderExtras() {
                   ) : null
                 }
                 selectedKey={timezone}
-                onSelectionChange={(val: Key) => {
+                onSelectionChange={(val: Key | null) => {
+                  if (!val) {
+                    return;
+                  }
+
                   const timezone = val as string;
 
                   updateQuery(() => ({

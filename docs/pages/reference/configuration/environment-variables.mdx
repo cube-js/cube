@@ -985,7 +985,7 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                | `false`               |
+| `true`, `false` | `true`                | `true`               |
 
 <InfoBox>
 
@@ -994,6 +994,14 @@ Query pushdown in the SQL API is available in public preview.
 
 </InfoBox>
 
+## `CUBESQL_STREAM_MODE`
+
+If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][ref-sql-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
 
 If `true`, prevents adding implicit [default `ORDER BY`
@@ -1001,7 +1009,17 @@ clause](/product/apis-integrations/queries#order) for [SQL API][ref-sql-api] que
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `true`                | `true`               |
+| `true`, `false` | `true`                 | `true`                |
+
+## `CUBEJS_MAX_SESSIONS`
+
+Specifies the maximum number of concurrent sessions (connections) to the
+[SQL API][ref-sql-api] and safeguards your Cube deployment from out-of-memory
+crashes when too many connections are attempted to be established.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 1024                   | 1024                  |
 
 ## `CUBESQL_REWRITE_MAX_NODES`
 
@@ -1136,12 +1154,12 @@ unique on each node and different from `CUBESTORE_REMOTE_DIR`.
 
 ## `CUBESTORE_GCP_CREDENTIALS`
 
-A Base64-encoded JSON key file for connecting to Google Cloud. Required when
+A Base64-encoded JSON key for connecting to Google Cloud. Required when
 using Google Cloud Storage
 
-| Possible Values                                                                         | Default in Development | Default in Production |
-| --------------------------------------------------------------------------------------- | ---------------------- | --------------------- |
-| [A valid Google BigQuery JSON key file encoded as a Base64 string][gcp-docs-creds-json] | N/A                    | N/A                   |
+| Possible Values                                                                 | Default in Development | Default in Production |
+| ------------------------------------------------------------------------------- | ---------------------- | --------------------- |
+| [A valid Google Cloud JSON key encoded as a Base64 string][gcp-docs-creds-json] | N/A                    | N/A                   |
 
 ## `CUBESTORE_GCP_KEY_FILE`
 
@@ -1466,4 +1484,5 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.snowflake.com/en/user-guide/warehouses.html
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming
 [ref-row-limit]: /product/apis-integrations/queries#row-limit

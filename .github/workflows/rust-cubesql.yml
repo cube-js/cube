@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubesqlplanner/**'
       - 'rust/cubesql/**'
     branches:
       - 'master'
@@ -12,6 +14,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubesqlplanner/**'
       - 'rust/cubesql/**'
 
 jobs:
@@ -43,22 +47,26 @@ jobs:
         run: cd rust/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
-      # TODO replace with clippy once cubesql is ready
-      - name: Check CubeSQL
-        run: cd rust/cubesql && cargo check --locked --workspace --all-targets --keep-going
+      - name: Lint cubenativeutils
+        run: cd rust/cubenativeutils && cargo fmt --all -- --check
+      - name: Lint cubesqlplanner
+        run: cd rust/cubesqlplanner && cargo fmt --all -- --check
+      - name: Clippy CubeSQL
+        run: cd rust/cubesql && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going --features python -- -D warnings
-      # CubeSQL is not ready for Clippy
-      #- name: Clippy CubeSQL
-      #  run: cd rust/cubesql && cargo clippy -- -D warnings
 
   unit:
     #  We use host instead of cross container, because it's much faster
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    name: Unit (Rewrite Engine)
+    name: Unit (Rewrite Engine) (CUBESQL_TOP_DOWN_EXTRACTOR=${{ matrix.top-down-extractor }})
+    strategy:
+      matrix:
+        top-down-extractor: ['true', 'false']
+      fail-fast: false
 
     steps:
       - name: Checkout
@@ -86,6 +94,7 @@ jobs:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
           CUBESQL_SQL_PUSH_DOWN: true
+          CUBESQL_TOP_DOWN_EXTRACTOR: ${{ matrix.top-down-extractor }}
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
         run: |
@@ -241,7 +250,7 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -323,7 +332,7 @@ jobs:
           rustflags: ""
           components: rustfmt
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}

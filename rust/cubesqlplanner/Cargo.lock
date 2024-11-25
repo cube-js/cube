@@ -461,7 +461,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29c39203181991a7dd4343b8005bd804e7a9a37afb8ac070e43771e8c820bbde"
 dependencies = [
  "chrono",
- "chrono-tz-build",
+ "chrono-tz-build 0.0.3",
+ "phf",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d59ae0466b83e838b81a54256c39d5d7c20b9d7daa10510a242d9b75abd5936e"
+dependencies = [
+ "chrono",
+ "chrono-tz-build 0.2.1",
  "phf",
 ]
 
@@ -470,6 +481,17 @@ name = "chrono-tz-build"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f509c3a87b33437b05e2458750a0700e5bdd6956176773e6c7d6dd15a283a0c"
+dependencies = [
+ "parse-zoneinfo",
+ "phf",
+ "phf_codegen",
+]
+
+[[package]]
+name = "chrono-tz-build"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
 dependencies = [
  "parse-zoneinfo",
  "phf",
@@ -672,18 +694,13 @@ dependencies = [
  "async-trait",
  "convert_case",
  "cubesql",
- "findshlibs",
- "futures",
- "libc",
+ "lazy_static",
  "log",
- "log-reroute",
- "minijinja",
  "neon",
- "once_cell",
+ "regex",
  "serde",
  "serde_derive",
  "serde_json",
- "simple_logger",
  "tokio",
  "uuid 0.8.2",
 ]
@@ -703,7 +720,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.3",
  "comfy-table 7.1.1",
  "csv",
  "cubeclient",
@@ -713,6 +730,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hashbrown 0.14.5",
+ "indexmap 1.9.3",
  "itertools",
  "log",
  "lru",
@@ -744,12 +762,18 @@ name = "cubesqlplanner"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
+ "chrono-tz 0.8.6",
+ "convert_case",
  "cubeclient",
  "cubenativeutils",
  "datafusion",
  "itertools",
+ "lazy_static",
+ "minijinja",
  "nativebridge",
  "neon",
+ "regex",
  "serde",
  "serde_json",
  "tokio",
@@ -953,18 +977,6 @@ name = "fastrand"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
-
-[[package]]
-name = "findshlibs"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b9e59cd0f7e0806cca4be089683ecb6434e602038df21fe6bf6711b2f07f64"
-dependencies = [
- "cc",
- "lazy_static",
- "libc",
- "winapi",
-]
 
 [[package]]
 name = "flatbuffers"
@@ -1595,17 +1607,6 @@ name = "log"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
-
-[[package]]
-name = "log-reroute"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "741a3ba679a9a1d331319dda1c7d8f204e9f6760fd867e28576a45d17048bc02"
-dependencies = [
- "arc-swap",
- "log",
- "once_cell",
-]
 
 [[package]]
 name = "lru"

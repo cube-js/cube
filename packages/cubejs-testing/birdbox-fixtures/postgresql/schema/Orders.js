@@ -26,7 +26,7 @@ cube(`Orders`, {
       type: `number`
     },
     amountRank: {
-      post_aggregate: true,
+      multi_stage: true,
       type: `rank`,
       order_by: [{
         sql: `${totalAmount}`,
@@ -35,23 +35,23 @@ cube(`Orders`, {
       reduce_by: [status],
     },
     amountReducedByStatus: {
-      post_aggregate: true,
+      multi_stage: true,
       type: `sum`,
       sql: `${totalAmount}`,
       reduce_by: [status],
     },
     statusPercentageOfTotal: {
-      post_aggregate: true,
+      multi_stage: true,
       sql: `${totalAmount} / NULLIF(${amountReducedByStatus}, 0)`,
       type: `number`,
     },
     amountRankView: {
-      post_aggregate: true,
+      multi_stage: true,
       type: `number`,
       sql: `${amountRank}`,
     },
     amountRankDateMax: {
-      post_aggregate: true,
+      multi_stage: true,
       sql: `${createdAt}`,
       type: `max`,
       filters: [{
@@ -59,7 +59,7 @@ cube(`Orders`, {
       }]
     },
     amountRankDate: {
-      post_aggregate: true,
+      multi_stage: true,
       sql: `${amountRankDateMax}`,
       type: `time`,
     },

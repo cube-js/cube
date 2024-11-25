@@ -1,26 +1,26 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules, transforming_rewrite,
-        udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, LogicalPlanLanguage, ScalarUDFExprFun,
-        WrapperPullupReplacerAliasToCube,
+        rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, ScalarUDFExprFun,
+        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerPushToCube,
+        WrapperPushdownReplacerPushToCube,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn udf_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn udf_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-udf",
                 wrapper_pushdown_replacer(
                     udf_expr_var_arg("?fun", "?args"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -29,7 +29,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?args",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -42,7 +42,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?args",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -50,7 +50,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     udf_expr_var_arg("?fun", "?args"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -61,7 +61,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     udf_fun_expr_args("?left", "?right"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -69,14 +69,14 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?left",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pushdown_replacer(
                         "?right",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -88,14 +88,14 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?left",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?right",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -103,27 +103,28 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     udf_fun_expr_args("?left", "?right"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "wrapper-push-down-udf-empty-tail",
                 wrapper_pushdown_replacer(
                     udf_fun_expr_args_empty_tail(),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     udf_fun_expr_args_empty_tail(),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
+                self.transform_udf_expr_tail("?push_to_cube", "?pullup_push_to_cube"),
             ),
         ]);
     }
@@ -132,7 +133,7 @@ impl WrapperRules {
         &self,
         fun_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
@@ -156,6 +157,28 @@ impl WrapperRules {
                 }
             }
             false
+        }
+    }
+
+    fn transform_udf_expr_tail(
+        &self,
+        push_to_cube_var: &'static str,
+        pullup_push_to_cube_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+            true
         }
     }
 }

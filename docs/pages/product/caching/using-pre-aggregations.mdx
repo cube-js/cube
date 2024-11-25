@@ -286,11 +286,11 @@ monitor Cube Store workers load, and iterate as needed.
 
 **When you define a pre-aggregation without any explicit indexes, the default
 index is created.** In this index, dimensions come first, time dimensions come
-second, and measures come last.
+second.
 
 When you define additional indexes, you don't incur any additional costs on
 the data warehouse side. However, the pre-aggregation build time for a
-particular pre-aggregation increases with each index.
+particular pre-aggregation increases with each index because all indexes for pre-aggregation are built during ingestion time.
 
 ### When to use indexes?
 
@@ -524,8 +524,12 @@ The data within `category_productname_zipcode_index` would look as follows:
 
 ### Aggregating indexes
 
-Aggregating indexes can be defined as well. Such indexes contain **only**
-dimensions and pre-aggregated measures from the pre-aggregation definition.
+Aggregating indexes should be used when there is a wide rollup pre-aggregation, however, only a subset of its dimensions is queried. 
+For example, you have rollup pre-aggregation with 50 dimensions, but any query is just using only 5 of those dimensions.
+Such a use case would be a sweet spot for the aggregating index.
+Such indexes would persist **only** dimensions from the index definition and pre-aggregated measures from the pre-aggregation definition.
+Cube Store would aggregate over missing dimensions to calculate stored measure values when preparing the aggregating index.
+During querying time, Cube Store will save time on this aggregation over missing dimensions, as it was done during the preparation step.
 
 Queries with the following characteristics can target aggregating indexes:
 
@@ -959,13 +963,10 @@ Cube Store in parallel:
   />
 </div>
 
-Enabling the export bucket functionality requires extra configuration; please
-refer to the database-specific documentation for more details:
-
-- [AWS Athena][ref-export-athena]
-- [AWS Redshift][ref-export-redshift]
-- [BigQuery][ref-export-bigquery]
-- [Snowflake][ref-export-snowflake]
+Enabling the export bucket functionality requires extra configuration and is 
+not available for all data sources. Please
+refer to the [database-specific documentation][ref-config-db] for more details. 
+Data sources that support export buckets will have an "Export Bucket" section with more information.
 
 When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube does not
@@ -1022,10 +1023,6 @@ of this member. For numeric types, it will most likely be an integer, a float,
 or a decimal type, depending on the nature of your data.
 
 
-[ref-export-athena]: /product/configuration/data-sources/aws-athena#export-bucket
-[ref-export-redshift]: /product/configuration/data-sources/aws-redshift#export-bucket
-[ref-export-bigquery]: /product/configuration/data-sources/google-bigquery#export-bucket
-[ref-export-snowflake]: /product/configuration/data-sources/snowflake#export-bucket
 [ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory

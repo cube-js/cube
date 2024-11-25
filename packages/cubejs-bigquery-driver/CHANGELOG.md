@@ -3,6 +3,191 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.1.6](https://github.com/cube-js/cube/compare/v1.1.5...v1.1.6) (2024-11-17)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.1.5](https://github.com/cube-js/cube/compare/v1.1.4...v1.1.5) (2024-11-13)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.1.4](https://github.com/cube-js/cube/compare/v1.1.3...v1.1.4) (2024-11-12)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.1.3](https://github.com/cube-js/cube/compare/v1.1.2...v1.1.3) (2024-11-08)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.1.2](https://github.com/cube-js/cube/compare/v1.1.1...v1.1.2) (2024-11-01)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.1.1](https://github.com/cube-js/cube/compare/v1.1.0...v1.1.1) (2024-10-31)
+
+
+### Features
+
+* **redshift-driver:** introspection for external schemas/tables (e.g. Spectrum) ([#8849](https://github.com/cube-js/cube/issues/8849)) ([fa4b3b8](https://github.com/cube-js/cube/commit/fa4b3b8161c38cc7d26e9ab00e70892fcbc0b137))
+
+
+
+
+
+# [1.1.0](https://github.com/cube-js/cube/compare/v1.0.4...v1.1.0) (2024-10-24)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.0.4](https://github.com/cube-js/cube/compare/v1.0.3...v1.0.4) (2024-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.0.3](https://github.com/cube-js/cube/compare/v1.0.2...v1.0.3) (2024-10-22)
+
+
+### Features
+
+* **bigquery-driver:** optimize testConnection() with free of charge request ([#8845](https://github.com/cube-js/cube/issues/8845)) ([99ad335](https://github.com/cube-js/cube/commit/99ad335d5a48dd3bfab48720d23cb39773817b9f))
+
+
+
+
+
+## [1.0.2](https://github.com/cube-js/cube/compare/v1.0.1...v1.0.2) (2024-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [1.0.1](https://github.com/cube-js/cube/compare/v1.0.0...v1.0.1) (2024-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+# [1.0.0](https://github.com/cube-js/cube/compare/v0.36.11...v1.0.0) (2024-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.11](https://github.com/cube-js/cube/compare/v0.36.10...v0.36.11) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.10](https://github.com/cube-js/cube/compare/v0.36.9...v0.36.10) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.9](https://github.com/cube-js/cube/compare/v0.36.8...v0.36.9) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.8](https://github.com/cube-js/cube/compare/v0.36.7...v0.36.8) (2024-10-11)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.7](https://github.com/cube-js/cube/compare/v0.36.6...v0.36.7) (2024-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.6](https://github.com/cube-js/cube/compare/v0.36.5...v0.36.6) (2024-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.5](https://github.com/cube-js/cube/compare/v0.36.4...v0.36.5) (2024-10-02)
+
+
+### Features
+
+* **snowflake-driver:** support azure exports buckets ([#8730](https://github.com/cube-js/cube/issues/8730)) ([37c6ccc](https://github.com/cube-js/cube/commit/37c6cccc7a3b0617d87bcc6775d63f501074b737))
+
+
+
+
+
+## [0.36.4](https://github.com/cube-js/cube/compare/v0.36.3...v0.36.4) (2024-09-27)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
+## [0.36.3](https://github.com/cube-js/cube/compare/v0.36.2...v0.36.3) (2024-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/bigquery-driver
+
+
+
+
+
 ## [0.36.2](https://github.com/cube-js/cube/compare/v0.36.1...v0.36.2) (2024-09-18)
 
 **Note:** Version bump only for package @cubejs-backend/bigquery-driver

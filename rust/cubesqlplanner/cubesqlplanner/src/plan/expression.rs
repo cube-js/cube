@@ -1,20 +1,26 @@
-use crate::planner::{BaseDimension, BaseMeasure};
-use std::fmt;
+use crate::planner::{BaseMember, VisitorContext};
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum Expr {
-    Measure(Rc<BaseMeasure>),
-    Dimension(Rc<BaseDimension>),
+    Field(Rc<dyn BaseMember>),
+    Reference(Option<String>, String),
+    Asterix,
 }
 
-impl fmt::Display for Expr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Expr {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         match self {
-            Expr::Measure(measure) => {
-                let sql = measure.to_sql().map_err(|_| fmt::Error).unwrap();
-                write!(f, "{}", sql)
+            Expr::Field(field) => field.to_sql(context),
+            Expr::Reference(cube_alias, field_alias) => {
+                if let Some(cube_alias) = cube_alias {
+                    Ok(format!("{}.{}", cube_alias, field_alias))
+                } else {
+                    Ok(field_alias.clone())
+                }
             }
-            Expr::Dimension(_) => write!(f, "dim"),
+            Expr::Asterix => Ok("*".to_string()),
         }
     }
 }

@@ -23,7 +23,7 @@ to run the following commands.
 
 You can run Cube Store with Docker with the following command:
 
-```bash{promptUser: user}
+```bash
 docker run -p 3030:3030 cubejs/cubestore
 ```
 
@@ -221,26 +221,40 @@ Cube Store cluster uses both persistent and scratch storage.
 Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files.
 
-Cube Store [can be configured][ref-config-env] to use either AWS S3 or
-Google Cloud Storage (GCS) as persistent storage. If desired, local path on
+Cube Store can be configured to use either AWS S3, Google Cloud Storage (GCS), or
+Azure Blob Storage as persistent storage. If desired, a local path on
 the server can also be used in case all Cube Store cluster nodes are
 co-located on a single machine.
 
 <InfoBox>
 
-Cube Store can only use one type of remote storage at runtime.
+Cube Store can only use one type of remote storage at the same time.
 
 </InfoBox>
 
 <WarningBox>
 
-Cube Store requires strong consistency guarantees from underlying distributed
-storage. AWS S3, Google Cloud Storage, and Azure Blob Storage (Cube Cloud only)
-are the only known implementations that provide strong consistency. Using other
-implementations in production is discouraged and can lead to consistency and
-data corruption errors.
+Cube Store requires strong consistency guarantees from an underlying distributed
+storage. AWS S3, Google Cloud Storage, and Azure Blob Storage are the only known
+implementations that provide them. Using other implementations in production is
+discouraged and can lead to consistency and data corruption errors.
 
 </WarningBox>
+
+<SuccessBox>
+
+Using Azure Blob Storage with Cube Store is only supported in Cube Cloud on
+[Enterprise and above](https://cube.dev/pricing) product tiers.
+
+</SuccessBox>
+
+<InfoBox>
+
+As an additional layer on top of standard AWS S3, Google Cloud Storage (GCS), or
+Azure Blob Storage encryption, persistent storage can optionally use [Parquet
+encryption](#data-at-rest-encryption) for data-at-rest protection.
+
+</InfoBox>
 
 A simplified example using AWS S3 might look like:
 
@@ -313,10 +327,38 @@ should be built before any tables are removed.
 
 ## Security
 
-Cube Store currently does not have any in-built authentication mechanisms. For
-this reason, we recommend running your Cube Store cluster on a network that only
-allows requests from the Cube deployment.
+### Authentication
+
+Cube Store does not have any in-built authentication mechanisms. For this reason,
+we recommend running your Cube Store cluster with a network configuration that
+only allows access from the Cube deployment.
+
+### Data-at-rest encryption
+
+[Persistent storage](#persistent-storage) is secured using the standard AWS S3,
+Google Cloud Storage (GCS), or Azure Blob Storage encryption.
+
+Cube Store also provides optional data-at-rest protection by utilizing the
+[modular encryption mechanism][link-parquet-encryption] of Parquet files in its
+persistent storage. Pre-aggregation data is secured using the [AES cipher][link-aes]
+with 256-bit keys. Data encyption and decryption are completely seamless to Cube
+Store operations.
+
+<SuccessBox>
+
+Data-at-rest encryption in Cube Store is available in Cube Cloud on the
+[Enterprise Premier](https://cube.dev/pricing) product tier.
+It also requires the M [Cube Store Worker tier](/product/deployment/cloud/pricing#cube-store-worker-tiers).
+
+</SuccessBox>
+
+You can provide, rotate, or drop your own [customer-managed keys][ref-cmk] (CMK)
+for Cube Store via the <Btn>Encryption Keys</Btn> page in Cube Cloud.
+
 
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 [ref-caching-partitioning]: /product/caching/using-pre-aggregations#partitioning
 [ref-config-env]: /reference/configuration/environment-variables
+[link-parquet-encryption]: https://parquet.apache.org/docs/file-format/data-pages/encryption/
+[link-aes]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
+[ref-cmk]: /product/workspace/encryption-keys

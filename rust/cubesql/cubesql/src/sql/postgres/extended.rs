@@ -58,6 +58,13 @@ pub enum PreparedStatement {
         description: Option<protocol::RowDescription>,
         span_id: Option<Arc<SpanId>>,
     },
+    Error {
+        /// Prepared statement can be declared from SQL or protocol (Parser)
+        from_sql: bool,
+        sql: String,
+        created: DateTime<Utc>,
+        span_id: Option<Arc<SpanId>>,
+    },
 }
 
 impl PreparedStatement {
@@ -65,6 +72,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { created, .. } => created,
             PreparedStatement::Query { created, .. } => created,
+            PreparedStatement::Error { created, .. } => created,
         }
     }
 
@@ -73,6 +81,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { .. } => "".to_string(),
             PreparedStatement::Query { query, .. } => query.to_string(),
+            PreparedStatement::Error { sql, .. } => sql.clone(),
         }
     }
 
@@ -80,6 +89,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { from_sql, .. } => from_sql.clone(),
             PreparedStatement::Query { from_sql, .. } => from_sql.clone(),
+            PreparedStatement::Error { from_sql, .. } => from_sql.clone(),
         }
     }
 
@@ -87,6 +97,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { .. } => None,
             PreparedStatement::Query { parameters, .. } => Some(&parameters.parameters),
+            PreparedStatement::Error { .. } => None,
         }
     }
 
@@ -103,6 +114,10 @@ impl PreparedStatement {
 
                 Ok(statement)
             }
+            PreparedStatement::Error { .. } => Err(CubeError::internal(
+                "It's not possible to bind errored prepared statements (it's a bug)".to_string(),
+            )
+            .into()),
         }
     }
 
@@ -110,6 +125,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { span_id, .. } => span_id.clone(),
             PreparedStatement::Query { span_id, .. } => span_id.clone(),
+            PreparedStatement::Error { span_id, .. } => span_id.clone(),
         }
     }
 }
@@ -492,7 +508,7 @@ impl Portal {
 
                             return;
                         }
-                        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+                        QueryPlan::DataFusionSelect(plan, ctx) => {
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let safe_stream = async move {
                                 std::panic::AssertUnwindSafe(df.execute_stream())
@@ -511,7 +527,7 @@ impl Portal {
                                 Err(err) => return yield Err(CubeError::panic(err).into()),
                             }
                         }
-                        QueryPlan::CreateTempTable(_, plan, ctx, name, temp_tables) => {
+                        QueryPlan::CreateTempTable(plan, ctx, name, temp_tables) => {
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let record_batch = df.collect();
                             let row_count = match record_batch.await {
