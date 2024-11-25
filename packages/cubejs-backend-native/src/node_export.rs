@@ -511,7 +511,7 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
 fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsValue> {
     let msg = cx.argument::<JsBuffer>(0)?;
     let msg_data = msg.as_slice(&cx).to_vec();
-    match parse_cubestore_ws_result(&*msg_data) {
+    match parse_cubestore_ws_result(&msg_data) {
         Ok(result) => {
             let js_array = cx.execute_scoped(|mut cx| {
                 let js_array = JsArray::new(&mut cx, result.len());
