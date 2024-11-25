@@ -5,7 +5,9 @@ use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
-use crate::queryplanner::optimizations::CubeQueryPlanner;
+use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
+use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
+use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
 use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
@@ -22,34 +24,44 @@ use async_trait::async_trait;
 use core::fmt;
 use datafusion::arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
-    Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
-    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array,
-    Int96Decimal10Array, Int96Decimal1Array, Int96Decimal2Array, Int96Decimal3Array,
-    Int96Decimal4Array, Int96Decimal5Array, MutableArrayData, StringArray,
-    TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
+    Int64Array, MutableArrayData, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
+    UInt16Array, UInt32Array, UInt64Array,
 };
-use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
+use datafusion::arrow::compute::SortOptions;
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::ipc::reader::StreamReader;
-use datafusion::arrow::ipc::writer::MemStreamWriter;
+use datafusion::arrow::ipc::writer::StreamWriter;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
-use datafusion::datasource::TableProvider;
+use datafusion::catalog::Session;
+use datafusion::datasource::listing::PartitionedFile;
+use datafusion::datasource::object_store::ObjectStoreUrl;
+use datafusion::datasource::physical_plan::parquet::ParquetExecBuilder;
+use datafusion::datasource::physical_plan::{
+    FileScanConfig, ParquetExec, ParquetFileReaderFactory,
+};
+use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
-use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
-use datafusion::logical_plan;
-use datafusion::logical_plan::{Expr, LogicalPlan};
+use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::execution::{SessionStateBuilder, TaskContext};
+use datafusion::logical_expr::{Expr, LogicalPlan};
+use datafusion::physical_expr;
+use datafusion::physical_expr::{
+    expressions, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
+};
+use datafusion::physical_optimizer::optimizer::PhysicalOptimizer;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::{
-    MetadataCacheFactory, NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache,
-};
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::repartition::RepartitionExec;
+use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
+use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr, SendableRecordBatchStream,
+    collect, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning,
+    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
+use datafusion::prelude::{and, SessionConfig, SessionContext};
+use futures_util::{stream, FutureExt, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
@@ -140,7 +152,9 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let execution_time = SystemTime::now();
 
-        let results = collect(split_plan.clone()).instrument(collect_span).await;
+        let results = collect(split_plan.clone(), Arc::new(TaskContext::default()))
+            .instrument(collect_span)
+            .await;
         let execution_time = execution_time.elapsed()?;
         debug!("Query data processing time: {:?}", execution_time,);
         app_metrics::DATA_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
@@ -205,7 +219,8 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
-        let results = collect(worker_plan.clone())
+        // TODO context
+        let results = collect(worker_plan.clone(), Arc::new(TaskContext::default()))
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
                 "collect_physical_plan"
@@ -240,8 +255,9 @@ impl QueryExecutor for QueryExecutorImpl {
             );
         }
         // TODO: stream results as they become available.
-        let results = regroup_batches(results?, max_batch_rows)?;
-        Ok((worker_plan.schema(), results, data_loaded_size.get()))
+        // TOOD upgrade DF
+        // let results = regroup_batches(results?, max_batch_rows)?;
+        Ok((worker_plan.schema(), results?, data_loaded_size.get()))
     }
 
     async fn router_plan(
@@ -257,7 +273,10 @@ impl QueryExecutor for QueryExecutorImpl {
         let serialized_plan = Arc::new(plan);
         let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
         Ok((
-            ctx.clone().create_physical_plan(&plan_to_move.clone())?,
+            ctx.clone()
+                .state()
+                .create_physical_plan(&plan_to_move.clone())
+                .await?,
             plan_to_move,
         ))
     }
@@ -278,7 +297,10 @@ impl QueryExecutor for QueryExecutorImpl {
         let ctx = self.worker_context(plan.clone(), data_loaded_size)?;
         let plan_ctx = ctx.clone();
         Ok((
-            plan_ctx.create_physical_plan(&plan_to_move.clone())?,
+            plan_ctx
+                .state()
+                .create_physical_plan(&plan_to_move.clone())
+                .await?,
             plan_to_move,
         ))
     }
@@ -329,36 +351,65 @@ impl QueryExecutorImpl {
         &self,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-    ) -> Result<Arc<ExecutionContext>, CubeError> {
-        Ok(Arc::new(ExecutionContext::with_config(
-            ExecutionConfig::new()
-                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
-                .with_batch_size(4096)
-                .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
-                    cluster,
-                    serialized_plan,
-                    self.memory_handler.clone(),
-                ))),
-        )))
+    ) -> Result<Arc<SessionContext>, CubeError> {
+        let runtime = Arc::new(RuntimeEnv::default());
+        let mut rules = PhysicalOptimizer::new().rules;
+        rules.insert(
+            0,
+            Arc::new(PreOptimizeRule::new(self.memory_handler.clone(), None)),
+        );
+        let session_state = SessionStateBuilder::new()
+            .with_config(
+                SessionConfig::new()
+                    .with_batch_size(4096)
+                    // TODO upgrade DF fails if bigger than 1
+                    .with_target_partitions(1),
+            )
+            .with_runtime_env(runtime)
+            .with_default_features()
+            .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
+                cluster,
+                serialized_plan,
+                self.memory_handler.clone(),
+            )))
+            .with_physical_optimizer_rules(rules)
+            .build();
+        let ctx = SessionContext::new_with_state(session_state);
+        Ok(Arc::new(ctx))
     }
 
     fn worker_context(
         &self,
         serialized_plan: Arc<SerializedPlan>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
-    ) -> Result<Arc<ExecutionContext>, CubeError> {
-        Ok(Arc::new(ExecutionContext::with_config(
-            ExecutionConfig::new()
-                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
-                .with_batch_size(4096)
-                .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
-                    serialized_plan,
-                    self.memory_handler.clone(),
-                    data_loaded_size,
-                ))),
-        )))
+    ) -> Result<Arc<SessionContext>, CubeError> {
+        let runtime = Arc::new(RuntimeEnv::default());
+        let mut rules = PhysicalOptimizer::new().rules;
+        rules.insert(
+            0,
+            Arc::new(PreOptimizeRule::new(
+                self.memory_handler.clone(),
+                data_loaded_size.clone(),
+            )),
+        );
+        let session_state = SessionStateBuilder::new()
+            .with_config(
+                SessionConfig::new()
+                    .with_batch_size(4096)
+                    // TODO upgrade DF fails if bigger than 1
+                    .with_target_partitions(1),
+            )
+            .with_runtime_env(runtime)
+            .with_default_features()
+            .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
+                serialized_plan,
+                self.memory_handler.clone(),
+                data_loaded_size,
+            )))
+            .with_physical_optimizer_rules(rules)
+            .build();
+        let ctx = SessionContext::new_with_state(session_state);
+        Ok(Arc::new(ctx))
     }
 }
 
@@ -372,7 +423,7 @@ pub struct CubeTable {
     #[serde(skip, default)]
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     #[serde(skip, default = "NoopParquetMetadataCache::new")]
-    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+    parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
 }
 
 impl Debug for CubeTable {
@@ -390,7 +441,7 @@ impl CubeTable {
         index_snapshot: IndexSnapshot,
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: Vec<(u64, RowFilter)>,
-        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+        parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
     ) -> Result<Self, CubeError> {
         let schema = Arc::new(Schema::new(
             // Tables are always exposed only using table columns order instead of index one because
@@ -403,7 +454,7 @@ impl CubeTable {
                 .get_columns()
                 .iter()
                 .map(|c| c.clone().into())
-                .collect(),
+                .collect::<Vec<Field>>(),
         ));
         Ok(Self {
             index_snapshot,
@@ -430,7 +481,7 @@ impl CubeTable {
         remote_to_local_names: HashMap<String, String>,
         worker_partition_ids: Vec<(u64, RowFilter)>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
+        parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
     ) -> CubeTable {
         debug_assert!(worker_partition_ids.iter().is_sorted_by_key(|(id, _)| id));
         let mut t = self.clone();
@@ -447,8 +498,7 @@ impl CubeTable {
 
     fn async_scan(
         &self,
-        table_projection: &Option<Vec<usize>>,
-        batch_size: usize,
+        table_projection: Option<&Vec<usize>>,
         filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
         let partition_snapshots = self.index_snapshot.partitions();
@@ -460,7 +510,7 @@ impl CubeTable {
         // We always introduce projection because index and table columns do not match in general
         // case so we can use simpler code without branching to handle it.
         let table_projection = table_projection
-            .clone()
+            .cloned()
             .unwrap_or((0..self.schema.fields().len()).collect::<Vec<_>>());
 
         // Prepare projection
@@ -523,7 +573,7 @@ impl CubeTable {
                         )
                         .clone()
                 })
-                .collect(),
+                .collect::<Vec<Field>>(),
         ));
 
         let index_projection_schema = {
@@ -531,7 +581,7 @@ impl CubeTable {
                 index_projection
                     .iter()
                     .map(|i| index_schema.field(*i).clone())
-                    .collect(),
+                    .collect::<Vec<Field>>(),
             ))
         };
 
@@ -560,15 +610,29 @@ impl CubeTable {
                     .remote_to_local_names
                     .get(remote_path.as_str())
                     .expect(format!("Missing remote path {}", remote_path).as_str());
-                let arc: Arc<dyn ExecutionPlan> = Arc::new(ParquetExec::try_from_path_with_cache(
-                    &local_path,
-                    index_projection_or_none_on_schema_match.clone(),
-                    predicate.clone(),
-                    batch_size,
-                    1,
-                    None, // TODO: propagate limit
-                    self.parquet_metadata_cache.clone(),
-                )?);
+
+                let file_scan =
+                    FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone())
+                        .with_file(PartitionedFile::from_path(local_path.to_string())?)
+                        .with_projection(index_projection_or_none_on_schema_match.clone())
+                        .with_output_ordering(vec![(0..key_len)
+                            .map(|i| -> Result<_, DataFusionError> {
+                                Ok(PhysicalSortExpr::new(
+                            Arc::new(
+                                datafusion::physical_expr::expressions::Column::new_with_schema(
+                                    index_schema.field(i).name(),
+                                    &index_schema,
+                                )?,
+                            ),
+                            SortOptions::default(),
+                        ))
+                            })
+                            .collect::<Result<Vec<_>, _>>()?]);
+                let parquet_exec = ParquetExecBuilder::new(file_scan)
+                    .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone())
+                    .build();
+
+                let arc: Arc<dyn ExecutionPlan> = Arc::new(parquet_exec);
                 let arc = FilterByKeyRangeExec::issue_filters(arc, filter.clone(), key_len);
                 partition_execs.push(arc);
             }
@@ -603,15 +667,22 @@ impl CubeTable {
                         .remote_to_local_names
                         .get(&remote_path)
                         .expect(format!("Missing remote path {}", remote_path).as_str());
-                    Arc::new(ParquetExec::try_from_path_with_cache(
-                        local_path,
-                        index_projection_or_none_on_schema_match.clone(),
-                        predicate.clone(),
-                        batch_size,
-                        1,
-                        None, // TODO: propagate limit
-                        self.parquet_metadata_cache.clone(),
-                    )?)
+
+                    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone())
+                        .with_file(PartitionedFile::from_path(local_path.to_string())?)
+                        .with_projection(index_projection_or_none_on_schema_match.clone())
+                        .with_output_ordering(vec![(0..key_len).map(|i| -> Result<_, DataFusionError> { Ok(PhysicalSortExpr::new(
+                            Arc::new(
+                                datafusion::physical_expr::expressions::Column::new_with_schema(index_schema.field(i).name(), &index_schema)?
+                            ),
+                            SortOptions::default(),
+                        ))}).collect::<Result<Vec<_>, _>>()?])
+                        ;
+                    let parquet_exec = ParquetExecBuilder::new(file_scan)
+                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone())
+                        .build();
+
+                    Arc::new(parquet_exec)
                 };
 
                 let node = FilterByKeyRangeExec::issue_filters(node, filter.clone(), key_len);
@@ -662,7 +733,7 @@ impl CubeTable {
                 table_projection_with_seq_column
                     .iter()
                     .map(|i| self.schema.field(*i).clone())
-                    .collect(),
+                    .collect::<Vec<Field>>(),
             ))
         };
         // TODO: 'nullable' modifiers differ, fix this and re-enable assertion.
@@ -671,18 +742,31 @@ impl CubeTable {
         // }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(EmptyExec::new(
-                false,
-                table_projected_schema.clone(),
-            )));
+            partition_execs.push(Arc::new(EmptyExec::new(table_projected_schema.clone())));
         }
 
         let schema = table_projected_schema;
+        let partition_num = partition_execs
+            .iter()
+            .map(|c| c.properties().partitioning.partition_count())
+            .sum();
+
         let read_data = Arc::new(CubeTableExec {
             schema: schema.clone(),
             partition_execs,
             index_snapshot: self.index_snapshot.clone(),
             filter: predicate,
+            properties: PlanProperties::new(
+                EquivalenceProperties::new_with_orderings(
+                    schema.clone(),
+                    &[lex_ordering_for_index(
+                        self.index_snapshot.index.get_row(),
+                        &schema,
+                    )?],
+                ),
+                Partitioning::UnknownPartitioning(partition_num),
+                ExecutionMode::Bounded,
+            ),
         });
         let unique_key_columns = self
             .index_snapshot()
@@ -699,15 +783,20 @@ impl CubeTable {
                 .columns()
                 .iter()
                 .take(self.index_snapshot.index.get_row().sort_key_size() as usize)
-                .map(|c| {
-                    datafusion::physical_plan::expressions::Column::new_with_schema(
-                        c.get_name(),
-                        &schema,
-                    )
+                .map(|c| -> Result<_, CubeError> {
+                    Ok(PhysicalSortExpr::new(
+                        Arc::new(
+                            datafusion::physical_plan::expressions::Column::new_with_schema(
+                                c.get_name(),
+                                &schema,
+                            )?,
+                        ),
+                        SortOptions::default(),
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let mut exec: Arc<dyn ExecutionPlan> =
-                Arc::new(MergeSortExec::try_new(read_data, sort_columns)?);
+                Arc::new(SortPreservingMergeExec::new(sort_columns, read_data));
             exec = Arc::new(LastRowByUniqueKeyExec::try_new(
                 exec,
                 key_columns
@@ -752,13 +841,23 @@ impl CubeTable {
 
             let join_columns = join_columns
                 .iter()
-                .map(|c| {
-                    datafusion::physical_plan::expressions::Column::new_with_schema(c, &schema)
+                .map(|c| -> Result<_, CubeError> {
+                    Ok(PhysicalSortExpr::new(
+                        Arc::new(
+                            datafusion::physical_plan::expressions::Column::new_with_schema(
+                                c, &schema,
+                            )?,
+                        ),
+                        SortOptions::default(),
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            Arc::new(MergeSortExec::try_new(read_data, join_columns)?)
+            Arc::new(SortPreservingMergeExec::new(join_columns, read_data))
         } else {
-            Arc::new(MergeExec::new(read_data))
+            Arc::new(RepartitionExec::try_new(
+                read_data,
+                Partitioning::UnknownPartitioning(1),
+            )?)
         };
 
         Ok(plan)
@@ -793,6 +892,7 @@ impl CubeTable {
 
 pub struct CubeTableExec {
     schema: SchemaRef,
+    properties: PlanProperties,
     pub(crate) index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
     pub(crate) filter: Option<Expr>,
@@ -807,6 +907,12 @@ impl Debug for CubeTableExec {
     }
 }
 
+impl DisplayAs for CubeTableExec {
+    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "CubeTableExec")
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for CubeTableExec {
     fn as_any(&self) -> &dyn Any {
@@ -817,27 +923,43 @@ impl ExecutionPlan for CubeTableExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.partition_execs.len())
-    }
+    // TODO upgrade DF
+    // fn output_partitioning(&self) -> Partitioning {
+    //     Partitioning::UnknownPartitioning(self.partition_execs.len())
+    // }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        self.partition_execs.clone()
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        self.partition_execs.iter().collect()
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        let partition_count = children
+            .iter()
+            .map(|c| c.properties().partitioning.partition_count())
+            .sum();
         Ok(Arc::new(CubeTableExec {
             schema: self.schema.clone(),
             partition_execs: children,
             index_snapshot: self.index_snapshot.clone(),
             filter: self.filter.clone(),
+            properties: PlanProperties::new(
+                EquivalenceProperties::new_with_orderings(
+                    self.schema.clone(),
+                    &[lex_ordering_for_index(
+                        self.index_snapshot.index.get_row(),
+                        &(&self.schema),
+                    )?],
+                ),
+                Partitioning::UnknownPartitioning(partition_count),
+                ExecutionMode::Bounded,
+            ),
         }))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
         let sort_order;
         if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
             // Note that this returns `None` if any of the columns were not found.
@@ -862,20 +984,114 @@ impl ExecutionPlan for CubeTableExec {
                 sort_order = None
             }
         }
+        vec![sort_order.map(|order| {
+            order
+                .into_iter()
+                .map(|col_index| {
+                    PhysicalSortRequirement::from(PhysicalSortExpr::new(
+                        // TODO unwrap()
+                        Arc::new(
+                            physical_expr::expressions::Column::new_with_schema(
+                                self.schema.field(col_index).name(),
+                                self.schema.as_ref(),
+                            )
+                            .unwrap(),
+                        ),
+                        SortOptions::default(),
+                    ))
+                })
+                .collect()
+        })]
+    }
 
-        OptimizerHints {
-            sort_order,
-            single_value_columns: Vec::new(),
-        }
+    // TODO upgrade DF
+    // fn output_hints(&self) -> OptimizerHints {
+    //     let sort_order;
+    //     if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
+    //         // Note that this returns `None` if any of the columns were not found.
+    //         // This only happens on programming errors.
+    //         sort_order = snapshot_sort_on
+    //             .iter()
+    //             .map(|c| self.schema.index_of(&c).ok())
+    //             .collect()
+    //     } else {
+    //         let index = self.index_snapshot.index().get_row();
+    //         let sort_cols = index
+    //             .get_columns()
+    //             .iter()
+    //             .take(index.sort_key_size() as usize)
+    //             .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
+    //             .take_while(|i| i.is_some())
+    //             .map(|i| i.unwrap())
+    //             .collect_vec();
+    //         if !sort_cols.is_empty() {
+    //             sort_order = Some(sort_cols)
+    //         } else {
+    //             sort_order = None
+    //         }
+    //     }
+    //
+    //     OptimizerHints {
+    //         sort_order,
+    //         single_value_columns: Vec::new(),
+    //     }
+    // }
+
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn execute(
+    fn execute(
         &self,
-        partition: usize,
+        mut partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        self.partition_execs[partition].execute(0).await
+        let exec = self
+            .partition_execs
+            .iter()
+            .find(|p| {
+                if partition < p.properties().partitioning.partition_count() {
+                    true
+                } else {
+                    partition -= p.properties().partitioning.partition_count();
+                    false
+                }
+            })
+            .expect(&format!(
+                "CubeTableExec: Partition index is outside of partition range: {}",
+                partition
+            ));
+        exec.execute(partition, context)
     }
+
+    fn name(&self) -> &str {
+        "CubeTableExec"
+    }
+
+    fn maintains_input_order(&self) -> Vec<bool> {
+        vec![true; self.children().len()]
+    }
+}
+
+pub fn lex_ordering_for_index(
+    index: &Index,
+    schema: &SchemaRef,
+) -> Result<Vec<PhysicalSortExpr>, DataFusionError> {
+    (0..(index.sort_key_size() as usize))
+        .map(|i| -> Result<_, _> {
+            Ok(PhysicalSortExpr::new(
+                Arc::new(
+                    datafusion::physical_expr::expressions::Column::new_with_schema(
+                        index.get_columns()[i].get_name(),
+                        &schema,
+                    )?,
+                ),
+                SortOptions::default(),
+            ))
+        })
+        .take_while(|e| e.is_ok())
+        .collect::<Result<Vec<_>, _>>()
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -927,6 +1143,7 @@ impl Debug for InlineTableProvider {
 
 pub struct ClusterSendExec {
     schema: SchemaRef,
+    properties: PlanProperties,
     pub partitions: Vec<(
         /*node*/ String,
         (Vec<PartitionWithFilters>, Vec<InlineTableId>),
@@ -964,8 +1181,14 @@ impl ClusterSendExec {
             union_snapshots,
             &serialized_plan.planning_meta().multi_part_subtree,
         )?;
+        let eq_properties = EquivalenceProperties::new(schema.clone());
         Ok(Self {
             schema,
+            properties: PlanProperties::new(
+                eq_properties,
+                Partitioning::UnknownPartitioning(partitions.len()),
+                ExecutionMode::Bounded,
+            ),
             partitions,
             cluster,
             serialized_plan,
@@ -1188,6 +1411,7 @@ impl ClusterSendExec {
     ) -> Self {
         ClusterSendExec {
             schema,
+            properties: self.properties.clone(),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
@@ -1224,6 +1448,12 @@ impl ClusterSendExec {
     }
 }
 
+impl DisplayAs for ClusterSendExec {
+    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "ClusterSendExec")
+    }
+}
+
 #[async_trait]
 impl ExecutionPlan for ClusterSendExec {
     fn as_any(&self) -> &dyn Any {
@@ -1234,16 +1464,12 @@ impl ExecutionPlan for ClusterSendExec {
         self.schema.clone()
     }
 
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(self.partitions.len())
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input_for_optimizations.clone()]
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input_for_optimizations]
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if children.len() != 1 {
@@ -1252,6 +1478,7 @@ impl ExecutionPlan for ClusterSendExec {
         let input_for_optimizations = children.into_iter().next().unwrap();
         Ok(Arc::new(ClusterSendExec {
             schema: self.schema.clone(),
+            properties: self.properties.clone(),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
@@ -1260,27 +1487,46 @@ impl ExecutionPlan for ClusterSendExec {
         }))
     }
 
-    fn output_hints(&self) -> OptimizerHints {
-        self.input_for_optimizations.output_hints()
-    }
-
     #[instrument(level = "trace", skip(self))]
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
         let (node_name, partitions) = &self.partitions[partition];
 
         let plan = self.serialized_plan_for_partitions(partitions);
 
+        let cluster = self.cluster.clone();
+        let schema = self.schema.clone();
+        let node_name = node_name.to_string();
         if self.use_streaming {
-            Ok(self.cluster.run_select_stream(node_name, plan).await?)
+            // A future that yields a stream
+            let fut = async move { cluster.run_select_stream(&node_name, plan).await };
+            // Use TryStreamExt::try_flatten to flatten the stream of streams
+            let stream = futures::stream::once(fut).try_flatten();
+
+            Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
         } else {
-            let record_batches = self.cluster.run_select(node_name, plan).await?;
-            // TODO .to_schema_ref()
-            let memory_exec = MemoryExec::try_new(&vec![record_batches], self.schema(), None)?;
-            memory_exec.execute(0).await
+            let record_batches = async move { cluster.run_select(&node_name, plan).await };
+            let stream = futures::stream::once(record_batches).flat_map(|r| match r {
+                Ok(vec) => stream::iter(vec.into_iter().map(|b| Ok(b)).collect::<Vec<_>>()),
+                Err(e) => stream::iter(vec![Err(DataFusionError::Execution(e.to_string()))]),
+            });
+            Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
         }
+    }
+
+    fn name(&self) -> &str {
+        "ClusterSendExec"
+    }
+
+    fn properties(&self) -> &PlanProperties {
+        &self.properties
+    }
+
+    fn maintains_input_order(&self) -> Vec<bool> {
+        vec![true; self.children().len()]
     }
 }
 
@@ -1293,6 +1539,7 @@ impl fmt::Debug for ClusterSendExec {
     }
 }
 
+#[async_trait]
 impl TableProvider for CubeTable {
     fn as_any(&self) -> &dyn Any {
         self
@@ -1302,34 +1549,22 @@ impl TableProvider for CubeTable {
         self.schema.clone()
     }
 
-    fn scan(
+    async fn scan(
         &self,
-        projection: &Option<Vec<usize>>,
-        batch_size: usize,
+        state: &dyn Session,
+        projection: Option<&Vec<usize>>,
         filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let res = self.async_scan(projection, batch_size, filters)?;
+        let res = self.async_scan(projection, filters)?;
         Ok(res)
     }
-
-    fn statistics(&self) -> Statistics {
-        // TODO
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-        }
-    }
-
-    fn supports_filter_pushdown(
-        &self,
-        _filter: &Expr,
-    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
-        return Ok(TableProviderFilterPushDown::Inexact);
+    fn table_type(&self) -> TableType {
+        TableType::Base
     }
 }
 
+#[async_trait]
 impl TableProvider for InlineTableProvider {
     fn as_any(&self) -> &dyn Any {
         self
@@ -1339,28 +1574,31 @@ impl TableProvider for InlineTableProvider {
         self.data.get_schema()
     }
 
-    fn scan(
+    async fn scan(
         &self,
-        projection: &Option<Vec<usize>>,
-        batch_size: usize,
-        _filters: &[Expr],
+        state: &dyn Session,
+        projection: Option<&Vec<usize>>,
+        filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         let schema = self.schema();
         let projected_schema = if let Some(p) = projection {
             Arc::new(Schema::new(
-                p.iter().map(|i| schema.field(*i).clone()).collect(),
+                p.iter()
+                    .map(|i| schema.field(*i).clone())
+                    .collect::<Vec<Field>>(),
             ))
         } else {
             schema
         };
 
         if !self.inline_table_ids.iter().any(|id| id == &self.id) {
-            return Ok(Arc::new(EmptyExec::new(false, projected_schema)));
+            return Ok(Arc::new(EmptyExec::new(projected_schema)));
         }
 
-        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
-        let projection = (*projection).clone();
+        // TODO batch_size
+        let batches = dataframe_to_batches(self.data.as_ref(), 16384)?;
+        let projection = projection.cloned();
         Ok(Arc::new(MemoryExec::try_new(
             &vec![batches],
             projected_schema,
@@ -1368,19 +1606,8 @@ impl TableProvider for InlineTableProvider {
         )?))
     }
 
-    fn statistics(&self) -> Statistics {
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-        }
-    }
-
-    fn supports_filter_pushdown(
-        &self,
-        _filter: &Expr,
-    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
-        return Ok(TableProviderFilterPushDown::Unsupported);
+    fn table_type(&self) -> TableType {
+        TableType::Temporary
     }
 }
 
@@ -1450,9 +1677,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                 DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
-                DataType::Int96 => {
-                    convert_array!(array, num_rows, rows, Int96Array, Int96, (Int96))
-                }
+                // DataType::Int96 => {
+                //     convert_array!(array, num_rows, rows, Int96Array, Int96, (Int96))
+                // }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
@@ -1464,118 +1691,119 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         });
                     }
                 }
-                DataType::Int64Decimal(0) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal0Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(1) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal1Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(2) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal2Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(3) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal3Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(4) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal4Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(5) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal5Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int64Decimal(10) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int64Decimal10Array,
-                    Decimal,
-                    (Decimal)
-                ),
-                DataType::Int96Decimal(0) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal0Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(1) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal1Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(2) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal2Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(3) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal3Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(4) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal4Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(5) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal5Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
-                DataType::Int96Decimal(10) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Int96Decimal10Array,
-                    Decimal96,
-                    (Decimal96)
-                ),
+                // TODO upgrade DF
+                // DataType::Int64Decimal(0) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int64Decimal0Array,
+                //     Decimal,
+                //     (Decimal)
+                // ),
+                // DataType::Int64Decimal(1) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int64Decimal1Array,
+                //     Decimal,
+                //     (Decimal)
+                // ),
+                // DataType::Int64Decimal(2) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int64Decimal2Array,
+                //     Decimal,
+                //     (Decimal)
+                // ),
+                // DataType::Int64Decimal(3) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int64Decimal3Array,
+                //     Decimal,
+                //     (Decimal)
+                // ),
+                // DataType::Int64Decimal(4) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int64Decimal4Array,
+                //     Decimal,
+                //     (Decimal)
+                // ),
+                // DataType::Int64Decimal(5) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int64Decimal5Array,
+                //     Decimal,
+                //     (Decimal)
+                // ),
+                // DataType::Int64Decimal(10) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int64Decimal10Array,
+                //     Decimal,
+                //     (Decimal)
+                // ),
+                // DataType::Int96Decimal(0) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int96Decimal0Array,
+                //     Decimal96,
+                //     (Decimal96)
+                // ),
+                // DataType::Int96Decimal(1) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int96Decimal1Array,
+                //     Decimal96,
+                //     (Decimal96)
+                // ),
+                // DataType::Int96Decimal(2) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int96Decimal2Array,
+                //     Decimal96,
+                //     (Decimal96)
+                // ),
+                // DataType::Int96Decimal(3) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int96Decimal3Array,
+                //     Decimal96,
+                //     (Decimal96)
+                // ),
+                // DataType::Int96Decimal(4) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int96Decimal4Array,
+                //     Decimal96,
+                //     (Decimal96)
+                // ),
+                // DataType::Int96Decimal(5) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int96Decimal5Array,
+                //     Decimal96,
+                //     (Decimal96)
+                // ),
+                // DataType::Int96Decimal(10) => convert_array!(
+                //     array,
+                //     num_rows,
+                //     rows,
+                //     Int96Decimal10Array,
+                //     Decimal96,
+                //     (Decimal96)
+                // ),
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
                         .as_any()
@@ -1589,7 +1817,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         });
                     }
                 }
-                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, tz)
+                    if tz.is_none() || tz.as_ref().unwrap().as_ref() == "+00:00" =>
+                {
                     let a = array
                         .as_any()
                         .downcast_ref::<TimestampNanosecondArray>()
@@ -1639,20 +1869,20 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
         DataType::Float16 | DataType::Float64 => Ok(ColumnType::Float),
-        DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
-            scale: scale as i32,
-            precision: 18,
-        }),
-        DataType::Int96Decimal(scale) => Ok(ColumnType::Decimal {
-            scale: scale as i32,
-            precision: 27,
-        }),
+        // TODO upgrade DF
+        // DataType::Int64Decimal(scale) => Ok(ColumnType::Decimal {
+        //     scale: scale as i32,
+        //     precision: 18,
+        // }),
+        // DataType::Int96Decimal(scale) => Ok(ColumnType::Decimal {
+        //     scale: scale as i32,
+        //     precision: 27,
+        // }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
         | DataType::Int64
-        | DataType::Int96
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt32
@@ -1690,9 +1920,9 @@ impl SerializedRecordBatchStream {
         let mut results = Vec::with_capacity(record_batches.len());
         for batch in record_batches {
             let file = Vec::new();
-            let mut writer = MemStreamWriter::try_new(Cursor::new(file), schema)?;
+            let mut writer = StreamWriter::try_new(Cursor::new(file), schema)?;
             writer.write(&batch)?;
-            let cursor = writer.finish()?;
+            let cursor = writer.into_inner()?;
             results.push(Self {
                 record_batch_file: cursor.into_inner(),
             })
@@ -1702,7 +1932,7 @@ impl SerializedRecordBatchStream {
 
     pub fn read(self) -> Result<RecordBatch, CubeError> {
         let cursor = Cursor::new(self.record_batch_file);
-        let mut reader = StreamReader::try_new(cursor)?;
+        let mut reader = StreamReader::try_new(cursor, None)?;
         let batch = reader.next();
         if batch.is_none() {
             return Err(CubeError::internal("zero batches deserialized".to_string()));
@@ -1729,9 +1959,7 @@ fn combine_filters(filters: &[Expr]) -> Option<Expr> {
     let combined_filter = filters
         .iter()
         .skip(1)
-        .fold(filters[0].clone(), |acc, filter| {
-            logical_plan::and(acc, filter.clone())
-        });
+        .fold(filters[0].clone(), |acc, filter| and(acc, filter.clone()));
     Some(combined_filter)
 }
 
@@ -1759,7 +1987,9 @@ fn regroup_batches(
 
 fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
     // If we use [Array::slice], serialization will still copy the whole contents.
-    let mut a = MutableArrayData::new(vec![a.data()], false, len);
+    let d = a.to_data();
+    let data = vec![&d];
+    let mut a = MutableArrayData::new(data, false, len);
     a.extend(0, start, start + len);
     make_array(a.freeze())
 }

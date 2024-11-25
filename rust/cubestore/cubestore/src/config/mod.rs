@@ -49,7 +49,11 @@ use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
 use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
-use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
+// use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
+use crate::queryplanner::metadata_cache::{
+    BasicMetadataCacheFactory, LruParquetMetadataCacheFactory, MetadataCacheFactory,
+    NoopParquetMetadataCache,
+};
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -2075,8 +2079,8 @@ impl Config {
                 let metadata_cache_factory: &_ = cubestore_metadata_cache_factory.cache_factory();
                 CubestoreParquetMetadataCacheImpl::new(
                     match c.metadata_cache_max_capacity_bytes() {
-                        0 => metadata_cache_factory.make_noop_cache(),
-                        max_cached_metadata => metadata_cache_factory.make_lru_cache(
+                        0 => NoopParquetMetadataCache::new(),
+                        max_cached_metadata => LruParquetMetadataCacheFactory::new(
                             max_cached_metadata,
                             Duration::from_secs(c.metadata_cache_time_to_idle_secs()),
                         ),

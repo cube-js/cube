@@ -1,11 +1,12 @@
-#![feature(test)]
+// #![feature(test)]
 #![feature(async_closure)]
 #![feature(box_patterns)]
-#![feature(vec_into_raw_parts)]
-#![feature(hash_set_entry)]
-#![feature(is_sorted)]
-#![feature(result_flattening)]
-#![feature(extract_if)]
+// TODO upgrade DF
+// #![feature(vec_into_raw_parts)]
+// #![feature(hash_set_entry)]
+// #![feature(is_sorted)]
+// #![feature(result_flattening)]
+// #![feature(extract_if)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
@@ -39,6 +40,7 @@ pub mod app_metrics;
 pub mod cachestore;
 pub mod cluster;
 pub mod config;
+pub mod cube_ext;
 pub mod http;
 pub mod import;
 pub mod metastore;
@@ -266,7 +268,8 @@ impl From<Elapsed> for CubeError {
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
         match v {
-            datafusion::error::DataFusionError::Panic(msg) => CubeError::panic(msg),
+            // TODO upgrade DF
+            // datafusion::error::DataFusionError::Panic(msg) => CubeError::panic(msg),
             v => CubeError::from_error(v),
         }
     }

@@ -1,24 +1,29 @@
 use crate::metastore::Column;
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
 use datafusion::arrow::array::ArrayRef;
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::compute::concat_batches;
+use datafusion::arrow::datatypes::{Field, Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::logical_plan::{
-    Column as DFColumn, DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan,
-};
+use datafusion::common;
+use datafusion::common::{DFSchema, DFSchemaRef};
+use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
+use datafusion::execution::TaskContext;
+use datafusion::logical_expr::expr::{Alias, ScalarFunction};
+use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use datafusion::physical_plan::{collect, ExecutionPlan};
-use datafusion::prelude::{ExecutionConfig, ExecutionContext};
+use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
-use sqlparser::ast::Expr as SQExpr;
+use sqlparser::ast::{Expr as SQExpr, FunctionArgExpr, FunctionArgumentList, FunctionArguments};
 use sqlparser::ast::{FunctionArg, Ident, ObjectName, Query, SelectItem, SetExpr, Statement};
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::Tokenizer;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -43,7 +48,7 @@ impl KafkaPostProcessPlan {
             source_columns
                 .iter()
                 .map(|c| c.clone().into())
-                .collect::<Vec<_>>(),
+                .collect::<Vec<Field>>(),
         ));
         Self {
             projection_plan,
@@ -75,18 +80,21 @@ impl KafkaPostProcessPlan {
             None,
         )?);
         let filter_input = if let Some(filter_plan) = &self.filter_plan {
-            filter_plan.with_new_children(vec![input])?
+            filter_plan.clone().with_new_children(vec![input])?
         } else {
             input
         };
 
-        let projection = self.projection_plan.with_new_children(vec![filter_input])?;
+        let projection = self
+            .projection_plan
+            .clone()
+            .with_new_children(vec![filter_input])?;
 
-        let mut out_batches = collect(projection).await?;
+        let mut out_batches = collect(projection, Arc::new(TaskContext::default())).await?;
         let res = if out_batches.len() == 1 {
             out_batches.pop().unwrap()
         } else {
-            RecordBatch::concat(&self.source_schema, &out_batches)?
+            concat_batches(&self.source_schema, &out_batches)?
         };
 
         Ok(res.columns().to_vec())
@@ -127,7 +135,7 @@ impl KafkaPostProcessPlanner {
         }
     }
 
-    pub fn build(
+    pub async fn build(
         &self,
         select_statement: String,
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
@@ -136,13 +144,14 @@ impl KafkaPostProcessPlanner {
             self.columns
                 .iter()
                 .map(|c| c.clone().into())
-                .collect::<Vec<_>>(),
+                .collect::<Vec<Field>>(),
         ));
         let logical_plan = self.make_logical_plan(&select_statement)?;
         let source_unique_columns = self.extract_source_unique_columns(&logical_plan)?;
 
-        let (projection_plan, filter_plan) =
-            self.make_projection_and_filter_physical_plans(&logical_plan, metadata_cache_factory)?;
+        let (projection_plan, filter_plan) = self
+            .make_projection_and_filter_physical_plans(&logical_plan, metadata_cache_factory)
+            .await?;
         if target_schema != projection_plan.schema() {
             return Err(CubeError::user(format!(
                 "Table schema: {:?} don't match select_statement result schema: {:?}",
@@ -169,18 +178,18 @@ impl KafkaPostProcessPlanner {
         let dialect = &MySqlDialectWithBackTicks {};
         let mut tokenizer = Tokenizer::new(dialect, &select_statement);
         let tokens = tokenizer.tokenize().unwrap();
-        let statement = Parser::new(tokens, dialect).parse_statement()?;
+        let statement = Parser::new(dialect).with_tokens(tokens).parse_statement()?;
         let statement = self.rewrite_statement(statement);
 
         match &statement {
             Statement::Query(box Query {
-                body: SetExpr::Select(_),
+                body: box SetExpr::Select(_),
                 ..
             }) => {
                 let provider = TopicTableProvider::new(self.topic.clone(), &self.source_columns);
                 let query_planner = SqlToRel::new(&provider);
-                let logical_plan =
-                    query_planner.statement_to_plan(&DFStatement::Statement(statement.clone()))?;
+                let logical_plan = query_planner
+                    .statement_to_plan(DFStatement::Statement(Box::new(statement.clone())))?;
                 Ok(logical_plan)
             }
             _ => Err(CubeError::user(format!(
@@ -193,12 +202,17 @@ impl KafkaPostProcessPlanner {
     fn rewrite_statement(&self, statement: Statement) -> Statement {
         match statement {
             Statement::Query(box Query {
-                body: SetExpr::Select(mut s),
+                body: box SetExpr::Select(mut s),
                 with,
                 order_by,
                 limit,
+                limit_by,
                 offset,
                 fetch,
+                locks,
+                for_clause,
+                settings,
+                format_clause,
             }) => {
                 s.projection = s
                     .projection
@@ -216,11 +230,16 @@ impl KafkaPostProcessPlanner {
                 //let select =
                 Statement::Query(Box::new(Query {
                     with,
-                    body: SetExpr::Select(s),
+                    body: Box::new(SetExpr::Select(s)),
                     order_by,
                     limit,
+                    limit_by,
                     offset,
                     fetch,
+                    locks,
+                    for_clause,
+                    settings,
+                    format_clause,
                 }))
             }
             _ => statement,
@@ -260,26 +279,36 @@ impl KafkaPostProcessPlanner {
                 op,
                 expr: Box::new(self.rewrite_expr(*expr)),
             },
-            SQExpr::Cast { expr, data_type } => SQExpr::Cast {
+            SQExpr::Cast {
+                kind,
+                expr,
+                data_type,
+                format,
+            } => SQExpr::Cast {
+                kind,
                 expr: Box::new(self.rewrite_expr(*expr)),
                 data_type,
+                format,
             },
-            SQExpr::TryCast { expr, data_type } => SQExpr::TryCast {
-                expr: Box::new(self.rewrite_expr(*expr)),
-                data_type,
-            },
-            SQExpr::Extract { field, expr } => SQExpr::Extract {
+            SQExpr::Extract {
                 field,
+                syntax,
+                expr,
+            } => SQExpr::Extract {
+                field,
+                syntax,
                 expr: Box::new(self.rewrite_expr(*expr)),
             },
             SQExpr::Substring {
                 expr,
                 substring_from,
                 substring_for,
+                special,
             } => SQExpr::Substring {
                 expr: Box::new(self.rewrite_expr(*expr)),
                 substring_from,
                 substring_for,
+                special,
             },
             SQExpr::Nested(e) => SQExpr::Nested(Box::new(self.rewrite_expr(*e))),
             SQExpr::Function(mut f) => {
@@ -292,17 +321,37 @@ impl KafkaPostProcessPlanner {
                 } else {
                     f.name
                 };
-                f.args = f
-                    .args
-                    .into_iter()
-                    .map(|a| match a {
-                        FunctionArg::Named { name, arg } => FunctionArg::Named {
-                            name,
-                            arg: self.rewrite_expr(arg),
-                        },
-                        FunctionArg::Unnamed(expr) => FunctionArg::Unnamed(self.rewrite_expr(expr)),
-                    })
-                    .collect::<Vec<_>>();
+                f.args = match f.args {
+                    FunctionArguments::None => FunctionArguments::None,
+                    FunctionArguments::Subquery(s) => FunctionArguments::Subquery(s),
+                    FunctionArguments::List(list) => {
+                        FunctionArguments::List(FunctionArgumentList {
+                            duplicate_treatment: list.duplicate_treatment,
+                            args: list
+                                .args
+                                .into_iter()
+                                .map(|a| match a {
+                                    FunctionArg::Named {
+                                        name,
+                                        arg: FunctionArgExpr::Expr(e_arg),
+                                        operator,
+                                    } => FunctionArg::Named {
+                                        name,
+                                        arg: FunctionArgExpr::Expr(self.rewrite_expr(e_arg)),
+                                        operator,
+                                    },
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(e_arg)) => {
+                                        FunctionArg::Unnamed(FunctionArgExpr::Expr(
+                                            self.rewrite_expr(e_arg),
+                                        ))
+                                    }
+                                    arg => arg,
+                                })
+                                .collect::<Vec<_>>(),
+                            clauses: list.clauses,
+                        })
+                    }
+                };
                 SQExpr::Function(f)
             }
             SQExpr::Case {
@@ -335,7 +384,7 @@ impl KafkaPostProcessPlanner {
 
     fn extract_source_unique_columns(&self, plan: &LogicalPlan) -> Result<Vec<Column>, CubeError> {
         match plan {
-            LogicalPlan::Projection { expr, .. } => {
+            LogicalPlan::Projection(Projection { expr, .. }) => {
                 let mut source_unique_columns = vec![];
                 for e in expr.iter() {
                     let col_name = self.col_name_from_expr(e)?;
@@ -354,7 +403,7 @@ impl KafkaPostProcessPlanner {
     }
 
     /// Only Projection > [Filter] > TableScan plans are allowed
-    fn make_projection_and_filter_physical_plans(
+    async fn make_projection_and_filter_physical_plans(
         &self,
         plan: &LogicalPlan,
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
@@ -363,33 +412,36 @@ impl KafkaPostProcessPlanner {
             self.source_columns
                 .iter()
                 .map(|c| c.clone().into())
-                .collect::<Vec<_>>(),
+                .collect::<Vec<Field>>(),
         ));
-        let empty_exec = Arc::new(EmptyExec::new(false, source_schema));
+        let empty_exec = Arc::new(EmptyExec::new(source_schema));
         match plan {
-            LogicalPlan::Projection {
+            LogicalPlan::Projection(Projection {
                 input: projection_input,
                 expr,
                 schema,
-            } => match projection_input.as_ref() {
-                filter_plan @ LogicalPlan::Filter { input, .. } => match input.as_ref() {
+                ..
+            }) => match projection_input.as_ref() {
+                filter_plan @ LogicalPlan::Filter(Filter { input, .. }) => match input.as_ref() {
                     LogicalPlan::TableScan { .. } => {
                         let projection_plan = self.make_projection_plan(
                             expr,
                             schema.clone(),
                             projection_input.clone(),
                         )?;
-                        let plan_ctx = Arc::new(ExecutionContext::with_config(
-                            ExecutionConfig::new()
-                                .with_metadata_cache_factory(metadata_cache_factory),
-                        ));
+                        let plan_ctx =
+                            Arc::new(SessionContext::new_with_config(SessionConfig::new()));
 
                         let projection_phys_plan = plan_ctx
-                            .create_physical_plan(&projection_plan)?
+                            .state()
+                            .create_physical_plan(&projection_plan)
+                            .await?
                             .with_new_children(vec![empty_exec.clone()])?;
 
                         let filter_phys_plan = plan_ctx
-                            .create_physical_plan(&filter_plan)?
+                            .state()
+                            .create_physical_plan(&filter_plan)
+                            .await?
                             .with_new_children(vec![empty_exec.clone()])?;
 
                         Ok((projection_phys_plan.clone(), Some(filter_phys_plan)))
@@ -402,11 +454,11 @@ impl KafkaPostProcessPlanner {
                 LogicalPlan::TableScan { .. } => {
                     let projection_plan =
                         self.make_projection_plan(expr, schema.clone(), projection_input.clone())?;
-                    let plan_ctx = Arc::new(ExecutionContext::with_config(
-                        ExecutionConfig::new().with_metadata_cache_factory(metadata_cache_factory),
-                    ));
+                    let plan_ctx = Arc::new(SessionContext::new_with_config(SessionConfig::new()));
                     let projection_phys_plan = plan_ctx
-                        .create_physical_plan(&projection_plan)?
+                        .state()
+                        .create_physical_plan(&projection_plan)
+                        .await?
                         .with_new_children(vec![empty_exec.clone()])?;
                     Ok((projection_phys_plan, None))
                 }
@@ -439,30 +491,35 @@ impl KafkaPostProcessPlanner {
         }
 
         let result_schema = if need_add_seq_col {
-            res.push(Expr::Column(DFColumn::from_name(
+            res.push(Expr::Column(common::Column::from_name(
                 self.seq_column.get_name(),
             )));
-            Arc::new(schema.join(&DFSchema::new(vec![DFField::new(
-                None,
-                self.seq_column.get_name(),
-                datafusion::arrow::datatypes::DataType::Int64,
-                true,
-            )])?)?)
+            Arc::new(schema.join(&DFSchema::new_with_metadata(
+                vec![(
+                    None,
+                    Arc::new(Field::new(
+                        self.seq_column.get_name(),
+                        datafusion::arrow::datatypes::DataType::Int64,
+                        true,
+                    )),
+                )],
+                HashMap::new(),
+            )?)?)
         } else {
             schema.clone()
         };
 
-        Ok(LogicalPlan::Projection {
-            expr: res,
+        Ok(LogicalPlan::Projection(Projection::try_new_with_schema(
+            res,
             input,
-            schema: result_schema,
-        })
+            result_schema,
+        )?))
     }
 
     fn col_name_from_expr(&self, expr: &Expr) -> Result<String, CubeError> {
         match expr {
             Expr::Column(c) => Ok(c.name.clone()),
-            Expr::Alias(_, name) => Ok(name.clone()),
+            Expr::Alias(Alias { name, .. }) => Ok(name.clone()),
             _ => Err(CubeError::user(
                 "All expressions must have aliases in kafka streaming queries".to_string(),
             )),
@@ -473,8 +530,12 @@ impl KafkaPostProcessPlanner {
         fn find_column_name(expr: &Expr) -> Result<Option<String>, CubeError> {
             match expr {
                 Expr::Column(c) => Ok(Some(c.name.clone())),
-                Expr::Alias(e, _) => find_column_name(&**e),
-                Expr::ScalarUDF { args, .. } => {
+                Expr::Alias(Alias {
+                    expr: e,
+                    relation: _,
+                    name: _,
+                }) => find_column_name(&**e),
+                Expr::ScalarFunction(ScalarFunction { func: _, args }) => {
                     let mut column_name: Option<String> = None;
                     for arg in args {
                         if let Some(name) = find_column_name(arg)? {
@@ -497,9 +558,9 @@ impl KafkaPostProcessPlanner {
 
         let source_name = match expr {
             Expr::Column(c) => Ok(c.name.clone()),
-            Expr::Alias(e, _) => match &**e {
+            Expr::Alias(Alias { expr, .. }) => match &**expr {
                 Expr::Column(c) => Ok(c.name.clone()),
-                Expr::ScalarUDF { .. } => find_column_name(expr)?.ok_or_else(|| {
+                Expr::ScalarFunction(_) => find_column_name(expr)?.ok_or_else(|| {
                     CubeError::user(format!("Scalar function must contain at least one column, expression: {:?}", expr))
                 }),
                 _ => Err(CubeError::user(format!(
