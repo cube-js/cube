@@ -55,7 +55,10 @@ cube('line_items', {
           // This is to test dynamic values based on security context
           values: [`${security_context.auth?.userAttributes?.minDefaultId || 20000}`],
         }]
-      }
+      },
+      memberLevel: {
+        excludes: ['count', 'price', 'price_dim'],
+      },
     },
     {
       role: 'admin',
@@ -69,7 +72,7 @@ cube('line_items', {
         allowAll: true,
       },
       memberLevel: {
-        excludes: ['created_at'],
+        excludes: ['price_dim'],
       },
     },
     {
