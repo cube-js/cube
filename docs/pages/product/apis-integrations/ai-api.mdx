@@ -138,3 +138,63 @@ One way of handling this is to pass the error message back into the AI API; it m
 #### 3. Continue wait
 
 When using `"runQuery": true`, you might sometimes receive a query result containing `{ "error": "Continue wait" }`. If this happens, you should use `/load` ([described above](#2-load)) instead of `runQuery` to run the query, and handle retries as described in the [REST API documentation](/product/apis-integrations/rest-api#continue-wait).
+
+## Advanced Features
+### Custom prompts
+
+You can prompt the AI API with custom instructions. For example, you may want it to always
+respond in a particular language, or to refer to itself by a name matching your brand.
+Custom prompts also allow you to give the model more context on your company and data model,
+for example if it should usually prefer a particular view.
+
+To use a custom prompt, set the `CUBE_CLOUD_AI_API_PROMPT` environment variable in your deployment.
+
+<InfoBox>
+  Custom prompts add to, rather than overwrite, the AI API's existing prompting, so you
+  do not need to re-write instructions around how to generate the query itself.
+</InfoBox>
+
+### Meta tags
+
+The AI API can read [meta tags](/reference/data-model/view#meta) on your dimensions, measures, 
+segments, and views.
+
+Use the `ai` meta tag to give context that is specific to AI and goes beyond what is 
+included in the description. This can have any keys that you want. For example, you can use it
+to give the AI context on possible values in a categorical dimension:
+```yaml
+      - name: status
+        sql: status
+        type: string
+        meta:
+          ai:
+            values:
+              - shipped
+              - processing
+              - completed
+```
+
+### Other LLM providers
+
+If desired, you may "bring your own" LLM model by providing a model and API credentials
+for a supported model provider. Do this by setting environment variables in your Cube
+deployment. See below for required variables by provider (required unless noted):
+
+#### AWS Bedrock
+
+- `CUBE_BEDROCK_MODEL_ID`
+- `CUBE_BEDROCK_ACCESS_KEY`
+- `CUBE_BEDROCK_ACCESS_SECRET`
+- `CUBE_BEDROCK_REGION_ID`
+
+#### GCP Vertex
+
+- `CUBE_VERTEX_MODEL_ID`
+- `CUBE_VERTEX_PROJECT_ID`
+- `CUBE_VERTEX_REGION`
+- `CUBE_VERTEX_CREDENTIALS`
+
+#### OpenAI
+
+- `OPENAI_MODEL`
+- `OPENAI_API_KEY`
