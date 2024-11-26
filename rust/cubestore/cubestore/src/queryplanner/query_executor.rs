@@ -1589,7 +1589,7 @@ impl TableProvider for InlineTableProvider {
                     .collect::<Vec<Field>>(),
             ))
         } else {
-            schema
+            schema.clone()
         };
 
         if !self.inline_table_ids.iter().any(|id| id == &self.id) {
@@ -1601,7 +1601,7 @@ impl TableProvider for InlineTableProvider {
         let projection = projection.cloned();
         Ok(Arc::new(MemoryExec::try_new(
             &vec![batches],
-            projected_schema,
+            schema.clone(),
             projection,
         )?))
     }
