@@ -571,10 +571,10 @@ impl<'a> Into<Field> for &'a Column {
                 ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
                 ColumnType::Boolean => DataType::Boolean,
                 ColumnType::Decimal { scale, precision } => {
-                    DataType::Decimal128(scale as u8, precision as i8)
+                    DataType::Decimal128(precision as u8, scale as i8)
                 }
                 ColumnType::Decimal96 { scale, precision } => {
-                    DataType::Decimal128(scale as u8, precision as i8)
+                    DataType::Decimal128(precision as u8, scale as i8)
                 }
                 ColumnType::Bytes => DataType::Binary,
                 ColumnType::HyperLogLog(_) => DataType::Binary,
