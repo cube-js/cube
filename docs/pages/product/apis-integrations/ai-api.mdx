@@ -139,7 +139,12 @@ One way of handling this is to pass the error message back into the AI API; it m
 
 When using `"runQuery": true`, you might sometimes receive a query result containing `{ "error": "Continue wait" }`. If this happens, you should use `/load` ([described above](#2-load)) instead of `runQuery` to run the query, and handle retries as described in the [REST API documentation](/product/apis-integrations/rest-api#continue-wait).
 
-## Advanced Features
+## Advanced Usage
+
+<InfoBox>
+    The advanced features discussed here are available on Cube version 1.1.7 and above.
+</InfoBox>
+
 ### Custom prompts
 
 You can prompt the AI API with custom instructions. For example, you may want it to always
@@ -176,10 +181,10 @@ to give the AI context on possible values in a categorical dimension:
 
 ### Other LLM providers
 
-<WarningBox>
+<InfoBox>
   These environment variables also apply to the [AI Assistant](/product/workspace/ai-assistant),
   if it is enabled on your deployment.
-</WarningBox>
+</InfoBox>
 
 If desired, you may "bring your own" LLM model by providing a model and API credentials
 for a supported model provider. Do this by setting environment variables in your Cube
