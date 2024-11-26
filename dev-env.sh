@@ -20,9 +20,9 @@ build_packages() {
         if [ -d "$package" ]; then
             echo "Building $package..."
             cd "$package"
-            if ! yarn build; then
-                echo "yarn build failed for $package, trying yarn tsc..."
-                yarn tsc || true
+            if ! yarn build 2>/dev/null; then
+                #echo "yarn build failed for $package, trying yarn tsc..."
+                yarn tsc 2>/dev/null || true
             fi
             cd "$SCRIPT_DIR"
         fi
@@ -55,24 +55,27 @@ get_db_types() {
             fi
         fi
     done
-    echo "${db_types[@]}"
+    printf "%s\n" "${db_types[@]}"
 }
 
 # Function to create new project
 create_project() {
     local app_name=$1
     local db_type=$2
-    
+
     # If app_name is not provided, ask for it
     if [ -z "$app_name" ]; then
-        read -p "Enter the application name: " app_name
+        read -r -p "Enter the application name: " app_name
     fi
-    
+
     # If db_type is not provided, show selection menu
     if [ -z "$db_type" ]; then
         # Get available database types
-        readarray -t db_types < <(get_db_types)
-        
+        db_types=()
+        while IFS= read -r line; do
+          db_types+=("$line")
+        done < <(get_db_types)
+
         echo "Available database types:"
         PS3='Please select the database type: '
         select DB_TYPE in "${db_types[@]}"
@@ -85,16 +88,20 @@ create_project() {
             fi
         done
     fi
-    
+
     cd "$CURRENT_DIR"
     echo "Creating new project with name $app_name and database type $db_type..."
     node "$SCRIPT_DIR/packages/cubejs-cli/dist/src/index.js" create "$app_name" -d "$db_type"
+    link_project_packages "$app_name"
+
+    echo "Project setup completed!"
+    echo "You can now run 'yarn dev' in the $app_name directory to start your project."
 }
 
 # Function to link packages to new project
 link_project_packages() {
     local app_name=$1
-    
+
     echo "Linking packages in the new project..."
     cd "$CURRENT_DIR/$app_name"
     for package in "$SCRIPT_DIR"/packages/*; do
@@ -110,15 +117,11 @@ link_project_packages() {
 setup() {
     local app_name=$1
     local db_type=$2
-    
+
     install_root_dependencies
     build_packages
     link_packages
     create_project "$app_name" "$db_type"
-    link_project_packages "$app_name"
-    
-    echo "Project setup completed!"
-    echo "You can now run 'yarn dev' in the $app_name directory to start your project."
 }
 
 # Function to show help
@@ -174,16 +177,16 @@ case "$command" in
         ;;
     "link")
         link_packages
-        link_project_packages "$1"
+        link_project_packages "$2"
         ;;
     "drivers")
         get_db_types
         ;;
     "create")
-        create_project "$1" "$2"
+        create_project "$2" "$3"
         ;;
     "setup")
-        setup "$1" "$2"
+        setup "$2" "$3"
         ;;
     "-h"|"--help"|"help")
         show_help
@@ -197,3 +200,4 @@ case "$command" in
 esac
 
 cd "$CURRENT_DIR"
+
