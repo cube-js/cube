@@ -23,9 +23,9 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
-    Int64Array, MutableArrayData, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray,
-    UInt16Array, UInt32Array, UInt64Array,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
+    Int16Array, Int32Array, Int64Array, MutableArrayData, StringArray, TimestampMicrosecondArray,
+    TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
@@ -1692,14 +1692,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                     }
                 }
                 // TODO upgrade DF
-                // DataType::Int64Decimal(0) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int64Decimal0Array,
-                //     Decimal,
-                //     (Decimal)
-                // ),
+                DataType::Decimal128(_, _) => {
+                    convert_array!(array, num_rows, rows, Decimal128Array, Decimal, (Decimal))
+                }
                 // DataType::Int64Decimal(1) => convert_array!(
                 //     array,
                 //     num_rows,
@@ -1878,6 +1873,10 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         //     scale: scale as i32,
         //     precision: 27,
         // }),
+        DataType::Decimal128(precision, scale) => Ok(ColumnType::Decimal {
+            scale: scale as i32,
+            precision: precision as i32,
+        }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16
