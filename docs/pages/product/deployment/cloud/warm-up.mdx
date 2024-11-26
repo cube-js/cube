@@ -41,6 +41,13 @@ Data-model warm-up will compile the data model before a Cube Cloud deployment
 is exposed to requests from users, making sure that they aren't affected by
 the data model compilation time.
 
+
+<InfoBox>
+If a data model warm-up takes more than 15 minutes, the deployment will be
+considered unhealthy and rolled back.
+
+</InfoBox>
+
 ### Configuring data model warm-up
 
 To configure data model warm-up, navigate to <Btn>Settings → Configuration</Btn>
@@ -61,6 +68,13 @@ their builds might take from seconds to minutes.
 Pre-aggregation warm-up will refresh pre-aggregations before a Cube Cloud
 deployment is exposed to requests from users, making sure they aren't affected
 by the pre-aggregation build time.
+
+<InfoBox>
+
+If a pre-aggregation warm-up takes more than 24 hours, it will be cancelled.
+However, the deployment will still succeed.
+
+</InfoBox>
 
 ### Configuring pre-aggregation warm-up
 
