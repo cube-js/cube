@@ -45,15 +45,15 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
             Field::new(
                 "build_range_end",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new(
                 "seal_at",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new("sealed", DataType::Boolean, false),
-            Field::new("select_statement", DataType::Utf8, false),
+            Field::new("select_statement", DataType::Utf8, true),
             Field::new("extension", DataType::Utf8, true),
         ]
     }

@@ -325,7 +325,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 let table = self
                     .inline_tables
                     .iter()
-                    .find(|inline_table| inline_table.name == table.as_ref())
+                    .find(|inline_table| inline_table.name.to_lowercase() == table.as_ref())
                     .ok_or_else(|| {
                         DataFusionError::Plan(format!("Inline table {} was not found", name))
                     })?;
@@ -796,11 +796,16 @@ impl ExecutionPlan for InfoSchemaTableExec {
         };
         let table = self.table.clone();
         let limit = self.limit.clone();
+        let projection = self.projection.clone();
         let batch = async move {
-            table
+            let mut batch = table
                 .scan(table_def, limit)
                 .await
-                .map_err(|e| DataFusionError::Execution(e.to_string()))
+                .map_err(|e| DataFusionError::Execution(e.to_string()))?;
+            if let Some(projection) = projection {
+                batch = batch.project(projection.as_slice())?;
+            }
+            Ok(batch)
         };
 
         let stream = futures::stream::once(batch);

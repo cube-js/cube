@@ -26,13 +26,9 @@ use crate::queryplanner::query_executor::{
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::ClusterAggregateTopK;
-use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
-use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
-use datafusion::cube_ext::join::CrossJoinExec;
-use datafusion::cube_ext::joinagg::CrossJoinAggExec;
-use datafusion::cube_ext::rolling::RollingWindowAggExec;
-use datafusion::cube_ext::rolling::RollingWindowAggregate;
+use crate::queryplanner::topk::SortColumn;
 use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::joins::HashJoinExec;

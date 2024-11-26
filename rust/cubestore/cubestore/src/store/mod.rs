@@ -59,12 +59,32 @@ pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
 #[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct DataFrame {
     columns: Vec<Column>,
-    data: Vec<Row>,
+    data: Arc<Vec<Row>>,
 }
 
 impl DataFrame {
     pub fn new(columns: Vec<Column>, data: Vec<Row>) -> DataFrame {
-        DataFrame { columns, data }
+        DataFrame {
+            columns,
+            data: Arc::new(data),
+        }
+    }
+
+    pub fn lowercase(&self) -> Self {
+        Self {
+            columns: self
+                .columns
+                .iter()
+                .map(|c| {
+                    Column::new(
+                        c.get_name().to_lowercase(),
+                        c.get_column_type().clone(),
+                        c.get_index().clone(),
+                    )
+                })
+                .collect(),
+            data: self.data.clone(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -86,14 +106,6 @@ impl DataFrame {
 
     pub fn get_rows(&self) -> &Vec<Row> {
         &self.data
-    }
-
-    pub fn mut_rows(&mut self) -> &mut Vec<Row> {
-        &mut self.data
-    }
-
-    pub fn into_rows(self) -> Vec<Row> {
-        self.data
     }
 
     pub fn to_execution_plan(
@@ -165,10 +177,6 @@ impl ChunkData {
 
     pub fn len(&self) -> usize {
         self.data_frame.len()
-    }
-
-    pub fn mut_rows(&mut self) -> &mut Vec<Row> {
-        &mut self.data_frame.data
     }
 }
 

@@ -1,5 +1,5 @@
-use super::udf_xirr::XirrAccumulator;
-use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
+//TODO rebase use super::udf_xirr::XirrAccumulator;
+use crate::queryplanner::coalesce::SUPPORTED_COALESCE_TYPES;
 use crate::queryplanner::hll::{Hll, HllUnion};
 use crate::CubeError;
 use chrono::{Datelike, Duration, Months, NaiveDateTime, TimeZone, Utc};
@@ -8,7 +8,7 @@ use datafusion::arrow::array::{
 };
 use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use std::any::Any;
-// use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
+// use datafusion::cube_ext::datetime::{date_addsub_array, datke_addsub_scalar};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::function::AccumulatorArgs;
 use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyInfo};
