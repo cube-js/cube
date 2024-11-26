@@ -455,7 +455,7 @@ impl WrapperRules {
                             "?grouped_subqueries",
                         ),
                         wrapper_pullup_replacer(
-                            wrapped_select_joins_empty_tail(),
+                            "?inner_joins",
                             "?alias_to_cube",
                             "WrapperPullupReplacerPushToCube:true",
                             "WrapperPullupReplacerInProjection:false",
@@ -545,7 +545,7 @@ impl WrapperRules {
                         "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
-                        wrapped_select_joins_empty_tail(),
+                        "?inner_joins",
                         "?alias_to_cube",
                         "WrapperPullupReplacerPushToCube:true",
                         "WrapperPullupReplacerInProjection:false",
