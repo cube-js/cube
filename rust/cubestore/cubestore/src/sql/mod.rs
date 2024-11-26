@@ -128,7 +128,11 @@ pub type InlineTables = Vec<InlineTable>;
 
 impl InlineTable {
     pub fn new(id: u64, name: String, data: Arc<DataFrame>) -> Self {
-        Self { id, name, data }
+        Self {
+            id,
+            name: name.to_lowercase(),
+            data: Arc::new(data.lowercase()),
+        }
     }
 }
 

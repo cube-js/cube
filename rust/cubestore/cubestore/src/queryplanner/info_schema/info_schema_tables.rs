@@ -27,12 +27,12 @@ impl InfoSchemaTableDef for TablesInfoSchemaTableDef {
             Field::new(
                 "build_range_end",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new(
                 "seal_at",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
         ]
     }

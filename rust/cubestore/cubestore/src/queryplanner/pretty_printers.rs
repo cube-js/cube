@@ -28,7 +28,7 @@ use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::SortColumn;
 use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
-use crate::queryplanner::CubeTableLogical;
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::joins::HashJoinExec;
@@ -303,6 +303,8 @@ fn pp_source(t: Arc<dyn TableProvider>) -> String {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
     } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
         format!("InlineTableProvider(data: {} rows)", t.get_data().len())
+    } else if let Some(t) = t.as_any().downcast_ref::<InfoSchemaTableProvider>() {
+        format!("InfoSchemaTableProvider(table: {:?})", t.table)
     } else {
         panic!("unknown table provider");
     }
