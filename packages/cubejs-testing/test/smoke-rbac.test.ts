@@ -203,12 +203,12 @@ describe('Cube RBAC Engine', () => {
       });
     });
 
-    test('line_items hidden created_at', async () => {
+    test('line_items hidden price_dim', async () => {
       let query: Query = {
         measures: ['line_items.count'],
-        dimensions: ['line_items.created_at'],
+        dimensions: ['line_items.price_dim'],
         order: {
-          'line_items.created_at': 'asc',
+          'line_items.price_dim': 'asc',
         },
       };
       let error = '';
@@ -220,9 +220,9 @@ describe('Cube RBAC Engine', () => {
       expect(error).toContain('You requested hidden member');
       query = {
         measures: ['line_items_view_no_policy.count'],
-        dimensions: ['line_items_view_no_policy.created_at'],
+        dimensions: ['line_items_view_no_policy.price_dim'],
         order: {
-          'line_items_view_no_policy.created_at': 'asc',
+          'line_items_view_no_policy.price_dim': 'asc',
         },
         limit: 10,
       };

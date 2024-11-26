@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { v4 as uuidv4 } from 'uuid';
 import { NativeInstance } from '@cubejs-backend/native';
@@ -439,17 +438,18 @@ export class CompilerApi {
         const applicablePolicies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
 
         const computeMemberVisibility = (item) => {
-          let isIncluded = false;
-          let isExplicitlyExcluded = false;
           for (const policy of applicablePolicies) {
             if (policy.memberLevel) {
-              isIncluded = policy.memberLevel.includesMembers.includes(item.name) || isIncluded;
-              isExplicitlyExcluded = policy.memberLevel.excludesMembers.includes(item.name) || isExplicitlyExcluded;
+              if (policy.memberLevel.includesMembers.includes(item.name) &&
+               !policy.memberLevel.excludesMembers.includes(item.name)) {
+                return true;
+              }
             } else {
-              isIncluded = true;
+              // If there's no memberLevel policy, we assume that all members are visible
+              return true;
             }
           }
-          return isIncluded && !isExplicitlyExcluded;
+          return false;
         };
 
         for (const dimension of cube.config.dimensions) {
