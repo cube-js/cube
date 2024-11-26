@@ -176,25 +176,40 @@ to give the AI context on possible values in a categorical dimension:
 
 ### Other LLM providers
 
+<WarningBox>
+  These environment variables also apply to the [AI Assistant](/product/workspace/ai-assistant),
+  if it is enabled on your deployment.
+</WarningBox>
+
 If desired, you may "bring your own" LLM model by providing a model and API credentials
 for a supported model provider. Do this by setting environment variables in your Cube
 deployment. See below for required variables by provider (required unless noted):
 
 #### AWS Bedrock
 
-- `CUBE_BEDROCK_MODEL_ID`
-- `CUBE_BEDROCK_ACCESS_KEY`
-- `CUBE_BEDROCK_ACCESS_SECRET`
-- `CUBE_BEDROCK_REGION_ID`
+<WarningBox>
+  The AI API currently supports only Anthropic Claude models on AWS Bedrock. Other
+  models may work but are not fully supported.
+</WarningBox>
+
+- `CUBE_BEDROCK_MODEL_ID` - A supported [AWS Bedrock chat model](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html), for example `anthropic.claude-3-5-sonnet-20241022-v2:0`
+- `CUBE_BEDROCK_ACCESS_KEY` - An access key for an IAM user with `InvokeModelWithResponseStream` permissions on the desired region/model.
+- `CUBE_BEDROCK_ACCESS_SECRET` - The corresponding access secret
+- `CUBE_BEDROCK_REGION_ID` - A supported AWS Bedrock region, for example `us-west-2`
 
 #### GCP Vertex
 
-- `CUBE_VERTEX_MODEL_ID`
-- `CUBE_VERTEX_PROJECT_ID`
-- `CUBE_VERTEX_REGION`
-- `CUBE_VERTEX_CREDENTIALS`
+<WarningBox>
+  The AI API currently supports only Anthropic Claude models on GCP Vertex. Other
+  models may work but are not fully supported.
+</WarningBox>
+
+- `CUBE_VERTEX_MODEL_ID` - A supported GCP Vertex chat model, for example `claude-3-5-sonnet@20240620`
+- `CUBE_VERTEX_PROJECT_ID` - The GCP project the model is deployed in
+- `CUBE_VERTEX_REGION` - The GCP region the model is deployed in, for example `us-east5`
+- `CUBE_VERTEX_CREDENTIALS` - The private key for a service account with permissions to run the chosen model
 
 #### OpenAI
 
-- `OPENAI_MODEL`
-- `OPENAI_API_KEY`
+- `OPENAI_MODEL` - An OpenAI chat model ID, for example `gpt-4o`
+- `OPENAI_API_KEY` - An OpenAI API key (we recommend creating a service account for the AI API)
