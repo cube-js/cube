@@ -197,6 +197,7 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.TRUNC = 'CASE WHEN ({{ args[0] }}) >= 0 THEN FLOOR({{ args_concat }}) ELSE CEIL({{ args_concat }}) END';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
     // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`
