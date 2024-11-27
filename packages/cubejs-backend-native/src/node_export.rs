@@ -514,14 +514,14 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsValu
     match parse_cubestore_ws_result(&msg_data) {
         Ok(result) => {
             let js_array = cx.execute_scoped(|mut cx| {
-                let js_array = JsArray::new(&mut cx, result.len());
+                let js_array = JsArray::new(&mut cx, result.rows.len());
 
-                for (i, row) in result.into_iter().enumerate() {
+                for (i, row) in result.rows.iter().enumerate() {
                     let js_row = cx.execute_scoped(|mut cx| {
                         let js_row = JsObject::new(&mut cx);
-                        for (key, value) in row.into_iter() {
-                            let js_value = cx.string(value);
-                            js_row.set(&mut cx, key, js_value)?;
+                        for (key, value) in result.columns.iter().zip(row.into_iter()) {
+                            let js_value = cx.string(*value);
+                            js_row.set(&mut cx, *key, js_value)?;
                         }
                         Ok(js_row)
                     })?;

@@ -1,5 +1,4 @@
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
-use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -24,9 +23,14 @@ impl std::fmt::Display for ParseError {
     }
 }
 
+pub struct CubeStoreResult<'a> {
+    pub columns: Vec<&'a str>,
+    pub rows: Vec<Vec<&'a str>>,
+}
+
 impl std::error::Error for ParseError {}
 
-pub fn parse_cubestore_ws_result(msg_data: &[u8]) -> Result<Vec<HashMap<&str, &str>>, ParseError> {
+pub fn parse_cubestore_ws_result(msg_data: &[u8]) -> Result<CubeStoreResult, ParseError> {
     let http_message = root_as_http_message(msg_data).map_err(|_| ParseError::FlatBufferError)?;
 
     let command_type = http_message.command_type();
@@ -51,20 +55,19 @@ pub fn parse_cubestore_ws_result(msg_data: &[u8]) -> Result<Vec<HashMap<&str, &s
             }
 
             let result_set_rows = result_set.rows().ok_or(ParseError::EmptyResultSet)?;
-            let mut result = Vec::with_capacity(result_set_rows.len());
+            let mut result = CubeStoreResult{
+                columns: result_set_columns.iter().collect(),
+                rows: Vec::with_capacity(result_set_rows.len())
+            };
 
             for row in result_set_rows.iter() {
                 let values = row.values().ok_or(ParseError::NullRow)?;
-                let row_obj: HashMap<_, _> = result_set_columns
+                let row_obj: Vec<_> = values
                     .iter()
-                    .zip(values.iter())
-                    .map(|(col, val)| {
-                        let value = val.string_value().unwrap_or("");
-                        (col, value)
-                    })
+                    .map(|val| val.string_value().unwrap_or(""))
                     .collect();
 
-                result.push(row_obj);
+                result.rows.push(row_obj);
             }
 
             Ok(result)
