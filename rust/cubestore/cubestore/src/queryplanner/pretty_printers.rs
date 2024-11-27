@@ -37,6 +37,7 @@ use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::union::UnionExec;
+use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {
@@ -305,6 +306,8 @@ fn pp_source(t: Arc<dyn TableProvider>) -> String {
         format!("InlineTableProvider(data: {} rows)", t.get_data().len())
     } else if let Some(t) = t.as_any().downcast_ref::<InfoSchemaTableProvider>() {
         format!("InfoSchemaTableProvider(table: {:?})", t.table)
+    } else if let Some(_) = t.as_any().downcast_ref::<InfoSchemaQueryCacheTableProvider>() {
+        "InfoSchemaQueryCacheTableProvider".to_string()
     } else {
         panic!("unknown table provider");
     }
