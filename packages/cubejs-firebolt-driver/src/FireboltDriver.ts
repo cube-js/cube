@@ -78,7 +78,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     } = {},
   ) {
     // Set connection timeout to 2 minutes to allow the engine to start if it's stopped
-    super({testConnectionTimeout: 120000, ...config});
+    super({ testConnectionTimeout: 120000, ...config });
 
     const dataSource =
       config.dataSource ||
