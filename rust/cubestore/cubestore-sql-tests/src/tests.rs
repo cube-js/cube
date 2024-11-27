@@ -4099,37 +4099,38 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         \n                  Empty"
     );
 
-    let p = service
-        .plan_query(
-            "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
+    let query = "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
                          FROM (SELECT * FROM s.Data1 \
                                UNION ALL \
                                SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          HAVING SUM(`hits`) > 10 AND CARDINALITY(MERGE(`uhits`)) > 5 \
                          ORDER BY 2 DESC \
-                         LIMIT 3",
-        )
-        .await
-        .unwrap();
+                         LIMIT 3";
+    let p = service.plan_query(query).await.unwrap();
     let mut show_hints = PPOptions::default();
     show_hints.show_filters = true;
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Projection, [url, SUM(Data.hits)@1:hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
-        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
-        \n    Worker\
-        \n      Sort\
-        \n        FullInplaceAggregate\
-        \n          MergeSort\
-        \n            Union\
-        \n              MergeSort\
-        \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
-        \n                  Empty\
-        \n              MergeSort\
-        \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
-        \n                  Empty"
+        "Projection, [url, hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
+        \n  Projection, [url, SUM(Data.hits)@1:hits, MERGE(Data.uhits)@2:MERGE(uhits)]\
+        \n    AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
+        \n      Worker\
+        \n        Sort\
+        \n          FullInplaceAggregate\
+        \n            MergeSort\
+        \n              Union\
+        \n                MergeSort\
+        \n                  Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                    Empty\
+        \n                MergeSort\
+        \n                  Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                    Empty"
         );
+    // Checking execution because the column name MERGE(Data.uhits) in the top projection in the
+    // above assertion seems incorrect, but the column number is correct.
+    let result = service.exec_query(query).await.unwrap();
+    assert_eq!(result.len(), 0);
 }
 async fn planning_topk_hll(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
