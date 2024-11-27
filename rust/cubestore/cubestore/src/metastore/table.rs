@@ -11,7 +11,9 @@ use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema as ArrowSchema;
-use datafusion::physical_plan::expressions::{sum_return_type, Column as FusionColumn, Max, Min, Sum};
+use datafusion::physical_plan::expressions::{
+    sum_return_type, Column as FusionColumn, Max, Min, Sum,
+};
 use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
 use itertools::Itertools;
 
@@ -77,7 +79,12 @@ impl AggregateColumn {
         let res: Arc<dyn AggregateExpr> = match self.function {
             AggregateFunction::SUM => {
                 let input_data_type = col.data_type(schema)?;
-                Arc::new(Sum::new(col.clone(), col.name(), sum_return_type(&input_data_type)?, &input_data_type))
+                Arc::new(Sum::new(
+                    col.clone(),
+                    col.name(),
+                    sum_return_type(&input_data_type)?,
+                    &input_data_type,
+                ))
             }
             AggregateFunction::MAX => {
                 Arc::new(Max::new(col.clone(), col.name(), col.data_type(schema)?))
