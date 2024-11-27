@@ -1525,8 +1525,22 @@ impl ExecutionPlan for ClusterSendExec {
         &self.properties
     }
 
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+        let input_ordering = self.input_for_optimizations.required_input_ordering();
+        if !input_ordering.is_empty() {
+            vec![input_ordering[0].clone()]
+        } else {
+            vec![None]
+        }
+    }
+
     fn maintains_input_order(&self) -> Vec<bool> {
-        vec![true; self.children().len()]
+        let maintains_input_order = self.input_for_optimizations.maintains_input_order();
+        if !maintains_input_order.is_empty() {
+            vec![maintains_input_order[0]]
+        } else {
+            vec![false]
+        }
     }
 }
 
