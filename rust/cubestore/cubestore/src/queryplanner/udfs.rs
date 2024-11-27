@@ -7,12 +7,14 @@ use datafusion::arrow::array::{
 };
 use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use std::any::Any;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::Data;
 // use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::function::AccumulatorArgs;
 use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyInfo};
 use datafusion::logical_expr::{
-    AggregateUDF, AggregateUDFImpl, Expr, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
+    AggregateUDF, AggregateUDFImpl, Expr, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature,
+    Volatility,
 };
 use datafusion::physical_plan::{Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
@@ -32,15 +34,9 @@ pub enum CubeScalarUDFKind {
     DateBin,
 }
 
-pub trait CubeScalarUDF {
-    fn kind(&self) -> CubeScalarUDFKind;
-    fn name(&self) -> &str;
-    fn descriptor(&self) -> ScalarUDF;
-}
-
 pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
     match k {
-        CubeScalarUDFKind::HllCardinality => todo!(), // Box::new(HllCardinality {}),
+        CubeScalarUDFKind::HllCardinality => Arc::new(HllCardinality::descriptor()),
         // CubeScalarUDFKind::Coalesce => Box::new(Coalesce {}),
         // CubeScalarUDFKind::Now => Box::new(Now {}),
         CubeScalarUDFKind::UnixTimestamp => {
@@ -560,47 +556,67 @@ impl ScalarUDFImpl for UnixTimestamp {
 //     }
 // }
 //
-// struct HllCardinality {}
-// impl CubeScalarUDF for HllCardinality {
-//     fn kind(&self) -> CubeScalarUDFKind {
-//         return CubeScalarUDFKind::HllCardinality;
-//     }
-//
-//     fn name(&self) -> &str {
-//         return "CARDINALITY";
-//     }
-//
-//     fn descriptor(&self) -> ScalarUDF {
-//         return ScalarUDF {
-//             name: self.name().to_string(),
-//             signature: Signature::Exact(vec![DataType::Binary]),
-//             return_type: Arc::new(|_| Ok(Arc::new(DataType::UInt64))),
-//             fun: Arc::new(|a| {
-//                 assert_eq!(a.len(), 1);
-//                 let sketches = a[0].clone().into_array(1);
-//                 let sketches = sketches
-//                     .as_any()
-//                     .downcast_ref::<BinaryArray>()
-//                     .expect("expected binary data");
-//
-//                 let mut r = UInt64Builder::new(sketches.len());
-//                 for s in sketches {
-//                     match s {
-//                         None => r.append_null()?,
-//                         Some(d) => {
-//                             if d.len() == 0 {
-//                                 r.append_value(0)?
-//                             } else {
-//                                 r.append_value(read_sketch(d)?.cardinality())?
-//                             }
-//                         }
-//                     }
-//                 }
-//                 return Ok(ColumnarValue::Array(Arc::new(r.finish())));
-//             }),
-//         };
-//     }
-// }
+
+#[derive(Debug)]
+struct HllCardinality {
+    signature: Signature,
+}
+impl HllCardinality {
+    pub fn new() -> HllCardinality {
+        // TODO upgrade DF: Is it Volatile or Immutable?
+        let signature = Signature::new(
+            TypeSignature::Exact(vec![DataType::Binary]),
+            Volatility::Volatile,
+        );
+
+        HllCardinality { signature }
+    }
+    fn descriptor() -> ScalarUDF {
+        return ScalarUDF::new_from_impl(HllCardinality::new());
+    }
+}
+
+impl ScalarUDFImpl for HllCardinality {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn name(&self) -> &str {
+        "CARDINALITY"
+    }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        Ok(DataType::UInt64)
+    }
+    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        assert_eq!(args.len(), 1);
+        let sketches = args[0].clone().into_array(1)?;
+        let sketches = sketches
+            .as_any()
+            .downcast_ref::<BinaryArray>()
+            .expect("expected binary data");
+
+        let mut r = UInt64Builder::with_capacity(sketches.len());
+        for s in sketches {
+            match s {
+                None => r.append_null(),
+                Some(d) => {
+                    if d.len() == 0 {
+                        r.append_value(0)
+                    } else {
+                        r.append_value(read_sketch(d)?.cardinality())
+                    }
+                }
+            }
+        }
+        return Ok(ColumnarValue::Array(Arc::new(r.finish())));
+    }
+    fn aliases(&self) -> &[String] {
+        &[]
+    }
+}
+
 //
 // #[derive(Debug)]
 // struct HllMergeUDF {}
@@ -715,7 +731,7 @@ impl ScalarUDFImpl for UnixTimestamp {
 //         return Ok(());
 //     }
 // }
-//
-// pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
-//     return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
-// }
+
+pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
+    return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
+}
