@@ -1,6 +1,9 @@
+import {assertDataSource, getEnv} from '@cubejs-backend/shared';
 import { DriverTests } from '@cubejs-backend/testing-shared';
 
 import { FireboltDriver } from '../src';
+import { Firebolt } from 'firebolt-sdk';
+import { version } from 'firebolt-sdk/package.json';
 
 describe('FireboltDriver autostart', () => {
   let tests: DriverTests;
@@ -29,5 +32,35 @@ describe('FireboltDriver autostart', () => {
     } catch (error) {
       expect(driver.ensureEngineRunning).toHaveBeenCalled();
     }
+  });
+  test('starts the engine after connection', async () => {
+    const dataSource = assertDataSource('default');
+
+    const username = getEnv('dbUser', { dataSource });
+    const auth = username.includes('@')
+      ? { username, password: getEnv('dbPass', { dataSource }) }
+      : { client_id: username, client_secret: getEnv('dbPass', { dataSource }) };
+    const engineName = getEnv('fireboltEngineName', { dataSource });
+    const firebolt = Firebolt({
+      apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
+    })
+    await firebolt.connect({
+      auth,
+      database: getEnv('dbName', { dataSource }),
+      account: getEnv('fireboltAccount', { dataSource }),
+      engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource }),
+      additionalParameters: {
+        userClients: [{
+          name: 'CubeDev+Cube',
+          version
+        }]
+      },
+    });
+
+    const engine = await firebolt.resourceManager.engine.getByName(engineName);
+    await engine.stop();
+
+    driver = new FireboltDriver({});
+    await driver.testConnection();
   });
 });
