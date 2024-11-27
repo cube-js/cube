@@ -2,8 +2,7 @@ use super::collectors::JoinHintsCollector;
 use super::dependecy::DependenciesBuilder;
 use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, EvaluationNode,
-    JoinConditionSymbolFactory, MeasureSymbolFactory, MemberSymbolFactory, SimpleSqlSymbolFactory,
-    TraversalVisitor,
+    MeasureSymbolFactory, SimpleSqlSymbolFactory, SymbolFactory, TraversalVisitor,
 };
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::MemberSql;
@@ -23,7 +22,7 @@ impl Compiler {
         }
     }
 
-    pub fn add_evaluator<T: MemberSymbolFactory + 'static>(
+    pub fn add_evaluator<T: SymbolFactory + 'static>(
         &mut self,
         full_name: &String,
         factory: T,
@@ -98,7 +97,7 @@ impl Compiler {
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         self.add_evaluator_impl(
             &cube_name,
-            JoinConditionSymbolFactory::try_new(&cube_name, sql)?,
+            SimpleSqlSymbolFactory::try_new(&cube_name, sql)?,
         )
     }
 
@@ -121,10 +120,7 @@ impl Compiler {
         Ok(collector.extract_result())
     }
 
-    fn exists_member<T: MemberSymbolFactory>(
-        &self,
-        full_name: &String,
-    ) -> Option<Rc<EvaluationNode>> {
+    fn exists_member<T: SymbolFactory>(&self, full_name: &String) -> Option<Rc<EvaluationNode>> {
         if T::is_cachable() {
             let key = (T::symbol_name(), full_name.clone());
             self.members.get(&key).cloned()
@@ -133,7 +129,7 @@ impl Compiler {
         }
     }
 
-    fn add_evaluator_impl<T: MemberSymbolFactory + 'static>(
+    fn add_evaluator_impl<T: SymbolFactory + 'static>(
         &mut self,
         full_name: &String,
         factory: T,

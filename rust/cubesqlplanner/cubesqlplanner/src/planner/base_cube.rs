@@ -1,8 +1,10 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
 use super::{evaluate_with_context, VisitorContext};
+use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+
 pub struct BaseCube {
     cube_name: String,
     member_evaluator: Rc<EvaluationNode>,
@@ -22,18 +24,29 @@ impl BaseCube {
     }
 
     pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        let cube_sql = self.table_sql(context.clone())?;
-        let cube_alias = self.query_tools.escape_column_name(
-            &self
-                .query_tools
-                .cube_alias_name(&self.cube_name, context.cube_alias_prefix()),
-        );
-        let as_syntax_join = "AS"; //FIXME should be from JS BaseQuery
-
-        Ok(format!("{} {} {}", cube_sql, as_syntax_join, cube_alias))
+        let cube_sql = evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            Rc::new(Schema::empty()),
+        )?;
+        Ok(cube_sql)
     }
 
-    pub fn table_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
+    pub fn name(&self) -> &String {
+        &self.cube_name
+    }
+
+    pub fn default_alias(&self) -> String {
+        self.query_tools.alias_name(&self.cube_name)
+    }
+
+    pub fn default_alias_with_prefix(&self, prefix: &Option<String>) -> String {
+        let alias = self.default_alias();
+        if let Some(prefix) = prefix {
+            format!("{prefix}_{alias}")
+        } else {
+            alias
+        }
     }
 }

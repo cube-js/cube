@@ -1,4 +1,4 @@
-use crate::plan::{Expr, OrderBy};
+use crate::plan::{Expr, MemberExpression, OrderBy};
 use crate::planner::{BaseMember, OrderByItem, QueryProperties};
 use std::rc::Rc;
 
@@ -30,7 +30,7 @@ impl OrderPlanner {
                 .find(|(_, m)| m.full_name().to_lowercase() == itm.name().to_lowercase())
             {
                 result.push(OrderBy::new(
-                    Expr::Field(member.clone()),
+                    Expr::Member(MemberExpression::new(member.clone(), None)),
                     pos + 1,
                     itm.desc(),
                 ));

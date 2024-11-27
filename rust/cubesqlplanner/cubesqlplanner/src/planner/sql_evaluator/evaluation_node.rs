@@ -1,7 +1,7 @@
 use super::dependecy::Dependency;
 use super::{
-    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, JoinConditionSymbol, MeasureSymbol,
-    MemberSymbolType, SimpleSqlSymbol,
+    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberSymbolType,
+    SimpleSqlSymbol,
 };
 use std::rc::Rc;
 
@@ -39,13 +39,6 @@ impl EvaluationNode {
     pub fn new_cube_table(symbol: CubeTableSymbol, deps: Vec<Dependency>) -> Rc<Self> {
         Rc::new(Self {
             symbol: MemberSymbolType::CubeTable(symbol),
-            deps,
-        })
-    }
-
-    pub fn new_join_condition(symbol: JoinConditionSymbol, deps: Vec<Dependency>) -> Rc<Self> {
-        Rc::new(Self {
-            symbol: MemberSymbolType::JoinCondition(symbol),
             deps,
         })
     }
