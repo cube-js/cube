@@ -1,4 +1,4 @@
-use super::{time_seria, Schema, SingleAliasedSource};
+use super::{time_series, Schema, SingleAliasedSource};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
@@ -6,71 +6,134 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct RollingWindowJoinCondition {
-    tailing_interval: Option<String>,
+    data_source: String,
+    time_series_source: String,
+    trailing_interval: Option<String>,
     leading_interval: Option<String>,
     offset: String,
-    is_from_start_to_end: bool,
-    time_dimension: Vec<Rc<BaseMember>>,
+    time_dimension: Rc<dyn BaseMember>,
 }
 
 impl RollingWindowJoinCondition {
     pub fn new(
+        data_source: String,
+        time_series_source: String,
         trailing_interval: Option<String>,
         leading_interval: Option<String>,
         offset: String,
-        is_from_start_to_end: bool,
-        dimensions: Vec<Rc<BaseMember>>,
+        time_dimension: Rc<dyn BaseMember>,
     ) -> Self {
         Self {
-            tailing_interval,
+            data_source,
+            time_series_source,
+            trailing_interval,
             leading_interval,
             offset,
-            is_from_start_to_end,
             time_dimension,
         }
     }
 
+    /*
+     *
+    offset = offset || 'end';
+    return this.timeDimensions.map(
+      d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+        // dateFrom based window
+        const conditions = [];
+        if (trailingInterval !== 'unbounded') {
+          const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
+          const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
+          const sign = offset === 'start' ? '>=' : '>';
+          conditions.push(`${dateField} ${sign} ${trailingStart}`);
+        }
+        if (leadingInterval !== 'unbounded') {
+          const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
+          const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
+          const sign = offset === 'end' ? '<=' : '<';
+          conditions.push(`${dateField} ${sign} ${leadingEnd}`);
+        }
+        return conditions.length ? conditions.join(' AND ') : '1 = 1';
+      }]
+    );
+     */
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
         schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
-        let result = if self.dimensions.is_empty() {
-            format!("1 = 1")
+        let mut conditions = vec![];
+        /* let date_column_alias = if let Some(column) = schema.find_column_for_member(&self.time_dimension.full_name(), &None) {
+            templates.column_reference(&source, &column.alias.clone())
         } else {
-            let conditions = vec![];
-            self.dimensions
-                .iter()
-                .map(|dim| -> Result<String, CubeError> {
-                    if let Some(trailing_interval) = self.trailing_interval {
-                        if tailing_interval == "unbounded" {
-                            let seria_column = "date_from",
-                        }
-                    }
+            dimension.to_sql(context.clone(), schema.clone())
+        } */
+        let date_column_alias =
+            self.resolve_time_column_alias(templates, context.clone(), schema.clone())?;
+        if let Some(trailing_interval) = &self.trailing_interval {
+            if trailing_interval != "unbounded" {
+                let start_date = if self.offset == "start" {
+                    templates
+                        .column_reference(&Some(self.time_series_source.clone()), "date_from")?
+                } else {
+                    templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
+                };
 
+                let trailing_start = if let Some(trailing_interval) = &self.trailing_interval {
+                    format!("{start_date} - interval '{trailing_interval}'")
+                } else {
+                    start_date
+                };
 
-                })
-                .collect::<Result<Vec<_>, _>>()?
-                .join(" AND ")
+                let sign = if self.offset == "start" { ">=" } else { ">" };
+
+                conditions.push(format!("{date_column_alias} {sign} {trailing_start}"));
+            }
+        }
+
+        if let Some(leading_interval) = &self.trailing_interval {
+            if leading_interval != "unbounded" {
+                let end_date = if self.offset == "end" {
+                    templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
+                } else {
+                    templates
+                        .column_reference(&Some(self.time_series_source.clone()), "date_from")?
+                };
+
+                let leading_end = if let Some(leading_interval) = &self.leading_interval {
+                    format!("{end_date} + interval '{leading_interval}'")
+                } else {
+                    end_date
+                };
+
+                let sign = if self.offset == "end" { "<=" } else { "<" };
+
+                conditions.push(format!("{date_column_alias} {sign} {leading_end}"));
+            }
+        }
+
+        let result = if conditions.is_empty() {
+            templates.always_true()?
+        } else {
+            conditions.join(" AND ")
         };
         Ok(result)
     }
 
-    fn resolve_member_alias(
+    fn resolve_time_column_alias(
         &self,
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
-        source: &String,
-        dimension: &Rc<dyn BaseMember>,
         schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
-        let schema = schema.extract_source_schema(source);
-        let source = Some(source.clone());
-        if let Some(column) = schema.find_column_for_member(&dimension.full_name(), &source) {
+        let schema = schema.extract_source_schema(&self.data_source);
+        let source = Some(self.data_source.clone());
+        if let Some(column) =
+            schema.find_column_for_member(&self.time_dimension.full_name(), &source)
+        {
             templates.column_reference(&source, &column.alias.clone())
         } else {
-            dimension.to_sql(context.clone(), schema.clone())
+            self.time_dimension.to_sql(context.clone(), schema.clone())
         }
     }
 }
@@ -162,6 +225,7 @@ impl DimensionJoinCondition {
 pub enum JoinCondition {
     DimensionJoinCondition(DimensionJoinCondition),
     BaseJoinCondition(Rc<dyn BaseJoinCondition>),
+    RollingWindowJoinCondition(RollingWindowJoinCondition),
 }
 
 impl JoinCondition {
@@ -179,6 +243,24 @@ impl JoinCondition {
         ))
     }
 
+    pub fn new_rolling_join(
+        data_source: String,
+        time_series_source: String,
+        trailing_interval: Option<String>,
+        leading_interval: Option<String>,
+        offset: String,
+        time_dimension: Rc<dyn BaseMember>,
+    ) -> Self {
+        Self::RollingWindowJoinCondition(RollingWindowJoinCondition::new(
+            data_source,
+            time_series_source,
+            trailing_interval,
+            leading_interval,
+            offset,
+            time_dimension,
+        ))
+    }
+
     pub fn new_base_join(base: Rc<dyn BaseJoinCondition>) -> Self {
         Self::BaseJoinCondition(base)
     }
@@ -192,6 +274,9 @@ impl JoinCondition {
         match &self {
             JoinCondition::DimensionJoinCondition(cond) => cond.to_sql(templates, context, schema),
             JoinCondition::BaseJoinCondition(cond) => cond.to_sql(context, schema),
+            JoinCondition::RollingWindowJoinCondition(cond) => {
+                cond.to_sql(templates, context, schema)
+            }
         }
     }
 }

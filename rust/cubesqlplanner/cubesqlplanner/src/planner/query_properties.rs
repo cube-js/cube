@@ -390,7 +390,7 @@ impl QueryProperties {
         Ok(true)
     }
 
-    pub fn should_use_time_seria(&self) -> Result<bool, CubeError> {
+    pub fn should_use_time_series(&self) -> Result<bool, CubeError> {
         for member in self.all_members(false) {
             if has_cumulative_members(&member.member_evaluator())? {
                 return Ok(true);

@@ -1,5 +1,6 @@
 use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
 use crate::planner::sql_evaluator::EvaluationNode;
+use crate::planner::BaseMember;
 use crate::planner::BaseTimeDimension;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -61,7 +62,15 @@ impl MultiStageTimeShift {
 #[derive(Clone)]
 pub enum MultiStageLeafMemberType {
     Measure,
-    TimeSeria(Rc<BaseTimeDimension>),
+    TimeSeries(Rc<BaseTimeDimension>),
+}
+
+#[derive(Clone)]
+pub struct RollingWindowDescription {
+    pub time_dimension: Rc<dyn BaseMember>,
+    pub trailing: Option<String>,
+    pub leading: Option<String>,
+    pub offset: String,
 }
 
 #[derive(Clone)]
@@ -69,7 +78,7 @@ pub enum MultiStageInodeMemberType {
     Rank,
     Aggregate,
     Calculate,
-    RollingWindow,
+    RollingWindow(RollingWindowDescription),
 }
 
 #[derive(Clone)]

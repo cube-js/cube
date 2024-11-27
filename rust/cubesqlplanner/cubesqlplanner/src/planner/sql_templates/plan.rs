@@ -121,14 +121,14 @@ impl PlanSqlTemplates {
         )
     }
 
-    pub fn time_seria_select(
+    pub fn time_series_select(
         &self,
         from_date: Option<String>,
         to_date: Option<String>,
         seria: Vec<Vec<String>>,
     ) -> Result<String, CubeError> {
         self.render.render_template(
-            "statements/time_seria_select",
+            "statements/time_series_select",
             context! {
                 from_date => from_date,
                 to_date => to_date,

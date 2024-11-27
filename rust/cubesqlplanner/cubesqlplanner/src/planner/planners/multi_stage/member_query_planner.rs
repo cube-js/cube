@@ -1,10 +1,10 @@
 use super::{
     MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
-    MultiStageQueryDescription,
+    MultiStageQueryDescription, RollingWindowDescription,
 };
 use crate::plan::{
     Cte, Expr, FilterGroup, FilterItem, From, JoinBuilder, JoinCondition, MemberExpression,
-    OrderBy, QueryPlan, Schema, SelectBuilder, TimeSeria,
+    OrderBy, QueryPlan, Schema, SelectBuilder, TimeSeries,
 };
 use crate::planner::planners::{
     FullKeyAggregateQueryPlanner, MultipliedMeasuresQueryPlanner, OrderPlanner, SimpleQueryPlanner,
@@ -43,17 +43,22 @@ impl MultiStageMemberQueryPlanner {
         cte_schemas: &HashMap<String, Rc<Schema>>,
     ) -> Result<Rc<Cte>, CubeError> {
         match self.description.member().member_type() {
-            MultiStageMemberType::Inode(member) => self.plan_for_cte_query(member, cte_schemas),
+            MultiStageMemberType::Inode(member) => match member.inode_type() {
+                MultiStageInodeMemberType::RollingWindow(rolling_window_desc) => {
+                    self.plan_rolling_window_query(rolling_window_desc, member, cte_schemas)
+                }
+                _ => self.plan_for_cte_query(member, cte_schemas),
+            },
             MultiStageMemberType::Leaf(node) => match node {
                 super::MultiStageLeafMemberType::Measure => self.plan_for_leaf_cte_query(),
-                super::MultiStageLeafMemberType::TimeSeria(time_dimension) => {
-                    self.plan_time_seria_query(time_dimension.clone())
+                super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
+                    self.plan_time_series_query(time_dimension.clone())
                 }
             },
         }
     }
 
-    fn plan_time_seria_query(
+    fn plan_time_series_query(
         &self,
         time_dimension: Rc<BaseTimeDimension>,
     ) -> Result<Rc<Cte>, CubeError> {
@@ -65,31 +70,78 @@ impl MultiStageMemberQueryPlanner {
             .query_tools
             .base_tools()
             .generate_time_series(granularity, date_range.clone())?;
-        let time_seira = TimeSeria {
+        let time_seira = TimeSeries {
             time_dimension_name: time_dimension.full_name(),
             from_date: Some(from_date),
             to_date: Some(to_date),
             seria,
         };
-        let query_plan = Rc::new(QueryPlan::TimeSeria(Rc::new(time_seira)));
-        Ok(Rc::new(Cte::new(query_plan, format!("time_seria"))))
+        let query_plan = Rc::new(QueryPlan::TimeSeries(Rc::new(time_seira)));
+        Ok(Rc::new(Cte::new(query_plan, format!("time_series"))))
     }
 
     fn plan_rolling_window_query(
         &self,
+        rolling_window_desc: &RollingWindowDescription,
         multi_stage_member: &MultiStageInodeMember,
         cte_schemas: &HashMap<String, Rc<Schema>>,
     ) -> Result<Rc<Cte>, CubeError> {
+        let inputs = self.input_cte_aliases();
         let dimensions = self.all_dimensions();
 
-        let root_alias = format!("time_seria");
-
+        let root_alias = format!("time_series");
         let cte_schema = cte_schemas.get(&inputs[0]).unwrap().clone();
+
         let mut join_builder = JoinBuilder::new_from_table_reference(
             inputs[0].clone(),
             cte_schema,
             Some(root_alias.clone()),
         );
+
+        for (i, input) in inputs.iter().skip(1).enumerate() {
+            let alias = format!("rolling_{}", i + 1);
+            let on = JoinCondition::new_rolling_join(
+                alias.clone(),
+                root_alias.clone(),
+                rolling_window_desc.trailing.clone(),
+                rolling_window_desc.leading.clone(),
+                rolling_window_desc.offset.clone(),
+                rolling_window_desc.time_dimension.clone(),
+            );
+            let cte_schema = cte_schemas.get(input).unwrap().clone();
+            join_builder.inner_join_table_reference(
+                input.clone(),
+                cte_schema,
+                Some(format!("rolling_{}", i + 1)),
+                on,
+            );
+        }
+
+        let from = From::new_from_join(join_builder.build());
+
+        let group_by = dimensions
+            .iter()
+            .map(|dim| Expr::Member(MemberExpression::new(dim.clone(), None)))
+            .collect_vec();
+
+        let context_factory = SqlNodesFactory::new();
+        let node_context = context_factory.default_node_processor();
+
+        let mut select_builder = SelectBuilder::new(from, VisitorContext::new(None, node_context));
+        for dim in dimensions.iter() {
+            select_builder.add_projection_member(&dim, None, None);
+        }
+
+        let query_member = self.query_member_as_base_member()?;
+        select_builder.add_projection_member(&query_member, None, None);
+        select_builder.set_group_by(group_by);
+        select_builder.set_order_by(self.query_order()?);
+        let select = select_builder.build();
+
+        Ok(Rc::new(Cte::new_from_select(
+            Rc::new(select),
+            self.description.alias().clone(),
+        )))
     }
 
     fn plan_for_cte_query(
@@ -221,7 +273,6 @@ impl MultiStageMemberQueryPlanner {
 
         let allowed_filter_members = self.description.state().allowed_filter_members().clone();
 
-        println!("!!!! meas count {}", measures.len());
         let cte_query_properties = QueryProperties::try_new_from_precompiled(
             self.query_tools.clone(),
             measures,

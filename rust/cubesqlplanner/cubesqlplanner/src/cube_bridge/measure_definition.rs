@@ -23,9 +23,9 @@ pub struct TimeShiftReference {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct RollingWindow {
-    trailing: Option<String>,
-    leading: Option<String>,
-    offset: Option<String>,
+    pub trailing: Option<String>,
+    pub leading: Option<String>,
+    pub offset: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

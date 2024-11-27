@@ -734,6 +734,7 @@ export class BaseQuery {
     offset = offset || 'end';
     return this.timeDimensions.map(
       d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+        console.log("!!!!!! IsFromStartToEnd: ", isFromStartToEnd, " --");
         // dateFrom based window
         const conditions = [];
         if (trailingInterval !== 'unbounded') {
@@ -1408,7 +1409,6 @@ export class BaseQuery {
       ) || undefined
     );
     const baseQueryAlias = this.cubeAlias('base');
-    console.log("!!! date join contdition: ", dateJoinCondition);
     const dateJoinConditionSql =
       dateJoinCondition.map(
         ([d, f]) => f(
@@ -3263,7 +3263,7 @@ export class BaseQuery {
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
         join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
         cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
-        time_seria_select: 'SELECT date_from::timestamp AS "date_from",\n' +
+        time_series_select: 'SELECT date_from::timestamp AS "date_from",\n' +
         'date_to::timestamp AS "date_to" \n' +
         'FROM(\n' +
         '    VALUES ' +

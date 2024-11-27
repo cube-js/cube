@@ -8,6 +8,7 @@ use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct MeasureOrderBy {
     evaluation_node: Rc<EvaluationNode>,
     direction: String,
@@ -30,6 +31,7 @@ impl MeasureOrderBy {
     }
 }
 
+#[derive(Clone)]
 pub struct MeasureSymbol {
     cube_name: String,
     name: String,
@@ -37,6 +39,7 @@ pub struct MeasureSymbol {
     measure_filters: Vec<Rc<EvaluationNode>>,
     measure_order_by: Vec<MeasureOrderBy>,
     member_sql: Rc<dyn MemberSql>,
+    is_splitted_source: bool,
 }
 
 impl MeasureSymbol {
@@ -55,11 +58,30 @@ impl MeasureSymbol {
             definition,
             measure_filters,
             measure_order_by,
+            is_splitted_source: false,
         }
     }
 
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
+    }
+
+    pub fn is_splitted_source(&self) -> bool {
+        self.is_splitted_source
+    }
+
+    pub fn split_with_source(&self, source_name: String) -> (Self, Self) {
+        let mut measure_with_source = self.clone();
+        measure_with_source.is_splitted_source = true;
+        let source = Self::new(
+            self.cube_name.clone(),
+            source_name.clone(),
+            self.member_sql.clone(),
+            self.definition().clone(),
+            self.measure_filters.clone(),
+            self.measure_order_by.clone(),
+        );
+        (measure_with_source, source)
     }
 
     pub fn is_calculated(&self) -> bool {

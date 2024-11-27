@@ -1,7 +1,7 @@
 use super::multi_stage::{
     MultiStageAppliedState, MultiStageInodeMember, MultiStageInodeMemberType,
     MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
-    MultiStageQueryDescription, MultiStageTimeShift,
+    MultiStageQueryDescription, MultiStageTimeShift, RollingWindowDescription,
 };
 use crate::plan::{Cte, From, Schema, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
@@ -9,8 +9,8 @@ use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::EvaluationNode;
-use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, VisitorContext};
+use crate::planner::{BaseTimeDimension, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -151,35 +151,29 @@ impl MultiStageQueryPlanner {
         Ok(inode)
     }
 
-    fn add_time_seria(
+    fn add_time_series(
         &self,
+        time_dimension: Rc<BaseTimeDimension>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let description =
-            if let Some(description) = descriptions.iter().find(|d| d.alias() == "time_seria") {
+            if let Some(description) = descriptions.iter().find(|d| d.alias() == "time_series") {
                 description.clone()
             } else {
-                let time_dimensions = self.query_properties.time_dimensions();
-                if time_dimensions.len() != 1 {
-                    return Err(CubeError::internal(
-                        "Rolling window requires one time dimension".to_string(),
-                    ));
-                }
-                let time_dimension = time_dimensions[0].clone();
-                let time_seria_node = MultiStageQueryDescription::new(
+                let time_series_node = MultiStageQueryDescription::new(
                     MultiStageMember::new(
-                        MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeria(
+                        MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeries(
                             time_dimension.clone(),
                         )),
                         time_dimension.member_evaluator(),
                     ),
                     state.clone(),
                     vec![],
-                    "time_seria".to_string(),
+                    "time_series".to_string(),
                 );
-                descriptions.push(time_seria_node.clone());
-                time_seria_node
+                descriptions.push(time_series_node.clone());
+                time_series_node
             };
         Ok(description)
     }
@@ -194,7 +188,7 @@ impl MultiStageQueryPlanner {
         let description = MultiStageQueryDescription::new(
             MultiStageMember::new(
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
-                member.clone(),
+                member,
             ),
             state.clone(),
             vec![],
@@ -212,17 +206,35 @@ impl MultiStageQueryPlanner {
     ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
         if let Some(measure) = BaseMeasure::try_new(member.clone(), self.query_tools.clone())? {
             if let Some(rolling_window) = measure.rolling_window() {
-                self.add_time_seria(state.clone(), descriptions)?;
-                let input = vec![self.add_rolling_window_base(
-                    member.clone(),
-                    state.clone(),
-                    descriptions,
-                )?];
+                let time_dimensions = self.query_properties.time_dimensions();
+                if time_dimensions.len() != 1 {
+                    return Err(CubeError::internal(
+                        "Rolling window requires one time dimension".to_string(),
+                    ));
+                }
+                let time_dimension = time_dimensions[0].clone();
+                let source_name = format!("_{}_base", member.name());
+                let (member, source) = member.try_split_measure(source_name).unwrap(); //FIXME
+                                                                                       //unwrap!!!
+
+                let input = vec![
+                    self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?,
+                    self.add_rolling_window_base(source.clone(), state.clone(), descriptions)?,
+                ];
+
+                let time_dimension = time_dimensions[0].clone();
 
                 let alias = format!("cte_{}", descriptions.len());
 
+                let rolling_window_descr = RollingWindowDescription {
+                    time_dimension: time_dimension.clone(),
+                    trailing: rolling_window.trailing.clone(),
+                    leading: rolling_window.leading.clone(),
+                    offset: rolling_window.offset.clone().unwrap_or("end".to_string()),
+                };
+
                 let inode_member = MultiStageInodeMember::new(
-                    MultiStageInodeMemberType::RollingWindow,
+                    MultiStageInodeMemberType::RollingWindow(rolling_window_descr),
                     vec![],
                     vec![],
                     None,
