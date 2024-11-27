@@ -20,6 +20,7 @@ use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
+use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{
     ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
 };
@@ -303,12 +304,13 @@ fn pp_source(t: Arc<dyn TableProvider>) -> String {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
     } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
         format!("InlineTableProvider(data: {} rows)", t.get_data().len())
-    } else if t
+    } else if let Some(t) = t.as_any().downcast_ref::<InfoSchemaTableProvider>() {
+        format!("InfoSchemaTableProvider(table: {:?})", t.table)
+    } else if let Some(_) = t
         .as_any()
-        .downcast_ref::<InfoSchemaTableProvider>()
-        .is_some()
+        .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
     {
-        "InfoSchemaTableProvider".to_string()
+        "InfoSchemaQueryCacheTableProvider".to_string()
     } else {
         panic!("unknown table provider");
     }
