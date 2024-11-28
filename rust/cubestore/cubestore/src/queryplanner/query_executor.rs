@@ -47,9 +47,11 @@ use datafusion::execution::{SessionStateBuilder, TaskContext};
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
 use datafusion::physical_expr::{
-    expressions, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
+    expressions, Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr,
+    PhysicalSortRequirement,
 };
 use datafusion::physical_optimizer::optimizer::PhysicalOptimizer;
+use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::projection::ProjectionExec;
@@ -984,7 +986,7 @@ impl ExecutionPlan for CubeTableExec {
                 sort_order = None
             }
         }
-        vec![sort_order.map(|order| {
+        let order = sort_order.map(|order| {
             order
                 .into_iter()
                 .map(|col_index| {
@@ -1001,7 +1003,9 @@ impl ExecutionPlan for CubeTableExec {
                     ))
                 })
                 .collect()
-        })]
+        });
+
+        (0..self.children().len()).map(|_| order.clone()).collect()
     }
 
     // TODO upgrade DF
@@ -1071,6 +1075,10 @@ impl ExecutionPlan for CubeTableExec {
 
     fn maintains_input_order(&self) -> Vec<bool> {
         vec![true; self.children().len()]
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition; self.children().len()]
     }
 }
 
@@ -1541,6 +1549,10 @@ impl ExecutionPlan for ClusterSendExec {
         } else {
             vec![false]
         }
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition; self.children().len()]
     }
 }
 
