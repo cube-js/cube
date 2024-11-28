@@ -185,7 +185,16 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { signal } = abortController;
 
     const promise = (async () => {
-      await this.client.ping();
+      const pingResult = await this.client.ping();
+      if (!pingResult.success) {
+        // TODO replace string formatting with proper cause
+        // pingResult.error can be AggregateError when ClickHouse hostname resolves to multiple addresses
+        let errorMessage = pingResult.error.toString();
+        if (pingResult.error instanceof AggregateError) {
+          errorMessage = `Aggregate error: ${pingResult.error.message}; errors: ${pingResult.error.errors.join('; ')}`;
+        }
+        throw new Error(`Connection check failed: ${errorMessage}`);
+      }
       signal.throwIfAborted();
       // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
       // TODO should we kill those as well?
@@ -260,7 +269,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         return results;
       } catch (e) {
         // TODO replace string formatting with proper cause
-        throw new Error(`Query failed; cause: ${e}; query id: ${queryId}; SQL: ${query}`);
+        throw new Error(`Query failed: ${e}; query id: ${queryId}`);
       }
     });
   }
@@ -409,7 +418,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     } catch (e) {
       await client.close();
       // TODO replace string formatting with proper cause
-      throw new Error(`Stream query failed; cause: ${e}; query id: ${queryId}; SQL: ${query}`);
+      throw new Error(`Stream query failed: ${e}; query id: ${queryId}`);
     }
   }
 
@@ -554,7 +563,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       await this.command(createTableSql);
     } catch (e) {
       // TODO replace string formatting with proper cause
-      throw new Error(`Create table failed; cause: ${e}; SQL: ${createTableSql}`);
+      throw new Error(`Create table failed: ${e}`);
     }
   }
 
