@@ -5,11 +5,23 @@ import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
 import pLimit from 'p-limit';
 
-import { ApiGateway, ApiGatewayOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
+import {
+  ApiGateway,
+  ApiGatewayOptions,
+  UserBackgroundContext
+} from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
-  createCancelableInterval, formatDuration, getAnonymousId,
-  getEnv, assertDataSource, getRealType, internalExceptions, track, FileRepository, SchemaFileRepository,
+  createCancelableInterval,
+  formatDuration,
+  getAnonymousId,
+  getEnv,
+  assertDataSource,
+  getRealType,
+  internalExceptions,
+  track,
+  FileRepository,
+  SchemaFileRepository,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -46,8 +58,15 @@ import type {
   DriverContext,
   LoggerFn,
   DriverConfig,
+  ScheduledRefreshTimeZonesFn,
 } from './types';
-import { ContextToOrchestratorIdFn, ContextAcceptanceResult, ContextAcceptanceResultHttp, ContextAcceptanceResultWs, ContextAcceptor } from './types';
+import {
+  ContextToOrchestratorIdFn,
+  ContextAcceptanceResult,
+  ContextAcceptanceResultHttp,
+  ContextAcceptanceResultWs,
+  ContextAcceptor
+} from './types';
 
 const { version } = require('../../../package.json');
 
@@ -119,6 +138,8 @@ export class CubejsServerCore {
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
+  protected readonly scheduledRefreshTimeZones: ScheduledRefreshTimeZonesFn;
+
   protected readonly orchestratorOptions: OrchestratorOptionsFn;
 
   public logger: LoggerFn;
@@ -173,6 +194,7 @@ export class CubejsServerCore {
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
     this.preAggregationsSchema = wrapToFnIfNeeded(this.options.preAggregationsSchema);
     this.orchestratorOptions = wrapToFnIfNeeded(this.options.orchestratorOptions);
+    this.scheduledRefreshTimeZones = wrapToFnIfNeeded(this.options.scheduledRefreshTimeZones || []);
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: this.options.compilerCacheSize || 250,
@@ -453,7 +475,7 @@ export class CubejsServerCore {
         jwt: this.options.jwt,
         refreshScheduler: this.getRefreshScheduler.bind(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
-        scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
+        scheduledRefreshTimeZones: this.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
         contextToApiScopes: this.options.contextToApiScopes,
         gatewayPort: this.options.gatewayPort,
@@ -700,7 +722,7 @@ export class CubejsServerCore {
   }
 
   /**
-   * @internal Please dont use this method directly, use refreshTimer
+   * @internal Please don't use this method directly, use refreshTimer
    */
   public handleScheduledRefreshInterval = async (options) => {
     const allContexts = await this.options.scheduledRefreshContexts();
@@ -730,8 +752,9 @@ export class CubejsServerCore {
             concurrency: this.options.scheduledRefreshConcurrency,
           };
 
-          if (this.options.scheduledRefreshTimeZones) {
-            queryingOptions.timezones = this.options.scheduledRefreshTimeZones;
+          const timezonesFromOptionsOrSecurityContext = await this.scheduledRefreshTimeZones(context);
+          if (timezonesFromOptionsOrSecurityContext.length > 0) {
+            queryingOptions.timezones = timezonesFromOptionsOrSecurityContext;
           }
 
           return this.runScheduledRefresh(context, queryingOptions);
@@ -746,7 +769,7 @@ export class CubejsServerCore {
   }
 
   /**
-   * @internal Please dont use this method directly, use refreshTimer
+   * @internal Please don't use this method directly, use refreshTimer
    */
   public async runScheduledRefresh(context: UserBackgroundContext | null, queryingOptions?: ScheduledRefreshOptions) {
     return this.getRefreshScheduler().runScheduledRefresh(

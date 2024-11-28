@@ -456,7 +456,7 @@ class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, systemAsyncHandler(async (req, res) => {
         this.resToResultFn(res)({
-          timezones: this.scheduledRefreshTimeZones || []
+          timezones: this.scheduledRefreshTimeZones ? this.scheduledRefreshTimeZones(req.context) : []
         });
       }));
 
@@ -630,7 +630,7 @@ class ApiGateway {
           context,
           normalizeQueryPreAggregations(
             {
-              timezones: this.scheduledRefreshTimeZones,
+              timezones: this.scheduledRefreshTimeZones ? this.scheduledRefreshTimeZones(context) : [],
               preAggregations: preAggregations.map(p => ({
                 id: p.id,
                 cacheOnly,
@@ -654,7 +654,7 @@ class ApiGateway {
     try {
       query = normalizeQueryPreAggregations(
         this.parseQueryParam(query),
-        { timezones: this.scheduledRefreshTimeZones }
+        { timezones: this.scheduledRefreshTimeZones ? this.scheduledRefreshTimeZones(context) : [] }
       );
       const orchestratorApi = await this.getAdapterApi(context);
       const compilerApi = await this.getCompilerApi(context);
