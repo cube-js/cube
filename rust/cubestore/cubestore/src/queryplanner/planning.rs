@@ -62,6 +62,7 @@ use datafusion::logical_expr::{
     expr, Aggregate, BinaryExpr, Expr, Extension, Filter, Join, Limit, LogicalPlan, Operator,
     Projection, Sort, SortExpr, SubqueryAlias, TableScan, Union, UserDefinedLogicalNode,
 };
+use datafusion::physical_expr::{Distribution, LexRequirement};
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_planner::{ExtensionPlanner, PhysicalPlanner};
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
@@ -1719,6 +1720,28 @@ impl ExecutionPlan for WorkerExec {
 
     fn properties(&self) -> &PlanProperties {
         self.input.properties()
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition; self.children().len()]
+    }
+
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+        let input_ordering = self.input.required_input_ordering();
+        if !input_ordering.is_empty() {
+            vec![input_ordering[0].clone()]
+        } else {
+            vec![None]
+        }
+    }
+
+    fn maintains_input_order(&self) -> Vec<bool> {
+        let maintains_input_order = self.input.maintains_input_order();
+        if !maintains_input_order.is_empty() {
+            vec![maintains_input_order[0]]
+        } else {
+            vec![false]
+        }
     }
 }
 
