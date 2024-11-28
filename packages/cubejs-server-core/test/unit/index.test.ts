@@ -833,4 +833,79 @@ describe('index.test', () => {
 
     jest.restoreAllMocks();
   });
+
+  test('scheduledRefreshTimeZones option', async () => {
+    jest.spyOn(
+      CubejsServerCoreOpen.prototype,
+      'isReadyForQueryProcessing',
+    ).mockImplementation(
+      () => true,
+    );
+
+    const timeoutKiller = withTimeout(
+      () => {
+        throw new Error('scheduledRefreshTimeZones was not called');
+      },
+      3 * 1000,
+    );
+
+    let counter = 0;
+
+    const cubejsServerCore = new CubejsServerCoreOpen({
+      dbType: 'mysql',
+      apiSecret: 'secret',
+      // 250ms
+      scheduledRefreshTimer: 1,
+      scheduledRefreshConcurrency: 1,
+      scheduledRefreshContexts: async () => [
+        {
+          securityContext: {
+            appid: 'test1',
+            u: {
+              prop1: 'value1'
+            }
+          }
+        },
+        // securityContext is required in typings, but can be empty in user-space
+        <any>{
+          // Renamed to securityContext, let's test that it migrate automatically
+          authInfo: {
+            appid: 'test2',
+            u: {
+              prop2: 'value2'
+            }
+          },
+        },
+        // Null is a default placeholder
+        null
+      ],
+      scheduledRefreshTimeZones: async (ctx) => {
+        counter++;
+        if (counter === 1) {
+          expect(ctx.securityContext).toEqual({ appid: 'test1', u: { prop1: 'value1' } });
+          return ['Europe/Kyiv'];
+        } else if (counter === 2) {
+          expect(ctx.securityContext).toEqual({ appid: 'test2', u: { prop2: 'value2' } });
+          return ['Europe/London'];
+        } else if (counter === 3) {
+          expect(ctx.securityContext).toEqual(undefined);
+
+          // Kill the timer after processing all 3 test contexts
+          await timeoutKiller.cancel();
+
+          return ['America/Los_Angeles'];
+        }
+
+        return ['Europe/Kyiv', 'Europe/London', 'America/Los_Angeles'];
+      }
+    });
+
+    await timeoutKiller;
+
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCoreOpen);
+    expect(counter).toBe(3);
+
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
+  });
 });
