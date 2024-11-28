@@ -75,7 +75,8 @@ use datafusion::datasource::{provider_as_source, DefaultTableSource, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::execution::{SessionState, TaskContext};
 use datafusion::logical_expr::{
-    AggregateUDF, Expr, Extension, LogicalPlan, ScalarUDF, TableSource, WindowUDF,
+    AggregateUDF, Expr, Extension, LogicalPlan, ScalarUDF, TableProviderFilterPushDown,
+    TableSource, WindowUDF,
 };
 use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -853,13 +854,13 @@ impl TableProvider for CubeTableLogical {
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         panic!("scan has been called on CubeTableLogical: serialized plan wasn't preprocessed for select");
     }
-    //
-    // fn supports_filter_pushdown(
-    //     &self,
-    //     _filter: &Expr,
-    // ) -> Result<TableProviderFilterPushDown, DataFusionError> {
-    //     return Ok(TableProviderFilterPushDown::Inexact);
-    // }
+
+    fn supports_filters_pushdown(
+        &self,
+        filters: &[&Expr],
+    ) -> datafusion::common::Result<Vec<TableProviderFilterPushDown>> {
+        Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
+    }
 }
 
 fn compute_workers(
