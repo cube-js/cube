@@ -735,11 +735,11 @@ export class CubejsServerCore {
     const contexts = [];
 
     for (const allContext of allContexts) {
-      const res = await this.contextAcceptor.shouldAccept(
-        this.migrateBackgroundContext(allContext)
-      );
+      const resContext = this.migrateBackgroundContext(allContext);
+      const res = await this.contextAcceptor.shouldAccept(resContext);
+
       if (res.accepted) {
-        contexts.push(allContext);
+        contexts.push(resContext || {});
       }
     }
 
