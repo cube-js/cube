@@ -2265,7 +2265,7 @@ async fn create_table_with_url(service: Box<dyn SqlClient>) {
         .exec_query("CREATE SCHEMA IF NOT EXISTS foo")
         .await
         .unwrap();
-    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) LOCATION '{}'", url);
+    let create_table_sql = format!("CREATE TABLE foo.bikes (`Response ID` int, `Start Date` text, `End Date` text) WITH (input_format = 'csv') LOCATION '{}'", url);
     let (_, query_result) = tokio::join!(
         service.exec_query(&create_table_sql),
         service.exec_query("SELECT count(*) from foo.bikes")

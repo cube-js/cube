@@ -649,143 +649,156 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     pub fn parse_create_table(&mut self) -> Result<Statement, ParserError> {
-        // Note that we disable hive extensions as they clash with `location`.
-        let statement = self.parser.parse_create_table(false, false, None, false)?;
-        if let SQLStatement::CreateTable(CreateTable {
-            name,
-            columns,
-            constraints,
-            with_options,
-            if_not_exists,
-            file_format,
-            query,
-            without_rowid,
-            or_replace,
-            table_properties,
-            like,
-            ..
-        }) = statement
+        let allow_unquoted_hyphen = false;
+        let if_not_exists =
+            self.parser
+                .parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
+        let name = self.parser.parse_object_name(allow_unquoted_hyphen)?;
+
+        let like = if self.parser.parse_keyword(Keyword::LIKE)
+            || self.parser.parse_keyword(Keyword::ILIKE)
         {
-            let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
-                self.parser.expect_token(&Token::LParen)?;
-                let res = Some(
-                    self.parser
-                        .parse_comma_separated(|p| p.parse_identifier(false))?,
-                );
-                self.parser.expect_token(&Token::RParen)?;
-                res
-            } else {
-                None
-            };
-
-            let aggregates = if self.parse_custom_token("aggregations") {
-                self.parser.expect_token(&Token::LParen)?;
-                let res = self.parser.parse_comma_separated(|p| {
-                    let func = p.parse_identifier(true)?;
-                    p.expect_token(&Token::LParen)?;
-                    let column = p.parse_identifier(true)?;
-                    p.expect_token(&Token::RParen)?;
-                    Ok((func, column))
-                })?;
-                self.parser.expect_token(&Token::RParen)?;
-                Some(res)
-            } else {
-                None
-            };
-
-            let mut indexes = Vec::new();
-
-            loop {
-                if self.parse_custom_token("aggregate") {
-                    self.parser.expect_keyword(Keyword::INDEX)?;
-                    indexes.push(self.parse_with_index(name.clone(), true)?);
-                } else if self.parser.parse_keyword(Keyword::INDEX) {
-                    indexes.push(self.parse_with_index(name.clone(), false)?);
-                } else {
-                    break;
-                }
-            }
-
-            let partitioned_index = if self.parser.parse_keywords(&[
-                Keyword::ADD,
-                Keyword::TO,
-                Keyword::PARTITIONED,
-                Keyword::INDEX,
-            ]) {
-                let name = self.parser.parse_object_name(true)?;
-                self.parser.expect_token(&Token::LParen)?;
-                let columns = self
-                    .parser
-                    .parse_comma_separated(|t| Parser::parse_identifier(t, true))?;
-                self.parser.expect_token(&Token::RParen)?;
-                Some(PartitionedIndexRef { name, columns })
-            } else {
-                None
-            };
-
-            let locations = if self.parser.parse_keyword(Keyword::LOCATION) {
-                Some(
-                    self.parser
-                        .parse_comma_separated(|p| p.parse_literal_string())?,
-                )
-            } else {
-                None
-            };
-
-            Ok(Statement::CreateTable {
-                create_table: SQLStatement::CreateTable(CreateTable {
-                    or_replace,
-                    name,
-                    columns,
-                    constraints,
-                    hive_distribution: HiveDistributionStyle::NONE,
-                    hive_formats: None,
-                    table_properties,
-                    with_options,
-                    if_not_exists,
-                    transient: false,
-                    external: locations.is_some(),
-                    file_format,
-                    location: None,
-                    query,
-                    without_rowid,
-                    temporary: false,
-                    like,
-                    clone: None,
-                    engine: None,
-                    comment: None,
-                    auto_increment_offset: None,
-                    default_charset: None,
-                    collation: None,
-                    on_commit: None,
-                    on_cluster: None,
-                    primary_key: None,
-                    order_by: None,
-                    partition_by: None,
-                    cluster_by: None,
-                    options: None,
-                    strict: false,
-                    copy_grants: false,
-                    enable_schema_evolution: None,
-                    change_tracking: None,
-                    data_retention_time_in_days: None,
-                    max_data_extension_time_in_days: None,
-                    default_ddl_collation: None,
-                    with_aggregation_policy: None,
-                    with_row_access_policy: None,
-                    global: None,
-                    volatile: false,
-                    with_tags: None,
-                }),
-                indexes,
-                aggregates,
-                partitioned_index,
-                locations,
-                unique_key,
-            })
+            self.parser.parse_object_name(allow_unquoted_hyphen).ok()
         } else {
-            Ok(Statement::Statement(statement))
+            None
+        };
+
+        // parse optional column list (schema)
+        let (columns, constraints) = self.parser.parse_columns()?;
+
+        // SQLite supports `WITHOUT ROWID` at the end of `CREATE TABLE`
+        let without_rowid = self
+            .parser
+            .parse_keywords(&[Keyword::WITHOUT, Keyword::ROWID]);
+
+        // PostgreSQL supports `WITH ( options )`, before `AS`
+        let with_options = self.parser.parse_options(Keyword::WITH)?;
+        let table_properties = self.parser.parse_options(Keyword::TBLPROPERTIES)?;
+
+        // Parse optional `AS ( query )`
+        let query = if self.parser.parse_keyword(Keyword::AS) {
+            Some(self.parser.parse_boxed_query()?)
+        } else {
+            None
+        };
+
+        let unique_key = if self.parser.parse_keywords(&[Keyword::UNIQUE, Keyword::KEY]) {
+            self.parser.expect_token(&Token::LParen)?;
+            let res = Some(
+                self.parser
+                    .parse_comma_separated(|p| p.parse_identifier(false))?,
+            );
+            self.parser.expect_token(&Token::RParen)?;
+            res
+        } else {
+            None
+        };
+
+        let aggregates = if self.parse_custom_token("aggregations") {
+            self.parser.expect_token(&Token::LParen)?;
+            let res = self.parser.parse_comma_separated(|p| {
+                let func = p.parse_identifier(true)?;
+                p.expect_token(&Token::LParen)?;
+                let column = p.parse_identifier(true)?;
+                p.expect_token(&Token::RParen)?;
+                Ok((func, column))
+            })?;
+            self.parser.expect_token(&Token::RParen)?;
+            Some(res)
+        } else {
+            None
+        };
+
+        let mut indexes = Vec::new();
+
+        loop {
+            if self.parse_custom_token("aggregate") {
+                self.parser.expect_keyword(Keyword::INDEX)?;
+                indexes.push(self.parse_with_index(name.clone(), true)?);
+            } else if self.parser.parse_keyword(Keyword::INDEX) {
+                indexes.push(self.parse_with_index(name.clone(), false)?);
+            } else {
+                break;
+            }
         }
+
+        let partitioned_index = if self.parser.parse_keywords(&[
+            Keyword::ADD,
+            Keyword::TO,
+            Keyword::PARTITIONED,
+            Keyword::INDEX,
+        ]) {
+            let name = self.parser.parse_object_name(true)?;
+            self.parser.expect_token(&Token::LParen)?;
+            let columns = self
+                .parser
+                .parse_comma_separated(|t| Parser::parse_identifier(t, true))?;
+            self.parser.expect_token(&Token::RParen)?;
+            Some(PartitionedIndexRef { name, columns })
+        } else {
+            None
+        };
+
+        let locations = if self.parser.parse_keyword(Keyword::LOCATION) {
+            Some(
+                self.parser
+                    .parse_comma_separated(|p| p.parse_literal_string())?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Statement::CreateTable {
+            create_table: SQLStatement::CreateTable(CreateTable {
+                or_replace: false,
+                name,
+                columns,
+                constraints,
+                hive_distribution: HiveDistributionStyle::NONE,
+                hive_formats: None,
+                table_properties,
+                with_options,
+                if_not_exists,
+                transient: false,
+                external: locations.is_some(),
+                file_format: None,
+                location: None,
+                query,
+                without_rowid,
+                temporary: false,
+                like,
+                clone: None,
+                engine: None,
+                comment: None,
+                auto_increment_offset: None,
+                default_charset: None,
+                collation: None,
+                on_commit: None,
+                on_cluster: None,
+                primary_key: None,
+                order_by: None,
+                partition_by: None,
+                cluster_by: None,
+                options: None,
+                strict: false,
+                copy_grants: false,
+                enable_schema_evolution: None,
+                change_tracking: None,
+                data_retention_time_in_days: None,
+                max_data_extension_time_in_days: None,
+                default_ddl_collation: None,
+                with_aggregation_policy: None,
+                with_row_access_policy: None,
+                global: None,
+                volatile: false,
+                with_tags: None,
+            }),
+            indexes,
+            aggregates,
+            partitioned_index,
+            locations,
+            unique_key,
+        })
     }
 
     pub fn parse_with_index(
