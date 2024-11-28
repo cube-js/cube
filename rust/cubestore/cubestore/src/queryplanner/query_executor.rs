@@ -22,7 +22,11 @@ use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use core::fmt;
-use datafusion::arrow::array::{make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array, Int16Array, Int32Array, Int64Array, MutableArrayData, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array};
+use datafusion::arrow::array::{
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
+    Int16Array, Int32Array, Int64Array, MutableArrayData, StringArray, TimestampMicrosecondArray,
+    TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
+};
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::ipc::reader::StreamReader;
@@ -43,9 +47,11 @@ use datafusion::execution::{SessionStateBuilder, TaskContext};
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
 use datafusion::physical_expr::{
-    expressions, EquivalenceProperties, LexRequirement, PhysicalSortExpr, PhysicalSortRequirement,
+    expressions, Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr,
+    PhysicalSortRequirement,
 };
 use datafusion::physical_optimizer::optimizer::PhysicalOptimizer;
+use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::projection::ProjectionExec;
@@ -607,15 +613,13 @@ impl CubeTable {
                     .get(remote_path.as_str())
                     .expect(format!("Missing remote path {}", remote_path).as_str());
 
-                let file_scan = FileScanConfig::new(
-                    ObjectStoreUrl::local_filesystem(),
-                    index_schema.clone(),
-                )
-                .with_file(PartitionedFile::from_path(local_path.to_string())?)
-                .with_projection(index_projection_or_none_on_schema_match.clone())
-                .with_output_ordering(vec![(0..key_len)
-                    .map(|i| -> Result<_, DataFusionError> {
-                        Ok(PhysicalSortExpr::new(
+                let file_scan =
+                    FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone())
+                        .with_file(PartitionedFile::from_path(local_path.to_string())?)
+                        .with_projection(index_projection_or_none_on_schema_match.clone())
+                        .with_output_ordering(vec![(0..key_len)
+                            .map(|i| -> Result<_, DataFusionError> {
+                                Ok(PhysicalSortExpr::new(
                             Arc::new(
                                 datafusion::physical_expr::expressions::Column::new_with_schema(
                                     index_schema.field(i).name(),
@@ -624,8 +628,8 @@ impl CubeTable {
                             ),
                             SortOptions::default(),
                         ))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?]);
+                            })
+                            .collect::<Result<Vec<_>, _>>()?]);
                 let parquet_exec = ParquetExecBuilder::new(file_scan)
                     .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone())
                     .build();
@@ -982,7 +986,7 @@ impl ExecutionPlan for CubeTableExec {
                 sort_order = None
             }
         }
-        vec![sort_order.map(|order| {
+        let order = sort_order.map(|order| {
             order
                 .into_iter()
                 .map(|col_index| {
@@ -999,7 +1003,9 @@ impl ExecutionPlan for CubeTableExec {
                     ))
                 })
                 .collect()
-        })]
+        });
+
+        (0..self.children().len()).map(|_| order.clone()).collect()
     }
 
     // TODO upgrade DF
@@ -1069,6 +1075,10 @@ impl ExecutionPlan for CubeTableExec {
 
     fn maintains_input_order(&self) -> Vec<bool> {
         vec![true; self.children().len()]
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition; self.children().len()]
     }
 }
 
@@ -1540,6 +1550,10 @@ impl ExecutionPlan for ClusterSendExec {
             vec![false]
         }
     }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition; self.children().len()]
+    }
 }
 
 impl fmt::Debug for ClusterSendExec {
@@ -1704,14 +1718,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                     }
                 }
                 // TODO upgrade DF
-                DataType::Decimal128(_, _) => convert_array!(
-                    array,
-                    num_rows,
-                    rows,
-                    Decimal128Array,
-                    Decimal,
-                    (Decimal)
-                ),
+                DataType::Decimal128(_, _) => {
+                    convert_array!(array, num_rows, rows, Decimal128Array, Decimal, (Decimal))
+                }
                 // DataType::Int64Decimal(1) => convert_array!(
                 //     array,
                 //     num_rows,
