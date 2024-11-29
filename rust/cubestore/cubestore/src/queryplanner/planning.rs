@@ -1627,30 +1627,15 @@ impl CubeExtensionPlanner {
         }
         // Note that MergeExecs are added automatically when needed.
         if let Some(c) = self.cluster.as_ref() {
-            let mut send: Arc<dyn ExecutionPlan> = Arc::new(ClusterSendExec::new(
+            Ok(Arc::new(ClusterSendExec::new(
                 schema,
                 c.clone(),
                 self.serialized_plan.clone(),
                 snapshots,
                 input,
                 use_streaming,
-            )?);
-            // TODO upgrade DF
-            if send.properties().partitioning.partition_count() != 1 {
-                send = Arc::new(RepartitionExec::try_new(
-                    send,
-                    Partitioning::UnknownPartitioning(1),
-                )?);
-            }
-            Ok(send)
+            )?))
         } else {
-            // TODO upgrade DF
-            if input.output_partitioning().partition_count() != 1 {
-                input = Arc::new(RepartitionExec::try_new(
-                    input,
-                    Partitioning::UnknownPartitioning(1),
-                )?);
-            }
             Ok(Arc::new(WorkerExec {
                 input,
                 schema,
