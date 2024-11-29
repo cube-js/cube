@@ -22,7 +22,7 @@ type DBResponseValue =
   { value: DBResponsePrimitive };
 
 /**
- * Transform cpecified `value` with specified `type` to the network
+ * Transform specified `value` with specified `type` to the network
  * protocol type.
  */
 function transformValue(
