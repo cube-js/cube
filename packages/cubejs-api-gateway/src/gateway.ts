@@ -2014,17 +2014,17 @@ class ApiGateway {
   }
 
   protected resToResultFn(res: ExpressResponse) {
-    return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
-  }
-
-  protected resToRawResultFn(res: ExpressResponse) {
-    return (jsonBuffer: ArrayBuffer, { status }: { status?: number } = {}) => {
+    return (message, { status }: { status?: number } = {}) => {
       if (status) {
         res.status(status);
       }
 
-      res.set('Content-Type', 'application/json');
-      res.send(jsonBuffer);
+      if (message instanceof ArrayBuffer) {
+        res.set('Content-Type', 'application/json');
+        res.send(message);
+      }
+
+      res.json(message);
     };
   }
 
