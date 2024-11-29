@@ -21,6 +21,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 binary_expr(
                     wrapper_pushdown_replacer(
@@ -29,6 +30,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "?op",
                     wrapper_pushdown_replacer(
@@ -37,6 +39,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                 ),
             ),
@@ -49,6 +52,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "?op",
                     wrapper_pullup_replacer(
@@ -57,6 +61,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -65,6 +70,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 self.transform_binary_expr("?op", "?alias_to_cube"),
             ),

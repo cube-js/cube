@@ -21,6 +21,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 is_null_expr(wrapper_pushdown_replacer(
                     "?expr",
@@ -28,6 +29,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 )),
             ),
             transforming_rewrite(
@@ -38,6 +40,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 )),
                 wrapper_pullup_replacer(
                     is_null_expr("?expr"),
@@ -45,6 +48,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 self.transform_is_null_expr("?alias_to_cube"),
             ),
@@ -56,6 +60,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 is_not_null_expr(wrapper_pushdown_replacer(
                     "?expr",
@@ -63,6 +68,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 )),
             ),
             transforming_rewrite(
@@ -73,6 +79,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 )),
                 wrapper_pullup_replacer(
                     is_not_null_expr("?expr"),
@@ -80,6 +87,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 self.transform_is_null_expr("?alias_to_cube"),
             ),
