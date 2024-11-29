@@ -12,6 +12,7 @@ mod filter;
 mod in_list_expr;
 mod in_subquery_expr;
 mod is_null_expr;
+mod join;
 mod like_expr;
 mod limit;
 mod literal;
@@ -57,6 +58,7 @@ impl RewriteRules for WrapperRules {
         let mut rules = Vec::new();
 
         self.cube_scan_wrapper_rules(&mut rules);
+        self.join_rules(&mut rules);
         self.wrapper_pull_up_rules(&mut rules);
         self.aggregate_rules(&mut rules);
         self.aggregate_rules_subquery(&mut rules);
