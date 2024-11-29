@@ -37,7 +37,7 @@ where
     for inputs in worker_inputs {
         let (send_done, recv_done) = ipc_channel::ipc::bytes_channel().unwrap();
         let args = (send_init.clone(), recv_done, inputs, timeout);
-        let handle = respawn(args, &[], &[]).unwrap();
+        let handle = respawn(args, &["--".to_string(), "--nocapture".to_string()], &[]).unwrap();
         // Ensure we signal completion to all started workers even if errors occur along the way.
         join_workers.push(scopeguard::guard(
             (send_done, handle),
