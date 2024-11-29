@@ -6,6 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use cubestore::config::Config;
 use cubestore::util::respawn;
+use cubestore::util::respawn::register_pushdownable_envs;
 use cubestore_sql_tests::multiproc::{
     multiproc_child_main, run_multiproc_test, MultiProcTest, SignalInit, WaitCompletion, WorkerProc,
 };
@@ -16,6 +17,7 @@ const WORKER_PORTS: [u16; 2] = [51337, 51338];
 
 #[cfg(not(target_os = "windows"))]
 fn main() {
+    register_pushdownable_envs(&["CUBESTORE_TEST_LOG_WORKER"]);
     respawn::register_handler(multiproc_child_main::<ClusterSqlTest>);
     respawn::init(); // TODO: logs in worker processes.
 
@@ -99,7 +101,11 @@ impl WorkerProc<WorkerArgs> for WorkerFn {
         }
         Config::test(&test_name)
             .update_config(|mut c| {
-                c.select_worker_pool_size = 2;
+                c.select_worker_pool_size = if std::env::var("CUBESTORE_TEST_LOG_WORKER").is_ok() {
+                    0
+                } else {
+                    2
+                };
                 c.server_name = format!("localhost:{}", WORKER_PORTS[id]);
                 c.worker_bind_address = Some(c.server_name.clone());
                 c.metastore_remote_address = Some(format!("localhost:{}", METASTORE_PORT));

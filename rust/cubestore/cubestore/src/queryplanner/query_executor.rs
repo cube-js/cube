@@ -748,12 +748,9 @@ impl CubeTable {
         }
 
         let schema = table_projected_schema;
-        let partition_num = partition_execs
-            .iter()
-            .map(|c| c.properties().partitioning.partition_count())
-            .sum();
+        let partition_num = partition_execs.len();
 
-        let read_data = Arc::new(CubeTableExec {
+        let read_data: Arc<dyn ExecutionPlan> = Arc::new(CubeTableExec {
             schema: schema.clone(),
             partition_execs,
             index_snapshot: self.index_snapshot.clone(),
@@ -856,10 +853,7 @@ impl CubeTable {
                 .collect::<Result<Vec<_>, _>>()?;
             Arc::new(SortPreservingMergeExec::new(join_columns, read_data))
         } else {
-            Arc::new(RepartitionExec::try_new(
-                read_data,
-                Partitioning::UnknownPartitioning(1),
-            )?)
+            read_data
         };
 
         Ok(plan)
