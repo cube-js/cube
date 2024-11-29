@@ -1,4 +1,6 @@
 use datafusion::physical_plan::displayable;
+use pretty_assertions::assert_eq;
+use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
@@ -11,6 +13,7 @@ use crate::{
         DatabaseProtocol,
     },
     config::ConfigObjImpl,
+    transport::TransportLoadRequestQuery,
 };
 
 #[tokio::test]
@@ -426,7 +429,7 @@ async fn test_simple_subquery_wrapper_projection() {
         .wrapped_sql
         .unwrap()
         .sql
-        .contains("\\\\\\\"limit\\\\\\\":1"));
+        .contains("\\\\\\\"limit\\\\\\\": 1"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
@@ -482,7 +485,7 @@ async fn test_simple_subquery_wrapper_filter_equal() {
         .wrapped_sql
         .unwrap()
         .sql
-        .contains("\\\\\\\"limit\\\\\\\":1"));
+        .contains("\\\\\\\"limit\\\\\\\": 1"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
@@ -536,6 +539,184 @@ async fn test_simple_subquery_wrapper_filter_and_projection() {
         .contains("IN (SELECT"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
+// TODO add more time zones
+// TODO add more TS syntax variants
+// TODO add TIMESTAMPTZ variant
+/// Using TIMESTAMP WITH TIME ZONE with actual timezone in wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2024-02-03T04:05:06Z'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains(
+            "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
+        ));
+}
+
+// TODO add more time zones
+// TODO add more TS syntax variants
+// TODO add TIMESTAMPTZ variant
+/// Using TIMESTAMP WITH TIME ZONE with actual timezone in ungrouped wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz_ungrouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2024-02-03T04:05:06Z'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains(
+            "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
+        ));
+}
+
+/// Using NOW() in wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_now() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= NOW()
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
+}
+
+/// Using NOW() in ungrouped wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_now_ungrouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= NOW()
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
 }
 
 #[tokio::test]
@@ -1000,4 +1181,80 @@ async fn test_wrapper_limit_zero() {
         .contains("LIMIT 0"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
+/// Tests that Aggregation(Filter(CubeScan(ungrouped=true))) with expresions in filter
+/// can be executed as a single ungrouped=false load query
+#[tokio::test]
+async fn test_wrapper_filter_flatten() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+            SELECT
+                customer_gender,
+                SUM(sumPrice)
+            FROM
+                KibanaSampleDataEcommerce
+            WHERE
+                LOWER(customer_gender) = 'male'
+            GROUP BY
+                1
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert_eq!(
+        query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .request
+            .unwrap(),
+        TransportLoadRequestQuery {
+            measures: Some(vec![json!({
+                "cube_name": "KibanaSampleDataEcommerce",
+                "alias": "sum_kibanasample",
+                "cube_params": ["KibanaSampleDataEcommerce"],
+                // This is grouped query, KibanaSampleDataEcommerce.sumPrice is correct in this context
+                // SUM(sumPrice) will be incrrect here, it would lead to SUM(SUM(sql)) in generated query
+                "expr": "${KibanaSampleDataEcommerce.sumPrice}",
+                "grouping_set": null,
+            })
+            .to_string(),]),
+            dimensions: Some(vec![json!({
+                "cube_name": "KibanaSampleDataEcommerce",
+                "alias": "customer_gender",
+                "cube_params": ["KibanaSampleDataEcommerce"],
+                "expr": "${KibanaSampleDataEcommerce.customer_gender}",
+                "grouping_set": null,
+            })
+            .to_string(),]),
+            segments: Some(vec![json!({
+                "cube_name": "KibanaSampleDataEcommerce",
+                "alias": "lower_kibanasamp",
+                "cube_params": ["KibanaSampleDataEcommerce"],
+                "expr": "(LOWER(${KibanaSampleDataEcommerce.customer_gender}) = $0$)",
+                "grouping_set": null,
+            })
+            .to_string(),]),
+            time_dimensions: None,
+            order: Some(vec![]),
+            limit: Some(50000),
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        }
+    );
 }

@@ -1,8 +1,9 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
-use crate::planner::sql_evaluator::{EvaluatorVisitor, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
+use std::any::Any;
 use std::rc::Rc;
 
 pub struct MultiStageRankNode {
@@ -17,6 +18,14 @@ impl MultiStageRankNode {
             partition,
         })
     }
+
+    pub fn else_processor(&self) -> &Rc<dyn SqlNode> {
+        &self.else_processor
+    }
+
+    pub fn partition(&self) -> &Vec<String> {
+        &self.partition
+    }
 }
 
 impl SqlNode for MultiStageRankNode {
@@ -25,6 +34,7 @@ impl SqlNode for MultiStageRankNode {
         visitor: &mut SqlEvaluatorVisitor,
         node: &Rc<EvaluationNode>,
         query_tools: Rc<QueryTools>,
+        node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
         let res = match node.symbol() {
             MemberSymbolType::Measure(m) => {
@@ -34,7 +44,8 @@ impl SqlNode for MultiStageRankNode {
                             .measure_order_by()
                             .iter()
                             .map(|item| -> Result<String, CubeError> {
-                                let sql = visitor.apply(item.evaluation_node())?;
+                                let sql = visitor
+                                    .apply(item.evaluation_node(), node_processor.clone())?;
                                 Ok(format!("{} {}", sql, item.direction()))
                             })
                             .collect::<Result<Vec<_>, _>>()?
@@ -50,8 +61,12 @@ impl SqlNode for MultiStageRankNode {
                     };
                     format!("rank() OVER ({partition_by}{order_by})")
                 } else {
-                    self.else_processor
-                        .to_sql(visitor, node, query_tools.clone())?
+                    self.else_processor.to_sql(
+                        visitor,
+                        node,
+                        query_tools.clone(),
+                        node_processor.clone(),
+                    )?
                 }
             }
             _ => {
@@ -61,5 +76,13 @@ impl SqlNode for MultiStageRankNode {
             }
         };
         Ok(res)
+    }
+
+    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+        self.clone()
+    }
+
+    fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
+        vec![self.else_processor.clone()]
     }
 }

@@ -117,7 +117,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       console.log(`Creating ${queries.length} fixture tables`);
       try {
         for (const q of queries) {
-          await driver.query(q);
+          await driver.createTableRaw(q);
         }
         console.log(`Creating ${queries.length} fixture tables completed`);
       } catch (e: any) {

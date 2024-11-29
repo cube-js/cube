@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 pub trait SqlTemplatesRender {
     fn contains_template(&self, template_name: &str) -> bool;
     fn render_template(&self, name: &str, ctx: Value) -> Result<String, CubeError>;
+    fn get_template(&self, template_name: &str) -> Result<&String, CubeError>;
 }
 
 pub struct NativeSqlTemplatesRender<IT: InnerTypes> {
@@ -42,6 +43,12 @@ impl<IT: InnerTypes> NativeSqlTemplatesRender<IT> {
 impl<IT: InnerTypes> SqlTemplatesRender for NativeSqlTemplatesRender<IT> {
     fn contains_template(&self, template_name: &str) -> bool {
         self.templates.contains_key(template_name)
+    }
+
+    fn get_template(&self, template_name: &str) -> Result<&String, CubeError> {
+        self.templates
+            .get(template_name)
+            .ok_or_else(|| CubeError::user("{template_name} template not found".to_string()))
     }
 
     fn render_template(&self, name: &str, ctx: Value) -> Result<String, CubeError> {
