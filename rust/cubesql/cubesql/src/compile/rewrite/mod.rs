@@ -544,24 +544,41 @@ macro_rules! var {
 }
 
 #[macro_export]
-macro_rules! copy_flag {
-    ($egraph:expr, $subst:expr, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {{
+macro_rules! copy_value {
+    ($egraph:expr, $subst:expr, $ty:ty, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {{
         let mut found = false;
+        let mut found_value: Option<&$ty> = None;
         for in_value in $crate::var_iter!($egraph[$subst[$in_var]], $in_kind) {
-            // Typechecking for $in_kind, only booleans are supported for now
-            let in_value: bool = *in_value;
+            // Typechecking for $in_kind
+            let in_value: &$ty = in_value;
+            if found {
+                // Found many different unified representations of same kind for a single eclass, not safe to copy
+                found_value = None;
+            } else {
+                found = true;
+                found_value = Some(in_value);
+            }
+        }
+        if let Some(found_value) = found_value {
+            let out_value = found_value.clone();
             $subst.insert(
                 $out_var,
                 $egraph.add($crate::compile::rewrite::LogicalPlanLanguage::$out_kind(
-                    $out_kind(in_value),
+                    $out_kind(out_value),
                 )),
             );
-            found = true;
-            // This is safe, because we expect only enode with one child, with boolena inside, and expect that they would never unify
-            break;
+            true
+        } else {
+            false
         }
-        found
     }};
+}
+
+#[macro_export]
+macro_rules! copy_flag {
+    ($egraph:expr, $subst:expr, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {
+        $crate::copy_value!($egraph, $subst, bool, $in_var, $in_kind, $out_var, $out_kind)
+    };
 }
 
 pub struct WithColumnRelation(Option<String>);
