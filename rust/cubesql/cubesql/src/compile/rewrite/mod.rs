@@ -649,6 +649,12 @@ pub fn column_name_to_member_vec(
 }
 
 impl LogicalPlanData {
+    // TODO use it instead of find_member_by_alias in more places
+    fn find_member_by_column(&mut self, column: &Column) -> Option<(&MemberNameToExpr, String)> {
+        let name = column.flat_name();
+        self.find_member_by_alias(&name)
+    }
+
     fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
         if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
             Self::do_find_member_by_alias(member_names_to_expr, name)
