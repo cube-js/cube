@@ -1,5 +1,5 @@
-use neon::prelude::Finalize;
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
+use neon::prelude::Finalize;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -40,8 +40,8 @@ impl CubeStoreResult {
             rows: vec![],
         };
 
-        let http_message = root_as_http_message(msg_data)
-            .map_err(|_| ParseError::FlatBufferError)?;
+        let http_message =
+            root_as_http_message(msg_data).map_err(|_| ParseError::FlatBufferError)?;
 
         match http_message.command_type() {
             HttpCommand::HttpError => {
@@ -62,7 +62,10 @@ impl CubeStoreResult {
                     return Err(ParseError::ColumnNameNotDefined);
                 }
 
-                result.columns = result_set_columns.iter().map(|val| val.to_owned()).collect();
+                result.columns = result_set_columns
+                    .iter()
+                    .map(|val| val.to_owned())
+                    .collect();
                 let result_set_rows = result_set.rows().ok_or(ParseError::EmptyResultSet)?;
                 result.rows = Vec::with_capacity(result_set_rows.len());
 
@@ -77,7 +80,7 @@ impl CubeStoreResult {
                 }
 
                 Ok(result)
-            },
+            }
             _ => Err(ParseError::UnsupportedCommand),
         }
     }
