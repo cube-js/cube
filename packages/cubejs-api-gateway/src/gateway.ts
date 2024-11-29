@@ -1749,14 +1749,14 @@ class ApiGateway {
           slowQuery = slowQuery ||
             Boolean(sqlQueries[index].slowQuery);
 
-          const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery
-          );
-
           const response = await this.getSqlResponseInternal(
             context,
             normalizedQuery,
             sqlQueries[index],
+          );
+
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQuery
           );
 
           return this.getResultInternal(

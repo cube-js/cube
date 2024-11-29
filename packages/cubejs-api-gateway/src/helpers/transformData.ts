@@ -216,7 +216,7 @@ function getCompactRow(
 }
 
 /**
- * Convert DB response object to the vanila output format.
+ * Convert DB response object to the vanilla output format.
  * @todo rewrite me please!
  * @internal
  */
