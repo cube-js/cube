@@ -512,16 +512,14 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsBox<
     let msg = cx.argument::<JsBuffer>(0)?;
     let msg_data = msg.as_slice(&cx);
     match CubeStoreResult::new(msg_data) {
-        Ok(result) => {
-            Ok(cx.boxed(result))
-        }
+        Ok(result) => Ok(cx.boxed(result)),
         Err(err) => cx.throw_error(err.to_string()),
     }
 }
 
 fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     let result = cx.argument::<JsBox<CubeStoreResult>>(0)?;
-    
+
     let js_array = cx.execute_scoped(|mut cx| {
         let js_array = JsArray::new(&mut cx, result.rows.len());
 
