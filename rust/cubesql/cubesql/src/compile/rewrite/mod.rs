@@ -1509,12 +1509,15 @@ fn wrapped_select_window_expr_empty_tail() -> String {
     wrapped_select_window_expr(Vec::<String>::new())
 }
 
+fn wrapped_select_join(input: impl Display, expr: impl Display, join_type: impl Display) -> String {
+    format!("(WrappedSelectJoin {} {} {})", input, expr, join_type)
+}
+
 #[allow(dead_code)]
 fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectJoins {} {})", left, right)
 }
 
-#[allow(dead_code)]
 fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
 }
