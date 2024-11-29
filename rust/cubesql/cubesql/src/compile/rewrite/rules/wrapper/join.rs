@@ -35,5 +35,13 @@ impl WrapperRules {
                 "?grouped_subqueries",
             ),
         )]);
+
+        // TODO only pullup is necessary here
+        Self::list_pushdown_pullup_rules(
+            rules,
+            "wrapper-joins",
+            "WrappedSelectJoins",
+            "WrappedSelectJoins",
+        );
     }
 }
