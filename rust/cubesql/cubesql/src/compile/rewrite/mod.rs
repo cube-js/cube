@@ -470,6 +470,9 @@ crate::plan_to_language! {
             push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+            // Known qualifiers of grouped subqueries
+            // Used to allow to rewrite columns from them even with push to Cube enabled
+            grouped_subqueries: Vec<String>,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
@@ -485,6 +488,9 @@ crate::plan_to_language! {
             push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+            // Known qualifiers of grouped subqueries
+            // Used to allow to rewrite columns from them even with push to Cube enabled
+            grouped_subqueries: Vec<String>,
         },
         FlattenPushdownReplacer {
             expr: Arc<Expr>,
@@ -1967,10 +1973,10 @@ fn wrapper_pushdown_replacer(
     push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
+    grouped_subqueries: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {} {} {} {} {})",
-        members, alias_to_cube, push_to_cube, in_projection, cube_members
+        "(WrapperPushdownReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
     )
 }
 
@@ -1980,10 +1986,10 @@ fn wrapper_pullup_replacer(
     push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
+    grouped_subqueries: impl Display,
 ) -> String {
     format!(
-        "(WrapperPullupReplacer {} {} {} {} {})",
-        members, alias_to_cube, push_to_cube, in_projection, cube_members
+        "(WrapperPullupReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
     )
 }
 

@@ -14,6 +14,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 alias_expr(
                     wrapper_pushdown_replacer(
@@ -22,6 +23,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "?alias",
                 ),
@@ -35,6 +37,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "?alias",
                 ),
@@ -44,6 +47,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
             ),
         ]);
