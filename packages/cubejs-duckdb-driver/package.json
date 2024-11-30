@@ -30,7 +30,7 @@
     "@cubejs-backend/base-driver": "1.1.10",
     "@cubejs-backend/schema-compiler": "1.1.11",
     "@cubejs-backend/shared": "1.1.10",
-    "duckdb": "^1.0.0"
+    "duckdb": "^1.1.3"
   },
   "license": "Apache-2.0",
   "devDependencies": {
