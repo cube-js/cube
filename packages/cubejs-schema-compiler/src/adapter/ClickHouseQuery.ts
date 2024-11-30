@@ -36,7 +36,13 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public escapeColumnName(name) {
-    return `\`${name}\``;
+    // ClickHouse does not document it's exact rules regarding identifiers
+    // https://clickhouse.com/docs/en/sql-reference/syntax#identifiers
+    // But there's a bit about escaping in string
+    // https://clickhouse.com/docs/en/sql-reference/syntax#string
+    // Note that documentation does not allow to use \` sequence
+    // See https://github.com/ClickHouse/ClickHouse/issues/71310
+    return `\`${name.replaceAll('`', '\\x60')}\``;
   }
 
   public convertTz(field) {
@@ -274,7 +280,8 @@ export class ClickHouseQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
     delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';
-    templates.quotes.escape = '\\`';
+    // See escapeColumnName comment
+    templates.quotes.escape = '\\x60';
     templates.types.boolean = 'BOOL';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.time;
