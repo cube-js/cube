@@ -360,13 +360,9 @@ impl QueryExecutorImpl {
             0,
             Arc::new(PreOptimizeRule::new(self.memory_handler.clone(), None)),
         );
+        let config = Self::session_config();
         let session_state = SessionStateBuilder::new()
-            .with_config(
-                SessionConfig::new()
-                    .with_batch_size(4096)
-                    // TODO upgrade DF fails if bigger than 1
-                    .with_target_partitions(1),
-            )
+            .with_config(config)
             .with_runtime_env(runtime)
             .with_default_features()
             .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
@@ -394,13 +390,9 @@ impl QueryExecutorImpl {
                 data_loaded_size.clone(),
             )),
         );
+        let config = Self::session_config();
         let session_state = SessionStateBuilder::new()
-            .with_config(
-                SessionConfig::new()
-                    .with_batch_size(4096)
-                    // TODO upgrade DF fails if bigger than 1
-                    .with_target_partitions(1),
-            )
+            .with_config(config)
             .with_runtime_env(runtime)
             .with_default_features()
             .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
@@ -412,6 +404,16 @@ impl QueryExecutorImpl {
             .build();
         let ctx = SessionContext::new_with_state(session_state);
         Ok(Arc::new(ctx))
+    }
+
+    fn session_config() -> SessionConfig {
+        let mut config = SessionConfig::new()
+            .with_batch_size(4096)
+            // TODO upgrade DF if less than 2 then there will be no MergeJoin. Decide on repartitioning.
+            .with_target_partitions(2)
+            .with_prefer_existing_sort(true);
+        config.options_mut().optimizer.prefer_hash_join = false;
+        config
     }
 }
 
@@ -1144,7 +1146,6 @@ impl Debug for InlineTableProvider {
 }
 
 pub struct ClusterSendExec {
-    schema: SchemaRef,
     properties: PlanProperties,
     pub partitions: Vec<(
         /*node*/ String,
@@ -1171,7 +1172,6 @@ pub enum InlineCompoundPartition {
 
 impl ClusterSendExec {
     pub fn new(
-        schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
         union_snapshots: &[Snapshots],
@@ -1183,13 +1183,10 @@ impl ClusterSendExec {
             union_snapshots,
             &serialized_plan.planning_meta().multi_part_subtree,
         )?;
-        let eq_properties = EquivalenceProperties::new(schema.clone());
         Ok(Self {
-            schema,
-            properties: PlanProperties::new(
-                eq_properties,
-                Partitioning::UnknownPartitioning(partitions.len()),
-                ExecutionMode::Bounded,
+            properties: Self::compute_properties(
+                input_for_optimizations.properties(),
+                partitions.len(),
             ),
             partitions,
             cluster,
@@ -1197,6 +1194,17 @@ impl ClusterSendExec {
             input_for_optimizations,
             use_streaming,
         })
+    }
+
+    fn compute_properties(
+        input_properties: &PlanProperties,
+        partitions_num: usize,
+    ) -> PlanProperties {
+        PlanProperties::new(
+            input_properties.eq_properties.clone(),
+            Partitioning::UnknownPartitioning(partitions_num),
+            input_properties.execution_mode.clone(),
+        )
     }
 
     pub(crate) fn distribute_to_workers(
@@ -1406,14 +1414,12 @@ impl ClusterSendExec {
         r
     }
 
-    pub fn with_changed_schema(
-        &self,
-        schema: SchemaRef,
-        input_for_optimizations: Arc<dyn ExecutionPlan>,
-    ) -> Self {
+    pub fn with_changed_schema(&self, input_for_optimizations: Arc<dyn ExecutionPlan>) -> Self {
         ClusterSendExec {
-            schema,
-            properties: self.properties.clone(),
+            properties: Self::compute_properties(
+                input_for_optimizations.properties(),
+                self.partitions.len(),
+            ),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
@@ -1462,10 +1468,6 @@ impl ExecutionPlan for ClusterSendExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![&self.input_for_optimizations]
     }
@@ -1479,8 +1481,10 @@ impl ExecutionPlan for ClusterSendExec {
         }
         let input_for_optimizations = children.into_iter().next().unwrap();
         Ok(Arc::new(ClusterSendExec {
-            schema: self.schema.clone(),
-            properties: self.properties.clone(),
+            properties: Self::compute_properties(
+                input_for_optimizations.properties(),
+                self.partitions.len(),
+            ),
             partitions: self.partitions.clone(),
             cluster: self.cluster.clone(),
             serialized_plan: self.serialized_plan.clone(),
@@ -1500,7 +1504,7 @@ impl ExecutionPlan for ClusterSendExec {
         let plan = self.serialized_plan_for_partitions(partitions);
 
         let cluster = self.cluster.clone();
-        let schema = self.schema.clone();
+        let schema = self.properties.eq_properties.schema().clone();
         let node_name = node_name.to_string();
         if self.use_streaming {
             // A future that yields a stream
@@ -1554,7 +1558,8 @@ impl fmt::Debug for ClusterSendExec {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         f.write_fmt(format_args!(
             "ClusterSendExec: {:?}: {:?}",
-            self.schema, self.partitions
+            self.properties.eq_properties.schema(),
+            self.partitions
         ))
     }
 }

@@ -34,7 +34,6 @@ pub fn push_aggregate_to_workers(
         // Router plan, replace partial aggregate with cluster send.
         Ok(Arc::new(
             cs.with_changed_schema(
-                agg.schema().clone(),
                 p.clone()
                     .with_new_children(vec![cs.input_for_optimizations.clone()])?,
             ),
@@ -43,7 +42,6 @@ pub fn push_aggregate_to_workers(
         // Worker plan, execute partial aggregate inside the worker.
         Ok(Arc::new(WorkerExec {
             input: p.clone().with_new_children(vec![w.input.clone()])?,
-            schema: agg.schema().clone(),
             max_batch_rows: w.max_batch_rows,
             limit_and_reverse: w.limit_and_reverse.clone(),
         }))

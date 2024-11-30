@@ -25,8 +25,23 @@ pub fn rewrite_plan_impl<'a, R: PlanRewriter>(
     let updated_ctx = f.enter_node(&p, ctx);
     let ctx = updated_ctx.as_ref().unwrap_or(ctx);
 
-    p.map_children(|c| rewrite_plan_impl(c, ctx, f))?
-        .transform_parent(|n| f.rewrite(n, ctx).map(|new| Transformed::yes(new)))
+    let join_context = match &p {
+        LogicalPlan::Join(Join { left, right, .. }) => vec![
+            (left.clone(), f.enter_join_left(&p, ctx)),
+            (right.clone(), f.enter_join_right(&p, ctx)),
+        ],
+        _ => Vec::new(),
+    };
+
+    p.map_children(|c| {
+        let next_ctx = join_context
+            .iter()
+            .find(|(n, _)| n.as_ref() == &c)
+            .and_then(|(_, join_ctx)| join_ctx.as_ref())
+            .unwrap_or(ctx);
+        rewrite_plan_impl(c, next_ctx, f)
+    })?
+    .transform_parent(|n| f.rewrite(n, ctx).map(|new| Transformed::yes(new)))
 
     // // First, update children.
     // let updated = match p {
