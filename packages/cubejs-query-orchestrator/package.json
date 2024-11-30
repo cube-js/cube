@@ -33,7 +33,7 @@
     "@cubejs-backend/cubestore-driver": "1.1.7",
     "@cubejs-backend/shared": "1.1.7",
     "csv-write-stream": "^2.0.0",
-    "es5-ext": "0.10.53",
+    "es5-ext": "^0.10.63",
     "generic-pool": "^3.7.1",
     "lru-cache": "^6.0.0",
     "moment-timezone": "^0.5.33",
@@ -66,7 +66,7 @@
     ]
   },
   "resolutions": {
-    "es5-ext": "0.10.53",
+    "es5-ext": "^0.10.63",
     "minimist": "^1.2.6"
   }
 }
