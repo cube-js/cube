@@ -613,7 +613,7 @@ impl PlanRewriter for CollectConstraints {
         }
         join_on
             .iter()
-            .map(|(l, _)| match l {
+            .map(|(_, r)| match r {
                 Expr::Column(c) => Some(c.name.to_string()),
                 _ => None,
             })
@@ -1593,7 +1593,6 @@ impl ExtensionPlanner for CubeExtensionPlanner {
             Ok(Some(self.plan_cluster_send(
                 input.clone(),
                 &cs.snapshots,
-                input.schema(),
                 false,
                 usize::MAX,
                 cs.limit_and_reverse.clone(),
@@ -1617,18 +1616,16 @@ impl CubeExtensionPlanner {
         &self,
         mut input: Arc<dyn ExecutionPlan>,
         snapshots: &Vec<Snapshots>,
-        schema: SchemaRef,
         use_streaming: bool,
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if snapshots.is_empty() {
-            return Ok(Arc::new(EmptyExec::new(schema)));
+            return Ok(Arc::new(EmptyExec::new(input.schema())));
         }
         // Note that MergeExecs are added automatically when needed.
         if let Some(c) = self.cluster.as_ref() {
             Ok(Arc::new(ClusterSendExec::new(
-                schema,
                 c.clone(),
                 self.serialized_plan.clone(),
                 snapshots,
@@ -1638,7 +1635,6 @@ impl CubeExtensionPlanner {
         } else {
             Ok(Arc::new(WorkerExec {
                 input,
-                schema,
                 max_batch_rows,
                 limit_and_reverse,
             }))
@@ -1651,9 +1647,6 @@ impl CubeExtensionPlanner {
 #[derive(Debug)]
 pub struct WorkerExec {
     pub input: Arc<dyn ExecutionPlan>,
-    // TODO: remove and use `self.input.schema()`
-    //       This is a hacky workaround for wrong schema of joins after projection pushdown.
-    pub schema: SchemaRef,
     pub max_batch_rows: usize,
     pub limit_and_reverse: Option<(usize, bool)>,
 }
@@ -1670,10 +1663,6 @@ impl ExecutionPlan for WorkerExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![&self.input]
     }
@@ -1683,9 +1672,9 @@ impl ExecutionPlan for WorkerExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 1);
+        let input = children.into_iter().next().unwrap();
         Ok(Arc::new(WorkerExec {
-            input: children.into_iter().next().unwrap(),
-            schema: self.schema.clone(),
+            input,
             max_batch_rows: self.max_batch_rows,
             limit_and_reverse: self.limit_and_reverse.clone(),
         }))
