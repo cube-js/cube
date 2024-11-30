@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
@@ -32,11 +33,12 @@ use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
-use datafusion::physical_plan::joins::HashJoinExec;
+use datafusion::physical_plan::joins::{HashJoinExec, SortMergeJoinExec};
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
+use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
 
 #[derive(Default, Clone, Copy)]
@@ -403,7 +405,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 AggregateMode::Single => "Single",
                 AggregateMode::SinglePartitioned => "SinglePartitioned",
             };
-            *out += &format!("{}{}Aggregate", mode, strat);
+            *out += &format!("{}{}Aggregate", strat, mode);
             if o.show_aggregations {
                 *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
@@ -487,18 +489,17 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             // TODO upgrade DF
             // } else if let Some(_) = a.downcast_ref::<MergeExec>() {
             //     *out += "Merge";
-            // } else if let Some(_) = a.downcast_ref::<MergeSortExec>() {
-            //     *out += "MergeSort";
+        } else if let Some(_) = a.downcast_ref::<SortPreservingMergeExec>() {
+            *out += "MergeSort";
             // } else if let Some(_) = a.downcast_ref::<MergeReSortExec>() {
             //     *out += "MergeResort";
-            // } else if let Some(j) = a.downcast_ref::<MergeJoinExec>() {
-            //     *out += &format!(
-            //         "MergeJoin, on: [{}]",
-            //         j.join_on()
-            //             .iter()
-            //             .map(|(l, r)| format!("{} = {}", l, r))
-            //             .join(", ")
-            //     );
+        } else if let Some(j) = a.downcast_ref::<SortMergeJoinExec>() {
+            *out += &format!(
+                "MergeJoin, on: [{}]",
+                j.on.iter()
+                    .map(|(l, r)| format!("{} = {}", l, r))
+                    .join(", ")
+            );
             // } else if let Some(j) = a.downcast_ref::<CrossJoinExec>() {
             //     *out += &format!("CrossJoin, on: {}", j.on)
             // } else if let Some(j) = a.downcast_ref::<CrossJoinAggExec>() {
@@ -525,8 +526,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             //     *out += "SkipRows";
             // } else if let Some(_) = a.downcast_ref::<RollingWindowAggExec>() {
             //     *out += "RollingWindowAgg";
-            // } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
-            //     *out += "LastRowByUniqueKey";
+        } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
+            *out += "LastRowByUniqueKey";
         } else if let Some(_) = a.downcast_ref::<MemoryExec>() {
             *out += "MemoryScan";
         } else if let Some(r) = a.downcast_ref::<RepartitionExec>() {
@@ -535,6 +536,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             let to_string = format!("{:?}", p);
             *out += &to_string.split(" ").next().unwrap_or(&to_string);
         }
+
+        // TODO upgrade DF - remove
+        // *out += &format!(", schema: {}", p.schema());
 
         // TODO upgrade DF
         // if o.show_output_hints {
