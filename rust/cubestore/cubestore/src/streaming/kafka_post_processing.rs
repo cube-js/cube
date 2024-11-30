@@ -481,7 +481,7 @@ impl KafkaPostProcessPlanner {
                             if let Some(existing_name) = &column_name {
                                 if existing_name != &name {
                                     return Err(CubeError::user(
-                                        "Scalar function can only use a single column".to_string(),
+                                        format!("Scalar function can only use a single column, expression: {:?}", expr),
                                     ));
                                 }
                             } else {
@@ -500,17 +500,15 @@ impl KafkaPostProcessPlanner {
             Expr::Alias(e, _) => match &**e {
                 Expr::Column(c) => Ok(c.name.clone()),
                 Expr::ScalarUDF { .. } => find_column_name(expr)?.ok_or_else(|| {
-                    CubeError::user("Scalar function must contain at least one column".to_string())
+                    CubeError::user(format!("Scalar function must contain at least one column, expression: {:?}", expr))
                 }),
-                _ => {
-                    println!("unknown expr: {:?}", e);
-                    Err(CubeError::user(format!(
-                        "Unique key can't be an expression in kafka streaming queries"
-                    )))
-                }
+                _ => Err(CubeError::user(format!(
+                    "Unique key can't be an expression in kafka streaming queries, expression: {:?}",
+                    expr
+                ))),
             },
             _ => Err(CubeError::user(
-                "All expressions must have aliases in kafka streaming queries".to_string(),
+                format!("All expressions must have aliases in kafka streaming queries, expression: {:?}", expr),
             )),
         }?;
 
