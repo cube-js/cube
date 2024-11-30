@@ -9,6 +9,7 @@ const GRANULARITY_VALUE = {
   hour: 'HH24',
   minute: 'mm',
   second: 'ss',
+  millisecond: 'FF3',
   month: 'MM',
   year: 'YYYY'
 };
