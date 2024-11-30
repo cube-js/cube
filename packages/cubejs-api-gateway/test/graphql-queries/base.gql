@@ -73,7 +73,9 @@ query CubeQuery {
 }
 
 query CubeQuery {
-  cube(where: { orders: { createdAt: { inDateRange: "2 weeks ago to now" } } }) {
+  cube(
+    where: { orders: { createdAt: { inDateRange: "2 weeks ago to now" } } }
+  ) {
     orders {
       count
       createdAt {
@@ -127,6 +129,17 @@ query CubeQuery {
     orders {
       count
       status
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { createdAt: { inDateRange: "This year" } } }) {
+    orders(orderBy: { createdAt: asc }) {
+      count
+      createdAt {
+        year
+      }
     }
   }
 }
