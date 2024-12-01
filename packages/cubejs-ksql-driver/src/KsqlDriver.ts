@@ -131,7 +131,9 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     if (this.config.kafkaHost) {
       this.kafkaClient = new Kafka({
         clientId: 'Cube',
-        brokers: this.config.kafkaHost.split(','),
+        brokers: this.config.kafkaHost
+          .split(',')
+          .map(h => h.trim()),
         // authenticationTimeout: 10000,
         // reauthenticationThreshold: 10000,
         ssl: this.config.kafkaUseSsl,

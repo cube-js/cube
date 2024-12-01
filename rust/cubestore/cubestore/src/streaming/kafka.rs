@@ -311,7 +311,7 @@ impl StreamingSource for KafkaStreamingSource {
             .clone()
             .split(",")
             .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
+            .map(|s| s.trim().to_string())
             .collect();
         let stream = self
             .kafka_client
