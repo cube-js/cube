@@ -438,28 +438,6 @@ impl PlanRewriter for CollectConstraints {
         c: &Self::Context,
     ) -> Result<LogicalPlan, DataFusionError> {
         match &n {
-            LogicalPlan::Projection {
-                expr,
-                input,
-                schema,
-            } => {
-                let mut alias_to_column = HashMap::new();
-                expr.iter().for_each(|e| {
-                    if let Expr::Alias(box Expr::Column(c), alias) = e {
-                        alias_to_column.insert(alias.clone(), c.clone());
-                    }
-                });
-
-                self.constraints.iter_mut().for_each(|c| {
-                    c.sort_on.iter_mut().for_each(|sort_columns| {
-                        sort_columns.sort_on.iter_mut().for_each(|sort_column| {
-                            if let Some(column) = alias_to_column.get(sort_column) {
-                                *sort_column = column.name.clone();
-                            }
-                        });
-                    });
-                });
-            }
             LogicalPlan::TableScan {
                 projection,
                 filters,
@@ -540,6 +518,28 @@ impl PlanRewriter for CollectConstraints {
                     aggregates: aggr_expr.to_vec(),
                     order_col_names: current_context.order_col_names.clone(),
                 })
+            }
+            LogicalPlan::Projection { expr, .. } => {
+                let alias_to_column = get_alias_to_column(expr);
+
+                if let Some(order_col_names) = &current_context.order_col_names {
+                    let names: Vec<String> = order_col_names
+                        .iter()
+                        .map(|k| {
+                            alias_to_column
+                                .get(k)
+                                .map_or_else(|| k.clone(), |v| v.name.clone())
+                        })
+                        .collect();
+
+                    if !names.is_empty() {
+                        return Some(current_context.update_order_col_names(names));
+                    } else {
+                        return None;
+                    }
+                }
+
+                None
             }
             LogicalPlan::Sort { expr, input, .. } => {
                 let (names, _) = sort_to_column_names(expr, input);
@@ -628,6 +628,17 @@ fn extract_column_name(expr: &Expr) -> Option<String> {
     }
 }
 
+fn get_alias_to_column(expr: &Vec<Expr>) -> HashMap<String, logical_plan::Column> {
+    let mut alias_to_column = HashMap::new();
+    expr.iter().for_each(|e| {
+        if let Expr::Alias(box Expr::Column(c), alias) = e {
+            alias_to_column.insert(alias.clone(), c.clone());
+        }
+    });
+
+    alias_to_column
+}
+
 ///Try to get original column namse from if underlined projection or aggregates contains columns aliases
 fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
     fn get_name(exprs: &Vec<Expr>, may_be_alias: &String) -> String {
@@ -664,7 +675,8 @@ fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<Str
                 }
                 match expr.as_ref() {
                     Expr::Column(c) => {
-                        res.push(get_original_name(&c.name, input));
+                        // res.push(get_original_name(&c.name, input));
+                        res.push(c.name.clone());
                     }
                     _ => {
                         return (Vec::new(), true);
@@ -778,30 +790,26 @@ impl PlanRewriter for ChooseIndex<'_> {
     fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
         match n {
             LogicalPlan::Projection { expr, .. } => {
-                let mut alias_to_column = HashMap::new();
-                expr.iter().for_each(|e| {
-                    if let Expr::Alias(box Expr::Column(c), alias) = e {
-                        alias_to_column.insert(alias.clone(), c.clone());
+                let alias_to_column = get_alias_to_column(expr);
+
+                if let Some(sort) = &context.sort {
+                    let names: Vec<String> = sort
+                        .clone()
+                        .iter()
+                        .map(|k| {
+                            alias_to_column
+                                .get(k)
+                                .map_or_else(|| k.clone(), |v| v.name.clone())
+                        })
+                        .collect();
+
+                    if !names.is_empty() {
+                        return Some(context.update_sort(names, context.sort_is_asc));
+                    } else {
+                        return None;
                     }
-                });
-
-                let names: Vec<String> = context
-                    .sort
-                    .clone()
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|k| {
-                        alias_to_column
-                            .get(k)
-                            .map_or_else(|| k.clone(), |v| v.name.clone())
-                    })
-                    .collect();
-
-                if !names.is_empty() {
-                    Some(context.update_sort(names, context.sort_is_asc))
-                } else {
-                    None
                 }
+                None
             }
             LogicalPlan::Limit { n, .. } => Some(context.update_limit(Some(*n))),
             LogicalPlan::Skip { n, .. } => {
