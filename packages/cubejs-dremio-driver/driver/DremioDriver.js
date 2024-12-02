@@ -53,6 +53,10 @@ class DremioDriver extends BaseDriver {
         config.dbUrl ||
         getEnv('dbUrl', { dataSource }) ||
         '',
+      dremioAuthToken:
+        config.dremioAuthToken ||
+        getEnv('dremioAuthToken', { dataSource }) ||
+        '',
       host:
         config.host ||
         getEnv('dbHost', { dataSource }) ||
@@ -88,19 +92,15 @@ class DremioDriver extends BaseDriver {
     if (this.config.dbUrl) {
       this.config.url = this.config.dbUrl;
       this.config.apiVersion = '';
-      this.config.auth = 'PAT';
+      if (this.config.dremioAuthToken === '') {
+        throw new Error('dremioAuthToken is blank');
+      }
     } else {
       const protocol = (this.config.ssl === true || this.config.ssl === 'true')
         ? 'https'
         : 'http';
       this.config.url = `${protocol}://${this.config.host}:${this.config.port}`;
       this.config.apiVersion = '/api/v3';
-    }
-
-    if (this.config.auth === 'PAT' || this.config.password.startsWith('Bearer ')) {
-      this.config.auth = 'PAT';
-    } else {
-      this.config.auth = 'BASIC';
     }
   }
 
@@ -120,17 +120,18 @@ class DremioDriver extends BaseDriver {
    * @protected
    */
   async getToken() {
-    if (this.config.auth === 'PAT') {
+    if (this.config.dremioAuthToken) {
+      const bearerToken = `Bearer ${this.config.dremioAuthToken}`;
       await axios.get(
         `${this.config.url}${this.config.apiVersion}/catalog`,
         {
           headers: {
-            Authorization: this.config.password
+            Authorization: bearerToken
           },
         },
       );
 
-      return this.config.password;
+      return bearerToken;
     }
 
     if (this.authToken && this.authToken.expires > new Date().getTime()) {

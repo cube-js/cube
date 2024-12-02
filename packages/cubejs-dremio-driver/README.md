@@ -13,14 +13,16 @@ Pure Javascript Dremio driver.
 
 To use this driver with [Dremio Cloud](https://docs.dremio.com/cloud/reference/api/), use the following setup:
 
-| Environment Variable | Value                                              |
-| -------------------- | -------------------------------------------------- |
-| CUBEJS_DB_TYPE       | dremio                                             |
-| CUBEJS_DB_URL        | https://api.dremio.cloud/v0/projects/${PROJECT_ID} |
-| CUBEJS_DB_NAME       | ${DB_NAME}                                         |
-| CUBEJS_DB_PASS       | Bearer ${PERSONAL_ACCESS_TOKEN}                    |
+| Environment Variable        | Value                                              |
+| --------------------------- | -------------------------------------------------- |
+| CUBEJS_DB_TYPE              | dremio                                             |
+| CUBEJS_DB_URL               | https://api.dremio.cloud/v0/projects/${PROJECT_ID} |
+| CUBEJS_DB_NAME              | ${DB_NAME}                                         |
+| CUBEJS_DB_DREMIO_AUTH_TOKEN | ${PERSONAL_ACCESS_TOKEN}                           |
 
-> It's important to note that "Bearer" is required for using personal access tokens.
+> [!NOTE]
+> When `CUBEJS_DB_URL` is set it takes precedence over `CUBEJS_DB_HOST` and it
+> is assumed that the driver is connecting to the Dremio Cloud API.
 
 ## Support
 
