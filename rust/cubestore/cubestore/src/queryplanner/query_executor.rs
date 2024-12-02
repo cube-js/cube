@@ -50,12 +50,26 @@ use datafusion::physical_expr::{
     expressions, Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr,
     PhysicalSortRequirement,
 };
+use datafusion::physical_optimizer::aggregate_statistics::AggregateStatistics;
+use datafusion::physical_optimizer::coalesce_batches::CoalesceBatches;
+use datafusion::physical_optimizer::combine_partial_final_agg::CombinePartialFinalAggregate;
+use datafusion::physical_optimizer::enforce_sorting::EnforceSorting;
+use datafusion::physical_optimizer::join_selection::JoinSelection;
+use datafusion::physical_optimizer::limit_pushdown::LimitPushdown;
+use datafusion::physical_optimizer::limited_distinct_aggregation::LimitedDistinctAggregation;
 use datafusion::physical_optimizer::optimizer::PhysicalOptimizer;
+use datafusion::physical_optimizer::output_requirements::OutputRequirements;
+use datafusion::physical_optimizer::projection_pushdown::ProjectionPushdown;
+use datafusion::physical_optimizer::sanity_checker::SanityCheckPlan;
+use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
+use datafusion::physical_optimizer::update_aggr_exprs::OptimizeAggregateOrder;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
+use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
@@ -355,11 +369,6 @@ impl QueryExecutorImpl {
         serialized_plan: Arc<SerializedPlan>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
-        let mut rules = PhysicalOptimizer::new().rules;
-        rules.insert(
-            0,
-            Arc::new(PreOptimizeRule::new(self.memory_handler.clone(), None)),
-        );
         let config = Self::session_config();
         let session_state = SessionStateBuilder::new()
             .with_config(config)
@@ -370,10 +379,39 @@ impl QueryExecutorImpl {
                 serialized_plan,
                 self.memory_handler.clone(),
             )))
-            .with_physical_optimizer_rules(rules)
+            .with_physical_optimizer_rules(self.optimizer_rules(None))
             .build();
         let ctx = SessionContext::new_with_state(session_state);
         Ok(Arc::new(ctx))
+    }
+
+    fn optimizer_rules(
+        &self,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
+    ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
+        vec![
+            // Cube rules
+            Arc::new(PreOptimizeRule::new(
+                self.memory_handler.clone(),
+                data_loaded_size,
+            )),
+            // DF rules without EnforceDistribution
+            Arc::new(OutputRequirements::new_add_mode()),
+            Arc::new(AggregateStatistics::new()),
+            Arc::new(JoinSelection::new()),
+            Arc::new(LimitedDistinctAggregation::new()),
+            // Arc::new(EnforceDistribution::new()),
+            Arc::new(CombinePartialFinalAggregate::new()),
+            // Arc::new(EnforceSorting::new()),
+            Arc::new(OptimizeAggregateOrder::new()),
+            Arc::new(ProjectionPushdown::new()),
+            Arc::new(CoalesceBatches::new()),
+            Arc::new(OutputRequirements::new_remove_mode()),
+            Arc::new(TopKAggregation::new()),
+            Arc::new(ProjectionPushdown::new()),
+            Arc::new(LimitPushdown::new()),
+            Arc::new(SanityCheckPlan::new()),
+        ]
     }
 
     fn worker_context(
@@ -382,14 +420,6 @@ impl QueryExecutorImpl {
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
-        let mut rules = PhysicalOptimizer::new().rules;
-        rules.insert(
-            0,
-            Arc::new(PreOptimizeRule::new(
-                self.memory_handler.clone(),
-                data_loaded_size.clone(),
-            )),
-        );
         let config = Self::session_config();
         let session_state = SessionStateBuilder::new()
             .with_config(config)
@@ -398,9 +428,9 @@ impl QueryExecutorImpl {
             .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
                 serialized_plan,
                 self.memory_handler.clone(),
-                data_loaded_size,
+                data_loaded_size.clone(),
             )))
-            .with_physical_optimizer_rules(rules)
+            .with_physical_optimizer_rules(self.optimizer_rules(data_loaded_size))
             .build();
         let ctx = SessionContext::new_with_state(session_state);
         Ok(Arc::new(ctx))
@@ -411,7 +441,8 @@ impl QueryExecutorImpl {
             .with_batch_size(4096)
             // TODO upgrade DF if less than 2 then there will be no MergeJoin. Decide on repartitioning.
             .with_target_partitions(2)
-            .with_prefer_existing_sort(true);
+            .with_prefer_existing_sort(true)
+            .with_round_robin_repartition(false);
         config.options_mut().optimizer.prefer_hash_join = false;
         config
     }
@@ -746,7 +777,13 @@ impl CubeTable {
         // }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(EmptyExec::new(table_projected_schema.clone())));
+            partition_execs.push(Arc::new(SortExec::new(
+                lex_ordering_for_index(
+                    self.index_snapshot.index.get_row(),
+                    &table_projected_schema,
+                )?,
+                Arc::new(EmptyExec::new(table_projected_schema.clone())),
+            )));
         }
 
         let schema = table_projected_schema;
@@ -855,7 +892,7 @@ impl CubeTable {
                 .collect::<Result<Vec<_>, _>>()?;
             Arc::new(SortPreservingMergeExec::new(join_columns, read_data))
         } else {
-            read_data
+            Arc::new(CoalescePartitionsExec::new(read_data))
         };
 
         Ok(plan)
