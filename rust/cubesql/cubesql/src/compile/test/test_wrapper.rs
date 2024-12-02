@@ -1157,9 +1157,7 @@ async fn test_wrapper_filter_flatten() {
             time_dimensions: None,
             order: Some(vec![]),
             limit: Some(50000),
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     );
 }
