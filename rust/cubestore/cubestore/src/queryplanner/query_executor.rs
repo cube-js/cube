@@ -691,11 +691,19 @@ impl CubeTable {
                             )));
                         }
                     }
-                    Arc::new(MemoryExec::try_new(
-                        &[record_batches.clone()],
-                        index_projection_schema.clone(),
-                        index_projection_or_none_on_schema_match.clone(),
-                    )?)
+                    Arc::new(
+                        MemoryExec::try_new(
+                            &[record_batches.clone()],
+                            index_projection_schema.clone(),
+                            index_projection_or_none_on_schema_match.clone(),
+                        )?
+                        .with_sort_information(vec![
+                            lex_ordering_for_index(
+                                self.index_snapshot.index.get_row(),
+                                &index_projection_schema,
+                            )?,
+                        ]),
+                    )
                 } else {
                     let remote_path = chunk.get_row().get_full_name(chunk.get_id());
                     let local_path = self
