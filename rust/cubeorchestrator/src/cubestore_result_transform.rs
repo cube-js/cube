@@ -146,7 +146,11 @@ pub fn get_members(
         QueryType::BlendingQuery => {
             let blending_key = get_blending_query_key(query.time_dimensions.as_ref())
                 .context("Failed to generate blending query key")?;
-            if let Some(dim) = query.time_dimensions.as_ref().and_then(|dims| dims.first().cloned()) {
+            if let Some(dim) = query
+                .time_dimensions
+                .as_ref()
+                .and_then(|dims| dims.first().cloned())
+            {
                 members.insert(blending_key, dim.dimension.clone());
             }
         }
@@ -301,26 +305,31 @@ pub fn transform_data(
         Some(ResultType::Compact) => {
             let dataset: Vec<_> = data
                 .into_iter()
-                .map(|row| get_compact_row(
+                .map(|row| {
+                    get_compact_row(
                         &members_to_alias_map,
                         annotation,
                         query_type,
                         &members,
                         query.time_dimensions.as_ref(),
-                        &row))
+                        &row,
+                    )
+                })
                 .collect::<Result<Vec<_>>>()?;
             Ok(TransformedData::Compact { members, dataset })
         }
         _ => {
             let dataset: Vec<_> = data
                 .into_iter()
-                .map(|row| get_vanilla_row(
-                    alias_to_member_name_map,
-                    annotation,
-                    query_type,
-                    query,
-                    &row,
-                ))
+                .map(|row| {
+                    get_vanilla_row(
+                        alias_to_member_name_map,
+                        annotation,
+                        query_type,
+                        query,
+                        &row,
+                    )
+                })
                 .collect::<Result<Vec<_>>>()?;
             Ok(TransformedData::Vanilla(dataset))
         }
