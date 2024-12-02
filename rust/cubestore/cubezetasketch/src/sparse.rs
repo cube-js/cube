@@ -409,4 +409,29 @@ impl SparseRepresentation {
         self.buffer.clear();
         return Ok(());
     }
+
+    /// Allocated size (not including size_of::<Self>).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        fn btree_set_alloc_size_estimate<T: Copy>(set: &BTreeSet<T>) -> usize {
+            // We can't be exact, so... for the sake of DataFusion, we do a worst case estimate.
+
+            // TODO upgrade DF: It might be that in the len() == 0 case, we can still have one
+            // allocated node (if we added and removed data).
+            let num_nodes = set.len().div_ceil(5);
+
+            let ptr_size = size_of::<usize>();
+            // This is made by looking at the internals of BTreeMap.  (Allocator overhead might be
+            // more important for this measurement than other DF code computing sizes, but we ignore
+            // that.)
+            //
+            // There are 5-11 keys and in internal nodes, 6-12 child pointers.
+            let leaf_node_size = 2 + 2 + ptr_size + 11 * size_of::<T>();
+            let internal_node_size = leaf_node_size + 12 * ptr_size;
+
+            // TODO upgrade DF: Lazy: This assumes everything is an internal node -- there are at
+            // least 6x as many leaf nodes, right?
+            internal_node_size * num_nodes
+        }
+        btree_set_alloc_size_estimate(&self.buffer)
+    }
 }
