@@ -12,7 +12,7 @@ use datafusion::logical_expr::{
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
-use datafusion::physical_plan::{ExecutionPlan, InputOrderMode};
+use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanProperties, InputOrderMode};
 use itertools::{repeat_n, Itertools};
 use std::sync::Arc;
 
@@ -123,10 +123,13 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                         self.output += &format!(", aggs: {:?}", aggr_expr)
                     }
                 }
-                LogicalPlan::Sort(Sort { expr, .. }) => {
+                LogicalPlan::Sort(Sort { expr, fetch, .. }) => {
                     self.output += "Sort";
                     if self.opts.show_sort_by {
                         self.output += &format!(", by: {:?}", expr)
+                    }
+                    if let Some(fetch) = fetch {
+                        self.output += &format!(", fetch: {}", fetch)
                     }
                 }
                 LogicalPlan::Union(Union { schema, .. }) => {
@@ -144,6 +147,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                     source,
                     projected_schema,
                     filters,
+                    fetch,
                     ..
                 }) => {
                     self.output += &format!(
@@ -173,6 +177,9 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
 
                     if self.opts.show_filters && !filters.is_empty() {
                         self.output += &format!(", filters: {:?}", filters)
+                    }
+                    if let Some(fetch) = fetch {
+                        self.output += &format!(", fetch: {}", fetch)
                     }
                 }
                 LogicalPlan::EmptyRelation(EmptyRelation { .. }) => self.output += "Empty",
@@ -409,6 +416,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             if o.show_aggregations {
                 *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
+            if let Some(limit) = agg.limit() {
+                *out += &format!(", limit: {}", limit)
+            }
         } else if let Some(l) = a.downcast_ref::<LocalLimitExec>() {
             *out += &format!("LocalLimit, n: {}", l.fetch());
         } else if let Some(l) = a.downcast_ref::<GlobalLimitExec>() {
@@ -418,6 +428,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     .map(|l| l.to_string())
                     .unwrap_or("None".to_string())
             );
+            if l.skip() > 0 {
+                *out += &format!(", skip: {}", l.skip());
+            }
         } else if let Some(l) = a.downcast_ref::<TailLimitExec>() {
             *out += &format!("TailLimit, n: {}", l.limit);
         } else if let Some(f) = a.downcast_ref::<FilterExec>() {
@@ -444,6 +457,9 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                         })
                         .join(", ")
                 );
+            }
+            if let Some(fetch) = s.fetch() {
+                *out += &format!(", fetch: {}", fetch);
             }
         } else if let Some(_) = a.downcast_ref::<HashJoinExec>() {
             *out += "HashJoin";
@@ -489,10 +505,13 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             // TODO upgrade DF
             // } else if let Some(_) = a.downcast_ref::<MergeExec>() {
             //     *out += "Merge";
-        } else if let Some(_) = a.downcast_ref::<SortPreservingMergeExec>() {
+        } else if let Some(s) = a.downcast_ref::<SortPreservingMergeExec>() {
             *out += "MergeSort";
             // } else if let Some(_) = a.downcast_ref::<MergeReSortExec>() {
             //     *out += "MergeResort";
+            if let Some(fetch) = s.fetch() {
+                *out += &format!(", fetch: {}", fetch);
+            }
         } else if let Some(j) = a.downcast_ref::<SortMergeJoinExec>() {
             *out += &format!(
                 "MergeJoin, on: [{}]",
@@ -539,6 +558,11 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
 
         // TODO upgrade DF - remove
         // *out += &format!(", schema: {}", p.schema());
+        // *out += &format!(
+        //     ", partitions: {}, output_ordering: {:?}",
+        //     p.properties().partitioning.partition_count(),
+        //     p.output_ordering()
+        // );
 
         // TODO upgrade DF
         // if o.show_output_hints {
