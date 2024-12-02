@@ -51,10 +51,6 @@ impl ExecutionPlan for TailLimitExec {
         self
     }
 
-    fn schema(&self) -> SchemaRef {
-        self.input.schema()
-    }
-
     fn properties(&self) -> &PlanProperties {
         self.input.properties()
     }
