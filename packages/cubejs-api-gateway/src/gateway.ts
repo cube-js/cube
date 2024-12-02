@@ -1556,7 +1556,7 @@ class ApiGateway {
   }
 
   /**
-   * Convert adapter's result and other request paramters to a final
+   * Convert adapter's result and other request parameters to a final
    * result object.
    * @internal
    */
@@ -1699,6 +1699,17 @@ class ApiGateway {
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
+      if (
+        queryType !== QueryTypeEnum.REGULAR_QUERY &&
+        props.queryType == null
+      ) {
+        throw new UserError(
+          `'${queryType
+          }' query type is not supported by the client.` +
+          'Please update the client.'
+        );
+      }
+
       let metaConfigResult = await (await this
         .getCompilerApi(context)).metaConfig(request.context, {
         requestId: context.requestId
@@ -1759,17 +1770,6 @@ class ApiGateway {
         },
         context,
       );
-
-      if (
-        queryType !== QueryTypeEnum.REGULAR_QUERY &&
-        props.queryType == null
-      ) {
-        throw new UserError(
-          `'${queryType
-          }' query type is not supported by the client.` +
-          'Please update the client.'
-        );
-      }
 
       if (props.queryType === 'multi') {
         res({
