@@ -70,44 +70,36 @@ impl AggregateColumn {
         &self.function
     }
 
-    pub fn aggregate_expr(&self, schema: &ArrowSchema) -> Result<AggregateFunctionExpr, CubeError> {
+    pub fn aggregate_expr(
+        &self,
+        schema: &Arc<ArrowSchema>,
+    ) -> Result<AggregateFunctionExpr, CubeError> {
         let col = Arc::new(FusionColumn::new_with_schema(
             self.column.get_name().as_str(),
-            &schema,
+            schema,
         )?);
-        let res: AggregateFunctionExpr = match self.function {
-            AggregateFunction::SUM => AggregateExprBuilder::new(
-                Arc::new(AggregateUDF::new_from_impl(Sum::new())),
-                vec![col],
-            )
-            .build()?,
-            AggregateFunction::MAX => AggregateExprBuilder::new(
-                Arc::new(AggregateUDF::new_from_impl(Max::new())),
-                vec![col],
-            )
-            .build()?,
-            AggregateFunction::MIN => AggregateExprBuilder::new(
-                Arc::new(AggregateUDF::new_from_impl(Min::new())),
-                vec![col],
-            )
-            .build()?,
-            AggregateFunction::MERGE => {
-                let fun = aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll);
-
-                // TODO upgrade DF: Understand what effect the choice of alias value has.
-                // TODO upgrade DF: We probably want .schema and .alias on other cases.
-                // TODO upgrade DF: schema.clone() is wasteful; pass an &Arc<ArrowSchema> to this function.
-                // TODO upgrade DF: Do we want more than .alias and .schema?  It seems some stuff is mandatory, in general
-
-                // A comment in DF downstream name() fn suggests 'Human readable name such as
-                // `"MIN(c2)"`.'  It is mandatory that a .alias be supplied.
-                let alias = format!("MERGE({})", col.name());
-                AggregateExprBuilder::new(Arc::new(fun), vec![col])
-                    .schema(Arc::new(schema.clone()))
-                    .alias(alias)
-                    .build()?
-            }
+        let (name, udaf): (&str, AggregateUDF) = match self.function {
+            AggregateFunction::SUM => ("SUM", AggregateUDF::new_from_impl(Sum::new())),
+            AggregateFunction::MAX => ("MAX", AggregateUDF::new_from_impl(Max::new())),
+            AggregateFunction::MIN => ("MIN", AggregateUDF::new_from_impl(Min::new())),
+            AggregateFunction::MERGE => (
+                "MERGE",
+                aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll),
+            ),
         };
+
+        // TODO upgrade DF: Understand what effect the choice of alias value has.
+        // TODO upgrade DF: schema.clone() is wasteful; pass an &Arc<ArrowSchema> to this function.
+        // TODO upgrade DF: Do we want more than .alias and .schema?  It seems some stuff is mandatory, in general
+
+        // A comment in DF downstream name() fn suggests 'Human readable name such as
+        // `"MIN(c2)"`.'  It is mandatory that a .alias be supplied.
+        let alias = format!("{}({})", name, col.name());
+        let res: AggregateFunctionExpr = AggregateExprBuilder::new(Arc::new(udaf), vec![col])
+            .schema(schema.clone())
+            .alias(alias)
+            .build()?;
+
         Ok(res)
     }
 }
