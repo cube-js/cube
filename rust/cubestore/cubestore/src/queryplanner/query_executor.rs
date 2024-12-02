@@ -92,6 +92,11 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
+use super::udfs::{
+    aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_arc_aggregate_udfs,
+    registerable_arc_scalar_udfs, CubeAggregateUDFKind,
+};
+
 #[automock]
 #[async_trait]
 pub trait QueryExecutor: DIService + Send + Sync {
@@ -380,6 +385,8 @@ impl QueryExecutorImpl {
                 self.memory_handler.clone(),
             )))
             .with_physical_optimizer_rules(self.optimizer_rules(None))
+            .with_aggregate_functions(registerable_arc_aggregate_udfs())
+            .with_scalar_functions(registerable_arc_scalar_udfs())
             .build();
         let ctx = SessionContext::new_with_state(session_state);
         Ok(Arc::new(ctx))
@@ -430,6 +437,8 @@ impl QueryExecutorImpl {
                 self.memory_handler.clone(),
                 data_loaded_size.clone(),
             )))
+            .with_aggregate_functions(registerable_arc_aggregate_udfs())
+            .with_scalar_functions(registerable_arc_scalar_udfs())
             .with_physical_optimizer_rules(self.optimizer_rules(data_loaded_size))
             .build();
         let ctx = SessionContext::new_with_state(session_state);

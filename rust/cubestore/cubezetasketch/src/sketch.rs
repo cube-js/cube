@@ -67,6 +67,14 @@ impl Representation {
             return Ok(Representation::Sparse(SparseRepresentation::new(state)?));
         }
     }
+
+    /// Allocated size not including size_of::<Self>.  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        match self {
+            Representation::Sparse(sparse) => sparse.allocated_size(),
+            Representation::Normal(_) => 0,
+        }
+    }
 }
 
 impl HyperLogLogPlusPlus {
@@ -186,5 +194,10 @@ impl HyperLogLogPlusPlus {
             state,
             representation,
         });
+    }
+
+    /// Allocated size not including size_of::<Self>.  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        self.state.allocated_size() + self.representation.allocated_size()
     }
 }

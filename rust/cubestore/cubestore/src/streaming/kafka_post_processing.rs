@@ -429,6 +429,7 @@ impl KafkaPostProcessPlanner {
                             schema.clone(),
                             projection_input.clone(),
                         )?;
+                        // TODO upgrade DF: SessionContext::new_...
                         let plan_ctx =
                             Arc::new(SessionContext::new_with_config(SessionConfig::new()));
 
@@ -454,6 +455,7 @@ impl KafkaPostProcessPlanner {
                 LogicalPlan::TableScan { .. } => {
                     let projection_plan =
                         self.make_projection_plan(expr, schema.clone(), projection_input.clone())?;
+                    // TODO upgrade DF: SessionContext::new_...
                     let plan_ctx = Arc::new(SessionContext::new_with_config(SessionConfig::new()));
                     let projection_phys_plan = plan_ctx
                         .state()

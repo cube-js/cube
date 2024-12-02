@@ -80,4 +80,9 @@ impl HllSketch {
     pub fn merge_with(&mut self, o: &HllSketch) {
         self.instance.merge_with(&o.instance);
     }
+
+    /// Allocated size (not including sizeof::<Self>).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        self.instance.allocated_size()
+    }
 }

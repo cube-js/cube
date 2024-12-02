@@ -94,4 +94,10 @@ impl HLLUnionDataSketch {
 
         Ok(())
     }
+
+    /// Allocated size, not including size_of::<Self>().  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        // TODO upgrade DF: How should we (how can we) implement this?
+        1
+    }
 }

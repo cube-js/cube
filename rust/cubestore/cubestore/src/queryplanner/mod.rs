@@ -15,6 +15,7 @@ mod tail_limit;
 mod topk;
 pub mod trace_data_loaded;
 pub use topk::MIN_TOPK_STREAM_ROWS;
+use udfs::{aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_scalar_udfs};
 mod coalesce;
 mod filter_by_key_range;
 mod flatten_union;
@@ -245,6 +246,14 @@ impl QueryPlannerImpl {
 impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
         let context = SessionContext::new();
+        // TODO upgrade DF: build SessionContexts consistently
+        for udaf in registerable_aggregate_udfs() {
+            context.register_udaf(udaf);
+        }
+        for udf in registerable_scalar_udfs() {
+            context.register_udf(udf);
+        }
+
         // TODO upgrade DF
         // context
         // .with_metadata_cache_factory(self.metadata_cache_factory.clone())
@@ -501,14 +510,22 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 
     fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
-        // TODO upgrade DF
         // HyperLogLog.
         // TODO: case-insensitive names.
-        // let kind = match name {
-        //     "merge" | "MERGE" => CubeAggregateUDFKind::MergeHll,
-        //     _ => return None,
-        // };
-        self.session_state.aggregate_functions().get(name).cloned() //TODO Some(aggregate_udf_by_kind(kind));
+        let (_kind, name) = match name {
+            "merge" | "MERGE" => (CubeAggregateUDFKind::MergeHll, "MERGE"),
+            _ => return None,
+        };
+
+        let aggregate_udf_by_registry = self.session_state.aggregate_functions().get(name);
+
+        // TODO upgrade DF: Remove this assertion (and/or remove the kind lookup above).
+        assert!(
+            aggregate_udf_by_registry.is_some(),
+            "MERGE is not registered in SessionState"
+        );
+
+        aggregate_udf_by_registry.map(|arc| arc.clone())
     }
 
     fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {

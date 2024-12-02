@@ -41,6 +41,8 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
+use super::udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
+
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
     /// Inclusive lower bound.
@@ -1099,9 +1101,19 @@ impl SerializedPlan {
         parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
     ) -> Result<LogicalPlan, CubeError> {
         // TODO DF upgrade SessionContext::new()
+        // After this comment was made, we now register_udaf... what else?
+        let session_context = SessionContext::new();
+        // TODO DF upgrade: consistently build SessionContexts/register udafs/udfs.
+        for udaf in registerable_aggregate_udfs() {
+            session_context.register_udaf(udaf);
+        }
+        for udf in registerable_scalar_udfs() {
+            session_context.register_udf(udf);
+        }
+
         let logical_plan = logical_plan_from_bytes_with_extension_codec(
             self.logical_plan.as_slice(),
-            &SessionContext::new(),
+            &session_context,
             &CubeExtensionCodec {
                 worker_context: Some(WorkerContext {
                     remote_to_local_names,
