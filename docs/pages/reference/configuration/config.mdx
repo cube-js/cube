@@ -654,32 +654,61 @@ You may also need to configure
 This option specifies a list of time zones that pre-aggregations will be built
 for. It has impact on [pre-aggregation matching][ref-matching-preaggs].
 
-You can specify multiple timezones in the [TZ Database Name][link-wiki-tz]
-format, e.g., `America/Los_Angeles`:
+Either an array or function returning an array can be passed. Providing a function
+allows to set the time zones dynamically depending on the security context.
+
+Time zones should be specified in the [TZ Database Name][link-wiki-tz] format,
+e.g., `America/Los_Angeles`.
 
 <CodeTabs>
 
 ```python
 from cube import config
 
+# An array of time zones
 config.scheduled_refresh_time_zones = [
   'America/Vancouver',
   'America/Toronto'
 ]
+
+# Alternatively, a function returning an array of time zones
+@config('scheduled_refresh_time_zones')
+def scheduled_refresh_time_zones(ctx: dict) -> list[str]:
+  time_zones = {
+    'tenant_1': ['America/New_York'],
+    'tenant_2': ['America/Chicago'],
+    'tenant_3': ['America/Los_Angeles']
+  }
+  default_time_zones = ['UTC']
+  tenant_id = ctx['securityContext']['tenant_id']
+  return time_zones.get(tenant_id, default_time_zones)
 ```
 
 ```javascript
 module.exports = {
+  // An array of time zones
   scheduledRefreshTimeZones: [
     'America/Vancouver',
     'America/Toronto'
-  ]
+  ],
+
+  // Alternatively, a function returning an array of time zones
+  scheduledRefreshTimeZones: ({ securityContext }) => {
+    let time_zones = {
+      'tenant_1': ['America/New_York'],
+      'tenant_2': ['America/Chicago'],
+      'tenant_3': ['America/Los_Angeles']
+    }
+    let default_time_zones = ['UTC']  
+    let tenant_id = securityContext.tenant_id
+    return time_zones[tenant_id] || default_time_zones
+  }
 };
 ```
 
 </CodeTabs>
 
-The default value is a list of a single time zone. `UTC`.
+The default value is a list of a single time zone: `UTC`.
 
 This configuration option can also be set using the
 `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
