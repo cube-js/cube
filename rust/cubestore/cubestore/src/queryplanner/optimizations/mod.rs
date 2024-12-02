@@ -6,12 +6,13 @@ mod trace_data_loaded;
 
 use crate::cluster::Cluster;
 use crate::queryplanner::optimizations::distributed_partial_aggregate::{
-    add_limit_to_workers, push_aggregate_to_workers,
+    add_limit_to_workers, ensure_partition_merge, push_aggregate_to_workers,
 };
 use std::fmt::{Debug, Formatter};
 // use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_switch_to_inplace_aggregates;
+use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_regroup_columns;
 use crate::queryplanner::planning::CubeExtensionPlanner;
-use crate::queryplanner::pretty_printers::pp_phys_plan;
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::util::memory::MemoryHandler;
@@ -138,7 +139,9 @@ fn pre_optimize_physical_plan(
     data_loaded_size: Option<Arc<DataLoadedSize>>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // TODO upgrade DF
-    rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))
+    let p = rewrite_physical_plan(p, &mut |p| push_aggregate_to_workers(p))?;
+    let p = rewrite_physical_plan(p, &mut |p| ensure_partition_merge(p))?;
+    Ok(p)
 }
 
 fn finalize_physical_plan(

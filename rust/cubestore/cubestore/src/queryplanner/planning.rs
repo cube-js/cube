@@ -742,7 +742,7 @@ struct ChooseIndex<'a> {
     can_pushdown_limit: bool,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Option<Vec<String>>,
@@ -783,7 +783,11 @@ impl PlanRewriter for ChooseIndex<'_> {
     fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
         match n {
             // TODO upgrade DF
-            // LogicalPlan::Limit(Limit { fetch, skip, .. }) => Some(context.update_limit(Some(*n))),
+            LogicalPlan::Limit(Limit {
+                fetch: Some(n),
+                skip: 0,
+                ..
+            }) => Some(context.update_limit(Some(*n))),
             // LogicalPlan::Skip { n, .. } => {
             //     if let Some(limit) = context.limit {
             //         Some(context.update_limit(Some(limit + *n)))
@@ -806,13 +810,20 @@ impl PlanRewriter for ChooseIndex<'_> {
                     None
                 }
             }
-            LogicalPlan::Sort(Sort { expr, input, .. }) => {
+            LogicalPlan::Sort(Sort {
+                expr, input, fetch, ..
+            }) => {
+                let mut new_context = fetch.as_ref().map(|f| context.update_limit(Some(*f)));
                 let (names, sort_is_asc) = sort_to_column_names(expr, input);
                 if !names.is_empty() {
-                    Some(context.update_sort(names, sort_is_asc))
-                } else {
-                    None
+                    new_context = Some(
+                        new_context
+                            .as_ref()
+                            .unwrap_or(context)
+                            .update_sort(names, sort_is_asc),
+                    );
                 }
+                new_context
             }
             _ => None,
         }
