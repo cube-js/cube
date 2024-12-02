@@ -93,7 +93,8 @@ impl AggregateColumn {
             .build()?,
             AggregateFunction::MERGE => {
                 let fun = aggregate_udf_by_kind(CubeAggregateUDFKind::MergeHll);
-                AggregateExprBuilder::new(fun, vec![col]).build()?
+                // TODO upgrade DF: cleanup: don't wrap fun in Arc::new
+                AggregateExprBuilder::new(Arc::new(fun), vec![col]).build()?
             }
         };
         Ok(res)
