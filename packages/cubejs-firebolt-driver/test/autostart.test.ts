@@ -58,9 +58,13 @@ describe('FireboltDriver autostart', () => {
     });
 
     const engine = await firebolt.resourceManager.engine.getByName(engineName);
-    await engine.stop();
+    try {
+      await engine.stop();
 
-    driver = new FireboltDriver({});
-    await driver.testConnection();
+      driver = new FireboltDriver({});
+      await driver.testConnection();
+    } finally {
+      await engine.start();
+    }
   });
 });
