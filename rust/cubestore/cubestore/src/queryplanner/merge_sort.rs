@@ -41,15 +41,11 @@ impl LastRowByUniqueKeyExec {
                 "Empty unique_key passed for LastRowByUniqueKeyExec".to_string(),
             ));
         }
-        let schema = input.schema();
+        let properties = input.properties().clone();
         Ok(Self {
             input,
             unique_key,
-            properties: PlanProperties::new(
-                EquivalenceProperties::new(schema),
-                Partitioning::UnknownPartitioning(1),
-                ExecutionMode::Bounded,
-            ),
+            properties,
         })
     }
 
@@ -81,6 +77,10 @@ impl ExecutionPlan for LastRowByUniqueKeyExec {
 
     fn properties(&self) -> &PlanProperties {
         &self.properties
+    }
+
+    fn maintains_input_order(&self) -> Vec<bool> {
+        vec![true]
     }
 
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
