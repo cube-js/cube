@@ -784,7 +784,6 @@ dependencies = [
 name = "cubeorchestrator"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "cubeshared",
  "neon",
 ]
