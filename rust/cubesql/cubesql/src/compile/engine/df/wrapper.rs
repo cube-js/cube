@@ -1198,6 +1198,7 @@ impl CubeScanWrapperNode {
                                     filters: ungrouped_scan_node.request.filters.clone(),
 
                                     time_dimensions: load_request.time_dimensions.clone(),
+                                    subquery_joins: None,
                                 };
 
                                 // TODO time dimensions, filters, segments
