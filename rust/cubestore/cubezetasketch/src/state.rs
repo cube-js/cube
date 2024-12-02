@@ -314,4 +314,20 @@ impl State {
 
         return size;
     }
+
+    /// Allocated size not including size_of::<Self>().  Must be exact (or worst-case).
+    pub fn allocated_size(&self) -> usize {
+        fn vec_alloc_size<T: Copy>(v: &Vec<T>) -> usize {
+            v.capacity() * size_of::<T>()
+        }
+
+        let mut sum = 0;
+        if let Some(d) = &self.data {
+            sum += vec_alloc_size(&d);
+        }
+        if let Some(sd) = &self.sparse_data {
+            sum += vec_alloc_size(&sd);
+        }
+        sum
+    }
 }

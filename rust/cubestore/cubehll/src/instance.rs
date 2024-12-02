@@ -354,6 +354,14 @@ impl HllInstance {
             self.ensure_dense();
         }
     }
+
+    /// Allocated size (not including sizeof::<Self>).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        match self {
+            Sparse(sparse) => sparse.allocated_size(),
+            Dense(dense) => dense.allocated_size(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -575,6 +583,14 @@ impl SparseHll {
                 index_bit_len
             )))
         }
+    }
+
+    /// Allocated size (not including size_of::<Self>).  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        fn vec_alloc_size<T: Copy>(v: &Vec<T>) -> usize {
+            v.capacity() * size_of::<T>()
+        }
+        vec_alloc_size(&self.entries)
     }
 }
 
@@ -1138,6 +1154,16 @@ impl DenseHll {
             "Duplicate overflow buckets: {:?}",
             self.overflow_buckets
         );
+    }
+
+    /// Allocated size of the type.  Does not include size_of::<Self>.  Must be exact.
+    pub fn allocated_size(&self) -> usize {
+        fn vec_alloc_size<T: Copy>(v: &Vec<T>) -> usize {
+            v.capacity() * size_of::<T>()
+        }
+        vec_alloc_size(&self.deltas)
+            + vec_alloc_size(&self.overflow_buckets)
+            + vec_alloc_size(&self.overflow_values)
     }
 }
 
