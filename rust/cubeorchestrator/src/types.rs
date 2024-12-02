@@ -1,7 +1,13 @@
-use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use chrono::{DateTime, Utc};
+use std::{collections::HashMap, fmt::Display};
+
+pub const COMPARE_DATE_RANGE_FIELD: &str = "compareDateRange";
+pub const COMPARE_DATE_RANGE_SEPARATOR: &str = " - ";
+pub const BLENDING_QUERY_KEY_PREFIX: &str = "time.";
+pub const BLENDING_QUERY_RES_SEPARATOR: &str = ".";
+pub const MEMBER_SEPARATOR: &str = ".";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DBResponsePrimitive {
@@ -35,6 +41,17 @@ pub enum QueryType {
     CompareDateRangeQuery,
     #[serde(rename = "blendingQuery")]
     BlendingQuery,
+}
+
+impl Display for QueryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = serde_json::to_value(self)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        write!(f, "{}", str)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -98,14 +115,14 @@ pub struct QueryFilter {
     pub values: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct GroupingSet {
     pub group_type: String,
     pub id: u32,
     pub sub_id: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ParsedMemberExpression {
     pub expression: Vec<String>,
     #[serde(rename = "cubeName")]
@@ -119,7 +136,7 @@ pub struct ParsedMemberExpression {
     pub grouping_set: Option<GroupingSet>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryTimeDimension {
     pub dimension: String,
     pub date_range: Option<Vec<String>>,
@@ -127,10 +144,9 @@ pub struct QueryTimeDimension {
     pub granularity: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AliasToMemberMap {
-    pub map: HashMap<String, String>,
-}
+pub type AliasToMemberMap = HashMap<String, String>;
+
+pub type MembersMap = HashMap<String, String>;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GranularityMeta {
@@ -151,11 +167,11 @@ pub struct ConfigItem {
     #[serde(rename = "type")]
     pub member_type: String,
     pub format: String,
-    pub meta: serde_json::Value,
+    pub meta: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub drill_members: Option<Vec<serde_json::Value>>,
+    pub drill_members: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub drill_members_grouped: Option<serde_json::Value>,
+    pub drill_members_grouped: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub granularities: Option<Vec<GranularityMeta>>,
 }
@@ -174,7 +190,8 @@ pub struct NormalizedQueryFilter {
     pub dimension: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+// XXX: Omitted function variant
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum MemberOrMemberExpression {
     Member(String),
     MemberExpression(ParsedMemberExpression),
@@ -249,4 +266,13 @@ pub struct NormalizedQuery {
     #[serde(rename = "rowLimit")]
     pub row_limit: Option<u32>,
     pub order: Option<Vec<Order>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TransformedData {
+    Compact {
+        members: Vec<String>,
+        dataset: Vec<Vec<DBResponsePrimitive>>,
+    },
+    Vanilla(Vec<HashMap<String, DBResponsePrimitive>>),
 }
