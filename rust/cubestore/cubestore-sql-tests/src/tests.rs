@@ -6400,7 +6400,9 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         r.elide_backtrace(),
-        CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
+        CubeError::internal(
+            "Execution error: Internal: Arrow error: Divide by zero error".to_string()
+        )
     );
 }
 
