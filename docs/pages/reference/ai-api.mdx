@@ -11,11 +11,21 @@ Generate a Cube query that can be used to answer a user's question, and (optiona
 | `messages` | ✅ Yes   | An array of messages in the format: `{ "role": "user" \| "assistant", "content": "string" }`    |
 | `views`    |          | An array of view names (used to limit the views that the AI API can use to generate its answer) |
 | `runQuery` |          | Boolean (true or false) whether to run the query and return its results                         |
+| `options`  |          | An object in the format `{ "chart": true \| false }`
 
 Response
 
 - `message` - A message from the AI assistant describing the query, how it was chosen, why it could not generate the requested query, etc.
 - `cube_query` - A Cube [Query](/product/apis-integrations/rest-api/query-format) that could be used to answer the given question
+- `chart` - If the `chart` option is set to `true`, an object containing a chart spec for the generated query in the following format:
+    ```json
+    {
+        "type": "bar" | "line" | "pie" | "table" | "area" | "scatter",
+        "x": string,
+        "y": string[],
+        "pivot": string // optional; the field to pivot by, if any
+    }
+    ```
 
 ### Examples
 
@@ -28,7 +38,7 @@ curl \
  -X POST  \
  -H "Content-Type: application/json" \
  -H "Authorization: EXAMPLE-API-TOKEN" \
- --data '{ "messages": [{ "role": "user", "content": "What cities have the highest aov this year?" }]}' \
+ --data '{ "messages": [{ "role": "user", "content": "What cities have the highest aov this year?", "views": ["orders_view"] }]}' \
  https://YOUR_CUBE_API/cubejs-api/v1/ai/query/completions
 ```
 

@@ -24,27 +24,16 @@ impl SqlNodesFactory {
         let auto_prefix_processor = AutoPrefixSqlNode::new(evaluate_sql_processor.clone());
         let measure_filter_processor = MeasureFilterSqlNode::new(auto_prefix_processor.clone());
         let final_measure_processor = FinalMeasureSqlNode::new(measure_filter_processor.clone());
-        RootSqlNode::new(
+        let root_node = RootSqlNode::new(
             self.dimension_processor(auto_prefix_processor.clone()),
             final_measure_processor.clone(),
             auto_prefix_processor.clone(),
             evaluate_sql_processor.clone(),
-        )
+        );
+        RenderReferencesSqlNode::new(root_node)
     }
 
-    pub fn with_render_references_default_node_processor(
-        &self,
-        references: HashMap<String, String>,
-    ) -> Rc<dyn SqlNode> {
-        let default_processor = self.default_node_processor();
-        RenderReferencesSqlNode::new(references, default_processor)
-    }
-
-    pub fn multi_stage_rank_node_processor(
-        &self,
-        partition: Vec<String>,
-        references: HashMap<String, String>,
-    ) -> Rc<dyn SqlNode> {
+    pub fn multi_stage_rank_node_processor(&self, partition: Vec<String>) -> Rc<dyn SqlNode> {
         let evaluate_sql_processor = EvaluateSqlNode::new();
         let auto_prefix_processor = AutoPrefixSqlNode::new(evaluate_sql_processor.clone());
         let measure_filter_processor = MeasureFilterSqlNode::new(auto_prefix_processor.clone());
@@ -58,15 +47,11 @@ impl SqlNodesFactory {
             auto_prefix_processor.clone(),
             evaluate_sql_processor.clone(),
         );
-        let references_processor = RenderReferencesSqlNode::new(references, root_processor);
+        let references_processor = RenderReferencesSqlNode::new(root_processor);
         references_processor
     }
 
-    pub fn multi_stage_window_node_processor(
-        &self,
-        partition: Vec<String>,
-        references: HashMap<String, String>,
-    ) -> Rc<dyn SqlNode> {
+    pub fn multi_stage_window_node_processor(&self, partition: Vec<String>) -> Rc<dyn SqlNode> {
         let evaluate_sql_processor = EvaluateSqlNode::new();
         let auto_prefix_processor = AutoPrefixSqlNode::new(evaluate_sql_processor.clone());
         let measure_filter_processor = MeasureFilterSqlNode::new(auto_prefix_processor.clone());
@@ -84,7 +69,7 @@ impl SqlNodesFactory {
             auto_prefix_processor.clone(),
             evaluate_sql_processor.clone(),
         );
-        let references_processor = RenderReferencesSqlNode::new(references, root_processor);
+        let references_processor = RenderReferencesSqlNode::new(root_processor);
         references_processor
     }
 

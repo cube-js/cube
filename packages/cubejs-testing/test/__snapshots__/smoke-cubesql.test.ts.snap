@@ -111,6 +111,17 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) query views with deep joins: query-view-deep-joins 1`] = `
+Array [
+  Object {
+    "Calculation_1055547778125863": 2024-01-01T00:00:00.000Z,
+    "Orders_arpu": null,
+    "Orders_netCollectionCompleted": null,
+    "Orders_refundRate": 0,
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) query with intervals (SQL PUSH DOWN): timestamps 1`] = `
 Array [
   Object {
