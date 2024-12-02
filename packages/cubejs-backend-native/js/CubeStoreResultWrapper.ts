@@ -5,6 +5,8 @@ export class CubeStoreResultWrapper {
 
   private cache: any;
 
+  public cached: Boolean = false;
+
   public constructor(private readonly nativeReference: any) {
     this.proxy = new Proxy(this, {
       get: (target, prop: string | symbol) => {
@@ -66,6 +68,7 @@ export class CubeStoreResultWrapper {
   private getArray(): ResultRow[] {
     if (!this.cache) {
       this.cache = getCubestoreResult(this.nativeReference);
+      this.cached = true;
     }
     return this.cache;
   }
