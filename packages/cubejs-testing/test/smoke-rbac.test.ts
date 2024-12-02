@@ -15,9 +15,8 @@ import {
 
 describe('Cube RBAC Engine', () => {
   jest.setTimeout(60 * 5 * 1000);
-
-  let birdbox: BirdBox;
   let db: StartedTestContainer;
+  let birdbox: BirdBox;
 
   const pgPort = 5656;
   let connectionId = 0;
@@ -55,8 +54,8 @@ describe('Cube RBAC Engine', () => {
       'postgres',
       {
         ...DEFAULT_CONFIG,
-        //
-        CUBESQL_LOG_LEVEL: 'trace',
+        CUBEJS_DEV_MODE: 'false',
+        NODE_ENV: 'production',
         //
         CUBEJS_DB_TYPE: 'postgres',
         CUBEJS_DB_HOST: db.getHost(),
@@ -66,8 +65,6 @@ describe('Cube RBAC Engine', () => {
         CUBEJS_DB_PASS: 'test',
         //
         CUBEJS_PG_SQL_PORT: `${pgPort}`,
-        CUBESQL_SQL_PUSH_DOWN: 'true',
-        CUBESQL_STREAM_MODE: 'true',
       },
       {
         schemaDir: 'rbac/model',
@@ -148,6 +145,26 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  describe('RBAC via SQL API manager', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('manager', 'manager_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT * from line_items', async () => {
+      const res = await connection.query('SELECT * FROM line_items limit 10');
+      // This query should return rows allowed by the default policy
+      // because the manager security context has a wrong city and should not match
+      // two conditions defined on the manager policy
+      expect(res.rows).toMatchSnapshot('line_items_manager');
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;
@@ -186,12 +203,12 @@ describe('Cube RBAC Engine', () => {
       });
     });
 
-    test('line_items hidden created_at', async () => {
+    test('line_items hidden price_dim', async () => {
       let query: Query = {
         measures: ['line_items.count'],
-        dimensions: ['line_items.created_at'],
+        dimensions: ['line_items.price_dim'],
         order: {
-          'line_items.created_at': 'asc',
+          'line_items.price_dim': 'asc',
         },
       };
       let error = '';
@@ -203,9 +220,9 @@ describe('Cube RBAC Engine', () => {
       expect(error).toContain('You requested hidden member');
       query = {
         measures: ['line_items_view_no_policy.count'],
-        dimensions: ['line_items_view_no_policy.created_at'],
+        dimensions: ['line_items_view_no_policy.price_dim'],
         order: {
-          'line_items_view_no_policy.created_at': 'asc',
+          'line_items_view_no_policy.price_dim': 'asc',
         },
         limit: 10,
       };
@@ -245,5 +262,68 @@ describe('Cube RBAC Engine', () => {
       // order_open should return all values since it has no access policy
       expect(result.rawData()).toMatchSnapshot('orders_open_rest');
     });
+  });
+});
+
+describe('Cube RBAC Engine [dev mode]', () => {
+  jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
+  let birdbox: BirdBox;
+  let client: CubeApi;
+
+  const DEFAULT_API_TOKEN = sign({
+    auth: {
+      username: 'nobody',
+      userAttributes: {},
+      roles: [],
+    },
+  }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+    expiresIn: '2 days'
+  });
+
+  const pgPort = 5656;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    await PostgresDBRunner.loadEcom(db);
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DEV_MODE: 'true',
+        NODE_ENV: 'dev',
+        //
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        //
+        CUBEJS_PG_SQL_PORT: `${pgPort}`,
+      },
+      {
+        schemaDir: 'rbac/model',
+        cubejsConfig: 'rbac/cube.js',
+      }
+    );
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
+      apiUrl: birdbox.configuration.apiUrl,
+    });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  test('line_items hidden created_at', async () => {
+    const meta = await client.meta();
+    const dimensions = meta.meta.cubes.find(c => c.name === 'orders')?.dimensions;
+    expect(dimensions?.length).toBe(2);
+    for (const dim of dimensions || []) {
+      expect(dim.isVisible).toBe(false);
+      expect(dim.public).toBe(false);
+    }
   });
 });
