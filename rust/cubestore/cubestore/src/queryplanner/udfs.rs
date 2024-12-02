@@ -48,6 +48,17 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
     }
 }
 
+pub fn registerable_scalar_udfs() -> Vec<ScalarUDF> {
+    vec![HllCardinality::descriptor()]
+}
+
+pub fn registerable_arc_scalar_udfs() -> Vec<Arc<ScalarUDF>> {
+    registerable_scalar_udfs()
+        .into_iter()
+        .map(Arc::new)
+        .collect()
+}
+
 /// Note that only full match counts. Pass capitalized names.
 pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
     if n == "CARDINALITY" {
@@ -87,11 +98,21 @@ pub trait CubeAggregateUDF {
     fn accumulator(&self) -> Box<dyn Accumulator>;
 }
 
-pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> Arc<AggregateUDF> {
-    todo!();
-    // match k {
-    //     CubeAggregateUDFKind::MergeHll => Arc::new(AggregateUDF::new_from_impl(HllMergeUDF {})),
-    // }
+pub fn registerable_aggregate_udfs() -> Vec<AggregateUDF> {
+    vec![AggregateUDF::new_from_impl(HllMergeUDF::new())]
+}
+
+pub fn registerable_arc_aggregate_udfs() -> Vec<Arc<AggregateUDF>> {
+    registerable_aggregate_udfs()
+        .into_iter()
+        .map(Arc::new)
+        .collect()
+}
+
+pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> AggregateUDF {
+    match k {
+        CubeAggregateUDFKind::MergeHll => AggregateUDF::new_from_impl(HllMergeUDF::new()),
+    }
 }
 
 /// Note that only full match counts. Pass capitalized names.
@@ -617,120 +638,138 @@ impl ScalarUDFImpl for HllCardinality {
     }
 }
 
-//
-// #[derive(Debug)]
-// struct HllMergeUDF {}
-// impl AggregateUDFImpl for HllMergeUDF {
-//
-//     fn name(&self) -> &str {
-//         return "MERGE";
-//     }
-//
-//     fn as_any(&self) -> &dyn Any {
-//         &self
-//     }
-//
-//     fn signature(&self) -> &Signature {
-//         &Signature::exact(vec![DataType::Binary], Volatility::Stable)
-//     }
-//
-//     fn return_type(&self, arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
-//         Ok(DataType::Binary)
-//     }
-//
-//     fn accumulator(&self, acc_args: AccumulatorArgs) -> datafusion::common::Result<Box<dyn Accumulator>> {
-//         Ok(Box::new(HllMergeAccumulator { acc: None }))
-//     }
-// }
-//
-// #[derive(Debug)]
-// struct HllMergeAccumulator {
-//     // TODO: store sketch for empty set from the start.
-//     //       this requires storing index_bit_len in the type.
-//     acc: Option<HllUnion>,
-// }
-//
-// impl Accumulator for HllMergeAccumulator {
-//     fn reset(&mut self) {
-//         self.acc = None;
-//     }
-//
-//     fn state(&self) -> Result<SmallVec<[ScalarValue; 2]>, DataFusionError> {
-//         return Ok(smallvec![self.evaluate()?]);
-//     }
-//
-//     fn update(&mut self, row: &[ScalarValue]) -> Result<(), DataFusionError> {
-//         assert_eq!(row.len(), 1);
-//         let data;
-//         if let ScalarValue::Binary(v) = &row[0] {
-//             if let Some(d) = v {
-//                 data = d
-//             } else {
-//                 return Ok(()); // ignore NULL.
-//             }
-//         } else {
-//             return Err(CubeError::internal(
-//                 "invalid scalar value passed to MERGE, expecting HLL sketch".to_string(),
-//             )
-//             .into());
-//         }
-//
-//         // empty state is ok, this means an empty sketch.
-//         if data.len() == 0 {
-//             return Ok(());
-//         }
-//         return self.merge_sketch(read_sketch(&data)?);
-//     }
-//
-//     fn merge(&mut self, states: &[ScalarValue]) -> Result<(), DataFusionError> {
-//         assert_eq!(states.len(), 1);
-//
-//         let data;
-//         if let ScalarValue::Binary(v) = &states[0] {
-//             if let Some(d) = v {
-//                 data = d
-//             } else {
-//                 return Ok(()); // ignore NULL.
-//             }
-//         } else {
-//             return Err(CubeError::internal("invalid state in MERGE".to_string()).into());
-//         }
-//         // empty state is ok, this means an empty sketch.
-//         if data.len() == 0 {
-//             return Ok(());
-//         }
-//         return self.merge_sketch(read_sketch(&data)?);
-//     }
-//
-//     fn evaluate(&self) -> Result<ScalarValue, DataFusionError> {
-//         let v;
-//         match &self.acc {
-//             None => v = Vec::new(),
-//             Some(s) => v = s.write(),
-//         }
-//         return Ok(ScalarValue::Binary(Some(v)));
-//     }
-// }
-//
-// impl HllMergeAccumulator {
-//     fn merge_sketch(&mut self, s: Hll) -> Result<(), DataFusionError> {
-//         if self.acc.is_none() {
-//             self.acc = Some(HllUnion::new(s)?);
-//             return Ok(());
-//         } else if let Some(acc_s) = &mut self.acc {
-//             if !acc_s.is_compatible(&s) {
-//                 return Err(CubeError::internal(
-//                     "cannot merge two incompatible HLL sketches".to_string(),
-//                 )
-//                 .into());
-//             }
-//             acc_s.merge_with(s)?;
-//         } else {
-//             unreachable!("impossible");
-//         }
-//         return Ok(());
-//     }
-// }
+#[derive(Debug)]
+struct HllMergeUDF {
+    signature: Signature,
+}
+impl HllMergeUDF {
+    fn new() -> HllMergeUDF {
+        HllMergeUDF {
+            signature: Signature::exact(vec![DataType::Binary], Volatility::Stable),
+        }
+    }
+}
+
+impl AggregateUDFImpl for HllMergeUDF {
+    fn name(&self) -> &str {
+        return "MERGE";
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+        Ok(DataType::Binary)
+    }
+
+    fn accumulator(
+        &self,
+        acc_args: AccumulatorArgs,
+    ) -> datafusion::common::Result<Box<dyn Accumulator>> {
+        Ok(Box::new(HllMergeAccumulator { acc: None }))
+    }
+}
+
+#[derive(Debug)]
+struct HllMergeAccumulator {
+    // TODO: store sketch for empty set from the start.
+    //       this requires storing index_bit_len in the type.
+    acc: Option<HllUnion>,
+}
+
+impl Accumulator for HllMergeAccumulator {
+    fn update_batch(&mut self, values: &[ArrayRef]) -> Result<(), DataFusionError> {
+        assert_eq!(values.len(), 1);
+
+        if let Some(value_rows) = values[0].as_any().downcast_ref::<BinaryArray>() {
+            for opt_datum in value_rows {
+                if let Some(data) = opt_datum {
+                    if data.len() != 0 {
+                        self.merge_sketch(read_sketch(&data)?)?;
+                    } else {
+                        // empty state is ok, this means an empty sketch.
+                    }
+                } else {
+                    // ignore NULL.
+                }
+            }
+            return Ok(());
+        } else {
+            return Err(CubeError::internal(
+                "invalid array type passed to update_batch, expecting HLL sketches".to_string(),
+            )
+            .into());
+        }
+    }
+
+    fn evaluate(&mut self) -> Result<ScalarValue, DataFusionError> {
+        let v;
+        match &self.acc {
+            None => v = Vec::new(),
+            Some(s) => v = s.write(),
+        }
+        return Ok(ScalarValue::Binary(Some(v)));
+    }
+
+    fn size(&self) -> usize {
+        let hllu_allocated_size = if let Some(hllu) = &self.acc {
+            hllu.allocated_size()
+        } else {
+            0
+        };
+        size_of::<Self>() + hllu_allocated_size
+    }
+
+    fn state(&mut self) -> Result<Vec<ScalarValue>, DataFusionError> {
+        return Ok(vec![self.evaluate()?]);
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<(), DataFusionError> {
+        assert_eq!(states.len(), 1);
+
+        if let Some(value_rows) = states[0].as_any().downcast_ref::<BinaryArray>() {
+            for opt_datum in value_rows {
+                if let Some(data) = opt_datum {
+                    if data.len() != 0 {
+                        self.merge_sketch(read_sketch(&data)?)?;
+                    } else {
+                        // empty state is ok, this means an empty sketch.
+                    }
+                } else {
+                    // ignore NULL.
+                }
+            }
+            return Ok(());
+        } else {
+            return Err(CubeError::internal("invalid state in MERGE".to_string()).into());
+        }
+    }
+}
+
+impl HllMergeAccumulator {
+    fn merge_sketch(&mut self, s: Hll) -> Result<(), DataFusionError> {
+        if self.acc.is_none() {
+            self.acc = Some(HllUnion::new(s)?);
+            return Ok(());
+        } else if let Some(acc_s) = &mut self.acc {
+            if !acc_s.is_compatible(&s) {
+                return Err(CubeError::internal(
+                    "cannot merge two incompatible HLL sketches".to_string(),
+                )
+                .into());
+            }
+            acc_s.merge_with(s)?;
+        } else {
+            unreachable!("impossible");
+        }
+        return Ok(());
+    }
+}
 
 pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
     return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
