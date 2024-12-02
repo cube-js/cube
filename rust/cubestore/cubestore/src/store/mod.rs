@@ -1342,12 +1342,15 @@ impl ChunkStore {
                 //     .map(|x| x as usize)
                 //     .collect();
 
+                // TODO upgrade DF:  this is probably correct, but find out if we now need to supply some filter_expr from some loose end.
+                let filter_expr: Vec<Option<Arc<dyn PhysicalExpr>>> = vec![None; aggregates.len()];
+
                 // TODO merge sort
                 let aggregate = Arc::new(AggregateExec::try_new(
                     AggregateMode::Single,
                     PhysicalGroupBy::new_single(groups),
                     aggregates,
-                    Vec::new(),
+                    filter_expr,
                     input,
                     schema.clone(),
                 )?);
