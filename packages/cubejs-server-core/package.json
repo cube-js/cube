@@ -61,7 +61,7 @@
     "@cubejs-backend/linter": "^1.0.0",
     "@cubejs-client/playground": "1.1.6",
     "@types/cross-spawn": "^6.0.2",
-    "@types/express": "^4.17.9",
+    "@types/express": "^4.17.21",
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
     "@types/jsonwebtoken": "^9.0.2",
