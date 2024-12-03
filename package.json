@@ -66,7 +66,8 @@
   },
   "resolutions": {
     "@types/node": "^18",
-    "@types/ramda": "0.27.40"
+    "@types/ramda": "0.27.40",
+    "thrift": "0.20.0"
   },
   "license": "MIT",
   "packageManager": "yarn@1.22.19"
