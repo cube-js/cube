@@ -42,8 +42,8 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
         CubeScalarUDFKind::UnixTimestamp => {
             Arc::new(ScalarUDF::new_from_impl(UnixTimestamp::new()))
         }
-        CubeScalarUDFKind::DateAdd => todo!(), // Box::new(DateAddSub { is_add: true }),
-        CubeScalarUDFKind::DateSub => todo!(), // Box::new(DateAddSub { is_add: false }),
+        CubeScalarUDFKind::DateAdd => Arc::new(ScalarUDF::new_from_impl(DateAddSub::new_add())),
+        CubeScalarUDFKind::DateSub => Arc::new(ScalarUDF::new_from_impl(DateAddSub::new_sub())),
         CubeScalarUDFKind::DateBin => Arc::new(ScalarUDF::new_from_impl(DateBin::new())),
     }
 }
@@ -52,6 +52,8 @@ pub fn registerable_scalar_udfs() -> Vec<ScalarUDF> {
     vec![
         HllCardinality::descriptor(),
         ScalarUDF::new_from_impl(DateBin::new()),
+        ScalarUDF::new_from_impl(DateAddSub::new_add()),
+        ScalarUDF::new_from_impl(DateAddSub::new_sub()),
     ]
 }
 
@@ -568,99 +570,81 @@ impl ScalarUDFImpl for DateBin {
     }
 }
 
-// struct DateAddSub {
-//     is_add: bool,
-// }
-//
-// impl DateAddSub {
-//     fn signature() -> Signature {
-//         Signature::OneOf(vec![
-//             Signature::Exact(vec![
-//                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-//                 DataType::Interval(IntervalUnit::YearMonth),
-//             ]),
-//             Signature::Exact(vec![
-//                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-//                 DataType::Interval(IntervalUnit::DayTime),
-//             ]),
-//         ])
-//     }
-// }
-//
-// impl DateAddSub {
-//     fn name_static(&self) -> &'static str {
-//         match self.is_add {
-//             true => "DATE_ADD",
-//             false => "DATE_SUB",
-//         }
-//     }
-// }
-//
-// impl CubeScalarUDF for DateAddSub {
-//     fn kind(&self) -> CubeScalarUDFKind {
-//         match self.is_add {
-//             true => CubeScalarUDFKind::DateAdd,
-//             false => CubeScalarUDFKind::DateSub,
-//         }
-//     }
-//
-//     fn name(&self) -> &str {
-//         self.name_static()
-//     }
-//
-//     fn descriptor(&self) -> ScalarUDF {
-//         let name = self.name_static();
-//         let is_add = self.is_add;
-//         return ScalarUDF {
-//             name: self.name().to_string(),
-//             signature: Self::signature(),
-//             return_type: Arc::new(|_| {
-//                 Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-//             }),
-//             fun: Arc::new(move |inputs| {
-//                 assert_eq!(inputs.len(), 2);
-//                 let interval = match &inputs[1] {
-//                     ColumnarValue::Scalar(i) => i.clone(),
-//                     _ => {
-//                         // We leave this case out for simplicity.
-//                         // CubeStore does not allow intervals inside tables, so this is super rare.
-//                         return Err(DataFusionError::Execution(format!(
-//                             "Only scalar intervals are supported in `{}`",
-//                             name
-//                         )));
-//                     }
-//                 };
-//                 match &inputs[0] {
-//                     ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)) => Ok(
-//                         ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None)),
-//                     ),
-//                     ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t))) => {
-//                         let r = date_addsub_scalar(Utc.timestamp_nanos(*t), interval, is_add)?;
-//                         Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-//                             Some(r.timestamp_nanos()),
-//                         )))
-//                     }
-//                     ColumnarValue::Array(t) if t.as_any().is::<TimestampNanosecondArray>() => {
-//                         let t = t
-//                             .as_any()
-//                             .downcast_ref::<TimestampNanosecondArray>()
-//                             .unwrap();
-//                         Ok(ColumnarValue::Array(Arc::new(date_addsub_array(
-//                             &t, interval, is_add,
-//                         )?)))
-//                     }
-//                     _ => {
-//                         return Err(DataFusionError::Execution(format!(
-//                             "First argument of `{}` must be a non-null timestamp",
-//                             name
-//                         )))
-//                     }
-//                 }
-//             }),
-//         };
-//     }
-// }
-//
+#[derive(Debug)]
+struct DateAddSub {
+    is_add: bool,
+    signature: Signature,
+}
+
+impl DateAddSub {
+    pub fn new(is_add: bool) -> DateAddSub {
+        DateAddSub {
+            is_add,
+            signature: Signature {
+                type_signature: TypeSignature::OneOf(vec![
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Interval(IntervalUnit::YearMonth),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Interval(IntervalUnit::DayTime),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Interval(IntervalUnit::MonthDayNano),
+                    ]),
+                ]),
+                volatility: Volatility::Immutable,
+            },
+        }
+    }
+    pub fn new_add() -> DateAddSub {
+        Self::new(true)
+    }
+    pub fn new_sub() -> DateAddSub {
+        Self::new(false)
+    }
+}
+
+impl DateAddSub {
+    fn name_static(&self) -> &'static str {
+        match self.is_add {
+            true => "DATE_ADD",
+            false => "DATE_SUB",
+        }
+    }
+}
+
+impl ScalarUDFImpl for DateAddSub {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn name(&self) -> &str {
+        self.name_static()
+    }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    }
+    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        use datafusion::arrow::compute::kernels::numeric::add;
+        use datafusion::arrow::compute::kernels::numeric::sub;
+        assert_eq!(inputs.len(), 2);
+        // DF 42.2.0 already has date + interval or date - interval.  Note that `add` and `sub` are
+        // public (defined in arrow_arith), while timestamp-specific functions they invoke,
+        // `arithmetic_op` and then `timestamp_op::<TimestampNanosecondType>`, are not.
+        //
+        // TODO upgrade DF: Double-check that the TypeSignature is actually enforced.
+        datafusion::physical_expr_common::datum::apply(
+            &inputs[0],
+            &inputs[1],
+            if self.is_add { add } else { sub },
+        )
+    }
+}
 
 #[derive(Debug)]
 struct HllCardinality {
