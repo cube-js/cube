@@ -179,7 +179,6 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange, optio
   // moment.range works with strings
   const range = moment.range(<any>dateRange[0], <any>dateRange[1]);
 
-  console.log("!!!! timeSeries:", TIME_SERIES[granularity](range, options.timestampPrecision));
   return TIME_SERIES[granularity](range, options.timestampPrecision);
 };
 

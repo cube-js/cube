@@ -115,6 +115,14 @@ impl MeasureSymbol {
         self.rolling_window().is_some()
     }
 
+    pub fn is_running_total(&self) -> bool {
+        self.measure_type() == "runningTotal"
+    }
+
+    pub fn is_cumulative(&self) -> bool {
+        self.is_rolling_window() || self.is_running_total()
+    }
+
     pub fn measure_filters(&self) -> &Vec<Rc<EvaluationNode>> {
         &self.measure_filters
     }

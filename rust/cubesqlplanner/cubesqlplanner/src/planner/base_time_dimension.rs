@@ -11,6 +11,7 @@ pub struct BaseTimeDimension {
     query_tools: Rc<QueryTools>,
     granularity: Option<String>,
     date_range: Option<Vec<String>>,
+    alias_suffix: String,
 }
 
 impl BaseMember for BaseTimeDimension {
@@ -55,12 +56,7 @@ impl BaseMember for BaseTimeDimension {
     }
 
     fn alias_suffix(&self) -> Option<String> {
-        let granularity = if let Some(granularity) = &self.granularity {
-            granularity
-        } else {
-            "day"
-        };
-        Some(granularity.to_string())
+        Some(self.alias_suffix.clone())
     }
 }
 
@@ -71,12 +67,28 @@ impl BaseTimeDimension {
         granularity: Option<String>,
         date_range: Option<Vec<String>>,
     ) -> Result<Rc<Self>, CubeError> {
+        let alias_suffix = if let Some(granularity) = &granularity {
+            granularity.clone()
+        } else {
+            "day".to_string()
+        };
         Ok(Rc::new(Self {
             dimension: BaseDimension::try_new_required(member_evaluator, query_tools.clone())?,
             query_tools,
             granularity,
             date_range,
+            alias_suffix,
         }))
+    }
+
+    pub fn change_granularity(&self, new_granularity: Option<String>) -> Rc<Self> {
+        Rc::new(Self {
+            dimension: self.dimension.clone(),
+            query_tools: self.query_tools.clone(),
+            granularity: new_granularity,
+            date_range: self.date_range.clone(),
+            alias_suffix: self.alias_suffix.clone(),
+        })
     }
 
     pub fn get_granularity(&self) -> Option<String> {

@@ -64,7 +64,7 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
-        revenueRolling3day: {
+        revenueRollingThreeDay: {
           type: 'sum',
           sql: 'amount',
           rollingWindow: {
@@ -666,7 +666,7 @@ describe('SQL Generation', () => {
     console.log(query.buildSqlAndParams());
 
     // TODO ordering doesn't work for running total
-    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+    return dbRunner.testQuery(query.buildSqlAndParamsTest()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [{
@@ -704,7 +704,7 @@ describe('SQL Generation', () => {
     });
   });
 
-  it('rolling 1', async () => runQueryTest({
+  it('rolling', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling'
     ],
@@ -730,7 +730,7 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_rolling: null }
   ]));
 
-  it('rolling multiplied 1', async () => runQueryTest({
+  it('rolling multiplied', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling',
       'visitor_checkins.visitor_checkins_count'
@@ -769,7 +769,7 @@ describe('SQL Generation', () => {
 
   it('rolling month', async () => runQueryTest({
     measures: [
-      'visitors.revenueRolling3day'
+      'visitors.revenueRollingThreeDay'
     ],
     timeDimensions: [{
       dimension: 'visitors.created_at',
@@ -781,7 +781,7 @@ describe('SQL Generation', () => {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling3day: '900' }
+    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling_three_day: '900' }
   ]));
 
   it('rolling count', async () => runQueryTest({

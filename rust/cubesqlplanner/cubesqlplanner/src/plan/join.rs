@@ -2,6 +2,7 @@ use super::{time_series, Schema, SingleAliasedSource};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
+use lazy_static::lazy_static;
 
 use std::rc::Rc;
 
@@ -33,29 +34,6 @@ impl RollingWindowJoinCondition {
         }
     }
 
-    /*
-     *
-    offset = offset || 'end';
-    return this.timeDimensions.map(
-      d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
-        // dateFrom based window
-        const conditions = [];
-        if (trailingInterval !== 'unbounded') {
-          const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
-          const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
-          const sign = offset === 'start' ? '>=' : '>';
-          conditions.push(`${dateField} ${sign} ${trailingStart}`);
-        }
-        if (leadingInterval !== 'unbounded') {
-          const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
-          const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
-          const sign = offset === 'end' ? '<=' : '<';
-          conditions.push(`${dateField} ${sign} ${leadingEnd}`);
-        }
-        return conditions.length ? conditions.join(' AND ') : '1 = 1';
-      }]
-    );
-     */
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,
@@ -63,55 +41,48 @@ impl RollingWindowJoinCondition {
         schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
         let mut conditions = vec![];
-        /* let date_column_alias = if let Some(column) = schema.find_column_for_member(&self.time_dimension.full_name(), &None) {
-            templates.column_reference(&source, &column.alias.clone())
-        } else {
-            dimension.to_sql(context.clone(), schema.clone())
-        } */
         let date_column_alias =
             self.resolve_time_column_alias(templates, context.clone(), schema.clone())?;
-        if let Some(trailing_interval) = &self.trailing_interval {
-            if trailing_interval != "unbounded" {
-                let start_date = if self.offset == "start" {
-                    templates
-                        .column_reference(&Some(self.time_series_source.clone()), "date_from")?
-                } else {
-                    templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
-                };
 
-                let trailing_start = if let Some(trailing_interval) = &self.trailing_interval {
-                    format!("{start_date} - interval '{trailing_interval}'")
-                } else {
-                    start_date
-                };
-
-                let sign = if self.offset == "start" { ">=" } else { ">" };
-
-                conditions.push(format!("{date_column_alias} {sign} {trailing_start}"));
-            }
+        lazy_static! {
+            static ref UNBOUNDED: Option<String> = Some("unbounded".to_string());
         }
 
-        if let Some(leading_interval) = &self.trailing_interval {
-            if leading_interval != "unbounded" {
-                let end_date = if self.offset == "end" {
-                    templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
-                } else {
-                    templates
-                        .column_reference(&Some(self.time_series_source.clone()), "date_from")?
-                };
+        if self.trailing_interval != *UNBOUNDED {
+            let start_date = if self.offset == "start" {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?
+            } else {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
+            };
 
-                let leading_end = if let Some(leading_interval) = &self.leading_interval {
-                    format!("{end_date} + interval '{leading_interval}'")
-                } else {
-                    end_date
-                };
+            let trailing_start = if let Some(trailing_interval) = &self.trailing_interval {
+                format!("{start_date} - interval '{trailing_interval}'")
+            } else {
+                start_date
+            };
 
-                let sign = if self.offset == "end" { "<=" } else { "<" };
+            let sign = if self.offset == "start" { ">=" } else { ">" };
 
-                conditions.push(format!("{date_column_alias} {sign} {leading_end}"));
-            }
+            conditions.push(format!("{date_column_alias} {sign} {trailing_start}"));
         }
 
+        if self.leading_interval != *UNBOUNDED {
+            let end_date = if self.offset == "end" {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
+            } else {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?
+            };
+
+            let leading_end = if let Some(leading_interval) = &self.leading_interval {
+                format!("{end_date} + interval '{leading_interval}'")
+            } else {
+                end_date
+            };
+
+            let sign = if self.offset == "end" { "<=" } else { "<" };
+
+            conditions.push(format!("{date_column_alias} {sign} {leading_end}"));
+        }
         let result = if conditions.is_empty() {
             templates.always_true()?
         } else {

@@ -6,7 +6,7 @@ use cubenativeutils::CubeError;
 use std::fmt;
 use std::rc::Rc;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum FilterGroupOperator {
     Or,
     And,
@@ -18,13 +18,19 @@ pub struct FilterGroup {
     pub items: Vec<FilterItem>,
 }
 
+impl PartialEq for FilterGroup {
+    fn eq(&self, other: &Self) -> bool {
+        self.operator == other.operator && self.items == other.items
+    }
+}
+
 impl FilterGroup {
     pub fn new(operator: FilterGroupOperator, items: Vec<FilterItem>) -> Self {
         Self { operator, items }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum FilterItem {
     Group(Rc<FilterGroup>),
     Item(Rc<BaseFilter>),

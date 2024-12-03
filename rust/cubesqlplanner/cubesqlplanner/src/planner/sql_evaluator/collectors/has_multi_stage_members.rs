@@ -26,7 +26,9 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
             MemberSymbolType::Measure(s) => {
                 if s.is_multi_stage() {
                     self.has_multi_stage = true;
-                } else if !self.ignore_cumulative && s.is_rolling_window() {
+                } else if !self.ignore_cumulative
+                    && (s.is_rolling_window() || s.measure_type() == "runningTotal")
+                {
                     self.has_multi_stage = true;
                 } else {
                     for filter_node in s.measure_filters() {

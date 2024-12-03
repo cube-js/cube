@@ -734,7 +734,6 @@ export class BaseQuery {
     offset = offset || 'end';
     return this.timeDimensions.map(
       d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
-        console.log("!!!!!! IsFromStartToEnd: ", isFromStartToEnd, " --");
         // dateFrom based window
         const conditions = [];
         if (trailingInterval !== 'unbounded') {
@@ -1420,7 +1419,6 @@ export class BaseQuery {
         )
       ).join(' AND ');
 
-    console.log("!!! date join contdition sql: ", dateJoinConditionSql);
 
     return this.overTimeSeriesSelect(
       cumulativeMeasures,
@@ -3292,6 +3290,8 @@ export class BaseQuery {
         cube: 'CUBE({{ exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
+        add_interval: '{{ date }} + interval \'{{ interval }}\'',
+        sub_interval: '{{ date }} - interval \'{{ interval }}\'',
         true: 'TRUE',
         false: 'FALSE',
         like: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}',

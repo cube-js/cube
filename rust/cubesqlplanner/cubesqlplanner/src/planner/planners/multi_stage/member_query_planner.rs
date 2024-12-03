@@ -109,7 +109,7 @@ impl MultiStageMemberQueryPlanner {
                 rolling_window_desc.time_dimension.clone(),
             );
             let cte_schema = cte_schemas.get(input).unwrap().clone();
-            join_builder.inner_join_table_reference(
+            join_builder.left_join_table_reference(
                 input.clone(),
                 cte_schema,
                 Some(format!("rolling_{}", i + 1)),
@@ -125,11 +125,24 @@ impl MultiStageMemberQueryPlanner {
             .collect_vec();
 
         let context_factory = SqlNodesFactory::new();
-        let node_context = context_factory.default_node_processor();
+        let node_context = context_factory.rolling_window_node_processor();
 
         let mut select_builder = SelectBuilder::new(from, VisitorContext::new(None, node_context));
         for dim in dimensions.iter() {
-            select_builder.add_projection_member(&dim, None, None);
+            if dim.full_name() == rolling_window_desc.time_dimension.full_name() {
+                select_builder.add_projection_member(
+                    &dim,
+                    Some(root_alias.clone()),
+                    Some(
+                        cte_schemas
+                            .get(&inputs[1])
+                            .unwrap()
+                            .resolve_member_alias(&dim, &Some(inputs[1].clone())),
+                    ),
+                );
+            } else {
+                select_builder.add_projection_member(&dim, None, None);
+            }
         }
 
         let query_member = self.query_member_as_base_member()?;
@@ -267,29 +280,17 @@ impl MultiStageMemberQueryPlanner {
         {
             vec![measure]
         } else {
-            println!("!!! kkkk {}", self.description.alias());
             vec![]
         };
-
-        let allowed_filter_members = self.description.state().allowed_filter_members().clone();
 
         let cte_query_properties = QueryProperties::try_new_from_precompiled(
             self.query_tools.clone(),
             measures,
             self.description.state().dimensions().clone(),
-            self.query_properties.time_dimensions().clone(),
-            self.extract_filters(
-                &allowed_filter_members,
-                self.query_properties.time_dimensions_filters(),
-            ),
-            self.extract_filters(
-                &allowed_filter_members,
-                self.query_properties.dimensions_filters(),
-            ),
-            self.extract_filters(
-                &allowed_filter_members,
-                self.query_properties.measures_filters(),
-            ),
+            self.description.state().time_dimensions().clone(),
+            self.description.state().time_dimensions_filters().clone(),
+            self.description.state().dimensions_filters().clone(),
+            self.description.state().measures_filters().clone(),
             vec![],
             None,
             None,
@@ -364,7 +365,7 @@ impl MultiStageMemberQueryPlanner {
     fn all_dimensions(&self) -> Vec<Rc<dyn BaseMember>> {
         BaseMemberHelper::iter_as_base_member(self.description.state().dimensions())
             .chain(BaseMemberHelper::iter_as_base_member(
-                self.query_properties.time_dimensions(),
+                self.description.state().time_dimensions(),
             ))
             .collect_vec()
     }
@@ -381,7 +382,7 @@ impl MultiStageMemberQueryPlanner {
     fn all_input_dimensions(&self) -> Vec<Rc<dyn BaseMember>> {
         BaseMemberHelper::iter_as_base_member(&self.input_dimensions())
             .chain(BaseMemberHelper::iter_as_base_member(
-                self.query_properties.time_dimensions(),
+                self.description.state().time_dimensions(),
             ))
             .collect_vec()
     }
@@ -488,7 +489,7 @@ impl MultiStageMemberQueryPlanner {
     fn subquery_order(&self) -> Result<Vec<OrderBy>, CubeError> {
         let order_items = QueryProperties::default_order(
             &self.input_dimensions(),
-            &self.query_properties.time_dimensions(),
+            &self.description.state().time_dimensions(),
             &self.raw_input_measures()?,
         );
         Ok(OrderPlanner::custom_order(
@@ -506,7 +507,7 @@ impl MultiStageMemberQueryPlanner {
 
         let order_items = QueryProperties::default_order(
             &self.description.state().dimensions(),
-            &self.query_properties.time_dimensions(),
+            &self.description.state().time_dimensions(),
             &measures,
         );
         let mut all_members = self.all_dimensions().clone();

@@ -3,6 +3,7 @@ use super::multi_stage::{
     MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
     MultiStageQueryDescription, MultiStageTimeShift, RollingWindowDescription,
 };
+use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::plan::{Cte, From, Schema, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
@@ -10,7 +11,7 @@ use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::{BaseDimension, BaseMeasure, VisitorContext};
-use crate::planner::{BaseTimeDimension, QueryProperties};
+use crate::planner::{BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -45,10 +46,12 @@ impl MultiStageQueryPlanner {
             return Ok((vec![], vec![]));
         }
         let mut descriptions = Vec::new();
-        let all_filter_members = self.query_properties.all_filtered_members();
         let state = MultiStageAppliedState::new(
+            self.query_properties.time_dimensions().clone(),
             self.query_properties.dimensions().clone(),
-            all_filter_members,
+            self.query_properties.time_dimensions_filters().clone(),
+            self.query_properties.dimensions_filters().clone(),
+            self.query_properties.measures_filters().clone(),
         );
 
         let top_level_ctes = multi_stage_members
@@ -190,12 +193,42 @@ impl MultiStageQueryPlanner {
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
                 member,
             ),
-            state.clone(),
+            state,
             vec![],
             alias.clone(),
         );
         descriptions.push(description.clone());
         Ok(description)
+    }
+
+    fn make_rolling_base_state(
+        &self,
+        time_dimension: Rc<BaseTimeDimension>,
+        rolling_window: &RollingWindow,
+        state: Rc<MultiStageAppliedState>,
+    ) -> Result<Rc<MultiStageAppliedState>, CubeError> {
+        let time_dimension_name = time_dimension.member_evaluator().full_name();
+        let mut new_state = state.clone_state();
+        let trailing_granularity =
+            GranularityHelper::granularity_from_interval(&rolling_window.trailing);
+        let leading_granularity =
+            GranularityHelper::granularity_from_interval(&rolling_window.leading);
+        let window_granularity =
+            GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
+        let result_granularity = GranularityHelper::min_granularity(
+            &window_granularity,
+            &time_dimension.get_granularity(),
+        )?;
+
+        new_state.change_time_dimension_granularity(&time_dimension_name, result_granularity);
+
+        new_state.expand_date_range_filter(
+            &time_dimension_name,
+            rolling_window.trailing.clone(),
+            rolling_window.leading.clone(),
+        );
+
+        Ok(Rc::new(new_state))
     }
 
     fn try_make_rolling_window(
@@ -205,8 +238,22 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
         if let Some(measure) = BaseMeasure::try_new(member.clone(), self.query_tools.clone())? {
-            if let Some(rolling_window) = measure.rolling_window() {
+            if measure.is_cumulative() {
+                let rolling_window = if let Some(rolling_window) = measure.rolling_window() {
+                    rolling_window.clone()
+                } else {
+                    RollingWindow {
+                        trailing: Some("unbounded".to_string()),
+                        leading: None,
+                        offset: None,
+                    }
+                };
                 let time_dimensions = self.query_properties.time_dimensions();
+                if time_dimensions.len() == 0 {
+                    let rolling_base =
+                        self.add_rolling_window_base(member.clone(), state.clone(), descriptions)?;
+                    return Ok(Some(rolling_base));
+                }
                 if time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
                         "Rolling window requires one time dimension".to_string(),
@@ -219,7 +266,15 @@ impl MultiStageQueryPlanner {
 
                 let input = vec![
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?,
-                    self.add_rolling_window_base(source.clone(), state.clone(), descriptions)?,
+                    self.add_rolling_window_base(
+                        source.clone(),
+                        self.make_rolling_base_state(
+                            time_dimension.clone(),
+                            &rolling_window,
+                            state.clone(),
+                        )?,
+                        descriptions,
+                    )?,
                 ];
 
                 let time_dimension = time_dimensions[0].clone();
@@ -308,7 +363,7 @@ impl MultiStageQueryPlanner {
 
             let new_state = if !dimensions_to_add.is_empty()
                 || !multi_stage_member.time_shifts().is_empty()
-                || state.is_filter_allowed(&member_name)
+                || state.has_filters_for_member(&member_name)
             {
                 let mut new_state = state.clone_state();
                 if !dimensions_to_add.is_empty() {
@@ -317,8 +372,8 @@ impl MultiStageQueryPlanner {
                 if !multi_stage_member.time_shifts().is_empty() {
                     new_state.add_time_shifts(multi_stage_member.time_shifts().clone());
                 }
-                if state.is_filter_allowed(&member_name) {
-                    new_state.disallow_filter(&member_name);
+                if state.has_filters_for_member(&member_name) {
+                    new_state.remove_filter_for_member(&member_name);
                 }
                 Rc::new(new_state)
             } else {

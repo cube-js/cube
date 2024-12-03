@@ -12,13 +12,12 @@ pub struct TimeSeries {
 
 impl TimeSeries {
     pub fn make_schema(&self, self_alias: Option<String>) -> Schema {
-        /* let column = SchemaColumn::new(
+        let column = SchemaColumn::new(
             self_alias,
-            format!("from_date"),
+            format!("date_from"),
             self.time_dimension_name.clone(),
         );
-        Schema::new(vec![column], vec![]) */
-        Schema::empty()
+        Schema::new(vec![column], vec![])
     }
 
     pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {

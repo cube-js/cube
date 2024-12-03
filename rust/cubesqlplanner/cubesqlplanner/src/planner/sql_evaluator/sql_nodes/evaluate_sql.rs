@@ -26,23 +26,7 @@ impl SqlNode for EvaluateSqlNode {
         let args = visitor.evaluate_deps(node, node_processor.clone())?;
         match node.symbol() {
             MemberSymbolType::Dimension(ev) => ev.evaluate_sql(args),
-            MemberSymbolType::Measure(ev) => {
-                let res = if ev.is_splitted_source() {
-                    //FIXME hack for working with
-                    //measures like rolling window
-                    if !args.is_empty() {
-                        match &args[0] {
-                            MemberSqlArg::String(s) => s.clone(),
-                            _ => "".to_string(),
-                        }
-                    } else {
-                        "".to_string()
-                    }
-                } else {
-                    ev.evaluate_sql(args)?
-                };
-                Ok(res)
-            }
+            MemberSymbolType::Measure(ev) => ev.evaluate_sql(args),
             MemberSymbolType::CubeTable(ev) => ev.evaluate_sql(args),
             MemberSymbolType::CubeName(ev) => ev.evaluate_sql(args),
             MemberSymbolType::SimpleSql(ev) => ev.evaluate_sql(args),

@@ -74,11 +74,17 @@ pub struct RollingWindowDescription {
 }
 
 #[derive(Clone)]
+pub struct RunningTotalDescription {
+    pub time_dimension: Rc<dyn BaseMember>,
+}
+
+#[derive(Clone)]
 pub enum MultiStageInodeMemberType {
     Rank,
     Aggregate,
     Calculate,
     RollingWindow(RollingWindowDescription),
+    RunningTotal(RunningTotalDescription),
 }
 
 #[derive(Clone)]

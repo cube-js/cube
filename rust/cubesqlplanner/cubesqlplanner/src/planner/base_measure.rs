@@ -205,6 +205,14 @@ impl BaseMeasure {
         self.rolling_window().is_some()
     }
 
+    pub fn is_running_total(&self) -> bool {
+        self.measure_type() == "runningTotal"
+    }
+
+    pub fn is_cumulative(&self) -> bool {
+        self.is_rolling_window() || self.is_running_total()
+    }
+
     //FIXME dublicate with symbol
     pub fn measure_type(&self) -> &String {
         &self.definition.static_data().measure_type
