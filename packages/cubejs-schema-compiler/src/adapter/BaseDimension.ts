@@ -31,10 +31,7 @@ export class BaseDimension {
     return this.dimensionSql() === this.aliasName();
   }
 
-  public cumulativeSelectColumns(baseQueryAliasName?: string): string[] {
-    if (baseQueryAliasName) {
-      return [`${baseQueryAliasName}.${this.aliasName()}`];
-    }
+  public cumulativeSelectColumns() {
     return [`${this.aliasName()}`];
   }
 
