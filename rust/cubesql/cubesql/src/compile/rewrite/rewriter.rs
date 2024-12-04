@@ -15,7 +15,7 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
 };
@@ -310,7 +310,7 @@ impl Rewriter {
 
     pub async fn run_rewrite_to_completion(
         &mut self,
-        auth_context: AuthContextRef,
+        cache_entry: Arc<CompilerCacheEntry>,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<CubeEGraph, CubeError> {
         let cube_context = self.cube_context.clone();
@@ -323,11 +323,7 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(
-                auth_context.clone(),
-                cube_context.session_state.protocol.clone(),
-                false,
-            )
+            .rewrite_rules(cache_entry, false)
             .await?;
 
         let (plan, qtrace_egraph_iterations) = tokio::task::spawn_blocking(move || {
@@ -392,6 +388,7 @@ impl Rewriter {
     pub async fn find_best_plan(
         &mut self,
         root: Id,
+        cache_entry: Arc<CompilerCacheEntry>,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
@@ -407,11 +404,7 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(
-                auth_context.clone(),
-                cube_context.session_state.protocol.clone(),
-                true,
-            )
+            .rewrite_rules(cache_entry, true)
             .await?;
 
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =

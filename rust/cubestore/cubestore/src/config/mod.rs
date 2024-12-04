@@ -1358,7 +1358,7 @@ impl Config {
                     Some(60),
                     Some(15),
                 ),
-                cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", true),
+                cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", false),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: env_parse_duration(
                     "CUBESTORE_CACHESTORE_GC_LOOP",

@@ -1,6 +1,6 @@
 use super::CommonUtils;
 use crate::cube_bridge::memeber_sql::MemberSql;
-use crate::plan::{From, FromSource, Join, JoinItem, JoinSource};
+use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::SqlJoinCondition;
@@ -20,38 +20,44 @@ impl JoinPlanner {
         }
     }
 
-    pub fn make_join_node(&self, /*TODO dimensions for subqueries*/) -> Result<From, CubeError> {
+    pub fn make_join_node_with_prefix(
+        &self,
+        alias_prefix: &Option<String>, /*TODO dimensions for subqueries*/
+    ) -> Result<From, CubeError> {
         let join = self.query_tools.cached_data().join()?.clone();
         let root = self.utils.cube_from_path(join.static_data().root.clone())?;
         let joins = join.joins()?;
         if joins.items().is_empty() {
-            Ok(From::new_from_cube(root))
+            Ok(From::new_from_cube(root, None))
         } else {
-            let join_items = joins
-                .items()
-                .iter()
-                .map(|join| {
-                    let definition = join.join()?;
-                    let evaluator = self.compile_join_condition(
-                        &join.static_data().original_from,
-                        definition.sql()?,
-                    )?;
-                    Ok(JoinItem {
-                        from: JoinSource::new_from_cube(
-                            self.utils
-                                .cube_from_path(join.static_data().original_to.clone())?,
-                        ),
-                        on: SqlJoinCondition::try_new(self.query_tools.clone(), evaluator)?,
-                        is_inner: false,
-                    })
-                })
-                .collect::<Result<Vec<_>, CubeError>>()?;
-            let result = From::new(FromSource::Join(Rc::new(Join {
-                root: JoinSource::new_from_cube(root),
-                joins: join_items,
-            })));
+            let mut join_builder = JoinBuilder::new_from_cube(
+                root.clone(),
+                Some(root.default_alias_with_prefix(alias_prefix)),
+            );
+            for join in joins.items().iter() {
+                let definition = join.join()?;
+                let evaluator = self
+                    .compile_join_condition(&join.static_data().original_from, definition.sql()?)?;
+                let on = JoinCondition::new_base_join(SqlJoinCondition::try_new(
+                    self.query_tools.clone(),
+                    evaluator,
+                )?);
+                let cube = self
+                    .utils
+                    .cube_from_path(join.static_data().original_to.clone())?;
+                join_builder.left_join_cube(
+                    cube.clone(),
+                    Some(cube.default_alias_with_prefix(alias_prefix)),
+                    on,
+                );
+            }
+            let result = From::new_from_join(join_builder.build());
             Ok(result)
         }
+    }
+
+    pub fn make_join_node(&self) -> Result<From, CubeError> {
+        self.make_join_node_with_prefix(&None)
     }
 
     fn compile_join_condition(

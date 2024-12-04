@@ -577,9 +577,9 @@ export class BaseQuery {
   }
 
   /**
-   * Returns an array of SQL query strings for the query.
+   * Returns a pair of SQL query string and parameter values for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
-   * @returns {Array<string>}
+   * @returns {[string, Array<unknown>]}
    */
   buildSqlAndParams(exportAnnotatedSql) {
     if (getEnv('nativeSqlPlanner')) {
@@ -1521,13 +1521,13 @@ export class BaseQuery {
         this.queryCache
       );
       if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
-        throw new UserError(`Subquery dimension ${m.expressionName} should reference at least one measure`);
+        throw new UserError(`Subquery measure ${m.expressionName} should reference at least one member`);
       }
       if (!collectedMeasures.length && m.isMemberExpression && m.query.allCubeNames.length > 1 && m.measureSql() === 'COUNT(*)') {
         const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
         throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
       }
-      return [m.measure, collectedMeasures];
+      return [typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`, collectedMeasures];
     }));
   }
 
@@ -2539,6 +2539,10 @@ export class BaseQuery {
       return evaluateSql === '*' ? '1' : evaluateSql;
     }
     if (this.ungrouped) {
+      if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
+        evaluateSql = this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative[measurePath];
+      }
+
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
         const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: '1' }]);
         return evaluateSql === '*' ? '1' : sql;
@@ -3214,24 +3218,35 @@ export class BaseQuery {
         DATE: 'DATE({{ args_concat }})',
       },
       statements: {
-        select: 'SELECT {% if distinct %}DISTINCT {% endif %}' +
+        select: '{% if ctes %} WITH \n' +
+          '{{ ctes | join(\',\n\') }}\n' +
+          '{% endif %}' +
+          'SELECT {% if distinct %}DISTINCT {% endif %}' +
           '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
-          ') AS {{ from_alias }}{% endif %}' +
+          ') AS {{ from_alias }}{% elif from_prepared %}\n' +
+          'FROM {{ from_prepared }}' +
+          '{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+          '{% if having %}\nHAVING {{ having }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
+        join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
+        cte: '{{ alias }} AS ({{ query | indent(2, true) }})'
       },
       expressions: {
+        column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',
         column_aliased: '{{expr}} {{quoted_alias}}',
+        query_aliased: '{{ query }} AS {{ quoted_alias }}',
         case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}',
+        order_by: '{% if index %} {{ index }} {% else %} {{ expr }} {% endif %} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
         window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})',
         window_frame_bounds: '{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}',
@@ -3260,7 +3275,8 @@ export class BaseQuery {
         gt: '{{ column }} > {{ param }}',
         gte: '{{ column }} >= {{ param }}',
         lt: '{{ column }} < {{ param }}',
-        lte: '{{ column }} <= {{ param }}'
+        lte: '{{ column }} <= {{ param }}',
+        always_true: '1 == 1'
 
       },
       quotes: {
@@ -3269,6 +3285,10 @@ export class BaseQuery {
       },
       params: {
         param: '?'
+      },
+      join_types: {
+        inner: 'INNER',
+        left: 'LEFT'
       },
       window_frame_types: {
         rows: 'ROWS',

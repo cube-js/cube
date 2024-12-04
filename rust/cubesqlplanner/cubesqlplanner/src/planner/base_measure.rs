@@ -2,6 +2,7 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
 use super::{evaluate_with_context, BaseMember, VisitorContext};
 use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
+use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -66,14 +67,17 @@ pub struct BaseMeasure {
     definition: Rc<dyn MeasureDefinition>,
     time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
+    name: String,
 }
 
 impl BaseMember for BaseMeasure {
-    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        let sql = evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
-        let alias_name = self.alias_name();
-
-        Ok(format!("{} {}", sql, alias_name))
+    fn to_sql(&self, context: Rc<VisitorContext>, schema: Rc<Schema>) -> Result<String, CubeError> {
+        evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            schema,
+        )
     }
 
     fn alias_name(&self) -> String {
@@ -88,40 +92,18 @@ impl BaseMember for BaseMeasure {
     fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember> {
         self.clone()
     }
+
+    fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+
+    fn name(&self) -> &String {
+        &self.name
+    }
 }
 
 impl BaseMeasure {
     pub fn try_new(
-        measure: String,
-        query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<EvaluationNode>,
-    ) -> Result<Rc<Self>, CubeError> {
-        let cube_name = query_tools
-            .cube_evaluator()
-            .cube_from_path(measure.clone())?
-            .static_data()
-            .name
-            .clone();
-        let definition = match member_evaluator.symbol() {
-            MemberSymbolType::Measure(m) => Ok(m.definition().clone()),
-            _ => Err(CubeError::internal(format!(
-                "wrong type of member_evaluator for measure: {}",
-                measure
-            ))),
-        }?;
-
-        let time_shifts = Self::parse_time_shifts(&definition)?;
-        Ok(Rc::new(Self {
-            measure,
-            query_tools,
-            definition,
-            member_evaluator,
-            cube_name,
-            time_shifts,
-        }))
-    }
-
-    pub fn try_new_from_precompiled(
         evaluation_node: Rc<EvaluationNode>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Option<Rc<Self>>, CubeError> {
@@ -134,12 +116,26 @@ impl BaseMeasure {
                     member_evaluator: evaluation_node.clone(),
                     definition: s.definition().clone(),
                     cube_name: s.cube_name().clone(),
+                    name: s.name().clone(),
                     time_shifts,
                 }))
             }
             _ => None,
         };
         Ok(res)
+    }
+
+    pub fn try_new_required(
+        evaluation_node: Rc<EvaluationNode>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Rc<Self>, CubeError> {
+        if let Some(result) = Self::try_new(evaluation_node, query_tools)? {
+            Ok(result)
+        } else {
+            Err(CubeError::internal(format!(
+                "MeasureSymbol expected as evaluation node for BaseMeasure"
+            )))
+        }
     }
 
     fn parse_time_shifts(
