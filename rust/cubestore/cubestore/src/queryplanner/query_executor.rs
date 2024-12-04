@@ -33,6 +33,7 @@ use datafusion::arrow::ipc::reader::StreamReader;
 use datafusion::arrow::ipc::writer::StreamWriter;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::catalog::Session;
+use datafusion::common::ToDFSchema;
 use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::object_store::ObjectStoreUrl;
 use datafusion::datasource::physical_plan::parquet::ParquetExecBuilder;
@@ -542,6 +543,7 @@ impl CubeTable {
 
     fn async_scan(
         &self,
+        state: &dyn Session,
         table_projection: Option<&Vec<usize>>,
         filters: &[Expr],
     ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
@@ -637,6 +639,14 @@ impl CubeTable {
         };
 
         let predicate = combine_filters(filters);
+        let physical_predicate = if let Some(pred) = &predicate {
+            Some(state.create_physical_expr(
+                pred.clone(),
+                &index_schema.as_ref().clone().to_dfschema()?,
+            )?)
+        } else {
+            None
+        };
         for partition_snapshot in partition_snapshots {
             let partition = partition_snapshot.partition();
             let filter = self
@@ -672,9 +682,14 @@ impl CubeTable {
                         ))
                             })
                             .collect::<Result<Vec<_>, _>>()?]);
-                let parquet_exec = ParquetExecBuilder::new(file_scan)
-                    .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone())
-                    .build();
+                let parquet_exec_builder = ParquetExecBuilder::new(file_scan)
+                    .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                let parquet_exec_builder = if let Some(phys_pred) = &physical_predicate {
+                    parquet_exec_builder.with_predicate(phys_pred.clone())
+                } else {
+                    parquet_exec_builder
+                };
+                let parquet_exec = parquet_exec_builder.build();
 
                 let arc: Arc<dyn ExecutionPlan> = Arc::new(parquet_exec);
                 let arc = FilterByKeyRangeExec::issue_filters(arc, filter.clone(), key_len);
@@ -1635,7 +1650,7 @@ impl TableProvider for CubeTable {
         filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let res = self.async_scan(projection, filters)?;
+        let res = self.async_scan(state, projection, filters)?;
         Ok(res)
     }
     fn table_type(&self) -> TableType {
