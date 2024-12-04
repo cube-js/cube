@@ -743,4 +743,26 @@ criterion_group! {
     targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_number_expr_1k, long_simple_in_str_expr_50, long_simple_in_str_expr_1k, tableau_logical_17,
         tableau_bugs_b8888, ts_last_day_redshift, quicksight_1, quicksight_2
 }
-criterion_main!(benches);
+
+fn simple_rules_loading(c: &mut Criterion) {
+    let context = Arc::new(
+        futures::executor::block_on(create_test_postgresql_cube_context(get_test_tenant_ctx()))
+            .unwrap(),
+    );
+    // preload rules at least once
+    let _rules = rewrite_rules(context.clone());
+
+    c.bench_function("simple_rules_loading", |b| {
+        b.iter(|| {
+            rewrite_rules(context.clone());
+        })
+    });
+}
+
+criterion_group! {
+    name = rules_loading;
+    config = Criterion::default();
+    targets = simple_rules_loading
+}
+
+criterion_main!(benches, rules_loading);
