@@ -1,13 +1,10 @@
 use crate::queryplanner::hll::{Hll, HllUnion};
 use crate::CubeError;
-use chrono::{Datelike, Duration, Months, NaiveDateTime, TimeZone, Utc};
+use chrono::{Datelike, Duration, Months, NaiveDateTime};
 use datafusion::arrow::array::{
     Array, ArrayRef, BinaryArray, TimestampNanosecondArray, UInt64Builder,
 };
-use datafusion::arrow::datatypes::{DataType, IntervalDayTime, IntervalUnit, TimeUnit};
-use std::any::Any;
-use tokio_tungstenite::tungstenite::protocol::frame::coding::Data;
-// use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
+use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::function::AccumulatorArgs;
 use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyInfo};
@@ -18,8 +15,7 @@ use datafusion::logical_expr::{
 use datafusion::physical_plan::{Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
-use smallvec::smallvec;
-use smallvec::SmallVec;
+use std::any::Any;
 use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -59,41 +55,6 @@ pub fn registerable_arc_scalar_udfs() -> Vec<Arc<ScalarUDF>> {
         .collect()
 }
 
-/// Note that only full match counts. Pass capitalized names.
-pub fn scalar_kind_by_name(n: &str) -> Option<CubeScalarUDFKind> {
-    if n == "CARDINALITY" {
-        return Some(CubeScalarUDFKind::HllCardinality);
-    }
-    if n == "UNIX_TIMESTAMP" {
-        return Some(CubeScalarUDFKind::UnixTimestamp);
-    }
-    if n == "DATE_ADD" {
-        return Some(CubeScalarUDFKind::DateAdd);
-    }
-    if n == "DATE_SUB" {
-        return Some(CubeScalarUDFKind::DateSub);
-    }
-    if n == "DATE_BIN" {
-        return Some(CubeScalarUDFKind::DateBin);
-    }
-    // TODO upgrade DF: Remove this (once we are no longer in flux about naming casing of UDFs and UDAFs).
-    if [
-        "CARDINALITY",
-        "UNIX_TIMESTAMP",
-        "DATE_ADD",
-        "DATE_SUB",
-        "DATE_BIN",
-    ]
-    .contains(&(&n.to_ascii_uppercase() as &str))
-    {
-        panic!(
-            "scalar_kind_by_name failing on '{}' due to uppercase/lowercase mixup",
-            n
-        );
-    }
-    return None;
-}
-
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CubeAggregateUDFKind {
     MergeHll, // merge(), accepting the HyperLogLog sketches.
@@ -124,7 +85,7 @@ pub fn aggregate_udf_by_kind(k: CubeAggregateUDFKind) -> AggregateUDF {
     }
 }
 
-/// Note that only full match counts. Pass capitalized names.
+/// Note that only full match counts. Pass lowercase names.
 pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
     if n == "merge" {
         return Some(CubeAggregateUDFKind::MergeHll);
@@ -156,7 +117,7 @@ impl UnixTimestamp {
 
 impl ScalarUDFImpl for UnixTimestamp {
     fn name(&self) -> &str {
-        "UNIX_TIMESTAMP"
+        "unix_timestamp"
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -167,7 +128,7 @@ impl ScalarUDFImpl for UnixTimestamp {
         &self.signature
     }
 
-    fn return_type(&self, arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+    fn return_type(&self, _arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
         Ok(DataType::Int64)
     }
 
@@ -198,17 +159,8 @@ impl ScalarUDFImpl for UnixTimestamp {
     }
 }
 
-fn interval_dt_duration(i: &IntervalDayTime) -> Duration {
-    // TODO upgrade DF: Check we're handling, or check that we _were_ handling, interval values
-    // correctly. It seems plausible there was a bug here with millis: if the representation hasn't
-    // changed, then it should have been doing `(i & ((1 << 32) - 1))`.
-
-    // let days: i64 = i.signum() * (i.abs() >> 32);
-    // let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-
-    let duration = Duration::days(i.days as i64) + Duration::milliseconds(i.milliseconds as i64);
-
-    duration
+fn interval_dt_duration(interval_days: i32, interval_nanos: i64) -> Duration {
+    Duration::days(interval_days as i64) + Duration::nanoseconds(interval_nanos)
 }
 
 fn calc_intervals(start: NaiveDateTime, end: NaiveDateTime, interval: i32) -> i32 {
@@ -229,9 +181,6 @@ fn calc_intervals(start: NaiveDateTime, end: NaiveDateTime, interval: i32) -> i3
 
     num_intervals
 }
-
-// TODO upgrade DF: Use DateTime::from_timestamp because NaiveDateTime::from_timestamp is
-// deprecated?  Or does that break behavior?
 
 /// Calculate date_bin timestamp for source date for year-month interval
 fn calc_bin_timestamp_ym(origin: NaiveDateTime, source: &i64, interval: i32) -> NaiveDateTime {
@@ -257,12 +206,13 @@ fn calc_bin_timestamp_ym(origin: NaiveDateTime, source: &i64, interval: i32) -> 
 fn calc_bin_timestamp_dt(
     origin: NaiveDateTime,
     source: &i64,
-    interval: &IntervalDayTime,
+    interval_days: i32,
+    interval_nanos: i64,
 ) -> NaiveDateTime {
     let timestamp =
         NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
     let diff = timestamp - origin;
-    let interval_duration = interval_dt_duration(&interval);
+    let interval_duration = interval_dt_duration(interval_days, interval_nanos);
     let num_intervals =
         diff.num_nanoseconds().unwrap_or(0) / interval_duration.num_nanoseconds().unwrap_or(1);
     let mut nearest_timestamp = origin
@@ -314,7 +264,7 @@ impl ScalarUDFImpl for DateBin {
         self
     }
     fn name(&self) -> &str {
-        "DATE_BIN"
+        "date_bin"
     }
     fn signature(&self) -> &Signature {
         &self.signature
@@ -336,8 +286,9 @@ impl ScalarUDFImpl for DateBin {
         };
 
         let origin = match &inputs[2] {
-            // TODO upgrade DF: We ignore timezone field
             ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(o), _tz)) => {
+                // The DF 42.2.0 upgrade added timezone values.  A comment about this in
+                // handle_year_month.
                 NaiveDateTime::from_timestamp(*o / 1_000_000_000, (*o % 1_000_000_000) as u32)
             }
             ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => {
@@ -365,12 +316,15 @@ impl ScalarUDFImpl for DateBin {
                     ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, None)),
                 ),
                 ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t), _tz)) => {
-                    // TODO upgrade DF: Handle _tz?
                     let nearest_timestamp = calc_bin_timestamp_ym(origin, t, interval);
 
+                    // The DF 42.2.0 upgrade added timezone values.  DF's date_bin drops this time zone
+                    // information.  For now we just ignore time zone if present and in that case
+                    // use UTC time zone for all calculations, and remove the time zone from the
+                    // return value.
                     Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
                         Some(nearest_timestamp.timestamp_nanos()),
-                        None, // TODO upgrade DF: handle _tz?
+                        None,
                     )))
                 }
                 ColumnarValue::Array(arr) if arr.as_any().is::<TimestampNanosecondArray>() => {
@@ -379,6 +333,8 @@ impl ScalarUDFImpl for DateBin {
                         .downcast_ref::<TimestampNanosecondArray>()
                         .unwrap();
 
+                    // Replicating the time zone decision in the scalar case (by not using
+                    // `.with_time_zone(ts_array.timezone())`).
                     let mut builder = TimestampNanosecondArray::builder(ts_array.len());
 
                     for i in 0..ts_array.len() {
@@ -404,18 +360,21 @@ impl ScalarUDFImpl for DateBin {
         fn handle_day_time(
             inputs: &[ColumnarValue],
             origin: NaiveDateTime,
-            interval: IntervalDayTime,
+            interval_days: i32,
+            interval_nanos: i64,
         ) -> Result<ColumnarValue, DataFusionError> {
             match &inputs[1] {
                 ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, _)) => Ok(
                     ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(None, None)),
                 ),
                 ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(Some(t), _tz)) => {
-                    let nearest_timestamp = calc_bin_timestamp_dt(origin, t, &interval);
+                    // As with handle_year_month, no use of the time zone.
+                    let nearest_timestamp =
+                        calc_bin_timestamp_dt(origin, t, interval_days, interval_nanos);
 
                     Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
                         Some(nearest_timestamp.timestamp_nanos()),
-                        None, // TODO upgrade DF: Handle _tz?
+                        None,
                     )))
                 }
                 ColumnarValue::Array(arr) if arr.as_any().is::<TimestampNanosecondArray>() => {
@@ -424,6 +383,7 @@ impl ScalarUDFImpl for DateBin {
                         .downcast_ref::<TimestampNanosecondArray>()
                         .unwrap();
 
+                    // As with handle_year_month (and the scalar case above), no use of `ts_array.timezone()`.
                     let mut builder = TimestampNanosecondArray::builder(ts_array.len());
 
                     for i in 0..ts_array.len() {
@@ -431,7 +391,8 @@ impl ScalarUDFImpl for DateBin {
                             builder.append_null();
                         } else {
                             let ts = ts_array.value(i);
-                            let nearest_timestamp = calc_bin_timestamp_dt(origin, &ts, &interval);
+                            let nearest_timestamp =
+                                calc_bin_timestamp_dt(origin, &ts, interval_days, interval_nanos);
                             builder.append_value(nearest_timestamp.timestamp_nanos());
                         }
                     }
@@ -450,9 +411,12 @@ impl ScalarUDFImpl for DateBin {
             ScalarValue::IntervalYearMonth(Some(interval)) => {
                 handle_year_month(inputs, origin, interval)
             }
-            ScalarValue::IntervalDayTime(Some(interval)) => {
-                handle_day_time(inputs, origin, interval)
-            }
+            ScalarValue::IntervalDayTime(Some(interval)) => handle_day_time(
+                inputs,
+                origin,
+                interval.days,
+                (interval.milliseconds as i64) * 1_000_000,
+            ),
             ScalarValue::IntervalMonthDayNano(Some(month_day_nano)) => {
                 // We handle months or day/time but not combinations of month with day/time.
                 // Potential reasons:  Before the upgrade to DF 42.2.0, there was no
@@ -468,19 +432,11 @@ impl ScalarUDFImpl for DateBin {
                         )))
                     }
                 } else {
-                    let milliseconds64 = month_day_nano.nanoseconds / 1_000_000;
-                    let milliseconds32 = i32::try_from(milliseconds64).map_err(|_| {
-                        DataFusionError::Execution(format!(
-                        "Unsupported interval time value ({} nanoseconds is out of range): {:?}",
-                        month_day_nano.nanoseconds,
-                        interval
-                    ))
-                    })?;
-                    // TODO upgrade DF: Pass nanoseconds to handle_day_time?
                     handle_day_time(
                         inputs,
                         origin,
-                        IntervalDayTime::new(month_day_nano.days, milliseconds32),
+                        month_day_nano.days,
+                        month_day_nano.nanoseconds,
                     )
                 }
             }
@@ -532,8 +488,8 @@ impl DateAddSub {
 impl DateAddSub {
     fn name_static(&self) -> &'static str {
         match self.is_add {
-            true => "DATE_ADD",
-            false => "DATE_SUB",
+            true => "date_add",
+            false => "date_sub",
         }
     }
 }
@@ -574,10 +530,9 @@ struct HllCardinality {
 }
 impl HllCardinality {
     pub fn new() -> HllCardinality {
-        // TODO upgrade DF: Is it Volatile or Immutable?
         let signature = Signature::new(
             TypeSignature::Exact(vec![DataType::Binary]),
-            Volatility::Volatile,
+            Volatility::Immutable,
         );
 
         HllCardinality { signature }
@@ -592,12 +547,12 @@ impl ScalarUDFImpl for HllCardinality {
         self
     }
     fn name(&self) -> &str {
-        "CARDINALITY"
+        "cardinality"
     }
     fn signature(&self) -> &Signature {
         &self.signature
     }
-    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
         Ok(DataType::UInt64)
     }
     fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
@@ -653,13 +608,13 @@ impl AggregateUDFImpl for HllMergeUDF {
         &self.signature
     }
 
-    fn return_type(&self, arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
+    fn return_type(&self, _arg_types: &[DataType]) -> datafusion::common::Result<DataType> {
         Ok(DataType::Binary)
     }
 
     fn accumulator(
         &self,
-        acc_args: AccumulatorArgs,
+        _acc_args: AccumulatorArgs,
     ) -> datafusion::common::Result<Box<dyn Accumulator>> {
         Ok(Box::new(HllMergeAccumulator { acc: None }))
     }

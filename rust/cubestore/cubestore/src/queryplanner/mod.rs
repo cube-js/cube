@@ -491,33 +491,13 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
-        // TODO upgrade DF
-        let kind = match name {
-            "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
-            "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
-            "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
-            "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
-            "date_bin" | "DATE_BIN" => CubeScalarUDFKind::DateBin,
-            _ => return self.session_state.scalar_functions().get(name).cloned(),
-        };
-        return Some(scalar_udf_by_kind(kind));
+        let name = name.to_ascii_lowercase();
+        self.session_state.scalar_functions().get(&name).cloned()
     }
 
     fn get_aggregate_meta(&self, name_param: &str) -> Option<Arc<AggregateUDF>> {
-        // HyperLogLog.
-        // TODO: case-insensitive names.
-        /*
-        let (_kind, name) = match name {
-            "merge" | "MERGE" => (CubeAggregateUDFKind::MergeHll, "MERGE"),
-            _ => return None,
-        };
-        */
         let name = name_param.to_ascii_lowercase();
-
-        let aggregate_udf_by_registry: Option<&Arc<AggregateUDF>> =
-            self.session_state.aggregate_functions().get(&name);
-
-        aggregate_udf_by_registry.map(|arc| arc.clone())
+        self.session_state.aggregate_functions().get(&name).cloned()
     }
 
     fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
