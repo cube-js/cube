@@ -406,7 +406,7 @@ describe('SQL Generation', () => {
 
     cube('visitor_checkins_sources', {
       sql: \`
-      select id, source from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins_sources.source.filter('source')}
+      select id, visitor_id, source from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins_sources.source.filter('source')}
       \`,
 
       rewriteQueries: true,
@@ -418,11 +418,21 @@ describe('SQL Generation', () => {
         }
       },
 
+      measures: {
+        count: {
+          type: 'count'
+        }
+      },
+
       dimensions: {
         id: {
           type: 'number',
           sql: 'id',
           primaryKey: true
+        },
+        visitor_id: {
+          type: 'number',
+          sql: 'visitor_id'
         },
         source: {
           type: 'string',
@@ -1834,6 +1844,171 @@ describe('SQL Generation', () => {
     }, [
       { visitors__source: 'some' },
       { visitors__source: null },
+    ])
+  );
+
+  it(
+    'equals NULL filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'equals',
+        values: [null]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'notSet(IS NULL) filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'notSet',
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'notEquals NULL filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'notEquals',
+        values: [null]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'set(IS NOT NULL) filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'set',
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'source is notSet(IS NULL) "or" source is google filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            dimension: 'visitor_checkins_sources.source',
+            operator: 'notSet',
+          },
+          {
+            dimension: 'visitor_checkins_sources.source',
+            operator: 'equals',
+            values: ['google']
+          }
+        ]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '3'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
     ])
   );
 
