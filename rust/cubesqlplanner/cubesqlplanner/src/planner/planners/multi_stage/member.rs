@@ -1,4 +1,4 @@
-use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
+use crate::cube_bridge::measure_definition::TimeShiftReference;
 use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::BaseMember;
 use crate::planner::BaseTimeDimension;

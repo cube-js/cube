@@ -1,4 +1,4 @@
-use super::{time_series, Schema, SingleAliasedSource};
+use super::{Schema, SingleAliasedSource};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, BaseMember, VisitorContext};
 use cubenativeutils::CubeError;

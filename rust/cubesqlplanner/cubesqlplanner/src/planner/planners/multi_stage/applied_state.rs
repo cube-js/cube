@@ -4,7 +4,7 @@ use crate::planner::planners::multi_stage::MultiStageTimeShift;
 use crate::planner::{BaseDimension, BaseTimeDimension};
 use itertools::Itertools;
 use std::cmp::PartialEq;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 

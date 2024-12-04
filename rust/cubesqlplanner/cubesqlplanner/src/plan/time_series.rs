@@ -1,7 +1,6 @@
-use super::{Schema, SchemaColumn, Select, Union};
+use super::{Schema, SchemaColumn};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
-use std::rc::Rc;
 
 pub struct TimeSeries {
     pub time_dimension_name: String,

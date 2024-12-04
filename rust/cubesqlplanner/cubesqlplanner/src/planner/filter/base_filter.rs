@@ -8,7 +8,6 @@ use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::rc::Rc;
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FilterType {

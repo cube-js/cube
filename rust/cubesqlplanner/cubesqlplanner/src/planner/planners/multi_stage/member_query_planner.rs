@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
-    query_properties: Rc<QueryProperties>,
+    _query_properties: Rc<QueryProperties>,
     description: Rc<MultiStageQueryDescription>,
 }
 
@@ -33,7 +33,7 @@ impl MultiStageMemberQueryPlanner {
     ) -> Self {
         Self {
             query_tools,
-            query_properties,
+            _query_properties: query_properties,
             description,
         }
     }
@@ -83,7 +83,7 @@ impl MultiStageMemberQueryPlanner {
     fn plan_rolling_window_query(
         &self,
         rolling_window_desc: &RollingWindowDescription,
-        multi_stage_member: &MultiStageInodeMember,
+        _multi_stage_member: &MultiStageInodeMember,
         cte_schemas: &HashMap<String, Rc<Schema>>,
     ) -> Result<Rc<Cte>, CubeError> {
         let inputs = self.input_cte_aliases();
@@ -226,7 +226,7 @@ impl MultiStageMemberQueryPlanner {
 
     fn make_input_join(
         &self,
-        multi_stage_member: &MultiStageInodeMember,
+        _multi_stage_member: &MultiStageInodeMember,
         cte_schemas: &HashMap<String, Rc<Schema>>,
     ) -> Result<QueryPlan, CubeError> {
         let inputs = self.input_cte_aliases();
@@ -335,31 +335,6 @@ impl MultiStageMemberQueryPlanner {
         };
         let result = Cte::new_from_select(Rc::new(cte_select), self.description.alias().clone());
         Ok(Rc::new(result))
-    }
-
-    fn extract_filters(
-        &self,
-        allowed_filter_members: &HashSet<String>,
-        filters: &Vec<FilterItem>,
-    ) -> Vec<FilterItem> {
-        let mut result = Vec::new();
-        for item in filters.iter() {
-            match item {
-                FilterItem::Group(group) => {
-                    let new_group = FilterItem::Group(Rc::new(FilterGroup::new(
-                        group.operator.clone(),
-                        self.extract_filters(allowed_filter_members, &group.items),
-                    )));
-                    result.push(new_group);
-                }
-                FilterItem::Item(itm) => {
-                    if allowed_filter_members.contains(&itm.member_name()) {
-                        result.push(FilterItem::Item(itm.clone()));
-                    }
-                }
-            }
-        }
-        result
     }
 
     fn all_dimensions(&self) -> Vec<Rc<dyn BaseMember>> {
