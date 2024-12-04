@@ -593,7 +593,6 @@ impl SparseHll {
         }
         vec_alloc_size(&self.entries)
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -1163,7 +1162,9 @@ impl DenseHll {
         fn vec_alloc_size<T: Copy>(v: &Vec<T>) -> usize {
             v.capacity() * size_of::<T>()
         }
-        vec_alloc_size(&self.deltas) + vec_alloc_size(&self.overflow_buckets) + vec_alloc_size(&self.overflow_values)
+        vec_alloc_size(&self.deltas)
+            + vec_alloc_size(&self.overflow_buckets)
+            + vec_alloc_size(&self.overflow_values)
     }
 }
 
