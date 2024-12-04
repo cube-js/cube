@@ -2,7 +2,7 @@ use crate::queryplanner::planning::{ClusterSendNode, CubeExtensionPlanner};
 // use crate::queryplanner::topk::execute::{AggregateTopKExec, TopKAggregateFunction};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn, MIN_TOPK_STREAM_ROWS};
 use crate::queryplanner::udfs::{
-    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
+    aggregate_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
