@@ -1556,7 +1556,7 @@ class ApiGateway {
   }
 
   /**
-   * Convert adapter's result and other request paramters to a final
+   * Convert adapter's result and other request parameters to a final
    * result object.
    * @internal
    */
@@ -1699,6 +1699,17 @@ class ApiGateway {
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
+      if (
+        queryType !== QueryTypeEnum.REGULAR_QUERY &&
+        props.queryType == null
+      ) {
+        throw new UserError(
+          `'${queryType
+          }' query type is not supported by the client.` +
+          'Please update the client.'
+        );
+      }
+
       let metaConfigResult = await (await this
         .getCompilerApi(context)).metaConfig(request.context, {
         requestId: context.requestId
@@ -1715,14 +1726,14 @@ class ApiGateway {
           slowQuery = slowQuery ||
             Boolean(sqlQueries[index].slowQuery);
 
-          const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery
-          );
-
           const response = await this.getSqlResponseInternal(
             context,
             normalizedQuery,
             sqlQueries[index],
+          );
+
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQuery
           );
 
           return this.getResultInternal(
@@ -1759,17 +1770,6 @@ class ApiGateway {
         },
         context,
       );
-
-      if (
-        queryType !== QueryTypeEnum.REGULAR_QUERY &&
-        props.queryType == null
-      ) {
-        throw new UserError(
-          `'${queryType
-          }' query type is not supported by the client.` +
-          'Please update the client.'
-        );
-      }
 
       if (props.queryType === 'multi') {
         res({
@@ -1980,7 +1980,18 @@ class ApiGateway {
   }
 
   protected resToResultFn(res: ExpressResponse) {
-    return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
+    return (message, { status }: { status?: number } = {}) => {
+      if (status) {
+        res.status(status);
+      }
+
+      if (message instanceof ArrayBuffer) {
+        res.set('Content-Type', 'application/json');
+        res.send(message);
+      }
+
+      res.json(message);
+    };
   }
 
   protected parseQueryParam(query): Query | Query[] {
