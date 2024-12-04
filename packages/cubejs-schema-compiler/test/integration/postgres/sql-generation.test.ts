@@ -976,7 +976,7 @@ describe('SQL Generation', () => {
 
     console.log(query.buildSqlAndParams());
 
-    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+    return dbRunner.testQuery(query.buildSqlAndParamsTest()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [{ visitor_checkins__revenue_per_checkin: '50' }]
@@ -1721,7 +1721,7 @@ describe('SQL Generation', () => {
   ]));
 
   it(
-    'contains filter',
+    'contains filter 1',
     () => runQueryTest({
       measures: [],
       dimensions: [

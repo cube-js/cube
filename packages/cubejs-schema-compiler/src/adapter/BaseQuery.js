@@ -1036,8 +1036,10 @@ export class BaseQuery {
       R.uniq,
       R.map(m => this.newMeasure(m))
     );
+    console.log("!!!! meas hierarchy", measureToHierarchy);
 
     const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
+    console.log("!!! mul meas", multipliedMeasures);
     const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
 
     const cumulativeMeasures =
@@ -1775,6 +1777,7 @@ export class BaseQuery {
     return measures.map(measure => {
       const cubes = this.collectFrom([measure], this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
       const joinHints = this.collectFrom([measure], this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      console.log("!!! cubes: ", cubes, " ", joinHints);
       if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
         const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
@@ -2481,6 +2484,7 @@ export class BaseQuery {
         fn,
         renderContext
       );
+      console.log("!!!!! renderContext.measuresToRender.length ", renderContext.measuresToRender.length);
       return renderContext.measuresToRender.length ?
         R.uniq(renderContext.measuresToRender) :
         [renderContext.rootMeasure.value];
@@ -3288,6 +3292,7 @@ export class BaseQuery {
         gte: '{{ column }} >= {{ param }}',
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
+        like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
         always_true: '1 == 1'
 
       },

@@ -381,13 +381,14 @@ impl QueryProperties {
     }
 
     pub fn is_simple_query(&self) -> Result<bool, CubeError> {
-        for member in self.all_members(false) {
-            match self.get_symbol_aggregate_type(&member.member_evaluator())? {
-                SymbolAggregateType::Regular => {}
-                _ => return Ok(false),
-            }
+        let full_aggregate_measure = self.full_key_aggregate_measures()?;
+        if full_aggregate_measure.multiplied_measures.is_empty()
+            && full_aggregate_measure.multi_stage_measures.is_empty()
+        {
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(true)
     }
 
     pub fn should_use_time_series(&self) -> Result<bool, CubeError> {
@@ -403,33 +404,23 @@ impl QueryProperties {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.measures();
         for m in measures.iter() {
-            match self.get_symbol_aggregate_type(m.member_evaluator())? {
-                SymbolAggregateType::Regular => result.regular_measures.push(m.clone()),
-                SymbolAggregateType::Multiplied => result.multiplied_measures.push(m.clone()),
-                SymbolAggregateType::MultiStage => result.multi_stage_measures.push(m.clone()),
+            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
+                result.multi_stage_measures.push(m.clone())
+            } else {
+                for item in
+                    collect_multiplied_measures(self.query_tools.clone(), m.member_evaluator())?
+                {
+                    if item.multiplied {
+                        println!("!!!! multiplied measure: {:?}", item.measure.full_name());
+                        result.multiplied_measures.push(item.measure.clone());
+                    } else {
+                        println!("!!!! regular measure: {:?}", item.measure.full_name());
+                        result.regular_measures.push(item.measure.clone());
+                    }
+                }
             }
         }
 
         Ok(result)
-    }
-
-    fn get_symbol_aggregate_type(
-        &self,
-        symbol: &Rc<EvaluationNode>,
-    ) -> Result<SymbolAggregateType, CubeError> {
-        let symbol_type = if has_multi_stage_members(symbol, self.ignore_cumulative)? {
-            SymbolAggregateType::MultiStage
-        } else if let Some(multiple) =
-            collect_multiplied_measures(self.query_tools.clone(), symbol)?
-        {
-            if multiple.multiplied {
-                SymbolAggregateType::Multiplied
-            } else {
-                SymbolAggregateType::Regular
-            }
-        } else {
-            SymbolAggregateType::Regular
-        };
-        Ok(symbol_type)
     }
 }

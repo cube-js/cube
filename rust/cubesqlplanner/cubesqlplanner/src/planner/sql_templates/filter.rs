@@ -1,7 +1,7 @@
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use cubenativeutils::CubeError;
 use minijinja::context;
-use std::rc::Rc;
+use std::{ptr::null, rc::Rc};
 
 #[derive(Clone)]
 pub struct FilterTemplates {
@@ -182,11 +182,37 @@ impl FilterTemplates {
         )
     }
 
-    fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {
+    pub fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {
         if need {
             self.or_is_null_check(column.clone())
         } else {
             Ok(String::default())
         }
+    }
+
+    pub fn ilike(
+        &self,
+        column: &str,
+        value: &str,
+        start_wild: bool,
+        end_wild: bool,
+        not: bool,
+    ) -> Result<String, CubeError> {
+        let pattern = self.render.render_template(
+            &"filters/like_pattern",
+            context! {
+                start_wild => start_wild,
+                value => value,
+                end_wild => end_wild
+            },
+        )?;
+        self.render.render_template(
+            &"expressions/ilike",
+            context! {
+                expr => column.clone(),
+                negated => not,
+                pattern => pattern
+            },
+        )
     }
 }

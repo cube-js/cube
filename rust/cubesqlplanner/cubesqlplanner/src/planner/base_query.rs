@@ -60,6 +60,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
     fn build_sql_and_params_impl(&self) -> Result<Select, CubeError> {
         if self.request.is_simple_query()? {
+            println!("!!!! IS SIMPLE");
             let planner = SimpleQueryPlanner::new(
                 self.query_tools.clone(),
                 self.request.clone(),
