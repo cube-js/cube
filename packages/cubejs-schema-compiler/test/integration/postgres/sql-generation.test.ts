@@ -666,7 +666,7 @@ describe('SQL Generation', () => {
     console.log(query.buildSqlAndParams());
 
     // TODO ordering doesn't work for running total
-    return dbRunner.testQuery(query.buildSqlAndParamsTest()).then(res => {
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [{
@@ -915,7 +915,6 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__running_revenue_per_count: '300' }
   ]));
-
 
   it('hll rolling (BigQuery)', async () => {
     await compiler.compile();

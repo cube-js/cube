@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv, timeSeries } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv, timeSeries as timeSeriesBase } from '@cubejs-backend/shared';
 
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
@@ -576,29 +576,6 @@ export class BaseQuery {
     return false;
   }
 
-  buildSqlAndParamsTest(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-      if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
-      }
-    }
-    const js_res = this.compilers.compiler.withQuery(
-      this,
-      () => this.cacheValue(
-        ['buildSqlAndParams', exportAnnotatedSql],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql(),
-          exportAnnotatedSql,
-          this.shouldReuseParams
-        ),
-        { cache: this.queryCache }
-      )
-    );
-    const rust = this.buildSqlAndParamsRust(exportAnnotatedSql);
-    console.log('js result: ', js_res[0]);
-    console.log('rust result: ', rust[0]);
-    return js_res;
-  }
   /**
    * Returns a pair of SQL query string and parameter values for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
@@ -651,10 +628,11 @@ export class BaseQuery {
     return res;
   }
 
-  //FIXME helper for native generator, maybe should be moved entire to rust
+  // FIXME helper for native generator, maybe should be moved entire to rust
   generateTimeSeries(granularity, dateRange) {
-      return timeSeries(granularity, dateRange);
+    return timeSeriesBase(granularity, dateRange);
   }
+
   get shouldReuseParams() {
     return false;
   }
@@ -1418,7 +1396,6 @@ export class BaseQuery {
           `'${d.dateToFormatted()}'`
         )
       ).join(' AND ');
-
 
     return this.overTimeSeriesSelect(
       cumulativeMeasures,
