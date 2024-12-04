@@ -9,7 +9,7 @@ use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableP
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
-    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
+    aggregate_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
