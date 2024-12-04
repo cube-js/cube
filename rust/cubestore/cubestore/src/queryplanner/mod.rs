@@ -21,7 +21,6 @@ mod flatten_union;
 pub mod info_schema;
 mod merge_sort;
 pub mod metadata_cache;
-pub mod now;
 pub mod providers;
 #[cfg(test)]
 mod test_utils;
@@ -41,7 +40,6 @@ use crate::queryplanner::info_schema::{
     SystemReplayHandlesTableDef, SystemSnapshotsTableDef, SystemTablesTableDef,
     TablesInfoSchemaTableDef,
 };
-// use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{
     batches_to_dataframe, ClusterSendExec, InlineTableProvider,
@@ -253,7 +251,6 @@ impl QueryPlannerImpl {
         // TODO upgrade DF
         // context
         // .with_metadata_cache_factory(self.metadata_cache_factory.clone())
-        // .add_optimizer_rule(Arc::new(MaterializeNow {}));
         Ok(Arc::new(context))
     }
 }
@@ -492,7 +489,6 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let kind = match name {
             "cardinality" | "CARDINALITY" => CubeScalarUDFKind::HllCardinality,
             // "coalesce" | "COALESCE" => CubeScalarUDFKind::Coalesce,
-            // "now" | "NOW" => CubeScalarUDFKind::Now,
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
             "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
@@ -977,6 +973,7 @@ pub mod tests {
         let plan = initial_plan("SELECT * FROM system.cache", get_test_execution_ctx());
         assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
 
+        // NOW is no longer a UDF.
         let plan = initial_plan("SELECT NOW()", get_test_execution_ctx());
         assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
     }
