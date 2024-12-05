@@ -1,26 +1,27 @@
 use crate::planner::sql_evaluator::{
     EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor,
 };
-use crate::planner::BaseMeasure;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-pub struct JoinHintsCollector {
-    hints: Vec<String>,
+pub struct CubeNamesCollector {
+    names: HashSet<String>,
 }
 
-impl JoinHintsCollector {
+impl CubeNamesCollector {
     pub fn new() -> Self {
-        Self { hints: Vec::new() }
+        Self {
+            names: HashSet::new(),
+        }
     }
 
     pub fn extract_result(self) -> Vec<String> {
-        self.hints
+        self.names.into_iter().collect()
     }
 }
 
-impl TraversalVisitor for JoinHintsCollector {
+impl TraversalVisitor for CubeNamesCollector {
     type State = ();
     fn on_node_traverse(
         &mut self,
@@ -30,7 +31,7 @@ impl TraversalVisitor for JoinHintsCollector {
         match node.symbol() {
             MemberSymbolType::Dimension(e) => {
                 if e.owned_by_cube() {
-                    self.hints.push(e.cube_name().clone());
+                    self.names.insert(e.cube_name().clone());
                 }
             }
             MemberSymbolType::Measure(e) => {
@@ -41,14 +42,14 @@ impl TraversalVisitor for JoinHintsCollector {
                     self.apply(order_by.evaluation_node(), &())?
                 }
                 if e.owned_by_cube() {
-                    self.hints.push(e.cube_name().clone());
+                    self.names.insert(e.cube_name().clone());
                 }
             }
             MemberSymbolType::CubeName(e) => {
-                self.hints.push(e.cube_name().clone());
+                self.names.insert(e.cube_name().clone());
             }
             MemberSymbolType::CubeTable(e) => {
-                self.hints.push(e.cube_name().clone());
+                self.names.insert(e.cube_name().clone());
             }
             _ => {}
         };
@@ -56,18 +57,8 @@ impl TraversalVisitor for JoinHintsCollector {
     }
 }
 
-pub fn collect_join_hints(node: &Rc<EvaluationNode>) -> Result<Vec<String>, CubeError> {
-    let mut visitor = JoinHintsCollector::new();
+pub fn collect_cube_names(node: &Rc<EvaluationNode>) -> Result<Vec<String>, CubeError> {
+    let mut visitor = CubeNamesCollector::new();
     visitor.apply(node, &())?;
-    Ok(visitor.extract_result())
-}
-
-pub fn collect_join_hints_for_measures(
-    measures: &Vec<Rc<BaseMeasure>>,
-) -> Result<Vec<String>, CubeError> {
-    let mut visitor = JoinHintsCollector::new();
-    for meas in measures.iter() {
-        visitor.apply(&meas.member_evaluator(), &())?;
-    }
     Ok(visitor.extract_result())
 }

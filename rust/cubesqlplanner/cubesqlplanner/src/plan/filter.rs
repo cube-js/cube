@@ -63,13 +63,16 @@ impl FilterItem {
                     .items
                     .iter()
                     .map(|itm| itm.to_sql(templates, context.clone(), schema.clone()))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let result = if items_sql.is_empty() {
-                    templates.always_true()?
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .filter(|itm| !itm.is_empty())
+                    .collect::<Vec<_>>();
+                if items_sql.is_empty() {
+                    "".to_string()
                 } else {
-                    items_sql.join(&operator)
-                };
-                format!("({})", result)
+                    let result = items_sql.join(&operator);
+                    format!("({})", result)
+                }
             }
             FilterItem::Item(item) => {
                 let sql = item.to_sql(context.clone(), schema)?;

@@ -43,4 +43,5 @@ pub trait BaseTools {
         granularity: String,
         date_range: Vec<String>,
     ) -> Result<Vec<Vec<String>>, CubeError>;
+    fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
 }

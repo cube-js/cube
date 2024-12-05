@@ -403,13 +403,12 @@ impl BaseFilter {
     }
 
     fn allocate_param(&self, param: &str) -> String {
-        let index = self.query_tools.allocaate_param(param);
-        format!("${}$", index)
+        self.query_tools.allocate_param(param)
     }
 
     fn allocate_timestamp_param(&self, param: &str) -> String {
-        let index = self.query_tools.allocaate_param(param);
-        format!("${}$::timestamptz", index)
+        let placeholder = self.query_tools.allocate_param(param);
+        format!("{}::timestamptz", placeholder)
     }
 
     fn first_param(&self) -> Result<String, CubeError> {

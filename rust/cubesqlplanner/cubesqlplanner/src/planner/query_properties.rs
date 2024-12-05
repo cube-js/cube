@@ -68,6 +68,7 @@ pub struct QueryProperties {
     offset: Option<usize>,
     query_tools: Rc<QueryTools>,
     ignore_cumulative: bool,
+    ungrouped: bool,
 }
 
 impl QueryProperties {
@@ -161,6 +162,7 @@ impl QueryProperties {
         } else {
             None
         };
+        let ungrouped = options.static_data().ungrouped.unwrap_or(false);
 
         Ok(Rc::new(Self {
             measures,
@@ -174,6 +176,7 @@ impl QueryProperties {
             offset,
             query_tools,
             ignore_cumulative: false,
+            ungrouped,
         }))
     }
 
@@ -189,6 +192,7 @@ impl QueryProperties {
         row_limit: Option<usize>,
         offset: Option<usize>,
         ignore_cumulative: bool,
+        ungrouped: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -208,6 +212,7 @@ impl QueryProperties {
             offset,
             query_tools,
             ignore_cumulative,
+            ungrouped,
         }))
     }
 
@@ -250,6 +255,10 @@ impl QueryProperties {
     pub fn set_order_by_to_default(&mut self) {
         self.order_by =
             Self::default_order(&self.dimensions, &self.time_dimensions, &self.measures);
+    }
+
+    pub fn ungrouped(&self) -> bool {
+        self.ungrouped
     }
 
     pub fn all_filters(&self) -> Option<Filter> {
@@ -326,15 +335,19 @@ impl QueryProperties {
     }
 
     pub fn group_by(&self) -> Vec<Expr> {
-        self.dimensions
-            .iter()
-            .map(|f| Expr::Member(MemberExpression::new(f.clone(), None)))
-            .chain(
-                self.time_dimensions
-                    .iter()
-                    .map(|f| Expr::Member(MemberExpression::new(f.clone(), None))),
-            )
-            .collect()
+        if self.ungrouped {
+            vec![]
+        } else {
+            self.dimensions
+                .iter()
+                .map(|f| Expr::Member(MemberExpression::new(f.clone(), None)))
+                .chain(
+                    self.time_dimensions
+                        .iter()
+                        .map(|f| Expr::Member(MemberExpression::new(f.clone(), None))),
+                )
+                .collect()
+        }
     }
 
     pub fn default_order(
@@ -411,10 +424,8 @@ impl QueryProperties {
                     collect_multiplied_measures(self.query_tools.clone(), m.member_evaluator())?
                 {
                     if item.multiplied {
-                        println!("!!!! multiplied measure: {:?}", item.measure.full_name());
                         result.multiplied_measures.push(item.measure.clone());
                     } else {
-                        println!("!!!! regular measure: {:?}", item.measure.full_name());
                         result.regular_measures.push(item.measure.clone());
                     }
                 }

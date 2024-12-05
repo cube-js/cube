@@ -115,7 +115,7 @@ impl Compiler {
     pub fn join_hints(&self) -> Result<Vec<String>, CubeError> {
         let mut collector = JoinHintsCollector::new();
         for member in self.members.values() {
-            collector.apply(member)?;
+            collector.apply(member, &())?;
         }
         Ok(collector.extract_result())
     }

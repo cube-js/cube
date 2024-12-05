@@ -59,24 +59,29 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<Select, CubeError> {
+        let nodes_factory = if self.request.ungrouped() {
+            SqlNodesFactory::new_ungroupped()
+        } else {
+            SqlNodesFactory::new()
+        };
+
         if self.request.is_simple_query()? {
-            println!("!!!! IS SIMPLE");
             let planner = SimpleQueryPlanner::new(
                 self.query_tools.clone(),
                 self.request.clone(),
-                SqlNodesFactory::new(),
+                nodes_factory.clone(),
             );
             planner.plan()
         } else {
             let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::new(
                 self.query_tools.clone(),
                 self.request.clone(),
-                SqlNodesFactory::new(),
+                nodes_factory.clone(),
             );
             let multi_stage_query_planner =
                 MultiStageQueryPlanner::new(self.query_tools.clone(), self.request.clone());
             let full_key_aggregate_planner =
-                FullKeyAggregateQueryPlanner::new(self.request.clone(), SqlNodesFactory::new());
+                FullKeyAggregateQueryPlanner::new(self.request.clone(), nodes_factory.clone());
             let mut subqueries = multiplied_measures_query_planner.plan_queries()?;
             let (multi_stage_ctes, multi_stage_subqueries) =
                 multi_stage_query_planner.plan_queries()?;

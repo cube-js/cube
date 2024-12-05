@@ -19,7 +19,12 @@ impl HasCumulativeMembersCollector {
 }
 
 impl TraversalVisitor for HasCumulativeMembersCollector {
-    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
+    type State = ();
+    fn on_node_traverse(
+        &mut self,
+        node: &Rc<EvaluationNode>,
+        state: &Self::State,
+    ) -> Result<Option<Self::State>, CubeError> {
         match node.symbol() {
             MemberSymbolType::Measure(s) => {
                 if s.is_rolling_window() {
@@ -28,12 +33,16 @@ impl TraversalVisitor for HasCumulativeMembersCollector {
             }
             _ => {}
         };
-        Ok(!self.has_cumulative_members)
+        if self.has_cumulative_members {
+            Ok(None)
+        } else {
+            Ok(Some(()))
+        }
     }
 }
 
 pub fn has_cumulative_members(node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
     let mut visitor = HasCumulativeMembersCollector::new();
-    visitor.apply(node)?;
+    visitor.apply(node, &())?;
     Ok(visitor.extract_result())
 }

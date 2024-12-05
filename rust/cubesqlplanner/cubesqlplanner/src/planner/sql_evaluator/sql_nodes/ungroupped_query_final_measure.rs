@@ -1,5 +1,4 @@
 use super::SqlNode;
-use crate::cube_bridge::memeber_sql::MemberSqlArg;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
@@ -7,11 +6,11 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
 
-pub struct FinalMeasureSqlNode {
+pub struct UngroupedQueryFinalMeasureSqlNode {
     input: Rc<dyn SqlNode>,
 }
 
-impl FinalMeasureSqlNode {
+impl UngroupedQueryFinalMeasureSqlNode {
     pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self { input })
     }
@@ -21,7 +20,7 @@ impl FinalMeasureSqlNode {
     }
 }
 
-impl SqlNode for FinalMeasureSqlNode {
+impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
     fn to_sql(
         &self,
         visitor: &mut SqlEvaluatorVisitor,
@@ -31,33 +30,24 @@ impl SqlNode for FinalMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.symbol() {
             MemberSymbolType::Measure(ev) => {
-                let input = if ev.is_splitted_source() {
-                    let args = visitor.evaluate_deps(node, node_processor.clone())?;
-                    //FIXME hack for working with
-                    //measures like rolling window
-                    if !args.is_empty() {
-                        match &args[0] {
-                            MemberSqlArg::String(s) => s.clone(),
-                            _ => "".to_string(),
-                        }
+                let input = self.input.to_sql(
+                    visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                )?;
+
+                if input == "*" {
+                    "1".to_string()
+                } else {
+                    if ev.measure_type() == "count"
+                        || ev.measure_type() == "countDistinct"
+                        || ev.measure_type() == "countDistinctApprox"
+                    {
+                        format!("CASE WHEN ({}) IS NOT NULL THEN 1 END", input) //TODO templates!!
                     } else {
-                        "".to_string()
+                        input
                     }
-                } else {
-                    self.input
-                        .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?
-                };
-
-                if ev.is_calculated() {
-                    input
-                } else {
-                    let measure_type = if ev.measure_type() == "runningTotal" {
-                        "sum"
-                    } else {
-                        &ev.measure_type()
-                    };
-
-                    format!("{}({})", measure_type, input)
                 }
             }
             _ => {
