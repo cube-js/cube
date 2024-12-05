@@ -43,7 +43,10 @@
     "access": "public"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": [
+      "./test/test-env.js"
+    ]
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

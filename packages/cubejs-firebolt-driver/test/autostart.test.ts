@@ -1,4 +1,4 @@
-import {assertDataSource, getEnv} from '@cubejs-backend/shared';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { DriverTests } from '@cubejs-backend/testing-shared';
 
 import { Firebolt } from 'firebolt-sdk';
