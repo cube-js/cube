@@ -23,7 +23,7 @@
     "watch": "tsc -w",
     "test": "yarn integration",
     "integration": "npm run integration:firebolt",
-    "integration:firebolt": "jest --verbose dist/test",
+    "integration:firebolt": "jest --verbose dist/test --runInBand",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
