@@ -29,12 +29,14 @@ query {
 - **`where` ([`RootWhereInput`](#root-where-input)):** Represents a SQL `WHERE` clause.
 - **`limit` (`Int`):** A [row limit][ref-row-limit] for your query.
 - **`offset` (`Int`):** The number of initial rows to be skipped for your query. The default value is `0`.
+- **`total` (`Boolean`):**  If set to true, Cube will run a total query and return the total number of rows as if no row limit or offset are set in the query. The default value is false.
 - **`timezone` (`String`):** The [time zone][ref-time-zone] for your query. You can set the
 desired time zone in the [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database)
 format, e.g., `America/Los_Angeles`.
 - **`renewQuery` (`Boolean`):** If `renewQuery` is set to `true`, Cube will renew all `refreshKey` for queries and query results in the foreground. The default value is `false`.
 - **`ungrouped` (`Boolean`):** If set to `true`, Cube will run an
 [ungrouped query][ref-ungrouped-query].
+- **`meta` (`Boolean`):** If set to `true`, Cube will return metadata about the query.
 
 [ref-recipe-pagination]: /guides/recipes/queries/pagination
 
