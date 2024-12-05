@@ -106,7 +106,14 @@ export class CubeToMetaTransformer {
           })),
           R.toPairs
         )(cube.segments || {}),
-        hierarchies: cube.hierarchies || []
+        hierarchies: (cube.hierarchies || []).map((it) => ({
+          ...it,
+          name: `${cube.name}.${it.name}`,
+        })),
+        folders: (cube.folders || []).map((it) => ({
+          name: it.name,
+          members: it.includes.map(member => `${cube.name}.${member.name}`),
+        })),
       },
     };
   }
