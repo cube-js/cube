@@ -1,0 +1,62 @@
+cubes:
+  - name: a
+    sql_table: a
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: shared_id
+        sql: shared_id
+        type: number
+    measures:
+      - name: count
+        type: count
+  - name: d
+    sql_table: d
+    joins:      
+      - name: a
+        sql: "{d}.id = {a}.shared_id"
+        # test with one_to_one
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+      - name: shared_id
+        sql: shared_id
+        type: number
+    measures:
+      - name: count
+        type: count
+###
+  - name: s1
+    sql_table: s1
+    joins:
+      - name: d
+        sql: "{s1}.id = {d.shared_id}"
+        # relationship: one_to_many
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: sp
+    cubes:
+      - join_path: a
+        includes: "*"
+        prefix: true
+
+      - join_path: s1
+        includes: "*"
+        split: true

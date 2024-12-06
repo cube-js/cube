@@ -266,11 +266,15 @@ export class CubeSymbols {
    * @protected
    */
   membersFromCubes(parentCube, cubes, type, errorReporter, splitViews) {
-    return R.unnest(cubes.map(cubeInclude => {
+    let hasSplitViews = false;
+    
+    const members = R.unnest(cubes.map((cubeInclude) => {
       const fullPath = this.evaluateReferences(null, cubeInclude.joinPath, { collectJoinHints: true });
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
+      
+      cubeInclude.fullPath = fullPath;
 
       let includes;
       const fullMemberName = (memberName) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);
@@ -315,6 +319,8 @@ export class CubeSymbols {
 
       const finalIncludes = this.diffByMember(includes.filter(Boolean), excludes.filter(Boolean));
 
+      hasSplitViews = hasSplitViews || cubeInclude.split;
+      
       if (cubeInclude.split) {
         const viewName = `${parentCube.name}_${cubeName}`;
         let splitViewDef = splitViews[viewName];
@@ -322,6 +328,8 @@ export class CubeSymbols {
           splitViews[viewName] = this.createCube({
             name: viewName,
             isView: true,
+            splitId: parentCube.name,
+            fullPath,
             // TODO might worth adding to validation as it goes around it right now
             isSplitView: true,
           });
@@ -336,6 +344,12 @@ export class CubeSymbols {
         return finalIncludes;
       }
     }));
+    
+    if (hasSplitViews) {
+      parentCube.splitId = parentCube.name;
+    }
+    
+    return members;
   }
 
   diffByMember(includes, excludes) {

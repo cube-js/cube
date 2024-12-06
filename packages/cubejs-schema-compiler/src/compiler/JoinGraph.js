@@ -96,6 +96,19 @@ export class JoinGraph {
   }
 
   buildJoin(cubesToJoin) {
+    if (!Array.isArray(cubesToJoin)) {
+      throw new Error('`cubesToJoin` must be an array');
+    }
+
+    cubesToJoin = cubesToJoin.map((joinPath) => {
+      const res = joinPath.split('.');
+      if (res.length === 1) {
+        return res[0];
+      }
+
+      return res;
+    });
+
     if (!cubesToJoin.length) {
       return null;
     }
@@ -111,6 +124,7 @@ export class JoinGraph {
       if (!join) {
         throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
       }
+      
       this.builtJoins[key] = Object.assign(join, {
         multiplicationFactor: R.compose(
           R.fromPairs,
