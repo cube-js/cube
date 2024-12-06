@@ -12,6 +12,8 @@ const dateTimeLocalURegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d\d\d\d$/;
 const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 export class BaseFilter extends BaseDimension {
+  public static readonly ALWAYS_TRUE: string = '1 = 1';
+
   public readonly measure: any;
 
   public readonly operator: any;
@@ -323,36 +325,57 @@ export class BaseFilter extends BaseDimension {
 
   public inDateRangeWhere(column) {
     const [from, to] = this.allocateTimestampParams();
+    if (!from || !to) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
     return this.query.timeRangeFilter(column, from, to);
   }
 
   public notInDateRangeWhere(column) {
     const [from, to] = this.allocateTimestampParams();
+    if (!from || !to) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
     return this.query.timeNotInRangeFilter(column, from, to);
   }
 
   public onTheDateWhere(column) {
     const [from, to] = this.allocateTimestampParams();
+    if (!from || !to) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
     return this.query.timeRangeFilter(column, from, to);
   }
 
   public beforeDateWhere(column) {
     const [before] = this.allocateTimestampParams();
+    if (!before) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
     return this.query.beforeDateFilter(column, before);
   }
 
   public beforeOrOnDateWhere(column) {
     const [before] = this.allocateTimestampParams();
+    if (!before) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
     return this.query.beforeOrOnDateFilter(column, before);
   }
 
   public afterDateWhere(column) {
     const [after] = this.allocateTimestampParams();
+    if (!after) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
     return this.query.afterDateFilter(column, after);
   }
 
   public afterOrOnDateWhere(column) {
     const [after] = this.allocateTimestampParams();
+    if (!after) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
     return this.query.afterOrOnDateFilter(column, after);
   }
 
