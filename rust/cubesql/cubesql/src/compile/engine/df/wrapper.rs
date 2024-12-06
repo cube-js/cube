@@ -19,11 +19,11 @@ use crate::{
     CubeError,
 };
 use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
-use cubeclient::models::V1LoadRequestQuery;
+use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet, JoinType,
         LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
@@ -45,8 +45,18 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
+pub struct JoinSubquery {
+    alias: String,
+    sql: String,
+    condition: Expr,
+    join_type: JoinType,
+}
+
 pub struct PushToCubeContext<'l> {
     ungrouped_scan_node: &'l CubeScanNode,
+    // Known join subquery qualifiers, to generate proper column expressions
+    known_join_subqueries: HashSet<String>,
+    join_subqueries: Vec<JoinSubquery>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -341,6 +351,10 @@ impl ColumnRemapping {
             &self.column_remapping.iter().map(|(k, v)| (k, v)).collect(),
         )
         .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
+    }
+
+    pub fn extend(&mut self, other: ColumnRemapping) {
+        self.column_remapping.extend(other.column_remapping);
     }
 }
 
@@ -845,7 +859,7 @@ impl CubeScanWrapperNode {
                         aggr_expr,
                         window_expr,
                         from,
-                        joins: _joins,
+                        joins,
                         filter_expr,
                         having_expr: _having_expr,
                         limit,
@@ -856,8 +870,8 @@ impl CubeScanWrapperNode {
                         push_to_cube,
                     }) = wrapped_select_node
                     {
-                        // TODO support joins
-                        let push_to_cube_context = if push_to_cube {
+                        // TODO support ungrouped joins
+                        let ungrouped_scan_node = if push_to_cube {
                             if let LogicalPlan::Extension(Extension { node }) = from.as_ref() {
                                 if let Some(cube_scan_node) =
                                     node.as_any().downcast_ref::<CubeScanNode>()
@@ -867,9 +881,7 @@ impl CubeScanWrapperNode {
                                             "Expected ungrouped CubeScan node but found: {cube_scan_node:?}"
                                         )));
                                     }
-                                    Some(PushToCubeContext {
-                                        ungrouped_scan_node: cube_scan_node,
-                                    })
+                                    Some(cube_scan_node)
                                 } else {
                                     return Err(CubeError::internal(format!(
                                         "Expected CubeScan node but found: {:?}",
@@ -886,16 +898,13 @@ impl CubeScanWrapperNode {
                             None
                         };
 
-                        let push_to_cube_context = push_to_cube_context.as_ref();
-
                         let SqlGenerationResult {
                             data_source,
                             from_alias,
-                            column_remapping,
+                            mut column_remapping,
                             mut sql,
                             request,
-                        } = if let Some(push_to_cube_context) = push_to_cube_context {
-                            let ungrouped_scan_node = push_to_cube_context.ungrouped_scan_node;
+                        } = if let Some(ungrouped_scan_node) = &ungrouped_scan_node {
                             let data_sources = ungrouped_scan_node
                                 .used_cubes
                                 .iter()
@@ -940,8 +949,6 @@ impl CubeScanWrapperNode {
                             .await?
                         };
 
-                        let column_remapping = column_remapping.as_ref();
-
                         let mut subqueries_sql = HashMap::new();
                         for subquery in subqueries.iter() {
                             let SqlGenerationResult {
@@ -963,12 +970,123 @@ impl CubeScanWrapperNode {
 
                             let (sql_string, new_values) = subquery_sql.unpack();
                             sql.extend_values(&new_values);
+                            // TODO why only field 0 is a key?
                             let field = subquery.schema().field(0);
                             subqueries_sql.insert(field.qualified_name(), sql_string);
                         }
                         let subqueries_sql = Arc::new(subqueries_sql);
                         let alias = alias.or(from_alias.clone());
                         let mut next_remapper = Remapper::new(alias.clone(), can_rename_columns);
+
+                        let push_to_cube_context = if let Some(ungrouped_scan_node) =
+                            ungrouped_scan_node
+                        {
+                            let mut join_subqueries = vec![];
+                            let mut known_join_subqueries = HashSet::new();
+                            for (lp, cond, join_type) in joins {
+                                match lp.as_ref() {
+                                    LogicalPlan::Extension(Extension { node }) => {
+                                        if let Some(join_cube_scan) =
+                                            node.as_any().downcast_ref::<CubeScanNode>()
+                                        {
+                                            if join_cube_scan.request.ungrouped == Some(true) {
+                                                return Err(CubeError::internal(format!(
+                                                    "Unsupported ungrouped CubeScan as join subquery: {join_cube_scan:?}"
+                                                )));
+                                            }
+                                        } else {
+                                            // TODO support more grouped cases here
+                                            return Err(CubeError::internal(format!(
+                                                "Unsupported unknown extension as join subquery: {node:?}"
+                                            )));
+                                        }
+                                    }
+                                    _ => {
+                                        // TODO support more grouped cases here
+                                        return Err(CubeError::internal(format!(
+                                            "Unsupported logical plan node as join subquery: {lp:?}"
+                                        )));
+                                    }
+                                }
+
+                                match join_type {
+                                    JoinType::Inner | JoinType::Left => {
+                                        // Do nothing
+                                    }
+                                    _ => {
+                                        return Err(CubeError::internal(format!(
+                                            "Unsupported join type for join subquery: {join_type:?}"
+                                        )));
+                                    }
+                                }
+
+                                // TODO avoid using direct alias from schema, implement remapping for qualifiers instead
+                                let alias = lp
+                                    .schema()
+                                    .fields()
+                                    .iter()
+                                    .filter_map(|f| f.qualifier())
+                                    .next()
+                                    .ok_or_else(|| {
+                                        CubeError::internal(format!(
+                                            "Alias not found for join subquery {lp:?}"
+                                        ))
+                                    })?;
+
+                                let subq_sql = Self::generate_sql_for_node(
+                                    plan.clone(),
+                                    transport.clone(),
+                                    load_request_meta.clone(),
+                                    lp.clone(),
+                                    true,
+                                    sql.values.clone(),
+                                    data_source.clone(),
+                                )
+                                .await?;
+                                let (subq_sql_string, new_values) = subq_sql.sql.unpack();
+                                sql.extend_values(&new_values);
+                                let subq_alias = subq_sql.from_alias;
+                                // Expect that subq_sql.column_remapping already incorporates subq_alias/
+                                // TODO does it?
+
+                                // TODO expect returned from_alias to be fine, but still need to remap it from original alias somewhere in generate_sql_for_node
+
+                                // grouped join subquery can have its columns remapped, and expressions current node can reference original columns
+                                column_remapping = {
+                                    match (column_remapping, subq_sql.column_remapping) {
+                                        (None, None) => None,
+                                        (None, Some(remapping)) | (Some(remapping), None) => {
+                                            Some(remapping)
+                                        }
+                                        (Some(mut left), Some(right)) => {
+                                            left.extend(right);
+                                            Some(left)
+                                        }
+                                    }
+                                };
+
+                                join_subqueries.push(JoinSubquery {
+                                    // TODO what alias to actually use here? two more-or-less valid options: returned from generate_sql_for_node ot realiased from `alias`. Plain `alias` is incorrect here
+                                    alias: subq_alias.unwrap_or_else(|| alias.clone()),
+                                    sql: subq_sql_string,
+                                    condition: cond.clone(),
+                                    join_type: join_type.clone(),
+                                });
+                                known_join_subqueries.insert(alias.clone());
+                            }
+
+                            Some(PushToCubeContext {
+                                ungrouped_scan_node,
+                                join_subqueries,
+                                known_join_subqueries,
+                            })
+                        } else {
+                            None
+                        };
+                        // Drop mut, turn to ref
+                        let column_remapping = column_remapping.as_ref();
+                        // Turn to ref
+                        let push_to_cube_context = push_to_cube_context.as_ref();
                         if let Some(data_source) = data_source {
                             let generator = plan
                                 .meta
@@ -1064,8 +1182,74 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
-                            if let Some(push_to_cube_context) = push_to_cube_context {
-                                let ungrouped_scan_node = push_to_cube_context.ungrouped_scan_node;
+                            if let Some(PushToCubeContext {
+                                ungrouped_scan_node,
+                                join_subqueries,
+                                known_join_subqueries: _,
+                            }) = push_to_cube_context
+                            {
+                                let mut prepared_join_subqueries = vec![];
+                                for JoinSubquery {
+                                    alias: subq_alias,
+                                    sql: subq_sql,
+                                    condition,
+                                    join_type,
+                                } in join_subqueries
+                                {
+                                    // Need to call generate_column_expr to apply column_remapping
+                                    let (join_condition, new_sql) = Self::generate_column_expr(
+                                        plan.clone(),
+                                        schema.clone(),
+                                        [condition.clone()],
+                                        sql,
+                                        generator.clone(),
+                                        column_remapping,
+                                        &mut next_remapper,
+                                        true,
+                                        push_to_cube_context,
+                                        subqueries_sql.clone(),
+                                    )
+                                    .await?;
+                                    let join_condition = join_condition[0].expr.clone();
+                                    sql = new_sql;
+
+                                    let join_sql_expression = {
+                                        // TODO this is NOT a proper way to generate member expr here
+                                        // TODO Do we even want a full-blown member expression here? or arguments + expr will be enough?
+                                        let res = Self::make_member_def(
+                                            &AliasedColumn {
+                                                expr: join_condition,
+                                                alias: "__join__alias__unused".to_string(),
+                                            },
+                                            &ungrouped_scan_node.used_cubes,
+                                        )?;
+                                        serde_json::json!(res).to_string()
+                                    };
+
+                                    let join_type = match join_type {
+                                        JoinType::Left => generator
+                                            .get_sql_templates()
+                                            .left_join()?,
+                                        JoinType::Inner => generator
+                                            .get_sql_templates()
+                                            .inner_join()?,
+                                        _ => {
+                                            return Err(CubeError::internal(format!(
+                                                "Unsupported join type for join subquery: {join_type:?}"
+                                            )))
+                                        }
+                                    };
+
+                                    // for simple ungrouped-grouped joins everything should already be present in from
+                                    // so we can just attach this join to the end, no need to look for a proper spot
+                                    prepared_join_subqueries.push(V1LoadRequestQueryJoinSubquery {
+                                        sql: subq_sql.clone(),
+                                        on: join_sql_expression,
+                                        join_type,
+                                        alias: subq_alias.clone(),
+                                    });
+                                }
+
                                 let load_request = &ungrouped_scan_node.request;
 
                                 let load_request = V1LoadRequestQuery {
@@ -1198,7 +1382,8 @@ impl CubeScanWrapperNode {
                                     filters: ungrouped_scan_node.request.filters.clone(),
 
                                     time_dimensions: load_request.time_dimensions.clone(),
-                                    subquery_joins: None,
+                                    subquery_joins: (!prepared_join_subqueries.is_empty())
+                                        .then_some(prepared_join_subqueries),
                                 };
 
                                 // TODO time dimensions, filters, segments
@@ -1302,7 +1487,7 @@ impl CubeScanWrapperNode {
     async fn generate_column_expr(
         plan: Arc<Self>,
         schema: DFSchemaRef,
-        exprs: Vec<Expr>,
+        exprs: impl IntoIterator<Item = Expr>,
         mut sql: SqlQuery,
         generator: Arc<dyn SqlGenerator>,
         column_remapping: Option<&ColumnRemapping>,
@@ -1431,7 +1616,7 @@ impl CubeScanWrapperNode {
                     Ok((expr, sql_query))
                 }
                 // Expr::OuterColumn(_, _) => {}
-                Expr::Column(c) => {
+                Expr::Column(ref c) => {
                     if let Some(subquery) = subqueries.get(&c.flat_name()) {
                         Ok((
                             sql_generator
@@ -1447,8 +1632,28 @@ impl CubeScanWrapperNode {
                         ))
                     } else if let Some(PushToCubeContext {
                         ungrouped_scan_node,
+                        join_subqueries: _,
+                        known_join_subqueries,
                     }) = push_to_cube_context
                     {
+                        if let Some(relation) = c.relation.as_ref() {
+                            if known_join_subqueries.contains(relation) {
+                                // SQL API passes fixed aliases to Cube.js for join subqueries
+                                // It means we don't need to use member expressions here, and can just use that fixed alias
+                                // So we can generate that as if it were regular column expression
+
+                                return Self::generate_sql_for_expr(
+                                    plan.clone(),
+                                    sql_query,
+                                    sql_generator.clone(),
+                                    expr,
+                                    None,
+                                    subqueries.clone(),
+                                )
+                                .await;
+                            }
+                        }
+
                         let field_index = ungrouped_scan_node
                             .schema
                             .fields()
