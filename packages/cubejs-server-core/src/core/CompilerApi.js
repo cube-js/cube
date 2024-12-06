@@ -462,6 +462,10 @@ export class CompilerApi {
         for (const segment of cube.config.segments) {
           isMemberVisibleInContext[segment.name] = computeMemberVisibility(segment);
         }
+
+        for (const hierarchy of cube.config.hierarchies) {
+          isMemberVisibleInContext[hierarchy.name] = computeMemberVisibility(hierarchy);
+        }
       }
     }
 
@@ -484,6 +488,7 @@ export class CompilerApi {
           measures: cube.config.measures?.map(visibilityPatcherForCube(cube)),
           dimensions: cube.config.dimensions?.map(visibilityPatcherForCube(cube)),
           segments: cube.config.segments?.map(visibilityPatcherForCube(cube)),
+          hierarchies: cube.config.hierarchies?.map(visibilityPatcherForCube(cube)),
         },
       }));
   }
