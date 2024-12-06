@@ -639,28 +639,6 @@ fn get_alias_to_column(expr: &Vec<Expr>) -> HashMap<String, logical_plan::Column
     alias_to_column
 }
 
-///Try to get original column namse from if underlined projection or aggregates contains columns aliases
-fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
-    fn get_name(exprs: &Vec<Expr>, may_be_alias: &String) -> String {
-        let expr = exprs.iter().find(|&expr| match expr {
-            Expr::Alias(_, name) => name == may_be_alias,
-            _ => false,
-        });
-        if let Some(expr) = expr {
-            if let Some(original_name) = extract_column_name(expr) {
-                return original_name;
-            }
-        }
-        may_be_alias.clone()
-    }
-    match input {
-        LogicalPlan::Projection { expr, .. } => get_name(expr, may_be_alias),
-        LogicalPlan::Filter { input, .. } => get_original_name(may_be_alias, input),
-        LogicalPlan::Aggregate { group_expr, .. } => get_name(group_expr, may_be_alias),
-        _ => may_be_alias.clone(),
-    }
-}
-
 fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<String>, bool) {
     let mut res = Vec::new();
     let mut has_desc = false;
@@ -675,7 +653,6 @@ fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<Str
                 }
                 match expr.as_ref() {
                     Expr::Column(c) => {
-                        // res.push(get_original_name(&c.name, input));
                         res.push(c.name.clone());
                     }
                     _ => {
@@ -820,7 +797,7 @@ impl PlanRewriter for ChooseIndex<'_> {
                 }
             }
             LogicalPlan::Filter { predicate, .. } => {
-                let mut single_filtered = Vec::new();
+                let mut single_filtered: Vec<&datafusion::prelude::Column> = Vec::new();
                 if single_value_filter_columns(predicate, &mut single_filtered) {
                     Some(
                         context.update_single_value_filtered_cols(
