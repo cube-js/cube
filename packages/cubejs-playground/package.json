@@ -57,6 +57,7 @@
     "react-responsive": "^8.0.1",
     "react-router-dom": "^5.1.2",
     "recharts": "^2.12.7",
+    "recursive-readdir": "2.2.3",
     "sql-formatter": "^3.1.0",
     "throttle-debounce": "^3.0.1",
     "uuid": "^8.3.2",
