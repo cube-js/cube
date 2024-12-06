@@ -6,7 +6,7 @@ import { prepareYamlCompiler } from './PrepareCompiler';
 describe('Cube hierarchies', () => {
   it('base cases', async () => {
     const modelContent = fs.readFileSync(
-      path.join(process.cwd(), '/test/unit/fixtures/hierarchies2.yml'),
+      path.join(process.cwd(), '/test/unit/fixtures/hierarchies.yml'),
       'utf8'
     );
     const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
