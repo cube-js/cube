@@ -2539,6 +2539,10 @@ export class BaseQuery {
       return evaluateSql === '*' ? '1' : evaluateSql;
     }
     if (this.ungrouped) {
+      if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
+        evaluateSql = this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative[measurePath];
+      }
+
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
         const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: '1' }]);
         return evaluateSql === '*' ? '1' : sql;
@@ -3801,7 +3805,7 @@ export class BaseQuery {
 
   static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases) {
     if (!filter) {
-      return '1 = 1';
+      return BaseFilter.ALWAYS_TRUE;
     }
 
     if (filter.operator === 'and' || filter.operator === 'or') {
@@ -3826,21 +3830,20 @@ export class BaseQuery {
     if (!filterParamArg) {
       throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
     }
-    if (
-      filterParams && filterParams.length
-    ) {
-      if (typeof filterParamArg.__column() === 'function') {
-        // eslint-disable-next-line prefer-spread
-        return filterParamArg.__column().apply(
-          null,
-          filterParams.map(allocateParam),
-        );
-      } else {
-        return filter.conditionSql(filterParamArg.__column());
-      }
-    } else {
-      return '1 = 1';
+
+    if (typeof filterParamArg.__column() !== 'function') {
+      return filter.conditionSql(filterParamArg.__column());
     }
+
+    if (!filterParams || !filterParams.length) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
+
+    // eslint-disable-next-line prefer-spread
+    return filterParamArg.__column().apply(
+      null,
+      filterParams.map(allocateParam),
+    );
   }
 
   filterGroupFunction() {

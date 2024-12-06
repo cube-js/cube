@@ -12,6 +12,7 @@ use crate::{
         CommandCompletion, CompilationError, DatabaseProtocol, QueryPlan, StatusFlags,
     },
     sql::{
+        compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalBatch, PortalFrom},
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
@@ -238,6 +239,15 @@ impl AsyncPostgresShim {
         shim.partial_write_buf = bytes::BytesMut::new();
         shim.write_admin_shutdown_fatal_message().await?;
         return Ok(());
+    }
+
+    async fn get_cache_entry(&self) -> Result<Arc<CompilerCacheEntry>, CubeError> {
+        self.session
+            .session_manager
+            .server
+            .compiler_cache
+            .get_cache_entry(self.auth_context()?, self.session.state.protocol.clone())
+            .await
     }
 
     pub async fn run_on(
@@ -1058,12 +1068,8 @@ impl AsyncPostgresShim {
                     source_statement.bind(body.to_bind_values(&parameters)?)?;
                 drop(statements_guard);
 
-                let meta = self
-                    .session
-                    .server
-                    .compiler_cache
-                    .meta(self.auth_context()?, self.session.state.protocol.clone())
-                    .await?;
+                let cache_entry = self.get_cache_entry().await?;
+                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
                 let plan = convert_statement_to_cube_query(
                     prepared_statement,
@@ -1171,12 +1177,8 @@ impl AsyncPostgresShim {
                     .map(|param| param.coltype.to_pg_tid())
                     .collect();
 
-                let meta = self
-                    .session
-                    .server
-                    .compiler_cache
-                    .meta(self.auth_context()?, self.session.state.protocol.clone())
-                    .await?;
+                let cache_entry = self.get_cache_entry().await?;
+                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
                 let stmt_replacer = StatementPlaceholderReplacer::new();
                 let hacked_query = stmt_replacer.replace(query.clone())?;
@@ -1794,12 +1796,8 @@ impl AsyncPostgresShim {
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<(), ConnectionError> {
-        let meta = self
-            .session
-            .server
-            .compiler_cache
-            .meta(self.auth_context()?, self.session.state.protocol.clone())
-            .await?;
+        let cache_entry = self.get_cache_entry().await?;
+        let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
         let statements =
             parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL, qtrace)?;

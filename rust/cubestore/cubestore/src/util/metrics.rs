@@ -17,7 +17,6 @@
 use crate::CubeError;
 use std::net::ToSocketAddrs;
 use std::net::UdpSocket;
-use std::sync::Once;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Compatibility {
@@ -189,8 +188,9 @@ impl Sink {
 
 mod global_sink {
     use super::*;
-    static mut GLOBAL_SINK: Option<Sink> = None;
-    static ONCE: Once = Once::new();
+    use std::sync::OnceLock;
+
+    static GLOBAL_SINK: OnceLock<Option<Sink>> = OnceLock::new();
 
     pub fn init(
         bind_addr: impl ToSocketAddrs,
@@ -201,11 +201,9 @@ mod global_sink {
         let s = Sink::connect(bind_addr, server_addr, mode, constant_tags)?;
 
         let mut called = false;
-        ONCE.call_once(|| {
-            unsafe {
-                GLOBAL_SINK = Some(s);
-            }
+        GLOBAL_SINK.get_or_init(|| {
             called = true;
+            Some(s)
         });
         if !called {
             panic!("Metrics initialized twice or used before initialization");
@@ -214,9 +212,7 @@ mod global_sink {
     }
 
     pub(super) fn sink() -> &'static Option<Sink> {
-        // Ensure we synchronize access to GLOBAL_SINK.
-        ONCE.call_once(|| {});
-        unsafe { &GLOBAL_SINK }
+        GLOBAL_SINK.get_or_init(|| None)
     }
 }
 
