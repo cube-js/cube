@@ -92,7 +92,7 @@ Array [
 ]
 `;
 
-exports[`SQL API Postgres (Data) power bi post aggregate measure wrap: power bi post aggregate measure wrap 1`] = `
+exports[`SQL API Postgres (Data) power bi multi stage measure wrap: power bi post aggregate measure wrap 1`] = `
 Array [
   Object {
     "a0": 1,
@@ -107,6 +107,17 @@ Array [
   Object {
     "a0": 2024-01-05T00:00:00.000Z,
     "a1": 2024-01-01T00:00:00.000Z,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) query views with deep joins: query-view-deep-joins 1`] = `
+Array [
+  Object {
+    "Calculation_1055547778125863": 2024-01-01T00:00:00.000Z,
+    "Orders_arpu": null,
+    "Orders_netCollectionCompleted": null,
+    "Orders_refundRate": 0,
   },
 ]
 `;

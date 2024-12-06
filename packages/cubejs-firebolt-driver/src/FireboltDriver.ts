@@ -77,7 +77,8 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       testConnectionTimeout?: number,
     } = {},
   ) {
-    super(config);
+    // Set connection timeout to 2 minutes to allow the engine to start if it's stopped
+    super({ testConnectionTimeout: 120000, ...config });
 
     const dataSource =
       config.dataSource ||
@@ -90,7 +91,8 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: true,
-      apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }),
+      apiEndpoint:
+        getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
       ...config,
       connection: {
         auth,
@@ -121,6 +123,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   private async initConnection() {
     try {
       const connection = await this.firebolt.connect(this.config.connection);
+      await this.ensureEngineRunning();
       return connection;
     } catch (e) {
       this.connection = null;
@@ -169,10 +172,11 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection(): Promise<void> {
     try {
-      await this.query('select 1');
+      const connection = await this.getConnection();
+      await connection.testConnection();
     } catch (error) {
       console.log(error);
-      throw new Error('Unable to connect');
+      throw error;
     }
   }
 

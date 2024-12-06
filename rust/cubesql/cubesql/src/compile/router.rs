@@ -3,7 +3,7 @@ use crate::compile::{
     StatusFlags,
 };
 use sqlparser::ast;
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::SystemTime};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     compile::{
@@ -30,7 +30,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use itertools::Itertools;
-use sqlparser::ast::{escape_single_quote_string, ObjectName};
+use sqlparser::ast::escape_single_quote_string;
 
 #[derive(Clone)]
 pub struct QueryRouter {
@@ -61,53 +61,28 @@ impl QueryRouter {
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
-        let planning_start = SystemTime::now();
-        if let Some(span_id) = span_id.as_ref() {
-            if let Some(auth_context) = self.state.auth_context() {
-                self.session_manager
-                    .server
-                    .transport
-                    .log_load_state(
-                        Some(span_id.clone()),
-                        auth_context,
-                        self.state.get_load_request_meta(),
-                        "SQL API Query Planning".to_string(),
-                        serde_json::json!({
-                            "query": span_id.query_key.clone(),
-                        }),
-                    )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
-            }
-        }
-        let result = self
-            .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-            .await?;
-
-        if let Some(span_id) = span_id.as_ref() {
-            if let Some(auth_context) = self.state.auth_context() {
-                self.session_manager
-                    .server
-                    .transport
-                    .log_load_state(
-                        Some(span_id.clone()),
-                        auth_context,
-                        self.state.get_load_request_meta(),
-                        "SQL API Query Planning Success".to_string(),
-                        serde_json::json!({
-                            "query": span_id.query_key.clone(),
-                            "duration": planning_start.elapsed().unwrap().as_millis() as u64,
-                        }),
-                    )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
-            }
-        }
-
-        return Ok(result);
+        self.create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
+            .await
     }
 
     pub async fn plan(
+        &self,
+        stmt: ast::Statement,
+        qtrace: &mut Option<Qtrace>,
+        span_id: Option<Arc<SpanId>>,
+    ) -> CompilationResult<QueryPlan> {
+        match stmt {
+            ast::Statement::Explain {
+                analyze,
+                statement,
+                verbose,
+                ..
+            } => self.explain_to_plan(statement, verbose, analyze).await,
+            other => self.plan_query(&other, qtrace, span_id).await,
+        }
+    }
+
+    async fn plan_query(
         &self,
         stmt: &ast::Statement,
         qtrace: &mut Option<Qtrace>,
@@ -134,15 +109,6 @@ impl QueryRouter {
             (ast::Statement::ShowVariable { variable }, _) => {
                 self.show_variable_to_plan(variable, span_id.clone()).await
             }
-            (
-                ast::Statement::Explain {
-                    statement,
-                    verbose,
-                    analyze,
-                    ..
-                },
-                _,
-            ) => self.explain_to_plan(&statement, *verbose, *analyze).await,
             (ast::Statement::StartTransaction { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
                 Ok(QueryPlan::MetaOk(
@@ -230,165 +196,92 @@ impl QueryRouter {
         variable: &Vec<ast::Ident>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
-        let name = variable.to_vec()[0].value.clone();
-        if self.state.protocol == DatabaseProtocol::PostgreSQL {
-            let full_variable = variable.iter().map(|v| v.value.to_lowercase()).join("_");
-            let full_variable = match full_variable.as_str() {
-                "transaction_isolation_level" => "transaction_isolation",
-                x => x,
-            };
-            let stmt = if name.eq_ignore_ascii_case("all") {
-                parse_sql_to_statement(
-                    &"SELECT name, setting, short_desc as description FROM pg_catalog.pg_settings"
-                        .to_string(),
-                    self.state.protocol.clone(),
-                    &mut None,
-                )?
-            } else {
-                parse_sql_to_statement(
-                    // TODO: column name might be expected to match variable name
-                    &format!(
-                        "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
-                        escape_single_quote_string(full_variable),
-                    ),
-                    self.state.protocol.clone(),
-                    &mut None,
-                )?
-            };
+        let full_variable = variable.iter().map(|v| v.value.to_lowercase()).join("_");
+        let full_variable = match full_variable.as_str() {
+            "transaction_isolation_level" => "transaction_isolation",
+            x => x,
+        };
 
-            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
-                .await
-        } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
-            Ok(QueryPlan::MetaTabular(
+        let name = variable.to_vec()[0].value.clone();
+        let stmt = if name.eq_ignore_ascii_case("all") {
+            parse_sql_to_statement(
+                &"SELECT name, setting, short_desc as description FROM pg_catalog.pg_settings"
+                    .to_string(),
+                self.state.protocol.clone(),
+                &mut None,
+            )?
+        } else {
+            parse_sql_to_statement(
+                // TODO: column name might be expected to match variable name
+                &format!(
+                    "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
+                    escape_single_quote_string(full_variable),
+                ),
+                self.state.protocol.clone(),
+                &mut None,
+            )?
+        };
+
+        self.create_df_logical_plan(stmt, &mut None, span_id.clone())
+            .await
+    }
+
+    async fn explain_to_plan(
+        &self,
+        statement: Box<ast::Statement>,
+        verbose: bool,
+        analyze: bool,
+    ) -> Result<QueryPlan, CompilationError> {
+        // TODO span_id ?
+        let plan = self.plan_query(&statement, &mut None, None).await?;
+
+        match plan {
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(
                     vec![dataframe::Column::new(
-                        "Database".to_string(),
+                        "Execution Plan".to_string(),
                         ColumnType::String,
                         ColumnFlags::empty(),
                     )],
-                    vec![
-                        dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String(
-                            "information_schema".to_string(),
-                        )]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String(
-                            "mysql".to_string(),
-                        )]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String(
-                            "performance_schema".to_string(),
-                        )]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
-                    ],
+                    vec![dataframe::Row::new(vec![dataframe::TableValue::String(
+                        "This query doesnt have a plan, because it already has values for response"
+                            .to_string(),
+                    )])],
                 )),
-            ))
-        } else if name.eq_ignore_ascii_case("processlist") {
-            let stmt = parse_sql_to_statement(
-                &"SELECT * FROM information_schema.processlist".to_string(),
-                self.state.protocol.clone(),
-                &mut None,
-            )?;
+            )),
+            QueryPlan::DataFusionSelect(plan, context)
+            | QueryPlan::CreateTempTable(plan, context, _, _) => {
+                // EXPLAIN over CREATE TABLE AS shows the SELECT query plan
+                let plan = Arc::new(plan);
+                let schema = LogicalPlan::explain_schema();
+                let schema = schema.to_dfschema_ref().map_err(|err| {
+                    CompilationError::internal(format!(
+                        "Unable to get DF schema for explain plan: {}",
+                        err
+                    ))
+                })?;
 
-            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
-                .await
-        } else if name.eq_ignore_ascii_case("warnings") {
-            Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(
-                    vec![
-                        dataframe::Column::new(
-                            "Level".to_string(),
-                            ColumnType::VarStr,
-                            ColumnFlags::NOT_NULL,
-                        ),
-                        dataframe::Column::new(
-                            "Code".to_string(),
-                            ColumnType::Int32,
-                            ColumnFlags::NOT_NULL | ColumnFlags::UNSIGNED,
-                        ),
-                        dataframe::Column::new(
-                            "Message".to_string(),
-                            ColumnType::VarStr,
-                            ColumnFlags::NOT_NULL,
-                        ),
-                    ],
-                    vec![],
-                )),
-            ))
-        } else {
-            self.create_df_logical_plan(
-                ast::Statement::ShowVariable {
-                    variable: variable.clone(),
-                },
-                &mut None,
-                span_id.clone(),
-            )
-            .await
-        }
-    }
+                let explain_plan = if analyze {
+                    LogicalPlan::Analyze(Analyze {
+                        verbose,
+                        input: plan,
+                        schema,
+                    })
+                } else {
+                    let stringified_plans = vec![plan.to_stringified(PlanType::InitialLogicalPlan)];
 
-    fn explain_to_plan(
-        &self,
-        statement: &Box<ast::Statement>,
-        verbose: bool,
-        analyze: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<QueryPlan, CompilationError>> + Send>> {
-        let self_cloned = self.clone();
+                    LogicalPlan::Explain(Explain {
+                        verbose,
+                        plan,
+                        stringified_plans,
+                        schema,
+                    })
+                };
 
-        let statement = statement.clone();
-        // This Boxing construct here because of recursive call to self.plan()
-        Box::pin(async move {
-            // TODO span_id ?
-            let plan = self_cloned.plan(&statement, &mut None, None).await?;
-
-            match plan {
-                QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
-                    StatusFlags::empty(),
-                    Box::new(dataframe::DataFrame::new(
-                        vec![dataframe::Column::new(
-                            "Execution Plan".to_string(),
-                            ColumnType::String,
-                            ColumnFlags::empty(),
-                        )],
-                        vec![dataframe::Row::new(vec![dataframe::TableValue::String(
-                            "This query doesnt have a plan, because it already has values for response"
-                                .to_string(),
-                        )])],
-                    )),
-                )),
-                QueryPlan::DataFusionSelect(flags, plan, context)
-                | QueryPlan::CreateTempTable(flags, plan, context, _, _) => {
-                    // EXPLAIN over CREATE TABLE AS shows the SELECT query plan
-                    let plan = Arc::new(plan);
-                    let schema = LogicalPlan::explain_schema();
-                    let schema = schema.to_dfschema_ref().map_err(|err| {
-                        CompilationError::internal(format!(
-                            "Unable to get DF schema for explain plan: {}",
-                            err
-                        ))
-                    })?;
-
-                    let explain_plan = if analyze {
-                        LogicalPlan::Analyze(Analyze {
-                            verbose,
-                            input: plan,
-                            schema,
-                        })
-                    } else {
-                        let stringified_plans = vec![plan.to_stringified(PlanType::InitialLogicalPlan)];
-
-                        LogicalPlan::Explain(Explain {
-                            verbose,
-                            plan,
-                            stringified_plans,
-                            schema,
-                        })
-                    };
-
-                    Ok(QueryPlan::DataFusionSelect(flags, explain_plan, context))
-                }
+                Ok(QueryPlan::DataFusionSelect(explain_plan, context))
             }
-        })
+        }
     }
 
     fn set_role_to_plan(
@@ -596,20 +489,20 @@ impl QueryRouter {
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
         let plan = self.select_to_plan(stmt, qtrace, span_id).await?;
-        let QueryPlan::DataFusionSelect(flags, plan, ctx) = plan else {
+        let QueryPlan::DataFusionSelect(plan, ctx) = plan else {
             return Err(CompilationError::internal(
                 "unable to build DataFusion plan from Query".to_string(),
             ));
         };
 
-        let ObjectName(ident_parts) = name;
+        let ast::ObjectName(ident_parts) = name;
         let Some(table_name) = ident_parts.last() else {
             return Err(CompilationError::internal(
                 "table name contains no ident parts".to_string(),
             ));
         };
+
         Ok(QueryPlan::CreateTempTable(
-            flags,
             plan,
             ctx,
             table_name.value.to_string(),
@@ -652,7 +545,7 @@ impl QueryRouter {
                 "DROP TABLE supports dropping only one table at a time".to_string(),
             ));
         }
-        let ObjectName(ident_parts) = names.first().unwrap();
+        let ast::ObjectName(ident_parts) = names.first().unwrap();
         let Some(table_name) = ident_parts.last() else {
             return Err(CompilationError::internal(
                 "table name contains no ident parts".to_string(),
@@ -708,9 +601,11 @@ impl QueryRouter {
         }
 
         let sql_query_engine = SqlQueryEngine::new(self.session_manager.clone());
-        sql_query_engine
+        let (plan, _) = sql_query_engine
             .plan(stmt, qtrace, span_id, self.meta.clone(), self.state.clone())
-            .await
+            .await?;
+
+        Ok(plan)
     }
 }
 
@@ -739,7 +634,7 @@ pub async fn convert_statement_to_cube_query(
     }
 
     let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone());
-    planner.plan(&stmt, qtrace, span_id).await
+    planner.plan(stmt, qtrace, span_id).await
 }
 
 pub async fn convert_sql_to_cube_query(

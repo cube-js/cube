@@ -25,17 +25,32 @@ pub struct PostgresIntegrationTestSuite {
     // connection: tokio_postgres::Connection<Socket, NoTlsStream>,
 }
 
+fn get_env_var(env_name: &'static str) -> Option<String> {
+    if let Ok(value) = env::var(env_name) {
+        // Variable can be defined, but be empty on the CI
+        if value.is_empty() {
+            log::warn!("Environment variable {} is declared, but empty", env_name);
+
+            None
+        } else {
+            Some(value)
+        }
+    } else {
+        None
+    }
+}
+
 impl PostgresIntegrationTestSuite {
     pub(crate) async fn before_all() -> AsyncTestConstructorResult {
         let mut env_defined = false;
 
-        if let Ok(testing_cube_token) = env::var("CUBESQL_TESTING_CUBE_TOKEN".to_string()) {
+        if let Some(testing_cube_token) = get_env_var("CUBESQL_TESTING_CUBE_TOKEN") {
             env::set_var("CUBESQL_CUBE_TOKEN", testing_cube_token);
 
             env_defined = true;
         };
 
-        if let Ok(testing_cube_url) = env::var("CUBESQL_TESTING_CUBE_URL".to_string()) {
+        if let Some(testing_cube_url) = get_env_var("CUBESQL_TESTING_CUBE_URL") {
             env::set_var("CUBESQL_CUBE_URL", testing_cube_url);
         } else {
             env_defined = false;
@@ -1167,7 +1182,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_simple_cursors_close_all().await?;
         self.test_simple_query_prepare().await?;
         self.test_snapshot_execute_query(
-            "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
+            "SELECT COUNT(*) count, status FROM Orders GROUP BY status ORDER BY count DESC"
+                .to_string(),
             None,
             false,
         )

@@ -128,7 +128,7 @@ describe('Yaml Schema Testing', () => {
     }
   });
 
-  it('unammed measure', async () => {
+  it('unnamed measure', async () => {
     const { compiler } = prepareYamlCompiler(
       `cubes:
   - name: Users
@@ -221,5 +221,180 @@ describe('Yaml Schema Testing', () => {
     expect(segments).toBeDefined();
     expect(segments.length).toBeGreaterThan(0);
     expect(segments.find((segment) => segment.name === 'CubeA.sfUsers').description).toBe('SF users segment from createCubeSchema');
+  });
+
+  describe('Custom dimension granularities: ', () => {
+    it('no granularity name', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          dimensions:
+            - name: created_at
+              sql: created_at
+              type: time
+              granularities:
+                - interval: 6 months
+            - name: status
+              sql: status
+              type: string
+          measures:
+            - name: count
+              type: count
+        `
+      );
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('name isn\'t defined for dimension.granularity');
+      }
+    });
+
+    it('incorrect granularity name', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          dimensions:
+            - name: created_at
+              sql: created_at
+              type: time
+              granularities:
+                - name: 6_months
+            - name: status
+              sql: status
+              type: string
+          measures:
+            - name: count
+              type: count
+        `
+      );
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('(dimensions.created_at.granularities.6_months = [object Object]) is not allowed');
+      }
+    });
+
+    it('granularities as object ', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          dimensions:
+            - name: created_at
+              sql: created_at
+              type: time
+              granularities:
+                name: half_year
+            - name: status
+              sql: status
+              type: string
+          measures:
+            - name: count
+              type: count
+        `
+      );
+
+      try {
+        await compiler.compile();
+        throw new Error('compile must return an error');
+      } catch (e: any) {
+        expect(e.message).toContain('dimension.granularitys must be defined as array');
+      }
+    });
+
+    it('4 correct granularities', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          dimensions:
+            - name: created_at
+              sql: created_at
+              type: time
+              granularities:
+                - name: six_months
+                  interval: 6 months
+                  title: 6 month intervals
+                - name: three_months_offset
+                  interval: 3 months
+                  offset: 2 weeks
+                - name: fiscal_year_1st_april
+                  title: Fiscal year by Apr
+                  interval: 1 year
+                  origin: >
+                    2024-04-01
+                - name: timestamp_offseted_3_weeks
+                  interval: 3 weeks
+                  origin: "2024-02-15 10:15:25"
+            - name: status
+              sql: status
+              type: string
+          measures:
+            - name: count
+              type: count
+        `
+      );
+
+      await compiler.compile();
+    });
+  });
+  describe('Access policy: ', () => {
+    it('defines a correct accessPolicy', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          dimensions:
+            - name: created_at
+              sql: created_at
+              type: time
+            - name: status
+              sql: status
+              type: string
+          measures:
+            - name: count
+              type: count
+          accessPolicy:
+            - role: admin
+              conditions:
+                - if: "{ !security_context.isBlocked }"
+              rowLevel:
+                filters:
+                  - member: status
+                    operator: equals
+                    values: ["completed"]
+                  - or:
+                    - member: "{CUBE}.created_at"
+                      operator: notInDateRange
+                      values:
+                        - 2022-01-01
+                        - "{ security_context.currentDate }"
+                    - member: "created_at"
+                      operator: equals
+                      values:
+                        - "{ securityContext.currentDate }"
+              memberLevel:
+                includes:
+                  - status
+            - role: manager
+              memberLevel:
+                excludes:
+                  - status
+        `
+      );
+
+      await compiler.compile();
+    });
   });
 });

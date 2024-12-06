@@ -1,32 +1,52 @@
-use crate::cube_bridge::cube_definition::CubeDefinition;
-use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::utils::escape_column_name;
+use super::query_tools::QueryTools;
+use super::sql_evaluator::EvaluationNode;
+use super::{evaluate_with_context, VisitorContext};
+use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+
 pub struct BaseCube {
-    cube_evaluator: Rc<dyn CubeEvaluator>,
-    cube_definition: Rc<dyn CubeDefinition>,
+    cube_name: String,
+    member_evaluator: Rc<EvaluationNode>,
+    query_tools: Rc<QueryTools>,
 }
 impl BaseCube {
-    pub fn new(
-        cube_evaluator: Rc<dyn CubeEvaluator>,
-        cube_definition: Rc<dyn CubeDefinition>,
-    ) -> Rc<Self> {
-        Rc::new(Self {
-            cube_evaluator,
-            cube_definition,
-        })
+    pub fn try_new(
+        cube_name: String,
+        query_tools: Rc<QueryTools>,
+        member_evaluator: Rc<EvaluationNode>,
+    ) -> Result<Rc<Self>, CubeError> {
+        Ok(Rc::new(Self {
+            cube_name,
+            member_evaluator,
+            query_tools,
+        }))
     }
 
-    pub fn to_sql(&self) -> Result<String, CubeError> {
-        let cube_sql = self.cube_definition.sql_table()?;
-        let cube_alias = self.cube_alias()?;
-        let as_syntax_join = "AS"; //FIXME should be from JS BaseQuery
-
-        Ok(format!("{} {} {}", cube_sql, as_syntax_join, cube_alias))
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        let cube_sql = evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            Rc::new(Schema::empty()),
+        )?;
+        Ok(cube_sql)
     }
 
-    fn cube_alias(&self) -> Result<String, CubeError> {
-        Ok(escape_column_name(&self.cube_definition.static_data().name))
+    pub fn name(&self) -> &String {
+        &self.cube_name
+    }
+
+    pub fn default_alias(&self) -> String {
+        self.query_tools.alias_name(&self.cube_name)
+    }
+
+    pub fn default_alias_with_prefix(&self, prefix: &Option<String>) -> String {
+        let alias = self.default_alias();
+        if let Some(prefix) = prefix {
+            format!("{prefix}_{alias}")
+        } else {
+            alias
+        }
     }
 }

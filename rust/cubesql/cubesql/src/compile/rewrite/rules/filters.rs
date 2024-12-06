@@ -2,7 +2,7 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, Member, OriginalExpr},
+        analysis::{ConstantFolding, Member, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
@@ -10,7 +10,7 @@ use crate::{
         fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
         is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
         literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
         transforming_rewrite, transforming_rewrite_with_root, udf_expr, udf_expr_var_arg,
@@ -45,7 +45,7 @@ use datafusion::{
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
 };
-use egg::{EGraph, Rewrite, Subst, Var};
+use egg::{Subst, Var};
 use std::{
     collections::HashSet,
     fmt::Display,
@@ -66,7 +66,7 @@ impl FilterRules {
 }
 
 impl RewriteRules for FilterRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
             transforming_rewrite(
                 "push-down-filter",
@@ -349,7 +349,14 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 change_user_member("?user"),
-                self.transform_change_user_eq("?column", "?literal", "?user"),
+                self.transform_change_user_eq(
+                    "?column",
+                    "?literal",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?user",
+                ),
             ),
             transforming_rewrite(
                 "change-user-equal-filter",
@@ -360,7 +367,35 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 change_user_member("?user"),
-                self.transform_change_user_eq("?column", "?literal", "?user"),
+                self.transform_change_user_eq(
+                    "?column",
+                    "?literal",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?user",
+                ),
+            ),
+            transforming_rewrite(
+                "user-is-not-null-filter",
+                filter_replacer(
+                    is_not_null_expr(column_expr("?column")),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    literal_bool(true),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_user_is_not_null(
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
             ),
             transforming_rewrite(
                 "join-field-filter-eq",
@@ -2484,7 +2519,7 @@ impl FilterRules {
         exp_var: &'static str,
         filter_alias_to_cube_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let exp_var = var!(exp_var);
         let filter_aliases_var = var!(filter_aliases_var);
@@ -2521,7 +2556,7 @@ impl FilterRules {
         new_limit_var: &'static str,
         new_limit_skip_var: &'static str,
         new_limit_fetch_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         let new_limit_var = var!(new_limit_var);
         let new_limit_skip_var = var!(new_limit_skip_var);
@@ -2553,7 +2588,7 @@ impl FilterRules {
     fn transform_literal_true(
         &self,
         literal_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         move |egraph, subst| {
             if let Some(ConstantFolding::Scalar(literal)) =
@@ -2570,7 +2605,7 @@ impl FilterRules {
     fn push_down_limit_projection(
         &self,
         input_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let input_var = var!(input_var);
         move |egraph, subst| {
             for node in egraph[subst[input_var]].nodes.iter() {
@@ -2586,7 +2621,7 @@ impl FilterRules {
     fn unwrap_lower_or_upper(
         &self,
         op_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let op_var = op_var.parse().unwrap();
 
         move |egraph, subst| {
@@ -2616,7 +2651,7 @@ impl FilterRules {
         filter_op_var: &'static str,
         filter_values_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = column_var.parse().unwrap();
         let op_var = op_var.parse().unwrap();
         let constant_var = var!(constant_var);
@@ -2854,7 +2889,7 @@ impl FilterRules {
         filter_op_var: &'static str,
         filter_values_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = var!(column_var);
         let literal_var = var!(literal_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -2956,7 +2991,7 @@ impl FilterRules {
         literal_var: &'static str,
         op_var: &'static str,
         new_op_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         let op_var = var!(op_var);
         let new_op_var = var!(new_op_var);
@@ -3014,7 +3049,7 @@ impl FilterRules {
         alias_to_cube_var: &'static str,
         members_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_left_var = var!(column_left_var);
         let column_right_var = var!(column_right_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -3064,7 +3099,7 @@ impl FilterRules {
         alias_to_cube_var: &'static str,
         members_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
@@ -3101,7 +3136,7 @@ impl FilterRules {
         output_op_var: &'static str,
         literal_var: &'static str,
         new_literal_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let op_var = var!(op_var);
         let output_op_var = var!(output_op_var);
         let literal_var = var!(literal_var);
@@ -3159,7 +3194,7 @@ impl FilterRules {
         member_var: &'static str,
         values_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let year_var = var!(year_var);
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -3236,7 +3271,7 @@ impl FilterRules {
         members_var: &'static str,
         segment_member_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = column_var.parse().unwrap();
         let op_var = op_var.parse().unwrap();
         let literal_var = literal_var.parse().unwrap();
@@ -3308,32 +3343,99 @@ impl FilterRules {
         &self,
         column_var: &'static str,
         literal_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
         change_user_member_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let column_var = column_var.parse().unwrap();
-        let literal_var = literal_var.parse().unwrap();
-        let change_user_member_var = change_user_member_var.parse().unwrap();
-
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let literal_var = var!(literal_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let change_user_member_var = var!(change_user_member_var);
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                if let ScalarValue::Utf8(Some(change_user)) = literal {
-                    let specified_user = change_user.clone();
+            let literals = var_iter!(egraph[subst[literal_var]], LiteralExprValue)
+                .cloned()
+                .collect::<Vec<_>>();
+            for literal in literals {
+                let ScalarValue::Utf8(Some(user_name)) = literal else {
+                    continue;
+                };
 
-                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                        if column.name.eq_ignore_ascii_case("__user") {
-                            subst.insert(
-                                change_user_member_var,
-                                egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
-                                    ChangeUserMemberValue(specified_user),
-                                )),
-                            );
+                let aliases_es =
+                    var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                for aliases in aliases_es {
+                    let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                        &aliases,
+                    ) else {
+                        continue;
+                    };
 
-                            return true;
-                        }
+                    let user_member_name = format!("{}.__user", cube.name);
+                    if !member_name.eq_ignore_ascii_case(&user_member_name) {
+                        continue;
                     }
+
+                    subst.insert(
+                        change_user_member_var,
+                        egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
+                            ChangeUserMemberValue(user_name.clone()),
+                        )),
+                    );
+                    return true;
                 }
             }
 
+            false
+        }
+    }
+
+    fn transform_user_is_not_null(
+        &self,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            let aliases_es = var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                .cloned()
+                .collect::<Vec<_>>();
+            for aliases in aliases_es {
+                let Some((member_name, cube)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                    &aliases,
+                ) else {
+                    continue;
+                };
+
+                let user_member_name = format!("{}.__user", cube.name);
+                if !member_name.eq_ignore_ascii_case(&user_member_name) {
+                    continue;
+                }
+
+                return true;
+            }
             false
         }
     }
@@ -3343,7 +3445,7 @@ impl FilterRules {
         &self,
         negated_var: &'static str,
         op_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let negated_var = var!(negated_var);
         let op_var = var!(op_var);
 
@@ -3377,7 +3479,7 @@ impl FilterRules {
         filter_op_var: &'static str,
         filter_values_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = var!(column_var);
         let list_var = var!(list_var);
         let negated_var = var!(negated_var);
@@ -3505,7 +3607,7 @@ impl FilterRules {
         filter_values_var: &'static str,
         filter_aliases_var: &'static str,
         is_null_op: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
@@ -3568,7 +3670,7 @@ impl FilterRules {
         &self,
         negated_var: &'static str,
         new_negated_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let negated_var = var!(negated_var);
         let new_negated_var = var!(new_negated_var);
         move |egraph, subst| {
@@ -3591,7 +3693,7 @@ impl FilterRules {
         &self,
         negated_var: &'static str,
         new_negated_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let negated_var = var!(negated_var);
         let new_negated_var = var!(new_negated_var);
         move |egraph, subst| {
@@ -3611,7 +3713,7 @@ impl FilterRules {
     }
 
     fn filter_member_name(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &Subst,
         meta_context: &Arc<MetaContext>,
         alias_to_cube_var: Var,
@@ -3632,7 +3734,7 @@ impl FilterRules {
     }
 
     fn filter_member_name_with_granularity(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &Subst,
         meta_context: &Arc<MetaContext>,
         alias_to_cube_var: Var,
@@ -3720,7 +3822,7 @@ impl FilterRules {
         filter_op_var: &'static str,
         filter_values_var: &'static str,
         filter_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = var!(column_var);
         let negated_var = var!(negated_var);
         let low_var = var!(low_var);
@@ -3812,7 +3914,7 @@ impl FilterRules {
         members_var: &'static str,
         filter_aliases_var: &'static str,
         is_negated: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = var!(column_var);
         let negated_var = var!(negated_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -3855,7 +3957,7 @@ impl FilterRules {
         &self,
         granularity_var: &'static str,
         interval_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let interval_var = var!(interval_var);
         move |egraph, subst| {
@@ -3927,7 +4029,7 @@ impl FilterRules {
         new_op_var: &'static str,
         date_add_interval_var: &'static str,
         date_sub_interval_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let op_var = var!(op_var);
         let new_op_var = var!(new_op_var);
@@ -3989,7 +4091,7 @@ impl FilterRules {
         date_var: &'static str,
         start_date_var: &'static str,
         end_date_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let date_var = var!(date_var);
         let start_date_var = var!(start_date_var);
@@ -4040,7 +4142,7 @@ impl FilterRules {
     fn is_empty_filter_ops_filters(
         &self,
         filter_ops_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let filter_ops_var = var!(filter_ops_var);
         move |egraph, subst| {
             if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list.clone() {
@@ -4058,7 +4160,7 @@ impl FilterRules {
         date_range_var: &'static str,
         date_range_start_op_var: &'static str,
         date_range_end_op_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let date_range_start_var = date_range_start_var.parse().unwrap();
         let date_range_end_var = date_range_end_var.parse().unwrap();
         let date_range_var = date_range_var.parse().unwrap();
@@ -4167,7 +4269,7 @@ impl FilterRules {
         granularity_var: &'static str,
         date_range_var: &'static str,
         expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let members_var = var!(members_var);
         let time_dimension_member_var = var!(time_dimension_member_var);
         let time_dimension_date_range_var = var!(time_dimension_date_range_var);
@@ -4243,7 +4345,7 @@ impl FilterRules {
         &self,
         members_var: &'static str,
         time_dimension_member_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let members_var = var!(members_var);
         let time_dimension_member_var = var!(time_dimension_member_var);
         move |egraph, subst| {
@@ -4278,7 +4380,7 @@ impl FilterRules {
         time_dimension_member_var: &'static str,
         time_dimension_date_range_var: &'static str,
         output_date_range_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_var = var!(member_var);
         let date_range_var = var!(date_range_var);
         let time_dimension_member_var = var!(time_dimension_member_var);
@@ -4324,7 +4426,7 @@ impl FilterRules {
         &self,
         granularity_var: &'static str,
         target_granularity: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         move |egraph, subst| {
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
@@ -4355,7 +4457,7 @@ impl FilterRules {
         filter_member_var: &'static str,
         filter_op_var: &'static str,
         filter_values_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let negated_var = var!(negated_var);
         let column_var = var!(column_var);
         let literal_var = var!(literal_var);
@@ -4458,7 +4560,7 @@ impl FilterRules {
         expr_var: &'static str,
         data_type_var: &'static str,
         negative: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = var!(expr_var);
         let data_type_var = var!(data_type_var);
         move |egraph, subst| {
@@ -4488,7 +4590,7 @@ impl FilterRules {
         &self,
         op_var: &'static str,
         literal_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let op_var = var!(op_var);
         let literal_var = var!(literal_var);
         move |egraph, subst| {
@@ -4517,7 +4619,7 @@ impl FilterRules {
         &self,
         literal_var: &'static str,
         one_day_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         let one_day_var = var!(one_day_var);
         move |egraph, subst| {
@@ -4549,7 +4651,7 @@ impl FilterRules {
         members_var: &'static str,
         filter_aliases_var: &'static str,
         new_filter_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let column_var = var!(column_var);
         let list_var = var!(list_var);
@@ -4809,7 +4911,7 @@ impl FilterRules {
         pull_up_member_var: &'static str,
         left_out_var: &'static str,
         right_out_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let time_dimension_filter_var = var!(time_dimension_filter_var);
         let time_dimension_member_var = var!(time_dimension_member_var);
         let time_dimension_op_var = var!(time_dimension_op_var);
@@ -4890,9 +4992,7 @@ impl FilterRules {
     }
 }
 
-fn filter_simplify_push_down(
-    node_type: impl Display,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+fn filter_simplify_push_down(node_type: impl Display) -> CubeRewrite {
     rewrite(
         &format!("filter-simplify-{}-push-down", node_type),
         filter_simplify_replacer(format!("({} ?left ?right)", node_type)),
@@ -4905,9 +5005,7 @@ fn filter_simplify_push_down(
     )
 }
 
-fn filter_simplify_push_down_tail(
-    node_type: impl Display,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+fn filter_simplify_push_down_tail(node_type: impl Display) -> CubeRewrite {
     rewrite(
         &format!("filter-simplify-{}-empty-tail-push-down", node_type),
         filter_simplify_replacer(node_type.to_string()),

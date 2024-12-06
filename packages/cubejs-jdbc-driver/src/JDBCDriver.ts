@@ -4,8 +4,6 @@
  * @fileoverview The `JDBCDriver` and related types declaration.
  */
 
-/* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
-import { Readable } from 'stream';
 import {
   getEnv,
   assertDataSource,
@@ -22,11 +20,13 @@ import { promisify } from 'util';
 import genericPool, { Factory, Pool } from 'generic-pool';
 import path from 'path';
 
-import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { JDBCDriverConfiguration } from './types';
-import { QueryStream, nextFn, Row, transformRow } from './QueryStream';
+import { SupportedDrivers } from './supported-drivers';
+import type { DriverOptionsInterface } from './supported-drivers';
+import type { JDBCDriverConfiguration } from './types';
+import { QueryStream, transformRow } from './QueryStream';
+import type { nextFn } from './QueryStream';
 
+/* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
 const Connection = require('@cubejs-backend/jdbc/lib/connection');
 const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
@@ -34,11 +34,6 @@ const jinst = require('@cubejs-backend/jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
-
-type JdbcStatement = {
-  setQueryTimeout: (t: number) => any,
-  execute: (q: string) => any,
-};
 
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
@@ -53,6 +48,11 @@ const initMvn = (customClassPath: any) => {
           if (!jinst.isJvmCreated()) {
             jinst.addOption('-Xrs');
             jinst.addOption('-Dfile.encoding=UTF8');
+
+            // Workaround for Databricks JDBC driver
+            // Issue when deserializing Apache Arrow data with Java JVMs version 11 or higher, due to compatibility issues.
+            jinst.addOption('--add-opens=java.base/java.nio=ALL-UNNAMED');
+
             const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
             jinst.setupClasspath(classPath);
           }
@@ -78,7 +78,7 @@ interface ExtendedPool extends Pool<any> {
 
 export class JDBCDriver extends BaseDriver {
   protected readonly config: JDBCDriverConfiguration;
-  
+
   protected pool: ExtendedPool;
 
   protected jdbcProps: any;
@@ -148,8 +148,7 @@ export class JDBCDriver extends BaseDriver {
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
         return new Connection(await getConnection(this.config.url, this.jdbcProps));
       },
-      // @ts-expect-error Promise<Function> vs Promise<void>
-      destroy: async (connection) => promisify(connection.close.bind(connection)),
+      destroy: async (connection) => promisify(connection.close.bind(connection))(),
       validate: async (connection) => (
         new Promise((resolve) => {
           const isValid = promisify(connection.isValid.bind(connection));
@@ -184,6 +183,14 @@ export class JDBCDriver extends BaseDriver {
       acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
     }) as ExtendedPool;
+
+    // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
+    this.pool.on('factoryCreateError', (err) => {
+      this.databasePoolError(err);
+    });
+    this.pool.on('factoryDestroyError', (err) => {
+      this.databasePoolError(err);
+    });
   }
 
   protected async getCustomClassPath() {
@@ -360,7 +367,7 @@ export class JDBCDriver extends BaseDriver {
   public static getSupportedDrivers(): string[] {
     return Object.keys(SupportedDrivers);
   }
-  
+
   public static dbTypeDescription(dbType: string): DriverOptionsInterface {
     return SupportedDrivers[dbType];
   }

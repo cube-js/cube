@@ -60,7 +60,7 @@ e.g., `cubejs/cubestore:arm64v8`.
 <InfoBox>
 
 Note that it's a best practice to use specific locked versions, e.g.,
-`cubejs/cube:v0.34.56`, instead of `cubejs/cube:latest` in production.
+`cubejs/cube:v0.36.0`, instead of `cubejs/cube:latest` in production.
 
 </InfoBox>
 
@@ -284,7 +284,7 @@ a specific tag instead of `latest`:
 ```yaml
 services:
   cube_api:
-    image: cubejs/cube:v0.34.56
+    image: cubejs/cube:v0.36.0
     ports:
       - 4000:4000
     environment:
@@ -310,7 +310,7 @@ models][ref-dynamic-data-models], build a custom Docker image.
 You can do this by creating a `Dockerfile` and a corresponding
 `.dockerignore` file:
 
-```bash{promptUser: user}
+```bash
 touch Dockerfile
 touch .dockerignore
 ```
@@ -339,7 +339,7 @@ npm-debug.log
 
 Then start the build process by running the following command:
 
-```bash{promptUser: user}
+```bash
 docker build -t <YOUR-USERNAME>/cube-custom-image .
 ```
 

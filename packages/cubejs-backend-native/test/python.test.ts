@@ -46,6 +46,7 @@ suite('Python Config', () => {
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
+      contextToRoles: expect.any(Function),
     });
 
     if (!config.checkAuth) {
@@ -64,6 +65,14 @@ suite('Python Config', () => {
         user_id: 42
       },
     });
+  });
+
+  test('context_to_roles', async () => {
+    if (!config.contextToRoles) {
+      throw new Error('contextToRoles was not defined in config.py');
+    }
+
+    expect(await config.contextToRoles({})).toEqual(['admin']);
   });
 
   test('context_to_api_scopes', async () => {

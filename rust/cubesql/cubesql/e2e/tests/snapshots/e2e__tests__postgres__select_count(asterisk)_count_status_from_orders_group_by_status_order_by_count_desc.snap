@@ -1,0 +1,11 @@
+---
+source: cubesql/e2e/tests/postgres.rs
+expression: "self.print_query_result(res, with_description, true).await"
+---
++-------+------------+
+| count | status     |
++-------+------------+
+| 3354  | processing |
+| 3346  | completed  |
+| 3300  | shipped    |
++-------+------------+

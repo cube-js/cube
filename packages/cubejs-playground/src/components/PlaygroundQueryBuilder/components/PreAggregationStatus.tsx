@@ -1,6 +1,4 @@
 import Icon, { ThunderboltFilled } from '@ant-design/icons';
-import { Query } from '@cubejs-client/core';
-import { AvailableMembers } from '@cubejs-client/react';
 import { Alert, Button, Space, Typography } from 'antd';
 import styled from 'styled-components';
 
@@ -16,11 +14,10 @@ const Badge = styled.div`
   background: var(--warning-bg-color);
 `;
 
-type PreAggregationStatusProps = QueryStatus & {
-  apiUrl: string;
-  availableMembers: AvailableMembers;
-  query: Query;
-};
+type PreAggregationStatusProps = Pick<
+  QueryStatus,
+  'preAggregationType' | 'isAggregated' | 'external' | 'extDbType'
+>;
 
 export function PreAggregationStatus({
   isAggregated,

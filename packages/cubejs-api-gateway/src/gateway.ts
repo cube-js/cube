@@ -60,7 +60,6 @@ import {
   ApiGatewayOptions,
 } from './types/gateway';
 import {
-  CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
   ContextRejectionMiddlewareFn,
   ContextAcceptorFn,
@@ -146,8 +145,6 @@ class ApiGateway {
   protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
     async () => ['graphql', 'meta', 'data'];
 
-  protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
-
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
@@ -188,9 +185,6 @@ class ApiGateway {
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
     this.contextToApiScopesFn = this.createContextToApiScopesFn(options);
-    this.checkAuthMiddleware = options.checkAuthMiddleware
-      ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
-      : this.checkAuth;
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
     this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
@@ -214,7 +208,7 @@ class ApiGateway {
 
   public initApp(app: ExpressApplication) {
     const userMiddlewares: RequestHandler[] = [
-      this.checkAuthMiddleware,
+      this.checkAuth,
       this.requestContextMiddleware,
       this.contextRejectionMiddleware,
       this.logNetworkUsage,
@@ -240,7 +234,7 @@ class ApiGateway {
       const { query, variables } = req.body;
       const compilerApi = await this.getCompilerApi(req.context);
 
-      const metaConfig = await compilerApi.metaConfig({
+      const metaConfig = await compilerApi.metaConfig(req.context, {
         requestId: req.context.requestId,
       });
 
@@ -273,7 +267,7 @@ class ApiGateway {
         const compilerApi = await this.getCompilerApi(req.context);
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
-          let metaConfig = await compilerApi.metaConfig({
+          let metaConfig = await compilerApi.metaConfig(req.context, {
             requestId: req.context.requestId,
           });
           metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
@@ -423,18 +417,6 @@ class ApiGateway {
      * jobs scope                                                    *
      *************************************************************** */
 
-    app.get(
-      `${this.basePath}/v1/run-scheduled-refresh`,
-      userMiddlewares,
-      userAsyncHandler(async (req, res) => {
-        await this.runScheduledRefresh({
-          queryingOptions: req.query.queryingOptions,
-          context: req.context,
-          res: this.resToResultFn(res)
-        });
-      })
-    );
-
     app.post(
       `${this.basePath}/v1/pre-aggregations/jobs`,
       userMiddlewares,
@@ -541,26 +523,6 @@ class ApiGateway {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
   }
 
-  public async runScheduledRefresh({ context, res, queryingOptions }: {
-    context: RequestContext,
-    res: ResponseResultFn,
-    queryingOptions: any
-  }) {
-    const requestStarted = new Date();
-    try {
-      await this.assertApiScope('jobs', context.securityContext);
-      const refreshScheduler = this.refreshScheduler();
-      res(await refreshScheduler.runScheduledRefresh(context, {
-        ...this.parseQueryParam(queryingOptions || {}),
-        throwErrors: true
-      }));
-    } catch (e: any) {
-      this.handleError({
-        e, context, res, requestStarted
-      });
-    }
-  }
-
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
     const isDevMode = getEnv('devMode');
     function visibilityFilter(item) {
@@ -589,7 +551,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('meta', context.securityContext);
       const compilerApi = await this.getCompilerApi(context);
-      const metaConfig = await compilerApi.metaConfig({
+      const metaConfig = await compilerApi.metaConfig(context, {
         requestId: context.requestId,
         includeCompilerId: includeCompilerId || onlyCompilerId
       });
@@ -625,7 +587,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('meta', context.securityContext);
       const compilerApi = await this.getCompilerApi(context);
-      const metaConfigExtended = await compilerApi.metaConfigExtended({
+      const metaConfigExtended = await compilerApi.metaConfigExtended(context, {
         requestId: context.requestId,
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
@@ -1048,7 +1010,7 @@ class ApiGateway {
           } else {
             const metaCacheKey = JSON.stringify(ctx);
             if (!metaCache.has(metaCacheKey)) {
-              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(ctx));
+              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(context, ctx));
             }
 
             // checking and fetching result status
@@ -1218,6 +1180,7 @@ class ApiGateway {
     }, context);
 
     const startTime = new Date().getTime();
+    const compilerApi = await this.getCompilerApi(context);
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
@@ -1233,8 +1196,14 @@ class ApiGateway {
           }
 
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
-          let rewrittenQuery = await this.queryRewrite(
+          // First apply cube/view level security policies
+          const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
+            context
+          );
+          // Then apply user-supplied queryRewrite
+          let rewrittenQuery = await this.queryRewrite(
+            queryWithRlsFilters,
             context,
           );
 
@@ -1269,7 +1238,7 @@ class ApiGateway {
       if (queryGranularity.length > 1) {
         throw new UserError('Data blending query granularities must match');
       }
-      if (queryGranularity.filter(Boolean).length === 0) {
+      if (queryGranularity.length === 0) {
         throw new UserError('Data blending query without granularity is not supported');
       }
     }
@@ -1552,9 +1521,13 @@ class ApiGateway {
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
       normalizedTotal.totalQuery = true;
+
+      delete normalizedTotal.order;
+
       normalizedTotal.limit = null;
       normalizedTotal.rowLimit = null;
       normalizedTotal.offset = null;
+
       const [totalQuery] = await this.getSqlQueriesInternal(
         context,
         [normalizedTotal],
@@ -1727,7 +1700,7 @@ class ApiGateway {
         await this.getNormalizedQueries(query, context);
 
       let metaConfigResult = await (await this
-        .getCompilerApi(context)).metaConfig({
+        .getCompilerApi(context)).metaConfig(request.context, {
         requestId: context.requestId
       });
 
@@ -1837,7 +1810,7 @@ class ApiGateway {
         await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions);
 
       const compilerApi = await this.getCompilerApi(context);
-      let metaConfigResult = await compilerApi.metaConfig({
+      let metaConfigResult = await compilerApi.metaConfig(request.context, {
         requestId: context.requestId
       });
 
@@ -2117,40 +2090,6 @@ class ApiGateway {
     }
   }
 
-  protected wrapCheckAuthMiddleware(fn: CheckAuthMiddlewareFn): CheckAuthMiddlewareFn {
-    this.logger('CheckAuthMiddleware Middleware Deprecation', {
-      warning: (
-        'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: ' +
-        'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
-      )
-    });
-
-    let showWarningAboutNotObject = false;
-
-    return (req, res, next) => {
-      fn(req, res, (e) => {
-        // We renamed authInfo to securityContext, but users can continue to use both ways
-        if (req.securityContext && !req.authInfo) {
-          req.authInfo = req.securityContext;
-        } else if (req.authInfo) {
-          req.securityContext = req.authInfo;
-        }
-
-        if ((typeof req.securityContext !== 'object' || req.securityContext === null) && !showWarningAboutNotObject) {
-          this.logger('Security Context Should Be Object', {
-            warning: (
-              `Value of securityContext (previously authInfo) expected to be object, actual: ${getRealType(req.securityContext)}`
-            )
-          });
-
-          showWarningAboutNotObject = true;
-        }
-
-        next(e);
-      });
-    };
-  }
-
   protected wrapCheckAuth(fn: CheckAuthFn): PreparedCheckAuthFn {
     // We dont need to span all logs with deprecation message
     let warningShowed = false;
@@ -2286,10 +2225,15 @@ class ApiGateway {
     if (this.playgroundAuthSecret) {
       const systemCheckAuthFn = this.createCheckAuthSystemFn();
       return async (ctx, authorization) => {
+        // TODO: separate two auth workflows
         try {
           await mainCheckAuthFn(ctx, authorization);
-        } catch (error) {
-          await systemCheckAuthFn(ctx, authorization);
+        } catch (mainAuthError) {
+          try {
+            await systemCheckAuthFn(ctx, authorization);
+          } catch (playgroundAuthError) {
+            throw mainAuthError;
+          }
         }
       };
     }
@@ -2366,8 +2310,10 @@ class ApiGateway {
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
-    if (typeof req.headers.authorization === 'string') {
-      const parts = req.headers.authorization.split(' ', 2);
+    const authHeader = req.headers?.['x-cube-authorization'] || req.headers?.authorization;
+
+    if (typeof authHeader === 'string') {
+      const parts = authHeader.split(' ', 2);
       if (parts.length === 1) {
         return parts[0];
       }
