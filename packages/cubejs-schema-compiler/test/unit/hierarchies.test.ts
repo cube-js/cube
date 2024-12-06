@@ -4,7 +4,7 @@ import path from 'path';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Cube hierarchies', () => {
-  it('hierarchies defined on a view only', async () => {
+  it('base cases', async () => {
     const modelContent = fs.readFileSync(
       path.join(process.cwd(), '/test/unit/fixtures/hierarchies2.yml'),
       'utf8'
@@ -21,6 +21,7 @@ describe('Cube hierarchies', () => {
     expect(ordersView.config.hierarchies).toEqual([
       {
         name: 'orders_users_view.orders_hierarchy',
+        public: true,
         levels: [
           'orders_users_view.status',
           'orders_users_view.number'
@@ -28,6 +29,7 @@ describe('Cube hierarchies', () => {
       },
       {
         name: 'orders_users_view.some_other_hierarchy',
+        public: true,
         title: 'Some other hierarchy',
         levels: ['orders_users_view.state']
       }
@@ -48,80 +50,14 @@ describe('Cube hierarchies', () => {
     );
     expect(allHierarchyView.config.hierarchies.length).toBe(3);
   });
-  //     const { compiler, metaTransformer } = prepareYamlCompiler(`
-  // views:
-  //   - name: orders_view
-  //     cubes:
-  //       - join_path: orders
-  //         prefix: true
-  //         includes: "*"
-  //       - join_path: users
-  //         prefix: false
-  //         includes:
-  //           - count
-  //           - name: gender
-  //             alias: hello_world
-  //     hierarchies:
-  //     - name: hello
-  //       levels:
-  //         - users.count
-  //         - users.gender
-  //         - orders.count
-  //         - orders.status
-  // cubes:
-  //   - name: orders
-  //     sql: SELECT * FROM orders
-  //     measures:
-  //       - name: count
-  //         type: count
-  //     dimensions:
-  //       - name: id
-  //         sql: id
-  //         type: number
-  //         primary_key: true
 
-  //       - name: status
-  //         sql: status
-  //         type: string
+  it(('hierarchy with measure'), async () => {
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/hierarchy-with-measure.yml'),
+      'utf8'
+    );
+    const { compiler } = prepareYamlCompiler(modelContent);
 
-  //   - name: users
-  //     sql: SELECT * FROM users
-  //     measures:
-  //       - name: count
-  //         type: count
-  //     dimensions:
-  //       - name: id
-  //         sql: id
-  //         type: number
-  //         primary_key: true
-
-  //       - name: gender
-  //         sql: gender
-  //         type: string
-
-  //       - name: city
-  //         sql: city
-  //         type: string
-
-  //       - name: status
-  //         sql: status
-  //         type: string
-  //       `);
-
-  //     await compiler.compile();
-
-  //     const ordersView = metaTransformer.cubes.find(it => it.config.name === 'orders_view');
-
-  //     expect(ordersView.config.hierarchies).toEqual([
-  //       {
-  //         name: 'hello',
-  //         levels: [
-  //           'orders_view.count',
-  //           'orders_view.hello_world',
-  //           'orders_view.orders_count',
-  //           'orders_view.orders_status'
-  //         ]
-  //       },
-  //     ]);
-  //   });
+    await expect(compiler.compile()).rejects.toThrow('Only dimensions can be part of a hierarchy. Please remove the \'count\' member from the \'orders_hierarchy\' hierarchy.');
+  });
 });

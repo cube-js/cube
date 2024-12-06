@@ -242,7 +242,17 @@ export class CubeEvaluator extends CubeSymbols {
           const filteredHierarchies = hierarchies
             .filter(it => includedHierarchyNames.includes(it.name))
             .map(it => {
-              const levels = it.levels.filter(level => includedMemberPaths.includes(level));
+              const levels = it.levels.filter(level => {
+                const member = cube.includedMembers.find(m => m.memberPath === level);
+                if (member && member.type !== 'dimensions') {
+                  const memberName = level.split('.')[1] || level;
+                  errorReporter.error(`Only dimensions can be part of a hierarchy. Please remove the '${memberName}' member from the '${it.name}' hierarchy.`);
+                } else if (member) {
+                  return includedMemberPaths.includes(level);
+                }
+
+                return null;
+              }).filter(Boolean);
 
               return {
                 ...it,

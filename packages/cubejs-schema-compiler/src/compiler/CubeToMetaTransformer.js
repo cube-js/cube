@@ -108,6 +108,7 @@ export class CubeToMetaTransformer {
         )(cube.segments || {}),
         hierarchies: (cube.hierarchies || []).map((it) => ({
           ...it,
+          public: it.public ?? true,
           name: `${cube.name}.${it.name}`,
         })),
         folders: (cube.folders || []).map((it) => ({

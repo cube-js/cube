@@ -324,7 +324,6 @@ export class CubeSymbols {
           errorReporter.error(`Paths aren't allowed in cube excludes but '${exclude}' provided as exclude member`);
         }
 
-        // const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[exclude];
         const resolvedMember = this.getResolvedMember(type, cubeReference, exclude);
         return resolvedMember ? {
           member: `${fullPath}.${exclude}`
