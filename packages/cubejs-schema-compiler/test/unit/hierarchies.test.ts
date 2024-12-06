@@ -21,6 +21,7 @@ describe('Cube hierarchies', () => {
     expect(ordersView.config.hierarchies).toEqual([
       {
         name: 'orders_users_view.orders_hierarchy',
+        title: 'Hello Hierarchy',
         public: true,
         levels: [
           'orders_users_view.status',
@@ -59,5 +60,46 @@ describe('Cube hierarchies', () => {
     const { compiler } = prepareYamlCompiler(modelContent);
 
     await expect(compiler.compile()).rejects.toThrow('Only dimensions can be part of a hierarchy. Please remove the \'count\' member from the \'orders_hierarchy\' hierarchy.');
+  });
+
+  it(('does not accept wrong name'), async () => {
+    const { compiler } = prepareYamlCompiler(`cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    hierarchies:
+      - name: hello wrong name
+        levels:
+          - id
+`);
+
+    await expect(compiler.compile()).rejects.toThrow('with value "hello wrong name" fails to match the identifier pattern');
+  });
+
+  it(('duplicated hierarchy'), async () => {
+    const { compiler } = prepareYamlCompiler(`cubes:
+      - name: orders
+        sql_table: orders
+        dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+
+        hierarchies:
+          - name: test_hierarchy
+            levels:
+              - id
+          - name: test_hierarchy
+            levels:
+              - id
+    `);
+
+    await expect(compiler.compile()).rejects.toThrow('Duplicate hierarchy name \'test_hierarchy\' in cube \'orders\'');
   });
 });

@@ -217,6 +217,9 @@ export class CubeEvaluator extends CubeSymbols {
     const uniqueHierarchyNames = new Set();
     if (Array.isArray(cube.hierarchies)) {
       cube.hierarchies = cube.hierarchies.map(hierarchy => {
+        if (uniqueHierarchyNames.has(hierarchy.name)) {
+          errorReporter.error(`Duplicate hierarchy name '${hierarchy.name}' in cube '${cube.name}'`);
+        }
         uniqueHierarchyNames.add(hierarchy.name);
 
         return ({

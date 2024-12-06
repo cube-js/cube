@@ -28,6 +28,7 @@ cubes:
         type: string
     hierarchies:
       - name: orders_hierarchy
+        title: Hello Hierarchy
         levels:
           - "{CUBE}.status"
           - number
