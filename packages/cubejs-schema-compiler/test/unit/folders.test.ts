@@ -24,8 +24,6 @@ describe('Cube Folders', () => {
     const emptyView = metaTransformer.cubes.find(
       (it) => it.config.name === 'test_view'
     );
-    console.log(JSON.stringify(emptyView.config, null, 2));
-    // expect(emptyView.config.hierarchies.length).toBe(0);
 
     expect(emptyView.config.folders.length).toBe(2);
 
@@ -49,8 +47,6 @@ describe('Cube Folders', () => {
     const view = metaTransformer.cubes.find(
       (it) => it.config.name === 'test_view2'
     );
-    console.log(JSON.stringify(view.config, null, 2));
-    // expect(emptyView.config.hierarchies.length).toBe(0);
 
     expect(view.config.folders.length).toBe(1);
 
