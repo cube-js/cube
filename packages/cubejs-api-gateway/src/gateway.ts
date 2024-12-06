@@ -1185,7 +1185,8 @@ class ApiGateway {
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => {
-          const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+          const hasExpressionsInQuery =
+            this.hasExpressionsInQuery(currentQuery);
 
           if (hasExpressionsInQuery) {
             if (!memberExpressions) {
@@ -1195,7 +1196,15 @@ class ApiGateway {
             currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
           }
 
-          const normalizedQuery = normalizeQuery(currentQuery, persistent);
+          let normalizedQuery = normalizeQuery(currentQuery, persistent);
+
+          if (hasExpressionsInQuery) {
+            // We need to parse/eval all member expressions early as applyRowLevelSecurity
+            // needs to access the full SQL query in order to evaluate rules
+            normalizedQuery =
+              this.evalMemberExpressionsInQuery(normalizedQuery);
+          }
+
           // First apply cube/view level security policies
           const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
@@ -1204,17 +1213,18 @@ class ApiGateway {
           // Then apply user-supplied queryRewrite
           let rewrittenQuery = await this.queryRewrite(
             queryWithRlsFilters,
-            context,
+            context
           );
 
-          if (hasExpressionsInQuery) {
+          // applyRowLevelSecurity may add new filters which may contain raw member expressions
+          // if that's the case, we should run an extra pass of parsing here to make sure
+          // nothing breaks down the road
+          if (this.hasExpressionsInQuery(rewrittenQuery)) {
+            rewrittenQuery = this.parseMemberExpressionsInQuery(rewrittenQuery);
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(
-            rewrittenQuery,
-            persistent,
-          );
+          return normalizeQuery(rewrittenQuery, persistent);
         }
       )
     );
