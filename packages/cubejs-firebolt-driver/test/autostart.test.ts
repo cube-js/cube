@@ -1,9 +1,9 @@
-import {assertDataSource, getEnv} from '@cubejs-backend/shared';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { DriverTests } from '@cubejs-backend/testing-shared';
 
-import { FireboltDriver } from '../src';
 import { Firebolt } from 'firebolt-sdk';
 import { version } from 'firebolt-sdk/package.json';
+import { FireboltDriver } from '../src';
 
 describe('FireboltDriver autostart', () => {
   let tests: DriverTests;
@@ -43,7 +43,7 @@ describe('FireboltDriver autostart', () => {
     const engineName = getEnv('fireboltEngineName', { dataSource });
     const firebolt = Firebolt({
       apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
-    })
+    });
     await firebolt.connect({
       auth,
       database: getEnv('dbName', { dataSource }),
