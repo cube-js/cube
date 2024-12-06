@@ -1,4 +1,7 @@
-use super::{dependecy::Dependency, EvaluationNode};
+use super::{
+    dependecy::{Dependency, StructDependency},
+    EvaluationNode,
+};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -36,25 +39,32 @@ pub trait TraversalVisitor {
     ) -> Result<(), CubeError> {
         match dep {
             Dependency::SingleDependency(dep) => self.apply(dep, state),
-            Dependency::StructDependency(dep) => {
-                if dep.sql_fn.is_some() {
-                    self.apply(node, state)?;
-                }
-                if let Some(to_string_fn) = &dep.to_string_fn {
-                    self.apply(to_string_fn, state)?;
-                }
-                for (_, v) in dep.properties.iter() {
-                    match v {
-                        Dependency::SingleDependency(dep) => {
-                            self.apply(dep, state)?;
-                        }
-                        Dependency::StructDependency(_) => unimplemented!(),
-                        Dependency::ContextDependency(_) => {}
-                    }
-                }
-                Ok(())
-            }
+            Dependency::StructDependency(dep) => self.traverse_struct_dep(dep, node, state),
             Dependency::ContextDependency(_) => Ok(()),
         }
+    }
+
+    fn traverse_struct_dep(
+        &mut self,
+        dep: &StructDependency,
+        node: &Rc<EvaluationNode>,
+        state: &Self::State,
+    ) -> Result<(), CubeError> {
+        if dep.sql_fn.is_some() {
+            self.apply(node, state)?;
+        }
+        if let Some(to_string_fn) = &dep.to_string_fn {
+            self.apply(to_string_fn, state)?;
+        }
+        for (_, v) in dep.properties.iter() {
+            match v {
+                Dependency::SingleDependency(dep) => {
+                    self.apply(dep, state)?;
+                }
+                Dependency::StructDependency(dep) => self.traverse_struct_dep(dep, node, state)?,
+                Dependency::ContextDependency(_) => {}
+            }
+        }
+        Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use super::{Compiler, EvaluationNode};
-use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
 use crate::cube_bridge::memeber_sql::MemberSql;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -72,6 +72,7 @@ impl<'a> DependenciesBuilder<'a> {
                 childs[parent].push(i);
             }
         }
+
         let mut result = Vec::new();
 
         for (i, dep) in call_deps.iter().enumerate() {
@@ -87,44 +88,57 @@ impl<'a> DependenciesBuilder<'a> {
                     self.build_evaluator(&cube_name, &dep.name)?,
                 ));
             } else {
-                let new_cube_name = if self.is_current_cube(&dep.name) {
-                    cube_name.clone()
-                } else {
-                    dep.name.clone()
-                };
-                let mut sql_fn = None;
-                let mut to_string_fn: Option<Rc<EvaluationNode>> = None;
-                let mut properties = HashMap::new();
-                for child_ind in childs[i].iter() {
-                    let name = &call_deps[*child_ind].name;
-                    if name.as_str() == "sql" {
-                        sql_fn = Some(
-                            self.compiler
-                                .add_cube_table_evaluator(new_cube_name.clone())?,
-                        );
-                    } else if name.as_str() == "toString" {
-                        to_string_fn = Some(
-                            self.compiler
-                                .add_cube_name_evaluator(new_cube_name.clone())?,
-                        );
-                    } else {
-                        properties.insert(
-                            name.clone(),
-                            Dependency::SingleDependency(
-                                self.build_evaluator(&new_cube_name, &name)?,
-                            ),
-                        );
-                    }
-                }
-                result.push(Dependency::StructDependency(StructDependency::new(
-                    sql_fn,
-                    to_string_fn,
-                    properties,
-                )));
+                let dep = self.build_struct_dependency(&cube_name, i, &call_deps, &childs)?;
+                result.push(Dependency::StructDependency(dep));
             }
         }
 
         Ok(result)
+    }
+
+    fn build_struct_dependency(
+        &mut self,
+        cube_name: &String,
+        dep_index: usize,
+        call_deps: &Vec<CallDep>,
+        call_childs: &Vec<Vec<usize>>,
+    ) -> Result<StructDependency, CubeError> {
+        let dep = &call_deps[dep_index];
+        let new_cube_name = if self.is_current_cube(&dep.name) {
+            cube_name.clone()
+        } else {
+            dep.name.clone()
+        };
+        let mut sql_fn = None;
+        let mut to_string_fn: Option<Rc<EvaluationNode>> = None;
+        let mut properties = HashMap::new();
+        for child_ind in call_childs[dep_index].iter() {
+            let name = &call_deps[*child_ind].name;
+            if name.as_str() == "sql" {
+                sql_fn = Some(
+                    self.compiler
+                        .add_cube_table_evaluator(new_cube_name.clone())?,
+                );
+            } else if name.as_str() == "toString" {
+                to_string_fn = Some(
+                    self.compiler
+                        .add_cube_name_evaluator(new_cube_name.clone())?,
+                );
+            } else {
+                let child_dep = if call_childs[*child_ind].is_empty() {
+                    Dependency::SingleDependency(self.build_evaluator(&new_cube_name, &name)?)
+                } else {
+                    Dependency::StructDependency(self.build_struct_dependency(
+                        &new_cube_name,
+                        *child_ind,
+                        call_deps,
+                        call_childs,
+                    )?)
+                };
+                properties.insert(name.clone(), child_dep);
+            }
+        }
+        Ok(StructDependency::new(sql_fn, to_string_fn, properties))
     }
 
     fn build_context_dep(&self, name: &str) -> Option<Dependency> {

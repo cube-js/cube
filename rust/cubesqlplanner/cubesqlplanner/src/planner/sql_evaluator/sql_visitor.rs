@@ -1,4 +1,4 @@
-use super::dependecy::{ContextSymbolDep, Dependency};
+use super::dependecy::{ContextSymbolDep, Dependency, StructDependency};
 use super::sql_nodes::SqlNode;
 use super::EvaluationNode;
 use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSqlArg, MemberSqlStruct};
@@ -69,28 +69,42 @@ impl SqlEvaluatorVisitor {
                 self.apply(dep, node_processor.clone())?,
             )),
             Dependency::StructDependency(dep) => {
-                let mut res = MemberSqlStruct::default();
-                if let Some(sql_fn) = &dep.sql_fn {
-                    res.sql_fn = Some(self.apply(sql_fn, node_processor.clone())?);
-                }
-                if let Some(to_string_fn) = &dep.to_string_fn {
-                    res.to_string_fn = Some(self.apply(to_string_fn, node_processor.clone())?);
-                }
-                for (k, v) in dep.properties.iter() {
-                    match v {
-                        Dependency::SingleDependency(dep) => {
-                            res.properties
-                                .insert(k.clone(), self.apply(dep, node_processor.clone())?);
-                        }
-                        Dependency::StructDependency(_) => unimplemented!(),
-                        Dependency::ContextDependency(_) => unimplemented!(),
-                    }
-                }
-                Ok(MemberSqlArg::Struct(res))
+                self.evaluate_struct_dep(dep, node_processor.clone())
             }
             Dependency::ContextDependency(contex_symbol) => {
                 self.apply_context_symbol(contex_symbol)
             }
         }
+    }
+
+    fn evaluate_struct_dep(
+        &mut self,
+        dep: &StructDependency,
+        node_processor: Rc<dyn SqlNode>,
+    ) -> Result<MemberSqlArg, CubeError> {
+        let mut res = MemberSqlStruct::default();
+        if let Some(sql_fn) = &dep.sql_fn {
+            res.sql_fn = Some(self.apply(sql_fn, node_processor.clone())?);
+        }
+        if let Some(to_string_fn) = &dep.to_string_fn {
+            res.to_string_fn = Some(self.apply(to_string_fn, node_processor.clone())?);
+        }
+        for (k, v) in dep.properties.iter() {
+            let prop_res = match v {
+                Dependency::SingleDependency(dep) => {
+                    MemberSqlArg::String(self.apply(dep, node_processor.clone())?)
+                }
+                Dependency::StructDependency(dep) => {
+                    self.evaluate_struct_dep(dep, node_processor.clone())?
+                }
+                Dependency::ContextDependency(_) => {
+                    return Err(CubeError::internal(format!(
+                        "Context dependency in struct dependency is not supported"
+                    )))
+                }
+            };
+            res.properties.insert(k.clone(), prop_res);
+        }
+        Ok(MemberSqlArg::Struct(res))
     }
 }
