@@ -36,6 +36,7 @@
     "@cubejs-backend/snowflake-driver": "1.1.8",
     "@cubejs-backend/sqlite-driver": "1.1.8",
     "@cubejs-backend/trino-driver": "1.1.8",
+    "@knowitall/vertica-driver": "^0.32.4",
     "cubejs-cli": "1.1.8",
     "typescript": "~5.2.2"
   },

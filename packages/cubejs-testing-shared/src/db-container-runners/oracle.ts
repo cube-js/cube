@@ -1,5 +1,4 @@
 import { GenericContainer, Wait } from 'testcontainers';
-import { isCI } from '@cubejs-backend/shared';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
