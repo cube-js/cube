@@ -797,7 +797,7 @@ impl PlanRewriter for ChooseIndex<'_> {
                 }
             }
             LogicalPlan::Filter { predicate, .. } => {
-                let mut single_filtered: Vec<&datafusion::prelude::Column> = Vec::new();
+                let mut single_filtered = Vec::new();
                 if single_value_filter_columns(predicate, &mut single_filtered) {
                     Some(
                         context.update_single_value_filtered_cols(
