@@ -524,8 +524,12 @@ The data within `category_productname_zipcode_index` would look as follows:
 
 ### Aggregating indexes
 
-Aggregating indexes can be defined as well. Such indexes contain **only**
-dimensions and pre-aggregated measures from the pre-aggregation definition.
+Aggregating indexes should be used when there is a wide rollup pre-aggregation, however, only a subset of its dimensions is queried. 
+For example, you have rollup pre-aggregation with 50 dimensions, but any query is just using only 5 of those dimensions.
+Such a use case would be a sweet spot for the aggregating index.
+Such indexes would persist **only** dimensions from the index definition and pre-aggregated measures from the pre-aggregation definition.
+Cube Store would aggregate over missing dimensions to calculate stored measure values when preparing the aggregating index.
+During querying time, Cube Store will save time on this aggregation over missing dimensions, as it was done during the preparation step.
 
 Queries with the following characteristics can target aggregating indexes:
 

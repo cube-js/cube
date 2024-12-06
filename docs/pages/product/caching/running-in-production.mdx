@@ -244,7 +244,7 @@ discouraged and can lead to consistency and data corruption errors.
 <SuccessBox>
 
 Using Azure Blob Storage with Cube Store is only supported in Cube Cloud on
-[Enterprise and above plans](https://cube.dev/pricing).
+[Enterprise and above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
 
@@ -325,6 +325,28 @@ Refresh worker should be able to finish pre-aggregation refresh before
 garbage collection starts. It means that all pre-aggregation partitions
 should be built before any tables are removed.
 
+#### Supported file systems
+
+The garbage collection mechanism relies on the ability of the underlying file
+system to report the creation time of a file.
+
+If the file system does not support getting the creation time, you will see the
+following error message in Cube Store logs:
+
+```
+ERROR [cubestore::remotefs::cleanup] <pid:1>
+error while getting created time for file "<name>.chunk.parquet":
+creation time is not available for the filesystem
+```
+
+<ReferenceBox>
+
+XFS is known to not support getting the creation time of a file.
+Please see [this issue](https://github.com/cube-js/cube/issues/7905#issuecomment-2504212623)
+for possible workarounds.
+
+</ReferenceBox>
+
 ## Security
 
 ### Authentication
@@ -346,8 +368,9 @@ Store operations.
 
 <SuccessBox>
 
-Data-at-rest encryption in Cube Store is only available in Cube Cloud on
-[Enterprise and above plans](https://cube.dev/pricing).
+Data-at-rest encryption in Cube Store is available in Cube Cloud on the
+[Enterprise Premier](https://cube.dev/pricing) product tier.
+It also requires the M [Cube Store Worker tier](/product/deployment/cloud/pricing#cube-store-worker-tiers).
 
 </SuccessBox>
 

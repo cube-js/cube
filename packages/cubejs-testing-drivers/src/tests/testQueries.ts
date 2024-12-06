@@ -13,14 +13,16 @@ import {
   buildPreaggs,
 } from '../helpers';
 import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
+import { redshiftExternalSchemasSuite } from './testExternalSchemas';
 
 type TestQueriesOptions = {
   includeIncrementalSchemaSuite?: boolean,
   includeHLLSuite?: boolean,
   extendedEnv?: string
+  externalSchemaTests?: boolean,
 };
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite }: TestQueriesOptions = {}): void {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
@@ -115,7 +117,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       console.log(`Creating ${queries.length} fixture tables`);
       try {
         for (const q of queries) {
-          await driver.query(q);
+          await driver.createTableRaw(q);
         }
         console.log(`Creating ${queries.length} fixture tables completed`);
       } catch (e: any) {
@@ -1784,7 +1786,15 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     });
 
     if (includeIncrementalSchemaSuite) {
-      incrementalSchemaLoadingSuite(execute, () => driver, tables);
+      describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
+        incrementalSchemaLoadingSuite(execute, () => driver, tables);
+      });
+    }
+
+    if (externalSchemaTests) {
+      describe(`External schema retrospection with @cubejs-backend/${type}-driver`, () => {
+        redshiftExternalSchemasSuite(execute, () => driver);
+      });
     }
 
     executePg('SQL API: powerbi min max push down', async (connection) => {
@@ -2002,6 +2012,18 @@ from
       `);
 
       expect(res.rows).toMatchSnapshot('metabase_count_cast_to_float32_from_push_down');
+    });
+
+    executePg('SQL API: NULLS FIRST/LAST SQL push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT CASE WHEN "category" > 'G' THEN "category" ELSE NULL END AS "category"
+        FROM "Products"
+        WHERE LOWER("category") != 'invalid'
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST
+        LIMIT 100
+      `);
+      expect(res.rows).toMatchSnapshot('nulls_first_last_sql_push_down');
     });
   });
 }

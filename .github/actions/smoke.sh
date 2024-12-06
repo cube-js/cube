@@ -60,3 +60,7 @@ echo "::endgroup::"
 echo "::group::Vertica"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:vertica
 echo "::endgroup::"
+
+echo "::group::RBAC"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:rbac
+echo "::endgroup::"

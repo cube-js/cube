@@ -2310,8 +2310,10 @@ class ApiGateway {
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
-    if (typeof req.headers.authorization === 'string') {
-      const parts = req.headers.authorization.split(' ', 2);
+    const authHeader = req.headers?.['x-cube-authorization'] || req.headers?.authorization;
+
+    if (typeof authHeader === 'string') {
+      const parts = authHeader.split(' ', 2);
       if (parts.length === 1) {
         return parts[0];
       }

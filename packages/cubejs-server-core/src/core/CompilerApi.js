@@ -204,7 +204,7 @@ export class CompilerApi {
         if (typeof b !== 'boolean') {
           throw new Error(`Access policy condition must return boolean, got ${JSON.stringify(b)}`);
         }
-        return a || b;
+        return a && b;
       });
     }
     return true;
@@ -421,12 +421,10 @@ export class CompilerApi {
   }
 
   /**
-   * if RBAC is enabled, this method is used to filter out the cubes that the
-   * user doesn't have access from meta responses.
-   * It evaluates all applicable memeberLevel accessPolicies givean a context
-   * and retains members that are allowed by any policy (most permissive set).
+   * if RBAC is enabled, this method is used to patch isVisible property of cube members
+   * based on access policies.
   */
-  async filterVisibilityByAccessPolicy(compilers, context, cubes) {
+  async patchVisibilityByAccessPolicy(compilers, context, cubes) {
     const isMemberVisibleInContext = {};
     const { cubeEvaluator } = compilers;
 
@@ -440,17 +438,18 @@ export class CompilerApi {
         const applicablePolicies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
 
         const computeMemberVisibility = (item) => {
-          let isIncluded = false;
-          let isExplicitlyExcluded = false;
           for (const policy of applicablePolicies) {
             if (policy.memberLevel) {
-              isIncluded = policy.memberLevel.includesMembers.includes(item.name) || isIncluded;
-              isExplicitlyExcluded = policy.memberLevel.excludesMembers.includes(item.name) || isExplicitlyExcluded;
+              if (policy.memberLevel.includesMembers.includes(item.name) &&
+               !policy.memberLevel.excludesMembers.includes(item.name)) {
+                return true;
+              }
             } else {
-              isIncluded = true;
+              // If there's no memberLevel policy, we assume that all members are visible
+              return true;
             }
           }
-          return isIncluded && !isExplicitlyExcluded;
+          return false;
         };
 
         for (const dimension of cube.config.dimensions) {
@@ -467,56 +466,56 @@ export class CompilerApi {
       }
     }
 
-    const visibilityFilterForCube = (cube) => {
+    const visibilityPatcherForCube = (cube) => {
       const evaluatedCube = cubeEvaluator.cubeFromPath(cube.config.name);
       if (!cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
-        return (item) => item.isVisible;
+        return (item) => item;
       }
-      return (item) => (item.isVisible && isMemberVisibleInContext[item.name] || false);
+      return (item) => ({
+        ...item,
+        isVisible: item.isVisible && isMemberVisibleInContext[item.name],
+        public: item.public && isMemberVisibleInContext[item.name]
+      });
     };
 
     return cubes
       .map((cube) => ({
         config: {
           ...cube.config,
-          measures: cube.config.measures?.filter(visibilityFilterForCube(cube)),
-          dimensions: cube.config.dimensions?.filter(visibilityFilterForCube(cube)),
-          segments: cube.config.segments?.filter(visibilityFilterForCube(cube)),
+          measures: cube.config.measures?.map(visibilityPatcherForCube(cube)),
+          dimensions: cube.config.dimensions?.map(visibilityPatcherForCube(cube)),
+          segments: cube.config.segments?.map(visibilityPatcherForCube(cube)),
         },
-      })).filter(
-        cube => cube.config.measures?.length ||
-          cube.config.dimensions?.length ||
-          cube.config.segments?.length
-      );
+      }));
   }
 
   async metaConfig(requestContext, options = {}) {
     const { includeCompilerId, ...restOptions } = options;
     const compilers = await this.getCompilers(restOptions);
     const { cubes } = compilers.metaTransformer;
-    const filteredCubes = await this.filterVisibilityByAccessPolicy(
+    const patchedCubes = await this.patchVisibilityByAccessPolicy(
       compilers,
       requestContext,
       cubes
     );
     if (includeCompilerId) {
       return {
-        cubes: filteredCubes,
+        cubes: patchedCubes,
         compilerId: compilers.compilerId,
       };
     }
-    return filteredCubes;
+    return patchedCubes;
   }
 
   async metaConfigExtended(requestContext, options) {
     const compilers = await this.getCompilers(options);
-    const filteredCubes = await this.filterVisibilityByAccessPolicy(
+    const patchedCubes = await this.patchVisibilityByAccessPolicy(
       compilers,
       requestContext,
       compilers.metaTransformer?.cubes
     );
     return {
-      metaConfig: filteredCubes,
+      metaConfig: patchedCubes,
       cubeDefinitions: compilers.metaTransformer?.cubeEvaluator?.cubeDefinitions,
     };
   }

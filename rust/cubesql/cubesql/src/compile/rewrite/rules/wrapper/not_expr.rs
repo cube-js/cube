@@ -4,7 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
@@ -18,14 +18,14 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     not_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 not_expr(wrapper_pushdown_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),
@@ -35,14 +35,14 @@ impl WrapperRules {
                 not_expr(wrapper_pullup_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),
                 wrapper_pullup_replacer(
                     not_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),

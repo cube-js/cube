@@ -21,6 +21,7 @@ import {
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver,
+  DatabaseStructure,
   DriverCapabilities,
   DriverInterface,
   QueryColumnsResult,
@@ -202,7 +203,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         );
       }
 
-      return [];
+      return {};
     } catch (e) {
       if ((<any>e).message.includes('Permission bigquery.tables.get denied on table')) {
         return {};
@@ -212,7 +213,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async tablesSchema() {
+  public async tablesSchema(): Promise<DatabaseStructure> {
     const dataSets = await this.bigquery.getDatasets();
     const dataSetsColumns = await Promise.all(
       dataSets[0].map((dataSet) => this.loadTablesForDataset(dataSet))

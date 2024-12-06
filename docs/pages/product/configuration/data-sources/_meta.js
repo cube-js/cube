@@ -1,6 +1,7 @@
 module.exports = {
-  "aws-athena": "AWS Athena",
-  "aws-redshift": "AWS Redshift",
+  "aws-athena": "Amazon Athena",
+  "aws-redshift": "Amazon Redshift",
+  "pinot": "Apache Pinot",
   "clickhouse": "ClickHouse",
   "databricks-jdbc": "Databricks",
   "druid": "Druid",

@@ -101,7 +101,9 @@ actual account ID.
                 "iam:CreateOpenIDConnectProvider",
                 "iam:PassRole",
                 "iam:TagOpenIDConnectProvider",
-                "logs:CreateLogDelivery"
+                "logs:CreateLogDelivery",
+                "kms:TagResource",
+                "kms:CreateKey"
             ],
             "Resource": "*",
             "Condition": {
@@ -192,7 +194,7 @@ actual account ID.
         },
         {
             "Effect": "Allow",
-            "Action": ["eks:*"],
+            "Action": ["eks:*", "kms:*"],
             "Resource": ["*"],
             "Condition": {
                 "StringEquals": {
