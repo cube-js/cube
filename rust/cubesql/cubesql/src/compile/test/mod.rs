@@ -30,6 +30,8 @@ pub mod test_bi_workarounds;
 #[cfg(test)]
 pub mod test_cube_join;
 #[cfg(test)]
+pub mod test_cube_join_grouped;
+#[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
 pub mod test_introspection;
