@@ -165,6 +165,24 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  describe('RBAC via SQL API default policy', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('default', 'default_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT with member expressions', async () => {
+      const res = await connection.query('SELECT COUNT(city) as count from "users" HAVING (COUNT(1) > 0)');
+      // Pushed SQL queries should not fail
+      expect(res.rows).toMatchSnapshot('users_member_expression');
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;

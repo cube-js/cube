@@ -43,6 +43,27 @@ module.exports = {
         },
       };
     }
+    if (user === 'default') {
+      if (password && password !== 'default_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'default',
+            userAttributes: {
+              region: 'CA',
+              city: 'San Francisco',
+              canHaveAdmin: false,
+              minDefaultId: 20000,
+            },
+            roles: [],
+          },
+        },
+      };
+    }
     throw new Error(`User "${user}" doesn't exist`);
   }
 };
