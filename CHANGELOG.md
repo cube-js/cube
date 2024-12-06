@@ -3,6 +3,48 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.8](https://github.com/cube-js/cube/compare/v1.1.7...v1.1.8) (2024-12-05)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Replace error cause with string formatting ([#8977](https://github.com/cube-js/cube/issues/8977)) ([e948856](https://github.com/cube-js/cube/commit/e94885674cf046e9b7188c1b0a6dc4420415a234))
+* **clickhouse-driver:** Tune ClickHouse errors: remove SQL, catch ping failure ([#8983](https://github.com/cube-js/cube/issues/8983)) ([811a7ce](https://github.com/cube-js/cube/commit/811a7ce2e5957de5e619ab9d22342580f22dc366))
+* **cubesql:** fix unhandled timestamp unwrapping in df/transform_response ([#8952](https://github.com/cube-js/cube/issues/8952)) ([4ea0740](https://github.com/cube-js/cube/commit/4ea0740a4001767ab1863c21c062a7e1487fc4e6))
+* **cubestore:** Disable writing cachestore logs by default to reduce use of disk space ([#9003](https://github.com/cube-js/cube/issues/9003)) ([7ccd607](https://github.com/cube-js/cube/commit/7ccd607027d948e867578767a8c3d54604da68da))
+* **dev_env_setup:** Fix incorrect arguments processing and make console output more user-friendly ([#8999](https://github.com/cube-js/cube/issues/8999)) ([ead97b4](https://github.com/cube-js/cube/commit/ead97b41130a87fa6cb963790fad8e7ddac6cdce))
+* **dev_env_setup:** use relative packages everywhere ([#8910](https://github.com/cube-js/cube/issues/8910)) ([ae823c9](https://github.com/cube-js/cube/commit/ae823c9bb09c893b5601d94fea4dfb33eaf426d7))
+* ensure public is in sync with isVisible when using DAP ([#8980](https://github.com/cube-js/cube/issues/8980)) ([a3ed6ea](https://github.com/cube-js/cube/commit/a3ed6ea0d88e644cb4e7506e857a9d4e29c86759))
+* fix data access policies condition logic ([#8976](https://github.com/cube-js/cube/issues/8976)) ([47e7897](https://github.com/cube-js/cube/commit/47e7897f7d16b9e24f350234c093d81f0b599dca))
+* **ksql-driver:** Kafka, list of brokers ([#9009](https://github.com/cube-js/cube/issues/9009)) ([31d4b46](https://github.com/cube-js/cube/commit/31d4b46a0f84e1095924219f4c34eb56b0efc23c))
+* **schema-compiler:** fix FILTER_PARAMS to populate set and notSet filters in cube's SQL query ([#8937](https://github.com/cube-js/cube/issues/8937)) ([6d82f18](https://github.com/cube-js/cube/commit/6d82f18c59f92cae2bb94fe754aa3c0431c24949)), closes [#9009](https://github.com/cube-js/cube/issues/9009) [#8793](https://github.com/cube-js/cube/issues/8793)
+* **schema-compiler:** Fix incorrect sql generation for view queries referencing measures from joined cubes ([#8991](https://github.com/cube-js/cube/issues/8991)) ([cd7490e](https://github.com/cube-js/cube/commit/cd7490ef0d5bf3fa1b81b7bf1d820b12a04b1e99))
+* **schema-compiler:** Fix ungrouped cumulative queries incorrect sql generation ([#8981](https://github.com/cube-js/cube/issues/8981)) ([82ba01a](https://github.com/cube-js/cube/commit/82ba01ae3695dc7469e76dd8bced1c532bea0865))
+* **schema-compiler:** Undefined columns for lambda pre-aggregation queries referencing dimensions from joined cubes ([#8946](https://github.com/cube-js/cube/issues/8946)) ([41b49f4](https://github.com/cube-js/cube/commit/41b49f4fc00f30da7c30d59f522970a24b0e1426))
+* **schema-compiler:** use query timezone for time granularity origin ([#8936](https://github.com/cube-js/cube/issues/8936)) ([1beba2d](https://github.com/cube-js/cube/commit/1beba2d3fa6e9a7d95c8c18b448e42fd1562a7e6))
+* **server-core:** fix improper requestId retrieval in DAP ([#9017](https://github.com/cube-js/cube/issues/9017)) ([4e366d3](https://github.com/cube-js/cube/commit/4e366d3375cbc8f2d8fc731a644b2310a41edfc0))
+* **server-core:** fix member level access policy evaluation ([#8992](https://github.com/cube-js/cube/issues/8992)) ([ff89d65](https://github.com/cube-js/cube/commit/ff89d65e74894a5310fa391db50d0147a9510946))
+
+
+### Features
+
+* **cubejs-api-gateway:** alternative auth headers ([#8987](https://github.com/cube-js/cube/issues/8987)) ([eb33d1a](https://github.com/cube-js/cube/commit/eb33d1aa6614945f4a73e6c1ef2200abc1917220))
+* **databricks-driver:** Support for intervals and CURRENT_DATE for sql push down ([#9000](https://github.com/cube-js/cube/issues/9000)) ([f61afc3](https://github.com/cube-js/cube/commit/f61afc306b225768f741171a8be9c4c82ec83145))
+* **duckdb-driver:** remove unnecessary installing and loading HttpFS extension  ([#8375](https://github.com/cube-js/cube/issues/8375)) ([0aee4fc](https://github.com/cube-js/cube/commit/0aee4fc9b8563e663030cc2aa0f8805114e746e6))
+* **firebolt:** Automatically start the engine after connection ([#9001](https://github.com/cube-js/cube/issues/9001)) ([8f45afa](https://github.com/cube-js/cube/commit/8f45afa28d568ad48b52b44a167f945b61a6e5eb))
+* **pinot-driver:** add optional oAuth headers ([#8953](https://github.com/cube-js/cube/issues/8953)) ([7b1f797](https://github.com/cube-js/cube/commit/7b1f7975102d204c8ca5cf08d91acb9352d63a08))
+* **sqlplanner:**  Extract alias logic from the symbols ([#8919](https://github.com/cube-js/cube/issues/8919)) ([d1b07f1](https://github.com/cube-js/cube/commit/d1b07f1029aa50bd391ba9e52bd1b575c3659da9))
+
+
+### Performance Improvements
+
+* **cubestore:** ProjectionAboveLimit query optimization ([#8984](https://github.com/cube-js/cube/issues/8984)) ([8a53481](https://github.com/cube-js/cube/commit/8a534817b48b3646439ce2a60dc357ce98e529f2))
+* **cubestore:** Update DataFusion pointer to new GroupsAccumulator changes ([#8985](https://github.com/cube-js/cube/issues/8985)) ([4613628](https://github.com/cube-js/cube/commit/46136282d02573d420afc40fdb3767c9d037c067))
+
+
+
+
+
 ## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
 
 
