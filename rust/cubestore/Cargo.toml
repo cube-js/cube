@@ -10,10 +10,16 @@ members = [
     "cuberockstore",
 ]
 
-# [patch.'https://github.com/cube-js/arrow-rs']
-# parquet = { path = "/Users/sam/arrow-rs", features = ["arrow"] }
-# parquet = { path = "/Users/sam/arrow-rs/parquet" }
-# arrow = { path = "/Users/sam/arrow-rs/arrow" }
+[patch.'https://github.com/cube-js/arrow-rs.git']
+arrow = { path = "/Users/sam/arrow-rs/arrow" }
+arrow-array = { path = "/Users/sam/arrow-rs/arrow-array" }
+arrow-buffer = { path = "/Users/sam/arrow-rs/arrow-buffer" }
+arrow-flight = { path = "/Users/sam/arrow-rs/arrow-flight" }
+arrow-ipc = { path = "/Users/sam/arrow-rs/arrow-ipc" }
+arrow-ord = { path = "/Users/sam/arrow-rs/arrow-ord" }
+arrow-schema = { path = "/Users/sam/arrow-rs/arrow-schema" }
+arrow-string = { path = "/Users/sam/arrow-rs/arrow-string" }
+parquet = { path = "/Users/sam/arrow-rs/parquet" }
 
 [patch.'https://github.com/cube-js/arrow-datafusion']
 # datafusion = { path = "/Users/sam/arrow-datafusion", features = ["default_nulls_last"] }
