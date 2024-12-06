@@ -14,7 +14,6 @@ import {
   isSslKey,
   isSslCert,
 } from '@cubejs-backend/shared';
-import { reduce } from 'ramda';
 import fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
@@ -53,6 +52,7 @@ import {
   TableMemoryData,
   PrimaryKeysQueryResult,
   ForeignKeysQueryResult,
+  DatabaseStructure,
 } from './driver.interface';
 
 /**
@@ -175,8 +175,6 @@ export abstract class BaseDriver implements DriverInterface {
 
   protected logger: any;
 
-  protected isTestConnectionDisabledFlag: boolean = false;
-
   /**
    * Class constructor.
    */
@@ -186,14 +184,8 @@ export abstract class BaseDriver implements DriverInterface {
      * request before determining it as not valid. Default - 10000 ms.
      */
     testConnectionTimeout?: number,
-
-    /**
-     * Flag for serverless DWHs to omit test connection probes.
-     */
-    isTestConnectionDisabled?: boolean,
   } = {}) {
     this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
-    this.isTestConnectionDisabledFlag = _options.isTestConnectionDisabled || false;
   }
 
   protected informationSchemaQuery() {
@@ -410,28 +402,28 @@ export abstract class BaseDriver implements DriverInterface {
     return false;
   }
 
-  protected informationColumnsSchemaReducer(result: any, i: any) {
+  protected informationColumnsSchemaReducer(result: any, i: any): DatabaseStructure {
     let schema = (result[i.table_schema] || {});
-    const tables = (schema[i.table_name] || []);
+    const columns = (schema[i.table_name] || []);
 
-    tables.push({
+    columns.push({
       name: i.column_name,
       type: i.data_type,
       attributes: i.key_type ? ['primaryKey'] : []
     });
 
-    tables.sort();
-    schema[i.table_name] = tables;
+    columns.sort();
+    schema[i.table_name] = columns;
     schema = sortByKeys(schema);
     result[i.table_schema] = schema;
 
     return sortByKeys(result);
   }
 
-  public tablesSchema() {
+  public tablesSchema(): Promise<DatabaseStructure> {
     const query = this.informationSchemaQuery();
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    return this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
   }
 
   // Extended version of tablesSchema containing primary and foreign keys
@@ -622,9 +614,14 @@ export abstract class BaseDriver implements DriverInterface {
     return [];
   }
 
-  public createTable(quotedTableName: string, columns: TableColumn[]) {
+  // This is only for use in tests
+  public async createTableRaw(query: string): Promise<void> {
+    await this.query(query);
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
     const createTableSql = this.createTableSql(quotedTableName, columns);
-    return this.query(createTableSql, []).catch(e => {
+    await this.query(createTableSql, []).catch(e => {
       e.message = `Error during create table: ${createTableSql}: ${e.message}`;
       throw e;
     });
@@ -686,10 +683,6 @@ export abstract class BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
-  }
-
-  public isTestConnectionDisabled(): boolean {
-    return !!this.isTestConnectionDisabledFlag;
   }
 
   /**
@@ -763,7 +756,8 @@ export abstract class BaseDriver implements DriverInterface {
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
-    const parts = bucketName.split('.blob.core.windows.net/');
+    const splitter = bucketName.includes('blob.core') ? '.blob.core.windows.net/' : '.dfs.core.windows.net/';
+    const parts = bucketName.split(splitter);
     const account = parts[0];
     const container = parts[1].split('/')[0];
     let credential: StorageSharedKeyCredential | DefaultAzureCredential;
@@ -817,7 +811,7 @@ export abstract class BaseDriver implements DriverInterface {
 
     const csvFiles: string[] = [];
     const containerClient = blobServiceClient.getContainerClient(container);
-    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}/` });
+    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}` });
     for await (const blob of blobsList) {
       if (blob.name && (blob.name.endsWith('.csv.gz') || blob.name.endsWith('.csv'))) {
         const starts = new Date();

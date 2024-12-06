@@ -29,6 +29,18 @@ pub struct FilterItem {
     pub values: Option<Vec<Option<String>>>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OrderByItem {
+    pub id: String,
+    pub desc: Option<bool>,
+}
+
+impl OrderByItem {
+    pub fn is_desc(&self) -> bool {
+        self.desc.unwrap_or(false)
+    }
+}
+
 impl FilterItem {
     pub fn member(&self) -> Option<&String> {
         self.member.as_ref().or(self.dimension.as_ref())
@@ -43,9 +55,11 @@ pub struct BaseQueryOptionsStatic {
     pub time_dimensions: Option<Vec<TimeDimension>>,
     pub timezone: Option<String>,
     pub filters: Option<Vec<FilterItem>>,
-    #[serde(rename = "joinRoot")]
-    pub join_root: Option<String>, //TODO temporaty. join graph should be rewrited in rust or taked
-                                   //from Js CubeCompiller
+    pub order: Option<Vec<OrderByItem>>,
+    pub limit: Option<String>,
+    #[serde(rename = "rowLimit")]
+    pub row_limit: Option<String>,
+    pub offset: Option<String>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

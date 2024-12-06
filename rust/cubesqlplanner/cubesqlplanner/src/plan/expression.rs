@@ -1,19 +1,50 @@
+use super::Schema;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
+pub struct MemberExpression {
+    pub member: Rc<dyn BaseMember>,
+    pub source: Option<String>,
+}
+
+impl MemberExpression {
+    pub fn new(member: Rc<dyn BaseMember>, source: Option<String>) -> Self {
+        Self { member, source }
+    }
+
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
+        if let Some(reference_column) =
+            schema.find_column_for_member(&self.member.full_name(), &self.source)
+        {
+            templates.column_reference(&reference_column.table_name, &reference_column.alias)
+        } else {
+            self.member.to_sql(context, schema)
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum Expr {
-    Field(Rc<dyn BaseMember>),
-    Reference(String, String),
+    Member(MemberExpression),
 }
 
 impl Expr {
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
         match self {
-            Expr::Field(field) => field.to_sql(context),
-            Expr::Reference(cube_alias, field_alias) => {
-                Ok(format!("{}.{}", cube_alias, field_alias))
-            }
+            Expr::Member(member) => member.to_sql(templates, context, schema),
         }
     }
 }

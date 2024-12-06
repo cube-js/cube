@@ -1,8 +1,7 @@
-use super::dependecy::ContextSymbolDep;
+use super::dependecy::{ContextSymbolDep, Dependency};
 use super::sql_nodes::SqlNode;
-use super::visitor::EvaluatorVisitor;
 use super::EvaluationNode;
-use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSqlArg};
+use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSqlArg, MemberSqlStruct};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -10,37 +9,24 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct SqlEvaluatorVisitor {
     query_tools: Rc<QueryTools>,
-    cube_alias_prefix: Option<String>,
-    node_processor: Rc<dyn SqlNode>,
 }
 
 impl SqlEvaluatorVisitor {
-    pub fn new(
-        query_tools: Rc<QueryTools>,
-        cube_alias_prefix: Option<String>,
+    pub fn new(query_tools: Rc<QueryTools>) -> Self {
+        Self { query_tools }
+    }
+
+    pub fn apply(
+        &mut self,
+        node: &Rc<EvaluationNode>,
         node_processor: Rc<dyn SqlNode>,
-    ) -> Self {
-        Self {
-            query_tools,
-            cube_alias_prefix,
-            node_processor,
-        }
-    }
-
-    pub fn cube_alias_prefix(&self) -> &Option<String> {
-        &self.cube_alias_prefix
-    }
-}
-
-impl EvaluatorVisitor for SqlEvaluatorVisitor {
-    fn apply(&mut self, node: &Rc<EvaluationNode>) -> Result<String, CubeError> {
-        self.on_node_enter(node)?;
-        let node_processor = self.node_processor.clone();
-        let result = node_processor.to_sql(self, node, self.query_tools.clone())?;
+    ) -> Result<String, CubeError> {
+        let result =
+            node_processor.to_sql(self, node, self.query_tools.clone(), node_processor.clone())?;
         Ok(result)
     }
 
-    fn apply_context_symbol(
+    pub fn apply_context_symbol(
         &mut self,
         context_symbol: &ContextSymbolDep,
     ) -> Result<MemberSqlArg, CubeError> {
@@ -60,5 +46,51 @@ impl EvaluatorVisitor for SqlEvaluatorVisitor {
             }
         };
         Ok(res)
+    }
+
+    pub fn evaluate_deps(
+        &mut self,
+        node: &Rc<EvaluationNode>,
+        node_processor: Rc<dyn SqlNode>,
+    ) -> Result<Vec<MemberSqlArg>, CubeError> {
+        node.deps()
+            .iter()
+            .map(|d| self.evaluate_single_dep(&d, node_processor.clone()))
+            .collect()
+    }
+
+    fn evaluate_single_dep(
+        &mut self,
+        dep: &Dependency,
+        node_processor: Rc<dyn SqlNode>,
+    ) -> Result<MemberSqlArg, CubeError> {
+        match dep {
+            Dependency::SingleDependency(dep) => Ok(MemberSqlArg::String(
+                self.apply(dep, node_processor.clone())?,
+            )),
+            Dependency::StructDependency(dep) => {
+                let mut res = MemberSqlStruct::default();
+                if let Some(sql_fn) = &dep.sql_fn {
+                    res.sql_fn = Some(self.apply(sql_fn, node_processor.clone())?);
+                }
+                if let Some(to_string_fn) = &dep.to_string_fn {
+                    res.to_string_fn = Some(self.apply(to_string_fn, node_processor.clone())?);
+                }
+                for (k, v) in dep.properties.iter() {
+                    match v {
+                        Dependency::SingleDependency(dep) => {
+                            res.properties
+                                .insert(k.clone(), self.apply(dep, node_processor.clone())?);
+                        }
+                        Dependency::StructDependency(_) => unimplemented!(),
+                        Dependency::ContextDependency(_) => unimplemented!(),
+                    }
+                }
+                Ok(MemberSqlArg::Struct(res))
+            }
+            Dependency::ContextDependency(contex_symbol) => {
+                self.apply_context_symbol(contex_symbol)
+            }
+        }
     }
 }

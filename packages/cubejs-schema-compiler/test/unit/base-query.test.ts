@@ -1356,7 +1356,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIME2) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
+          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
           [
             '__TO_PARTITION_RANGE',
           ],
@@ -1586,15 +1586,37 @@ describe('SQL Generation', () => {
         cubes: [{
           name: 'Order',
           sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
-          measures: [{
-            name: 'count',
-            type: 'count',
-          }],
-          dimensions: [{
-            name: 'type',
-            sql: 'type',
-            type: 'string'
-          }]
+          measures: [
+            {
+              name: 'count',
+              type: 'count',
+            },
+            {
+              name: 'avg_filtered',
+              sql: 'product_id',
+              type: 'avg',
+              filters: [
+                { sql: `{FILTER_PARAMS.Order.category.filter('category')}` }
+              ]
+            }
+          ],
+          dimensions: [
+            {
+              name: 'type',
+              sql: 'type',
+              type: 'string'
+            },
+            {
+              name: 'category',
+              sql: 'category',
+              type: 'string'
+            },
+            {
+              name: 'proxied',
+              sql: `{FILTER_PARAMS.Order.type.filter("x => type = 'online'")}`,
+              type: 'boolean',
+            }
+          ]
         }],
         views: [{
           name: 'orders_view',
@@ -1762,6 +1784,84 @@ describe('SQL Generation', () => {
       expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
     });
 
+    it('equals NULL filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'equals',
+                values: [null],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NULL)))');
+    });
+
+    it('notSet(IS NULL) filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'notSet',
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NULL)))');
+    });
+
+    it('notEquals NULL filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'notEquals',
+                values: [null],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NOT NULL)))');
+    });
+
+    it('set(IS NOT NULL) filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'set',
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NOT NULL)))');
+    });
+
     it('propagate filter params from view into cube\'s query', async () => {
       await compilers.compiler.compile();
       const query = new BaseQuery(compilers, {
@@ -1828,6 +1928,53 @@ describe('SQL Generation', () => {
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
       expect(/select\s+\*\s+from\s+order\s+where\s+\(\(type\s=\s\?\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('correctly substitute filter params in cube\'s query dimension used in filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        dimensions: ['Order.proxied'],
+        filters: [
+          {
+            member: 'Order.proxied',
+            operator: 'equals',
+            values: [true],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString).toContain(`SELECT
+      (1 = 1) "order__proxied", count(*) "order__count"
+    FROM
+      (select * from order where (1 = 1)) AS "order"  WHERE ((1 = 1) = ?)`);
+    });
+
+    it('correctly substitute filter params in cube\'s query measure used in filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.avg_filtered'],
+        dimensions: ['Order.type'],
+        filters: [
+          {
+            member: 'Order.type',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'Order.category',
+            operator: 'equals',
+            values: ['category'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString).toContain(`SELECT
+      "order".type "order__type", avg(CASE WHEN ((category = ?)) THEN "order".product_id END) "order__avg_filtered"
+    FROM
+      (select * from order where (type = ?)) AS "order"  WHERE ("order".type = ?) AND ("order".category = ?)`);
     });
   });
 

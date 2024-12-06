@@ -12,9 +12,20 @@ An environment provides access to your data model. Cube Cloud provides the follo
   You cannot query the development enviornment unless your user is in dev mode on the branch you are trying to access.
 
 ## Staging Environments
-Staging environments are typically only available when the linked branch is active.
-An active branch is the one that is selected on the Data Model screen by at least one user.
-To keep a staging environment always active, toggle the switch for the corresponding branch in Settings > Staging Environments.
+Staging environments are created for each branch in your repository. By default, these environments are only accessible when the branch is being viewed on the Data Model screen by at least one user. When no users are viewing the branch, the environment becomes inactive and inaccessible.
+
+To maintain continuous access to a staging environment regardless of user activity, you can use the "Always Active" toggle in Settings > Staging Environments. Here's how it works:
+
+- Toggle OFF (default): The environment is only accessible when users are viewing the branch. When no users are viewing the branch, queries to this environment will fail.
+- Toggle ON: The environment remains active and accessible 24/7, regardless of user activity.
+
+### Cost Implications
+Please note that staging environments consume resources only when they are being used:
+- Environments automatically suspend after 10 minutes of inactivity, regardless of the "Always Active" toggle setting
+- You are only charged for the time when environments are being used
+
+Therefore, the "Always Active" toggle only affects accessibility to inactive branches and does not impact your costs directly.
+
 <Screenshot
   src="https://ucarecdn.com/b0e81a61-5887-424b-af89-d5e9cebb24f2/"
   alt="Staging Environments settings"

@@ -16,6 +16,9 @@ pub struct V1CubeMetaDimension {
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub r#type: String,
+    /// When dimension is defined in View, it keeps the original path: Cube.dimension
+    #[serde(rename = "aliasMember", skip_serializing_if = "Option::is_none")]
+    pub alias_member: Option<String>,
     #[serde(rename = "granularities", skip_serializing_if = "Option::is_none")]
     pub granularities: Option<Vec<crate::models::V1CubeMetaDimensionGranularity>>,
     #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
@@ -28,6 +31,7 @@ impl V1CubeMetaDimension {
             name,
             description: None,
             r#type,
+            alias_member: None,
             granularities: None,
             meta: None,
         }

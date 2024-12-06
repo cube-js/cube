@@ -32,12 +32,8 @@ async fn test_change_user_via_filter() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -63,12 +59,8 @@ async fn test_change_user_via_in_filter() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -87,12 +79,8 @@ async fn test_change_user_via_in_filter_thoughtspot() {
         measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
         segments: Some(vec![]),
         dimensions: Some(vec![]),
-        time_dimensions: None,
         order: Some(vec![]),
-        limit: None,
-        offset: None,
-        filters: None,
-        ungrouped: None,
+        ..Default::default()
     };
 
     let cube_scan = query_plan.as_logical_plan().find_cube_scan();
@@ -130,12 +118,8 @@ async fn test_change_user_via_filter_powerbi() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -158,10 +142,7 @@ async fn test_change_user_via_filter_and() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
             filters: Some(vec![V1LoadRequestQueryFilterItem {
                 member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                 operator: Some("equals".to_string()),
@@ -169,7 +150,7 @@ async fn test_change_user_via_filter_and() {
                 or: None,
                 and: None,
             }]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -210,12 +191,9 @@ async fn test_user_with_join() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
             dimensions: Some(vec![]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
             ungrouped: Some(true),
+            ..Default::default()
         }
     );
 
@@ -253,12 +231,8 @@ async fn test_change_user_via_filter_with_alias() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             segments: Some(vec![]),
             dimensions: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -297,6 +271,6 @@ GROUP BY 1
     let sql_query = load_calls[0].sql_query.as_ref().unwrap();
     // This should be placed from load meta to query by TestConnectionTransport::sql
     // It would mean that SQL generation used changed user
-    assert!(sql_query.sql.contains(r#""changeUser":"gopher""#));
+    assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
 }

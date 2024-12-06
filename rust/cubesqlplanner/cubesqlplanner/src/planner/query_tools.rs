@@ -106,6 +106,10 @@ impl QueryTools {
         name.to_case(Case::Snake).replace(".", "__")
     }
 
+    pub fn escaped_alias_name(&self, name: &str) -> String {
+        self.escape_column_name(&self.alias_name(name))
+    }
+
     pub fn cube_alias_name(&self, name: &str, prefix: &Option<String>) -> String {
         if let Some(prefix) = prefix {
             self.alias_name(&format!("{}__{}", prefix, self.alias_name(name)))
@@ -114,19 +118,14 @@ impl QueryTools {
         }
     }
 
-    pub fn auto_prefix_with_cube_name(
-        &self,
-        cube_name: &str,
-        sql: &str,
-        prefix: &Option<String>,
-    ) -> String {
+    pub fn auto_prefix_with_cube_name(&self, cube_name: &str, sql: &str) -> String {
         lazy_static! {
             static ref SINGLE_MEMBER_RE: Regex = Regex::new(r"^[_a-zA-Z][_a-zA-Z0-9]*$").unwrap();
         }
         if SINGLE_MEMBER_RE.is_match(sql) {
             format!(
                 "{}.{}",
-                self.escape_column_name(&self.cube_alias_name(&cube_name, prefix)),
+                self.escape_column_name(&self.cube_alias_name(&cube_name, &None)),
                 sql
             )
         } else {

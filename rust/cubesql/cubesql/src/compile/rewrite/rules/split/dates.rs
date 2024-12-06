@@ -1,7 +1,8 @@
 use crate::{
     compile::rewrite::{
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::ConstantFolding,
         cast_expr, literal_expr,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::{
             members::min_granularity,
             split::SplitRules,
@@ -12,10 +13,9 @@ use crate::{
     var,
 };
 use datafusion::scalar::ScalarValue;
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn date_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn date_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO check for time dimension before push down to optimize performance
         // TODO use pass-through instead point rules for epoch
         self.single_arg_split_point_rules(
@@ -149,14 +149,7 @@ impl SplitRules {
         &self,
         date_part_var: &str,
         new_date_part_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let date_part_var = var!(date_part_var);
         let new_date_part_var = var!(new_date_part_var);
         move |_, egraph, subst| {
@@ -193,14 +186,7 @@ impl SplitRules {
         date_part_var: &str,
         new_date_part_var: &str,
         new_trunc_granularity_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let date_part_var = var!(date_part_var);
         let new_date_part_var = var!(new_date_part_var);
         let new_trunc_granularity_var = var!(new_trunc_granularity_var);
@@ -242,14 +228,7 @@ impl SplitRules {
         inner_var: &str,
         new_outer_var: &str,
         new_inner_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let outer_var = var!(outer_var);
         let inner_var = var!(inner_var);
         let new_outer_var = var!(new_outer_var);

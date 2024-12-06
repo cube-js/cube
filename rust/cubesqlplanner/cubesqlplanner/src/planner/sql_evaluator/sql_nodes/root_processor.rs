@@ -3,6 +3,7 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
+use std::any::Any;
 use std::rc::Rc;
 
 pub struct RootSqlNode {
@@ -26,6 +27,22 @@ impl RootSqlNode {
             default_processor,
         })
     }
+
+    pub fn dimension_processor(&self) -> &Rc<dyn SqlNode> {
+        &self.dimension_processor
+    }
+
+    pub fn measure_processor(&self) -> &Rc<dyn SqlNode> {
+        &self.measure_processor
+    }
+
+    pub fn cube_name_processor(&self) -> &Rc<dyn SqlNode> {
+        &self.cube_name_processor
+    }
+
+    pub fn default_processor(&self) -> &Rc<dyn SqlNode> {
+        &self.default_processor
+    }
 }
 
 impl SqlNode for RootSqlNode {
@@ -34,24 +51,47 @@ impl SqlNode for RootSqlNode {
         visitor: &mut SqlEvaluatorVisitor,
         node: &Rc<EvaluationNode>,
         query_tools: Rc<QueryTools>,
+        node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
         let res = match node.symbol() {
-            MemberSymbolType::Dimension(_) => {
-                self.dimension_processor
-                    .to_sql(visitor, node, query_tools.clone())?
-            }
-            MemberSymbolType::Measure(_) => {
-                self.measure_processor
-                    .to_sql(visitor, node, query_tools.clone())?
-            }
-            MemberSymbolType::CubeName(_) => {
-                self.cube_name_processor
-                    .to_sql(visitor, node, query_tools.clone())?
-            }
-            _ => self
-                .default_processor
-                .to_sql(visitor, node, query_tools.clone())?,
+            MemberSymbolType::Dimension(_) => self.dimension_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+            )?,
+            MemberSymbolType::Measure(_) => self.measure_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+            )?,
+            MemberSymbolType::CubeName(_) => self.cube_name_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+            )?,
+            _ => self.default_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+            )?,
         };
         Ok(res)
+    }
+
+    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+        self.clone()
+    }
+
+    fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
+        vec![
+            self.dimension_processor.clone(),
+            self.measure_processor.clone(),
+            self.cube_name_processor.clone(),
+            self.default_processor.clone(),
+        ]
     }
 }

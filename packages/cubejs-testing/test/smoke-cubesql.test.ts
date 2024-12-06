@@ -471,5 +471,33 @@ describe('SQL API', () => {
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('timestamps');
     });
+
+    test('query views with deep joins', async () => {
+      const query = `
+      SELECT
+        CAST(
+          DATE_TRUNC(
+            'MONTH',
+            CAST(
+              CAST("OrdersItemsPrefixView"."Orders_createdAt" AS DATE) AS TIMESTAMP
+            )
+          ) AS DATE
+        ) AS "Calculation_1055547778125863",
+        SUM("OrdersItemsPrefixView"."Orders_arpu") AS "Orders_arpu",
+        SUM("OrdersItemsPrefixView"."Orders_refundRate") AS "Orders_refundRate",
+        SUM("OrdersItemsPrefixView"."Orders_netCollectionCompleted") AS "Orders_netCollectionCompleted"
+      FROM
+        OrdersItemsPrefixView
+      WHERE
+        OrdersItemsPrefixView.Orders_createdAt >= '2024-01-01T00:00:00.000'
+        AND OrdersItemsPrefixView.Orders_createdAt <= '2024-12-31T23:59:59.999'
+        AND (OrdersItemsPrefixView.Orders_status IN ('shipped', 'processed'))
+        AND (OrdersItemsPrefixView.OrderItems_type IN ('Electronics', 'Home'))
+      GROUP BY 1
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('query-view-deep-joins');
+    });
   });
 });

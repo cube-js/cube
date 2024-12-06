@@ -1,5 +1,5 @@
-use crate::plan::{Expr, OrderBy};
-use crate::planner::QueryProperties;
+use crate::plan::{Expr, MemberExpression, OrderBy};
+use crate::planner::{BaseMember, OrderByItem, QueryProperties};
 use std::rc::Rc;
 
 pub struct OrderPlanner {
@@ -12,27 +12,30 @@ impl OrderPlanner {
     }
 
     pub fn default_order(&self) -> Vec<OrderBy> {
-        if let Some(granularity_dim) = self
-            .query_properties
-            .time_dimensions()
-            .iter()
-            .find(|d| d.has_granularity())
-        {
-            vec![OrderBy::new(Expr::Field(granularity_dim.clone()), true)]
-        } else if !self.query_properties.measures().is_empty()
-            && !self.query_properties.dimensions().is_empty()
-        {
-            vec![OrderBy::new(
-                Expr::Field(self.query_properties.measures()[0].clone()),
-                false,
-            )]
-        } else if !self.query_properties.dimensions().is_empty() {
-            vec![OrderBy::new(
-                Expr::Field(self.query_properties.dimensions()[0].clone()),
-                true,
-            )]
-        } else {
-            vec![]
+        Self::custom_order(
+            self.query_properties.order_by(),
+            &self.query_properties.all_members(false),
+        )
+    }
+
+    pub fn custom_order(
+        order_by: &Vec<OrderByItem>,
+        members: &Vec<Rc<dyn BaseMember>>,
+    ) -> Vec<OrderBy> {
+        let mut result = Vec::new();
+        for itm in order_by.iter() {
+            if let Some((pos, member)) = members
+                .iter()
+                .enumerate()
+                .find(|(_, m)| m.full_name().to_lowercase() == itm.name().to_lowercase())
+            {
+                result.push(OrderBy::new(
+                    Expr::Member(MemberExpression::new(member.clone(), None)),
+                    pos + 1,
+                    itm.desc(),
+                ));
+            }
         }
+        result
     }
 }

@@ -1,4 +1,5 @@
 use super::filter_operator::FilterOperator;
+use crate::plan::Schema;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::sql_templates::filter::FilterTemplates;
@@ -57,9 +58,21 @@ impl BaseFilter {
         }))
     }
 
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        let member_sql =
-            evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
+    pub fn member_name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
+    pub fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
+        let member_sql = evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            schema,
+        )?;
         let res = match self.filter_operator {
             FilterOperator::Equal => self.equals_where(&member_sql)?,
             FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,

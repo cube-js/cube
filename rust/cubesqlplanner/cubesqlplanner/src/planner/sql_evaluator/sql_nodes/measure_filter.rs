@@ -1,9 +1,9 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::visitor::EvaluatorVisitor;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
+use std::any::Any;
 use std::rc::Rc;
 
 pub struct MeasureFilterSqlNode {
@@ -14,6 +14,10 @@ impl MeasureFilterSqlNode {
     pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self { input })
     }
+
+    pub fn input(&self) -> &Rc<dyn SqlNode> {
+        &self.input
+    }
 }
 
 impl SqlNode for MeasureFilterSqlNode {
@@ -22,8 +26,11 @@ impl SqlNode for MeasureFilterSqlNode {
         visitor: &mut SqlEvaluatorVisitor,
         node: &Rc<EvaluationNode>,
         query_tools: Rc<QueryTools>,
+        node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let input = self.input.to_sql(visitor, node, query_tools.clone())?;
+        let input =
+            self.input
+                .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?;
         let res = match node.symbol() {
             MemberSymbolType::Measure(ev) => {
                 let measure_filters = ev.measure_filters();
@@ -31,11 +38,13 @@ impl SqlNode for MeasureFilterSqlNode {
                     let filters = measure_filters
                         .iter()
                         .map(|filter| -> Result<String, CubeError> {
-                            Ok(format!("({})", visitor.apply(filter)?))
+                            Ok(format!(
+                                "({})",
+                                visitor.apply(filter, node_processor.clone())?
+                            ))
                         })
                         .collect::<Result<Vec<_>, _>>()?
                         .join(" AND ");
-                    //return `CASE WHEN ${where} THEN ${evaluateSql === '*' ? '1' : evaluateSql} END`;
                     let result = if input.as_str() == "*" {
                         "1".to_string()
                     } else {
@@ -53,5 +62,13 @@ impl SqlNode for MeasureFilterSqlNode {
             }
         };
         Ok(res)
+    }
+
+    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+        self.clone()
+    }
+
+    fn childs(&self) -> Vec<Rc<dyn SqlNode>> {
+        vec![self.input.clone()]
     }
 }
