@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.6](https://github.com/cube-js/cube/compare/v1.0.5...v1.0.6) (2024-12-07)
+
+
+### Bug Fixes
+
+* **schema-compiler:** set missed CUBESQL_SQL_PUSH_DOWN to true by default in convertTzForRawTimeDimension flag ([#8939](https://github.com/cube-js/cube/issues/8939)) ([b20a3ca](https://github.com/cube-js/cube/commit/b20a3ca087e7002b6600e6d4c82d6a2372d54e1e))
+
+
+
+
+
 ## [1.0.3](https://github.com/cube-js/cube/compare/v1.0.2...v1.0.3) (2024-10-22)
 
 
