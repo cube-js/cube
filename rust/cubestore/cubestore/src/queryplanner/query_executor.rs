@@ -745,9 +745,14 @@ impl CubeTable {
                             SortOptions::default(),
                         ))}).collect::<Result<Vec<_>, _>>()?])
                         ;
-                    let parquet_exec = ParquetExecBuilder::new(file_scan)
-                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone())
-                        .build();
+                    let parquet_exec_builder = ParquetExecBuilder::new(file_scan)
+                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                    let parquet_exec_builder = if let Some(phys_pred) = &physical_predicate {
+                        parquet_exec_builder.with_predicate(phys_pred.clone())
+                    } else {
+                        parquet_exec_builder
+                    };
+                    let parquet_exec = parquet_exec_builder.build();
 
                     Arc::new(parquet_exec)
                 };
