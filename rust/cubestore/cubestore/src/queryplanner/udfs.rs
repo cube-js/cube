@@ -45,6 +45,7 @@ pub fn registerable_scalar_udfs() -> Vec<ScalarUDF> {
         ScalarUDF::new_from_impl(DateBin::new()),
         ScalarUDF::new_from_impl(DateAddSub::new_add()),
         ScalarUDF::new_from_impl(DateAddSub::new_sub()),
+        ScalarUDF::new_from_impl(UnixTimestamp::new()),
     ]
 }
 
