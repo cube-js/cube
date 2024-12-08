@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { asyncMemoizeBackground, asyncRetry, BackgroundMemoizeOptions } from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
 import jwkToPem from 'jwk-to-pem';
+import { ProxyAgent } from 'proxy-agent';
 import { JWTOptions } from './interfaces';
 
 const HEADER_REGEXP = /([a-zA-Z][a-zA-Z_-]*)\s*(?:=(?:"([^"]*)"|([^ \t",;]*)))?/g;
@@ -51,7 +52,7 @@ export type JWKsFetcherOptions = Pick<BackgroundMemoizeOptions<any, any>, 'onBac
 
 export const createJWKsFetcher = (jwtOptions: JWTOptions, options: JWKsFetcherOptions) => {
   const fetchJwkUrl = asyncMemoizeBackground(async (url: string) => {
-    const response = await asyncRetry(() => fetch(url), {
+    const response = await asyncRetry(() => fetch(url, { agent: new ProxyAgent() }), {
       times: jwtOptions.jwkRetry || 3,
     });
     const json = await response.json();
