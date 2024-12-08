@@ -8285,15 +8285,34 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     );
 
     // ====================================
-    let res = assert_limit_pushdown(
+    assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT a, b, c FROM foo.pushdown_where_group1
-                union all
-                SELECT a_alias a, b_alias b, c_alias c FROM foo.pushdown_where_group2_with_alias
+                    SELECT a, b, c FROM foo.pushdown_where_group1
+                    UNION ALL
+                    SELECT a_alias a, b_alias b, c_alias c FROM foo.pushdown_where_group2_with_alias
                 ) as `tb`
-                ORDER BY 3 DESC LIMIT 3",
+                ORDER BY 3 DESC
+                LIMIT 10",
         Some("ind2"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+
+    // ====================================
+    assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                    SELECT a, b, c FROM foo.pushdown_where_group1
+                    UNION ALL
+                    SELECT a_alias a, b_alias b, c_alias c FROM foo.pushdown_where_group2_with_alias
+                ) as `tb`
+                WHERE b = 20
+                ORDER BY 1 DESC, 3 DESC
+                LIMIT 3",
+        Some("ind1"),
         true,
         true,
     )

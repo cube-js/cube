@@ -769,24 +769,35 @@ impl PlanRewriter for ChooseIndex<'_> {
             LogicalPlan::Projection { expr, .. } => {
                 let alias_to_column = get_alias_to_column(expr);
 
-                if let Some(sort) = &context.sort {
+                let new_single_value_filtered_cols = context
+                    .single_value_filtered_cols
+                    .iter()
+                    .map(|name| {
+                        alias_to_column
+                            .get(name)
+                            .map_or_else(|| name.clone(), |col| col.name.clone())
+                    })
+                    .collect();
+
+                let mut new_context =
+                    context.update_single_value_filtered_cols(new_single_value_filtered_cols);
+
+                if let Some(sort) = &new_context.sort {
                     let names: Vec<String> = sort
-                        .clone()
                         .iter()
                         .map(|k| {
                             alias_to_column
                                 .get(k)
-                                .map_or_else(|| k.clone(), |v| v.name.clone())
+                                .map_or_else(|| k.clone(), |col| col.name.clone())
                         })
                         .collect();
 
                     if !names.is_empty() {
-                        return Some(context.update_sort(names, context.sort_is_asc));
-                    } else {
-                        return None;
+                        new_context = new_context.update_sort(names, context.sort_is_asc);
                     }
                 }
-                None
+
+                Some(new_context)
             }
             LogicalPlan::Limit { n, .. } => Some(context.update_limit(Some(*n))),
             LogicalPlan::Skip { n, .. } => {
