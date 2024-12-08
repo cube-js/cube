@@ -341,7 +341,7 @@ class ResultSet {
     const pivotImpl = (resultIndex = 0) => {
       let groupByXAxis = groupByToPairs(({ xValues }) => this.axisValuesString(xValues));
 
-      const measureValue = (row, measure) => row[measure] || 0;
+      const measureValue = (row, measure) => row[measure] || pivotConfig.fillWithValue || 0;
 
       if (
         pivotConfig.fillMissingDates &&
