@@ -1,7 +1,9 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
 use super::{evaluate_with_context, BaseMember, VisitorContext};
-use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
+use crate::cube_bridge::measure_definition::{
+    MeasureDefinition, RollingWindow, TimeShiftReference,
+};
 use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -193,6 +195,22 @@ impl BaseMeasure {
 
     pub fn is_multi_stage(&self) -> bool {
         self.definition.static_data().multi_stage.unwrap_or(false)
+    }
+
+    pub fn rolling_window(&self) -> &Option<RollingWindow> {
+        &self.definition.static_data().rolling_window
+    }
+
+    pub fn is_rolling_window(&self) -> bool {
+        self.rolling_window().is_some()
+    }
+
+    pub fn is_running_total(&self) -> bool {
+        self.measure_type() == "runningTotal"
+    }
+
+    pub fn is_cumulative(&self) -> bool {
+        self.is_rolling_window() || self.is_running_total()
     }
 
     //FIXME dublicate with symbol

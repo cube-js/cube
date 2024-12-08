@@ -62,10 +62,33 @@ impl EvaluationNode {
         self.symbol.full_name()
     }
 
+    pub fn name(&self) -> String {
+        self.symbol.name()
+    }
+
     pub fn is_measure(&self) -> bool {
         self.symbol.is_measure()
     }
     pub fn is_dimension(&self) -> bool {
         self.symbol.is_dimension()
+    }
+
+    pub fn try_split_measure(self: Rc<Self>, source_name: String) -> Option<(Rc<Self>, Rc<Self>)> {
+        match &self.symbol {
+            MemberSymbolType::Measure(measure_symbol) => {
+                let (measure, source) = measure_symbol.split_with_source(source_name);
+                let source = Self {
+                    symbol: MemberSymbolType::Measure(source),
+                    deps: self.deps.clone(),
+                };
+                let source = Rc::new(source);
+                let measure = Self {
+                    symbol: MemberSymbolType::Measure(measure),
+                    deps: vec![Dependency::SingleDependency(source.clone())],
+                };
+                Some((Rc::new(measure), source))
+            }
+            _ => None,
+        }
     }
 }

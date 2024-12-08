@@ -2,8 +2,112 @@ use super::{Schema, SingleAliasedSource};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
+use lazy_static::lazy_static;
 
 use std::rc::Rc;
+
+pub struct RollingWindowJoinCondition {
+    data_source: String,
+    time_series_source: String,
+    trailing_interval: Option<String>,
+    leading_interval: Option<String>,
+    offset: String,
+    time_dimension: Rc<dyn BaseMember>,
+}
+
+impl RollingWindowJoinCondition {
+    pub fn new(
+        data_source: String,
+        time_series_source: String,
+        trailing_interval: Option<String>,
+        leading_interval: Option<String>,
+        offset: String,
+        time_dimension: Rc<dyn BaseMember>,
+    ) -> Self {
+        Self {
+            data_source,
+            time_series_source,
+            trailing_interval,
+            leading_interval,
+            offset,
+            time_dimension,
+        }
+    }
+
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
+        let mut conditions = vec![];
+        let date_column_alias =
+            self.resolve_time_column_alias(templates, context.clone(), schema.clone())?;
+
+        lazy_static! {
+            static ref UNBOUNDED: Option<String> = Some("unbounded".to_string());
+        }
+
+        if self.trailing_interval != *UNBOUNDED {
+            let start_date = if self.offset == "start" {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?
+            } else {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
+            };
+
+            let trailing_start = if let Some(trailing_interval) = &self.trailing_interval {
+                format!("{start_date} - interval '{trailing_interval}'")
+            } else {
+                start_date
+            };
+
+            let sign = if self.offset == "start" { ">=" } else { ">" };
+
+            conditions.push(format!("{date_column_alias} {sign} {trailing_start}"));
+        }
+
+        if self.leading_interval != *UNBOUNDED {
+            let end_date = if self.offset == "end" {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?
+            } else {
+                templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?
+            };
+
+            let leading_end = if let Some(leading_interval) = &self.leading_interval {
+                format!("{end_date} + interval '{leading_interval}'")
+            } else {
+                end_date
+            };
+
+            let sign = if self.offset == "end" { "<=" } else { "<" };
+
+            conditions.push(format!("{date_column_alias} {sign} {leading_end}"));
+        }
+        let result = if conditions.is_empty() {
+            templates.always_true()?
+        } else {
+            conditions.join(" AND ")
+        };
+        Ok(result)
+    }
+
+    fn resolve_time_column_alias(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
+        let schema = schema.extract_source_schema(&self.data_source);
+        let source = Some(self.data_source.clone());
+        if let Some(column) =
+            schema.find_column_for_member(&self.time_dimension.full_name(), &source)
+        {
+            templates.column_reference(&source, &column.alias.clone())
+        } else {
+            self.time_dimension.to_sql(context.clone(), schema.clone())
+        }
+    }
+}
 
 pub struct DimensionJoinCondition {
     left_source: String,
@@ -92,6 +196,7 @@ impl DimensionJoinCondition {
 pub enum JoinCondition {
     DimensionJoinCondition(DimensionJoinCondition),
     BaseJoinCondition(Rc<dyn BaseJoinCondition>),
+    RollingWindowJoinCondition(RollingWindowJoinCondition),
 }
 
 impl JoinCondition {
@@ -109,6 +214,24 @@ impl JoinCondition {
         ))
     }
 
+    pub fn new_rolling_join(
+        data_source: String,
+        time_series_source: String,
+        trailing_interval: Option<String>,
+        leading_interval: Option<String>,
+        offset: String,
+        time_dimension: Rc<dyn BaseMember>,
+    ) -> Self {
+        Self::RollingWindowJoinCondition(RollingWindowJoinCondition::new(
+            data_source,
+            time_series_source,
+            trailing_interval,
+            leading_interval,
+            offset,
+            time_dimension,
+        ))
+    }
+
     pub fn new_base_join(base: Rc<dyn BaseJoinCondition>) -> Self {
         Self::BaseJoinCondition(base)
     }
@@ -122,6 +245,9 @@ impl JoinCondition {
         match &self {
             JoinCondition::DimensionJoinCondition(cond) => cond.to_sql(templates, context, schema),
             JoinCondition::BaseJoinCondition(cond) => cond.to_sql(context, schema),
+            JoinCondition::RollingWindowJoinCondition(cond) => {
+                cond.to_sql(templates, context, schema)
+            }
         }
     }
 }

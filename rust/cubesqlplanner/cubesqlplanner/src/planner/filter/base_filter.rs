@@ -8,7 +8,6 @@ use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::rc::Rc;
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FilterType {
@@ -26,6 +25,14 @@ pub struct BaseFilter {
     templates: FilterTemplates,
 }
 
+impl PartialEq for BaseFilter {
+    fn eq(&self, other: &Self) -> bool {
+        self.filter_type == other.filter_type
+            && self.filter_operator == other.filter_operator
+            && self.values == other.values
+    }
+}
+
 lazy_static! {
     static ref DATE_TIME_LOCAL_MS_RE: Regex =
         Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$").unwrap();
@@ -39,7 +46,7 @@ impl BaseFilter {
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<EvaluationNode>,
         filter_type: FilterType,
-        filter_operator: String,
+        filter_operator: FilterOperator,
         values: Option<Vec<Option<String>>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates = FilterTemplates::new(query_tools.templates_render());
@@ -52,10 +59,33 @@ impl BaseFilter {
             query_tools,
             member_evaluator,
             filter_type,
-            filter_operator: FilterOperator::from_str(&filter_operator)?,
+            filter_operator,
             values,
             templates,
         }))
+    }
+
+    pub fn change_operator(
+        &self,
+        filter_operator: FilterOperator,
+        values: Vec<Option<String>>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            query_tools: self.query_tools.clone(),
+            member_evaluator: self.member_evaluator.clone(),
+            filter_type: self.filter_type.clone(),
+            filter_operator,
+            values,
+            templates: self.templates.clone(),
+        })
+    }
+
+    pub fn values(&self) -> &Vec<Option<String>> {
+        &self.values
+    }
+
+    pub fn filter_operator(&self) -> &FilterOperator {
+        &self.filter_operator
     }
 
     pub fn member_name(&self) -> String {
@@ -77,6 +107,7 @@ impl BaseFilter {
             FilterOperator::Equal => self.equals_where(&member_sql)?,
             FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,
             FilterOperator::InDateRange => self.in_date_range(&member_sql)?,
+            FilterOperator::InDateRangeExtended => self.in_date_range_extended(&member_sql)?,
             FilterOperator::In => self.in_where(&member_sql)?,
             FilterOperator::NotIn => self.not_in_where(&member_sql)?,
             FilterOperator::Set => self.set_where(&member_sql)?,
@@ -123,6 +154,45 @@ impl BaseFilter {
 
     fn in_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
         let (from, to) = self.allocate_date_params()?;
+        self.templates
+            .time_range_filter(member_sql.to_string(), from, to)
+    }
+
+    fn extend_date_range_bound(
+        &self,
+        date: String,
+        interval: &Option<String>,
+        is_sub: bool,
+    ) -> Result<String, CubeError> {
+        if let Some(interval) = interval {
+            if interval != "unbounded" {
+                if is_sub {
+                    self.templates.sub_interval(date, interval.clone())
+                } else {
+                    self.templates.add_interval(date, interval.clone())
+                }
+            } else {
+                Ok(date.to_string())
+            }
+        } else {
+            Ok(date.to_string())
+        }
+    }
+    fn in_date_range_extended(&self, member_sql: &str) -> Result<String, CubeError> {
+        let (from, to) = self.allocate_date_params()?;
+
+        let from = if self.values.len() >= 3 {
+            self.extend_date_range_bound(from, &self.values[2], true)?
+        } else {
+            from
+        };
+
+        let to = if self.values.len() >= 4 {
+            self.extend_date_range_bound(to, &self.values[3], false)?
+        } else {
+            to
+        };
+
         self.templates
             .time_range_filter(member_sql.to_string(), from, to)
     }

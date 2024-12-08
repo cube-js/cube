@@ -1,11 +1,14 @@
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
+use crate::cube_bridge::measure_definition::{
+    MeasureDefinition, RollingWindow, TimeShiftReference,
+};
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct MeasureOrderBy {
     evaluation_node: Rc<EvaluationNode>,
     direction: String,
@@ -28,6 +31,7 @@ impl MeasureOrderBy {
     }
 }
 
+#[derive(Clone)]
 pub struct MeasureSymbol {
     cube_name: String,
     name: String,
@@ -35,6 +39,7 @@ pub struct MeasureSymbol {
     measure_filters: Vec<Rc<EvaluationNode>>,
     measure_order_by: Vec<MeasureOrderBy>,
     member_sql: Rc<dyn MemberSql>,
+    is_splitted_source: bool,
 }
 
 impl MeasureSymbol {
@@ -53,11 +58,30 @@ impl MeasureSymbol {
             definition,
             measure_filters,
             measure_order_by,
+            is_splitted_source: false,
         }
     }
 
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
+    }
+
+    pub fn is_splitted_source(&self) -> bool {
+        self.is_splitted_source
+    }
+
+    pub fn split_with_source(&self, source_name: String) -> (Self, Self) {
+        let mut measure_with_source = self.clone();
+        measure_with_source.is_splitted_source = true;
+        let source = Self::new(
+            self.cube_name.clone(),
+            source_name.clone(),
+            self.member_sql.clone(),
+            self.definition().clone(),
+            self.measure_filters.clone(),
+            self.measure_order_by.clone(),
+        );
+        (measure_with_source, source)
     }
 
     pub fn is_calculated(&self) -> bool {
@@ -81,6 +105,22 @@ impl MeasureSymbol {
 
     pub fn measure_type(&self) -> &String {
         &self.definition.static_data().measure_type
+    }
+
+    pub fn rolling_window(&self) -> &Option<RollingWindow> {
+        &self.definition.static_data().rolling_window
+    }
+
+    pub fn is_rolling_window(&self) -> bool {
+        self.rolling_window().is_some()
+    }
+
+    pub fn is_running_total(&self) -> bool {
+        self.measure_type() == "runningTotal"
+    }
+
+    pub fn is_cumulative(&self) -> bool {
+        self.is_rolling_window() || self.is_running_total()
     }
 
     pub fn measure_filters(&self) -> &Vec<Rc<EvaluationNode>> {

@@ -1,9 +1,12 @@
 use cubenativeutils::CubeError;
 use std::str::FromStr;
+
+#[derive(Clone, PartialEq, Debug)]
 pub enum FilterOperator {
     Equal,
     NotEqual,
     InDateRange,
+    InDateRangeExtended,
     In,
     NotIn,
     Set,

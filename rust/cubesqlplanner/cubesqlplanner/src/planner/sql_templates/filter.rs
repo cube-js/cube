@@ -3,6 +3,7 @@ use cubenativeutils::CubeError;
 use minijinja::context;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct FilterTemplates {
     render: Rc<dyn SqlTemplatesRender>,
 }
@@ -99,6 +100,26 @@ impl FilterTemplates {
             &"filters/or_is_null_check",
             context! {
                 column => column,
+            },
+        )
+    }
+
+    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/add_interval",
+            context! {
+                date => date,
+                interval => interval
+            },
+        )
+    }
+
+    pub fn sub_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/sub_interval",
+            context! {
+                date => date,
+                interval => interval
             },
         )
     }

@@ -1,4 +1,6 @@
-use super::{CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, SimpleSqlSymbol};
+use super::{
+    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberSymbol, SimpleSqlSymbol,
+};
 pub enum MemberSymbolType {
     Dimension(DimensionSymbol),
     Measure(MeasureSymbol),
@@ -12,6 +14,15 @@ impl MemberSymbolType {
         match self {
             MemberSymbolType::Dimension(d) => d.full_name(),
             MemberSymbolType::Measure(m) => m.full_name(),
+            MemberSymbolType::CubeName(c) => c.cube_name().clone(),
+            MemberSymbolType::CubeTable(c) => c.cube_name().clone(),
+            MemberSymbolType::SimpleSql(_) => "".to_string(),
+        }
+    }
+    pub fn name(&self) -> String {
+        match self {
+            MemberSymbolType::Dimension(d) => d.name().clone(),
+            MemberSymbolType::Measure(m) => m.name().clone(),
             MemberSymbolType::CubeName(c) => c.cube_name().clone(),
             MemberSymbolType::CubeTable(c) => c.cube_name().clone(),
             MemberSymbolType::SimpleSql(_) => "".to_string(),

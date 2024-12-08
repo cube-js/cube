@@ -3,12 +3,14 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct HasMultiStageMembersCollector {
+    pub ignore_cumulative: bool,
     pub has_multi_stage: bool,
 }
 
 impl HasMultiStageMembersCollector {
-    pub fn new() -> Self {
+    pub fn new(ignore_cumulative: bool) -> Self {
         Self {
+            ignore_cumulative,
             has_multi_stage: false,
         }
     }
@@ -23,6 +25,10 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
         match node.symbol() {
             MemberSymbolType::Measure(s) => {
                 if s.is_multi_stage() {
+                    self.has_multi_stage = true;
+                } else if !self.ignore_cumulative
+                    && (s.is_rolling_window() || s.measure_type() == "runningTotal")
+                {
                     self.has_multi_stage = true;
                 } else {
                     for filter_node in s.measure_filters() {
@@ -44,8 +50,11 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
     }
 }
 
-pub fn has_multi_stage_members(node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
-    let mut visitor = HasMultiStageMembersCollector::new();
+pub fn has_multi_stage_members(
+    node: &Rc<EvaluationNode>,
+    ignore_cumulative: bool,
+) -> Result<bool, CubeError> {
+    let mut visitor = HasMultiStageMembersCollector::new(ignore_cumulative);
     visitor.apply(node)?;
     Ok(visitor.extract_result())
 }
