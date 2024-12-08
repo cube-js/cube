@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.7](https://github.com/cube-js/cube/compare/v1.0.6...v1.0.7) (2024-12-08)
+
+
+### Bug Fixes
+
+* **ksql-driver:** Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first if Kafka download isn't enabled ([8af60fe](https://github.com/cube-js/cube/commit/8af60fee19114f5a6b2a9a615035062ee99774cb))
+
+
+
+
+
 ## [1.0.6](https://github.com/cube-js/cube/compare/v1.0.5...v1.0.6) (2024-12-07)
 
 **Note:** Version bump only for package @cubejs-backend/ksql-driver

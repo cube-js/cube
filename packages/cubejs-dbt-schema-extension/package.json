@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/dbt-schema-extension",
   "description": "Cube.js dbt Schema Extension",
   "author": "Cube Dev, Inc.",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^1.0.0",
-    "@cubejs-backend/testing": "1.0.6",
+    "@cubejs-backend/testing": "1.0.7",
     "@types/generic-pool": "^3.1.9",
     "@types/jest": "^27",
     "jest": "^27",
