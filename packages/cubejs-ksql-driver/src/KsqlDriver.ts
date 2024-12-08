@@ -363,7 +363,6 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   public capabilities(): DriverCapabilities {
     return {
       streamingSource: true,
-      unloadWithoutTempTable: !!this.config.kafkaHost,
     };
   }
 }
