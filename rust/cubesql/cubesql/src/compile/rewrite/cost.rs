@@ -468,6 +468,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::Union(_) => 1,
             LogicalPlanLanguage::Window(_) => 1,
             LogicalPlanLanguage::Subquery(_) => 1,
+            LogicalPlanLanguage::Distinct(_) => 1,
             _ => 0,
         };
 
