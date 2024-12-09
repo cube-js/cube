@@ -38,6 +38,9 @@ use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
+use serde::Deserialize;
+use cubeorchestrator::cubestore_result_transform::transform_data;
+use cubeorchestrator::types::{TransformDataRequest};
 
 struct SQLInterface {
     services: Arc<NodeCubeServices>,
@@ -543,6 +546,56 @@ fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     Ok(js_array.upcast())
 }
 
+fn js_object_to_struct<T>(cx: &mut FunctionContext) -> Result<T, neon::result::Throw>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    let json_str = cx
+        .argument::<JsString>(0)?
+        .value(cx);
+
+    let result: Result<T, serde_json::Error> = serde_json::from_str(&json_str);
+    match result {
+        Ok(value) => Ok(value),
+        Err(err) => cx.throw_error(err.to_string()),
+    }
+}
+
+fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsObject> {
+    let request_data: TransformDataRequest = js_object_to_struct(&mut cx)?;
+
+    let alias_to_member_name_map = &request_data.alias_to_member_name_map;
+    let annotation = &request_data.annotation;
+    let data = &request_data.data;
+    let query = &request_data.query;
+    let query_type = &request_data.query_type;
+    let res_type = &request_data.res_type;
+
+    let transformed = match transform_data(
+        alias_to_member_name_map,
+        annotation,
+        data.clone(),
+        query,
+        query_type,
+        res_type.clone(),
+    ) {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string())
+    };
+
+    let json_data = match serde_json::to_string(&transformed) {
+        Ok(data) => data,
+        Err(e) => return cx.throw_error(format!("Serialization error: {}", e)),
+    };
+
+    let js_string = cx.string(json_data);
+
+    let js_result = cx.empty_object();
+    js_result.set(&mut cx, "result", js_string)?;
+
+    Ok(js_result)
+}
+
 pub fn register_module_exports<C: NodeConfiguration + 'static>(
     mut cx: ModuleContext,
 ) -> NeonResult<()> {
@@ -562,6 +615,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
         parse_cubestore_ws_result_message,
     )?;
     cx.export_function("getCubestoreResult", get_cubestore_result)?;
+    cx.export_function("transformQueryData", transform_query_data)?;
 
     crate::template::template_register_module(&mut cx)?;
 

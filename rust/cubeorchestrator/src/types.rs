@@ -17,7 +17,7 @@ pub enum DBResponsePrimitive {
     String(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum DBResponseValue {
     DateTime(DateTime<Utc>),
     Primitive(DBResponsePrimitive),
@@ -148,7 +148,7 @@ pub type AliasToMemberMap = HashMap<String, String>;
 
 pub type MembersMap = HashMap<String, String>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GranularityMeta {
     pub name: String,
     pub title: String,
@@ -159,7 +159,7 @@ pub struct GranularityMeta {
     pub origin: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigItem {
     pub title: String,
     pub short_title: String,
@@ -277,4 +277,17 @@ pub enum TransformedData {
         dataset: Vec<Vec<DBResponsePrimitive>>,
     },
     Vanilla(Vec<HashMap<String, DBResponsePrimitive>>),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TransformDataRequest {
+    #[serde(rename = "aliasToMemberNameMap")]
+    pub alias_to_member_name_map: HashMap<String, String>,
+    pub annotation: HashMap<String, ConfigItem>,
+    pub data: Vec<HashMap<String, DBResponseValue>>,
+    pub query: NormalizedQuery,
+    #[serde(rename = "queryType")]
+    pub query_type: QueryType,
+    #[serde(rename = "resType")]
+    pub res_type: Option<ResultType>,
 }
