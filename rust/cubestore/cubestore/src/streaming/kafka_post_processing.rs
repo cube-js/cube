@@ -1,5 +1,4 @@
 use crate::metastore::Column;
-use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
@@ -9,7 +8,6 @@ use datafusion::arrow::datatypes::{Field, Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common;
 use datafusion::common::{DFSchema, DFSchemaRef};
-use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::expr::{Alias, ScalarFunction};
 use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection};
@@ -135,11 +133,7 @@ impl KafkaPostProcessPlanner {
         }
     }
 
-    pub async fn build(
-        &self,
-        select_statement: String,
-        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
-    ) -> Result<KafkaPostProcessPlan, CubeError> {
+    pub async fn build(&self, select_statement: String) -> Result<KafkaPostProcessPlan, CubeError> {
         let target_schema = Arc::new(Schema::new(
             self.columns
                 .iter()
@@ -150,7 +144,7 @@ impl KafkaPostProcessPlanner {
         let source_unique_columns = self.extract_source_unique_columns(&logical_plan)?;
 
         let (projection_plan, filter_plan) = self
-            .make_projection_and_filter_physical_plans(&logical_plan, metadata_cache_factory)
+            .make_projection_and_filter_physical_plans(&logical_plan)
             .await?;
         if target_schema != projection_plan.schema() {
             return Err(CubeError::user(format!(
@@ -406,7 +400,6 @@ impl KafkaPostProcessPlanner {
     async fn make_projection_and_filter_physical_plans(
         &self,
         plan: &LogicalPlan,
-        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Result<(Arc<dyn ExecutionPlan>, Option<Arc<dyn ExecutionPlan>>), CubeError> {
         let source_schema = Arc::new(Schema::new(
             self.source_columns
