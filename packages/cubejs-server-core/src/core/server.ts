@@ -126,7 +126,7 @@ export class CubejsServerCore {
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
-  protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
+  protected repositoryFactory: ((_context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
   protected contextToDbType: DbTypeAsyncFn;
 
@@ -162,7 +162,7 @@ export class CubejsServerCore {
 
   protected apiGatewayInstance: ApiGateway | null = null;
 
-  public readonly event: (name: string, props?: object) => Promise<void>;
+  public readonly event: (_name: string, _props?: object) => Promise<void>;
 
   public projectFingerprint: string | null = null;
 
