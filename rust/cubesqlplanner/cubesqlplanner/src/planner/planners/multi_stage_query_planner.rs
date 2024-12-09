@@ -9,7 +9,7 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::EvaluationNode;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::{BaseDimension, BaseMeasure, VisitorContext};
 use crate::planner::{BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
@@ -107,7 +107,7 @@ impl MultiStageQueryPlanner {
 
     fn create_multi_stage_inode_member(
         &self,
-        base_member: Rc<EvaluationNode>,
+        base_member: Rc<MemberSymbol>,
     ) -> Result<MultiStageInodeMember, CubeError> {
         let inode = if let Some(measure) =
             BaseMeasure::try_new(base_member.clone(), self.query_tools.clone())?
@@ -183,7 +183,7 @@ impl MultiStageQueryPlanner {
 
     fn add_rolling_window_base(
         &self,
-        member: Rc<EvaluationNode>,
+        member: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
@@ -233,7 +233,7 @@ impl MultiStageQueryPlanner {
 
     fn try_make_rolling_window(
         &self,
-        member: Rc<EvaluationNode>,
+        member: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
@@ -261,12 +261,12 @@ impl MultiStageQueryPlanner {
                 }
                 let time_dimension = time_dimensions[0].clone();
                 let source_name = format!("_{}_base", member.name());
-                let (member, source) = member.try_split_measure(source_name).unwrap(); //FIXME
-                                                                                       //unwrap!!!
+                //let (member, source) = member.try_split_measure(source_name).unwrap(); //FIXME
+                //unwrap!!!
 
                 let input = vec![
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?,
-                    self.add_rolling_window_base(
+                    /* self.add_rolling_window_base(
                         source.clone(),
                         self.make_rolling_base_state(
                             time_dimension.clone(),
@@ -274,7 +274,7 @@ impl MultiStageQueryPlanner {
                             state.clone(),
                         )?,
                         descriptions,
-                    )?,
+                    )?, */
                 ];
 
                 let time_dimension = time_dimensions[0].clone();
@@ -315,7 +315,7 @@ impl MultiStageQueryPlanner {
 
     fn make_queries_descriptions(
         &self,
-        member: Rc<EvaluationNode>,
+        member: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {

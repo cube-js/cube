@@ -1,9 +1,9 @@
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType, TraversalVisitor};
+use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct MemberChildsCollector {
-    pub childs: Vec<Rc<EvaluationNode>>,
+    pub childs: Vec<Rc<MemberSymbol>>,
 }
 
 #[derive(Clone)]
@@ -22,7 +22,7 @@ impl MemberChildsCollector {
         Self { childs: vec![] }
     }
 
-    pub fn extract_result(self) -> Vec<Rc<EvaluationNode>> {
+    pub fn extract_result(self) -> Vec<Rc<MemberSymbol>> {
         self.childs
     }
 }
@@ -31,27 +31,19 @@ impl TraversalVisitor for MemberChildsCollector {
     type State = MemberChildsCollectorState;
     fn on_node_traverse(
         &mut self,
-        node: &Rc<EvaluationNode>,
+        node: &Rc<MemberSymbol>,
         state: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         if state.is_root {
             let new_state = MemberChildsCollectorState::new(false);
-            match node.symbol() {
-                MemberSymbolType::Measure(s) => {
-                    for filter_node in s.measure_filters() {
-                        self.apply(filter_node, &new_state)?
-                    }
-                    for order_by in s.measure_order_by() {
-                        self.apply(order_by.evaluation_node(), &new_state)?
-                    }
-                    Ok(Some(new_state))
-                }
-                MemberSymbolType::Dimension(_) => Ok(Some(new_state)),
+            match node.as_ref() {
+                MemberSymbol::Measure(s) => Ok(Some(new_state)),
+                MemberSymbol::Dimension(_) => Ok(Some(new_state)),
                 _ => Ok(None),
             }
         } else {
-            match node.symbol() {
-                MemberSymbolType::Measure(_) | MemberSymbolType::Dimension(_) => {
+            match node.as_ref() {
+                MemberSymbol::Measure(_) | MemberSymbol::Dimension(_) => {
                     self.childs.push(node.clone());
                     Ok(None)
                 }
@@ -61,7 +53,7 @@ impl TraversalVisitor for MemberChildsCollector {
     }
 }
 
-pub fn member_childs(node: &Rc<EvaluationNode>) -> Result<Vec<Rc<EvaluationNode>>, CubeError> {
+pub fn member_childs(node: &Rc<MemberSymbol>) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
     let mut visitor = MemberChildsCollector::new();
     visitor.apply(node, &MemberChildsCollectorState::new(true))?;
     Ok(visitor.extract_result())

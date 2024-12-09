@@ -1,7 +1,5 @@
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{
-    EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor,
-};
+use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use crate::planner::BaseMeasure;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
@@ -12,11 +10,11 @@ struct CompositeMeasuresCollector {
 }
 
 struct CompositeMeasureCollectorState {
-    pub parent_measure: Option<Rc<EvaluationNode>>,
+    pub parent_measure: Option<Rc<MemberSymbol>>,
 }
 
 impl CompositeMeasureCollectorState {
-    pub fn new(parent_measure: Option<Rc<EvaluationNode>>) -> Self {
+    pub fn new(parent_measure: Option<Rc<MemberSymbol>>) -> Self {
         Self { parent_measure }
     }
 }
@@ -37,11 +35,11 @@ impl TraversalVisitor for CompositeMeasuresCollector {
     type State = CompositeMeasureCollectorState;
     fn on_node_traverse(
         &mut self,
-        node: &Rc<EvaluationNode>,
+        node: &Rc<MemberSymbol>,
         state: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Measure(e) => {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(e) => {
                 if let Some(parent) = &state.parent_measure {
                     if parent.cube_name() != node.cube_name() {
                         self.composite_measures.insert(parent.full_name());
@@ -51,7 +49,7 @@ impl TraversalVisitor for CompositeMeasuresCollector {
                 let new_state = CompositeMeasureCollectorState::new(Some(node.clone()));
                 Some(new_state)
             }
-            MemberSymbolType::Dimension(_) => None,
+            MemberSymbol::Dimension(_) => None,
             _ => None,
         };
         Ok(res)
@@ -87,11 +85,11 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
     type State = ();
     fn on_node_traverse(
         &mut self,
-        node: &Rc<EvaluationNode>,
-        state: &Self::State,
+        node: &Rc<MemberSymbol>,
+        _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Measure(e) => {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(e) => {
                 let full_name = e.full_name();
                 let join = self.query_tools.cached_data().join()?;
                 let multiplied = join
@@ -115,7 +113,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
                     None
                 }
             }
-            MemberSymbolType::Dimension(_) => None,
+            MemberSymbol::Dimension(_) => None,
             _ => None,
         };
         Ok(res)
@@ -124,7 +122,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
 
 pub fn collect_multiplied_measures(
     query_tools: Rc<QueryTools>,
-    node: &Rc<EvaluationNode>,
+    node: &Rc<MemberSymbol>,
 ) -> Result<Vec<MeasureResult>, CubeError> {
     let mut composite_collector = CompositeMeasuresCollector::new();
     composite_collector.apply(node, &CompositeMeasureCollectorState::new(None))?;

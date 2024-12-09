@@ -1,5 +1,5 @@
 use crate::cube_bridge::measure_definition::TimeShiftReference;
-use crate::planner::sql_evaluator::EvaluationNode;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::BaseMember;
 use crate::planner::BaseTimeDimension;
 use cubenativeutils::CubeError;
@@ -149,11 +149,11 @@ pub enum MultiStageMemberType {
 
 pub struct MultiStageMember {
     member_type: MultiStageMemberType,
-    evaluation_node: Rc<EvaluationNode>,
+    evaluation_node: Rc<MemberSymbol>,
 }
 
 impl MultiStageMember {
-    pub fn new(member_type: MultiStageMemberType, evaluation_node: Rc<EvaluationNode>) -> Rc<Self> {
+    pub fn new(member_type: MultiStageMemberType, evaluation_node: Rc<MemberSymbol>) -> Rc<Self> {
         Rc::new(Self {
             member_type,
             evaluation_node,
@@ -164,7 +164,7 @@ impl MultiStageMember {
         &self.member_type
     }
 
-    pub fn evaluation_node(&self) -> &Rc<EvaluationNode> {
+    pub fn evaluation_node(&self) -> &Rc<MemberSymbol> {
         &self.evaluation_node
     }
 

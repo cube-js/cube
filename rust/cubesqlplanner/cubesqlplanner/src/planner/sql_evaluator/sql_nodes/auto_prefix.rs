@@ -1,8 +1,8 @@
 use super::SqlNode;
 use crate::plan::Schema;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -36,24 +36,24 @@ impl AutoPrefixSqlNode {
 impl SqlNode for AutoPrefixSqlNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
         let input =
             self.input
                 .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?;
-        let res = match node.symbol() {
-            MemberSymbolType::Dimension(ev) => {
+        let res = match node.as_ref() {
+            MemberSymbol::Dimension(ev) => {
                 let cube_alias = self.schema.resolve_cube_alias(&ev.cube_name());
                 query_tools.auto_prefix_with_cube_name(&cube_alias, &input)
             }
-            MemberSymbolType::Measure(ev) => {
+            MemberSymbol::Measure(ev) => {
                 let cube_alias = self.schema.resolve_cube_alias(&ev.cube_name());
                 query_tools.auto_prefix_with_cube_name(&cube_alias, &input)
             }
-            MemberSymbolType::CubeName(_) => {
+            MemberSymbol::CubeName(_) => {
                 let cube_alias = self.schema.resolve_cube_alias(&input);
                 query_tools.escape_column_name(&cube_alias)
             }

@@ -6,7 +6,6 @@ use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::sql_evaluator::collectors::{
     collect_multiplied_measures, has_cumulative_members, has_multi_stage_members,
 };
-use crate::planner::sql_evaluator::EvaluationNode;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;

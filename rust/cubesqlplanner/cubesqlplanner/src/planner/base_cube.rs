@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::EvaluationNode;
+use super::sql_evaluator::MemberSymbol;
 use super::{evaluate_with_context, VisitorContext};
 use crate::plan::Schema;
 use cubenativeutils::CubeError;
@@ -7,14 +7,14 @@ use std::rc::Rc;
 
 pub struct BaseCube {
     cube_name: String,
-    member_evaluator: Rc<EvaluationNode>,
+    member_evaluator: Rc<MemberSymbol>,
     query_tools: Rc<QueryTools>,
 }
 impl BaseCube {
     pub fn try_new(
         cube_name: String,
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<EvaluationNode>,
+        member_evaluator: Rc<MemberSymbol>,
     ) -> Result<Rc<Self>, CubeError> {
         Ok(Rc::new(Self {
             cube_name,

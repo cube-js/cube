@@ -1,8 +1,8 @@
 use super::SqlNode;
 use crate::plan::Schema;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -32,18 +32,16 @@ impl RenderReferencesSqlNode {
 impl SqlNode for RenderReferencesSqlNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let reference_column = match node.symbol() {
-            MemberSymbolType::Dimension(ev) => {
+        let reference_column = match node.as_ref() {
+            MemberSymbol::Dimension(ev) => {
                 self.schema.find_column_for_member(&ev.full_name(), &None)
             }
-            MemberSymbolType::Measure(ev) => {
-                self.schema.find_column_for_member(&ev.full_name(), &None)
-            }
+            MemberSymbol::Measure(ev) => self.schema.find_column_for_member(&ev.full_name(), &None),
             _ => None,
         };
 

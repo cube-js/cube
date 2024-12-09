@@ -1,8 +1,8 @@
 use super::SqlNode;
 use crate::cube_bridge::memeber_sql::MemberSqlArg;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -24,14 +24,14 @@ impl FinalMeasureSqlNode {
 impl SqlNode for FinalMeasureSqlNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Measure(ev) => {
-                let input = if ev.is_splitted_source() {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(ev) => {
+                /* let input = if ev.is_splitted_source() {
                     let args = visitor.evaluate_deps(node, node_processor.clone())?;
                     //FIXME hack for working with
                     //measures like rolling window
@@ -43,10 +43,14 @@ impl SqlNode for FinalMeasureSqlNode {
                     } else {
                         "".to_string()
                     }
-                } else {
-                    self.input
-                        .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?
-                };
+                } else { */
+                let input = self.input.to_sql(
+                    visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor.clone(),
+                )?;
+                //};
 
                 if ev.is_calculated() {
                     input

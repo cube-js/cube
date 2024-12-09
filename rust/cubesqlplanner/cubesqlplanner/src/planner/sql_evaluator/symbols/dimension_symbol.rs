@@ -2,14 +2,17 @@ use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
-use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
+use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::{
+    sql_nodes::SqlNode, Compiler, Dependency, SqlCall, SqlEvaluatorVisitor,
+};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct DimensionSymbol {
     cube_name: String,
     name: String,
-    member_sql: Rc<dyn MemberSql>,
+    member_sql: Rc<SqlCall>,
     #[allow(dead_code)]
     definition: Rc<dyn DimensionDefinition>,
 }
@@ -18,7 +21,7 @@ impl DimensionSymbol {
     pub fn new(
         cube_name: String,
         name: String,
-        member_sql: Rc<dyn MemberSql>,
+        member_sql: Rc<SqlCall>,
         definition: Rc<dyn DimensionDefinition>,
     ) -> Self {
         Self {
@@ -29,8 +32,13 @@ impl DimensionSymbol {
         }
     }
 
-    pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
-        let sql = self.member_sql.call(args)?;
+    pub fn evaluate_sql(
+        &self,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<String, CubeError> {
+        let sql = self.member_sql.eval(visitor, node_processor, query_tools)?;
         Ok(sql)
     }
 
@@ -45,14 +53,17 @@ impl DimensionSymbol {
     pub fn is_multi_stage(&self) -> bool {
         self.definition.static_data().multi_stage.unwrap_or(false)
     }
-}
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut deps = vec![];
+        self.member_sql.extract_symbol_deps(&mut deps);
+        deps
+    }
 
-impl MemberSymbol for DimensionSymbol {
-    fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &String {
         &self.cube_name
     }
 
-    fn name(&self) -> &String {
+    pub fn name(&self) -> &String {
         &self.name
     }
 }
@@ -101,20 +112,16 @@ impl SymbolFactory for DimensionSymbolFactory {
         Some(self.sql.clone())
     }
 
-    fn build(
-        self,
-        deps: Vec<Dependency>,
-        _compiler: &mut Compiler,
-    ) -> Result<Rc<EvaluationNode>, CubeError> {
+    fn build(self, compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
         let Self {
             cube_name,
             name,
             sql,
             definition,
         } = self;
-        Ok(EvaluationNode::new_dimension(
-            DimensionSymbol::new(cube_name, name, sql, definition),
-            deps,
-        ))
+        let sql = compiler.compile_sql_call(&cube_name, sql)?;
+        Ok(MemberSymbol::new_dimension(DimensionSymbol::new(
+            cube_name, name, sql, definition,
+        )))
     }
 }

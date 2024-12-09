@@ -3,7 +3,7 @@ use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::EvaluationNode;
+use crate::planner::sql_evaluator::SqlCall;
 use crate::planner::SqlJoinCondition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -58,11 +58,11 @@ impl JoinPlanner {
             );
             for join in joins.items().iter() {
                 let definition = join.join()?;
-                let evaluator = self
+                let sql_call = self
                     .compile_join_condition(&join.static_data().original_from, definition.sql()?)?;
                 let on = JoinCondition::new_base_join(SqlJoinCondition::try_new(
                     self.query_tools.clone(),
-                    evaluator,
+                    sql_call,
                 )?);
                 let cube = self
                     .utils
@@ -82,9 +82,9 @@ impl JoinPlanner {
         &self,
         cube_name: &String,
         sql: Rc<dyn MemberSql>,
-    ) -> Result<Rc<EvaluationNode>, CubeError> {
+    ) -> Result<Rc<SqlCall>, CubeError> {
         let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        evaluator_compiler.add_join_condition_evaluator(cube_name.clone(), sql)
+        evaluator_compiler.compile_sql_call(&cube_name, sql)
     }
 }

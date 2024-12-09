@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
+use super::sql_evaluator::MemberSymbol;
 use super::{evaluate_with_context, BaseMember, VisitorContext};
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
@@ -65,7 +65,7 @@ impl MeasureTimeShift {
 pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
-    member_evaluator: Rc<EvaluationNode>,
+    member_evaluator: Rc<MemberSymbol>,
     definition: Rc<dyn MeasureDefinition>,
     time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
@@ -87,7 +87,7 @@ impl BaseMember for BaseMeasure {
             .escape_column_name(&self.unescaped_alias_name())
     }
 
-    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+    fn member_evaluator(&self) -> Rc<MemberSymbol> {
         self.member_evaluator.clone()
     }
 
@@ -106,11 +106,11 @@ impl BaseMember for BaseMeasure {
 
 impl BaseMeasure {
     pub fn try_new(
-        evaluation_node: Rc<EvaluationNode>,
+        evaluation_node: Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Option<Rc<Self>>, CubeError> {
-        let res = match evaluation_node.symbol() {
-            MemberSymbolType::Measure(s) => {
+        let res = match evaluation_node.as_ref() {
+            MemberSymbol::Measure(s) => {
                 let time_shifts = Self::parse_time_shifts(&s.definition())?;
                 Some(Rc::new(Self {
                     measure: s.full_name(),
@@ -128,7 +128,7 @@ impl BaseMeasure {
     }
 
     pub fn try_new_required(
-        evaluation_node: Rc<EvaluationNode>,
+        evaluation_node: Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Rc<Self>, CubeError> {
         if let Some(result) = Self::try_new(evaluation_node, query_tools)? {
@@ -153,7 +153,7 @@ impl BaseMeasure {
         }
     }
 
-    pub fn member_evaluator(&self) -> &Rc<EvaluationNode> {
+    pub fn member_evaluator(&self) -> &Rc<MemberSymbol> {
         &self.member_evaluator
     }
 

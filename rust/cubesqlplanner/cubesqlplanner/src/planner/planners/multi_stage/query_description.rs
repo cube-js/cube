@@ -1,5 +1,5 @@
 use super::{MultiStageAppliedState, MultiStageMember};
-use crate::planner::sql_evaluator::EvaluationNode;
+use crate::planner::sql_evaluator::MemberSymbol;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -39,7 +39,7 @@ impl MultiStageQueryDescription {
         })
     }
 
-    pub fn member_node(&self) -> &Rc<EvaluationNode> {
+    pub fn member_node(&self) -> &Rc<MemberSymbol> {
         &self.member.evaluation_node()
     }
 
@@ -69,7 +69,7 @@ impl MultiStageQueryDescription {
 
     pub fn is_match_member_and_state(
         &self,
-        member_node: &Rc<EvaluationNode>,
+        member_node: &Rc<MemberSymbol>,
         state: &Rc<MultiStageAppliedState>,
     ) -> bool {
         member_node.full_name() == self.member_name() && state == &self.state

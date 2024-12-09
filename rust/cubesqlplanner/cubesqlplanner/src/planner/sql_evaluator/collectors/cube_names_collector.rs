@@ -1,6 +1,4 @@
-use crate::planner::sql_evaluator::{
-    EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor,
-};
+use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -25,39 +23,32 @@ impl TraversalVisitor for CubeNamesCollector {
     type State = ();
     fn on_node_traverse(
         &mut self,
-        node: &Rc<EvaluationNode>,
-        state: &Self::State,
+        node: &Rc<MemberSymbol>,
+        _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        match node.symbol() {
-            MemberSymbolType::Dimension(e) => {
+        match node.as_ref() {
+            MemberSymbol::Dimension(e) => {
                 if e.owned_by_cube() {
                     self.names.insert(e.cube_name().clone());
                 }
             }
-            MemberSymbolType::Measure(e) => {
-                for filter_node in e.measure_filters() {
-                    self.apply(filter_node, &())?
-                }
-                for order_by in e.measure_order_by() {
-                    self.apply(order_by.evaluation_node(), &())?
-                }
+            MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
                     self.names.insert(e.cube_name().clone());
                 }
             }
-            MemberSymbolType::CubeName(e) => {
+            MemberSymbol::CubeName(e) => {
                 self.names.insert(e.cube_name().clone());
             }
-            MemberSymbolType::CubeTable(e) => {
+            MemberSymbol::CubeTable(e) => {
                 self.names.insert(e.cube_name().clone());
             }
-            _ => {}
         };
         Ok(Some(()))
     }
 }
 
-pub fn collect_cube_names(node: &Rc<EvaluationNode>) -> Result<Vec<String>, CubeError> {
+pub fn collect_cube_names(node: &Rc<MemberSymbol>) -> Result<Vec<String>, CubeError> {
     let mut visitor = CubeNamesCollector::new();
     visitor.apply(node, &())?;
     Ok(visitor.extract_result())

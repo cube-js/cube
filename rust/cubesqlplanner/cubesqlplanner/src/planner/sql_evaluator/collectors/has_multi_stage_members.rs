@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType, TraversalVisitor};
+use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -24,27 +24,20 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
     type State = ();
     fn on_node_traverse(
         &mut self,
-        node: &Rc<EvaluationNode>,
-        state: &Self::State,
+        node: &Rc<MemberSymbol>,
+        _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        match node.symbol() {
-            MemberSymbolType::Measure(s) => {
+        match node.as_ref() {
+            MemberSymbol::Measure(s) => {
                 if s.is_multi_stage() {
                     self.has_multi_stage = true;
                 } else if !self.ignore_cumulative
                     && (s.is_rolling_window() || s.measure_type() == "runningTotal")
                 {
                     self.has_multi_stage = true;
-                } else {
-                    for filter_node in s.measure_filters() {
-                        self.apply(filter_node, &())?
-                    }
-                    for order_by in s.measure_order_by() {
-                        self.apply(order_by.evaluation_node(), &())?
-                    }
                 }
             }
-            MemberSymbolType::Dimension(s) => {
+            MemberSymbol::Dimension(s) => {
                 if s.is_multi_stage() {
                     self.has_multi_stage = true;
                 }
@@ -60,7 +53,7 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
 }
 
 pub fn has_multi_stage_members(
-    node: &Rc<EvaluationNode>,
+    node: &Rc<MemberSymbol>,
     ignore_cumulative: bool,
 ) -> Result<bool, CubeError> {
     let mut visitor = HasMultiStageMembersCollector::new(ignore_cumulative);

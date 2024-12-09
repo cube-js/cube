@@ -83,7 +83,7 @@ impl MultipliedMeasuresQueryPlanner {
         let measures = if should_build_join_for_measure_select {
             let mut top_measures = vec![];
             let mut ungroupped_measures = vec![];
-            for meas in measures.iter() {
+            /* for meas in measures.iter() {
                 let ungropped_name = format!("{}_ungrouped", meas.name());
                 let (top, ungrouped) = meas
                     .member_evaluator()
@@ -93,7 +93,7 @@ impl MultipliedMeasuresQueryPlanner {
                 top_measures.push(BaseMeasure::try_new(top, self.query_tools.clone())?.unwrap());
                 ungroupped_measures
                     .push(BaseMeasure::try_new(ungrouped, self.query_tools.clone())?.unwrap());
-            }
+            } */
             join_builder.left_join_subselect(
                 self.aggregate_subquery_measure_join(
                     key_cube_name,

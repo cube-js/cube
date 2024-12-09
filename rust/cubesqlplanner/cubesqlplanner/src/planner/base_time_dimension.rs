@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::EvaluationNode;
+use super::sql_evaluator::MemberSymbol;
 use super::BaseDimension;
 use super::{BaseMember, VisitorContext};
 use crate::plan::Schema;
@@ -39,7 +39,7 @@ impl BaseMember for BaseTimeDimension {
             .escape_column_name(&self.unescaped_alias_name())
     }
 
-    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+    fn member_evaluator(&self) -> Rc<MemberSymbol> {
         self.dimension.member_evaluator()
     }
 
@@ -63,7 +63,7 @@ impl BaseMember for BaseTimeDimension {
 impl BaseTimeDimension {
     pub fn try_new_required(
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<EvaluationNode>,
+        member_evaluator: Rc<MemberSymbol>,
         granularity: Option<String>,
         date_range: Option<Vec<String>>,
     ) -> Result<Rc<Self>, CubeError> {
@@ -107,7 +107,7 @@ impl BaseTimeDimension {
         self.dimension.clone()
     }
 
-    pub fn member_evaluator(&self) -> Rc<EvaluationNode> {
+    pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
         self.dimension.member_evaluator()
     }
 

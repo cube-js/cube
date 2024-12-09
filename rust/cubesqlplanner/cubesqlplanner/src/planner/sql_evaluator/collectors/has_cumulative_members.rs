@@ -1,4 +1,4 @@
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType, TraversalVisitor};
+use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -22,11 +22,11 @@ impl TraversalVisitor for HasCumulativeMembersCollector {
     type State = ();
     fn on_node_traverse(
         &mut self,
-        node: &Rc<EvaluationNode>,
-        state: &Self::State,
+        node: &Rc<MemberSymbol>,
+        _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        match node.symbol() {
-            MemberSymbolType::Measure(s) => {
+        match node.as_ref() {
+            MemberSymbol::Measure(s) => {
                 if s.is_rolling_window() {
                     self.has_cumulative_members = true;
                 }
@@ -41,7 +41,7 @@ impl TraversalVisitor for HasCumulativeMembersCollector {
     }
 }
 
-pub fn has_cumulative_members(node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
+pub fn has_cumulative_members(node: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
     let mut visitor = HasCumulativeMembersCollector::new();
     visitor.apply(node, &())?;
     Ok(visitor.extract_result())

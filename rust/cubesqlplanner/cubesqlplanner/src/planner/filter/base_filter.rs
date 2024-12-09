@@ -1,7 +1,7 @@
 use super::filter_operator::FilterOperator;
 use crate::plan::Schema;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::EvaluationNode;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::filter::FilterTemplates;
 use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
@@ -17,7 +17,7 @@ pub enum FilterType {
 
 pub struct BaseFilter {
     query_tools: Rc<QueryTools>,
-    member_evaluator: Rc<EvaluationNode>,
+    member_evaluator: Rc<MemberSymbol>,
     #[allow(dead_code)]
     filter_type: FilterType,
     filter_operator: FilterOperator,
@@ -44,7 +44,7 @@ lazy_static! {
 impl BaseFilter {
     pub fn try_new(
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<EvaluationNode>,
+        member_evaluator: Rc<MemberSymbol>,
         filter_type: FilterType,
         filter_operator: FilterOperator,
         values: Option<Vec<Option<String>>>,
