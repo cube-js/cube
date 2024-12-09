@@ -1274,7 +1274,7 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             let res = match self.index_type {
                 IndexType::Regular => match other.index_type {
-                    IndexType::Regular => core::cmp::Ordering::Equal,
+                    IndexType::Regular => core::cmp::Ordering::Less,
                     IndexType::Aggregate => core::cmp::Ordering::Greater,
                 },
                 IndexType::Aggregate => match other.index_type {
