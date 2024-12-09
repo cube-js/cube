@@ -23,6 +23,10 @@ class CubejsServerCoreOpen extends CubejsServerCore {
   public isReadyForQueryProcessing = super.isReadyForQueryProcessing;
 
   public createOrchestratorApi = super.createOrchestratorApi;
+
+  public pubScheduledRefreshTimeZones(ctx: any) {
+    return this.scheduledRefreshTimeZones(ctx);
+  };
 }
 
 const repositoryWithoutPreAggregations: SchemaFileRepository = {
@@ -300,6 +304,7 @@ describe('index.test', () => {
 
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    expect(cubejsServerCore.pubScheduledRefreshTimeZones({} as any)).toEqual(['Europe/Moscow']);
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
