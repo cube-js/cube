@@ -1189,11 +1189,15 @@ async fn pick_index(
                 )));
                 (err, None, sort_on)
             } else {
+                let filter_columns_updated = match sort_on_order_col_only {
+                    Some(_) => HashSet::new(),
+                    _ => filter_columns,
+                };
                 let optimal = optimal_index_by_score(
                     // Skipping default index
                     indices.iter().skip(1),
                     &projection_columns,
-                    &filter_columns,
+                    &filter_columns_updated,
                 );
                 let index = optimal.unwrap_or(default_index);
                 (
@@ -1274,7 +1278,7 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             let res = match self.index_type {
                 IndexType::Regular => match other.index_type {
-                    IndexType::Regular => core::cmp::Ordering::Less,
+                    IndexType::Regular => core::cmp::Ordering::Equal,
                     IndexType::Aggregate => core::cmp::Ordering::Greater,
                 },
                 IndexType::Aggregate => match other.index_type {
