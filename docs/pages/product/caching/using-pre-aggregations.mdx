@@ -601,6 +601,12 @@ The data for `zip_code_index` would look as follows:
 | 88523    | 3800        |
 | 88524    | 5000        |
 
+### Compaction
+
+Whenever a newer version of pre-aggregation is just built and becomes available its performance would be suboptimal as it's pending compaction.
+Most of the essential compaction process usually takes several seconds to several minutes for bigger partitions after pre-aggregation creation, depending on the size of the partition and the Cube Store workers' processing power available.
+This compaction process is usually unnoticeable for queries that are optimal in terms of index usage, so it's always best practice to make sure all of your queries match an index.
+
 ## Inspecting pre-aggregations
 
 Cube Store partially supports the MySQL protocol. This allows you to execute

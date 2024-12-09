@@ -3,6 +3,45 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.9](https://github.com/cube-js/cube/compare/v1.1.8...v1.1.9) (2024-12-08)
+
+
+### Features
+
+* **schema-compiler:** folders support, hierarchies improvements ([#9018](https://github.com/cube-js/cube/issues/9018)) ([2012281](https://github.com/cube-js/cube/commit/20122810f508d978921b56f8d9b8a4e479290d56))
+
+
+
+
+
+## [1.1.8](https://github.com/cube-js/cube/compare/v1.1.7...v1.1.8) (2024-12-05)
+
+
+### Bug Fixes
+
+* **schema-compiler:** fix FILTER_PARAMS to populate set and notSet filters in cube's SQL query ([#8937](https://github.com/cube-js/cube/issues/8937)) ([6d82f18](https://github.com/cube-js/cube/commit/6d82f18c59f92cae2bb94fe754aa3c0431c24949)), closes [#9009](https://github.com/cube-js/cube/issues/9009) [#8793](https://github.com/cube-js/cube/issues/8793)
+* **schema-compiler:** Fix incorrect sql generation for view queries referencing measures from joined cubes ([#8991](https://github.com/cube-js/cube/issues/8991)) ([cd7490e](https://github.com/cube-js/cube/commit/cd7490ef0d5bf3fa1b81b7bf1d820b12a04b1e99))
+* **schema-compiler:** Fix ungrouped cumulative queries incorrect sql generation ([#8981](https://github.com/cube-js/cube/issues/8981)) ([82ba01a](https://github.com/cube-js/cube/commit/82ba01ae3695dc7469e76dd8bced1c532bea0865))
+* **schema-compiler:** Undefined columns for lambda pre-aggregation queries referencing dimensions from joined cubes ([#8946](https://github.com/cube-js/cube/issues/8946)) ([41b49f4](https://github.com/cube-js/cube/commit/41b49f4fc00f30da7c30d59f522970a24b0e1426))
+* **schema-compiler:** use query timezone for time granularity origin ([#8936](https://github.com/cube-js/cube/issues/8936)) ([1beba2d](https://github.com/cube-js/cube/commit/1beba2d3fa6e9a7d95c8c18b448e42fd1562a7e6))
+
+
+### Features
+
+* **sqlplanner:**  Extract alias logic from the symbols ([#8919](https://github.com/cube-js/cube/issues/8919)) ([d1b07f1](https://github.com/cube-js/cube/commit/d1b07f1029aa50bd391ba9e52bd1b575c3659da9))
+
+
+
+
+
+## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [1.1.6](https://github.com/cube-js/cube/compare/v1.1.5...v1.1.6) (2024-11-17)
 
 

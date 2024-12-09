@@ -1706,10 +1706,17 @@ impl CubeScanWrapperNode {
                             }
                         }
                         // ScalarValue::Date64(_) => {}
-                        ScalarValue::TimestampSecond(s, _) => {
+
+                        // generate_sql_for_timestamp will call Utc constructors, so only support UTC zone for now
+                        // DataFusion can return "UTC" for stuff like `NOW()` during constant folding
+                        ScalarValue::TimestampSecond(s, tz)
+                            if matches!(tz.as_deref(), None | Some("UTC")) =>
+                        {
                             generate_sql_for_timestamp!(s, timestamp, sql_generator, sql_query)
                         }
-                        ScalarValue::TimestampMillisecond(ms, None) => {
+                        ScalarValue::TimestampMillisecond(ms, tz)
+                            if matches!(tz.as_deref(), None | Some("UTC")) =>
+                        {
                             generate_sql_for_timestamp!(
                                 ms,
                                 timestamp_millis_opt,
@@ -1717,7 +1724,9 @@ impl CubeScanWrapperNode {
                                 sql_query
                             )
                         }
-                        ScalarValue::TimestampMicrosecond(ms, None) => {
+                        ScalarValue::TimestampMicrosecond(ms, tz)
+                            if matches!(tz.as_deref(), None | Some("UTC")) =>
+                        {
                             generate_sql_for_timestamp!(
                                 ms,
                                 timestamp_micros,
@@ -1725,7 +1734,9 @@ impl CubeScanWrapperNode {
                                 sql_query
                             )
                         }
-                        ScalarValue::TimestampNanosecond(nanoseconds, None) => {
+                        ScalarValue::TimestampNanosecond(nanoseconds, tz)
+                            if matches!(tz.as_deref(), None | Some("UTC")) =>
+                        {
                             generate_sql_for_timestamp!(
                                 nanoseconds,
                                 timestamp_nanos,

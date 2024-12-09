@@ -1,17 +1,17 @@
-import { getEnv, convertTimeStrToMs } from '../src/env';
+import { getEnv, convertTimeStrToSeconds } from '../src/env';
 
 test('convertTimeStrToMs', () => {
-  expect(convertTimeStrToMs('1', 'VARIABLE_ENV')).toBe(1);
-  expect(convertTimeStrToMs('1s', 'VARIABLE_ENV')).toBe(1);
-  expect(convertTimeStrToMs('5s', 'VARIABLE_ENV')).toBe(5);
-  expect(convertTimeStrToMs('1m', 'VARIABLE_ENV')).toBe(1 * 60);
-  expect(convertTimeStrToMs('10m', 'VARIABLE_ENV')).toBe(10 * 60);
-  expect(convertTimeStrToMs('1h', 'VARIABLE_ENV')).toBe(60 * 60);
-  expect(convertTimeStrToMs('2h', 'VARIABLE_ENV')).toBe(2 * 60 * 60);
+  expect(convertTimeStrToSeconds('1', 'VARIABLE_ENV')).toBe(1);
+  expect(convertTimeStrToSeconds('1s', 'VARIABLE_ENV')).toBe(1);
+  expect(convertTimeStrToSeconds('5s', 'VARIABLE_ENV')).toBe(5);
+  expect(convertTimeStrToSeconds('1m', 'VARIABLE_ENV')).toBe(1 * 60);
+  expect(convertTimeStrToSeconds('10m', 'VARIABLE_ENV')).toBe(10 * 60);
+  expect(convertTimeStrToSeconds('1h', 'VARIABLE_ENV')).toBe(60 * 60);
+  expect(convertTimeStrToSeconds('2h', 'VARIABLE_ENV')).toBe(2 * 60 * 60);
 });
 
 test('convertTimeStrToMs(exception)', () => {
-  expect(() => convertTimeStrToMs('', 'VARIABLE_ENV')).toThrowError(
+  expect(() => convertTimeStrToSeconds('', 'VARIABLE_ENV')).toThrowError(
     `Value "" is not valid for VARIABLE_ENV. Must be a number in seconds or duration string (1s, 1m, 1h).`
   );
 });

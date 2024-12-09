@@ -53,10 +53,10 @@ export class SnowflakeQuery extends BaseQuery {
 
     return `DATEADD(${timeUnit},
         FLOOR(
-          DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          DATEDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
           DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}'))
         ) * DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}')),
-        ${this.timeStampCast(`'${origin}'`)})`;
+        ${this.dateTimeCast(`'${origin}'`)})`;
   }
 
   /**

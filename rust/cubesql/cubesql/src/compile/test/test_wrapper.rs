@@ -1,3 +1,4 @@
+use cubeclient::models::V1LoadRequestQuery;
 use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -541,6 +542,184 @@ async fn test_simple_subquery_wrapper_filter_and_projection() {
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
 
+// TODO add more time zones
+// TODO add more TS syntax variants
+// TODO add TIMESTAMPTZ variant
+/// Using TIMESTAMP WITH TIME ZONE with actual timezone in wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2024-02-03T04:05:06Z'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains(
+            "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
+        ));
+}
+
+// TODO add more time zones
+// TODO add more TS syntax variants
+// TODO add TIMESTAMPTZ variant
+/// Using TIMESTAMP WITH TIME ZONE with actual timezone in ungrouped wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_timestamptz_ungrouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= TIMESTAMP WITH TIME ZONE '2024-02-03T04:05:06Z'
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains(
+            "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
+        ));
+}
+
+/// Using NOW() in wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_now() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= NOW()
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
+}
+
+/// Using NOW() in ungrouped wrapper should render proper timestamptz in SQL
+#[tokio::test]
+async fn test_wrapper_now_ungrouped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender
+FROM KibanaSampleDataEcommerce
+WHERE
+    order_date >= NOW()
+    AND
+--   This filter should trigger pushdown
+    LOWER(customer_gender) = 'male'
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
+}
+
 #[tokio::test]
 async fn test_case_wrapper() {
     if !Rewriter::sql_push_down_enabled() {
@@ -1079,4 +1258,128 @@ async fn test_wrapper_filter_flatten() {
             ungrouped: None,
         }
     );
+}
+
+/// Regular aggregation over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+#[tokio::test]
+async fn wrapper_agg_over_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM (
+            SELECT
+                customer_gender
+            FROM
+                KibanaSampleDataEcommerce
+            LIMIT 5
+        ) scan
+        GROUP BY
+            1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: Some(5),
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    assert!(logical_plan
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("\"limit\": 5"));
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("\"ungrouped\": true"));
+}
+
+/// Aggregation(dimension) over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+#[tokio::test]
+async fn wrapper_agg_dimension_over_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            MAX(customer_gender)
+        FROM (
+            SELECT
+                customer_gender
+            FROM
+                KibanaSampleDataEcommerce
+            LIMIT 5
+        ) scan
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: Some(5),
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    assert!(logical_plan
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("\"limit\": 5"));
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("\"ungrouped\": true"));
 }
