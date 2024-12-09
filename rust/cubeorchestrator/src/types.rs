@@ -25,7 +25,7 @@ pub enum DBResponseValue {
     Object { value: DBResponsePrimitive },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResultType {
     #[serde(rename = "default")]
     Default,
@@ -33,7 +33,7 @@ pub enum ResultType {
     Compact,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum QueryType {
     #[serde(rename = "regularQuery")]
     RegularQuery,
@@ -64,7 +64,7 @@ pub enum MemberType {
     Segments,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FilterOperator {
     #[serde(rename = "equals")]
     Equals,
@@ -115,14 +115,14 @@ pub struct QueryFilter {
     pub values: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct GroupingSet {
     pub group_type: String,
     pub id: u32,
     pub sub_id: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct ParsedMemberExpression {
     pub expression: Vec<String>,
     #[serde(rename = "cubeName")]
@@ -176,13 +176,13 @@ pub struct ConfigItem {
     pub granularities: Option<Vec<GranularityMeta>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
     pub id: String,
     pub desc: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedQueryFilter {
     pub member: String,
     pub operator: FilterOperator,
@@ -191,7 +191,7 @@ pub struct NormalizedQueryFilter {
 }
 
 // XXX: Omitted function variant
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum MemberOrMemberExpression {
     Member(String),
     MemberExpression(ParsedMemberExpression),
@@ -244,7 +244,7 @@ pub struct Query {
     pub response_format: Option<ResultType>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedQuery {
     pub measures: Vec<MemberOrMemberExpression>,
     pub dimensions: Option<Vec<MemberOrMemberExpression>>,
@@ -266,6 +266,8 @@ pub struct NormalizedQuery {
     #[serde(rename = "rowLimit")]
     pub row_limit: Option<u32>,
     pub order: Option<Vec<Order>>,
+    #[serde(rename = "queryType")]
+    pub query_type: QueryType,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
