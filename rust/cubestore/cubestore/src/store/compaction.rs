@@ -1464,9 +1464,7 @@ mod tests {
     use crate::metastore::{
         BaseRocksStoreFs, Column, ColumnType, IndexDef, IndexType, RocksMetaStore,
     };
-    use crate::queryplanner::metadata_cache::{
-        BasicMetadataCacheFactory, NoopParquetMetadataCache,
-    };
+    use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
     use crate::table::data::rows_to_columns;

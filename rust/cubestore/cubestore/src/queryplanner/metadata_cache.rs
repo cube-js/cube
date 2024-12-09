@@ -8,7 +8,6 @@ use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::fs::File;
 use std::ops::Range;
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,20 +23,19 @@ pub trait MetadataCacheFactory: Sync + Send {
         time_to_idle: Duration,
     ) -> Arc<dyn ParquetFileReaderFactory>;
 }
-
 /// Default MetadataCache, does not cache anything
 #[derive(Debug)]
 pub struct NoopParquetMetadataCache {
-    default_factory: Arc<dyn ParquetFileReaderFactory>,
+    default_factory: DefaultParquetFileReaderFactory,
 }
 
 impl NoopParquetMetadataCache {
-    /// Creates a new DefaultMetadataCache
+     /// Creates a new DefaultMetadataCache
     pub fn new() -> Arc<Self> {
         Arc::new(NoopParquetMetadataCache {
-            default_factory: Arc::new(DefaultParquetFileReaderFactory::new(Arc::new(
-                object_store::local::LocalFileSystem::new(),
-            ))),
+            default_factory: DefaultParquetFileReaderFactory::new(Arc::new(
+                 object_store::local::LocalFileSystem::new(),
+            )),
         })
     }
 }
@@ -52,8 +50,9 @@ impl ParquetFileReaderFactory for NoopParquetMetadataCache {
     ) -> datafusion::common::Result<Box<dyn AsyncFileReader + Send>> {
         self.default_factory
             .create_reader(partition_index, file_meta, metadata_size_hint, metrics)
-    }
-}
+     }
+ }
+
 
 /// LruMetadataCache, caches parquet metadata.
 pub struct LruParquetMetadataCacheFactory {
@@ -115,9 +114,7 @@ impl BasicMetadataCacheFactory {
 
 impl MetadataCacheFactory for BasicMetadataCacheFactory {
     fn make_noop_cache(&self) -> Arc<dyn ParquetFileReaderFactory> {
-        Arc::new(DefaultParquetFileReaderFactory::new(Arc::new(
-            object_store::local::LocalFileSystem::new(),
-        )))
+        NoopParquetMetadataCache::new()
     }
 
     fn make_lru_cache(
