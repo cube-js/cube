@@ -389,6 +389,7 @@ impl<'a> PlanIndexStore for &'a dyn MetaStore {
 #[derive(Clone)]
 struct SortColumns {
     sort_on: Vec<String>,
+    sort_on_order_col_only: Vec<String>,
     required: bool,
 }
 
@@ -461,12 +462,18 @@ impl PlanRewriter for CollectConstraints {
                                                 .map(|n| n.clone())
                                                 .unique()
                                                 .collect::<Vec<_>>(),
+                                            sort_on_order_col_only: order_col_names
+                                                .iter()
+                                                .map(|n| n.clone())
+                                                .unique()
+                                                .collect::<Vec<_>>(),
                                             required: s.required,
                                         })
                                     }
                                 }
                                 None => Some(SortColumns {
                                     sort_on: order_col_names.clone(),
+                                    sort_on_order_col_only: vec![],
                                     required: false,
                                 }),
                             }
@@ -508,6 +515,7 @@ impl PlanRewriter for CollectConstraints {
                 let sort_on = if !sort_on.is_empty() && sort_on.iter().all(|c| c.is_some()) {
                     Some(SortColumns {
                         sort_on: sort_on.into_iter().map(|c| c.unwrap()).collect(),
+                        sort_on_order_col_only: vec![],
                         required: false,
                     })
                 } else {
@@ -518,6 +526,28 @@ impl PlanRewriter for CollectConstraints {
                     aggregates: aggr_expr.to_vec(),
                     order_col_names: current_context.order_col_names.clone(),
                 })
+            }
+            LogicalPlan::Projection { expr, .. } => {
+                let alias_to_column = get_alias_to_column(expr);
+
+                if let Some(order_col_names) = &current_context.order_col_names {
+                    let names: Vec<String> = order_col_names
+                        .iter()
+                        .map(|k| {
+                            alias_to_column
+                                .get(k)
+                                .map_or_else(|| k.clone(), |v| v.name.clone())
+                        })
+                        .collect();
+
+                    if !names.is_empty() {
+                        return Some(current_context.update_order_col_names(names));
+                    } else {
+                        return None;
+                    }
+                }
+
+                None
             }
             LogicalPlan::Sort { expr, input, .. } => {
                 let (names, _) = sort_to_column_names(expr, input);
@@ -533,6 +563,7 @@ impl PlanRewriter for CollectConstraints {
                 if single_value_filter_columns(predicate, &mut sort_on) {
                     if !sort_on.is_empty() {
                         let sort_on = Some(SortColumns {
+                            sort_on_order_col_only: vec![],
                             sort_on: sort_on
                                 .into_iter()
                                 .map(|c| c.name.to_string())
@@ -569,6 +600,7 @@ impl PlanRewriter for CollectConstraints {
         }
         Some(ConstraintsContext {
             sort_on: Some(SortColumns {
+                sort_on_order_col_only: vec![],
                 sort_on: join_on.iter().map(|(l, _)| l.name.clone()).collect(),
                 required: true,
             }),
@@ -590,6 +622,7 @@ impl PlanRewriter for CollectConstraints {
         }
         Some(ConstraintsContext {
             sort_on: Some(SortColumns {
+                sort_on_order_col_only: vec![],
                 sort_on: join_on.iter().map(|(_, r)| r.name.clone()).collect(),
                 required: true,
             }),
@@ -606,26 +639,15 @@ fn extract_column_name(expr: &Expr) -> Option<String> {
     }
 }
 
-///Try to get original column namse from if underlined projection or aggregates contains columns aliases
-fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
-    fn get_name(exprs: &Vec<Expr>, may_be_alias: &String) -> String {
-        let expr = exprs.iter().find(|&expr| match expr {
-            Expr::Alias(_, name) => name == may_be_alias,
-            _ => false,
-        });
-        if let Some(expr) = expr {
-            if let Some(original_name) = extract_column_name(expr) {
-                return original_name;
-            }
+fn get_alias_to_column(expr: &Vec<Expr>) -> HashMap<String, logical_plan::Column> {
+    let mut alias_to_column = HashMap::new();
+    expr.iter().for_each(|e| {
+        if let Expr::Alias(box Expr::Column(c), alias) = e {
+            alias_to_column.insert(alias.clone(), c.clone());
         }
-        may_be_alias.clone()
-    }
-    match input {
-        LogicalPlan::Projection { expr, .. } => get_name(expr, may_be_alias),
-        LogicalPlan::Filter { input, .. } => get_original_name(may_be_alias, input),
-        LogicalPlan::Aggregate { group_expr, .. } => get_name(group_expr, may_be_alias),
-        _ => may_be_alias.clone(),
-    }
+    });
+
+    alias_to_column
 }
 
 fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<String>, bool) {
@@ -642,7 +664,7 @@ fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<Str
                 }
                 match expr.as_ref() {
                     Expr::Column(c) => {
-                        res.push(get_original_name(&c.name, input));
+                        res.push(c.name.clone());
                     }
                     _ => {
                         return (Vec::new(), true);
@@ -755,6 +777,39 @@ impl PlanRewriter for ChooseIndex<'_> {
 
     fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
         match n {
+            LogicalPlan::Projection { expr, .. } => {
+                let alias_to_column = get_alias_to_column(expr);
+
+                let new_single_value_filtered_cols = context
+                    .single_value_filtered_cols
+                    .iter()
+                    .map(|name| {
+                        alias_to_column
+                            .get(name)
+                            .map_or_else(|| name.clone(), |col| col.name.clone())
+                    })
+                    .collect();
+
+                let mut new_context =
+                    context.update_single_value_filtered_cols(new_single_value_filtered_cols);
+
+                if let Some(sort) = &new_context.sort {
+                    let names: Vec<String> = sort
+                        .iter()
+                        .map(|k| {
+                            alias_to_column
+                                .get(k)
+                                .map_or_else(|| k.clone(), |col| col.name.clone())
+                        })
+                        .collect();
+
+                    if !names.is_empty() {
+                        new_context = new_context.update_sort(names, context.sort_is_asc);
+                    }
+                }
+
+                Some(new_context)
+            }
             LogicalPlan::Limit { n, .. } => Some(context.update_limit(Some(*n))),
             LogicalPlan::Skip { n, .. } => {
                 if let Some(limit) = context.limit {
@@ -1016,6 +1071,10 @@ async fn pick_index(
     indices: Vec<IdRow<Index>>,
 ) -> Result<IndexCandidate, DataFusionError> {
     let sort_on = c.sort_on.as_ref().map(|sc| (&sc.sort_on, sc.required));
+    let sort_on_order_col_only = c
+        .sort_on
+        .as_ref()
+        .map(|sc| (&sc.sort_on_order_col_only, sc.required));
 
     let aggr_index_allowed = check_aggregates_expr(&table, &c.aggregates);
 
@@ -1130,18 +1189,24 @@ async fn pick_index(
                 )));
                 (err, None, sort_on)
             } else {
+                let filter_columns_updated = match sort_on_order_col_only {
+                    Some(_) => HashSet::new(),
+                    _ => filter_columns,
+                };
                 let optimal = optimal_index_by_score(
                     // Skipping default index
                     indices.iter().skip(1),
                     &projection_columns,
-                    &filter_columns,
+                    &filter_columns_updated,
                 );
-
                 let index = optimal.unwrap_or(default_index);
                 (
                     Ok(index),
                     index.get_row().multi_index_id().map(|_| index),
-                    None,
+                    match sort_on_order_col_only {
+                        Some((columns, flag)) if !columns.is_empty() => Some((columns, flag)),
+                        _ => None,
+                    },
                 )
             }
         }
