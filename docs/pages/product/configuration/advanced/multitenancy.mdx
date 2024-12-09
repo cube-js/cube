@@ -23,8 +23,8 @@ your specific case. The options are:
 - `scheduled_refresh_contexts`
 - `scheduled_refresh_time_zones`
 
-All of the above options are functions, which you provide to Cube in the
-[`cube.js` configuration file][ref-config]. The functions accept one argument -
+All of the above options are functions, which you provide in the
+[configuration file][ref-config]. The functions accept one argument:
 a context object, which has a [`securityContext`][ref-config-security-ctx]
 property where you can provide all the necessary data to identify a user e.g.,
 organization, app, etc. By default, the
@@ -375,7 +375,7 @@ input.
 
 </WarningBox>
 
-[ref-config]: /reference/configuration/config
+[ref-config]: /product/configuration#configuration-options
 [ref-config-opts]: /reference/configuration/config
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driver_factory
