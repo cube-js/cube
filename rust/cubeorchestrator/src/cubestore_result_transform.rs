@@ -6,7 +6,7 @@ use crate::types::{
 };
 use anyhow::{bail, Context, Result};
 use chrono::SecondsFormat;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimitive {
@@ -334,4 +334,73 @@ pub fn transform_data(
             Ok(TransformedData::Vanilla(dataset))
         }
     }
+}
+
+/// Helper to get a list if unique granularities from normalized queries
+pub fn get_query_granularities(queries: &[NormalizedQuery]) -> Vec<String> {
+    queries
+        .iter()
+        .filter_map(|query| {
+            query
+                .time_dimensions
+                .as_ref()
+                .and_then(|tds| tds.get(0))
+                .and_then(|td| td.granularity.clone())
+        })
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+/// Get Pivot Query for a list of queries
+pub fn get_pivot_query(query_type: QueryType, queries: &[NormalizedQuery]) -> Result<NormalizedQuery> {
+    let mut pivot_query = queries
+        .first()
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("Queries list cannot be empty"))?;
+
+    match query_type {
+        QueryType::BlendingQuery => {
+            // Merge and deduplicate measures and dimensions across all queries
+            let mut merged_measures = HashSet::new();
+            let mut merged_dimensions = HashSet::new();
+
+            for query in queries {
+                merged_measures.extend(query.measures.iter().cloned());
+                if let Some(dimensions) = &query.dimensions {
+                    merged_dimensions.extend(dimensions.iter().cloned());
+                }
+            }
+
+            pivot_query.measures = merged_measures.into_iter().collect();
+            pivot_query.dimensions = if !merged_dimensions.is_empty() {
+                Some(merged_dimensions.into_iter().collect())
+            } else {
+                None
+            };
+
+            // Add time dimensions
+            let granularities = get_query_granularities(queries);
+            if !granularities.is_empty() {
+                pivot_query.time_dimensions = Some(vec![QueryTimeDimension {
+                    dimension: "time".to_string(),
+                    date_range: None,
+                    compare_date_range: None,
+                    granularity: granularities.get(0).cloned(),
+                }]);
+            }
+        }
+        QueryType::CompareDateRangeQuery => {
+            let mut dimensions = vec![MemberOrMemberExpression::Member("compareDateRange".to_string())];
+            if let Some(dims) = pivot_query.dimensions {
+                dimensions.extend(dims.clone());
+            }
+            pivot_query.dimensions = Option::from(dimensions);
+        }
+        _ => {}
+    }
+
+    pivot_query.query_type = query_type;
+
+    Ok(pivot_query)
 }
