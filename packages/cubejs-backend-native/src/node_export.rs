@@ -32,9 +32,12 @@ use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
 
+use cubeorchestrator::cubestore_message_parser::CubeStoreResult;
+
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
+use neon::types::buffer::TypedArray;
 
 struct SQLInterface {
     services: Arc<NodeCubeServices>,
@@ -503,6 +506,43 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
+//============ sql orchestrator ===================
+
+fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsBox<CubeStoreResult>> {
+    let msg = cx.argument::<JsBuffer>(0)?;
+    let msg_data = msg.as_slice(&cx);
+    match CubeStoreResult::new(msg_data) {
+        Ok(result) => Ok(cx.boxed(result)),
+        Err(err) => cx.throw_error(err.to_string()),
+    }
+}
+
+fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let result = cx.argument::<JsBox<CubeStoreResult>>(0)?;
+
+    let js_array = cx.execute_scoped(|mut cx| {
+        let js_array = JsArray::new(&mut cx, result.rows.len());
+
+        for (i, row) in result.rows.iter().enumerate() {
+            let js_row = cx.execute_scoped(|mut cx| {
+                let js_row = JsObject::new(&mut cx);
+                for (key, value) in result.columns.iter().zip(row.iter()) {
+                    let js_key = cx.string(key);
+                    let js_value = cx.string(value);
+                    js_row.set(&mut cx, js_key, js_value)?;
+                }
+                Ok(js_row)
+            })?;
+
+            js_array.set(&mut cx, i as u32, js_row)?;
+        }
+
+        Ok(js_array)
+    })?;
+
+    Ok(js_array.upcast())
+}
+
 pub fn register_module_exports<C: NodeConfiguration + 'static>(
     mut cx: ModuleContext,
 ) -> NeonResult<()> {
@@ -513,7 +553,15 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
+    //============ sql planner exports ===================
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
+
+    //========= sql orchestrator exports =================
+    cx.export_function(
+        "parseCubestoreResultMessage",
+        parse_cubestore_ws_result_message,
+    )?;
+    cx.export_function("getCubestoreResult", get_cubestore_result)?;
 
     crate::template::template_register_module(&mut cx)?;
 

@@ -1,7 +1,9 @@
-use super::context::NativeContext;
-use super::object::{
-    NativeArray, NativeBoolean, NativeFunction, NativeNumber, NativeObject, NativeString,
-    NativeStruct,
+use super::{
+    context::NativeContext,
+    object::{
+        NativeArray, NativeBoolean, NativeFunction, NativeNumber, NativeObject, NativeString,
+        NativeStruct,
+    },
 };
 pub trait InnerTypes: Clone + 'static {
     type Object: NativeObject<Self>;
