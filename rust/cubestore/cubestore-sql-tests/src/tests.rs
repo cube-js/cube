@@ -8010,6 +8010,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     service
+        .exec_query("CREATE TABLE foo.pushdown_where_group4_with_alias (a_alias_2 int, b_alias_2 int, c_alias_2 int) index ind1 (c_alias_2, b_alias_2)")
+        .await
+        .unwrap();
+    service
         .exec_query(
             "INSERT INTO foo.pushdown_where_group1
             (a, b, c)
@@ -8328,6 +8332,8 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
         &service,
         "SELECT a, b, c FROM (
                     SELECT a_alias a, b_alias b, c_alias c FROM foo.pushdown_where_group3_with_alias
+                    UNION ALL
+                    SELECT a_alias_2 a, b_alias_2 b, c_alias_2 c FROM foo.pushdown_where_group4_with_alias
                 ) as `tb`
                 WHERE a = 20
                 ORDER BY 3 DESC
@@ -8344,6 +8350,8 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
         &service,
         "SELECT a, b, c FROM (
                     SELECT a_alias a, b_alias b, c_alias c FROM foo.pushdown_where_group3_with_alias
+                    UNION ALL
+                    SELECT a_alias_2 a, b_alias_2 b, c_alias_2 c FROM foo.pushdown_where_group4_with_alias
                 ) as `tb`
                 WHERE a > 20
                 ORDER BY 3 DESC
