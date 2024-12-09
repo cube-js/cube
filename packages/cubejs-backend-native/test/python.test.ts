@@ -83,6 +83,38 @@ suite('Python Config', () => {
     expect(await config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
   });
 
+  test('scheduled_refresh_time_zones', async () => {
+    if (!config.scheduledRefreshTimeZones) {
+      throw new Error('scheduledRefreshTimeZones was not defined in config.py');
+    }
+
+    expect(await config.scheduledRefreshTimeZones()).toEqual(['Europe/Kyiv', 'Antarctica/Troll', 'Australia/Sydney']);
+  });
+
+  test('scheduled_refresh_contexts', async () => {
+    if (!config.scheduledRefreshContexts) {
+      throw new Error('scheduledRefreshContexts was not defined in config.py');
+    }
+
+    expect(await config.scheduledRefreshContexts()).toEqual([
+      {
+        securityContext: {
+          appid: 'test1', u: { prop1: 'value1' }
+        }
+      },
+      {
+        securityContext: {
+          appid: 'test2', u: { prop1: 'value2' }
+        }
+      },
+      {
+        securityContext: {
+          appid: 'test3', u: { prop1: 'value3' }
+        }
+      },
+    ]);
+  });
+
   test('repository factory', async () => {
     if (!config.repositoryFactory) {
       throw new Error('repositoryFactory was not defined in config.py');

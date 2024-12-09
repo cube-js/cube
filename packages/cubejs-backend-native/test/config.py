@@ -34,6 +34,34 @@ async def context_to_api_scopes():
 
 
 @config
+async def scheduled_refresh_time_zones(ctx):
+    print("[python] scheduled_refresh_time_zones ctx=", ctx)
+    return ["Europe/Kyiv", "Antarctica/Troll", "Australia/Sydney"]
+
+
+@config
+async def scheduled_refresh_contexts(ctx):
+    print("[python] scheduled_refresh_contexts ctx=", ctx)
+    return [
+      {
+        "securityContext": {
+          "appid": 'test1', "u": { "prop1": "value1" }
+        }
+      },
+      {
+        "securityContext": {
+          "appid": 'test2', "u": { "prop1": "value2" }
+        }
+      },
+      {
+        "securityContext": {
+          "appid": 'test3', "u": { "prop1": "value3" }
+        }
+      },
+    ]
+
+
+@config
 def schema_version(ctx):
     print("[python] schema_version", ctx)
 

@@ -354,6 +354,8 @@ export interface PyConfiguration {
   checkAuth?: (req: unknown, authorization: string) => Promise<{ 'security_context'?: unknown }>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>
+  scheduledRefreshContexts?: () => Promise<string[]>
+  scheduledRefreshTimeZones?: () => Promise<string[]>
   contextToRoles?: (ctx: unknown) => Promise<string[]>
 }
 
