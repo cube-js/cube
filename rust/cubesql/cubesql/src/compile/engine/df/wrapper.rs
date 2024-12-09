@@ -145,8 +145,8 @@ impl SqlQuery {
         index
     }
 
-    pub fn extend_values(&mut self, values: &Vec<Option<String>>) {
-        self.values.extend(values.iter().cloned());
+    pub fn extend_values(&mut self, values: impl IntoIterator<Item = Option<String>>) {
+        self.values.extend(values.into_iter());
     }
 
     pub fn replace_sql(&mut self, sql: String) {
@@ -969,7 +969,7 @@ impl CubeScanWrapperNode {
                             .await?;
 
                             let (sql_string, new_values) = subquery_sql.unpack();
-                            sql.extend_values(&new_values);
+                            sql.extend_values(new_values);
                             // TODO why only field 0 is a key?
                             let field = subquery.schema().field(0);
                             subqueries_sql.insert(field.qualified_name(), sql_string);
@@ -1044,7 +1044,7 @@ impl CubeScanWrapperNode {
                                 )
                                 .await?;
                                 let (subq_sql_string, new_values) = subq_sql.sql.unpack();
-                                sql.extend_values(&new_values);
+                                sql.extend_values(new_values);
                                 let subq_alias = subq_sql.from_alias;
                                 // Expect that subq_sql.column_remapping already incorporates subq_alias/
                                 // TODO does it?
