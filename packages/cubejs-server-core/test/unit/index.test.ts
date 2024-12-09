@@ -26,7 +26,7 @@ class CubejsServerCoreOpen extends CubejsServerCore {
 
   public pubScheduledRefreshTimeZones(ctx: any) {
     return this.scheduledRefreshTimeZones(ctx);
-  };
+  }
 }
 
 const repositoryWithoutPreAggregations: SchemaFileRepository = {
