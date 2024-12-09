@@ -128,6 +128,16 @@ export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOpt
 
 export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
 
+export type ScheduledRefreshTimeZonesFn = (context: RequestContext) => string[] | Promise<string[]>;
+
+/**
+ * Function that should provide a logic of scheduled returning of
+ * the user background context. Used as a part of a main
+ * configuration object of the Gateway to provide extendability to
+ * this logic.
+ */
+export type ScheduledRefreshContextsFn = () => Promise<UserBackgroundContext[]>;
+
 // internal
 export type DriverOptions = {
   dataSource?: string,
@@ -194,7 +204,7 @@ export interface CreateOptions {
   schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
-  scheduledRefreshTimeZones?: string[];
+  scheduledRefreshTimeZones?: string[] | ScheduledRefreshTimeZonesFn;
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
   scheduledRefreshBatchSize?: number;
