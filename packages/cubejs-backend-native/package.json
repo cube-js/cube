@@ -21,7 +21,8 @@
     "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:server:stream": "CUBESQL_STREAM_MODE=true CUBESQL_LOG_LEVEL=error CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
-    "test:unit": "jest --forceExit",
+    "unit": "jest --forceExit",
+    "test:unit": "yarn run unit",
     "test:cargo": "cargo test",
     "lint": "eslint test/ js/ --ext .ts",
     "lint:fix": "eslint --fix test/ js/ --ext .ts"

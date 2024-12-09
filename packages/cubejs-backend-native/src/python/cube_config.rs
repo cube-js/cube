@@ -33,7 +33,7 @@ impl CubeConfigPy {
             "scheduled_refresh_batch_size",
             "scheduled_refresh_concurrency",
             "scheduled_refresh_timer",
-            "scheduled_refresh_timezones",
+            "scheduled_refresh_time_zones",
             "schema_path",
             "sql_cache",
             "sql_password",
