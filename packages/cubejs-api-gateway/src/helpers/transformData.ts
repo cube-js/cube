@@ -6,25 +6,13 @@
  */
 
 import R from 'ramda';
+import moment, { MomentInput } from 'moment';
 import { UserError } from '../UserError';
 import { ConfigItem } from './prepareAnnotation';
-import {
-  DBResponsePrimitive,
-  DBResponseValue,
-  transformValue,
-} from './transformValue';
-import {
-  NormalizedQuery,
-  QueryTimeDimension
-} from '../types/query';
-import {
-  ResultType,
-  QueryType,
-} from '../types/strings';
-import {
-  ResultType as ResultTypeEnum,
-  QueryType as QueryTypeEnum,
-} from '../types/enums';
+import { NormalizedQuery, QueryTimeDimension } from '../types/query';
+import { QueryType, ResultType, } from '../types/strings';
+import { QueryType as QueryTypeEnum, ResultType as ResultTypeEnum, } from '../types/enums';
+import { DBResponsePrimitive, DBResponseValue } from '../types/responses';
 
 const COMPARE_DATE_RANGE_FIELD = 'compareDateRange';
 const COMPARE_DATE_RANGE_SEPARATOR = ' - ';
@@ -173,6 +161,25 @@ function getMembers(
       members[query.timeDimensions[0].dimension];
   }
   return members;
+}
+
+/**
+ * Transform specified `value` with specified `type` to the network
+ * protocol type.
+ */
+function transformValue(
+  value: DBResponseValue,
+  type: string
+): DBResponsePrimitive {
+  // TODO: support for max time
+  if (value && (type === 'time' || value instanceof Date)) {
+    return (
+      value instanceof Date
+        ? moment(value)
+        : moment.utc(value as MomentInput)
+    ).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  }
+  return value as DBResponsePrimitive;
 }
 
 /**
@@ -370,4 +377,5 @@ export {
   getCompactRow,
   getVanilaRow,
   transformData,
+  transformValue,
 };
