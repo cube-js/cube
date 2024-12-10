@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
+import type { TransformDataRequest, TransformDataResponse, } from '@cubejs-backend/api-gateway';
 import { CubeStoreResultWrapper } from './CubeStoreResultWrapper';
 
 export * from './CubeStoreResultWrapper';
@@ -364,6 +365,12 @@ export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => 
   const native = loadNative();
 
   return native.getCubestoreResult(ref);
+};
+
+export const transformData = (data: TransformDataRequest): TransformDataResponse => {
+  const native = loadNative();
+
+  return native.transformQueryData(data);
 };
 
 export interface PyConfiguration {
