@@ -299,14 +299,21 @@ function getVanilaRow(
 /**
  * Transforms queried data array to the output format.
  */
-function transformData(
-  aliasToMemberNameMap: AliasToMemberMap,
-  annotation: { [member: string]: ConfigItem },
-  data: { [sqlAlias: string]: unknown }[],
-  query: NormalizedQuery,
-  queryType: QueryType,
-  resType?: ResultType
-): TransformDataResponse {
+function transformData({
+  aliasToMemberNameMap,
+  annotation,
+  data,
+  query,
+  queryType,
+  resType,
+}: {
+  aliasToMemberNameMap: AliasToMemberMap;
+  annotation: { [member: string]: ConfigItem };
+  data: { [sqlAlias: string]: unknown }[];
+  query: NormalizedQuery;
+  queryType: QueryType;
+  resType?: ResultType;
+}): TransformDataResponse {
   const d = data as { [sqlAlias: string]: DBResponseValue }[];
   const membersToAliasMap = getMembers(
     queryType,

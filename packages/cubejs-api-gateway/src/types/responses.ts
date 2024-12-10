@@ -33,3 +33,5 @@ export type TransformDataRequest = {
   queryType: QueryType,
   resType?: ResultType
 };
+
+export type TransformDataResponseCb = () => TransformDataResponse;

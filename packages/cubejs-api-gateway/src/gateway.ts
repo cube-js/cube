@@ -92,6 +92,7 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
+import { TransformDataResponseCb } from './types/responses';
 
 type HandleErrorOptions = {
     e: any,
@@ -1617,34 +1618,36 @@ class ApiGateway {
     response: any,
     responseType?: ResultType,
   ) {
-    const data = response.data.isNative ?
-      JSON.parse(transformDataNative(JSON.stringify({
-        aliasToMemberNameMap: sqlQuery.aliasNameToMember,
-        annotation: {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        },
-        query: normalizedQuery,
-        queryType,
-        resType: responseType,
-      }), response.data.getNativeRef()).result) as TransformDataResponse
+    const transformDataParams = {
+      aliasToMemberNameMap: sqlQuery.aliasNameToMember,
+      annotation: {
+        ...annotation.measures,
+        ...annotation.dimensions,
+        ...annotation.timeDimensions
+      } as { [member: string]: ConfigItem },
+      query: normalizedQuery,
+      queryType,
+      resType: responseType,
+    };
+
+    // We postpone data transformation until the last minute
+    // in case when all responses are native - we process them in native part
+    const dataCb: TransformDataResponseCb = response.data.isNative ?
+      () => JSON.parse(
+        transformDataNative(
+          JSON.stringify(transformDataParams), response.data.getNativeRef()
+        ).result
+      ) as TransformDataResponse
       :
-      transformData(
-        sqlQuery.aliasNameToMember,
-        {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        } as { [member: string]: ConfigItem },
-        response.data,
-        normalizedQuery,
-        queryType,
-        responseType,
-      );
+      () => transformData({
+        ...transformDataParams,
+        data: response.data,
+      });
+
     return {
       query: normalizedQuery,
-      data,
+      dataCb,
+      transformDataParams,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||
@@ -1664,6 +1667,7 @@ class ApiGateway {
       external: response.external,
       slowQuery: Boolean(response.slowQuery),
       total: normalizedQuery.total ? response.total : null,
+      isNative: response.data.isNative
     };
   }
 
@@ -1813,22 +1817,40 @@ class ApiGateway {
                 r.usedPreAggregations || {}
               ).length
             ).length,
-          queriesWithData:
-            results.filter((r: any) => r.data?.length).length,
+          // Have to omit because data could be processed natively
+          // so it is not known at this point
+          // queriesWithData:
+          //   results.filter((r: any) => r.data?.length).length,
           dbType: results.map(r => r.dbType),
         },
         context,
       );
 
+      const allNative = results.every(r => r.isNative);
+
       if (props.queryType === 'multi') {
         res({
           queryType,
-          results,
+          results: results.map(r => {
+            const data = r.dataCb();
+            return {
+              ...r,
+              data,
+              dataCb: undefined,
+              transformDataParams: undefined
+            };
+          }),
           pivotQuery: getPivotQuery(queryType, normalizedQueries),
           slowQuery
         });
       } else {
-        res(results[0]);
+        const data = results[0].dataCb();
+        res({
+          ...results[0],
+          data,
+          dataCb: undefined,
+          transformDataParams: undefined
+        });
       }
     } catch (e: any) {
       this.handleError({
