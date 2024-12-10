@@ -13,39 +13,39 @@ import {
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
 } from './smoke-tests';
 
+const PG_PORT = 5656;
+let connectionId = 0;
+
+async function createPostgresClient(user: string, password: string) {
+  connectionId++;
+  const currentConnId = connectionId;
+
+  console.debug(`[pg] new connection ${currentConnId}`);
+
+  const conn = new PgClient({
+    database: 'db',
+    port: PG_PORT,
+    host: '127.0.0.1',
+    user,
+    password,
+    ssl: false,
+  });
+  conn.on('error', (err) => {
+    console.log(err);
+  });
+  conn.on('end', () => {
+    console.debug(`[pg] end ${currentConnId}`);
+  });
+
+  await conn.connect();
+
+  return conn;
+}
+
 describe('Cube RBAC Engine', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
   let birdbox: BirdBox;
-
-  const pgPort = 5656;
-  let connectionId = 0;
-
-  async function createPostgresClient(user: string, password: string) {
-    connectionId++;
-    const currentConnId = connectionId;
-
-    console.debug(`[pg] new connection ${currentConnId}`);
-
-    const conn = new PgClient({
-      database: 'db',
-      port: pgPort,
-      host: '127.0.0.1',
-      user,
-      password,
-      ssl: false,
-    });
-    conn.on('error', (err) => {
-      console.log(err);
-    });
-    conn.on('end', () => {
-      console.debug(`[pg] end ${currentConnId}`);
-    });
-
-    await conn.connect();
-
-    return conn;
-  }
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
@@ -64,7 +64,7 @@ describe('Cube RBAC Engine', () => {
         CUBEJS_DB_USER: 'test',
         CUBEJS_DB_PASS: 'test',
         //
-        CUBEJS_PG_SQL_PORT: `${pgPort}`,
+        CUBEJS_PG_SQL_PORT: `${PG_PORT}`,
       },
       {
         schemaDir: 'rbac/model',
@@ -343,5 +343,62 @@ describe('Cube RBAC Engine [dev mode]', () => {
       expect(dim.isVisible).toBe(false);
       expect(dim.public).toBe(false);
     }
+  });
+});
+
+describe('Cube RBAC Engine [Python config]', () => {
+  jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
+  let birdbox: BirdBox;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    await PostgresDBRunner.loadEcom(db);
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DEV_MODE: 'false',
+        NODE_ENV: 'production',
+        //
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        //
+        CUBEJS_PG_SQL_PORT: `${PG_PORT}`,
+      },
+      {
+        schemaDir: 'rbac-python/model',
+        cubejsConfig: 'rbac-python/cube.py',
+      }
+    );
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  describe('RBAC via SQL API [python config]', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('admin', 'admin_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT * from users', async () => {
+      const res = await connection.query('SELECT COUNT(city) as count from "users" HAVING (COUNT(1) > 0)');
+      // const res = await connection.query('SELECT * FROM users limit 10');
+      // This query should return all rows because of the `allow_all` statement
+      // It should also exclude the `created_at` dimension as per memberLevel policy
+      expect(res.rows).toMatchSnapshot('users_python');
+    });
   });
 });

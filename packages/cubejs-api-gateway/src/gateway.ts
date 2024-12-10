@@ -1196,18 +1196,20 @@ class ApiGateway {
             currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
           }
 
-          let normalizedQuery = normalizeQuery(currentQuery, persistent);
+          const normalizedQuery = normalizeQuery(currentQuery, persistent);
+          let evaluatedQuery = normalizedQuery;
 
           if (hasExpressionsInQuery) {
             // We need to parse/eval all member expressions early as applyRowLevelSecurity
             // needs to access the full SQL query in order to evaluate rules
-            normalizedQuery =
+            evaluatedQuery =
               this.evalMemberExpressionsInQuery(normalizedQuery);
           }
 
           // First apply cube/view level security policies
           const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
+            evaluatedQuery,
             context
           );
           // Then apply user-supplied queryRewrite
@@ -1219,7 +1221,7 @@ class ApiGateway {
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
           // if that's the case, we should run an extra pass of parsing here to make sure
           // nothing breaks down the road
-          if (this.hasExpressionsInQuery(rewrittenQuery)) {
+          if (hasExpressionsInQuery || this.hasExpressionsInQuery(rewrittenQuery)) {
             rewrittenQuery = this.parseMemberExpressionsInQuery(rewrittenQuery);
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
