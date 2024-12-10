@@ -1395,12 +1395,13 @@ pub async fn merge_chunks(
             .iter()
             .map(|aggr_col| aggr_col.aggregate_expr(&res.schema()))
             .collect::<Result<Vec<_>, _>>()?;
+        let aggregates_len = aggregates.len();
 
         res = Arc::new(AggregateExec::try_new(
             AggregateMode::Final,
-            PhysicalGroupBy::new(groups, Vec::new(), Vec::new()),
+            PhysicalGroupBy::new_single(groups),
             aggregates,
-            Vec::new(),
+            vec![None; aggregates_len],
             res.clone(),
             schema,
         )?);
