@@ -90,7 +90,7 @@ pub struct ParquetTableStore {
 
 impl ParquetTableStore {
     pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
-        let builder = ParquetRecordBatchReaderBuilder::try_new(File::create_new(path)?)?;
+        let builder = ParquetRecordBatchReaderBuilder::try_new(File::open(path)?)?;
         let mut r = builder.with_batch_size(self.row_group_size).build()?;
         let mut batches = Vec::new();
         for b in r {
