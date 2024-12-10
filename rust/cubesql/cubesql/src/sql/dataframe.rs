@@ -404,7 +404,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Utf8 | DataType::LargeUtf8 => Ok(ColumnType::String),
         DataType::Date32 => Ok(ColumnType::Date(false)),
         DataType::Date64 => Ok(ColumnType::Date(true)),
-        DataType::Timestamp(_, _) => Ok(ColumnType::String),
+        DataType::Timestamp(_, _) => Ok(ColumnType::Timestamp),
         DataType::Interval(unit) => Ok(ColumnType::Interval(unit)),
         DataType::Float16 | DataType::Float32 | DataType::Float64 => Ok(ColumnType::Double),
         DataType::Boolean => Ok(ColumnType::Boolean),
@@ -793,5 +793,42 @@ mod tests {
             "table_value_serializer",
             serde_json::to_string(&frame.data).unwrap()
         );
+    }
+
+    #[test]
+    fn test_arrow_to_column_type() {
+        let cases = vec![
+            (DataType::Binary, ColumnType::Blob),
+            (DataType::Utf8, ColumnType::String),
+            (DataType::LargeUtf8, ColumnType::String),
+            (DataType::Date32, ColumnType::Date(false)),
+            (DataType::Date64, ColumnType::Date(true)),
+            (
+                DataType::Timestamp(TimeUnit::Second, None),
+                ColumnType::Timestamp,
+            ),
+            (
+                DataType::Interval(IntervalUnit::YearMonth),
+                ColumnType::Interval(IntervalUnit::YearMonth),
+            ),
+            (DataType::Float16, ColumnType::Double),
+            (DataType::Float32, ColumnType::Double),
+            (DataType::Float64, ColumnType::Double),
+            (DataType::Boolean, ColumnType::Boolean),
+            (DataType::Int32, ColumnType::Int32),
+            (DataType::UInt32, ColumnType::Int32),
+            (DataType::Int8, ColumnType::Int64),
+            (DataType::Int16, ColumnType::Int64),
+            (DataType::Int64, ColumnType::Int64),
+            (DataType::UInt8, ColumnType::Int64),
+            (DataType::UInt16, ColumnType::Int64),
+            (DataType::UInt64, ColumnType::Int64),
+            (DataType::Null, ColumnType::String),
+        ];
+
+        for (arrow_type, expected_column_type) in cases {
+            let result = arrow_to_column_type(arrow_type.clone()).unwrap();
+            assert_eq!(result, expected_column_type, "Failed for {:?}", arrow_type);
+        }
     }
 }
