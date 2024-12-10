@@ -5,19 +5,11 @@
  */
 
 /* globals describe,test,expect */
-/* eslint-disable import/no-duplicates */
-/* eslint-disable @typescript-eslint/no-duplicate-imports */
-
 import moment from 'moment';
-import transformValueDef from '../../src/helpers/transformValue';
-import { transformValue } from '../../src/helpers/transformValue';
+
+import { transformValue } from '../../src/helpers/transformData';
 
 describe('transformValue helper', () => {
-  test('export looks as expected', () => {
-    expect(transformValueDef).toBeDefined();
-    expect(transformValue).toBeDefined();
-    expect(transformValue).toEqual(transformValueDef);
-  });
   test('object with the time value', () => {
     const date = Date();
     expect(transformValue(date, 'time')).toBe(

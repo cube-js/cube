@@ -3,6 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
+import type {
+  AliasToMemberMap,
+  TransformDataResponse,
+  NormalizedQuery,
+  QueryType,
+  ResultType,
+  ConfigItem,
+} from '@cubejs-backend/api-gateway';
+import { CubeStoreResultWrapper } from './CubeStoreResultWrapper';
+
+export * from './CubeStoreResultWrapper';
 
 export interface BaseMeta {
   // postgres or mysql
@@ -96,6 +107,15 @@ export type SQLInterfaceOptions = {
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
   // gateway options
   gatewayPort?: number,
+};
+
+export type TransformDataRequest = {
+  aliasToMemberNameMap: AliasToMemberMap,
+  annotation: { [member: string]: ConfigItem },
+  data: { [sqlAlias: string]: unknown }[],
+  query: NormalizedQuery,
+  queryType: QueryType,
+  resType?: ResultType
 };
 
 export function loadNative() {
@@ -346,6 +366,27 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
   const native = loadNative();
 
   return native.buildSqlAndParams(cubeEvaluator);
+};
+
+export type ResultRow = Record<string, string>;
+
+export const parseCubestoreResultMessage = (message: ArrayBuffer): CubeStoreResultWrapper => {
+  const native = loadNative();
+
+  const msg = native.parseCubestoreResultMessage(message);
+  return new CubeStoreResultWrapper(msg);
+};
+
+export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => {
+  const native = loadNative();
+
+  return native.getCubestoreResult(ref);
+};
+
+export const transformData = (data: TransformDataRequest): TransformDataResponse => {
+  const native = loadNative();
+
+  return native.transformQueryData(data);
 };
 
 export interface PyConfiguration {

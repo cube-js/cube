@@ -6,36 +6,19 @@
  */
 
 import R from 'ramda';
+import moment, { MomentInput } from 'moment';
 import { UserError } from '../UserError';
 import { ConfigItem } from './prepareAnnotation';
-import {
-  DBResponsePrimitive,
-  DBResponseValue,
-  transformValue,
-} from './transformValue';
-import {
-  NormalizedQuery,
-  QueryTimeDimension
-} from '../types/query';
-import {
-  ResultType,
-  QueryType,
-} from '../types/strings';
-import {
-  ResultType as ResultTypeEnum,
-  QueryType as QueryTypeEnum,
-} from '../types/enums';
+import { NormalizedQuery, QueryTimeDimension } from '../types/query';
+import { QueryType, ResultType, } from '../types/strings';
+import { QueryType as QueryTypeEnum, ResultType as ResultTypeEnum, } from '../types/enums';
+import { AliasToMemberMap, DBResponsePrimitive, DBResponseValue, TransformDataResponse } from '../types/responses';
 
 const COMPARE_DATE_RANGE_FIELD = 'compareDateRange';
 const COMPARE_DATE_RANGE_SEPARATOR = ' - ';
 const BLENDING_QUERY_KEY_PREFIX = 'time.';
 const BLENDING_QUERY_RES_SEPARATOR = '.';
 const MEMBER_SEPARATOR = '.';
-
-/**
- * SQL aliases to cube properties hash map.
- */
-type AliasToMemberMap = { [alias: string]: string };
 
 /**
  * Parse date range value from time dimension.
@@ -176,6 +159,25 @@ function getMembers(
 }
 
 /**
+ * Transform specified `value` with specified `type` to the network
+ * protocol type.
+ */
+function transformValue(
+  value: DBResponseValue,
+  type: string
+): DBResponsePrimitive {
+  // TODO: support for max time
+  if (value && (type === 'time' || value instanceof Date)) {
+    return (
+      value instanceof Date
+        ? moment(value)
+        : moment.utc(value as MomentInput)
+    ).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  }
+  return value as DBResponsePrimitive;
+}
+
+/**
  * Convert DB response object to the compact output format.
  * @internal
  * @todo should we use transformValue for blending query?
@@ -216,7 +218,7 @@ function getCompactRow(
 }
 
 /**
- * Convert DB response object to the vanila output format.
+ * Convert DB response object to the vanilla output format.
  * @todo rewrite me please!
  * @internal
  */
@@ -304,12 +306,7 @@ function transformData(
   query: NormalizedQuery,
   queryType: QueryType,
   resType?: ResultType
-): {
-  members: string[],
-  dataset: DBResponsePrimitive[][]
-} | {
-  [member: string]: DBResponsePrimitive
-}[] {
+): TransformDataResponse {
   const d = data as { [sqlAlias: string]: DBResponseValue }[];
   const membersToAliasMap = getMembers(
     queryType,
@@ -357,7 +354,6 @@ function transformData(
 
 export default transformData;
 export {
-  AliasToMemberMap,
   COMPARE_DATE_RANGE_FIELD,
   COMPARE_DATE_RANGE_SEPARATOR,
   BLENDING_QUERY_KEY_PREFIX,
@@ -370,4 +366,5 @@ export {
   getCompactRow,
   getVanilaRow,
   transformData,
+  transformValue,
 };

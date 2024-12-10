@@ -17,9 +17,6 @@ import {
   ResultType as ResultTypeEnum,
 } from '../../src/types/enums';
 import {
-  DBResponseValue,
-} from '../../src/helpers/transformValue';
-import {
   ConfigItem,
 } from '../../src/helpers/prepareAnnotation';
 import transformDataDefault
@@ -41,6 +38,7 @@ import {
 import {
   QueryType,
 } from '../../src/types/strings';
+import { DBResponseValue } from '../../src/types/responses';
 
 const mockData = {
   regular_discount_by_city: {
@@ -792,7 +790,7 @@ describe('transformData helpers', () => {
           .timeDimensions
       )
     ) as QueryTimeDimension[];
-    
+
     expect(() => {
       getBlendingResponseKey();
     }).toThrow(

@@ -10,6 +10,7 @@ import {
 
 import {
   QueryType,
+  ResultType,
 } from './types/enums';
 
 import {
@@ -43,9 +44,24 @@ import {
   QueryRequest
 } from './types/request';
 
+import {
+  AliasToMemberMap,
+  TransformDataResponse
+} from './types/responses';
+
+import {
+  ConfigItem,
+  GranularityMeta
+} from './helpers/prepareAnnotation';
+
 export {
+  AliasToMemberMap,
+  TransformDataResponse,
+  ConfigItem,
+  GranularityMeta,
   QueryTimeDimensionGranularity,
   QueryType,
+  ResultType,
   QueryFilter,
   LogicalAndFilter,
   LogicalOrFilter,
