@@ -1,6 +1,6 @@
 import type { ConfigItem } from '../helpers/prepareAnnotation';
 import type { NormalizedQuery } from './query';
-import type { QueryType, ResultType } from './enums';
+import type { QueryType, ResultType } from './strings';
 
 export type DBResponsePrimitive =
   null |

@@ -38,7 +38,6 @@ use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
-use serde::Deserialize;
 use cubeorchestrator::cubestore_result_transform::transform_data;
 use cubeorchestrator::types::{TransformDataRequest};
 
@@ -546,37 +545,29 @@ fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     Ok(js_array.upcast())
 }
 
-fn js_object_to_struct<T>(cx: &mut FunctionContext) -> Result<T, neon::result::Throw>
-where
-    T: for<'de> Deserialize<'de>,
-{
+fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsObject> {
     let json_str = cx
         .argument::<JsString>(0)?
-        .value(cx);
+        .value(&mut cx);
+    let request_data = match serde_json::from_str::<TransformDataRequest>(&json_str) {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
 
-    let result: Result<T, serde_json::Error> = serde_json::from_str(&json_str);
-    match result {
-        Ok(value) => Ok(value),
-        Err(err) => cx.throw_error(err.to_string()),
-    }
-}
-
-fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsObject> {
-    let request_data: TransformDataRequest = js_object_to_struct(&mut cx)?;
+    let cube_store_result = cx.argument::<JsBox<CubeStoreResult>>(1)?;
 
     let alias_to_member_name_map = &request_data.alias_to_member_name_map;
     let annotation = &request_data.annotation;
-    let data = &request_data.data;
     let query = &request_data.query;
-    let query_type = &request_data.query_type;
+    let query_type = &request_data.query_type.unwrap_or_default();
     let res_type = &request_data.res_type;
 
     let transformed = match transform_data(
         alias_to_member_name_map,
         annotation,
-        data.clone(),
+        &**cube_store_result,
         query,
-        query_type,
+        &query_type,
         res_type.clone(),
     ) {
         Ok(data) => data,

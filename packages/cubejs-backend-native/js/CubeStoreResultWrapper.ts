@@ -77,4 +77,8 @@ export class CubeStoreResultWrapper {
     const array = this.getArray();
     return (array as any)[method](...args);
   }
+
+  public getNativeRef() {
+    return this.nativeReference;
+  }
 }

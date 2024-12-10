@@ -1,23 +1,22 @@
 use crate::types::{
-    ConfigItem, DBResponsePrimitive, DBResponseValue, MemberOrMemberExpression, MembersMap,
+    ConfigItem, MembersMap,
     NormalizedQuery, QueryTimeDimension, QueryType, ResultType, TransformedData,
     BLENDING_QUERY_KEY_PREFIX, BLENDING_QUERY_RES_SEPARATOR, COMPARE_DATE_RANGE_FIELD,
     COMPARE_DATE_RANGE_SEPARATOR, MEMBER_SEPARATOR,
 };
 use anyhow::{bail, Context, Result};
-use chrono::SecondsFormat;
+use chrono::{DateTime, SecondsFormat};
 use std::collections::{HashMap, HashSet};
+use crate::cubestore_message_parser::CubeStoreResult;
 
 /// Transform specified `value` with specified `type` to the network protocol type.
-pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimitive {
-    match value {
-        DBResponseValue::DateTime(dt) if type_ == "time" || type_.is_empty() => {
-            let formatted = dt.to_rfc3339_opts(SecondsFormat::Millis, true);
-            DBResponsePrimitive::String(formatted)
-        }
-        DBResponseValue::Primitive(p) => p,
-        DBResponseValue::Object { value } => value,
-        _ => DBResponsePrimitive::Null,
+pub fn transform_value(value: String, type_: &str) -> String {
+    if type_ == "time" || type_.is_empty() {
+        DateTime::parse_from_rfc3339(&value)
+            .map(|dt| dt.to_rfc3339_opts(SecondsFormat::Millis, true))
+            .unwrap_or_else(|_| value)
+    } else {
+        value
     }
 }
 
@@ -91,19 +90,17 @@ pub fn get_blending_response_key(
 pub fn get_members(
     query_type: &QueryType,
     query: &NormalizedQuery,
-    db_data: &Vec<HashMap<String, DBResponseValue>>,
+    db_data: &CubeStoreResult,
     alias_to_member_name_map: &HashMap<String, String>,
     annotation: &HashMap<String, ConfigItem>,
 ) -> Result<MembersMap> {
     let mut members: MembersMap = HashMap::new();
 
-    if db_data.is_empty() {
+    if db_data.columns.is_empty() {
         return Ok(members);
     }
 
-    let columns = db_data[0].keys().collect::<Vec<_>>();
-
-    for column in columns {
+    for column in db_data.columns.iter() {
         let member_name = alias_to_member_name_map
             .get(column)
             .context(format!("Member name not found for alias: '{}'", column))?;
@@ -126,10 +123,7 @@ pub fn get_members(
 
         if path.len() == 3
             && query.dimensions.as_ref().map_or(true, |dims| {
-                !dims.iter().any(|dim| match dim {
-                    MemberOrMemberExpression::Member(name) => *name == calc_member,
-                    MemberOrMemberExpression::MemberExpression(expr) => expr.name == calc_member,
-                })
+                !dims.iter().any(|dim| *dim == calc_member)
             })
         {
             members.insert(calc_member, column.clone());
@@ -167,15 +161,18 @@ pub fn get_compact_row(
     query_type: &QueryType,
     members: &[String],
     time_dimensions: Option<&Vec<QueryTimeDimension>>,
-    db_row: &HashMap<String, DBResponseValue>,
-) -> Result<Vec<DBResponsePrimitive>> {
-    let mut row: Vec<DBResponsePrimitive> = Vec::with_capacity(members.len());
+    db_row: &Vec<String>,
+    columns_pos: &HashMap<String, usize>,
+) -> Result<Vec<String>> {
+    let mut row: Vec<String> = Vec::with_capacity(members.len());
 
     for m in members {
         if let Some(annotation_item) = annotation.get(m) {
             if let Some(alias) = members_to_alias_map.get(m) {
-                if let Some(value) = db_row.get(alias) {
-                    row.push(transform_value(value.clone(), &annotation_item.member_type));
+                if let Some(key) = columns_pos.get(alias) {
+                    if let Some(value) = db_row.get(*key) {
+                        row.push(transform_value(value.clone(), &annotation_item.member_type));
+                    }
                 }
             }
         }
@@ -183,20 +180,20 @@ pub fn get_compact_row(
 
     match query_type {
         QueryType::CompareDateRangeQuery => {
-            row.push(DBResponsePrimitive::String(get_date_range_value(
-                time_dimensions,
-            )?));
+            row.push(get_date_range_value(time_dimensions)?);
         }
         QueryType::BlendingQuery => {
             let blending_key = get_blending_response_key(time_dimensions)?;
 
             if let Some(alias) = members_to_alias_map.get(&blending_key) {
-                if let Some(value) = db_row.get(alias) {
-                    let member_type = annotation
-                        .get(alias)
-                        .map_or("", |annotation_item| &annotation_item.member_type);
+                if let Some(key) = columns_pos.get(alias) {
+                    if let Some(value) = db_row.get(*key) {
+                        let member_type = annotation
+                            .get(alias)
+                            .map_or("", |annotation_item| &annotation_item.member_type);
 
-                    row.push(transform_value(value.clone(), member_type));
+                        row.push(transform_value(value.clone(), member_type));
+                    }
                 }
             }
         }
@@ -212,22 +209,25 @@ pub fn get_vanilla_row(
     annotation: &HashMap<String, ConfigItem>,
     query_type: &QueryType,
     query: &NormalizedQuery,
-    db_row: &HashMap<String, DBResponseValue>,
-) -> Result<HashMap<String, DBResponsePrimitive>> {
+    db_row: &Vec<String>,
+    columns_pos: &HashMap<String, usize>,
+) -> Result<HashMap<String, String>> {
     let mut row = HashMap::new();
 
-    for (alias, value) in db_row {
-        let member_name = match alias_to_member_name_map.get(alias) {
-            Some(m) => m,
-            None => {
-                bail!("Missing member name for alias: {}", alias);
-            }
-        };
+    for (alias, &index) in columns_pos {
+        if let Some(value) = db_row.get(index) {
 
-        let annotation_for_member = match annotation.get(member_name) {
-            Some(am) => am,
-            None => {
-                bail!(
+            let member_name = match alias_to_member_name_map.get(alias) {
+                Some(m) => m,
+                None => {
+                    bail!("Missing member name for alias: {}", alias);
+                }
+            };
+
+            let annotation_for_member = match annotation.get(member_name) {
+                Some(am) => am,
+                None => {
+                    bail!(
                     concat!(
                         "You requested hidden member: '{}'. Please make it visible using `shown: true`. ",
                         "Please note primaryKey fields are `shown: false` by default: ",
@@ -235,29 +235,23 @@ pub fn get_vanilla_row(
                     ),
                     alias
                 )
-            }
-        };
+                }
+            };
 
-        let transformed_value = transform_value(value.clone(), &annotation_for_member.member_type);
+            let transformed_value = transform_value(value.clone(), &annotation_for_member.member_type);
 
-        // Handle deprecated time dimensions without granularity
-        let path: Vec<&str> = member_name.split(MEMBER_SEPARATOR).collect();
-        let member_name_without_granularity = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
-        if path.len() == 3
-            && query.dimensions.as_ref().map_or(true, |dims| {
-                !dims.iter().any(|dim| match dim {
-                    MemberOrMemberExpression::Member(name) => {
-                        *name == member_name_without_granularity
-                    }
-                    MemberOrMemberExpression::MemberExpression(expr) => {
-                        expr.name == member_name_without_granularity
-                    }
-                })
+            // Handle deprecated time dimensions without granularity
+            let path: Vec<&str> = member_name.split(MEMBER_SEPARATOR).collect();
+            let member_name_without_granularity = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
+            if path.len() == 3
+                && query.dimensions.as_ref().map_or(true, |dims| {
+                !dims.iter().any(|dim| *dim == member_name_without_granularity)
             })
-        {
-            row.insert(member_name_without_granularity, transformed_value);
-        } else {
-            row.insert(member_name.clone(), transformed_value);
+            {
+                row.insert(member_name_without_granularity, transformed_value);
+            } else {
+                row.insert(member_name.clone(), transformed_value);
+            }
         }
     }
 
@@ -266,7 +260,7 @@ pub fn get_vanilla_row(
             let date_range_value = get_date_range_value(query.time_dimensions.as_ref())?;
             row.insert(
                 "compareDateRange".to_string(),
-                DBResponsePrimitive::String(date_range_value),
+                date_range_value,
             );
         }
         QueryType::BlendingQuery => {
@@ -287,7 +281,7 @@ pub fn get_vanilla_row(
 pub fn transform_data(
     alias_to_member_name_map: &HashMap<String, String>,
     annotation: &HashMap<String, ConfigItem>,
-    data: Vec<HashMap<String, DBResponseValue>>,
+    data: &CubeStoreResult,
     query: &NormalizedQuery,
     query_type: &QueryType,
     res_type: Option<ResultType>,
@@ -303,8 +297,8 @@ pub fn transform_data(
 
     match res_type {
         Some(ResultType::Compact) => {
-            let dataset: Vec<_> = data
-                .into_iter()
+            let dataset: Vec<_> = data.rows
+                .iter()
                 .map(|row| {
                     get_compact_row(
                         &members_to_alias_map,
@@ -313,14 +307,15 @@ pub fn transform_data(
                         &members,
                         query.time_dimensions.as_ref(),
                         &row,
+                        &data.columns_pos,
                     )
                 })
                 .collect::<Result<Vec<_>>>()?;
             Ok(TransformedData::Compact { members, dataset })
         }
         _ => {
-            let dataset: Vec<_> = data
-                .into_iter()
+            let dataset: Vec<_> = data.rows
+                .iter()
                 .map(|row| {
                     get_vanilla_row(
                         alias_to_member_name_map,
@@ -328,6 +323,7 @@ pub fn transform_data(
                         query_type,
                         query,
                         &row,
+                        &data.columns_pos,
                     )
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -391,7 +387,7 @@ pub fn get_pivot_query(query_type: QueryType, queries: &[NormalizedQuery]) -> Re
             }
         }
         QueryType::CompareDateRangeQuery => {
-            let mut dimensions = vec![MemberOrMemberExpression::Member("compareDateRange".to_string())];
+            let mut dimensions = vec!["compareDateRange".to_string()];
             if let Some(dims) = pivot_query.dimensions {
                 dimensions.extend(dims.clone());
             }
@@ -400,7 +396,7 @@ pub fn get_pivot_query(query_type: QueryType, queries: &[NormalizedQuery]) -> Re
         _ => {}
     }
 
-    pivot_query.query_type = query_type;
+    pivot_query.query_type = Option::from(query_type);
 
     Ok(pivot_query)
 }

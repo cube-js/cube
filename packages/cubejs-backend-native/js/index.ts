@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
-import type { TransformDataRequest, TransformDataResponse, } from '@cubejs-backend/api-gateway';
 import { CubeStoreResultWrapper } from './CubeStoreResultWrapper';
 
 export * from './CubeStoreResultWrapper';
@@ -100,6 +99,23 @@ export type SQLInterfaceOptions = {
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
   // gateway options
   gatewayPort?: number,
+};
+
+export type DBResponsePrimitive =
+  null |
+  boolean |
+  number |
+  string;
+
+export type TransformDataResponse = {
+  members: string[],
+  dataset: DBResponsePrimitive[][]
+} | {
+  [member: string]: DBResponsePrimitive
+}[];
+
+export type TransformDataResponseNative = {
+  result: string
 };
 
 export function loadNative() {
@@ -367,10 +383,10 @@ export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => 
   return native.getCubestoreResult(ref);
 };
 
-export const transformData = (data: TransformDataRequest): TransformDataResponse => {
+export const transformData = (transformDataJson: string, rows: any): TransformDataResponseNative => {
   const native = loadNative();
 
-  return native.transformQueryData(data);
+  return native.transformQueryData(transformDataJson, rows);
 };
 
 export interface PyConfiguration {

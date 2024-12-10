@@ -9,6 +9,7 @@ pub const BLENDING_QUERY_KEY_PREFIX: &str = "time.";
 pub const BLENDING_QUERY_RES_SEPARATOR: &str = ".";
 pub const MEMBER_SEPARATOR: &str = ".";
 
+// TODO: Seems to be unused
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DBResponsePrimitive {
     Null,
@@ -17,6 +18,7 @@ pub enum DBResponsePrimitive {
     String(String),
 }
 
+// TODO: Seems to be unused
 #[derive(Debug, Clone, Deserialize)]
 pub enum DBResponseValue {
     DateTime(DateTime<Utc>),
@@ -51,6 +53,12 @@ impl Display for QueryType {
             .unwrap()
             .to_string();
         write!(f, "{}", str)
+    }
+}
+
+impl Default for QueryType {
+    fn default() -> Self {
+        QueryType::RegularQuery
     }
 }
 
@@ -162,12 +170,12 @@ pub struct GranularityMeta {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigItem {
     pub title: String,
-    pub short_title: String,
-    pub description: String,
+    pub short_title: Option<String>,
+    pub description: Option<String>,
     #[serde(rename = "type")]
     pub member_type: String,
-    pub format: String,
-    pub meta: Value,
+    pub format: Option<String>,
+    pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub drill_members: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -190,6 +198,7 @@ pub struct NormalizedQueryFilter {
     pub dimension: Option<String>,
 }
 
+// TODO: Not used, as all members are made as Strings for now
 // XXX: Omitted function variant
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum MemberOrMemberExpression {
@@ -224,12 +233,15 @@ pub enum LogicalFilter {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Query {
-    pub measures: Vec<MemberOrMemberExpression>,
-    pub dimensions: Option<Vec<MemberOrMemberExpression>>,
+    // pub measures: Vec<MemberOrMemberExpression>,
+    pub measures: Vec<String>,
+    // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
+    pub dimensions: Option<Vec<String>>,
     pub filters: Option<Vec<LogicalFilter>>,
     #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
-    pub segments: Option<Vec<MemberOrMemberExpression>>,
+    // pub segments: Option<Vec<MemberOrMemberExpression>>,
+    pub segments: Option<Vec<String>>,
     pub limit: Option<u32>,
     pub offset: Option<u32>,
     pub total: Option<bool>,
@@ -246,11 +258,14 @@ pub struct Query {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedQuery {
-    pub measures: Vec<MemberOrMemberExpression>,
-    pub dimensions: Option<Vec<MemberOrMemberExpression>>,
+    // pub measures: Vec<MemberOrMemberExpression>,
+    pub measures: Vec<String>,
+    // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
+    pub dimensions: Option<Vec<String>>,
     #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
-    pub segments: Option<Vec<MemberOrMemberExpression>>,
+    // pub segments: Option<Vec<MemberOrMemberExpression>>,
+    pub segments: Option<Vec<String>>,
     pub limit: Option<u32>,
     pub offset: Option<u32>,
     pub total: Option<bool>,
@@ -267,16 +282,17 @@ pub struct NormalizedQuery {
     pub row_limit: Option<u32>,
     pub order: Option<Vec<Order>>,
     #[serde(rename = "queryType")]
-    pub query_type: QueryType,
+    pub query_type: Option<QueryType>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum TransformedData {
     Compact {
         members: Vec<String>,
-        dataset: Vec<Vec<DBResponsePrimitive>>,
+        dataset: Vec<Vec<String>>,
     },
-    Vanilla(Vec<HashMap<String, DBResponsePrimitive>>),
+    Vanilla(Vec<HashMap<String, String>>),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -284,10 +300,9 @@ pub struct TransformDataRequest {
     #[serde(rename = "aliasToMemberNameMap")]
     pub alias_to_member_name_map: HashMap<String, String>,
     pub annotation: HashMap<String, ConfigItem>,
-    pub data: Vec<HashMap<String, DBResponseValue>>,
     pub query: NormalizedQuery,
     #[serde(rename = "queryType")]
-    pub query_type: QueryType,
+    pub query_type: Option<QueryType>,
     #[serde(rename = "resType")]
     pub res_type: Option<ResultType>,
 }
