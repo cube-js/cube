@@ -9,19 +9,22 @@ Cube supports multitenancy out of the box, both on database and data model
 levels. Multiple drivers are also supported, meaning that you can have one
 customer’s data in MongoDB and others in Postgres with one Cube instance.
 
-There are 6 [configuration options][ref-config-opts] you can leverage to make
+There are several [configuration options][ref-config-opts] you can leverage for
 your multitenancy setup. You can use all of them or just a couple, depending on
 your specific case. The options are:
 
-- `contextToAppId`
-- `contextToOrchestratorId`
-- `driverFactory`
-- `repositoryFactory`
-- `preAggregationsSchema`
-- `queryRewrite`
+- `context_to_app_id`
+- `schema_version`
+- `repository_factory`
+- `driver_factory`
+- `context_to_orchestrator_id`
+- `pre_aggregations_schema`
+- `query_rewrite`
+- `scheduled_refresh_contexts`
+- `scheduled_refresh_time_zones`
 
-All of the above options are functions, which you provide to Cube in the
-[`cube.js` configuration file][ref-config]. The functions accept one argument -
+All of the above options are functions, which you provide in the
+[configuration file][ref-config]. The functions accept one argument:
 a context object, which has a [`securityContext`][ref-config-security-ctx]
 property where you can provide all the necessary data to identify a user e.g.,
 organization, app, etc. By default, the
@@ -360,19 +363,19 @@ module.exports = {
 
 If you need scheduled refreshes for your pre-aggregations in a multi-tenant
 deployment, ensure you have configured
-[`scheduledRefreshContexts`][ref-config-refresh-ctx] correctly. You may also
-need to configure [`scheduledRefreshTimeZones`][ref-config-refresh-tz].
+[`scheduled_refresh_contexts`][ref-config-refresh-ctx] correctly. You may also
+need to configure [`scheduled_refresh_time_zones`][ref-config-refresh-tz].
 
 <WarningBox>
 
-Leaving [`scheduledRefreshContexts`][ref-config-refresh-ctx] unconfigured will
+Leaving [`scheduled_refresh_contexts`][ref-config-refresh-ctx] unconfigured will
 lead to issues where the security context will be `undefined`. This is because
 there is no way for Cube to know how to generate a context without the required
 input.
 
 </WarningBox>
 
-[ref-config]: /reference/configuration/config
+[ref-config]: /product/configuration#configuration-options
 [ref-config-opts]: /reference/configuration/config
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driver_factory
