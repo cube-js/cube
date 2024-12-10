@@ -19,7 +19,7 @@ use udfs::{aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_scal
 mod filter_by_key_range;
 mod flatten_union;
 pub mod info_schema;
-mod merge_sort;
+pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
 #[cfg(test)]
