@@ -118,7 +118,7 @@ export class WebSocketConnection {
             throw new Error(`Cube Store missed message id: ${httpMessage.messageId()}`); // logging
           }
 
-          if (getEnv('nativeOrchestrator')) {
+          if (getEnv('nativeOrchestrator') && msg.length > 1000) {
             try {
               const nativeResMsg = parseCubestoreResultMessage(msg);
               resolvers.resolve(nativeResMsg);
