@@ -417,7 +417,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::Int32 => Ok(ColumnType::Int32),
         DataType::UInt32
         | DataType::Int64 => Ok(ColumnType::Int64),
-        DataType::UInt64 => Ok(ColumnType::Decimal(128, 0)),
+        DataType::UInt64 => Ok(ColumnType::Decimal(39, 0)),
         DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
@@ -844,7 +844,7 @@ mod tests {
             (DataType::Int32, ColumnType::Int32),
             (DataType::UInt32, ColumnType::Int64),
             (DataType::Int64, ColumnType::Int64),
-            (DataType::UInt64, ColumnType::Decimal(128, 0)),
+            (DataType::UInt64, ColumnType::Decimal(39, 0)),
             (DataType::Null, ColumnType::String),
         ];
 
@@ -1018,7 +1018,7 @@ mod tests {
         create_record_batch(
             DataType::UInt64,
             UInt64Array::from(data64.clone()),
-            ColumnType::Decimal(128, 0),
+            ColumnType::Decimal(39, 0),
             data64
                 .into_iter()
                 .map(|e| TableValue::Decimal128(Decimal128Value::new(e as i128, 0)))
