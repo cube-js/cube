@@ -4,7 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -15,79 +15,59 @@ impl WrapperRules {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-is-null-expr",
-                wrapper_pushdown_replacer(
-                    is_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                ),
-                is_null_expr(wrapper_pushdown_replacer(
-                    "?expr",
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )),
+                wrapper_pushdown_replacer(is_null_expr("?expr"), "?context"),
+                is_null_expr(wrapper_pushdown_replacer("?expr", "?context")),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-is-null-expr",
                 is_null_expr(wrapper_pullup_replacer(
                     "?expr",
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                 )),
                 wrapper_pullup_replacer(
                     is_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                 ),
                 self.transform_is_null_expr("?alias_to_cube"),
             ),
             rewrite(
                 "wrapper-push-down-is-not-null-expr",
-                wrapper_pushdown_replacer(
-                    is_not_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                ),
-                is_not_null_expr(wrapper_pushdown_replacer(
-                    "?expr",
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )),
+                wrapper_pushdown_replacer(is_not_null_expr("?expr"), "?context"),
+                is_not_null_expr(wrapper_pushdown_replacer("?expr", "?context")),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-is-not-null-expr",
                 is_not_null_expr(wrapper_pullup_replacer(
                     "?expr",
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                 )),
                 wrapper_pullup_replacer(
                     is_not_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                 ),
                 self.transform_is_null_expr("?alias_to_cube"),
             ),
@@ -103,7 +83,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {
