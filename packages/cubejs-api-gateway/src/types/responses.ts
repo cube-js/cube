@@ -1,6 +1,7 @@
-/**
- * Query 'or'-filters type definition.
- */
+import type { ConfigItem } from '../helpers/prepareAnnotation';
+import type { NormalizedQuery } from './query';
+import type { QueryType, ResultType } from './enums';
+
 export type DBResponsePrimitive =
   null |
   boolean |
@@ -18,3 +19,17 @@ export type TransformDataResponse = {
 } | {
   [member: string]: DBResponsePrimitive
 }[];
+
+/**
+ * SQL aliases to cube properties hash map.
+ */
+export type AliasToMemberMap = { [alias: string]: string };
+
+export type TransformDataRequest = {
+  aliasToMemberNameMap: { [alias: string]: string },
+  annotation: { [member: string]: ConfigItem },
+  data: { [sqlAlias: string]: unknown }[],
+  query: NormalizedQuery,
+  queryType: QueryType,
+  resType?: ResultType
+};
