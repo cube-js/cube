@@ -4,7 +4,8 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        AggregateFunctionExprDistinct, AggregateFunctionExprFun, WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, AggregateFunctionExprDistinct, AggregateFunctionExprFun,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -18,22 +19,11 @@ impl WrapperRules {
                 "wrapper-push-down-aggregate-function",
                 wrapper_pushdown_replacer(
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    "?context",
                 ),
                 agg_fun_expr(
                     "?fun",
-                    vec![wrapper_pushdown_replacer(
-                        "?expr",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                    )],
+                    vec![wrapper_pushdown_replacer("?expr", "?context")],
                     "?distinct",
                 ),
             ),
@@ -43,21 +33,25 @@ impl WrapperRules {
                     "?fun",
                     vec![wrapper_pullup_replacer(
                         "?expr",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                        ),
                     )],
                     "?distinct",
                 ),
                 wrapper_pullup_replacer(
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                 ),
                 self.transform_agg_fun_expr("?fun", "?distinct", "?alias_to_cube"),
             ),
@@ -77,7 +71,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

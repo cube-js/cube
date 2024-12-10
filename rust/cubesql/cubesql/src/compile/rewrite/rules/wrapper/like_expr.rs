@@ -4,7 +4,8 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LikeExprEscapeChar, LikeExprLikeType, LikeType, WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, LikeExprEscapeChar, LikeExprLikeType, LikeType,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -23,31 +24,13 @@ impl WrapperRules {
                         "?pattern",
                         "?escape_char",
                     ),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    "?context",
                 ),
                 like_expr(
                     "?like_type",
                     "?negated",
-                    wrapper_pushdown_replacer(
-                        "?expr",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?pattern",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                    ),
+                    wrapper_pushdown_replacer("?expr", "?context"),
+                    wrapper_pushdown_replacer("?pattern", "?context"),
                     "?escape_char",
                 ),
             ),
@@ -58,19 +41,23 @@ impl WrapperRules {
                     "?negated",
                     wrapper_pullup_replacer(
                         "?expr",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?pattern",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                        ),
                     ),
                     "?escape_char",
                 ),
@@ -82,11 +69,13 @@ impl WrapperRules {
                         "?pattern",
                         "?escape_char",
                     ),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                 ),
                 self.transform_like_expr("?alias_to_cube", "?like_type", "?escape_char"),
             ),
@@ -106,7 +95,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube)
                 else {
