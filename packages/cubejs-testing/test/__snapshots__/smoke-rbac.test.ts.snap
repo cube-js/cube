@@ -587,4 +587,12 @@ Array [
 ]
 `;
 
+exports[`Cube RBAC Engine RBAC via SQL API default policy SELECT with member expressions: users_member_expression 1`] = `
+Array [
+  Object {
+    "count": "149",
+  },
+]
+`;
+
 exports[`Cube RBAC Engine RBAC via SQL API manager SELECT * from line_items: line_items_manager 1`] = `Array []`;

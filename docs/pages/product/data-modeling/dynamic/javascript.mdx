@@ -9,11 +9,11 @@ For similar functionality in YAML, see [Dynamic data models with Jinja and Pytho
 </InfoBox>
 
 Cube allows data models to be created on-the-fly using a special
-[`asyncModule()`][ref-async-module] function only available in the [schema
-execution environment][ref-schema-env]. `asyncModule()` allows registering an
+[`asyncModule()`][ref-async-module] function only available in the
+[execution environment][ref-schema-env]. `asyncModule()` allows registering an
 async function to be executed at the end of the data model compile phase so
 additional definitions can be added. This is often useful in situations where
-schema properties can be dynamically updated through an API, for example.
+data model properties can be dynamically updated through an API, for example.
 
 <WarningBox>
 
@@ -91,7 +91,7 @@ generate data models from that data:
   /product/data-modeling/dynamic/schema-execution-environment#cube-js-globals-cube-and-others
 
 ```javascript
-// model/cubes/DynamicSchema.js
+// model/cubes/DynamicDataModel.js
 const fetch = require("node-fetch");
 import {
   convertStringPropToFunction,
@@ -144,10 +144,10 @@ asyncModule(async () => {
 });
 ```
 
-## Usage with schemaVersion
+## Usage with `schema_version`
 
 It is also useful to be able to recompile the data model when there are changes
-in the underlying input data. For this purpose, the [`schemaVersion`
+in the underlying input data. For this purpose, the [`schema_version`
 ][link-config-schema-version] value in the `cube.js` configuration options can
 be specified as an asynchronous function:
 
@@ -156,7 +156,7 @@ be specified as an asynchronous function:
 module.exports = {
   schemaVersion: async ({ securityContext }) => {
     const schemaVersions = await (
-      await fetch("http://your-api-endpoint/schemaVersion")
+      await fetch("http://your-api-endpoint/schema_version")
     ).json();
 
     return schemaVersions[securityContext.tenantId];
@@ -164,18 +164,18 @@ module.exports = {
 };
 ```
 
-[link-config-schema-version]: /reference/configuration/config#schemaversion
+[link-config-schema-version]: /reference/configuration/config#schema_version
 
 ## Usage with COMPILE_CONTEXT
 
 The `COMPILE_CONTEXT` global object can also be used in conjunction with async
-schema creation to allow for multi-tenant deployments of Cube.
+data model creation to allow for multi-tenant deployments of Cube.
 
 In an example scenario where all tenants share the same cube, but see different
 dimensions and measures, you could do the following:
 
 ```javascript
-// model/cubes/DynamicSchema.js
+// model/cubes/DynamicDataModel.js
 const fetch = require("node-fetch");
 import {
   convertStringPropToFunction,
@@ -223,7 +223,7 @@ asyncModule(async () => {
 
 When using multiple databases, you'll need to ensure you set the
 [`data_source`][ref-schema-datasource] property for any asynchronously-created
-schemas, as well as ensuring the corresponding database drivers are set up with
+data models, as well as ensuring the corresponding database drivers are set up with
 [`driverFactory()`][ref-config-driverfactory] in your [`cube.js` configuration
 file][ref-config].
 
@@ -235,7 +235,7 @@ For an example scenario where data models may use either MySQL or Postgres
 databases, you could do the following:
 
 ```javascript
-// model/cubes/DynamicSchema.js
+// model/cubes/DynamicDataModel.js
 const fetch = require("node-fetch");
 import {
   convertStringPropToFunction,
