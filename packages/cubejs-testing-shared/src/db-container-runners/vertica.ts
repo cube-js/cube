@@ -1,5 +1,4 @@
-import { GenericContainer } from 'testcontainers';
-import { LogWaitStrategy } from 'testcontainers/build/wait-strategies/log-wait-strategy';
+import { GenericContainer, Wait } from 'testcontainers';
 import { DbRunnerAbstract } from './db-runner.abstract';
 
 export class VerticaDBRunner extends DbRunnerAbstract {
@@ -10,7 +9,9 @@ export class VerticaDBRunner extends DbRunnerAbstract {
       .withEnvironment({ TZ: 'Antarctica/Troll', VERTICA_DB_NAME: 'test' })
       .withExposedPorts(5433)
       .withStartupTimeout(60 * 1000)
-      .withWaitStrategy(new LogWaitStrategy('Node Status: v_test_node0001: (UP)', 1));
+      .withWaitStrategy(
+        Wait.forLogMessage('Node Status: v_test_node0001: (UP)')
+      );
 
     return container.start();
   }
