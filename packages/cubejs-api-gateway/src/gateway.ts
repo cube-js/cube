@@ -10,6 +10,7 @@ import {
   getRealType,
   QueryAlias,
 } from '@cubejs-backend/shared';
+import { transformData as transformDataNative, TransformDataResponse } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -1616,9 +1617,20 @@ class ApiGateway {
     response: any,
     responseType?: ResultType,
   ) {
-    return {
-      query: normalizedQuery,
-      data: transformData(
+    const data = response.data.isNative ?
+      JSON.parse(transformDataNative(JSON.stringify({
+        aliasToMemberNameMap: sqlQuery.aliasNameToMember,
+        annotation: {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        },
+        query: normalizedQuery,
+        queryType,
+        resType: responseType,
+      }), response.data.getNativeRef()).result) as TransformDataResponse
+      :
+      transformData(
         sqlQuery.aliasNameToMember,
         {
           ...annotation.measures,
@@ -1629,7 +1641,10 @@ class ApiGateway {
         normalizedQuery,
         queryType,
         responseType,
-      ),
+      );
+    return {
+      query: normalizedQuery,
+      data,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||

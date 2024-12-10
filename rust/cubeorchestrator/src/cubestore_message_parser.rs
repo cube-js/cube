@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
 use neon::prelude::Finalize;
 
@@ -29,6 +30,7 @@ impl std::error::Error for ParseError {}
 pub struct CubeStoreResult {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<String>>,
+    pub columns_pos: HashMap<String, usize>,
 }
 
 impl Finalize for CubeStoreResult {}
@@ -38,6 +40,7 @@ impl CubeStoreResult {
         let mut result = CubeStoreResult {
             columns: vec![],
             rows: vec![],
+            columns_pos: HashMap::new(),
         };
 
         let http_message =
@@ -62,10 +65,15 @@ impl CubeStoreResult {
                     return Err(ParseError::ColumnNameNotDefined);
                 }
 
-                result.columns = result_set_columns
+                let (columns, columns_pos): (Vec<_>, HashMap<_, _>) = result_set_columns
                     .iter()
-                    .map(|val| val.to_owned())
-                    .collect();
+                    .enumerate()
+                    .map(|(index, column_name)| (column_name.to_owned(), (column_name.to_owned(), index)))
+                    .unzip();
+
+                result.columns = columns;
+                result.columns_pos = columns_pos;
+
                 let result_set_rows = result_set.rows().ok_or(ParseError::EmptyResultSet)?;
                 result.rows = Vec::with_capacity(result_set_rows.len());
 
