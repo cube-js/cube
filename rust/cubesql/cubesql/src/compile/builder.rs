@@ -151,6 +151,7 @@ impl QueryBuilder {
                     None
                 },
                 ungrouped: None,
+                subquery_joins: None,
             },
             meta: self.meta,
         }

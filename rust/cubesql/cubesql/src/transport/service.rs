@@ -906,4 +906,12 @@ impl SqlTemplates {
         };
         self.render_template(&format!("types/{}", data_type), context! {})
     }
+
+    pub fn left_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/left", context! {})
+    }
+
+    pub fn inner_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/inner", context! {})
+    }
 }

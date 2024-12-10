@@ -2,10 +2,11 @@ use crate::{
     compile::rewrite::{
         literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerPushToCube,
+        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerGroupedSubqueries,
+        WrapperPullupReplacerPushToCube, WrapperPushdownReplacerGroupedSubqueries,
         WrapperPushdownReplacerPushToCube,
     },
-    copy_flag, var, var_iter,
+    copy_flag, copy_value, var, var_iter,
 };
 
 use crate::compile::rewrite::{
@@ -26,6 +27,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 wrapper_pullup_replacer(
                     literal_expr("?value"),
@@ -33,12 +35,15 @@ impl WrapperRules {
                     "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?pullup_grouped_subqueries",
                 ),
                 self.transform_literal(
                     "?alias_to_cube",
                     "?value",
                     "?push_to_cube",
                     "?pullup_push_to_cube",
+                    "?grouped_subqueries",
+                    "?pullup_grouped_subqueries",
                 ),
             ),
             transforming_rewrite(
@@ -49,6 +54,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 wrapper_pullup_replacer(
                     "?new_value",
@@ -56,6 +62,7 @@ impl WrapperRules {
                     "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?pullup_grouped_subqueries",
                 ),
                 self.transform_interval_literal(
                     "?alias_to_cube",
@@ -63,6 +70,8 @@ impl WrapperRules {
                     "?new_value",
                     "?push_to_cube",
                     "?pullup_push_to_cube",
+                    "?grouped_subqueries",
+                    "?pullup_grouped_subqueries",
                 ),
             ),
         ]);
@@ -74,11 +83,15 @@ impl WrapperRules {
         value_var: &str,
         push_to_cube_var: &str,
         pullup_push_to_cube_var: &str,
+        grouped_subqueries_var: &str,
+        pullup_grouped_subqueries_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let push_to_cube_var = var!(push_to_cube_var);
         let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
+        let grouped_subqueries_var = var!(grouped_subqueries_var);
+        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             if !copy_flag!(
@@ -88,6 +101,17 @@ impl WrapperRules {
                 WrapperPushdownReplacerPushToCube,
                 pullup_push_to_cube_var,
                 WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+            if !copy_value!(
+                egraph,
+                subst,
+                Vec<String>,
+                grouped_subqueries_var,
+                WrapperPushdownReplacerGroupedSubqueries,
+                pullup_grouped_subqueries_var,
+                WrapperPullupReplacerGroupedSubqueries
             ) {
                 return false;
             }
@@ -129,12 +153,16 @@ impl WrapperRules {
         new_value_var: &str,
         push_to_cube_var: &str,
         pullup_push_to_cube_var: &str,
+        grouped_subqueries_var: &str,
+        pullup_grouped_subqueries_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let new_value_var = var!(new_value_var);
         let push_to_cube_var = var!(push_to_cube_var);
         let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
+        let grouped_subqueries_var = var!(grouped_subqueries_var);
+        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             if !copy_flag!(
@@ -144,6 +172,17 @@ impl WrapperRules {
                 WrapperPushdownReplacerPushToCube,
                 pullup_push_to_cube_var,
                 WrapperPullupReplacerPushToCube
+            ) {
+                return false;
+            }
+            if !copy_value!(
+                egraph,
+                subst,
+                Vec<String>,
+                grouped_subqueries_var,
+                WrapperPushdownReplacerGroupedSubqueries,
+                pullup_grouped_subqueries_var,
+                WrapperPullupReplacerGroupedSubqueries
             ) {
                 return false;
             }

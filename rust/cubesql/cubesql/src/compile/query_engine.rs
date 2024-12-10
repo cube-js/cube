@@ -298,6 +298,8 @@ pub trait QueryEngine {
             }
         }
 
+        // We want to generate SQL early, as a part of planning, and not later (like during execution)
+        // to catch all SQL generation errors during planning
         let rewrite_plan = Self::evaluate_wrapped_sql(
             self.transport_ref().clone(),
             Arc::new(state.get_load_request_meta()),
