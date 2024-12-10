@@ -9,6 +9,7 @@ use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, IdRow, Index, IndexType, MetaStore,
     Partition, PartitionData,
 };
+use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
@@ -1406,20 +1407,18 @@ pub async fn merge_chunks(
             schema,
         )?);
     } else if let Some(key_columns) = unique_key_columns {
-        todo!();
-        // TODO upgrade DF
-        // res = Arc::new(LastRowByUniqueKeyExec::try_new(
-        //     res.clone(),
-        //     key_columns
-        //         .iter()
-        //         .map(|c| {
-        //             datafusion::physical_plan::expressions::Column::new_with_schema(
-        //                 c.get_name().as_str(),
-        //                 &res.schema(),
-        //             )
-        //         })
-        //         .collect::<Result<Vec<_>, _>>()?,
-        // )?);
+        res = Arc::new(LastRowByUniqueKeyExec::try_new(
+            res.clone(),
+            key_columns
+                .iter()
+                .map(|c| {
+                    datafusion::physical_plan::expressions::Column::new_with_schema(
+                        c.get_name().as_str(),
+                        &res.schema(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )?);
     }
 
     Ok(res.execute(0, Arc::new(TaskContext::default()))?)
