@@ -699,8 +699,10 @@ pub fn batches_to_dataframe(
 mod tests {
     use std::sync::Arc;
 
-    use datafusion::arrow::{array::PrimitiveArray, datatypes::TimestampMicrosecondType};
-    use datafusion::scalar::ScalarValue::TimestampMillisecond;
+    use datafusion::{
+        arrow::{array::PrimitiveArray, datatypes::TimestampMicrosecondType},
+        scalar::ScalarValue::TimestampMillisecond,
+    };
     use itertools::Itertools;
 
     use super::*;
