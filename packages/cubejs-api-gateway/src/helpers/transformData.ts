@@ -12,18 +12,13 @@ import { ConfigItem } from './prepareAnnotation';
 import { NormalizedQuery, QueryTimeDimension } from '../types/query';
 import { QueryType, ResultType, } from '../types/strings';
 import { QueryType as QueryTypeEnum, ResultType as ResultTypeEnum, } from '../types/enums';
-import { DBResponsePrimitive, DBResponseValue } from '../types/responses';
+import { AliasToMemberMap, DBResponsePrimitive, DBResponseValue, TransformDataResponse } from '../types/responses';
 
 const COMPARE_DATE_RANGE_FIELD = 'compareDateRange';
 const COMPARE_DATE_RANGE_SEPARATOR = ' - ';
 const BLENDING_QUERY_KEY_PREFIX = 'time.';
 const BLENDING_QUERY_RES_SEPARATOR = '.';
 const MEMBER_SEPARATOR = '.';
-
-/**
- * SQL aliases to cube properties hash map.
- */
-type AliasToMemberMap = { [alias: string]: string };
 
 /**
  * Parse date range value from time dimension.
@@ -311,12 +306,7 @@ function transformData(
   query: NormalizedQuery,
   queryType: QueryType,
   resType?: ResultType
-): {
-  members: string[],
-  dataset: DBResponsePrimitive[][]
-} | {
-  [member: string]: DBResponsePrimitive
-}[] {
+): TransformDataResponse {
   const d = data as { [sqlAlias: string]: DBResponseValue }[];
   const membersToAliasMap = getMembers(
     queryType,
@@ -364,7 +354,6 @@ function transformData(
 
 export default transformData;
 export {
-  AliasToMemberMap,
   COMPARE_DATE_RANGE_FIELD,
   COMPARE_DATE_RANGE_SEPARATOR,
   BLENDING_QUERY_KEY_PREFIX,

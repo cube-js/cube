@@ -1,6 +1,3 @@
-/**
- * Query 'or'-filters type definition.
- */
 export type DBResponsePrimitive =
   null |
   boolean |
@@ -18,3 +15,8 @@ export type TransformDataResponse = {
 } | {
   [member: string]: DBResponsePrimitive
 }[];
+
+/**
+ * SQL aliases to cube properties hash map.
+ */
+export type AliasToMemberMap = { [alias: string]: string };
