@@ -6,14 +6,19 @@ use super::{
 };
 use std::collections::HashMap;
 use std::rc::Rc;
+#[derive(Clone)]
+pub struct Reference {
+    pub reference: String,
+    pub source: Option<String>,
+}
 
 #[derive(Clone)]
 pub struct SqlNodesFactory {
     time_shifts: HashMap<String, String>,
     ungrouped: bool,
     ungrouped_measure: bool,
-    render_references: HashMap<String, String>,
-    ungrouped_measure_references: HashMap<String, String>,
+    render_references: HashMap<String, Reference>,
+    ungrouped_measure_references: HashMap<String, Reference>,
     cube_name_references: HashMap<String, String>,
     multi_stage_rank: Option<Vec<String>>,   //partition_by
     multi_stage_window: Option<Vec<String>>, //partition_by
@@ -73,15 +78,15 @@ impl SqlNodesFactory {
         self.ungrouped_measure = value;
     }
 
-    pub fn set_render_references(&mut self, value: HashMap<String, String>) {
+    pub fn set_render_references(&mut self, value: HashMap<String, Reference>) {
         self.render_references = value;
     }
 
-    pub fn render_references(&self) -> &HashMap<String, String> {
+    pub fn render_references(&self) -> &HashMap<String, Reference> {
         &self.render_references
     }
 
-    pub fn add_render_reference(&mut self, key: String, value: String) {
+    pub fn add_render_reference(&mut self, key: String, value: Reference) {
         self.render_references.insert(key, value);
     }
 
@@ -97,11 +102,11 @@ impl SqlNodesFactory {
         self.rolling_window = value;
     }
 
-    pub fn set_ungrouped_measure_references(&mut self, value: HashMap<String, String>) {
+    pub fn set_ungrouped_measure_references(&mut self, value: HashMap<String, Reference>) {
         self.ungrouped_measure_references = value;
     }
 
-    pub fn add_ungrouped_measure_reference(&mut self, key: String, value: String) {
+    pub fn add_ungrouped_measure_reference(&mut self, key: String, value: Reference) {
         self.ungrouped_measure_references.insert(key, value);
     }
 

@@ -61,7 +61,6 @@ impl SelectBuilder {
             expr,
             alias: alias.clone(),
         };
-        self.resolve_render_reference_for_member(&member.member_evaluator());
 
         self.projection_columns.push(aliased_expr);
     }
@@ -96,27 +95,6 @@ impl SelectBuilder {
 
     pub fn set_ctes(&mut self, ctes: Vec<Rc<Cte>>) {
         self.ctes = ctes;
-    }
-
-    fn resolve_render_reference_for_member(&mut self, member: &Rc<MemberSymbol>) {
-        let member_name = member.full_name();
-        if !self
-            .nodes_factory
-            .render_references()
-            .contains_key(&member_name)
-        {
-            if let Some(reference) = self
-                .input_schema
-                .resolve_member_reference(&member_name, &None)
-            {
-                self.nodes_factory
-                    .add_render_reference(member_name, reference);
-            } else {
-                for dep in member.get_dependencies() {
-                    self.resolve_render_reference_for_member(&dep);
-                }
-            }
-        }
     }
 
     fn make_cube_references(&self) -> HashMap<String, String> {
