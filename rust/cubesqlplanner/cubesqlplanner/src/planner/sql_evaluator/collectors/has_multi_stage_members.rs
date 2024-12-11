@@ -21,7 +21,12 @@ impl HasMultiStageMembersCollector {
 }
 
 impl TraversalVisitor for HasMultiStageMembersCollector {
-    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
+    type State = ();
+    fn on_node_traverse(
+        &mut self,
+        node: &Rc<EvaluationNode>,
+        state: &Self::State,
+    ) -> Result<Option<Self::State>, CubeError> {
         match node.symbol() {
             MemberSymbolType::Measure(s) => {
                 if s.is_multi_stage() {
@@ -32,10 +37,10 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
                     self.has_multi_stage = true;
                 } else {
                     for filter_node in s.measure_filters() {
-                        self.apply(filter_node)?
+                        self.apply(filter_node, &())?
                     }
                     for order_by in s.measure_order_by() {
-                        self.apply(order_by.evaluation_node())?
+                        self.apply(order_by.evaluation_node(), &())?
                     }
                 }
             }
@@ -46,7 +51,11 @@ impl TraversalVisitor for HasMultiStageMembersCollector {
             }
             _ => {}
         };
-        Ok(!self.has_multi_stage)
+        if self.has_multi_stage {
+            Ok(None)
+        } else {
+            Ok(Some(()))
+        }
     }
 }
 
@@ -55,6 +64,6 @@ pub fn has_multi_stage_members(
     ignore_cumulative: bool,
 ) -> Result<bool, CubeError> {
     let mut visitor = HasMultiStageMembersCollector::new(ignore_cumulative);
-    visitor.apply(node)?;
+    visitor.apply(node, &())?;
     Ok(visitor.extract_result())
 }

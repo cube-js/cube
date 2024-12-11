@@ -295,6 +295,7 @@ impl MultiStageMemberQueryPlanner {
             None,
             None,
             true,
+            false,
         )?;
 
         let node_factory = if self.description.state().time_shifts().is_empty() {

@@ -33,21 +33,8 @@ impl FullKeyAggregateQueryPlanner {
             )));
         }
 
-        let measures = self.query_properties.full_key_aggregate_measures()?;
-
-        let inner_measures = measures
-            .multiplied_measures
-            .iter()
-            .chain(measures.multi_stage_measures.iter())
-            .chain(measures.regular_measures.iter())
-            .cloned()
-            .collect_vec();
-
-        let mut aggregate = self.outer_measures_join_full_key_aggregate(
-            &inner_measures,
-            &self.query_properties.measures(),
-            joins,
-        )?;
+        let mut aggregate =
+            self.outer_measures_join_full_key_aggregate(&self.query_properties.measures(), joins)?;
         if !ctes.is_empty() {
             aggregate.set_ctes(ctes.clone());
         }
@@ -57,7 +44,6 @@ impl FullKeyAggregateQueryPlanner {
 
     fn outer_measures_join_full_key_aggregate(
         &self,
-        _inner_measures: &Vec<Rc<BaseMeasure>>,
         outer_measures: &Vec<Rc<BaseMeasure>>,
         joins: Vec<Rc<Select>>,
     ) -> Result<SelectBuilder, CubeError> {

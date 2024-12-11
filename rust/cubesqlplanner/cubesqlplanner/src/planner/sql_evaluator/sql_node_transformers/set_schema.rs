@@ -3,7 +3,7 @@ use crate::planner::sql_evaluator::sql_nodes::final_measure::FinalMeasureSqlNode
 use crate::planner::sql_evaluator::sql_nodes::{
     AutoPrefixSqlNode, EvaluateSqlNode, MeasureFilterSqlNode, MultiStageRankNode,
     MultiStageWindowNode, RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode,
-    TimeShiftSqlNode,
+    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use std::rc::Rc;
 
@@ -88,6 +88,20 @@ pub fn set_schema_impl(sql_node: Rc<dyn SqlNode>, schema: Rc<Schema>) -> Rc<dyn 
     } else if let Some(time_shift) = sql_node.clone().as_any().downcast_ref::<TimeShiftSqlNode>() {
         let input = set_schema_impl(time_shift.input().clone(), schema.clone());
         TimeShiftSqlNode::new(time_shift.shifts().clone(), input)
+    } else if let Some(ungrouped_measure) = sql_node
+        .clone()
+        .as_any()
+        .downcast_ref::<UngroupedMeasureSqlNode>()
+    {
+        let input = set_schema_impl(ungrouped_measure.input().clone(), schema.clone());
+        UngroupedMeasureSqlNode::new(input)
+    } else if let Some(ungrouped_measure) = sql_node
+        .clone()
+        .as_any()
+        .downcast_ref::<UngroupedQueryFinalMeasureSqlNode>()
+    {
+        let input = set_schema_impl(ungrouped_measure.input().clone(), schema.clone());
+        UngroupedQueryFinalMeasureSqlNode::new(input)
     } else {
         unreachable!("Not all nodes are implemented in set_schema function");
     }

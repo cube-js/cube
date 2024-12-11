@@ -66,6 +66,10 @@ impl EvaluationNode {
         self.symbol.name()
     }
 
+    pub fn cube_name(&self) -> String {
+        self.symbol.cube_name()
+    }
+
     pub fn is_measure(&self) -> bool {
         self.symbol.is_measure()
     }

@@ -28,6 +28,16 @@ impl MemberSymbolType {
             MemberSymbolType::SimpleSql(_) => "".to_string(),
         }
     }
+
+    pub fn cube_name(&self) -> String {
+        match self {
+            MemberSymbolType::Dimension(d) => d.cube_name().clone(),
+            MemberSymbolType::Measure(m) => m.cube_name().clone(),
+            MemberSymbolType::CubeName(c) => c.cube_name().clone(),
+            MemberSymbolType::CubeTable(c) => c.cube_name().clone(),
+            MemberSymbolType::SimpleSql(_) => "".to_string(),
+        }
+    }
     pub fn is_measure(&self) -> bool {
         matches!(self, Self::Measure(_))
     }

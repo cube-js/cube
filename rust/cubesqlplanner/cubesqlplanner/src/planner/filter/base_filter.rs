@@ -116,6 +116,12 @@ impl BaseFilter {
             FilterOperator::Gte => self.gte_where(&member_sql)?,
             FilterOperator::Lt => self.lt_where(&member_sql)?,
             FilterOperator::Lte => self.lte_where(&member_sql)?,
+            FilterOperator::Contains => self.contains_where(&member_sql)?,
+            FilterOperator::NotContains => self.not_contains_where(&member_sql)?,
+            FilterOperator::StartsWith => self.starts_with_where(&member_sql)?,
+            FilterOperator::NotStartsWith => self.not_starts_with_where(&member_sql)?,
+            FilterOperator::EndsWith => self.ends_with_where(&member_sql)?,
+            FilterOperator::NotEndsWith => self.not_ends_with_where(&member_sql)?,
         };
         Ok(res)
     }
@@ -243,6 +249,58 @@ impl BaseFilter {
             .lte(member_sql.to_string(), self.first_param()?)
     }
 
+    fn contains_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, false, true, true)
+    }
+
+    fn not_contains_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, true, true, true)
+    }
+
+    fn starts_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, false, false, true)
+    }
+
+    fn not_starts_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, true, false, true)
+    }
+
+    fn ends_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, false, true, false)
+    }
+
+    fn not_ends_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, true, true, false)
+    }
+
+    fn like_or_where(
+        &self,
+        member_sql: &str,
+        not: bool,
+        start_wild: bool,
+        end_wild: bool,
+    ) -> Result<String, CubeError> {
+        let values = self.filter_and_allocate_values();
+        let like_parts = values
+            .into_iter()
+            .map(|v| {
+                self.templates
+                    .ilike(member_sql, &v, start_wild, end_wild, not)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let logical_symbol = if not { " AND " } else { " OR " };
+        let null_check = if self.is_need_null_chek(not) {
+            self.templates.or_is_null_check(member_sql.to_string())?
+        } else {
+            "".to_string()
+        };
+        Ok(format!(
+            "({}){}",
+            like_parts.join(logical_symbol),
+            null_check
+        ))
+    }
+
     fn allocate_date_params(&self) -> Result<(String, String), CubeError> {
         if self.values.len() >= 2 {
             let from = if let Some(from_str) = &self.values[0] {
@@ -345,13 +403,12 @@ impl BaseFilter {
     }
 
     fn allocate_param(&self, param: &str) -> String {
-        let index = self.query_tools.allocaate_param(param);
-        format!("${}$", index)
+        self.query_tools.allocate_param(param)
     }
 
     fn allocate_timestamp_param(&self, param: &str) -> String {
-        let index = self.query_tools.allocaate_param(param);
-        format!("${}$::timestamptz", index)
+        let placeholder = self.query_tools.allocate_param(param);
+        format!("{}::timestamptz", placeholder)
     }
 
     fn first_param(&self) -> Result<String, CubeError> {

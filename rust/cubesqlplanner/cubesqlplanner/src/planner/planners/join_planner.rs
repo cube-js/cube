@@ -1,4 +1,5 @@
 use super::CommonUtils;
+use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::query_tools::QueryTools;
@@ -25,6 +26,27 @@ impl JoinPlanner {
         alias_prefix: &Option<String>, /*TODO dimensions for subqueries*/
     ) -> Result<From, CubeError> {
         let join = self.query_tools.cached_data().join()?.clone();
+        self.make_join_node_impl(alias_prefix, join)
+    }
+
+    pub fn make_join_node_with_prefix_and_join_hints(
+        &self,
+        alias_prefix: &Option<String>, /*TODO dimensions for subqueries*/
+        join_hints: Vec<String>,
+    ) -> Result<From, CubeError> {
+        let join = self.query_tools.join_graph().build_join(join_hints)?;
+        self.make_join_node_impl(alias_prefix, join)
+    }
+
+    pub fn make_join_node(&self) -> Result<From, CubeError> {
+        self.make_join_node_with_prefix(&None)
+    }
+
+    fn make_join_node_impl(
+        &self,
+        alias_prefix: &Option<String>,
+        join: Rc<dyn JoinDefinition>,
+    ) -> Result<From, CubeError> {
         let root = self.utils.cube_from_path(join.static_data().root.clone())?;
         let joins = join.joins()?;
         if joins.items().is_empty() {
@@ -54,10 +76,6 @@ impl JoinPlanner {
             let result = From::new_from_join(join_builder.build());
             Ok(result)
         }
-    }
-
-    pub fn make_join_node(&self) -> Result<From, CubeError> {
-        self.make_join_node_with_prefix(&None)
     }
 
     fn compile_join_condition(

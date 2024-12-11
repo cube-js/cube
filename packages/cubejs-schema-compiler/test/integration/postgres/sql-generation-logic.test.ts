@@ -453,7 +453,7 @@ describe('SQL Generation', () => {
     }
   });
 
-  it('having filter with operator OR', async () => {
+  it('having filter with operator OR 1', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -486,7 +486,7 @@ describe('SQL Generation', () => {
       }]
     });
 
-    console.log(query.buildSqlAndParams());
+    console.log(query.buildSqlAndParamsTest());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
@@ -648,7 +648,7 @@ describe('SQL Generation', () => {
     });
   });
 
-  it('where filter with operators OR & AND', async () => {
+  it('where filter with operators OR & AND 1', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

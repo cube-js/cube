@@ -141,7 +141,7 @@ impl QueryTools {
         self.templates_render.clone()
     }
 
-    pub fn allocaate_param(&self, name: &str) -> usize {
+    pub fn allocate_param(&self, name: &str) -> String {
         self.params_allocator.borrow_mut().allocate_param(name)
     }
     pub fn get_allocated_params(&self) -> Vec<String> {
@@ -152,8 +152,11 @@ impl QueryTools {
         sql: &str,
         should_reuse_params: bool,
     ) -> Result<(String, Vec<String>), CubeError> {
-        self.params_allocator
-            .borrow()
-            .build_sql_and_params(sql, should_reuse_params)
+        let native_allocated_params = self.base_tools.get_allocated_params()?;
+        self.params_allocator.borrow().build_sql_and_params(
+            sql,
+            native_allocated_params,
+            should_reuse_params,
+        )
     }
 }
