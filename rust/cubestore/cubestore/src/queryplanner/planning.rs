@@ -1180,6 +1180,7 @@ async fn pick_index(
                     &projection_columns,
                     &filter_columns,
                 );
+
                 let index = optimal.unwrap_or(default_index);
                 (
                     Ok(index),
