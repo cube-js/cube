@@ -173,6 +173,7 @@ interface SnowflakeDriverOptions {
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
+  caseSensitiveIdentifiers?: boolean,
   application: string,
   readOnly?: boolean,
 
@@ -213,6 +214,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS',
       'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH',
+      'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
     ];
   }
 
@@ -279,6 +281,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(dataSource),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      ignoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource }),
       exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
       application: 'CubeDev_Cube',
       ...config
@@ -450,8 +453,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
       await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
-      await this.execute(connection, 'ALTER SESSION SET QUOTED_IDENTIFIRS_IGNORE_CASE = FALSE', [], false);
-
+      if (this.ignoreCase) {
+        await this.execute(connection, 'ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = FALSE', [], false);
+      }
       return connection;
     } catch (e) {
       this.connection = null;

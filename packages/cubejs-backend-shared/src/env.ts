@@ -1478,6 +1478,39 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Snowflake case sensitivity for identifiers (like database columns).
+   */
+  snowflakeQuotedIdentIgnoreCase: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
+        dataSource,
+      )
+    ];
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return true;
+    }
+  },
   /** ****************************************************************
    * Presto Driver                                                   *
    ***************************************************************** */
