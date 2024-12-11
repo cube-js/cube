@@ -32,7 +32,7 @@ import {
   getBlendingResponseKey,
   getMembers,
   getCompactRow,
-  getVanilaRow,
+  getVanillaRow,
   transformData,
 } from '../../src/helpers/transformData';
 import {
@@ -691,7 +691,7 @@ describe('transformData helpers', () => {
     expect(getBlendingResponseKey).toBeDefined();
     expect(getMembers).toBeDefined();
     expect(getCompactRow).toBeDefined();
-    expect(getVanilaRow).toBeDefined();
+    expect(getVanillaRow).toBeDefined();
     expect(transformData).toBeDefined();
     expect(transformData).toEqual(transformDataDefault);
   });
@@ -1110,7 +1110,7 @@ describe('transformData helpers', () => {
       JSON.stringify(mockData.regular_discount_by_city.data)
     );
     delete data.aliasToMemberNameMap.e_commerce_records_us2021__avg_discount;
-    expect(() => getVanilaRow(
+    expect(() => getVanillaRow(
       data.aliasToMemberNameMap,
       data.annotation as unknown as { [member: string]: ConfigItem },
       data.queryType as QueryType,

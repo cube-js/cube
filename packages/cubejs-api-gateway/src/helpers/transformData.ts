@@ -52,7 +52,7 @@ function getDateRangeValue(
 }
 
 /**
- * Parse blending query key from time time dimension.
+ * Parse blending query key from time dimension granularity.
  * @internal
  */
 function getBlendingQueryKey(
@@ -77,7 +77,7 @@ function getBlendingQueryKey(
 }
 
 /**
- * Parse blending response key from time time dimension.
+ * Parse blending response key from time dimension and granularity.
  * @internal
  */
 function getBlendingResponseKey(
@@ -219,80 +219,64 @@ function getCompactRow(
 
 /**
  * Convert DB response object to the vanilla output format.
- * @todo rewrite me please!
  * @internal
  */
-function getVanilaRow(
+function getVanillaRow(
   aliasToMemberNameMap: AliasToMemberMap,
   annotation: { [member: string]: ConfigItem },
   queryType: QueryType,
   query: NormalizedQuery,
   dbRow: { [sqlAlias: string]: DBResponseValue },
 ): { [member: string]: DBResponsePrimitive } {
-  const row = R.pipe(
-    R.toPairs,
-    R.map(p => {
-      const memberName = aliasToMemberNameMap[p[0]];
+  const row = Object
+    .entries(dbRow)
+    .reduce((acc, [sqlAlias, value]) => {
+      const memberName = aliasToMemberNameMap[sqlAlias];
       const annotationForMember = annotation[memberName];
+
       if (!annotationForMember) {
         throw new UserError(
-          `You requested hidden member: '${
-            p[0]
-          }'. Please make it visible using \`shown: true\`. ` +
-          'Please note primaryKey fields are `shown: false` by ' +
-          'default: https://cube.dev/docs/schema/reference/joins#' +
-          'setting-a-primary-key.'
+          `You requested hidden member: '${sqlAlias}'. ` +
+          'Please make it visible using `shown: true`. ' +
+          'Please note primaryKey fields are `shown: false` by default: ' +
+          'https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.'
         );
       }
-      const transformResult = [
-        memberName,
-        transformValue(
-          p[1] as DBResponseValue,
-          annotationForMember.type
-        )
-      ];
+
+      const transformedValue = transformValue(value as DBResponseValue, annotationForMember.type);
       const path = memberName.split(MEMBER_SEPARATOR);
 
+      acc[memberName] = transformedValue;
+
       /**
-       * Time dimensions without granularity.
+       * Handle time dimensions without granularity
        * @deprecated
        * @todo backward compatibility for referencing
        */
-      const memberNameWithoutGranularity =
-        [path[0], path[1]].join(MEMBER_SEPARATOR);
-      if (
-        path.length === 3 &&
-        (query.dimensions || [])
-          .indexOf(memberNameWithoutGranularity) === -1
-      ) {
-        return [
-          transformResult,
-          [
-            memberNameWithoutGranularity,
-            transformResult[1]
-          ]
-        ];
+      const memberNameWithoutGranularity = [path[0], path[1]].join(MEMBER_SEPARATOR);
+      if (path.length === 3 &&
+        (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
+        acc[memberNameWithoutGranularity] = transformedValue;
       }
 
-      return [transformResult];
-    }),
-    // @ts-ignore
-    R.unnest,
-    R.fromPairs
-  // @ts-ignore
-  )(dbRow);
+      return acc;
+    }, {} as { [member: string]: DBResponsePrimitive });
+
   if (queryType === QueryTypeEnum.COMPARE_DATE_RANGE_QUERY) {
     return {
       ...row,
       compareDateRange: getDateRangeValue(query.timeDimensions)
     };
-  } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
+  }
+
+  if (queryType === QueryTypeEnum.BLENDING_QUERY) {
     return {
       ...row,
       [getBlendingQueryKey(query.timeDimensions)]:
         row[getBlendingResponseKey(query.timeDimensions)]
     };
   }
+
   return row as { [member: string]: DBResponsePrimitive; };
 }
 
@@ -337,7 +321,7 @@ function transformData({
         query.timeDimensions,
         r,
       )
-      : getVanilaRow(
+      : getVanillaRow(
         aliasToMemberNameMap,
         annotation,
         queryType,
@@ -371,7 +355,7 @@ export {
   getBlendingResponseKey,
   getMembers,
   getCompactRow,
-  getVanilaRow,
+  getVanillaRow,
   transformData,
   transformValue,
 };
