@@ -436,6 +436,22 @@ pub fn get_final_cubestore_result(
     Ok(())
 }
 
+pub fn get_final_cubestore_result_array(
+    transform_requests: &[TransformDataRequest],
+    cube_store_results: &[&CubeStoreResult],
+    result_data: &mut [RequestResultData],
+) -> Result<()> {
+    for (transform_data, cube_store_result, result) in multizip((
+        transform_requests.iter(),
+        cube_store_results.iter(),
+        result_data.iter_mut(),
+    )) {
+        get_final_cubestore_result(transform_data, cube_store_result, result)?;
+    }
+
+    Ok(())
+}
+
 pub fn get_final_cubestore_result_multi(
     request_data: &[TransformDataRequest],
     cube_store_result: &[&CubeStoreResult],

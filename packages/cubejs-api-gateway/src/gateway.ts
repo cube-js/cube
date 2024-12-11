@@ -11,7 +11,9 @@ import {
   QueryAlias,
 } from '@cubejs-backend/shared';
 import {
-  getFinalCubestoreResult, getFinalCubestoreResultMulti,
+  getFinalCubestoreResult,
+  getFinalCubestoreResultArray,
+  getFinalCubestoreResultMulti,
   transformData as transformDataNative,
   TransformDataResponse
 } from '@cubejs-backend/native';
@@ -1847,7 +1849,7 @@ class ApiGateway {
         // If all query results are from Cubestore (are native)
         // we prepare the final json result on native side
         if (allNative) {
-          const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[string[], any[], string[]]>(
+          const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[string[], any[], any[]]>(
             ([transformList, rawList, resultList], r) => {
               transformList.push(JSON.stringify(r.transformDataParams));
               rawList.push(r.rawData.getNativeRef());
@@ -1990,6 +1992,8 @@ class ApiGateway {
             annotation
           }];
         }
+
+        res(request.streaming ? results[0] : { results });
       } else {
         results = await Promise.all(
           normalizedQueries.map(async (normalizedQuery, index) => {
@@ -2021,11 +2025,45 @@ class ApiGateway {
             );
           })
         );
-      }
 
-      res(request.streaming ? results[0] : {
-        results,
-      });
+        const allNative = results.every(r => r.isNative);
+
+        if (!request.streaming) {
+          // If all query results are from Cubestore (are native)
+          // we prepare the final json result on native side
+          if (allNative) {
+            const [transformDataJson, rawDataRef, resultDataJson] = (results as {
+              transformDataParams: any;
+              rawData: { getNativeRef: () => any };
+            }[]).reduce<[string[], any[], string[]]>(
+              ([transformList, rawList, resultList], r) => {
+                transformList.push(JSON.stringify(r.transformDataParams));
+                rawList.push(r.rawData.getNativeRef());
+                resultList.push(JSON.stringify(cleanupResult(r)));
+                return [transformList, rawList, resultList];
+              },
+              [[], [], []]
+            );
+
+            res(getFinalCubestoreResultArray(transformDataJson, rawDataRef, resultDataJson));
+          } else {
+            // if we have mixed query results (there are js and native)
+            // we prepare results separately: on js and native sides
+            // and serve final response from JS side
+            res({
+              results: results.map(r => {
+                const data = r.dataCb();
+                return {
+                  ...cleanupResult(r),
+                  data,
+                };
+              }),
+            });
+          }
+        } else {
+          res(results[0]);
+        }
+      }
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted

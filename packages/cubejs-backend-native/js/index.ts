@@ -395,6 +395,12 @@ export const getFinalCubestoreResult = (transformDataJson: string, rows: any, re
   return native.getFinalCubestoreResult(transformDataJson, rows, resultData);
 };
 
+export const getFinalCubestoreResultArray = (transformDataJson: string[], rows: any[], resultDataJson: string[]): ArrayBuffer => {
+  const native = loadNative();
+
+  return native.getFinalCubestoreResultArray(transformDataJson, rows, resultDataJson);
+};
+
 export const getFinalCubestoreResultMulti = (transformDataJson: string[], rows: any[], responseData: string): ArrayBuffer => {
   const native = loadNative();
 
