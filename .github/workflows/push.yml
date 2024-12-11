@@ -92,6 +92,9 @@ jobs:
         run: yarn tsc
       - name: Build client
         run: yarn build
+      - name: Build cubejs-backend-native
+        run: yarn run native:build-debug-python
+        working-directory: ./packages/cubejs-backend-native
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
 #      - uses: codecov/codecov-action@v1
