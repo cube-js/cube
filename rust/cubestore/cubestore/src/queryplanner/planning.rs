@@ -1308,12 +1308,6 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
                 None
             };
 
-            println!(
-                "Index score is {:?} {:?}",
-                i.get_row().get_name(),
-                index_score
-            );
-
             let res = Some(i).zip(index_score);
             res
         })
