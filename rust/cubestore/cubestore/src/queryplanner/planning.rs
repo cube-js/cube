@@ -389,7 +389,6 @@ impl<'a> PlanIndexStore for &'a dyn MetaStore {
 #[derive(Clone)]
 struct SortColumns {
     sort_on: Vec<String>,
-    sort_on_order_col_only: Vec<String>,
     required: bool,
 }
 
@@ -462,18 +461,12 @@ impl PlanRewriter for CollectConstraints {
                                                 .map(|n| n.clone())
                                                 .unique()
                                                 .collect::<Vec<_>>(),
-                                            sort_on_order_col_only: order_col_names
-                                                .iter()
-                                                .map(|n| n.clone())
-                                                .unique()
-                                                .collect::<Vec<_>>(),
                                             required: s.required,
                                         })
                                     }
                                 }
                                 None => Some(SortColumns {
                                     sort_on: order_col_names.clone(),
-                                    sort_on_order_col_only: vec![],
                                     required: false,
                                 }),
                             }
@@ -515,7 +508,6 @@ impl PlanRewriter for CollectConstraints {
                 let sort_on = if !sort_on.is_empty() && sort_on.iter().all(|c| c.is_some()) {
                     Some(SortColumns {
                         sort_on: sort_on.into_iter().map(|c| c.unwrap()).collect(),
-                        sort_on_order_col_only: vec![],
                         required: false,
                     })
                 } else {
@@ -563,7 +555,6 @@ impl PlanRewriter for CollectConstraints {
                 if single_value_filter_columns(predicate, &mut sort_on) {
                     if !sort_on.is_empty() {
                         let sort_on = Some(SortColumns {
-                            sort_on_order_col_only: vec![],
                             sort_on: sort_on
                                 .into_iter()
                                 .map(|c| c.name.to_string())
@@ -600,7 +591,6 @@ impl PlanRewriter for CollectConstraints {
         }
         Some(ConstraintsContext {
             sort_on: Some(SortColumns {
-                sort_on_order_col_only: vec![],
                 sort_on: join_on.iter().map(|(l, _)| l.name.clone()).collect(),
                 required: true,
             }),
@@ -622,7 +612,6 @@ impl PlanRewriter for CollectConstraints {
         }
         Some(ConstraintsContext {
             sort_on: Some(SortColumns {
-                sort_on_order_col_only: vec![],
                 sort_on: join_on.iter().map(|(_, r)| r.name.clone()).collect(),
                 required: true,
             }),
@@ -1071,10 +1060,6 @@ async fn pick_index(
     indices: Vec<IdRow<Index>>,
 ) -> Result<IndexCandidate, DataFusionError> {
     let sort_on = c.sort_on.as_ref().map(|sc| (&sc.sort_on, sc.required));
-    let sort_on_order_col_only = c
-        .sort_on
-        .as_ref()
-        .map(|sc| (&sc.sort_on_order_col_only, sc.required));
 
     let aggr_index_allowed = check_aggregates_expr(&table, &c.aggregates);
 
@@ -1189,24 +1174,17 @@ async fn pick_index(
                 )));
                 (err, None, sort_on)
             } else {
-                let filter_columns_updated = match sort_on_order_col_only {
-                    Some(_) => HashSet::new(),
-                    _ => filter_columns,
-                };
                 let optimal = optimal_index_by_score(
                     // Skipping default index
                     indices.iter().skip(1),
                     &projection_columns,
-                    &filter_columns_updated,
+                    &filter_columns,
                 );
                 let index = optimal.unwrap_or(default_index);
                 (
                     Ok(index),
                     index.get_row().multi_index_id().map(|_| index),
-                    match sort_on_order_col_only {
-                        Some((columns, flag)) if !columns.is_empty() => Some((columns, flag)),
-                        _ => None,
-                    },
+                    None,
                 )
             }
         }
@@ -1262,7 +1240,7 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
     projection_columns: &Vec<Column>,
     filter_columns: &HashSet<logical_plan::Column>,
 ) -> Option<&'a IdRow<Index>> {
-    #[derive(PartialEq, Eq, Clone)]
+    #[derive(PartialEq, Eq, Clone, Debug)]
     struct Score {
         index_type: IndexType,
         index_size: u64,
@@ -1329,6 +1307,12 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
             } else {
                 None
             };
+
+            println!(
+                "Index score is {:?} {:?}",
+                i.get_row().get_name(),
+                index_score
+            );
 
             let res = Some(i).zip(index_score);
             res
