@@ -1,13 +1,16 @@
-use crate::types::{
-    ConfigItem, MembersMap,
-    NormalizedQuery, QueryTimeDimension, QueryType, ResultType, TransformedData,
-    BLENDING_QUERY_KEY_PREFIX, BLENDING_QUERY_RES_SEPARATOR, COMPARE_DATE_RANGE_FIELD,
-    COMPARE_DATE_RANGE_SEPARATOR, MEMBER_SEPARATOR,
+use crate::{
+    cubestore_message_parser::CubeStoreResult,
+    types::{
+        ConfigItem, MembersMap, NormalizedQuery, QueryTimeDimension, QueryType, RequestResultData,
+        RequestResultDataMulti, ResultType, TransformDataRequest, TransformedData,
+        BLENDING_QUERY_KEY_PREFIX, BLENDING_QUERY_RES_SEPARATOR, COMPARE_DATE_RANGE_FIELD,
+        COMPARE_DATE_RANGE_SEPARATOR, MEMBER_SEPARATOR,
+    },
 };
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, SecondsFormat};
+use itertools::multizip;
 use std::collections::{HashMap, HashSet};
-use crate::cubestore_message_parser::CubeStoreResult;
 
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: String, type_: &str) -> String {
@@ -122,9 +125,10 @@ pub fn get_members(
         let calc_member = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
 
         if path.len() == 3
-            && query.dimensions.as_ref().map_or(true, |dims| {
-                !dims.iter().any(|dim| *dim == calc_member)
-            })
+            && query
+                .dimensions
+                .as_ref()
+                .map_or(true, |dims| !dims.iter().any(|dim| *dim == calc_member))
         {
             members.insert(calc_member, column.clone());
         }
@@ -216,7 +220,6 @@ pub fn get_vanilla_row(
 
     for (alias, &index) in columns_pos {
         if let Some(value) = db_row.get(index) {
-
             let member_name = match alias_to_member_name_map.get(alias) {
                 Some(m) => m,
                 None => {
@@ -238,15 +241,19 @@ pub fn get_vanilla_row(
                 }
             };
 
-            let transformed_value = transform_value(value.clone(), &annotation_for_member.member_type);
+            let transformed_value =
+                transform_value(value.clone(), &annotation_for_member.member_type);
 
             // Handle deprecated time dimensions without granularity
             let path: Vec<&str> = member_name.split(MEMBER_SEPARATOR).collect();
-            let member_name_without_granularity = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
+            let member_name_without_granularity =
+                format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
             if path.len() == 3
                 && query.dimensions.as_ref().map_or(true, |dims| {
-                !dims.iter().any(|dim| *dim == member_name_without_granularity)
-            })
+                    !dims
+                        .iter()
+                        .any(|dim| *dim == member_name_without_granularity)
+                })
             {
                 row.insert(member_name_without_granularity, transformed_value);
             } else {
@@ -258,10 +265,7 @@ pub fn get_vanilla_row(
     match query_type {
         QueryType::CompareDateRangeQuery => {
             let date_range_value = get_date_range_value(query.time_dimensions.as_ref())?;
-            row.insert(
-                "compareDateRange".to_string(),
-                date_range_value,
-            );
+            row.insert("compareDateRange".to_string(), date_range_value);
         }
         QueryType::BlendingQuery => {
             let blending_key = get_blending_query_key(query.time_dimensions.as_ref())?;
@@ -297,7 +301,8 @@ pub fn transform_data(
 
     match res_type {
         Some(ResultType::Compact) => {
-            let dataset: Vec<_> = data.rows
+            let dataset: Vec<_> = data
+                .rows
                 .iter()
                 .map(|row| {
                     get_compact_row(
@@ -314,7 +319,8 @@ pub fn transform_data(
             Ok(TransformedData::Compact { members, dataset })
         }
         _ => {
-            let dataset: Vec<_> = data.rows
+            let dataset: Vec<_> = data
+                .rows
                 .iter()
                 .map(|row| {
                     get_vanilla_row(
@@ -333,7 +339,7 @@ pub fn transform_data(
 }
 
 /// Helper to get a list if unique granularities from normalized queries
-pub fn get_query_granularities(queries: &[NormalizedQuery]) -> Vec<String> {
+pub fn get_query_granularities(queries: &Vec<&NormalizedQuery>) -> Vec<String> {
     queries
         .iter()
         .filter_map(|query| {
@@ -349,9 +355,13 @@ pub fn get_query_granularities(queries: &[NormalizedQuery]) -> Vec<String> {
 }
 
 /// Get Pivot Query for a list of queries
-pub fn get_pivot_query(query_type: QueryType, queries: &[NormalizedQuery]) -> Result<NormalizedQuery> {
+pub fn get_pivot_query(
+    query_type: &QueryType,
+    queries: &Vec<&NormalizedQuery>,
+) -> Result<NormalizedQuery> {
     let mut pivot_query = queries
         .first()
+        .map(|q| *q)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("Queries list cannot be empty"))?;
 
@@ -396,7 +406,55 @@ pub fn get_pivot_query(query_type: QueryType, queries: &[NormalizedQuery]) -> Re
         _ => {}
     }
 
-    pivot_query.query_type = Option::from(query_type);
+    pivot_query.query_type = Option::from(query_type.clone());
 
     Ok(pivot_query)
+}
+
+pub fn get_final_cubestore_result(
+    request_data: &TransformDataRequest,
+    cube_store_result: &CubeStoreResult,
+    result_data: &mut RequestResultData,
+) -> Result<()> {
+    let alias_to_member_name_map = &request_data.alias_to_member_name_map;
+    let annotation = &request_data.annotation;
+    let query = &request_data.query;
+    let query_type = &request_data.query_type.clone().unwrap_or_default();
+    let res_type = &request_data.res_type;
+
+    let transformed = transform_data(
+        alias_to_member_name_map,
+        annotation,
+        cube_store_result,
+        query,
+        &query_type,
+        res_type.clone(),
+    )?;
+
+    result_data.data = Some(transformed);
+
+    Ok(())
+}
+
+pub fn get_final_cubestore_result_multi(
+    request_data: &Vec<TransformDataRequest>,
+    cube_store_result: &Vec<&CubeStoreResult>,
+    result_data: &mut RequestResultDataMulti,
+) -> Result<()> {
+    for (transform_data, cube_store_result, result) in multizip((
+        request_data.iter(),
+        cube_store_result.iter(),
+        result_data.results.iter_mut(),
+    )) {
+        get_final_cubestore_result(transform_data, *cube_store_result, result)?;
+    }
+
+    let normalized_queries = result_data.results
+        .iter()
+        .map(|result| &result.query)
+        .collect::<Vec<_>>();
+
+    result_data.pivot_query = Option::from(get_pivot_query(&result_data.query_type, &normalized_queries)?);
+
+    Ok(())
 }

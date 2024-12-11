@@ -170,15 +170,21 @@ pub struct GranularityMeta {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigItem {
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub short_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub member_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "drillMembers")]
     pub drill_members: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "drillMembersGrouped")]
     pub drill_members_grouped: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub granularities: Option<Vec<GranularityMeta>>,
@@ -194,7 +200,9 @@ pub struct Order {
 pub struct NormalizedQueryFilter {
     pub member: String,
     pub operator: FilterOperator,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub values: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dimension: Option<String>,
 }
 
@@ -235,23 +243,36 @@ pub enum LogicalFilter {
 pub struct Query {
     // pub measures: Vec<MemberOrMemberExpression>,
     pub measures: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
     pub dimensions: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<Vec<LogicalFilter>>,
     #[serde(rename = "timeDimensions")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     // pub segments: Option<Vec<MemberOrMemberExpression>>,
     pub segments: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "totalQuery")]
     pub total_query: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
     #[serde(rename = "renewQuery")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub renew_query: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "responseFormat")]
     pub response_format: Option<ResultType>,
 }
@@ -260,32 +281,46 @@ pub struct Query {
 pub struct NormalizedQuery {
     // pub measures: Vec<MemberOrMemberExpression>,
     pub measures: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
     pub dimensions: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
     // pub segments: Option<Vec<MemberOrMemberExpression>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub segments: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "totalQuery")]
     pub total_query: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "renewQuery")]
     pub renew_query: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
     #[serde(rename = "responseFormat")]
     pub response_format: Option<ResultType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<Vec<NormalizedQueryFilter>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "rowLimit")]
     pub row_limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Vec<Order>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "queryType")]
     pub query_type: Option<QueryType>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TransformedData {
     Compact {
@@ -305,4 +340,42 @@ pub struct TransformDataRequest {
     pub query_type: Option<QueryType>,
     #[serde(rename = "resType")]
     pub res_type: Option<ResultType>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestResultData {
+    pub query: NormalizedQuery,
+    #[serde(rename = "lastRefreshTime")]
+    pub last_refresh_time: Option<String>,
+    #[serde(rename = "refreshKeyValues")]
+    pub refresh_key_values: Option<Value>,
+    #[serde(rename = "usedPreAggregations")]
+    pub used_pre_aggregations: Option<Value>,
+    #[serde(rename = "transformedQuery")]
+    pub transformed_query: Option<Value>,
+    #[serde(rename = "requestId")]
+    pub request_id: Option<String>,
+    pub annotation: HashMap<String, HashMap<String, ConfigItem>>,
+    #[serde(rename = "dataSource")]
+    pub data_source: String,
+    #[serde(rename = "dbType")]
+    pub db_type: String,
+    #[serde(rename = "extDbType")]
+    pub ext_db_type: Option<String>,
+    pub external: bool,
+    #[serde(rename = "slowQuery")]
+    pub slow_query: bool,
+    pub total: Option<u64>,
+    pub data: Option<TransformedData>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestResultDataMulti {
+    #[serde(rename = "queryType")]
+    pub query_type: QueryType,
+    pub results: Vec<RequestResultData>,
+    #[serde(rename = "pivotQuery")]
+    pub pivot_query: Option<NormalizedQuery>,
+    #[serde(rename = "slowQuery")]
+    pub slow_query: bool,
 }
