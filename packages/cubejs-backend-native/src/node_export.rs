@@ -565,9 +565,9 @@ fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsObject> {
     let transformed = match transform_data(
         alias_to_member_name_map,
         annotation,
-        &**cube_store_result,
+        &cube_store_result,
         query,
-        &query_type,
+        query_type,
         res_type.clone(),
     ) {
         Ok(data) => data,
@@ -603,7 +603,7 @@ fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsArrayBuffer> {
 
     if let Err(err) = get_final_cubestore_result(
         &transform_request_data,
-        &**cube_store_result,
+        &cube_store_result,
         &mut result_data,
     ) {
         return cx.throw_error(err.to_string());
@@ -636,7 +636,7 @@ fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsArrayBuff
 
             match serde_json::from_str::<TransformDataRequest>(&js_string) {
                 Ok(request) => Ok(request),
-                Err(err) => return cx.throw_error(err.to_string()),
+                Err(err) => cx.throw_error(err.to_string()),
             }
         })
         .collect::<Result<_, _>>()?;

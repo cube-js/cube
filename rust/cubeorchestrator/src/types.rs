@@ -35,9 +35,10 @@ pub enum ResultType {
     Compact,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub enum QueryType {
     #[serde(rename = "regularQuery")]
+    #[default]
     RegularQuery,
     #[serde(rename = "compareDateRangeQuery")]
     CompareDateRangeQuery,
@@ -53,12 +54,6 @@ impl Display for QueryType {
             .unwrap()
             .to_string();
         write!(f, "{}", str)
-    }
-}
-
-impl Default for QueryType {
-    fn default() -> Self {
-        QueryType::RegularQuery
     }
 }
 
