@@ -449,12 +449,16 @@ pub fn get_final_cubestore_result_multi(
         get_final_cubestore_result(transform_data, *cube_store_result, result)?;
     }
 
-    let normalized_queries = result_data.results
+    let normalized_queries = result_data
+        .results
         .iter()
         .map(|result| &result.query)
         .collect::<Vec<_>>();
 
-    result_data.pivot_query = Option::from(get_pivot_query(&result_data.query_type, &normalized_queries)?);
+    result_data.pivot_query = Option::from(get_pivot_query(
+        &result_data.query_type,
+        &normalized_queries,
+    )?);
 
     Ok(())
 }
