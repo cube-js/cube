@@ -1240,7 +1240,7 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
     projection_columns: &Vec<Column>,
     filter_columns: &HashSet<logical_plan::Column>,
 ) -> Option<&'a IdRow<Index>> {
-    #[derive(PartialEq, Eq, Clone, Debug)]
+    #[derive(PartialEq, Eq, Clone)]
     struct Score {
         index_type: IndexType,
         index_size: u64,
