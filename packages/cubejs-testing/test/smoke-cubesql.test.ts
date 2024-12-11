@@ -119,7 +119,7 @@ describe('SQL API', () => {
             expect(JSON.parse(chunk.toString()).schema).toEqual([
               {
                 name: 'orderDate',
-                column_type: 'String',
+                column_type: 'Timestamp',
               },
             ]);
           } else {
