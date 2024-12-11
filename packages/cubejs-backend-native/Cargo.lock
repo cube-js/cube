@@ -788,6 +788,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "cubeshared",
+ "itertools 0.13.0",
  "neon",
  "serde",
  "serde_json",
@@ -826,7 +827,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.14.3",
  "indexmap 1.9.3",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "lru",
  "minijinja",
@@ -863,7 +864,7 @@ dependencies = [
  "cubeclient",
  "cubenativeutils",
  "datafusion",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "minijinja",
  "nativebridge",
@@ -895,7 +896,7 @@ dependencies = [
  "datafusion-physical-expr",
  "futures",
  "hashbrown 0.12.3",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "log",
  "num_cpus",
@@ -1618,6 +1619,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1934,7 +1944,7 @@ dependencies = [
  "Inflector",
  "async-trait",
  "byteorder",
- "itertools",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 1.0.109",

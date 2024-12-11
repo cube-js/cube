@@ -389,6 +389,18 @@ export const transformData = (transformDataJson: string, rows: any): TransformDa
   return native.transformQueryData(transformDataJson, rows);
 };
 
+export const getFinalCubestoreResult = (transformDataJson: string, rows: any, resultData: string): ArrayBuffer => {
+  const native = loadNative();
+
+  return native.getFinalCubestoreResult(transformDataJson, rows, resultData);
+};
+
+export const getFinalCubestoreResultMulti = (transformDataJson: string[], rows: any[], responseData: string): ArrayBuffer => {
+  const native = loadNative();
+
+  return native.getFinalCubestoreResultMulti(transformDataJson, rows, responseData);
+};
+
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,

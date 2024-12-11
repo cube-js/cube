@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
 use neon::prelude::Finalize;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -68,7 +68,9 @@ impl CubeStoreResult {
                 let (columns, columns_pos): (Vec<_>, HashMap<_, _>) = result_set_columns
                     .iter()
                     .enumerate()
-                    .map(|(index, column_name)| (column_name.to_owned(), (column_name.to_owned(), index)))
+                    .map(|(index, column_name)| {
+                        (column_name.to_owned(), (column_name.to_owned(), index))
+                    })
                     .unzip();
 
                 result.columns = columns;

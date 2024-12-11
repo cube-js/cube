@@ -10,7 +10,11 @@ import {
   getRealType,
   QueryAlias,
 } from '@cubejs-backend/shared';
-import { transformData as transformDataNative, TransformDataResponse } from '@cubejs-backend/native';
+import {
+  getFinalCubestoreResult, getFinalCubestoreResultMulti,
+  transformData as transformDataNative,
+  TransformDataResponse
+} from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -111,6 +115,16 @@ function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestCon
 function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
     handler(req as any, res).catch(next);
+  };
+}
+
+function cleanupResult(result) {
+  return {
+    ...result,
+    dataCb: undefined,
+    rawData: undefined,
+    transformDataParams: undefined,
+    isNative: undefined,
   };
 }
 
@@ -1647,6 +1661,7 @@ class ApiGateway {
     return {
       query: normalizedQuery,
       dataCb,
+      rawData: response.data,
       transformDataParams,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
@@ -1829,27 +1844,56 @@ class ApiGateway {
       const allNative = results.every(r => r.isNative);
 
       if (props.queryType === 'multi') {
-        res({
-          queryType,
-          results: results.map(r => {
-            const data = r.dataCb();
-            return {
-              ...r,
-              data,
-              dataCb: undefined,
-              transformDataParams: undefined
-            };
-          }),
-          pivotQuery: getPivotQuery(queryType, normalizedQueries),
-          slowQuery
-        });
+        // If all query results are from Cubestore (are native)
+        // we prepare the final json result on native side
+        if (allNative) {
+          const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[string[], any[], string[]]>(
+            ([transformList, rawList, resultList], r) => {
+              transformList.push(JSON.stringify(r.transformDataParams));
+              rawList.push(r.rawData.getNativeRef());
+              resultList.push(cleanupResult(r));
+              return [transformList, rawList, resultList];
+            },
+            [[], [], []]
+          );
+
+          const responseDataObj = {
+            queryType,
+            results: cleanResultList,
+            slowQuery
+          };
+          const resultDataJson = JSON.stringify(responseDataObj);
+
+          res(getFinalCubestoreResultMulti(transformDataJson, rawDataRef, resultDataJson));
+        } else {
+          // if we have mixed query results (there are js and native)
+          // we prepare results separately: on js and native sides
+          // and serve final response from JS side
+          res({
+            queryType,
+            results: results.map(r => {
+              const data = r.dataCb();
+              return {
+                ...cleanupResult(r),
+                data,
+              };
+            }),
+            pivotQuery: getPivotQuery(queryType, normalizedQueries),
+            slowQuery
+          });
+        }
+      } else if (allNative) {
+        // We prepare the full final json result on native side
+        const r = results[0];
+        const transformDataJson = JSON.stringify(r.transformDataParams);
+        const rawDataRef = r.rawData.getNativeRef();
+        const resultDataJson = JSON.stringify(cleanupResult(r));
+        res(getFinalCubestoreResult(transformDataJson, rawDataRef, resultDataJson));
       } else {
         const data = results[0].dataCb();
         res({
-          ...results[0],
+          ...cleanupResult(results[0]),
           data,
-          dataCb: undefined,
-          transformDataParams: undefined
         });
       }
     } catch (e: any) {
@@ -2058,10 +2102,10 @@ class ApiGateway {
 
       if (message instanceof ArrayBuffer) {
         res.set('Content-Type', 'application/json');
-        res.send(message);
+        res.send(Buffer.from(message));
+      } else {
+        res.json(message);
       }
-
-      res.json(message);
     };
   }
 
