@@ -30,13 +30,13 @@ pub fn get_date_range_value(time_dimensions: Option<&Vec<QueryTimeDimension>>) -
         None => bail!("QueryTimeDimension should be specified for the compare date range query."),
     };
 
-    let dim = match time_dimensions.get(0) {
+    let dim = match time_dimensions.first() {
         Some(dim) => dim,
         None => bail!("No time dimension provided."),
     };
 
     let date_range: &Vec<String> = match &dim.date_range {
-        Some(date_range) => date_range.as_ref(),
+        Some(date_range) => date_range,
         None => bail!("Inconsistent QueryTimeDimension configuration: dateRange required."),
     };
 
@@ -165,7 +165,7 @@ pub fn get_compact_row(
     query_type: &QueryType,
     members: &[String],
     time_dimensions: Option<&Vec<QueryTimeDimension>>,
-    db_row: &Vec<String>,
+    db_row: &[String],
     columns_pos: &HashMap<String, usize>,
 ) -> Result<Vec<String>> {
     let mut row: Vec<String> = Vec::with_capacity(members.len());
@@ -213,7 +213,7 @@ pub fn get_vanilla_row(
     annotation: &HashMap<String, ConfigItem>,
     query_type: &QueryType,
     query: &NormalizedQuery,
-    db_row: &Vec<String>,
+    db_row: &[String],
     columns_pos: &HashMap<String, usize>,
 ) -> Result<HashMap<String, String>> {
     let mut row = HashMap::new();
@@ -293,7 +293,7 @@ pub fn transform_data(
     let members_to_alias_map = get_members(
         query_type,
         query,
-        &data,
+        data,
         alias_to_member_name_map,
         annotation,
     )?;
@@ -311,7 +311,7 @@ pub fn transform_data(
                         query_type,
                         &members,
                         query.time_dimensions.as_ref(),
-                        &row,
+                        row,
                         &data.columns_pos,
                     )
                 })
@@ -328,7 +328,7 @@ pub fn transform_data(
                         annotation,
                         query_type,
                         query,
-                        &row,
+                        row,
                         &data.columns_pos,
                     )
                 })
@@ -339,14 +339,14 @@ pub fn transform_data(
 }
 
 /// Helper to get a list if unique granularities from normalized queries
-pub fn get_query_granularities(queries: &Vec<&NormalizedQuery>) -> Vec<String> {
+pub fn get_query_granularities(queries: &[&NormalizedQuery]) -> Vec<String> {
     queries
         .iter()
         .filter_map(|query| {
             query
                 .time_dimensions
                 .as_ref()
-                .and_then(|tds| tds.get(0))
+                .and_then(|tds| tds.first())
                 .and_then(|td| td.granularity.clone())
         })
         .collect::<HashSet<_>>()
@@ -361,7 +361,7 @@ pub fn get_pivot_query(
 ) -> Result<NormalizedQuery> {
     let mut pivot_query = queries
         .first()
-        .map(|q| *q)
+        .copied()
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("Queries list cannot be empty"))?;
 
@@ -392,7 +392,7 @@ pub fn get_pivot_query(
                     dimension: "time".to_string(),
                     date_range: None,
                     compare_date_range: None,
-                    granularity: granularities.get(0).cloned(),
+                    granularity: granularities.first().cloned(),
                 }]);
             }
         }
@@ -427,7 +427,7 @@ pub fn get_final_cubestore_result(
         annotation,
         cube_store_result,
         query,
-        &query_type,
+        query_type,
         res_type.clone(),
     )?;
 
@@ -437,8 +437,8 @@ pub fn get_final_cubestore_result(
 }
 
 pub fn get_final_cubestore_result_multi(
-    request_data: &Vec<TransformDataRequest>,
-    cube_store_result: &Vec<&CubeStoreResult>,
+    request_data: &[TransformDataRequest],
+    cube_store_result: &[&CubeStoreResult],
     result_data: &mut RequestResultDataMulti,
 ) -> Result<()> {
     for (transform_data, cube_store_result, result) in multizip((
@@ -446,7 +446,7 @@ pub fn get_final_cubestore_result_multi(
         cube_store_result.iter(),
         result_data.results.iter_mut(),
     )) {
-        get_final_cubestore_result(transform_data, *cube_store_result, result)?;
+        get_final_cubestore_result(transform_data, cube_store_result, result)?;
     }
 
     let normalized_queries = result_data
