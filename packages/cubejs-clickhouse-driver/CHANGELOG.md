@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.9](https://github.com/cube-js/cube/compare/v1.1.8...v1.1.9) (2024-12-08)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+
+
+
+
+## [1.1.8](https://github.com/cube-js/cube/compare/v1.1.7...v1.1.8) (2024-12-05)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Replace error cause with string formatting ([#8977](https://github.com/cube-js/cube/issues/8977)) ([e948856](https://github.com/cube-js/cube/commit/e94885674cf046e9b7188c1b0a6dc4420415a234))
+* **clickhouse-driver:** Tune ClickHouse errors: remove SQL, catch ping failure ([#8983](https://github.com/cube-js/cube/issues/8983)) ([811a7ce](https://github.com/cube-js/cube/commit/811a7ce2e5957de5e619ab9d22342580f22dc366))
+
+
+
+
+
 ## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
 
 

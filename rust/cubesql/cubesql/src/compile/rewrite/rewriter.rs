@@ -15,7 +15,7 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
 };
@@ -42,99 +42,74 @@ pub struct Rewriter {
 
 pub type CubeRunner = Runner<LogicalPlanLanguage, LogicalPlanAnalysis, IterInfo>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugNode {
-    id: String,
-    label: String,
-    #[serde(rename = "comboId")]
-    combo_id: String,
-}
+#[derive(Clone, Serialize, Deserialize)]
+struct DebugENodeId(String);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugEdge {
-    source: String,
-    target: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugCombo {
-    id: String,
-    label: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugData {
-    nodes: Vec<DebugNode>,
-    #[serde(rename = "removedNodes")]
-    removed_nodes: Vec<DebugNode>,
-    edges: Vec<DebugEdge>,
-    #[serde(rename = "removedEdges")]
-    removed_edges: Vec<DebugEdge>,
-    combos: Vec<DebugCombo>,
-    #[serde(rename = "removedCombos")]
-    removed_combos: Vec<DebugCombo>,
-    #[serde(rename = "appliedRules")]
-    applied_rules: Option<Vec<String>>,
-}
-
-impl DebugData {
-    pub fn prepare(graph: &CubeEGraph) -> DebugData {
-        DebugData {
-            applied_rules: None,
-            nodes: graph
-                .classes()
-                .flat_map(|class| {
-                    let mut result = class
-                        .nodes
-                        .iter()
-                        .map(|n| {
-                            let node_id = format!("{}-{:?}", class.id, n);
-                            DebugNode {
-                                id: node_id.to_string(),
-                                label: format!("{:?}", n),
-                                combo_id: format!("c{}", class.id),
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    result.push(DebugNode {
-                        id: class.id.to_string(),
-                        label: class.id.to_string(),
-                        combo_id: format!("c{}", class.id),
-                    });
-                    result
-                })
-                .collect(),
-            edges: graph
-                .classes()
-                .flat_map(|class| {
-                    class
-                        .nodes
-                        .iter()
-                        .map(|n| DebugEdge {
-                            source: class.id.to_string(),
-                            target: format!("{}-{:?}", class.id, n,),
-                        })
-                        .chain(class.nodes.iter().flat_map(|n| {
-                            n.children().iter().map(move |c| DebugEdge {
-                                source: format!("{}-{:?}", class.id, n),
-                                target: c.to_string(),
-                            })
-                        }))
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
-            combos: graph
-                .classes()
-                .map(|class| DebugCombo {
-                    id: format!("c{}", class.id),
-                    label: format!("#{}", class.id),
-                })
-                .collect(),
-            removed_nodes: Vec::new(),
-            removed_edges: Vec::new(),
-            removed_combos: Vec::new(),
-        }
+impl From<&LogicalPlanLanguage> for DebugENodeId {
+    fn from(value: &LogicalPlanLanguage) -> Self {
+        Self(format!("{value:?}"))
     }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EClassDebugData {
+    id: Id,
+    canon: Id,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ENodeDebugData {
+    enode: DebugENodeId,
+    eclass: Id,
+    children: Vec<Id>,
+}
+
+/// Representation is optimised for storing in JSON, to transfer to UI
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EGraphDebugState {
+    eclasses: Vec<EClassDebugData>,
+    enodes: Vec<ENodeDebugData>,
+}
+
+impl EGraphDebugState {
+    pub fn new(graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>) -> Self {
+        let current_eclasses = graph.classes().map(|ec| ec.id);
+        let previous_debug_eclasses = graph
+            .analysis
+            .debug_states
+            .iter()
+            .flat_map(|state| state.eclasses.iter().map(|ecd| ecd.id));
+        let all_known_eclasses = current_eclasses.chain(previous_debug_eclasses);
+
+        let all_known_eclasses = all_known_eclasses.collect::<HashSet<_>>();
+
+        let eclasses = all_known_eclasses
+            .into_iter()
+            .map(|ec| EClassDebugData {
+                id: ec,
+                canon: graph.find(ec),
+            })
+            .collect::<Vec<_>>();
+
+        let enodes = graph
+            .classes()
+            .flat_map(|ec| ec.nodes.iter().map(move |node| (ec.id, node)))
+            .map(|(ec, node)| ENodeDebugData {
+                enode: node.into(),
+                eclass: ec,
+                children: node.children().to_vec(),
+            })
+            .collect();
+
+        EGraphDebugState { eclasses, enodes }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct DebugState {
+    egraph: EGraphDebugState,
+    #[serde(rename = "appliedRules")]
+    applied_rules: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -190,9 +165,6 @@ fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError>
         format!("{}/src/index.tsx", dir),
     )?;
 
-    let mut states = Vec::new();
-    let mut last_debug_data: Option<DebugData> = None;
-
     let debug_data = runner.egraph.analysis.debug_states.as_slice();
     debug_assert_eq!(debug_data.len(), runner.iterations.len() + 1);
 
@@ -202,53 +174,19 @@ fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError>
         .iter()
         .skip(1)
         .zip(runner.iterations.iter().map(|i| Some(&i.applied)));
-    let states_data = std::iter::once((&debug_data[0], None)).chain(states_data);
-
-    for (debug_data, applied) in states_data {
-        let mut debug_data = debug_data.clone();
-        let debug_data_clone = debug_data.clone();
-
-        if let Some(last) = last_debug_data {
-            debug_data
-                .nodes
-                .retain(|n| !last.nodes.iter().any(|ln| ln.id == n.id));
-            debug_data.edges.retain(|n| {
-                !last
-                    .edges
-                    .iter()
-                    .any(|ln| ln.source == n.source && ln.target == n.target)
-            });
-            debug_data
-                .combos
-                .retain(|n| !last.combos.iter().any(|ln| ln.id == n.id));
-
-            debug_data.removed_nodes = last.nodes.clone();
-            debug_data
-                .removed_nodes
-                .retain(|n| !debug_data_clone.nodes.iter().any(|ln| ln.id == n.id));
-            debug_data.removed_edges = last.edges.clone();
-            debug_data.removed_edges.retain(|n| {
-                !debug_data_clone
-                    .edges
-                    .iter()
-                    .any(|ln| ln.source == n.source && ln.target == n.target)
-            });
-            debug_data.removed_combos = last.combos.clone();
-            debug_data
-                .removed_combos
-                .retain(|n| !debug_data_clone.combos.iter().any(|ln| ln.id == n.id));
-        }
-        debug_data.applied_rules = Some(
-            applied
+    let debug_data = std::iter::once((&debug_data[0], None))
+        .chain(states_data)
+        .map(|(egraph, applied_rules)| DebugState {
+            egraph: egraph.clone(),
+            applied_rules: applied_rules
                 .map(|applied| applied.iter().map(|s| format!("{:?}", s)).collect())
                 .unwrap_or(vec![]),
-        );
-        states.push(debug_data);
-        last_debug_data = Some(debug_data_clone);
-    }
+        })
+        .collect::<Vec<_>>();
+
     fs::write(
         format!("{}/src/states.json", dir),
-        serde_json::to_string_pretty(&states)?,
+        serde_json::to_string_pretty(&debug_data)?,
     )?;
 
     Ok(())
@@ -310,7 +248,7 @@ impl Rewriter {
 
     pub async fn run_rewrite_to_completion(
         &mut self,
-        auth_context: AuthContextRef,
+        cache_entry: Arc<CompilerCacheEntry>,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<CubeEGraph, CubeError> {
         let cube_context = self.cube_context.clone();
@@ -323,11 +261,7 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(
-                auth_context.clone(),
-                cube_context.session_state.protocol.clone(),
-                false,
-            )
+            .rewrite_rules(cache_entry, false)
             .await?;
 
         let (plan, qtrace_egraph_iterations) = tokio::task::spawn_blocking(move || {
@@ -392,6 +326,7 @@ impl Rewriter {
     pub async fn find_best_plan(
         &mut self,
         root: Id,
+        cache_entry: Arc<CompilerCacheEntry>,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
@@ -407,11 +342,7 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(
-                auth_context.clone(),
-                cube_context.session_state.protocol.clone(),
-                true,
-            )
+            .rewrite_rules(cache_entry, true)
             .await?;
 
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =

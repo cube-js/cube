@@ -169,7 +169,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async query<R = unknown>(query: string, values?: unknown[], options: KsqlQueryOptions = {}): Promise<R> {    
+  public async query<R = unknown>(query: string, values?: unknown[], options: KsqlQueryOptions = {}): Promise<R> {
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
@@ -181,7 +181,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         }
       } : {})
     });
-    
+
     return data[0];
   }
 
@@ -363,7 +363,6 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   public capabilities(): DriverCapabilities {
     return {
       streamingSource: true,
-      unloadWithoutTempTable: true,
     };
   }
 }

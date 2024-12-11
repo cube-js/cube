@@ -1,0 +1,89 @@
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    joins:
+      - name: users
+        sql: "{CUBE}.order_id = {orders}.id"
+        relationship: many_to_one
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: number
+        sql: number
+        type: number
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+    hierarchies:
+      - name: orders_hierarchy
+        title: Hello Hierarchy
+        levels:
+          - "{CUBE}.status"
+          - number
+          - users.city
+      - name: some_other_hierarchy
+        title: Some other hierarchy
+        levels:
+          - users.state
+          - users.city
+  #
+  - name: users
+    sql: SELECT * FROM users
+    hierarchies:
+      - name: users_hierarchy
+        levels:
+          - users.age
+          - city
+    dimensions:
+      - name: age
+        sql: age
+        type: number
+      - name: state
+        sql: state
+        type: string
+      - name: city
+        sql: city
+        type: string
+
+views:
+  - name: orders_users_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+      - join_path: users
+        includes:
+          - age
+          - state
+  - name: orders_includes_excludes_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+        excludes:
+          - some_other_hierarchy
+  - name: empty_view
+    cubes:
+      - join_path: orders
+        includes:
+          - count
+          - status
+  - name: all_hierarchy_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+      - join_path: users
+        prefix: true
+        includes: "*"
+
+

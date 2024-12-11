@@ -426,4 +426,34 @@ describe('Views YAML', () => {
       other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
   });
+
+  it('throws error for unresolved members', async () => {
+    const { compiler } = prepareYamlCompiler(`
+      cubes:
+        - name: orders
+          sql: SELECT * FROM orders
+          measures:
+            - name: count
+              type: count
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: status
+              sql: status
+              type: string
+      views:
+        - name: test_view
+          cubes:
+            - join_path: orders
+              includes:
+                - name: count
+                  alias: renamed_count
+                - status
+                - unknown
+`);
+
+    await expect(compiler.compile()).rejects.toThrow('test_view cube: Member \'unknown\'');
+  });
 });
