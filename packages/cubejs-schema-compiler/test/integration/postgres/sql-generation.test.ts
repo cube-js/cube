@@ -561,7 +561,7 @@ describe('SQL Generation', () => {
       }]
     });
 
-    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+    return dbRunner.testQuery(query.buildSqlAndParamsTest()).then(res => {
       expect(res).toEqual(
         [
           {

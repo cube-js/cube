@@ -1,3 +1,5 @@
+use super::dimension_definition::DimenstionDefinitionStatic;
+use super::measure_definition::MeasureDefinitionStatic;
 use super::memeber_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -7,6 +9,7 @@ use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -11,14 +11,11 @@ use std::rc::Rc;
 pub struct FullKeyAggregateQueryPlanner {
     query_properties: Rc<QueryProperties>,
     order_planner: OrderPlanner,
-    context_factory: Rc<SqlNodesFactory>,
+    context_factory: SqlNodesFactory,
 }
 
 impl FullKeyAggregateQueryPlanner {
-    pub fn new(
-        query_properties: Rc<QueryProperties>,
-        context_factory: Rc<SqlNodesFactory>,
-    ) -> Self {
+    pub fn new(query_properties: Rc<QueryProperties>, context_factory: SqlNodesFactory) -> Self {
         Self {
             order_planner: OrderPlanner::new(query_properties.clone()),
             query_properties,
@@ -61,8 +58,6 @@ impl FullKeyAggregateQueryPlanner {
             join_builder.inner_join_subselect(join.clone(), format!("q_{}", i + 1), on);
         }
 
-        let context = VisitorContext::new(None, self.context_factory.default_node_processor());
-
         let having = if self.query_properties.measures_filters().is_empty() {
             None
         } else {
@@ -72,7 +67,7 @@ impl FullKeyAggregateQueryPlanner {
         };
 
         let from = From::new_from_join(join_builder.build());
-        let mut select_builder = SelectBuilder::new(from, context);
+        let mut select_builder = SelectBuilder::new(from, self.context_factory.clone());
 
         for member in self
             .query_properties

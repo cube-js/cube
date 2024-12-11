@@ -76,11 +76,7 @@ impl SingleAliasedSource {
     pub fn make_schema(&self) -> Schema {
         match &self.source {
             SingleSource::Subquery(query) => query.make_schema(Some(self.alias.clone())),
-            SingleSource::Cube(cube) => {
-                let mut schema = Schema::empty();
-                schema.add_cube(SchemaCube::new(cube.name().clone(), self.alias.clone()));
-                schema
-            }
+            SingleSource::Cube(cube) => Schema::empty(), //cube.schema().move_to_source(&self.alias),
             SingleSource::TableReference(_, schema) => schema.move_to_source(&self.alias),
         }
     }

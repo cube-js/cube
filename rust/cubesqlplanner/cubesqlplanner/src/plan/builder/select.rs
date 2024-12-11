@@ -1,7 +1,12 @@
 use crate::plan::{
     AliasedExpr, Cte, Expr, Filter, From, MemberExpression, OrderBy, Schema, Select,
+    SingleAliasedSource, SingleSource,
 };
+
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::symbols::MemberSymbol;
 use crate::planner::{BaseMember, VisitorContext};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct SelectBuilder {
@@ -11,16 +16,17 @@ pub struct SelectBuilder {
     group_by: Vec<Expr>,
     having: Option<Filter>,
     order_by: Vec<OrderBy>,
-    context: Rc<VisitorContext>,
+    nodes_factory: SqlNodesFactory,
     ctes: Vec<Rc<Cte>>,
     is_distinct: bool,
     limit: Option<usize>,
     offset: Option<usize>,
     input_schema: Rc<Schema>,
+    result_schema: Schema,
 }
 
 impl SelectBuilder {
-    pub fn new(from: From, context: VisitorContext) -> Self {
+    pub fn new(from: From, nodes_factory: SqlNodesFactory) -> Self {
         let input_schema = from.schema.clone();
         Self {
             projection_columns: vec![],
@@ -29,12 +35,13 @@ impl SelectBuilder {
             group_by: vec![],
             having: None,
             order_by: vec![],
-            context: Rc::new(context),
+            nodes_factory,
             ctes: vec![],
             is_distinct: false,
             limit: None,
             offset: None,
             input_schema,
+            result_schema: Schema::empty(),
         }
     }
 
@@ -54,6 +61,7 @@ impl SelectBuilder {
             expr,
             alias: alias.clone(),
         };
+        self.resolve_render_reference_for_member(&member.member_evaluator());
 
         self.projection_columns.push(aliased_expr);
     }
@@ -85,11 +93,65 @@ impl SelectBuilder {
     pub fn set_offset(&mut self, offset: Option<usize>) {
         self.offset = offset;
     }
+
     pub fn set_ctes(&mut self, ctes: Vec<Rc<Cte>>) {
         self.ctes = ctes;
     }
 
-    pub fn build(self) -> Select {
+    fn resolve_render_reference_for_member(&mut self, member: &Rc<MemberSymbol>) {
+        let member_name = member.full_name();
+        if !self
+            .nodes_factory
+            .render_references()
+            .contains_key(&member_name)
+        {
+            if let Some(reference) = self
+                .input_schema
+                .resolve_member_reference(&member_name, &None)
+            {
+                self.nodes_factory
+                    .add_render_reference(member_name, reference);
+            } else {
+                for dep in member.get_dependencies() {
+                    self.resolve_render_reference_for_member(&dep);
+                }
+            }
+        }
+    }
+
+    fn make_cube_references(&self) -> HashMap<String, String> {
+        let mut refs = HashMap::new();
+        match &self.from.source {
+            crate::plan::FromSource::Single(source) => {
+                self.add_cube_reference_if_needed(source, &mut refs)
+            }
+            crate::plan::FromSource::Join(join) => {
+                self.add_cube_reference_if_needed(&join.root, &mut refs);
+                for join_item in join.joins.iter() {
+                    self.add_cube_reference_if_needed(&join_item.from, &mut refs);
+                }
+            }
+            crate::plan::FromSource::Empty => {}
+        }
+        refs
+    }
+
+    fn add_cube_reference_if_needed(
+        &self,
+        source: &SingleAliasedSource,
+        refs: &mut HashMap<String, String>,
+    ) {
+        match &source.source {
+            SingleSource::Cube(cube) => {
+                refs.insert(cube.name().clone(), source.alias.clone());
+            }
+            _ => {}
+        }
+    }
+
+    pub fn build(mut self) -> Select {
+        let cube_references = self.make_cube_references();
+        self.nodes_factory.set_cube_name_references(cube_references);
         Select {
             projection_columns: self.projection_columns,
             from: self.from,
@@ -97,7 +159,7 @@ impl SelectBuilder {
             group_by: self.group_by,
             having: self.having,
             order_by: self.order_by,
-            context: self.context.clone(),
+            context: Rc::new(VisitorContext::new(&self.nodes_factory)),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
             limit: self.limit,

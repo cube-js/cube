@@ -18,7 +18,7 @@ pub fn set_schema_impl(sql_node: Rc<dyn SqlNode>, schema: Rc<Schema>) -> Rc<dyn 
         .downcast_ref::<AutoPrefixSqlNode>()
     {
         let input = set_schema_impl(auto_prefix.input().clone(), schema.clone());
-        AutoPrefixSqlNode::new_with_schema(input, schema)
+        AutoPrefixSqlNode::new_with_schema(input, auto_prefix.cube_references().clone(), schema)
     } else if let Some(_) = sql_node.clone().as_any().downcast_ref::<EvaluateSqlNode>() {
         sql_node
     } else if let Some(final_measure) = sql_node
@@ -103,6 +103,6 @@ pub fn set_schema_impl(sql_node: Rc<dyn SqlNode>, schema: Rc<Schema>) -> Rc<dyn 
         let input = set_schema_impl(ungrouped_measure.input().clone(), schema.clone());
         UngroupedQueryFinalMeasureSqlNode::new(input)
     } else {
-        unreachable!("Not all nodes are implemented in set_schema function");
+        sql_node
     }
 }

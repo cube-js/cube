@@ -32,11 +32,34 @@ impl MemberExpression {
 }
 
 #[derive(Clone)]
+pub struct ReferenceExpression {
+    pub reference: String,
+    pub source: Option<String>,
+}
+
+impl ReferenceExpression {
+    pub fn new(reference: String, source: Option<String>) -> Self {
+        Self { reference, source }
+    }
+
+    pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
+        templates.column_reference(&self.source, &self.reference)
+    }
+}
+
+#[derive(Clone)]
 pub enum Expr {
     Member(MemberExpression),
+    Reference(ReferenceExpression),
 }
 
 impl Expr {
+    pub fn new_member(member: Rc<dyn BaseMember>, source: Option<String>) -> Self {
+        Self::Member(MemberExpression::new(member, source))
+    }
+    pub fn new_reference(reference: String, source: Option<String>) -> Self {
+        Self::Reference(ReferenceExpression::new(reference, source))
+    }
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,
@@ -44,7 +67,8 @@ impl Expr {
         schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
         match self {
-            Expr::Member(member) => member.to_sql(templates, context, schema),
+            Self::Member(member) => member.to_sql(templates, context, schema),
+            Self::Reference(reference) => reference.to_sql(templates),
         }
     }
 }

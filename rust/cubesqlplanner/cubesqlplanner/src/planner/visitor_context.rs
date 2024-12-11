@@ -8,30 +8,14 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct VisitorContext {
-    cube_alias_prefix: Option<String>,
     node_processor: Rc<dyn SqlNode>,
 }
 
 impl VisitorContext {
-    pub fn new(cube_alias_prefix: Option<String>, node_processor: Rc<dyn SqlNode>) -> Self {
+    pub fn new(nodes_factory: &SqlNodesFactory) -> Self {
         Self {
-            cube_alias_prefix,
-            node_processor,
+            node_processor: nodes_factory.default_node_processor(),
         }
-    }
-
-    pub fn new_with_cube_alias_prefix(
-        nodes_factory: Rc<SqlNodesFactory>,
-        cube_alias_prefix: String,
-    ) -> Self {
-        Self::new(
-            Some(cube_alias_prefix),
-            nodes_factory.default_node_processor(),
-        )
-    }
-
-    pub fn default(nodes_factory: Rc<SqlNodesFactory>) -> Self {
-        Self::new(Default::default(), nodes_factory.default_node_processor())
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {
@@ -40,10 +24,6 @@ impl VisitorContext {
 
     pub fn node_processor(&self) -> Rc<dyn SqlNode> {
         self.node_processor.clone()
-    }
-
-    pub fn cube_alias_prefix(&self) -> &Option<String> {
-        &self.cube_alias_prefix
     }
 }
 

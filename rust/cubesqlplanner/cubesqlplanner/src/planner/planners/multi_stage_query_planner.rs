@@ -99,7 +99,7 @@ impl MultiStageQueryPlanner {
         let schema = cte_schemas.get(alias).unwrap().clone();
         let select_builder = SelectBuilder::new(
             From::new_from_table_reference(alias.clone(), schema, None),
-            VisitorContext::default(SqlNodesFactory::new()),
+            SqlNodesFactory::new(),
         );
 
         Rc::new(select_builder.build())

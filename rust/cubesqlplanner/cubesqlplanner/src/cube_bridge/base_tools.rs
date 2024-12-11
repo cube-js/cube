@@ -44,4 +44,5 @@ pub trait BaseTools {
         date_range: Vec<String>,
     ) -> Result<Vec<Vec<String>>, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
+    fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
 }

@@ -124,10 +124,12 @@ impl MultiStageMemberQueryPlanner {
             .map(|dim| Expr::Member(MemberExpression::new(dim.clone(), None)))
             .collect_vec();
 
-        let context_factory = SqlNodesFactory::new();
-        let node_context = context_factory.rolling_window_node_processor();
+        let mut context_factory = SqlNodesFactory::new();
+        context_factory.set_rolling_window(true);
 
-        let mut select_builder = SelectBuilder::new(from, VisitorContext::new(None, node_context));
+        //let node_context = context_factory.rolling_window_node_processor();
+
+        let mut select_builder = SelectBuilder::new(from, context_factory);
         for dim in dimensions.iter() {
             if dim.full_name() == rolling_window_desc.time_dimension.full_name() {
                 select_builder.add_projection_member(
@@ -191,23 +193,19 @@ impl MultiStageMemberQueryPlanner {
             multi_stage_member.group_by(),
         );
 
-        let context_factory = SqlNodesFactory::new();
+        let mut context_factory = SqlNodesFactory::new();
 
-        let node_context = match multi_stage_member.inode_type() {
-            MultiStageInodeMemberType::Rank => {
-                context_factory.multi_stage_rank_node_processor(partition_by)
-            }
+        match multi_stage_member.inode_type() {
+            MultiStageInodeMemberType::Rank => context_factory.set_multi_stage_rank(partition_by),
             MultiStageInodeMemberType::Aggregate => {
                 if partition_by != dimensions_aliases {
-                    context_factory.multi_stage_window_node_processor(partition_by)
-                } else {
-                    context_factory.default_node_processor()
+                    context_factory.set_multi_stage_window(partition_by)
                 }
             }
-            _ => context_factory.default_node_processor(),
+            _ => {}
         };
 
-        let mut select_builder = SelectBuilder::new(from, VisitorContext::new(None, node_context));
+        let mut select_builder = SelectBuilder::new(from, context_factory);
         for dim in dimensions.iter() {
             select_builder.add_projection_member(&dim, None, None);
         }
@@ -258,8 +256,7 @@ impl MultiStageMemberQueryPlanner {
         }
 
         let from = From::new_from_join(join_builder.build());
-        let mut select_builder =
-            SelectBuilder::new(from, VisitorContext::default(SqlNodesFactory::new()));
+        let mut select_builder = SelectBuilder::new(from, SqlNodesFactory::new());
 
         for dim in dimensions.iter() {
             select_builder.add_projection_member(dim, None, None)

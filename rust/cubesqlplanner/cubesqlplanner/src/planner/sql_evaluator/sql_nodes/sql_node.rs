@@ -17,3 +17,7 @@ pub trait SqlNode {
 
     fn childs(&self) -> Vec<Rc<dyn SqlNode>>;
 }
+
+pub trait CubeNameNode {
+    fn to_sql(&self, cube_name: &String) -> Result<String, CubeError>;
+}

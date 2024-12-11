@@ -631,9 +631,8 @@ export class BaseQuery {
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
 
-
     const order = this.options.order && R.pipe(
-      R.map((hash) => (!hash || !hash.id)  ? null : hash),
+      R.map((hash) => (!hash || !hash.id) ? null : hash),
       R.reject(R.isNil),
     )(this.options.order);
 
@@ -660,8 +659,14 @@ export class BaseQuery {
     return res;
   }
 
+  allCubeMembers(path) {
+    const fromPath = this.cubeEvaluator.cubeFromPath(path);
+
+    return Object.keys(fromPath.measures).concat(Object.keys(fromPath.dimensions));
+  }
+
   getAllocatedParams() {
-    return this.paramAllocator.getParams()
+    return this.paramAllocator.getParams();
   }
 
   // FIXME helper for native generator, maybe should be moved entire to rust

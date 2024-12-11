@@ -11,13 +11,13 @@ pub struct SimpleQueryPlanner {
     query_properties: Rc<QueryProperties>,
     join_planner: JoinPlanner,
     order_planner: OrderPlanner,
-    context_factory: Rc<SqlNodesFactory>,
+    context_factory: SqlNodesFactory,
 }
 impl SimpleQueryPlanner {
     pub fn new(
         query_tools: Rc<QueryTools>,
         query_properties: Rc<QueryProperties>,
-        context_factory: Rc<SqlNodesFactory>,
+        context_factory: SqlNodesFactory,
     ) -> Self {
         Self {
             join_planner: JoinPlanner::new(query_tools.clone()),
@@ -38,7 +38,7 @@ impl SimpleQueryPlanner {
         };
         let mut select_builder = SelectBuilder::new(
             self.join_planner.make_join_node()?,
-            VisitorContext::default(self.context_factory.clone()),
+            self.context_factory.clone(),
         );
         for member in self
             .query_properties

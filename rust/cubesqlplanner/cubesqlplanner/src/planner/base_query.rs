@@ -59,11 +59,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<Select, CubeError> {
-        let nodes_factory = if self.request.ungrouped() {
-            SqlNodesFactory::new_ungroupped()
-        } else {
-            SqlNodesFactory::new()
-        };
+        let mut nodes_factory = SqlNodesFactory::new();
+
+        if self.request.ungrouped() {
+            nodes_factory.set_ungrouped(true)
+        }
 
         if self.request.is_simple_query()? {
             let planner = SimpleQueryPlanner::new(

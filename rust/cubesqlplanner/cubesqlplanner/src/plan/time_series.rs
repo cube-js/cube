@@ -14,7 +14,7 @@ impl TimeSeries {
         let column = SchemaColumn::new(
             self_alias,
             format!("date_from"),
-            self.time_dimension_name.clone(),
+            Some(self.time_dimension_name.clone()),
         );
         Schema::new(vec![column], vec![])
     }

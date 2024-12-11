@@ -7,11 +7,11 @@ use std::rc::Rc;
 pub struct SchemaColumn {
     pub table_name: Option<String>,
     pub alias: String,
-    pub origin_member: String,
+    pub origin_member: Option<String>,
 }
 
 impl SchemaColumn {
-    pub fn new(table_name: Option<String>, alias: String, origin_member: String) -> Self {
+    pub fn new(table_name: Option<String>, alias: String, origin_member: Option<String>) -> Self {
         Self {
             table_name,
             alias,
@@ -107,7 +107,11 @@ impl Schema {
             if source.is_some() && source != &col.table_name {
                 return false;
             }
-            &col.origin_member == member_name
+            if let Some(origin_member) = &col.origin_member {
+                origin_member == member_name
+            } else {
+                false
+            }
         })
     }
 

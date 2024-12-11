@@ -63,7 +63,15 @@ impl Select {
                         let schema_col = SchemaColumn::new(
                             self_alias.clone(),
                             col.alias.clone(),
-                            member.member.full_name(),
+                            Some(member.member.full_name()),
+                        );
+                        schema.add_column(schema_col);
+                    }
+                    Expr::Reference(reference) => {
+                        let schema_col = SchemaColumn::new(
+                            self_alias.clone(),
+                            col.alias.clone(),
+                            None, //"".to_string(), //member.member.full_name(),
                         );
                         schema.add_column(schema_col);
                     }

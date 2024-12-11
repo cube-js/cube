@@ -17,14 +17,14 @@ pub struct MultipliedMeasuresQueryPlanner {
     query_properties: Rc<QueryProperties>,
     join_planner: JoinPlanner,
     common_utils: CommonUtils,
-    context_factory: Rc<SqlNodesFactory>,
+    context_factory: SqlNodesFactory,
 }
 
 impl MultipliedMeasuresQueryPlanner {
     pub fn new(
         query_tools: Rc<QueryTools>,
         query_properties: Rc<QueryProperties>,
-        context_factory: Rc<SqlNodesFactory>,
+        context_factory: SqlNodesFactory,
     ) -> Self {
         Self {
             query_tools: query_tools.clone(),
@@ -125,10 +125,7 @@ impl MultipliedMeasuresQueryPlanner {
 
         let mut select_builder = SelectBuilder::new(
             From::new_from_join(join_builder.build()),
-            VisitorContext::new_with_cube_alias_prefix(
-                self.context_factory.clone(),
-                format!("{}_key", key_cube_name),
-            ),
+            self.context_factory.clone(),
         );
         for member in self
             .query_properties
@@ -174,13 +171,9 @@ impl MultipliedMeasuresQueryPlanner {
         let from = self
             .join_planner
             .make_join_node_with_prefix_and_join_hints(&None, join_hints)?;
-        let mut select_builder = SelectBuilder::new(
-            from,
-            VisitorContext::new(
-                None,
-                self.context_factory.ungroupped_measure_node_processor(),
-            ),
-        );
+        let mut context_factory = self.context_factory.clone();
+        context_factory.set_ungrouped_measure(true);
+        let mut select_builder = SelectBuilder::new(from, context_factory);
         for dim in primary_keys_dimensions.iter() {
             select_builder.add_projection_member(dim, None, None);
         }
@@ -197,13 +190,7 @@ impl MultipliedMeasuresQueryPlanner {
         let source = self
             .join_planner
             .make_join_node_with_prefix(&Some(format!("main")))?;
-        let mut select_builder = SelectBuilder::new(
-            source,
-            VisitorContext::new_with_cube_alias_prefix(
-                self.context_factory.clone(),
-                "main".to_string(),
-            ),
-        );
+        let mut select_builder = SelectBuilder::new(source, self.context_factory.clone());
         for member in self
             .query_properties
             .all_dimensions_and_measures(&measures)?
@@ -228,13 +215,7 @@ impl MultipliedMeasuresQueryPlanner {
             .query_properties
             .dimensions_for_select_append(dimensions);
 
-        let mut select_builder = SelectBuilder::new(
-            source,
-            VisitorContext::new_with_cube_alias_prefix(
-                self.context_factory.clone(),
-                format!("{}_key", key_cube_name),
-            ),
-        );
+        let mut select_builder = SelectBuilder::new(source, self.context_factory.clone());
         for member in dimensions.iter() {
             select_builder.add_projection_member(&member, None, None);
         }

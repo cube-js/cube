@@ -8,6 +8,7 @@ use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use chrono_tz::Tz;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::cell::{Ref, RefCell, RefMut};
@@ -115,6 +116,18 @@ impl QueryTools {
             self.alias_name(&format!("{}__{}", prefix, self.alias_name(name)))
         } else {
             self.alias_name(name)
+        }
+    }
+
+    pub fn parse_member_path(&self, name: &str) -> Result<(String, String), CubeError> {
+        let path = name.split('.').collect_vec();
+        if path.len() == 2 {
+            Ok((path[0].to_string(), path[1].to_string()))
+        } else {
+            Err(CubeError::internal(format!(
+                "Invalid member name: '{}'",
+                name
+            )))
         }
     }
 
