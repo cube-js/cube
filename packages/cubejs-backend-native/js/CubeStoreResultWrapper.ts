@@ -16,22 +16,19 @@ export class CubeStoreResultWrapper {
           return array[Number(prop)];
         }
 
-        // intercept array methods
-        if (typeof prop === 'string' && prop in Array.prototype) {
-          const arrayMethod = (Array.prototype as any)[prop];
-          if (typeof arrayMethod === 'function') {
-            return (...args: any[]) => this.invokeArrayMethod(prop, ...args);
-          }
-        }
-
         // intercept isNative
         if (prop === 'isNative') {
           return true;
         }
 
-        // intercept array length
-        if (prop === 'length') {
-          return this.getArray().length;
+        // intercept array props and methods
+        if (typeof prop === 'string' && prop in Array.prototype) {
+          const arrayMethod = (Array.prototype as any)[prop];
+          if (typeof arrayMethod === 'function') {
+            return (...args: any[]) => this.invokeArrayMethod(prop, ...args);
+          }
+
+          return (this.getArray() as any)[prop];
         }
 
         // intercept JSON.stringify or toJSON()
