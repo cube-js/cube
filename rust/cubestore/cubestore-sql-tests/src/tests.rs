@@ -4324,14 +4324,13 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
         .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
         .await
         .unwrap();
-    // TODO upgrade DF: Replace "AS `data`" back to "AS `Data`" to reveal bug
     // A typical top-k query.
     let p = service
         .plan_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
                          FROM (SELECT * FROM s.Data1 \
                                UNION ALL \
-                               SELECT * FROM s.Data2) AS `data` \
+                               SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          ORDER BY 2 DESC \
                          LIMIT 3",
@@ -4357,13 +4356,12 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
          \n                  Empty"
     );
 
-    // TODO upgrade DF: Replace "AS `data`" back to "AS `Data`" to reveal bug
     let p = service
         .plan_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
                          FROM (SELECT * FROM s.Data1 \
                                UNION ALL \
-                               SELECT * FROM s.Data2) AS `data` \
+                               SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          HAVING cardinality(merge(hits)) > 20 and cardinality(merge(hits)) < 40\
                          ORDER BY 2 DESC \
@@ -4423,14 +4421,13 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
             .await
             .unwrap();
 
-    // TODO upgrade DF: Change "AS `data`" three times in this fn back to "AS `Data`"
     // A typical top-k query.
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
                          FROM (SELECT * FROM s.Data1 \
                                UNION ALL \
-                               SELECT * FROM s.Data2) AS `data` \
+                               SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          ORDER BY 2 DESC \
                          LIMIT 3",
@@ -4444,7 +4441,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
                          FROM (SELECT * FROM s.Data1 \
                                UNION ALL \
-                               SELECT * FROM s.Data2) AS `data` \
+                               SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          HAVING cardinality(merge(hits)) < 9000
                          ORDER BY 2 DESC \
@@ -4458,7 +4455,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
                          FROM (SELECT * FROM s.Data1 \
                                UNION ALL \
-                               SELECT * FROM s.Data2) AS `data` \
+                               SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          HAVING cardinality(merge(hits)) < 170 and cardinality(merge(hits)) > 160
                          ORDER BY 2 DESC \
@@ -4501,14 +4498,13 @@ async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
             .await
             .unwrap();
 
-    // TODO upgrade DF: Change "AS `data`" in this fn back to "AS `Data`"
     // A typical top-k query.
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
                          FROM (SELECT * FROM s.Data1 \
                                UNION ALL \
-                               SELECT * FROM s.Data2) AS `data` \
+                               SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
                          ORDER BY 2 ASC \
                          LIMIT 3",
