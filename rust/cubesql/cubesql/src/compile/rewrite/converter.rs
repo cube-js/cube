@@ -26,7 +26,7 @@ use crate::{
             SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch, TableScanProjection,
             TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
             TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
-            WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
+            ValuesValues, WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
             WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
             WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
             WrappedSelectType,
@@ -772,11 +772,12 @@ impl LogicalPlanToLanguageConverter {
                 self.graph
                     .add(LogicalPlanLanguage::Limit([skip, fetch, input]))
             }
+            LogicalPlan::Values(values) => {
+                let values = add_data_node!(self, values.values, ValuesValues);
+                self.graph.add(LogicalPlanLanguage::Values([values]))
+            }
             LogicalPlan::CreateExternalTable { .. } => {
                 panic!("CreateExternalTable is not supported");
-            }
-            LogicalPlan::Values { .. } => {
-                panic!("Values is not supported");
             }
             LogicalPlan::Explain { .. } => {
                 panic!("Explain is not supported");
@@ -2282,6 +2283,11 @@ impl LanguageToLogicalPlanConverter {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
 
                 LogicalPlan::Distinct(Distinct { input })
+            }
+            LogicalPlanLanguage::Values(values) => {
+                let values = match_data_node!(node_by_id, values[0], ValuesValues);
+
+                LogicalPlanBuilder::values(values)?.build()?
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })
