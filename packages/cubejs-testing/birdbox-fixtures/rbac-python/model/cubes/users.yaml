@@ -1,0 +1,54 @@
+cubes:
+  - name: users
+    sql_table: users
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+    dimensions:
+      - name: city
+        sql: city
+        type: string
+
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    access_policy:
+      - role: "*"
+        row_level:
+          filters:
+            - member: "{CUBE}.city"
+              operator: equals
+              values: ["{ security_context.auth.userAttributes.city }"]
+      - role: admin
+        conditions:
+          # This thing will fail if there's no auth info in the context
+          # Unfortunately, as of now, there's no way to write more complex expressions
+          # that would allow us to check for the existence of the auth object
+          - if: "{ security_context.auth.userAttributes.canHaveAdmin }"
+        row_level:
+          filters:
+            - or:
+              - and:
+                - member: "{CUBE}.city"
+                  operator: notStartsWith
+                  values:
+                    - London
+                    - "{ security_context.auth.userAttributes.city }"
+                    # mixing string, dynamic values, integers and bools should not
+                    # cause any compilation issues
+                    - 4
+                    - true
+                - member: "city"
+                  operator: notEquals
+                  values:
+                    - 'San Francisco'
+              - member: "{CUBE}.city"
+                operator: equals
+                values:
+                  - "New York"
+
