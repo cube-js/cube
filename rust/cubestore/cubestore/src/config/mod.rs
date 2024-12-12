@@ -21,6 +21,7 @@ use crate::metastore::{
     BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
 };
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
+use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
 use crate::remotefs::cleanup::RemoteFsCleanup;
@@ -49,7 +50,6 @@ use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
 use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
-use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};

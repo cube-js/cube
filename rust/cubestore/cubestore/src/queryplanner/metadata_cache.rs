@@ -30,11 +30,11 @@ pub struct NoopParquetMetadataCache {
 }
 
 impl NoopParquetMetadataCache {
-     /// Creates a new DefaultMetadataCache
+    /// Creates a new DefaultMetadataCache
     pub fn new() -> Arc<Self> {
         Arc::new(NoopParquetMetadataCache {
             default_factory: DefaultParquetFileReaderFactory::new(Arc::new(
-                 object_store::local::LocalFileSystem::new(),
+                object_store::local::LocalFileSystem::new(),
             )),
         })
     }
@@ -50,9 +50,8 @@ impl ParquetFileReaderFactory for NoopParquetMetadataCache {
     ) -> datafusion::common::Result<Box<dyn AsyncFileReader + Send>> {
         self.default_factory
             .create_reader(partition_index, file_meta, metadata_size_hint, metrics)
-     }
- }
-
+    }
+}
 
 /// LruMetadataCache, caches parquet metadata.
 pub struct LruParquetMetadataCacheFactory {
