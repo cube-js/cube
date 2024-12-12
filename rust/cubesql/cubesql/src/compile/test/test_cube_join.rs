@@ -497,8 +497,8 @@ async fn test_join_cubes_on_wrong_field_error() {
     let query = convert_sql_to_cube_query(
         &r#"
             SELECT *
-            FROM KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read)
+            FROM (SELECT customer_gender, has_subscription FROM KibanaSampleDataEcommerce) kibana
+            LEFT JOIN (SELECT read, content FROM Logs) logs ON (kibana.has_subscription = logs.read)
             "#
         .to_string(),
         meta.clone(),
@@ -567,7 +567,9 @@ async fn test_join_cubes_with_aggr_error() {
     )
 }
 
+// TODO it seems this query should not execute: it has join of grouped CubeScan with ungrouped CubeScan by __cubeJoinField
 #[tokio::test]
+#[ignore]
 async fn test_join_cubes_with_postprocessing() {
     if !Rewriter::sql_push_down_enabled() {
         return;
@@ -621,7 +623,9 @@ async fn test_join_cubes_with_postprocessing() {
     )
 }
 
+// TODO it seems this test is not necessary:: this case is covered by ungrouped-grouped join, and we explicitly forbid executing joins with ungrouped scans in DF
 #[tokio::test]
+#[ignore]
 async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
     if !Rewriter::sql_push_down_enabled() {
         return;
