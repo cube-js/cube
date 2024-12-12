@@ -223,6 +223,7 @@ jobs:
           - mssql
           - mysql
           - postgres
+          - postgres-native-cubestore-response
           - redshift
           - redshift-export-bucket-s3
           - snowflake
