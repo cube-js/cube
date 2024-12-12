@@ -1331,23 +1331,29 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
         let serialized = ExtensionNodeSerialized::deserialize(r)
             .map_err(|e| DataFusionError::Execution(format!("try_decode: {}", e)))?;
         Ok(Extension {
-            node: Arc::new(match serialized {
+            node: match serialized {
                 ExtensionNodeSerialized::ClusterSend(serialized) => {
-                    ClusterSendNode::from_serialized(inputs, serialized)
+                    Arc::new(ClusterSendNode::from_serialized(inputs, serialized))
                 }
-            }),
+                ExtensionNodeSerialized::PanicWorker(serialized) => {
+                    Arc::new(PanicWorkerNode::from_serialized(inputs, serialized))
+                }
+            },
         })
     }
 
     fn try_encode(&self, node: &Extension, buf: &mut Vec<u8>) -> datafusion::common::Result<()> {
         use serde::Serialize;
         let mut ser = flexbuffers::FlexbufferSerializer::new();
-        let to_serialize =
-            if let Some(cluster_send) = node.node.as_any().downcast_ref::<ClusterSendNode>() {
-                ExtensionNodeSerialized::ClusterSend(cluster_send.to_serialized())
-            } else {
-                todo!("{:?}", node)
-            };
+        let to_serialize = if let Some(cluster_send) =
+            node.node.as_any().downcast_ref::<ClusterSendNode>()
+        {
+            ExtensionNodeSerialized::ClusterSend(cluster_send.to_serialized())
+        } else if let Some(panic_worker) = node.node.as_any().downcast_ref::<PanicWorkerNode>() {
+            ExtensionNodeSerialized::PanicWorker(panic_worker.to_serialized())
+        } else {
+            todo!("{:?}", node)
+        };
         to_serialize
             .serialize(&mut ser)
             .map_err(|e| DataFusionError::Execution(format!("try_encode: {}", e)))?;
