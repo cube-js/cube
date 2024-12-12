@@ -374,3 +374,8 @@ pub struct RequestResultDataMulti {
     #[serde(rename = "slowQuery")]
     pub slow_query: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestResultArray {
+    pub results: Vec<RequestResultData>,
+}

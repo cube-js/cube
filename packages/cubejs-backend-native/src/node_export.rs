@@ -40,7 +40,9 @@ use cubeorchestrator::cubestore_result_transform::{
     get_final_cubestore_result, get_final_cubestore_result_array, get_final_cubestore_result_multi,
     transform_data,
 };
-use cubeorchestrator::types::{RequestResultData, RequestResultDataMulti, TransformDataRequest};
+use cubeorchestrator::types::{
+    RequestResultArray, RequestResultData, RequestResultDataMulti, TransformDataRequest,
+};
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 
@@ -677,7 +679,11 @@ fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsArrayBuff
         return cx.throw_error(err.to_string());
     }
 
-    let json_data = match serde_json::to_string(&request_results) {
+    let final_obj = RequestResultArray {
+        results: request_results,
+    };
+
+    let json_data = match serde_json::to_string(&final_obj) {
         Ok(data) => data,
         Err(e) => return cx.throw_error(format!("Serialization error: {}", e)),
     };
