@@ -38,7 +38,9 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{
     AggregateFunction, Chunk, Column, IdRow, Index, IndexType, MetaStore, Partition, Schema,
 };
+use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
+use crate::queryplanner::panic::PanicWorkerSerialized;
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
@@ -50,7 +52,6 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
 use crate::CubeError;
-use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use datafusion::common;
 use datafusion::common::DFSchemaRef;
 use datafusion::datasource::DefaultTableSource;
@@ -1366,6 +1367,7 @@ pub type Snapshots = Vec<Snapshot>;
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ExtensionNodeSerialized {
     ClusterSend(ClusterSendSerialized),
+    PanicWorker(PanicWorkerSerialized),
 }
 
 #[derive(Debug, Clone)]
