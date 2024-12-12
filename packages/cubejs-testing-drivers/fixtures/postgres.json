@@ -1,4 +1,13 @@
 {
+  "extendedEnvs": {
+    "native-cubestore-response": {
+      "cube": {
+        "environment": {
+          "CUBEJS_TESSERACT_ORCHESTRATOR": "true"
+        }
+      }
+    }
+  },
   "cube": {
     "environment": {
       "CUBEJS_API_SECRET": "mysupersecret",
