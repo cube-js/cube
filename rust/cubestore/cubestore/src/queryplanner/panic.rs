@@ -10,6 +10,7 @@ use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning, PlanProperties,
     SendableRecordBatchStream,
 };
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Pointer};
@@ -24,6 +25,16 @@ impl PanicWorkerNode {
         LogicalPlan::Extension(Extension {
             node: Arc::new(self),
         })
+    }
+
+    pub fn from_serialized(inputs: &[LogicalPlan], serialized: PanicWorkerSerialized) -> Self {
+        assert_eq!(0, inputs.len());
+        let PanicWorkerSerialized {} = serialized;
+        Self {}
+    }
+
+    pub fn to_serialized(&self) -> PanicWorkerSerialized {
+        PanicWorkerSerialized {}
     }
 }
 
@@ -80,6 +91,9 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
             .unwrap_or(false)
     }
 }
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct PanicWorkerSerialized {}
 
 #[derive(Debug)]
 pub struct PanicWorkerExec {
