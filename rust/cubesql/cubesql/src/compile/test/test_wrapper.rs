@@ -1,5 +1,5 @@
-use cubeclient::models::V1LoadRequestQuery;
-use datafusion::physical_plan::displayable;
+use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use datafusion::{physical_plan::displayable, scalar::ScalarValue};
 use pretty_assertions::assert_eq;
 use regex::Regex;
 use serde_json::json;
@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::{
     compile::{
+        engine::df::scan::MemberField,
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
@@ -1167,6 +1168,12 @@ cube_scan_subq AS (
     SELECT
         logs_alias.content logs_content,
         DATE_TRUNC('month', kibana_alias.last_mod) last_mod_month,
+        kibana_alias.__user AS cube_user,
+        1 AS literal,
+        -- Columns without aliases should also work
+        DATE_TRUNC('month', kibana_alias.order_date),
+        kibana_alias.__cubeJoinField,
+        2,
         CASE
             WHEN sum(kibana_alias."sumPrice") IS NOT NULL
                 THEN sum(kibana_alias."sumPrice")
@@ -1175,9 +1182,7 @@ cube_scan_subq AS (
     FROM KibanaSampleDataEcommerce kibana_alias
     JOIN Logs logs_alias
     ON kibana_alias.__cubeJoinField = logs_alias.__cubeJoinField
-    GROUP BY
-        logs_content,
-        last_mod_month
+    GROUP BY 1,2,3,4,5,6,7
 ),
 filter_subq AS (
     SELECT
@@ -1187,7 +1192,12 @@ filter_subq AS (
         logs_content_filter
 )
 SELECT
-    logs_content
+    -- Should use SELECT * here to reference columns without aliases.
+    -- But it's broken ATM in DF, initial plan contains `Projection: ... #__subquery-0.logs_content_filter` on top, but it should not be there
+    -- TODO fix it
+    logs_content,
+    cube_user,
+    literal
 FROM cube_scan_subq
 WHERE
     -- This subquery filter should trigger wrapping of whole query
@@ -1216,6 +1226,43 @@ WHERE
         .unwrap()
         .sql;
 
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+            dimensions: Some(vec!["Logs.content".to_string(),]),
+            time_dimensions: Some(vec![
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                },
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                },
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+
+    assert_eq!(
+        logical_plan.find_cube_scan().member_fields,
+        vec![
+            MemberField::Member("Logs.content".to_string()),
+            MemberField::Member("KibanaSampleDataEcommerce.last_mod.month".to_string()),
+            MemberField::Literal(ScalarValue::Utf8(None)),
+            MemberField::Literal(ScalarValue::Int64(Some(1))),
+            MemberField::Member("KibanaSampleDataEcommerce.order_date.month".to_string()),
+            MemberField::Literal(ScalarValue::Utf8(None)),
+            MemberField::Literal(ScalarValue::Int64(Some(2))),
+            MemberField::Member("KibanaSampleDataEcommerce.sumPrice".to_string()),
+        ],
+    );
+
     // Check that all aliases from different tables have same qualifier, and that names are simple and short
     // logs_content => logs_alias.content
     // last_mod_month => DATE_TRUNC('month', kibana_alias.last_mod),
@@ -1228,6 +1275,10 @@ WHERE
     let sum_price_re = Regex::new(r#"CASE WHEN "logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
         .unwrap();
     assert!(sum_price_re.is_match(&sql));
+    let cube_user_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "cube_user""#).unwrap();
+    assert!(cube_user_re.is_match(&sql));
+    let literal_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "literal""#).unwrap();
+    assert!(literal_re.is_match(&sql));
 }
 
 /// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
