@@ -166,6 +166,11 @@ jobs:
         with:
           name: backend-native
           path: packages/cubejs-backend-native
+      # current .dockerignore prevents use of native build
+      - name: Unignore native from .dockerignore
+        run: |
+          grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
+          mv .dockerignore.tmp .dockerignore
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
