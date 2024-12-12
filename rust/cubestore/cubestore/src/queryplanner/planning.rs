@@ -40,6 +40,7 @@ use crate::metastore::{
 };
 use crate::queryplanner::metadata_cache::NoopParquetMetadataCache;
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
+use crate::queryplanner::panic::PanicWorkerSerialized;
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
@@ -1366,6 +1367,7 @@ pub type Snapshots = Vec<Snapshot>;
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ExtensionNodeSerialized {
     ClusterSend(ClusterSendSerialized),
+    PanicWorker(PanicWorkerSerialized),
 }
 
 #[derive(Debug, Clone)]
