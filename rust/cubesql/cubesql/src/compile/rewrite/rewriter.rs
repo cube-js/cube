@@ -550,10 +550,12 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
         if iteration != self.current_iter {
             self.current_iter = iteration;
             self.current_eclasses.clear();
-            self.current_eclasses
-                .extend(egraph.classes().filter_map(|class| {
-                    (class.data.iteration_timestamp >= iteration).then(|| class.id)
-                }));
+            self.current_eclasses.extend(
+                egraph
+                    .classes()
+                    .filter(|class| (class.data.iteration_timestamp >= iteration))
+                    .map(|class| class.id),
+            );
         };
         assert_eq!(iteration, self.current_iter);
         rewrite.searcher.search_eclasses_with_limit(
