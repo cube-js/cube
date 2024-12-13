@@ -1336,7 +1336,7 @@ impl AsyncPostgresShim {
                 .await?;
             }
             Statement::Rollback { .. } => {
-                if self.end_transaction()? == false {
+                if !self.end_transaction()? {
                     // PostgreSQL returns command completion anyway
                     self.write(protocol::NoticeResponse::warning(
                         ErrorCode::NoActiveSqlTransaction,
@@ -1355,7 +1355,7 @@ impl AsyncPostgresShim {
                 .await?;
             }
             Statement::Commit { .. } => {
-                if self.end_transaction()? == false {
+                if !self.end_transaction()? {
                     // PostgreSQL returns command completion anyway
                     self.write(protocol::NoticeResponse::warning(
                         ErrorCode::NoActiveSqlTransaction,
