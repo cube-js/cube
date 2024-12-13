@@ -16,6 +16,16 @@ data applications, including but not limited to the following ones:
 Often, the REST API is used to enable [embedded analytics][cube-ea] and
 [real-time analytics][cube-rta] use cases.
 
+See [REST API reference][ref-ref-rest-api] for the list of supported API endpoinsts.
+Also, check [query format][ref-rest-query-format] for details about query syntax.
+
+<InfoBox>
+
+You can find a mostly complete OpenAPI documentation for the REST API in the
+linked [`openspec.yml` file][gh-cube-openspec] that you can use with tools like Swagger.
+
+</InfoBox>
+
 <InfoBox>
 
 If you've chosen [GraphQL][graphql] as a query language for your front-end
@@ -24,10 +34,9 @@ provides.
 
 </InfoBox>
 
-Under the hood, REST API also provides endpoints for [GraphQL
-API][ref-graphql-api] and [Orchestration API][ref-orchestration-api]. However,
-they target specific use cases and are not usually considered part of the REST
-API.
+REST API also provides endpoints for [GraphQL API][ref-graphql-api] and
+[Orchestration API][ref-orchestration-api]. However, they target specific use
+cases and are not considered part of the REST API.
 
 ## Example request
 
@@ -83,10 +92,6 @@ curl \
   -H "Authorization: JSON.WEB.TOKEN" \
   http://localhost:4000/cubejs-api/v1/meta | jq
 ```
-
-Check [query format][ref-rest-query-format] for details about supported queries.
-Also, check [REST API reference][ref-ref-rest-api] for the list of supported API
-endpoints.
 
 ## Configuration
 
@@ -291,3 +296,4 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [self-cors]: #configuration-cors
 [ref-ref-rest-api]: /reference/rest-api
 [link-jq-utility]: https://jqlang.github.io/jq/
+[gh-cube-openspec]: https://github.com/cube-js/cube/blob/master/packages/cubejs-api-gateway/openspec.yml

@@ -1185,7 +1185,8 @@ class ApiGateway {
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => {
-          const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+          const hasExpressionsInQuery =
+            this.hasExpressionsInQuery(currentQuery);
 
           if (hasExpressionsInQuery) {
             if (!memberExpressions) {
@@ -1196,25 +1197,36 @@ class ApiGateway {
           }
 
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
+          let evaluatedQuery = normalizedQuery;
+
+          if (hasExpressionsInQuery) {
+            // We need to parse/eval all member expressions early as applyRowLevelSecurity
+            // needs to access the full SQL query in order to evaluate rules
+            evaluatedQuery =
+              this.evalMemberExpressionsInQuery(normalizedQuery);
+          }
+
           // First apply cube/view level security policies
           const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
+            evaluatedQuery,
             context
           );
           // Then apply user-supplied queryRewrite
           let rewrittenQuery = await this.queryRewrite(
             queryWithRlsFilters,
-            context,
+            context
           );
 
-          if (hasExpressionsInQuery) {
+          // applyRowLevelSecurity may add new filters which may contain raw member expressions
+          // if that's the case, we should run an extra pass of parsing here to make sure
+          // nothing breaks down the road
+          if (hasExpressionsInQuery || this.hasExpressionsInQuery(rewrittenQuery)) {
+            rewrittenQuery = this.parseMemberExpressionsInQuery(rewrittenQuery);
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(
-            rewrittenQuery,
-            persistent,
-          );
+          return normalizeQuery(rewrittenQuery, persistent);
         }
       )
     );
