@@ -90,7 +90,6 @@ harness = false
 # Feel free to remove any rule from here and fix all warnings with it
 # Or to write a comment why rule should stay disabled
 [lints.clippy]
-borrowed_box = "allow"
 cast_abs_to_unsigned = "allow"
 clone_on_copy = "allow"
 cmp_owned = "allow"
