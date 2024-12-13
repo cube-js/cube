@@ -4,7 +4,10 @@ use crate::{protocol::Format, ProtocolError};
 use bytes::{BufMut, BytesMut};
 #[cfg(feature = "with-chrono")]
 use chrono::{NaiveDate, NaiveDateTime};
-use std::io::{Error, ErrorKind};
+use std::{
+    fmt::{Display, Formatter},
+    io::{Error, ErrorKind},
+};
 
 /// This trait explains how to encode values to the protocol format
 pub trait ToProtocolValue: std::fmt::Debug {
@@ -256,10 +259,11 @@ impl IntervalValue {
     }
 }
 
-impl ToString for IntervalValue {
-    // https://github.com/postgres/postgres/blob/REL_14_4/src/interfaces/ecpg/pgtypeslib/interval.c#L763
-    fn to_string(&self) -> String {
-        self.as_postgresql_str()
+impl Display for IntervalValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // TODO lift formatter higher, to as_postgresql_str
+        // https://github.com/postgres/postgres/blob/REL_14_4/src/interfaces/ecpg/pgtypeslib/interval.c#L763
+        f.write_str(&self.as_postgresql_str())
     }
 }
 
