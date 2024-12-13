@@ -109,7 +109,7 @@ export class WebSocketConnection {
             this.webSocket = undefined;
           }
         });
-        webSocket.on('message', (msg) => {
+        webSocket.on('message', async (msg) => {
           const buf = new flatbuffers.ByteBuffer(msg);
           const httpMessage = HttpMessage.getRootAsHttpMessage(buf);
           const resolvers = webSocket.sentMessages[httpMessage.messageId()];
@@ -120,7 +120,7 @@ export class WebSocketConnection {
 
           if (getEnv('nativeOrchestrator') && msg.length > 1000) {
             try {
-              const nativeResMsg = parseCubestoreResultMessage(msg);
+              const nativeResMsg = await parseCubestoreResultMessage(msg);
               resolvers.resolve(nativeResMsg);
             } catch (e) {
               resolvers.reject(e);

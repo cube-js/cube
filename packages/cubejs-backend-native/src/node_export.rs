@@ -515,13 +515,20 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
 
 //============ sql orchestrator ===================
 
-fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsBox<CubeStoreResult>> {
+fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let msg = cx.argument::<JsBuffer>(0)?;
-    let msg_data = msg.as_slice(&cx);
-    match CubeStoreResult::new(msg_data) {
-        Ok(result) => Ok(cx.boxed(result)),
-        Err(err) => cx.throw_error(err.to_string()),
-    }
+    let msg_data = msg.as_slice(&cx).to_vec();
+
+    let promise = cx
+        .task(move || CubeStoreResult::new(&msg_data))
+        .promise(move |mut cx, res| {
+            match res {
+                Ok(result) => Ok(cx.boxed(result)),
+                Err(err) => cx.throw_error(err.to_string()),
+            }
+        });
+
+    Ok(promise)
 }
 
 fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
