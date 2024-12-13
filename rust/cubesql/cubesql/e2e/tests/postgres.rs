@@ -83,7 +83,7 @@ impl PostgresIntegrationTestSuite {
             services.wait_processing_loops().await.unwrap();
         });
 
-        sleep(Duration::from_millis(1 * 1000)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let client = PostgresIntegrationTestSuite::create_client(
             format!("host=127.0.0.1 port={} user=test password=test", port)
