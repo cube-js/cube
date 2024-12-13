@@ -9,10 +9,6 @@ use futures::StreamExt;
 use serde_json::Map;
 use tokio::sync::Semaphore;
 
-use std::net::SocketAddr;
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::Arc;
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
@@ -30,6 +26,10 @@ use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use std::net::SocketAddr;
+use std::rc::Rc;
+use std::str::FromStr;
+use std::sync::Arc;
 
 use cubeorchestrator::cubestore_message_parser::CubeStoreResult;
 
@@ -520,11 +520,9 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsProm
 
     let promise = cx
         .task(move || CubeStoreResult::new(&msg_data))
-        .promise(move |mut cx, res| {
-            match res {
-                Ok(result) => Ok(cx.boxed(Arc::new(result))),
-                Err(err) => cx.throw_error(err.to_string()),
-            }
+        .promise(move |mut cx, res| match res {
+            Ok(result) => Ok(cx.boxed(Arc::new(result))),
+            Err(err) => cx.throw_error(err.to_string()),
         });
 
     Ok(promise)
@@ -589,18 +587,16 @@ fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 Err(err) => Err(anyhow::Error::from(err)),
             }
         })
-        .promise(move |mut cx, json_data| {
-            match json_data {
-                Ok(json_data) => {
-                    let js_string = cx.string(json_data);
+        .promise(move |mut cx, json_data| match json_data {
+            Ok(json_data) => {
+                let js_string = cx.string(json_data);
 
-                    let js_result = cx.empty_object();
-                    js_result.set(&mut cx, "result", js_string)?;
+                let js_result = cx.empty_object();
+                js_result.set(&mut cx, "result", js_string)?;
 
-                    Ok(js_result)
-                }
-                Err(err) => cx.throw_error(err.to_string()),
+                Ok(js_result)
             }
+            Err(err) => cx.throw_error(err.to_string()),
         });
 
     Ok(promise)
@@ -620,7 +616,8 @@ fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
                     Err(err) => return Err(anyhow::Error::from(err)),
                 };
 
-            let mut result_data = match serde_json::from_str::<RequestResultData>(&result_data_str) {
+            let mut result_data = match serde_json::from_str::<RequestResultData>(&result_data_str)
+            {
                 Ok(data) => data,
                 Err(err) => return Err(anyhow::Error::from(err)),
             };
@@ -636,21 +633,19 @@ fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 Err(err) => Err(anyhow::Error::from(err)),
             }
         })
-        .promise(move |mut cx, json_string| {
-            match json_string {
-                Ok(json_string) => {
-                    let json_bytes = json_string.as_bytes();
+        .promise(move |mut cx, json_string| match json_string {
+            Ok(json_string) => {
+                let json_bytes = json_string.as_bytes();
 
-                    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-                    {
-                        let buffer = js_buffer.as_mut_slice(&mut cx);
-                        buffer.copy_from_slice(json_bytes);
-                    }
-
-                    Ok(js_buffer)
+                let mut js_buffer = cx.array_buffer(json_bytes.len())?;
+                {
+                    let buffer = js_buffer.as_mut_slice(&mut cx);
+                    buffer.copy_from_slice(json_bytes);
                 }
-                Err(err) => cx.throw_error(err.to_string()),
+
+                Ok(js_buffer)
             }
+            Err(err) => cx.throw_error(err.to_string()),
         });
 
     Ok(promise)
@@ -672,10 +667,7 @@ fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> 
     let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
         .to_vec(&mut cx)?
         .into_iter()
-        .map(|js_value| {
-            js_value
-                .downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx)
-        })
+        .map(|js_value| js_value.downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx))
         .collect::<Result<_, _>>()?;
     let cube_store_results: Vec<Arc<CubeStoreResult>> = cube_store_results_boxed
         .iter()
@@ -697,22 +689,22 @@ fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> 
         .task(move || {
             let transform_requests: Vec<TransformDataRequest> = transform_request_strings
                 .into_iter()
-                .map(|req_str| {
-                    match serde_json::from_str::<TransformDataRequest>(&req_str) {
+                .map(
+                    |req_str| match serde_json::from_str::<TransformDataRequest>(&req_str) {
                         Ok(request) => Ok(request),
                         Err(err) => Err(anyhow::Error::from(err)),
-                    }
-                })
+                    },
+                )
                 .collect::<Result<_, _>>()?;
 
             let mut request_results: Vec<RequestResultData> = request_result_strings
                 .into_iter()
-                .map(|req_str| {
-                    match serde_json::from_str::<RequestResultData>(&req_str) {
+                .map(
+                    |req_str| match serde_json::from_str::<RequestResultData>(&req_str) {
                         Ok(request) => Ok(request),
                         Err(err) => Err(anyhow::Error::from(err)),
-                    }
-                })
+                    },
+                )
                 .collect::<Result<_, _>>()?;
 
             get_final_cubestore_result_array(
@@ -730,21 +722,19 @@ fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> 
                 Err(err) => Err(anyhow::Error::from(err)),
             }
         })
-        .promise(move |mut cx, json_data| {
-            match json_data {
-                Ok(json_data) => {
-                    let json_bytes = json_data.as_bytes();
+        .promise(move |mut cx, json_data| match json_data {
+            Ok(json_data) => {
+                let json_bytes = json_data.as_bytes();
 
-                    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-                    {
-                        let buffer = js_buffer.as_mut_slice(&mut cx);
-                        buffer.copy_from_slice(json_bytes);
-                    }
-
-                    Ok(js_buffer)
+                let mut js_buffer = cx.array_buffer(json_bytes.len())?;
+                {
+                    let buffer = js_buffer.as_mut_slice(&mut cx);
+                    buffer.copy_from_slice(json_bytes);
                 }
-                Err(err) => cx.throw_error(err.to_string()),
+
+                Ok(js_buffer)
             }
+            Err(err) => cx.throw_error(err.to_string()),
         });
 
     Ok(promise)
@@ -766,10 +756,7 @@ fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> 
     let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
         .to_vec(&mut cx)?
         .into_iter()
-        .map(|js_value| {
-            js_value
-                .downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx)
-        })
+        .map(|js_value| js_value.downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx))
         .collect::<Result<_, _>>()?;
     let cube_store_results: Vec<Arc<CubeStoreResult>> = cube_store_results_boxed
         .iter()
@@ -782,41 +769,44 @@ fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> 
         .task(move || {
             let transform_requests: Vec<TransformDataRequest> = transform_request_strings
                 .into_iter()
-                .map(|req_str| {
-                    match serde_json::from_str::<TransformDataRequest>(&req_str) {
+                .map(
+                    |req_str| match serde_json::from_str::<TransformDataRequest>(&req_str) {
                         Ok(request) => Ok(request),
                         Err(err) => Err(anyhow::Error::from(err)),
-                    }
-                })
+                    },
+                )
                 .collect::<Result<_, _>>()?;
 
-            let mut result_data = match serde_json::from_str::<RequestResultDataMulti>(&result_data_str) {
-                Ok(data) => data,
-                Err(err) => return Err(anyhow::Error::from(err)),
-            };
+            let mut result_data =
+                match serde_json::from_str::<RequestResultDataMulti>(&result_data_str) {
+                    Ok(data) => data,
+                    Err(err) => return Err(anyhow::Error::from(err)),
+                };
 
-            get_final_cubestore_result_multi(&transform_requests, &cube_store_results, &mut result_data)?;
+            get_final_cubestore_result_multi(
+                &transform_requests,
+                &cube_store_results,
+                &mut result_data,
+            )?;
 
             match serde_json::to_string(&result_data) {
                 Ok(json) => Ok(json),
                 Err(err) => Err(anyhow::Error::from(err)),
             }
         })
-        .promise(move |mut cx, json_data| {
-            match json_data {
-                Ok(json_data) => {
-                    let json_bytes = json_data.as_bytes();
+        .promise(move |mut cx, json_data| match json_data {
+            Ok(json_data) => {
+                let json_bytes = json_data.as_bytes();
 
-                    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-                    {
-                        let buffer = js_buffer.as_mut_slice(&mut cx);
-                        buffer.copy_from_slice(json_bytes);
-                    }
-
-                    Ok(js_buffer)
+                let mut js_buffer = cx.array_buffer(json_bytes.len())?;
+                {
+                    let buffer = js_buffer.as_mut_slice(&mut cx);
+                    buffer.copy_from_slice(json_bytes);
                 }
-                Err(err) => cx.throw_error(err.to_string()),
+
+                Ok(js_buffer)
             }
+            Err(err) => cx.throw_error(err.to_string()),
         });
 
     Ok(promise)

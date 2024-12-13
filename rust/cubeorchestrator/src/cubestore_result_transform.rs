@@ -10,8 +10,10 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, SecondsFormat};
 use itertools::multizip;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: String, type_: &str) -> String {
