@@ -293,11 +293,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -310,11 +308,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 
@@ -349,11 +345,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -366,11 +360,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 
