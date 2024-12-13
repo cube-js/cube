@@ -1269,7 +1269,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
             |rows| {
                 assert_eq!(rows.len(), 1);
 
-                let columns = rows.get(0).unwrap().columns();
+                let columns = rows.first().unwrap().columns();
                 assert_eq!(
                     columns
                         .into_iter()
