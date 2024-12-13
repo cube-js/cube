@@ -310,7 +310,7 @@ impl BatchWriter {
     }
 }
 
-impl<'a> Serialize for BatchWriter {
+impl Serialize for BatchWriter {
     const CODE: u8 = b'D';
 
     fn serialize(&self) -> Option<Vec<u8>> {
