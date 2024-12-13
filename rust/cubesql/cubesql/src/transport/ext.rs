@@ -319,7 +319,7 @@ impl V1CubeMetaExt for CubeMeta {
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(member_name))
         {
-            return Some(df_data_type_by_column_type(m.get_sql_type()));
+            return Some(m.get_sql_type().to_arrow());
         }
 
         if let Some(m) = self
@@ -327,7 +327,7 @@ impl V1CubeMetaExt for CubeMeta {
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(member_name))
         {
-            return Some(df_data_type_by_column_type(m.get_sql_type()));
+            return Some(m.get_sql_type().to_arrow());
         }
 
         if let Some(_) = self
@@ -335,7 +335,7 @@ impl V1CubeMetaExt for CubeMeta {
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(member_name))
         {
-            return Some(df_data_type_by_column_type(ColumnType::Int8));
+            return Some(ColumnType::Int8.to_arrow());
         }
         None
     }
@@ -371,16 +371,5 @@ impl V1CubeMetaExt for CubeMeta {
             return Some(MemberType::Boolean);
         }
         None
-    }
-}
-
-pub fn df_data_type_by_column_type(column_type: ColumnType) -> DataType {
-    match column_type {
-        ColumnType::Int32 | ColumnType::Int64 | ColumnType::Int8 => DataType::Int64,
-        ColumnType::String => DataType::Utf8,
-        ColumnType::Double => DataType::Float64,
-        ColumnType::Boolean => DataType::Boolean,
-        ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
-        _ => panic!("Unimplemented support for {:?}", column_type),
     }
 }

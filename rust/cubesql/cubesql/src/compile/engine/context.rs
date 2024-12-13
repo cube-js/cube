@@ -2,7 +2,7 @@ use std::{any::Any, collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use datafusion::{
-    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
+    arrow::datatypes::{DataType, Field, Schema, SchemaRef},
     datasource::{self, TableProvider},
     error::DataFusionError,
     execution::context::SessionState as DFSessionState,
@@ -13,7 +13,7 @@ use datafusion::{
 
 use crate::{
     compile::DatabaseProtocolDetails,
-    sql::{ColumnType, SessionManager, SessionState},
+    sql::{SessionManager, SessionState},
     transport::{CubeMeta, MetaContext, V1CubeMetaExt},
     CubeError,
 };
@@ -120,29 +120,7 @@ impl TableProvider for CubeTableProvider {
                 .map(|c| {
                     Field::new(
                         c.get_name(),
-                        match c.get_column_type() {
-                            ColumnType::Date(large) => {
-                                if large {
-                                    DataType::Date64
-                                } else {
-                                    DataType::Date32
-                                }
-                            }
-                            ColumnType::Interval(unit) => DataType::Interval(unit),
-                            ColumnType::String => DataType::Utf8,
-                            ColumnType::VarStr => DataType::Utf8,
-                            ColumnType::Boolean => DataType::Boolean,
-                            ColumnType::Double => DataType::Float64,
-                            ColumnType::Int8 => DataType::Int64,
-                            ColumnType::Int32 => DataType::Int64,
-                            ColumnType::Int64 => DataType::Int64,
-                            ColumnType::Blob => DataType::Utf8,
-                            ColumnType::Decimal(p, s) => DataType::Decimal(p, s),
-                            ColumnType::List(field) => DataType::List(field.clone()),
-                            ColumnType::Timestamp => {
-                                DataType::Timestamp(TimeUnit::Millisecond, None)
-                            }
-                        },
+                        c.get_column_type().to_arrow(),
                         true,
                     )
                 })
