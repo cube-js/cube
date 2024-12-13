@@ -168,8 +168,7 @@ impl QueryRouter {
                 DatabaseProtocol::PostgreSQL,
             ) if object_type == &ast::ObjectType::Table => self.drop_table_to_plan(names).await,
             _ => Err(CompilationError::unsupported(format!(
-                "Unsupported query type: {}",
-                stmt.to_string()
+                "Unsupported query type: {stmt}"
             ))),
         };
 
