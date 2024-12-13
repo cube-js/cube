@@ -3583,7 +3583,7 @@ pub fn create_array_to_string_udf() -> ScalarUDF {
             let join_str = join_strs.value(i);
             let strings = downcast_string_arg!(array, "str", i32);
             let joined_string =
-                itertools::Itertools::intersperse(strings.iter().filter_map(|s| s), join_str)
+                itertools::Itertools::intersperse(strings.iter().flatten(), join_str)
                     .collect::<String>();
             builder.append_value(joined_string)?;
         }
