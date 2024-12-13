@@ -2780,12 +2780,13 @@ impl FilterRules {
                                                     value.to_string()
                                                 }
                                             } else if op == "endsWith" || op == "notEndsWith" {
-                                                if value.starts_with("%") {
-                                                    let without_wildcard = value[1..].to_string();
+                                                if let Some(without_wildcard) =
+                                                    value.strip_prefix("%")
+                                                {
                                                     if without_wildcard.contains("%") {
                                                         continue;
                                                     }
-                                                    without_wildcard
+                                                    without_wildcard.to_string()
                                                 } else {
                                                     value.to_string()
                                                 }
