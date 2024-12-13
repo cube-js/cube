@@ -337,7 +337,7 @@ mod tests {
         let mut buf = BytesMut::new();
         value.to_text(&mut buf).unwrap();
 
-        assert_eq!(&buf.as_ref()[..], expected);
+        assert_eq!(buf.as_ref(), expected);
     }
 
     #[test]
@@ -364,7 +364,7 @@ mod tests {
         let mut buf = BytesMut::new();
         value.to_binary(&mut buf).unwrap();
 
-        assert_eq!(&buf.as_ref()[..], expected);
+        assert_eq!(buf.as_ref(), expected);
     }
 
     #[test]
