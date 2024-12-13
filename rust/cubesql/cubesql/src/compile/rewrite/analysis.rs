@@ -551,7 +551,7 @@ impl LogicalPlanAnalysis {
                         .unwrap();
                     let expr = original_expr(params[2])?;
                     map.push((
-                        Some(format!("{}.{}", cube, field_name.to_string())),
+                        Some(format!("{cube}.{field_name}")),
                         Member::VirtualField {
                             name: field_name.to_string(),
                             cube: cube.to_string(),
