@@ -1442,13 +1442,13 @@ fn date_addsub_month_day_nano(
     let result = if month > 0 && is_add || month < 0 && !is_add {
         t.checked_add_months(Months::new(month as u32))
     } else {
-        t.checked_sub_months(Months::new(month.abs() as u32))
+        t.checked_sub_months(Months::new(month.unsigned_abs()))
     };
 
     let result = if day > 0 && is_add || day < 0 && !is_add {
         result.and_then(|t| t.checked_add_days(Days::new(day as u64)))
     } else {
-        result.and_then(|t| t.checked_sub_days(Days::new(day.abs() as u64)))
+        result.and_then(|t| t.checked_sub_days(Days::new(day.unsigned_abs() as u64)))
     };
 
     let result = result.and_then(|t| {
@@ -1472,7 +1472,7 @@ fn date_addsub_day_time(
     let result = if days > 0 && is_add || days < 0 && !is_add {
         t.checked_add_days(Days::new(days as u64))
     } else {
-        t.checked_sub_days(Days::new(days.abs() as u64))
+        t.checked_sub_days(Days::new(days.unsigned_abs() as u64))
     };
 
     let result = result.and_then(|t| {
