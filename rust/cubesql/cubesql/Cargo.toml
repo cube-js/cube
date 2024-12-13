@@ -90,7 +90,6 @@ harness = false
 # Feel free to remove any rule from here and fix all warnings with it
 # Or to write a comment why rule should stay disabled
 [lints.clippy]
-bool_assert_comparison = "allow"
 bool_comparison = "allow"
 borrowed_box = "allow"
 cast_abs_to_unsigned = "allow"
