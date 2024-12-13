@@ -210,7 +210,7 @@ impl IntervalValue {
 
         if self.hours != 0 || self.mins != 0 || self.secs != 0 || self.usecs != 0 {
             if self.hours < 0 || self.mins < 0 || self.secs < 0 || self.usecs < 0 {
-                res.push_str("-")
+                res.push('-')
             };
 
             res.push_str(&format!(
