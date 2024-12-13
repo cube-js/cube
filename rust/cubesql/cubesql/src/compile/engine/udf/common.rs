@@ -848,6 +848,7 @@ pub fn create_timediff_udf() -> ScalarUDF {
         let right_dt = &args[1];
 
         let left_date = match left_dt.data_type() {
+            // Nanosecond!?
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
                 let arr = downcast_primitive_arg!(left_dt, "left_dt", TimestampNanosecondType);
                 let ts = arr.value(0);

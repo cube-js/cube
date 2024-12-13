@@ -1597,6 +1597,7 @@ impl LanguageToLogicalPlanConverter {
                                         expr_relation(&expr),
                                         // TODO empty schema
                                         &expr_name(&expr)?,
+                                        // Nanosecond!?
                                         DataType::Timestamp(TimeUnit::Nanosecond, None),
                                         true,
                                     ),

@@ -108,6 +108,7 @@ pub fn create_dateadd_udf() -> ScalarUDF {
         )));
     });
 
+    // Nanosecond!?
     let return_type: ReturnTypeFunction =
         Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
 
