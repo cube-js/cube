@@ -2237,10 +2237,7 @@ pub fn create_pg_get_constraintdef_udf() -> ScalarUDF {
         let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
         let result = oids_arr
             .iter()
-            .map(|oid| match oid {
-                Some(_oid) => Some("PRIMARY KEY (oid)".to_string()),
-                _ => None,
-            })
+            .map(|oid| oid.map(|_oid| "PRIMARY KEY (oid)".to_string()))
             .collect::<StringArray>();
 
         Ok(Arc::new(result))
