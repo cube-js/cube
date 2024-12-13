@@ -1418,7 +1418,7 @@ fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<Naiv
     }
     debug_assert!(0 <= month);
     year += month / 12;
-    month = month % 12;
+    month %= 12;
 
     match change_ym(t, year, 1 + month as u32) {
         Some(t) => return Ok(t),
