@@ -1612,7 +1612,7 @@ class ApiGateway {
    * result object.
    * @internal
    */
-  private getResultInternal(
+  private async getResultInternal(
     context: RequestContext,
     queryType: QueryType,
     normalizedQuery: NormalizedQuery,
@@ -1649,13 +1649,14 @@ class ApiGateway {
     // We postpone data transformation until the last minute
     // in case when all responses are native - we process them in native part
     const dataCb: TransformDataResponseCb = response.data.isNative ?
-      () => JSON.parse(
-        transformDataNative(
+      async () => {
+        const jsonData = await transformDataNative(
           JSON.stringify(transformDataParams), response.data.getNativeRef()
-        ).result
-      ) as TransformDataResponse
+        );
+        return JSON.parse(jsonData.result) as TransformDataResponse;
+      }
       :
-      () => transformData({
+      async () => transformData({
         ...transformDataParams,
         data: response.data,
       });
@@ -1866,20 +1867,20 @@ class ApiGateway {
           };
           const resultDataJson = JSON.stringify(responseDataObj);
 
-          res(getFinalCubestoreResultMulti(transformDataJson, rawDataRef, resultDataJson));
+          res(await getFinalCubestoreResultMulti(transformDataJson, rawDataRef, resultDataJson));
         } else {
           // if we have mixed query results (there are js and native)
           // we prepare results separately: on js and native sides
           // and serve final response from JS side
           res({
             queryType,
-            results: results.map(r => {
-              const data = r.dataCb();
+            results: await Promise.all(results.map(async (r) => {
+              const data = await r.dataCb();
               return {
                 ...cleanupResult(r),
                 data,
               };
-            }),
+            })),
             pivotQuery: getPivotQuery(queryType, normalizedQueries),
             slowQuery
           });
@@ -1890,9 +1891,9 @@ class ApiGateway {
         const transformDataJson = JSON.stringify(r.transformDataParams);
         const rawDataRef = r.rawData.getNativeRef();
         const resultDataJson = JSON.stringify(cleanupResult(r));
-        res(getFinalCubestoreResult(transformDataJson, rawDataRef, resultDataJson));
+        res(await getFinalCubestoreResult(transformDataJson, rawDataRef, resultDataJson));
       } else {
-        const data = results[0].dataCb();
+        const data = await results[0].dataCb();
         res({
           ...cleanupResult(results[0]),
           data,
@@ -2045,19 +2046,19 @@ class ApiGateway {
               [[], [], []]
             );
 
-            res(getFinalCubestoreResultArray(transformDataJson, rawDataRef, resultDataJson));
+            res(await getFinalCubestoreResultArray(transformDataJson, rawDataRef, resultDataJson));
           } else {
             // if we have mixed query results (there are js and native)
             // we prepare results separately: on js and native sides
             // and serve final response from JS side
             res({
-              results: results.map(r => {
-                const data = r.dataCb();
+              results: await Promise.all(results.map(async (r) => {
+                const data = await r.dataCb();
                 return {
                   ...cleanupResult(r),
                   data,
                 };
-              }),
+              })),
             });
           }
         } else {
