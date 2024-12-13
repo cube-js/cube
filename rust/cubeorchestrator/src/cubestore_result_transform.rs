@@ -11,6 +11,7 @@ use anyhow::{bail, Context, Result};
 use chrono::{DateTime, SecondsFormat};
 use itertools::multizip;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: String, type_: &str) -> String {
@@ -438,7 +439,7 @@ pub fn get_final_cubestore_result(
 
 pub fn get_final_cubestore_result_array(
     transform_requests: &[TransformDataRequest],
-    cube_store_results: &[&CubeStoreResult],
+    cube_store_results: &[Arc<CubeStoreResult>],
     result_data: &mut [RequestResultData],
 ) -> Result<()> {
     for (transform_data, cube_store_result, result) in multizip((
@@ -454,7 +455,7 @@ pub fn get_final_cubestore_result_array(
 
 pub fn get_final_cubestore_result_multi(
     request_data: &[TransformDataRequest],
-    cube_store_result: &[&CubeStoreResult],
+    cube_store_result: &[Arc<CubeStoreResult>],
     result_data: &mut RequestResultDataMulti,
 ) -> Result<()> {
     for (transform_data, cube_store_result, result) in multizip((

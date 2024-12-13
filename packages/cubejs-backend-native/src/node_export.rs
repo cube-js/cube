@@ -13,7 +13,6 @@ use std::net::SocketAddr;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
-
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
@@ -523,7 +522,7 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsProm
         .task(move || CubeStoreResult::new(&msg_data))
         .promise(move |mut cx, res| {
             match res {
-                Ok(result) => Ok(cx.boxed(result)),
+                Ok(result) => Ok(cx.boxed(Arc::new(result))),
                 Err(err) => cx.throw_error(err.to_string()),
             }
         });
@@ -532,7 +531,7 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsProm
 }
 
 fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
-    let result = cx.argument::<JsBox<CubeStoreResult>>(0)?;
+    let result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(0)?;
 
     let js_array = cx.execute_scoped(|mut cx| {
         let js_array = JsArray::new(&mut cx, result.rows.len());
@@ -557,207 +556,270 @@ fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     Ok(js_array.upcast())
 }
 
-fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsObject> {
+fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let json_str = cx.argument::<JsString>(0)?.value(&mut cx);
-    let request_data = match serde_json::from_str::<TransformDataRequest>(&json_str) {
-        Ok(data) => data,
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
 
-    let cube_store_result = cx.argument::<JsBox<CubeStoreResult>>(1)?;
+    let cube_store_result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(1)?;
+    let cube_store_result = Arc::clone(&cube_store_result);
 
-    let alias_to_member_name_map = &request_data.alias_to_member_name_map;
-    let annotation = &request_data.annotation;
-    let query = &request_data.query;
-    let query_type = &request_data.query_type.unwrap_or_default();
-    let res_type = &request_data.res_type;
+    let promise = cx
+        .task(move || {
+            let request_data = match serde_json::from_str::<TransformDataRequest>(&json_str) {
+                Ok(data) => data,
+                Err(err) => return Err(anyhow::Error::from(err)),
+            };
 
-    let transformed = match transform_data(
-        alias_to_member_name_map,
-        annotation,
-        &cube_store_result,
-        query,
-        query_type,
-        res_type.clone(),
-    ) {
-        Ok(data) => data,
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
+            let alias_to_member_name_map = &request_data.alias_to_member_name_map;
+            let annotation = &request_data.annotation;
+            let query = &request_data.query;
+            let query_type = &request_data.query_type.unwrap_or_default();
+            let res_type = &request_data.res_type;
 
-    let json_data = match serde_json::to_string(&transformed) {
-        Ok(data) => data,
-        Err(e) => return cx.throw_error(format!("Serialization error: {}", e)),
-    };
+            let transformed = transform_data(
+                alias_to_member_name_map,
+                annotation,
+                &cube_store_result,
+                query,
+                query_type,
+                res_type.clone(),
+            )?;
 
-    let js_string = cx.string(json_data);
+            match serde_json::to_string(&transformed) {
+                Ok(json) => Ok(json),
+                Err(err) => Err(anyhow::Error::from(err)),
+            }
+        })
+        .promise(move |mut cx, json_data| {
+            match json_data {
+                Ok(json_data) => {
+                    let js_string = cx.string(json_data);
 
-    let js_result = cx.empty_object();
-    js_result.set(&mut cx, "result", js_string)?;
+                    let js_result = cx.empty_object();
+                    js_result.set(&mut cx, "result", js_string)?;
 
-    Ok(js_result)
+                    Ok(js_result)
+                }
+                Err(err) => cx.throw_error(err.to_string()),
+            }
+        });
+
+    Ok(promise)
 }
 
-fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsArrayBuffer> {
+fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transform_data_str = cx.argument::<JsString>(0)?.value(&mut cx);
-    let transform_request_data =
-        match serde_json::from_str::<TransformDataRequest>(&transform_data_str) {
-            Ok(data) => data,
-            Err(err) => return cx.throw_error(err.to_string()),
-        };
-    let cube_store_result = cx.argument::<JsBox<CubeStoreResult>>(1)?;
+    let cube_store_result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(1)?;
+    let cube_store_result = Arc::clone(&cube_store_result);
     let result_data_str = cx.argument::<JsString>(2)?.value(&mut cx);
-    let mut result_data = match serde_json::from_str::<RequestResultData>(&result_data_str) {
-        Ok(data) => data,
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
 
-    if let Err(err) = get_final_cubestore_result(
-        &transform_request_data,
-        &cube_store_result,
-        &mut result_data,
-    ) {
-        return cx.throw_error(err.to_string());
-    }
+    let promise = cx
+        .task(move || {
+            let transform_request_data =
+                match serde_json::from_str::<TransformDataRequest>(&transform_data_str) {
+                    Ok(data) => data,
+                    Err(err) => return Err(anyhow::Error::from(err)),
+                };
 
-    let json_data = match serde_json::to_string(&result_data) {
-        Ok(data) => data,
-        Err(e) => return cx.throw_error(format!("Serialization error: {}", e)),
-    };
-    let json_bytes = json_data.as_bytes();
+            let mut result_data = match serde_json::from_str::<RequestResultData>(&result_data_str) {
+                Ok(data) => data,
+                Err(err) => return Err(anyhow::Error::from(err)),
+            };
 
-    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-    {
-        let buffer = js_buffer.as_mut_slice(&mut cx);
-        buffer.copy_from_slice(json_bytes);
-    }
+            get_final_cubestore_result(
+                &transform_request_data,
+                &cube_store_result,
+                &mut result_data,
+            )?;
 
-    Ok(js_buffer)
+            match serde_json::to_string(&result_data) {
+                Ok(json) => Ok(json),
+                Err(err) => Err(anyhow::Error::from(err)),
+            }
+        })
+        .promise(move |mut cx, json_string| {
+            match json_string {
+                Ok(json_string) => {
+                    let json_bytes = json_string.as_bytes();
+
+                    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
+                    {
+                        let buffer = js_buffer.as_mut_slice(&mut cx);
+                        buffer.copy_from_slice(json_bytes);
+                    }
+
+                    Ok(js_buffer)
+                }
+                Err(err) => cx.throw_error(err.to_string()),
+            }
+        });
+
+    Ok(promise)
 }
 
-fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsArrayBuffer> {
+fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transform_data_array = cx.argument::<JsArray>(0)?;
-    let transform_requests: Vec<TransformDataRequest> = transform_data_array
+    let transform_request_strings: Vec<String> = transform_data_array
         .to_vec(&mut cx)?
         .into_iter()
         .map(|js_value| {
-            let js_string = js_value
-                .downcast_or_throw::<JsString, _>(&mut cx)?
-                .value(&mut cx);
-
-            match serde_json::from_str::<TransformDataRequest>(&js_string) {
-                Ok(request) => Ok(request),
-                Err(err) => cx.throw_error(err.to_string()),
-            }
+            js_value
+                .downcast_or_throw::<JsString, _>(&mut cx)
+                .map(|js_string| js_string.value(&mut cx))
         })
         .collect::<Result<_, _>>()?;
 
     let cube_store_array = cx.argument::<JsArray>(1)?;
-    let cube_store_results_boxed: Vec<Handle<JsBox<CubeStoreResult>>> = cube_store_array
+    let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
         .to_vec(&mut cx)?
         .into_iter()
-        .map(|js_value| js_value.downcast_or_throw::<JsBox<CubeStoreResult>, _>(&mut cx))
+        .map(|js_value| {
+            js_value
+                .downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx)
+        })
         .collect::<Result<_, _>>()?;
-    let cube_store_results: Vec<&CubeStoreResult> = cube_store_results_boxed
+    let cube_store_results: Vec<Arc<CubeStoreResult>> = cube_store_results_boxed
         .iter()
-        .map(|handle| &***handle)
+        .map(|handle| (**handle).clone())
         .collect();
 
     let results_data_array = cx.argument::<JsArray>(2)?;
-    let mut request_results: Vec<RequestResultData> = results_data_array
+    let request_result_strings: Vec<String> = results_data_array
         .to_vec(&mut cx)?
         .into_iter()
         .map(|js_value| {
-            let js_string = js_value
-                .downcast_or_throw::<JsString, _>(&mut cx)?
-                .value(&mut cx);
-
-            match serde_json::from_str::<RequestResultData>(&js_string) {
-                Ok(request) => Ok(request),
-                Err(err) => cx.throw_error(err.to_string()),
-            }
+            js_value
+                .downcast_or_throw::<JsString, _>(&mut cx)
+                .map(|js_string| js_string.value(&mut cx))
         })
         .collect::<Result<_, _>>()?;
 
-    if let Err(err) = get_final_cubestore_result_array(
-        &transform_requests,
-        &cube_store_results,
-        &mut request_results,
-    ) {
-        return cx.throw_error(err.to_string());
-    }
+    let promise = cx
+        .task(move || {
+            let transform_requests: Vec<TransformDataRequest> = transform_request_strings
+                .into_iter()
+                .map(|req_str| {
+                    match serde_json::from_str::<TransformDataRequest>(&req_str) {
+                        Ok(request) => Ok(request),
+                        Err(err) => Err(anyhow::Error::from(err)),
+                    }
+                })
+                .collect::<Result<_, _>>()?;
 
-    let final_obj = RequestResultArray {
-        results: request_results,
-    };
+            let mut request_results: Vec<RequestResultData> = request_result_strings
+                .into_iter()
+                .map(|req_str| {
+                    match serde_json::from_str::<RequestResultData>(&req_str) {
+                        Ok(request) => Ok(request),
+                        Err(err) => Err(anyhow::Error::from(err)),
+                    }
+                })
+                .collect::<Result<_, _>>()?;
 
-    let json_data = match serde_json::to_string(&final_obj) {
-        Ok(data) => data,
-        Err(e) => return cx.throw_error(format!("Serialization error: {}", e)),
-    };
-    let json_bytes = json_data.as_bytes();
+            get_final_cubestore_result_array(
+                &transform_requests,
+                &cube_store_results,
+                &mut request_results,
+            )?;
 
-    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-    {
-        let buffer = js_buffer.as_mut_slice(&mut cx);
-        buffer.copy_from_slice(json_bytes);
-    }
+            let final_obj = RequestResultArray {
+                results: request_results,
+            };
 
-    Ok(js_buffer)
+            match serde_json::to_string(&final_obj) {
+                Ok(json) => Ok(json),
+                Err(err) => Err(anyhow::Error::from(err)),
+            }
+        })
+        .promise(move |mut cx, json_data| {
+            match json_data {
+                Ok(json_data) => {
+                    let json_bytes = json_data.as_bytes();
+
+                    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
+                    {
+                        let buffer = js_buffer.as_mut_slice(&mut cx);
+                        buffer.copy_from_slice(json_bytes);
+                    }
+
+                    Ok(js_buffer)
+                }
+                Err(err) => cx.throw_error(err.to_string()),
+            }
+        });
+
+    Ok(promise)
 }
 
-fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsArrayBuffer> {
+fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transform_data_array = cx.argument::<JsArray>(0)?;
-    let transform_requests: Vec<TransformDataRequest> = transform_data_array
+    let transform_request_strings: Vec<String> = transform_data_array
         .to_vec(&mut cx)?
         .into_iter()
         .map(|js_value| {
-            let js_string = js_value
-                .downcast_or_throw::<JsString, _>(&mut cx)?
-                .value(&mut cx);
-
-            match serde_json::from_str::<TransformDataRequest>(&js_string) {
-                Ok(request) => Ok(request),
-                Err(err) => cx.throw_error(err.to_string()),
-            }
+            js_value
+                .downcast_or_throw::<JsString, _>(&mut cx)
+                .map(|js_string| js_string.value(&mut cx))
         })
         .collect::<Result<_, _>>()?;
 
     let cube_store_array = cx.argument::<JsArray>(1)?;
-    let cube_store_results_boxed: Vec<Handle<JsBox<CubeStoreResult>>> = cube_store_array
+    let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
         .to_vec(&mut cx)?
         .into_iter()
-        .map(|js_value| js_value.downcast_or_throw::<JsBox<CubeStoreResult>, _>(&mut cx))
+        .map(|js_value| {
+            js_value
+                .downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx)
+        })
         .collect::<Result<_, _>>()?;
-    let cube_store_results: Vec<&CubeStoreResult> = cube_store_results_boxed
+    let cube_store_results: Vec<Arc<CubeStoreResult>> = cube_store_results_boxed
         .iter()
-        .map(|handle| &***handle)
+        .map(|handle| (**handle).clone())
         .collect();
 
     let result_data_str = cx.argument::<JsString>(2)?.value(&mut cx);
-    let mut result_data = match serde_json::from_str::<RequestResultDataMulti>(&result_data_str) {
-        Ok(data) => data,
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
 
-    if let Err(err) =
-        get_final_cubestore_result_multi(&transform_requests, &cube_store_results, &mut result_data)
-    {
-        return cx.throw_error(err.to_string());
-    }
+    let promise = cx
+        .task(move || {
+            let transform_requests: Vec<TransformDataRequest> = transform_request_strings
+                .into_iter()
+                .map(|req_str| {
+                    match serde_json::from_str::<TransformDataRequest>(&req_str) {
+                        Ok(request) => Ok(request),
+                        Err(err) => Err(anyhow::Error::from(err)),
+                    }
+                })
+                .collect::<Result<_, _>>()?;
 
-    let json_data = match serde_json::to_string(&result_data) {
-        Ok(data) => data,
-        Err(e) => return cx.throw_error(format!("Serialization error: {}", e)),
-    };
-    let json_bytes = json_data.as_bytes();
+            let mut result_data = match serde_json::from_str::<RequestResultDataMulti>(&result_data_str) {
+                Ok(data) => data,
+                Err(err) => return Err(anyhow::Error::from(err)),
+            };
 
-    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-    {
-        let buffer = js_buffer.as_mut_slice(&mut cx);
-        buffer.copy_from_slice(json_bytes);
-    }
+            get_final_cubestore_result_multi(&transform_requests, &cube_store_results, &mut result_data)?;
 
-    Ok(js_buffer)
+            match serde_json::to_string(&result_data) {
+                Ok(json) => Ok(json),
+                Err(err) => Err(anyhow::Error::from(err)),
+            }
+        })
+        .promise(move |mut cx, json_data| {
+            match json_data {
+                Ok(json_data) => {
+                    let json_bytes = json_data.as_bytes();
+
+                    let mut js_buffer = cx.array_buffer(json_bytes.len())?;
+                    {
+                        let buffer = js_buffer.as_mut_slice(&mut cx);
+                        buffer.copy_from_slice(json_bytes);
+                    }
+
+                    Ok(js_buffer)
+                }
+                Err(err) => cx.throw_error(err.to_string()),
+            }
+        });
+
+    Ok(promise)
 }
 
 pub fn register_module_exports<C: NodeConfiguration + 'static>(

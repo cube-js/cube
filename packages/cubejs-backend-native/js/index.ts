@@ -383,25 +383,25 @@ export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => 
   return native.getCubestoreResult(ref);
 };
 
-export const transformData = (transformDataJson: string, rows: any): TransformDataResponseNative => {
+export const transformData = (transformDataJson: string, rows: any): Promise<TransformDataResponseNative> => {
   const native = loadNative();
 
   return native.transformQueryData(transformDataJson, rows);
 };
 
-export const getFinalCubestoreResult = (transformDataJson: string, rows: any, resultData: string): ArrayBuffer => {
+export const getFinalCubestoreResult = (transformDataJson: string, rows: any, resultData: string): Promise<ArrayBuffer> => {
   const native = loadNative();
 
   return native.getFinalCubestoreResult(transformDataJson, rows, resultData);
 };
 
-export const getFinalCubestoreResultArray = (transformDataJson: string[], rows: any[], resultDataJson: string[]): ArrayBuffer => {
+export const getFinalCubestoreResultArray = (transformDataJson: string[], rows: any[], resultDataJson: string[]): Promise<ArrayBuffer> => {
   const native = loadNative();
 
   return native.getFinalCubestoreResultArray(transformDataJson, rows, resultDataJson);
 };
 
-export const getFinalCubestoreResultMulti = (transformDataJson: string[], rows: any[], responseData: string): ArrayBuffer => {
+export const getFinalCubestoreResultMulti = (transformDataJson: string[], rows: any[], responseData: string): Promise<ArrayBuffer> => {
   const native = loadNative();
 
   return native.getFinalCubestoreResultMulti(transformDataJson, rows, responseData);

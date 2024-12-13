@@ -34,4 +34,4 @@ export type TransformDataRequest = {
   resType?: ResultType
 };
 
-export type TransformDataResponseCb = () => TransformDataResponse;
+export type TransformDataResponseCb = () => Promise<TransformDataResponse>;
