@@ -1645,17 +1645,10 @@ impl AsyncPostgresShim {
             Statement::Close { cursor } => {
                 let plan = match cursor {
                     CloseCursor::All => {
-                        let mut portals_to_remove = Vec::new();
-
-                        for (key, _) in &self.cursors {
-                            portals_to_remove.push(key.clone());
+                        for key in self.cursors.keys() {
+                            self.portals.remove(key);
                         }
-
-                        self.cursors = HashMap::new();
-
-                        for key in portals_to_remove {
-                            self.portals.remove(&key);
-                        }
+                        self.cursors.clear();
 
                         Ok(QueryPlan::MetaOk(
                             StatusFlags::empty(),
