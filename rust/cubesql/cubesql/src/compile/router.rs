@@ -513,7 +513,7 @@ impl QueryRouter {
     async fn select_into_to_plan(
         &self,
         into: &ast::SelectInto,
-        query: &Box<ast::Query>,
+        query: &ast::Query,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -531,7 +531,7 @@ impl QueryRouter {
                 "query is unexpectedly not SELECT".to_string(),
             ));
         }
-        let new_stmt = ast::Statement::Query(new_query);
+        let new_stmt = ast::Statement::Query(Box::new(new_query));
         self.create_table_to_plan(&into.name, &new_stmt, qtrace, span_id)
             .await
     }
