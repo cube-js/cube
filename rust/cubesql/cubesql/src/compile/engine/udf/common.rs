@@ -1564,10 +1564,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
 
             let res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Error evaluating str_to_date('{}', '{}'): {}",
-                    timestamp,
-                    format,
-                    e.to_string()
+                    "Error evaluating str_to_date('{timestamp}', '{format}'): {e}"
                 ))
             })?;
 
