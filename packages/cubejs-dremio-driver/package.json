@@ -13,6 +13,11 @@
   },
   "main": "driver/DremioDriver.js",
   "scripts": {
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "test": "yarn integration",
+    "integration": "npm run integration:dremio",
+    "integration:dremio": "jest --verbose dist/test",
     "lint": "eslint driver/*.js",
     "lint:fix": "eslint driver/*.js"
   },
@@ -26,6 +31,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^1.0.0",
+    "@cubejs-backend/testing-shared": "1.1.9",
     "jest": "^27"
   },
   "license": "Apache-2.0",
@@ -33,7 +39,10 @@
     "access": "public"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": [
+      "./test/test-env.js"
+    ]
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
