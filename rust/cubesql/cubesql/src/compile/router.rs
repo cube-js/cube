@@ -348,7 +348,7 @@ impl QueryRouter {
             }
             DatabaseProtocol::MySQL => {
                 for key_value in key_values.iter() {
-                    if key_value.key.value.to_lowercase() == "autocommit".to_string() {
+                    if key_value.key.value.to_lowercase() == "autocommit" {
                         flags |= StatusFlags::AUTOCOMMIT;
 
                         break;

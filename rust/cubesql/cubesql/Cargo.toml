@@ -91,7 +91,6 @@ harness = false
 # Or to write a comment why rule should stay disabled
 [lints.clippy]
 clone_on_copy = "allow"
-cmp_owned = "allow"
 collapsible_if = "allow"
 collapsible_match = "allow"
 collapsible_else_if = "allow"
