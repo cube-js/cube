@@ -365,10 +365,15 @@ impl Remapper {
     }
 
     fn insert_new_alias(&mut self, original_column: &Column, new_alias: &String) {
+        let target_column = Column {
+            name: new_alias.clone(),
+            relation: self.from_alias.clone(),
+        };
+
         self.used_targets.insert(new_alias.clone());
         self.remapping.insert(
             Column::from_name(&original_column.name),
-            Column::from_name(new_alias),
+            target_column.clone(),
         );
         if let Some(from_alias) = &self.from_alias {
             self.remapping.insert(
@@ -376,20 +381,12 @@ impl Remapper {
                     name: original_column.name.clone(),
                     relation: Some(from_alias.clone()),
                 },
-                Column {
-                    name: new_alias.clone(),
-                    relation: Some(from_alias.clone()),
-                },
+                target_column.clone(),
             );
             if let Some(original_relation) = &original_column.relation {
                 if original_relation != from_alias {
-                    self.remapping.insert(
-                        original_column.clone(),
-                        Column {
-                            name: new_alias.clone(),
-                            relation: Some(from_alias.clone()),
-                        },
-                    );
+                    self.remapping
+                        .insert(original_column.clone(), target_column);
                 }
             }
         }

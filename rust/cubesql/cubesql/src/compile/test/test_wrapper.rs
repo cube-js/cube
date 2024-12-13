@@ -807,7 +807,7 @@ async fn test_case_wrapper_alias_with_order() {
         .wrapped_sql
         .unwrap()
         .sql
-        .contains("ORDER BY \"case_when_a_cust\""));
+        .contains("ORDER BY \"a\".\"case_when_a_cust\""));
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
     println!(
@@ -935,7 +935,7 @@ async fn test_case_wrapper_ungrouped_sorted_aliased() {
         .unwrap()
         .sql
         // TODO test without depend on column name
-        .contains("ORDER BY \"case_when"));
+        .contains("ORDER BY \"a\".\"case_when"));
 }
 
 #[tokio::test]
