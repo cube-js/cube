@@ -486,7 +486,7 @@ describe('SQL Generation', () => {
       }]
     });
 
-    console.log(query.buildSqlAndParamsTest());
+    console.log(query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));

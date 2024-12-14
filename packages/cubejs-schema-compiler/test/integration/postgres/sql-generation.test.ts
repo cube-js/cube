@@ -561,7 +561,7 @@ describe('SQL Generation', () => {
       }]
     });
 
-    return dbRunner.testQuery(query.buildSqlAndParamsTest()).then(res => {
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       expect(res).toEqual(
         [
           {
@@ -976,7 +976,7 @@ describe('SQL Generation', () => {
 
     console.log(query.buildSqlAndParams());
 
-    return dbRunner.testQuery(query.buildSqlAndParamsTest()).then(res => {
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [{ visitor_checkins__revenue_per_checkin: '50' }]
