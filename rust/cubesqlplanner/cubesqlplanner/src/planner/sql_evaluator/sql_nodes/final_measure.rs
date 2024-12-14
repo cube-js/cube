@@ -40,7 +40,11 @@ impl SqlNode for FinalMeasureSqlNode {
                 if ev.is_calculated() {
                     input
                 } else {
-                    let measure_type = ev.measure_type();
+                    let measure_type = if ev.measure_type() == "runningTotal" {
+                        "sum"
+                    } else {
+                        &ev.measure_type()
+                    };
                     format!("{}({})", measure_type, input)
                 }
             }

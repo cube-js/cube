@@ -38,4 +38,9 @@ pub trait BaseTools {
     fn filter_group_function(&self) -> Result<Rc<dyn FilterGroup>, CubeError>;
     fn timestamp_precision(&self) -> Result<u32, CubeError>;
     fn in_db_time_zone(&self, date: String) -> Result<String, CubeError>;
+    fn generate_time_series(
+        &self,
+        granularity: String,
+        date_range: Vec<String>,
+    ) -> Result<Vec<Vec<String>>, CubeError>;
 }

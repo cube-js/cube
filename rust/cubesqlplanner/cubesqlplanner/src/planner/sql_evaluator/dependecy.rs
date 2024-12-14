@@ -5,6 +5,7 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct StructDependency {
     pub sql_fn: Option<Rc<EvaluationNode>>,
     pub to_string_fn: Option<Rc<EvaluationNode>>,
@@ -25,12 +26,14 @@ impl StructDependency {
     }
 }
 
+#[derive(Clone)]
 pub enum ContextSymbolDep {
     SecurityContext,
     FilterParams,
     FilterGroup,
 }
 
+#[derive(Clone)]
 pub enum Dependency {
     SingleDependency(Rc<EvaluationNode>),
     StructDependency(StructDependency),

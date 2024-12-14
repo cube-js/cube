@@ -4,7 +4,7 @@ use super::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDi
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::sql_evaluator::collectors::{
-    collect_multiplied_measures, has_multi_stage_members,
+    collect_multiplied_measures, has_cumulative_members, has_multi_stage_members,
 };
 use crate::planner::sql_evaluator::EvaluationNode;
 use cubenativeutils::CubeError;
@@ -67,6 +67,7 @@ pub struct QueryProperties {
     row_limit: Option<usize>,
     offset: Option<usize>,
     query_tools: Rc<QueryTools>,
+    ignore_cumulative: bool,
 }
 
 impl QueryProperties {
@@ -172,6 +173,7 @@ impl QueryProperties {
             row_limit,
             offset,
             query_tools,
+            ignore_cumulative: false,
         }))
     }
 
@@ -186,6 +188,7 @@ impl QueryProperties {
         order_by: Vec<OrderByItem>,
         row_limit: Option<usize>,
         offset: Option<usize>,
+        ignore_cumulative: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -204,6 +207,7 @@ impl QueryProperties {
             row_limit,
             offset,
             query_tools,
+            ignore_cumulative,
         }))
     }
 
@@ -386,6 +390,15 @@ impl QueryProperties {
         Ok(true)
     }
 
+    pub fn should_use_time_series(&self) -> Result<bool, CubeError> {
+        for member in self.all_members(false) {
+            if has_cumulative_members(&member.member_evaluator())? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.measures();
@@ -404,7 +417,7 @@ impl QueryProperties {
         &self,
         symbol: &Rc<EvaluationNode>,
     ) -> Result<SymbolAggregateType, CubeError> {
-        let symbol_type = if has_multi_stage_members(symbol)? {
+        let symbol_type = if has_multi_stage_members(symbol, self.ignore_cumulative)? {
             SymbolAggregateType::MultiStage
         } else if let Some(multiple) =
             collect_multiplied_measures(self.query_tools.clone(), symbol)?
