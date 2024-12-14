@@ -1,7 +1,7 @@
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use cubenativeutils::CubeError;
 use minijinja::context;
-use std::{ptr::null, rc::Rc};
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct FilterTemplates {
@@ -209,7 +209,7 @@ impl FilterTemplates {
         self.render.render_template(
             &"expressions/ilike",
             context! {
-                expr => column.clone(),
+                expr => column,
                 negated => not,
                 pattern => pattern
             },

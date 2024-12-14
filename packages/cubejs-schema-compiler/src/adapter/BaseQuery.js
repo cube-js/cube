@@ -605,34 +605,9 @@ export class BaseQuery {
     }
   }
 
-  buildSqlAndParamsTest(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-      if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
-      }
-    }
-    const js_res = this.compilers.compiler.withQuery(
-      this,
-      () => this.cacheValue(
-        ['buildSqlAndParams', exportAnnotatedSql],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql(),
-          exportAnnotatedSql,
-          this.shouldReuseParams
-        ),
-        { cache: this.queryCache }
-      )
-    );
-    console.log('js result: ', js_res[0]);
-    const rust = this.buildSqlAndParamsRust(exportAnnotatedSql);
-    console.log('rust result: ', rust[0]);
-    return js_res;
-  }
-
   buildSqlAndParamsRust(exportAnnotatedSql) {
-
     const order = this.options.order && R.pipe(
-      R.map((hash) => (!hash || !hash.id) ? null : hash),
+      R.map((hash) => ((!hash || !hash.id) ? null : hash)),
       R.reject(R.isNil),
     )(this.options.order);
 
@@ -644,7 +619,7 @@ export class BaseQuery {
       joinRoot: this.join.root,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
-      order: order,
+      order,
       filters: this.options.filters,
       limit: this.options.limit ? this.options.limit.toString() : null,
       rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
@@ -847,7 +822,6 @@ export class BaseQuery {
     } = this.fullKeyQueryAggregateMeasures();
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length && !multiStageMembers.length) {
-    console.log("!!!!! LLLOOOO!!!!");
       return this.simpleQuery();
     }
 
@@ -1060,8 +1034,6 @@ export class BaseQuery {
     const measureToHierarchy = this.collectRootMeasureToHieararchy(context);
     const allMemberChildren = this.collectAllMemberChildren(context);
     const memberToIsMultiStage = this.collectAllMultiStageMembers(allMemberChildren);
-
-    console.log("!!! measure to her ", measureToHierarchy);
 
     const hasMultiStageMembers = (m) => {
       if (memberToIsMultiStage[m]) {

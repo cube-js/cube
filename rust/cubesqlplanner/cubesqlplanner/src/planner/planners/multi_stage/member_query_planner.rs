@@ -3,21 +3,20 @@ use super::{
     MultiStageQueryDescription, RollingWindowDescription,
 };
 use crate::plan::{
-    Cte, Expr, FilterGroup, FilterItem, From, JoinBuilder, JoinCondition, MemberExpression,
-    OrderBy, QueryPlan, Schema, SelectBuilder, TimeSeries,
+    Cte, Expr, From, JoinBuilder, JoinCondition, MemberExpression, OrderBy, QualifiedColumnName,
+    QueryPlan, Schema, SelectBuilder, TimeSeries,
 };
 use crate::planner::planners::{
     FullKeyAggregateQueryPlanner, MultipliedMeasuresQueryPlanner, OrderPlanner, SimpleQueryPlanner,
 };
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::QueryProperties;
-use crate::planner::{
-    BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension, VisitorContext,
-};
+use crate::planner::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
@@ -70,12 +69,12 @@ impl MultiStageMemberQueryPlanner {
             .query_tools
             .base_tools()
             .generate_time_series(granularity, date_range.clone())?;
-        let time_seira = TimeSeries {
-            time_dimension_name: time_dimension.full_name(),
-            from_date: Some(from_date),
-            to_date: Some(to_date),
+        let time_seira = TimeSeries::new(
+            time_dimension.full_name(),
+            Some(from_date),
+            Some(to_date),
             seria,
-        };
+        );
         let query_plan = Rc::new(QueryPlan::TimeSeries(Rc::new(time_seira)));
         Ok(Rc::new(Cte::new(query_plan, format!("time_series"))))
     }
@@ -87,6 +86,7 @@ impl MultiStageMemberQueryPlanner {
         cte_schemas: &HashMap<String, Rc<Schema>>,
     ) -> Result<Rc<Cte>, CubeError> {
         let inputs = self.input_cte_aliases();
+        assert!(inputs.len() == 2);
         let dimensions = self.all_dimensions();
 
         let root_alias = format!("time_series");
@@ -98,60 +98,72 @@ impl MultiStageMemberQueryPlanner {
             Some(root_alias.clone()),
         );
 
-        for (i, input) in inputs.iter().skip(1).enumerate() {
-            let alias = format!("rolling_{}", i + 1);
-            let on = JoinCondition::new_rolling_join(
-                alias.clone(),
-                root_alias.clone(),
-                rolling_window_desc.trailing.clone(),
-                rolling_window_desc.leading.clone(),
-                rolling_window_desc.offset.clone(),
-                rolling_window_desc.time_dimension.clone(),
-            );
-            let cte_schema = cte_schemas.get(input).unwrap().clone();
-            join_builder.left_join_table_reference(
-                input.clone(),
-                cte_schema,
-                Some(format!("rolling_{}", i + 1)),
-                on,
-            );
-        }
+        let input = &inputs[1];
+        let alias = format!("rolling_source");
+        let rolling_base_cte_schema = cte_schemas.get(input).unwrap().clone();
+        let time_dimension_alias =
+            rolling_base_cte_schema.resolve_member_alias(&rolling_window_desc.time_dimension);
+        let on = JoinCondition::new_rolling_join(
+            root_alias.clone(),
+            rolling_window_desc.trailing.clone(),
+            rolling_window_desc.leading.clone(),
+            rolling_window_desc.offset.clone(),
+            Expr::Reference(QualifiedColumnName::new(
+                Some(alias.clone()),
+                time_dimension_alias,
+            )),
+        );
+        join_builder.left_join_table_reference(
+            input.clone(),
+            rolling_base_cte_schema.clone(),
+            Some(alias.clone()),
+            on,
+        );
 
         let from = From::new_from_join(join_builder.build());
 
         let group_by = dimensions
             .iter()
-            .map(|dim| Expr::Member(MemberExpression::new(dim.clone(), None)))
+            .map(|dim| Expr::Member(MemberExpression::new(dim.clone())))
             .collect_vec();
 
         let mut context_factory = SqlNodesFactory::new();
         context_factory.set_rolling_window(true);
 
-        //let node_context = context_factory.rolling_window_node_processor();
-
-        let mut select_builder = SelectBuilder::new(from, context_factory);
+        let references_builder = ReferencesBuilder::new(from.clone());
+        let mut render_references = HashMap::new();
+        let mut select_builder = SelectBuilder::new(from.clone());
         for dim in dimensions.iter() {
             if dim.full_name() == rolling_window_desc.time_dimension.full_name() {
-                select_builder.add_projection_member(
-                    &dim,
-                    Some(root_alias.clone()),
-                    Some(
-                        cte_schemas
-                            .get(&inputs[1])
-                            .unwrap()
-                            .resolve_member_alias(&dim, &Some(inputs[1].clone())),
-                    ),
+                render_references.insert(
+                    dim.full_name(),
+                    QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
                 );
             } else {
-                select_builder.add_projection_member(&dim, None, None);
+                references_builder.resolve_references_for_member(
+                    dim.member_evaluator(),
+                    &Some(alias.clone()),
+                    &mut render_references,
+                )?;
             }
+            let alias =
+                references_builder.resolve_alias_for_member(&dim.full_name(), &Some(alias.clone()));
+            select_builder.add_projection_member(&dim, alias);
         }
 
         let query_member = self.query_member_as_base_member()?;
-        select_builder.add_projection_member(&query_member, None, None);
+        let query_member_base_name = rolling_base_cte_schema.resolve_member_alias(&query_member);
+
+        context_factory.add_ungrouped_measure_reference(
+            query_member.full_name(),
+            QualifiedColumnName::new(Some(alias), query_member_base_name),
+        );
+        context_factory.set_render_references(render_references);
+
+        select_builder.add_projection_member(&query_member, None);
         select_builder.set_group_by(group_by);
         select_builder.set_order_by(self.query_order()?);
-        let select = select_builder.build();
+        let select = select_builder.build(context_factory);
 
         Ok(Rc::new(Cte::new_from_select(
             Rc::new(select),
@@ -177,7 +189,7 @@ impl MultiStageMemberQueryPlanner {
         } else {
             dimensions
                 .iter()
-                .map(|dim| Expr::Member(MemberExpression::new(dim.clone(), None)))
+                .map(|dim| Expr::Member(MemberExpression::new(dim.clone())))
                 .collect_vec()
         };
 
@@ -205,16 +217,31 @@ impl MultiStageMemberQueryPlanner {
             _ => {}
         };
 
-        let mut select_builder = SelectBuilder::new(from, context_factory);
+        let references_builder = ReferencesBuilder::new(from.clone());
+        let mut render_references = HashMap::new();
+        let mut select_builder = SelectBuilder::new(from.clone());
         for dim in dimensions.iter() {
-            select_builder.add_projection_member(&dim, None, None);
+            references_builder.resolve_references_for_member(
+                dim.member_evaluator(),
+                &None,
+                &mut render_references,
+            )?;
+            let alias = references_builder.resolve_alias_for_member(&dim.full_name(), &None);
+            select_builder.add_projection_member(&dim, alias);
         }
 
         let query_member = self.query_member_as_base_member()?;
-        select_builder.add_projection_member(&query_member, None, None);
+        references_builder.resolve_references_for_member(
+            query_member.member_evaluator(),
+            &None,
+            &mut render_references,
+        )?;
+        let alias = references_builder.resolve_alias_for_member(&query_member.full_name(), &None);
+        select_builder.add_projection_member(&query_member, alias);
         select_builder.set_group_by(group_by);
         select_builder.set_order_by(order_by);
-        let select = select_builder.build();
+        context_factory.set_render_references(render_references);
+        let select = select_builder.build(context_factory);
 
         Ok(Rc::new(Cte::new_from_select(
             Rc::new(select),
@@ -237,36 +264,67 @@ impl MultiStageMemberQueryPlanner {
             cte_schema,
             Some(root_alias.clone()),
         );
-        for (i, input) in inputs.iter().skip(1).enumerate() {
-            let left_alias = format!("q_{}", i);
-            let right_alias = format!("q_{}", i + 1);
-            let on = JoinCondition::new_dimension_join(
-                left_alias,
-                right_alias,
-                dimensions.clone(),
-                true,
-            );
+        for (i, input) in inputs.iter().enumerate().skip(1) {
+            let left_alias = format!("q_{}", i - 1);
+            let right_alias = format!("q_{}", i);
+            let left_schema = cte_schemas.get(&inputs[i - 1]).unwrap().clone();
             let cte_schema = cte_schemas.get(input).unwrap().clone();
+            let conditions = dimensions
+                .iter()
+                .map(|dim| {
+                    let alias_in_left_query = left_schema.resolve_member_alias(dim);
+                    let left_ref = Expr::Reference(QualifiedColumnName::new(
+                        Some(left_alias.clone()),
+                        alias_in_left_query,
+                    ));
+                    let alias_in_right_query = cte_schema.resolve_member_alias(dim);
+                    let right_ref = Expr::Reference(QualifiedColumnName::new(
+                        Some(right_alias.clone()),
+                        alias_in_right_query,
+                    ));
+                    (left_ref, right_ref)
+                })
+                .collect_vec();
+            let on = JoinCondition::new_dimension_join(conditions, true);
             join_builder.inner_join_table_reference(
                 input.clone(),
                 cte_schema,
-                Some(format!("q_{}", i + 1)),
+                Some(format!("q_{}", i)),
                 on,
             );
         }
 
         let from = From::new_from_join(join_builder.build());
-        let mut select_builder = SelectBuilder::new(from, SqlNodesFactory::new());
+        let references_builder = ReferencesBuilder::new(from.clone());
+        let mut render_references = HashMap::new();
+        let mut select_builder = SelectBuilder::new(from.clone());
 
+        let root_source = Some(root_alias);
         for dim in dimensions.iter() {
-            select_builder.add_projection_member(dim, None, None)
+            references_builder.resolve_references_for_member(
+                dim.member_evaluator(),
+                &root_source,
+                &mut render_references,
+            )?;
+            let alias = references_builder.resolve_alias_for_member(&dim.full_name(), &root_source);
+            select_builder.add_projection_member(dim, alias)
         }
         for meas in self.input_measures()?.iter() {
-            select_builder.add_projection_member(meas, None, None)
+            references_builder.resolve_references_for_member(
+                meas.member_evaluator(),
+                &None,
+                &mut render_references,
+            )?;
+            let alias = references_builder.resolve_alias_for_member(&meas.full_name(), &None);
+            select_builder.add_projection_member(meas, alias)
         }
         select_builder.set_order_by(self.subquery_order()?);
 
-        Ok(QueryPlan::Select(Rc::new(select_builder.build())))
+        let mut node_factory = SqlNodesFactory::new();
+        node_factory.set_render_references(render_references);
+        Ok(QueryPlan::Select(Rc::new(
+            select_builder.build(node_factory),
+        )))
     }
 
     fn plan_for_leaf_cte_query(&self) -> Result<Rc<Cte>, CubeError> {
@@ -295,11 +353,8 @@ impl MultiStageMemberQueryPlanner {
             false,
         )?;
 
-        let node_factory = if self.description.state().time_shifts().is_empty() {
-            SqlNodesFactory::new()
-        } else {
-            SqlNodesFactory::new_with_time_shifts(self.description.state().time_shifts().clone())
-        };
+        let mut node_factory = SqlNodesFactory::new();
+        node_factory.set_time_shifts(self.description.state().time_shifts().clone());
 
         /* if cte_query_properties
             .full_key_aggregate_measures()?

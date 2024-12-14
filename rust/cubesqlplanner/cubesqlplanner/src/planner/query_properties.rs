@@ -31,12 +31,6 @@ impl OrderByItem {
     }
 }
 
-enum SymbolAggregateType {
-    Regular,
-    Multiplied,
-    MultiStage,
-}
-
 #[derive(Default, Clone)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<BaseMeasure>>,
@@ -339,11 +333,11 @@ impl QueryProperties {
         } else {
             self.dimensions
                 .iter()
-                .map(|f| Expr::Member(MemberExpression::new(f.clone(), None)))
+                .map(|f| Expr::Member(MemberExpression::new(f.clone())))
                 .chain(
                     self.time_dimensions
                         .iter()
-                        .map(|f| Expr::Member(MemberExpression::new(f.clone(), None))),
+                        .map(|f| Expr::Member(MemberExpression::new(f.clone()))),
                 )
                 .collect()
         }

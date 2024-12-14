@@ -5,7 +5,7 @@ import type { StartedTestContainer } from 'testcontainers';
 import { format as formatSql } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
-import { BaseDbRunner } from "../utils/BaseDbRunner";
+import { BaseDbRunner } from '../utils/BaseDbRunner';
 
 process.env.TZ = 'GMT';
 

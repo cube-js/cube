@@ -2,6 +2,7 @@ pub mod auto_prefix;
 pub mod evaluate_sql;
 pub mod factory;
 pub mod final_measure;
+pub mod leaf_time_dimension;
 pub mod measure_filter;
 pub mod multi_stage_rank;
 pub mod multi_stage_window;

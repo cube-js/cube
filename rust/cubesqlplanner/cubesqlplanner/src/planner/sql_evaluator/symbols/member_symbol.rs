@@ -64,4 +64,17 @@ impl MemberSymbol {
             Self::CubeTable(_) => vec![],
         }
     }
+
+    pub fn get_dependent_cubes(&self) -> Vec<String> {
+        match self {
+            Self::Dimension(d) => d.get_dependent_cubes(),
+            Self::Measure(m) => m.get_dependent_cubes(),
+            Self::CubeName(_) => vec![],
+            Self::CubeTable(_) => vec![],
+        }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.get_dependencies().is_empty()
+    }
 }

@@ -4,7 +4,6 @@ use super::{evaluate_with_context, BaseMember, VisitorContext};
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
 };
-use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -73,18 +72,12 @@ pub struct BaseMeasure {
 }
 
 impl BaseMember for BaseMeasure {
-    fn to_sql(&self, context: Rc<VisitorContext>, schema: Rc<Schema>) -> Result<String, CubeError> {
-        evaluate_with_context(
-            &self.member_evaluator,
-            self.query_tools.clone(),
-            context,
-            schema,
-        )
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 
     fn alias_name(&self) -> String {
-        self.query_tools
-            .escape_column_name(&self.unescaped_alias_name())
+        self.unescaped_alias_name()
     }
 
     fn member_evaluator(&self) -> Rc<MemberSymbol> {

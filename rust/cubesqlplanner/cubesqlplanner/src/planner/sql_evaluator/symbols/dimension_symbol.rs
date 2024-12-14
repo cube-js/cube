@@ -1,11 +1,9 @@
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
+use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{
-    sql_nodes::SqlNode, Compiler, Dependency, SqlCall, SqlEvaluatorVisitor,
-};
+use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -57,6 +55,12 @@ impl DimensionSymbol {
         let mut deps = vec![];
         self.member_sql.extract_symbol_deps(&mut deps);
         deps
+    }
+
+    pub fn get_dependent_cubes(&self) -> Vec<String> {
+        let mut cubes = vec![];
+        self.member_sql.extract_cube_deps(&mut cubes);
+        cubes
     }
 
     pub fn cube_name(&self) -> &String {

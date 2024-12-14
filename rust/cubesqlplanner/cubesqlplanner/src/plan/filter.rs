@@ -1,4 +1,3 @@
-use super::Schema;
 use crate::planner::filter::BaseFilter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
@@ -54,7 +53,6 @@ impl FilterItem {
         &self,
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
-        schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
         let res = match self {
             FilterItem::Group(group) => {
@@ -62,7 +60,7 @@ impl FilterItem {
                 let items_sql = group
                     .items
                     .iter()
-                    .map(|itm| itm.to_sql(templates, context.clone(), schema.clone()))
+                    .map(|itm| itm.to_sql(templates, context.clone()))
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .filter(|itm| !itm.is_empty())
@@ -75,7 +73,7 @@ impl FilterItem {
                 }
             }
             FilterItem::Item(item) => {
-                let sql = item.to_sql(context.clone(), schema)?;
+                let sql = item.to_sql(context.clone())?;
                 format!("({})", sql)
             }
         };
@@ -88,12 +86,11 @@ impl Filter {
         &self,
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
-        schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
         let res = self
             .items
             .iter()
-            .map(|itm| itm.to_sql(templates, context.clone(), schema.clone()))
+            .map(|itm| itm.to_sql(templates, context.clone()))
             .collect::<Result<Vec<_>, _>>()?
             .join(" AND ");
         Ok(res)

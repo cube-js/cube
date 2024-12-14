@@ -2348,7 +2348,7 @@ describe('SQL Generation', () => {
     ]
   ));
 
-  it('rank measure', async () => runQueryTest(
+  it('rank measure 1', async () => runQueryTest(
     {
       measures: ['visitors.revenue_rank'],
     },

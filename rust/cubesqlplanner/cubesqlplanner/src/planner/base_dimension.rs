@@ -1,7 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
 use super::{evaluate_with_context, BaseMember, VisitorContext};
-use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -14,18 +13,12 @@ pub struct BaseDimension {
 }
 
 impl BaseMember for BaseDimension {
-    fn to_sql(&self, context: Rc<VisitorContext>, schema: Rc<Schema>) -> Result<String, CubeError> {
-        evaluate_with_context(
-            &self.member_evaluator,
-            self.query_tools.clone(),
-            context,
-            schema,
-        )
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 
     fn alias_name(&self) -> String {
-        self.query_tools
-            .escape_column_name(&self.unescaped_alias_name())
+        self.unescaped_alias_name()
     }
 
     fn member_evaluator(&self) -> Rc<MemberSymbol> {

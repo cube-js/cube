@@ -29,7 +29,7 @@ impl SqlNode for UngroupedMeasureSqlNode {
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
-            MemberSymbol::Measure(ev) => {
+            MemberSymbol::Measure(_) => {
                 let input = self.input.to_sql(
                     visitor,
                     node,

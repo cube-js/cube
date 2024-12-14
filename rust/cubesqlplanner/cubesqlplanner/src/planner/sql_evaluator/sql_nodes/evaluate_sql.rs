@@ -1,5 +1,4 @@
 use super::SqlNode;
-use crate::cube_bridge::memeber_sql::MemberSqlArg;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;

@@ -3,11 +3,9 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
 };
-use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
+use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{
-    sql_nodes::SqlNode, Compiler, Dependency, SqlCall, SqlEvaluatorVisitor,
-};
+use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -114,6 +112,18 @@ impl MeasureSymbol {
             order.sql_call().extract_symbol_deps(&mut deps);
         }
         deps
+    }
+
+    pub fn get_dependent_cubes(&self) -> Vec<String> {
+        let mut cubes = vec![];
+        self.member_sql.extract_cube_deps(&mut cubes);
+        for filter in self.measure_filters.iter() {
+            filter.extract_cube_deps(&mut cubes);
+        }
+        for order in self.measure_order_by.iter() {
+            order.sql_call().extract_cube_deps(&mut cubes);
+        }
+        cubes
     }
 
     pub fn owned_by_cube(&self) -> bool {

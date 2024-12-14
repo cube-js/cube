@@ -112,8 +112,6 @@ impl Compiler {
         full_name: &String,
         factory: T,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let cube_name = factory.cube_name();
-
         let node = factory.build(self)?;
         let key = (T::symbol_name().to_string(), full_name.clone());
         if T::is_cachable() {

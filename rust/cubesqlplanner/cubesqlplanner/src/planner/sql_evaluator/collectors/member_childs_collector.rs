@@ -37,7 +37,7 @@ impl TraversalVisitor for MemberChildsCollector {
         if state.is_root {
             let new_state = MemberChildsCollectorState::new(false);
             match node.as_ref() {
-                MemberSymbol::Measure(s) => Ok(Some(new_state)),
+                MemberSymbol::Measure(_) => Ok(Some(new_state)),
                 MemberSymbol::Dimension(_) => Ok(Some(new_state)),
                 _ => Ok(None),
             }

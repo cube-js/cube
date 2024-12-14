@@ -1,7 +1,5 @@
-use super::dependecy::{ContextSymbolDep, CubeDepProperty, CubeDependency, Dependency};
 use super::sql_nodes::SqlNode;
 use super::MemberSymbol;
-use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSqlArg, MemberSqlStruct};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

@@ -24,7 +24,7 @@ impl JoinPlanner {
     pub fn make_join_node_with_prefix(
         &self,
         alias_prefix: &Option<String>, /*TODO dimensions for subqueries*/
-    ) -> Result<From, CubeError> {
+    ) -> Result<Rc<From>, CubeError> {
         let join = self.query_tools.cached_data().join()?.clone();
         self.make_join_node_impl(alias_prefix, join)
     }
@@ -33,12 +33,12 @@ impl JoinPlanner {
         &self,
         alias_prefix: &Option<String>, /*TODO dimensions for subqueries*/
         join_hints: Vec<String>,
-    ) -> Result<From, CubeError> {
+    ) -> Result<Rc<From>, CubeError> {
         let join = self.query_tools.join_graph().build_join(join_hints)?;
         self.make_join_node_impl(alias_prefix, join)
     }
 
-    pub fn make_join_node(&self) -> Result<From, CubeError> {
+    pub fn make_join_node(&self) -> Result<Rc<From>, CubeError> {
         self.make_join_node_with_prefix(&None)
     }
 
@@ -46,7 +46,7 @@ impl JoinPlanner {
         &self,
         alias_prefix: &Option<String>,
         join: Rc<dyn JoinDefinition>,
-    ) -> Result<From, CubeError> {
+    ) -> Result<Rc<From>, CubeError> {
         let root = self.utils.cube_from_path(join.static_data().root.clone())?;
         let joins = join.joins()?;
         if joins.items().is_empty() {

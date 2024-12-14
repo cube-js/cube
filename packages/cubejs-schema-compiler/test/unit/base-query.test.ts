@@ -1596,7 +1596,7 @@ describe('SQL Generation', () => {
               sql: 'product_id',
               type: 'avg',
               filters: [
-                { sql: `{FILTER_PARAMS.Order.category.filter('category')}` }
+                { sql: '{FILTER_PARAMS.Order.category.filter(\'category\')}' }
               ]
             }
           ],
@@ -1613,7 +1613,7 @@ describe('SQL Generation', () => {
             },
             {
               name: 'proxied',
-              sql: `{FILTER_PARAMS.Order.type.filter("x => type = 'online'")}`,
+              sql: '{FILTER_PARAMS.Order.type.filter("x => type = \'online\'")}',
               type: 'boolean',
             }
           ]

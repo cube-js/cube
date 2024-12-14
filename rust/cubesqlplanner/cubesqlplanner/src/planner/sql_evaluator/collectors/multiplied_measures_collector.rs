@@ -39,7 +39,7 @@ impl TraversalVisitor for CompositeMeasuresCollector {
         state: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         let res = match node.as_ref() {
-            MemberSymbol::Measure(e) => {
+            MemberSymbol::Measure(_) => {
                 if let Some(parent) = &state.parent_measure {
                     if parent.cube_name() != node.cube_name() {
                         self.composite_measures.insert(parent.full_name());

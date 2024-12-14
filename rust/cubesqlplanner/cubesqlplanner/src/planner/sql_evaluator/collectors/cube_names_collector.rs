@@ -31,10 +31,16 @@ impl TraversalVisitor for CubeNamesCollector {
                 if e.owned_by_cube() {
                     self.names.insert(e.cube_name().clone());
                 }
+                for name in e.get_dependent_cubes().into_iter() {
+                    self.names.insert(name);
+                }
             }
             MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
                     self.names.insert(e.cube_name().clone());
+                }
+                for name in e.get_dependent_cubes().into_iter() {
+                    self.names.insert(name);
                 }
             }
             MemberSymbol::CubeName(e) => {

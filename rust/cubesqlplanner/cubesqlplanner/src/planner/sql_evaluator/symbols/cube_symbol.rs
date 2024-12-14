@@ -1,11 +1,9 @@
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
+use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{
-    dependecy::Dependency, sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor,
-};
+use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;

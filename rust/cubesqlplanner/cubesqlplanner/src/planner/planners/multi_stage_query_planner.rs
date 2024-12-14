@@ -10,7 +10,7 @@ use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{BaseDimension, BaseMeasure, VisitorContext};
+use crate::planner::{BaseDimension, BaseMeasure};
 use crate::planner::{BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -78,7 +78,7 @@ impl MultiStageQueryPlanner {
                     descr.clone(),
                 )
                 .plan_query(&cte_schemas)?;
-                cte_schemas.insert(descr.alias().clone(), Rc::new(res.make_schema()));
+                cte_schemas.insert(descr.alias().clone(), res.query().schema());
                 Ok(res)
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -97,12 +97,10 @@ impl MultiStageQueryPlanner {
         cte_schemas: &HashMap<String, Rc<Schema>>,
     ) -> Rc<Select> {
         let schema = cte_schemas.get(alias).unwrap().clone();
-        let select_builder = SelectBuilder::new(
-            From::new_from_table_reference(alias.clone(), schema, None),
-            SqlNodesFactory::new(),
-        );
+        let select_builder =
+            SelectBuilder::new(From::new_from_table_reference(alias.clone(), schema, None));
 
-        Rc::new(select_builder.build())
+        Rc::new(select_builder.build(SqlNodesFactory::new()))
     }
 
     fn create_multi_stage_inode_member(
@@ -260,21 +258,18 @@ impl MultiStageQueryPlanner {
                     ));
                 }
                 let time_dimension = time_dimensions[0].clone();
-                let source_name = format!("_{}_base", member.name());
-                //let (member, source) = member.try_split_measure(source_name).unwrap(); //FIXME
-                //unwrap!!!
 
                 let input = vec![
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?,
-                    /* self.add_rolling_window_base(
-                        source.clone(),
+                    self.add_rolling_window_base(
+                        member.clone(),
                         self.make_rolling_base_state(
                             time_dimension.clone(),
                             &rolling_window,
                             state.clone(),
                         )?,
                         descriptions,
-                    )?, */
+                    )?,
                 ];
 
                 let time_dimension = time_dimensions[0].clone();

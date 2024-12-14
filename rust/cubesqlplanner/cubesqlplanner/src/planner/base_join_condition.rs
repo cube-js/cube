@@ -1,11 +1,10 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::SqlCall;
-use super::{evaluate_sql_call_with_context, evaluate_with_context, VisitorContext};
-use crate::plan::Schema;
+use super::{evaluate_sql_call_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 pub trait BaseJoinCondition {
-    fn to_sql(&self, context: Rc<VisitorContext>, schema: Rc<Schema>) -> Result<String, CubeError>;
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError>;
 }
 pub struct SqlJoinCondition {
     sql_call: Rc<SqlCall>,
@@ -24,7 +23,7 @@ impl SqlJoinCondition {
 }
 
 impl BaseJoinCondition for SqlJoinCondition {
-    fn to_sql(&self, context: Rc<VisitorContext>, schema: Rc<Schema>) -> Result<String, CubeError> {
-        evaluate_sql_call_with_context(&self.sql_call, self.query_tools.clone(), context, schema)
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        evaluate_sql_call_with_context(&self.sql_call, self.query_tools.clone(), context)
     }
 }

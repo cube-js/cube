@@ -2,7 +2,6 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
 use super::BaseDimension;
 use super::{BaseMember, VisitorContext};
-use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -15,28 +14,12 @@ pub struct BaseTimeDimension {
 }
 
 impl BaseMember for BaseTimeDimension {
-    fn to_sql(
-        &self,
-        context: Rc<VisitorContext>,
-        source_schema: Rc<Schema>,
-    ) -> Result<String, CubeError> {
-        let field_sql = if let Some(granularity) = &self.granularity {
-            let converted_tz = self
-                .query_tools
-                .base_tools()
-                .convert_tz(self.dimension.to_sql(context, source_schema)?)?;
-            self.query_tools
-                .base_tools()
-                .time_grouped_column(granularity.clone(), converted_tz)?
-        } else {
-            unimplemented!("Time dimensions without granularity not supported yet")
-        };
-        Ok(field_sql)
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        self.dimension.to_sql(context)
     }
 
     fn alias_name(&self) -> String {
-        self.query_tools
-            .escape_column_name(&self.unescaped_alias_name())
+        self.unescaped_alias_name()
     }
 
     fn member_evaluator(&self) -> Rc<MemberSymbol> {

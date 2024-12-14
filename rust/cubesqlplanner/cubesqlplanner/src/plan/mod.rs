@@ -19,7 +19,7 @@ pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
 pub use join::{Join, JoinCondition, JoinItem, RollingWindowJoinCondition};
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
-pub use schema::{Schema, SchemaColumn, SchemaCube};
+pub use schema::{QualifiedColumnName, Schema, SchemaColumn};
 pub use select::{AliasedExpr, Select};
 pub use time_series::TimeSeries;
 pub use union::Union;

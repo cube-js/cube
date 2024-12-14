@@ -1,33 +1,29 @@
 use crate::plan::{
-    AliasedExpr, Cte, Expr, Filter, From, MemberExpression, OrderBy, Schema, Select,
+    AliasedExpr, Cte, Expr, Filter, From, MemberExpression, OrderBy, Schema, SchemaColumn, Select,
     SingleAliasedSource, SingleSource,
 };
 
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::sql_evaluator::symbols::MemberSymbol;
 use crate::planner::{BaseMember, VisitorContext};
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct SelectBuilder {
     projection_columns: Vec<AliasedExpr>,
-    from: From,
+    from: Rc<From>,
     filter: Option<Filter>,
     group_by: Vec<Expr>,
     having: Option<Filter>,
     order_by: Vec<OrderBy>,
-    nodes_factory: SqlNodesFactory,
     ctes: Vec<Rc<Cte>>,
     is_distinct: bool,
     limit: Option<usize>,
     offset: Option<usize>,
-    input_schema: Rc<Schema>,
     result_schema: Schema,
 }
 
 impl SelectBuilder {
-    pub fn new(from: From, nodes_factory: SqlNodesFactory) -> Self {
-        let input_schema = from.schema.clone();
+    pub fn new(from: Rc<From>) -> Self {
         Self {
             projection_columns: vec![],
             from,
@@ -35,34 +31,30 @@ impl SelectBuilder {
             group_by: vec![],
             having: None,
             order_by: vec![],
-            nodes_factory,
             ctes: vec![],
             is_distinct: false,
             limit: None,
             offset: None,
-            input_schema,
             result_schema: Schema::empty(),
         }
     }
 
-    pub fn add_projection_member(
-        &mut self,
-        member: &Rc<dyn BaseMember>,
-        source: Option<String>,
-        alias: Option<String>,
-    ) {
+    pub fn add_projection_member(&mut self, member: &Rc<dyn BaseMember>, alias: Option<String>) {
         let alias = if let Some(alias) = alias {
             alias
         } else {
-            self.input_schema.resolve_member_alias(&member, &source)
+            member.alias_name()
         };
-        let expr = Expr::Member(MemberExpression::new(member.clone(), source));
+
+        let expr = Expr::Member(MemberExpression::new(member.clone()));
         let aliased_expr = AliasedExpr {
             expr,
             alias: alias.clone(),
         };
 
         self.projection_columns.push(aliased_expr);
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
     }
 
     pub fn set_filter(&mut self, filter: Option<Filter>) {
@@ -127,9 +119,30 @@ impl SelectBuilder {
         }
     }
 
-    pub fn build(mut self) -> Select {
+    fn make_asteriks_schema(&self) -> Rc<Schema> {
+        let schema = match &self.from.source {
+            crate::plan::FromSource::Empty => Rc::new(Schema::empty()),
+            crate::plan::FromSource::Single(source) => source.source.schema(),
+            crate::plan::FromSource::Join(join) => {
+                let mut schema = Schema::empty();
+                schema.merge(join.root.source.schema().as_ref());
+                for itm in join.joins.iter() {
+                    schema.merge(itm.from.source.schema().as_ref())
+                }
+                Rc::new(schema)
+            }
+        };
+        schema
+    }
+
+    pub fn build(self, mut nodes_factory: SqlNodesFactory) -> Select {
         let cube_references = self.make_cube_references();
-        self.nodes_factory.set_cube_name_references(cube_references);
+        nodes_factory.set_cube_name_references(cube_references);
+        let schema = if self.projection_columns.is_empty() {
+            self.make_asteriks_schema()
+        } else {
+            Rc::new(self.result_schema)
+        };
         Select {
             projection_columns: self.projection_columns,
             from: self.from,
@@ -137,11 +150,12 @@ impl SelectBuilder {
             group_by: self.group_by,
             having: self.having,
             order_by: self.order_by,
-            context: Rc::new(VisitorContext::new(&self.nodes_factory)),
+            context: Rc::new(VisitorContext::new(&nodes_factory)),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
             limit: self.limit,
             offset: self.offset,
+            schema,
         }
     }
 }

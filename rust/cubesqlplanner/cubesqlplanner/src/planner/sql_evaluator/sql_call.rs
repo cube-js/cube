@@ -1,9 +1,6 @@
 use super::dependecy::{ContextSymbolDep, CubeDepProperty, CubeDependency, Dependency};
 use super::sql_nodes::SqlNode;
-use super::{
-    symbols::MemberSymbol, CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol,
-    SqlEvaluatorVisitor,
-};
+use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSql, MemberSqlArg, MemberSqlStruct};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
@@ -47,6 +44,18 @@ impl SqlCall {
         }
     }
 
+    pub fn extract_cube_deps(&self, result: &mut Vec<String>) {
+        for dep in self.deps.iter() {
+            match dep {
+                Dependency::SymbolDependency(_) => {}
+                Dependency::CubeDependency(cube_dep) => {
+                    self.extract_cube_deps_from_cube_dep(cube_dep, result)
+                }
+                Dependency::ContextDependency(_) => {}
+            }
+        }
+    }
+
     fn extract_symbol_deps_from_cube_dep(
         &self,
         cube_dep: &CubeDependency,
@@ -58,6 +67,19 @@ impl SqlCall {
                 CubeDepProperty::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
                 }
+            };
+        }
+    }
+
+    fn extract_cube_deps_from_cube_dep(&self, cube_dep: &CubeDependency, result: &mut Vec<String>) {
+        result.push(cube_dep.cube_symbol.name());
+
+        for (_, v) in cube_dep.properties.iter() {
+            match v {
+                CubeDepProperty::CubeDependency(cube_dep) => {
+                    self.extract_cube_deps_from_cube_dep(cube_dep, result)
+                }
+                _ => {}
             };
         }
     }

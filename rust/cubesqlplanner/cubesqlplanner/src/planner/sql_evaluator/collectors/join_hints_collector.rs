@@ -1,7 +1,6 @@
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use crate::planner::BaseMeasure;
 use cubenativeutils::CubeError;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct JoinHintsCollector {
@@ -30,10 +29,16 @@ impl TraversalVisitor for JoinHintsCollector {
                 if e.owned_by_cube() {
                     self.hints.push(e.cube_name().clone());
                 }
+                for name in e.get_dependent_cubes().into_iter() {
+                    self.hints.push(name);
+                }
             }
             MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
                     self.hints.push(e.cube_name().clone());
+                }
+                for name in e.get_dependent_cubes().into_iter() {
+                    self.hints.push(name);
                 }
             }
             MemberSymbol::CubeName(e) => {

@@ -1,5 +1,4 @@
 use super::SqlNode;
-use crate::cube_bridge::memeber_sql::MemberSqlArg;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
@@ -30,19 +29,10 @@ impl SqlNode for RollingWindowNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                if m.is_cumulative() && m.is_splitted_source() {
-                    //let args = visitor.evaluate_deps(node, node_processor.clone())?;
-                    //FIXME hack for working with
-                    //measures like rolling window
-                    let input = "111".to_string();
-                    /* if !args.is_empty() {
-                        match &args[0] {
-                            MemberSqlArg::String(s) => s.clone(),
-                            _ => "".to_string(),
-                        }
-                    } else {
-                        "".to_string()
-                    }; */
+                let input =
+                    self.input
+                        .to_sql(visitor, node, query_tools.clone(), node_processor)?;
+                if m.is_cumulative() {
                     let aggregate_function = if m.measure_type() == "sum"
                         || m.measure_type() == "count"
                         || m.measure_type() == "runningTotal"
@@ -54,8 +44,7 @@ impl SqlNode for RollingWindowNode {
 
                     format!("{}({})", aggregate_function, input)
                 } else {
-                    self.input
-                        .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?
+                    input
                 }
             }
             _ => {
