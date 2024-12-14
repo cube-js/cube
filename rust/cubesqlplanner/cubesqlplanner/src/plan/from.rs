@@ -1,4 +1,4 @@
-use super::{Join, QueryPlan, Schema, SchemaCube, Select};
+use super::{Join, QueryPlan, Schema, Select};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseCube, VisitorContext};
 use cubenativeutils::CubeError;
@@ -26,6 +26,14 @@ impl SingleSource {
             SingleSource::TableReference(r, _) => format!(" {} ", r),
         };
         Ok(sql)
+    }
+
+    pub fn schema(&self) -> Rc<Schema> {
+        match self {
+            SingleSource::Subquery(subquery) => subquery.schema(),
+            SingleSource::Cube(_) => Rc::new(Schema::empty()),
+            SingleSource::TableReference(_, schema) => schema.clone(),
+        }
     }
 }
 
@@ -72,18 +80,6 @@ impl SingleAliasedSource {
 
         templates.query_aliased(&sql, &self.alias)
     }
-
-    pub fn make_schema(&self) -> Schema {
-        match &self.source {
-            SingleSource::Subquery(query) => query.make_schema(Some(self.alias.clone())),
-            SingleSource::Cube(cube) => {
-                let mut schema = Schema::empty();
-                schema.add_cube(SchemaCube::new(cube.name().clone(), self.alias.clone()));
-                schema
-            }
-            SingleSource::TableReference(_, schema) => schema.move_to_source(&self.alias),
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -93,30 +89,17 @@ pub enum FromSource {
     Join(Rc<Join>),
 }
 
-impl FromSource {
-    pub fn get_schema(&self) -> Rc<Schema> {
-        let schema = match self {
-            FromSource::Empty => Schema::empty(),
-            FromSource::Single(source) => source.make_schema(),
-            FromSource::Join(join) => join.make_schema(),
-        };
-        Rc::new(schema)
-    }
-}
-
 #[derive(Clone)]
 pub struct From {
     pub source: FromSource,
-    pub schema: Rc<Schema>,
 }
 
 impl From {
-    pub fn new(source: FromSource) -> Self {
-        let schema = source.get_schema();
-        Self { source, schema }
+    pub fn new(source: FromSource) -> Rc<Self> {
+        Rc::new(Self { source })
     }
 
-    pub fn new_from_cube(cube: Rc<BaseCube>, alias: Option<String>) -> Self {
+    pub fn new_from_cube(cube: Rc<BaseCube>, alias: Option<String>) -> Rc<Self> {
         Self::new(FromSource::Single(SingleAliasedSource::new_from_cube(
             cube, alias,
         )))
@@ -126,23 +109,23 @@ impl From {
         reference: String,
         schema: Rc<Schema>,
         alias: Option<String>,
-    ) -> Self {
+    ) -> Rc<Self> {
         Self::new(FromSource::Single(
             SingleAliasedSource::new_from_table_reference(reference, schema, alias),
         ))
     }
 
-    pub fn new_from_join(join: Rc<Join>) -> Self {
+    pub fn new_from_join(join: Rc<Join>) -> Rc<Self> {
         Self::new(FromSource::Join(join))
     }
 
-    pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Self {
+    pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Rc<Self> {
         Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
             plan, alias,
         )))
     }
 
-    pub fn new_from_subselect(plan: Rc<Select>, alias: String) -> Self {
+    pub fn new_from_subselect(plan: Rc<Select>, alias: String) -> Rc<Self> {
         Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
             Rc::new(QueryPlan::Select(plan)),
             alias,

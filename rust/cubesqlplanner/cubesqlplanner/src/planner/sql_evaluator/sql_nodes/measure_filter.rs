@@ -1,7 +1,7 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -23,16 +23,16 @@ impl MeasureFilterSqlNode {
 impl SqlNode for MeasureFilterSqlNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
         let input =
             self.input
                 .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?;
-        let res = match node.symbol() {
-            MemberSymbolType::Measure(ev) => {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(ev) => {
                 let measure_filters = ev.measure_filters();
                 if !measure_filters.is_empty() {
                     let filters = measure_filters
@@ -40,7 +40,11 @@ impl SqlNode for MeasureFilterSqlNode {
                         .map(|filter| -> Result<String, CubeError> {
                             Ok(format!(
                                 "({})",
-                                visitor.apply(filter, node_processor.clone())?
+                                filter.eval(
+                                    &visitor,
+                                    node_processor.clone(),
+                                    query_tools.clone()
+                                )?
                             ))
                         })
                         .collect::<Result<Vec<_>, _>>()?

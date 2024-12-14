@@ -1,9 +1,12 @@
 use cubenativeutils::CubeError;
 use std::str::FromStr;
+
+#[derive(Clone, PartialEq, Debug)]
 pub enum FilterOperator {
     Equal,
     NotEqual,
     InDateRange,
+    InDateRangeExtended,
     In,
     NotIn,
     Set,
@@ -12,6 +15,12 @@ pub enum FilterOperator {
     Gte,
     Lt,
     Lte,
+    Contains,
+    NotContains,
+    StartsWith,
+    NotStartsWith,
+    NotEndsWith,
+    EndsWith,
 }
 
 impl FromStr for FilterOperator {
@@ -29,6 +38,12 @@ impl FromStr for FilterOperator {
             "gte" => Ok(Self::Gte),
             "lt" => Ok(Self::Lt),
             "lte" => Ok(Self::Lte),
+            "contains" => Ok(Self::Contains),
+            "notcontains" => Ok(Self::NotContains),
+            "startswith" => Ok(Self::StartsWith),
+            "notstartswith" => Ok(Self::NotStartsWith),
+            "endswith" => Ok(Self::EndsWith),
+            "notendswith" => Ok(Self::NotEndsWith),
 
             _ => Err(CubeError::user(format!("Unknown filter operator {}", s))),
         }

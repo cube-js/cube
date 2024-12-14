@@ -4,9 +4,8 @@ use super::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDi
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::sql_evaluator::collectors::{
-    collect_multiplied_measures, has_multi_stage_members,
+    collect_multiplied_measures, has_cumulative_members, has_multi_stage_members,
 };
-use crate::planner::sql_evaluator::EvaluationNode;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -30,12 +29,6 @@ impl OrderByItem {
     pub fn desc(&self) -> bool {
         self.desc
     }
-}
-
-enum SymbolAggregateType {
-    Regular,
-    Multiplied,
-    MultiStage,
 }
 
 #[derive(Default, Clone)]
@@ -67,6 +60,8 @@ pub struct QueryProperties {
     row_limit: Option<usize>,
     offset: Option<usize>,
     query_tools: Rc<QueryTools>,
+    ignore_cumulative: bool,
+    ungrouped: bool,
 }
 
 impl QueryProperties {
@@ -160,6 +155,7 @@ impl QueryProperties {
         } else {
             None
         };
+        let ungrouped = options.static_data().ungrouped.unwrap_or(false);
 
         Ok(Rc::new(Self {
             measures,
@@ -172,6 +168,8 @@ impl QueryProperties {
             row_limit,
             offset,
             query_tools,
+            ignore_cumulative: false,
+            ungrouped,
         }))
     }
 
@@ -186,6 +184,8 @@ impl QueryProperties {
         order_by: Vec<OrderByItem>,
         row_limit: Option<usize>,
         offset: Option<usize>,
+        ignore_cumulative: bool,
+        ungrouped: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -204,6 +204,8 @@ impl QueryProperties {
             row_limit,
             offset,
             query_tools,
+            ignore_cumulative,
+            ungrouped,
         }))
     }
 
@@ -246,6 +248,10 @@ impl QueryProperties {
     pub fn set_order_by_to_default(&mut self) {
         self.order_by =
             Self::default_order(&self.dimensions, &self.time_dimensions, &self.measures);
+    }
+
+    pub fn ungrouped(&self) -> bool {
+        self.ungrouped
     }
 
     pub fn all_filters(&self) -> Option<Filter> {
@@ -322,15 +328,19 @@ impl QueryProperties {
     }
 
     pub fn group_by(&self) -> Vec<Expr> {
-        self.dimensions
-            .iter()
-            .map(|f| Expr::Member(MemberExpression::new(f.clone(), None)))
-            .chain(
-                self.time_dimensions
-                    .iter()
-                    .map(|f| Expr::Member(MemberExpression::new(f.clone(), None))),
-            )
-            .collect()
+        if self.ungrouped {
+            vec![]
+        } else {
+            self.dimensions
+                .iter()
+                .map(|f| Expr::Member(MemberExpression::new(f.clone())))
+                .chain(
+                    self.time_dimensions
+                        .iter()
+                        .map(|f| Expr::Member(MemberExpression::new(f.clone()))),
+                )
+                .collect()
+        }
     }
 
     pub fn default_order(
@@ -377,46 +387,44 @@ impl QueryProperties {
     }
 
     pub fn is_simple_query(&self) -> Result<bool, CubeError> {
+        let full_aggregate_measure = self.full_key_aggregate_measures()?;
+        if full_aggregate_measure.multiplied_measures.is_empty()
+            && full_aggregate_measure.multi_stage_measures.is_empty()
+        {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn should_use_time_series(&self) -> Result<bool, CubeError> {
         for member in self.all_members(false) {
-            match self.get_symbol_aggregate_type(&member.member_evaluator())? {
-                SymbolAggregateType::Regular => {}
-                _ => return Ok(false),
+            if has_cumulative_members(&member.member_evaluator())? {
+                return Ok(true);
             }
         }
-        Ok(true)
+        Ok(false)
     }
 
     pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.measures();
         for m in measures.iter() {
-            match self.get_symbol_aggregate_type(m.member_evaluator())? {
-                SymbolAggregateType::Regular => result.regular_measures.push(m.clone()),
-                SymbolAggregateType::Multiplied => result.multiplied_measures.push(m.clone()),
-                SymbolAggregateType::MultiStage => result.multi_stage_measures.push(m.clone()),
+            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
+                result.multi_stage_measures.push(m.clone())
+            } else {
+                for item in
+                    collect_multiplied_measures(self.query_tools.clone(), m.member_evaluator())?
+                {
+                    if item.multiplied {
+                        result.multiplied_measures.push(item.measure.clone());
+                    } else {
+                        result.regular_measures.push(item.measure.clone());
+                    }
+                }
             }
         }
 
         Ok(result)
-    }
-
-    fn get_symbol_aggregate_type(
-        &self,
-        symbol: &Rc<EvaluationNode>,
-    ) -> Result<SymbolAggregateType, CubeError> {
-        let symbol_type = if has_multi_stage_members(symbol)? {
-            SymbolAggregateType::MultiStage
-        } else if let Some(multiple) =
-            collect_multiplied_measures(self.query_tools.clone(), symbol)?
-        {
-            if multiple.multiplied {
-                SymbolAggregateType::Multiplied
-            } else {
-                SymbolAggregateType::Regular
-            }
-        } else {
-            SymbolAggregateType::Regular
-        };
-        Ok(symbol_type)
     }
 }

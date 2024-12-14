@@ -1,4 +1,5 @@
 use super::base_filter::{BaseFilter, FilterType};
+use super::FilterOperator;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
@@ -6,6 +7,7 @@ use crate::planner::sql_evaluator::Compiler;
 use crate::planner::BaseTimeDimension;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+use std::str::FromStr;
 
 pub struct FilterCompiler<'a> {
     evaluator_compiler: &'a mut Compiler,
@@ -43,7 +45,7 @@ impl<'a> FilterCompiler<'a> {
                 self.query_tools.clone(),
                 item.member_evaluator(),
                 FilterType::Dimension,
-                "InDateRange".to_string(),
+                FilterOperator::InDateRange,
                 Some(date_range.into_iter().map(|v| Some(v)).collect()),
             )?;
             self.time_dimension_filters.push(FilterItem::Item(filter));
@@ -92,7 +94,7 @@ impl<'a> FilterCompiler<'a> {
                     self.query_tools.clone(),
                     evaluator,
                     item_type.clone(),
-                    operator.clone(),
+                    FilterOperator::from_str(&operator)?,
                     item.values.clone(),
                 )?))
             } else {
