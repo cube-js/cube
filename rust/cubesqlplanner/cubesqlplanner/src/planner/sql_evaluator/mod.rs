@@ -3,7 +3,6 @@ pub mod compiler;
 mod dependecy;
 pub mod references_builder;
 pub mod sql_call;
-pub mod sql_node_transformers;
 pub mod sql_nodes;
 pub mod sql_visitor;
 pub mod symbols;
