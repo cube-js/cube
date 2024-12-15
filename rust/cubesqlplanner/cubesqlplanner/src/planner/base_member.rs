@@ -1,15 +1,13 @@
-use super::sql_evaluator::EvaluationNode;
+use super::sql_evaluator::MemberSymbol;
 use super::VisitorContext;
-use crate::plan::Schema;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub trait BaseMember {
-    fn to_sql(&self, context: Rc<VisitorContext>, schema: Rc<Schema>) -> Result<String, CubeError>;
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError>;
     fn alias_name(&self) -> String;
-    fn member_evaluator(&self) -> Rc<EvaluationNode>;
+    fn member_evaluator(&self) -> Rc<MemberSymbol>;
     fn full_name(&self) -> String {
         self.member_evaluator().full_name()
     }
@@ -38,12 +36,5 @@ impl BaseMemberHelper {
 
     pub fn to_alias_vec(members: &Vec<Rc<dyn BaseMember>>) -> Vec<String> {
         members.iter().map(|m| m.alias_name()).collect_vec()
-    }
-
-    pub fn to_reference_map(members: &Vec<Rc<dyn BaseMember>>) -> HashMap<String, String> {
-        members
-            .iter()
-            .map(|m| (m.full_name(), m.alias_name()))
-            .collect::<HashMap<String, String>>()
     }
 }

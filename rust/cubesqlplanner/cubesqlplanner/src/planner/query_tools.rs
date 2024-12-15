@@ -8,6 +8,7 @@ use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use chrono_tz::Tz;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::cell::{Ref, RefCell, RefMut};
@@ -118,6 +119,18 @@ impl QueryTools {
         }
     }
 
+    pub fn parse_member_path(&self, name: &str) -> Result<(String, String), CubeError> {
+        let path = name.split('.').collect_vec();
+        if path.len() == 2 {
+            Ok((path[0].to_string(), path[1].to_string()))
+        } else {
+            Err(CubeError::internal(format!(
+                "Invalid member name: '{}'",
+                name
+            )))
+        }
+    }
+
     pub fn auto_prefix_with_cube_name(&self, cube_name: &str, sql: &str) -> String {
         lazy_static! {
             static ref SINGLE_MEMBER_RE: Regex = Regex::new(r"^[_a-zA-Z][_a-zA-Z0-9]*$").unwrap();
@@ -141,7 +154,7 @@ impl QueryTools {
         self.templates_render.clone()
     }
 
-    pub fn allocaate_param(&self, name: &str) -> usize {
+    pub fn allocate_param(&self, name: &str) -> String {
         self.params_allocator.borrow_mut().allocate_param(name)
     }
     pub fn get_allocated_params(&self) -> Vec<String> {
@@ -152,8 +165,11 @@ impl QueryTools {
         sql: &str,
         should_reuse_params: bool,
     ) -> Result<(String, Vec<String>), CubeError> {
-        self.params_allocator
-            .borrow()
-            .build_sql_and_params(sql, should_reuse_params)
+        let native_allocated_params = self.base_tools.get_allocated_params()?;
+        self.params_allocator.borrow().build_sql_and_params(
+            sql,
+            native_allocated_params,
+            should_reuse_params,
+        )
     }
 }

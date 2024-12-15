@@ -137,8 +137,11 @@ impl RewriteRules for MemberRules {
                         "?old_members",
                         "?filters",
                         "?orders",
-                        "?limit",
-                        "?offset",
+                        // If CubeScan already have limit and offset it would be incorrect to push aggregation into it
+                        // Aggregate(CubeScan(limit, offset)) would run aggregation over limited rows
+                        // CubeScan(aggregation, limit, offset) would return limited groups
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
                         "?split",
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
@@ -164,8 +167,8 @@ impl RewriteRules for MemberRules {
                     ),
                     "?filters",
                     "?orders",
-                    "?limit",
-                    "?offset",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
                     "?split",
                     "?new_pushdown_join",
                     "CubeScanWrapped:false",

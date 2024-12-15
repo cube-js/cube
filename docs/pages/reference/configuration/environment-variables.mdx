@@ -560,6 +560,14 @@ The timeout value for any queries made to the database by Cube.
 | ---------------------------------------- | ---------------------- | --------------------- |
 | A number in seconds or a duration string | `10m`                  | `10m`                 |
 
+<InfoBox>
+
+There's a hard limit of 20 minutes for queries that ingest data into Cube Store
+when pre-aggregations are built. If you bump into this limit, consider using
+an export bucket and splitting pre-aggregations into partitions.
+
+</InfoBox>
+
 ## `CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION`
 
 Force fetching of columns by ordinal positions. Certain data-providers (e.g., Redshift) do not guarantee columns in the

@@ -1,7 +1,7 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -31,21 +31,24 @@ impl MultiStageRankNode {
 impl SqlNode for MultiStageRankNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Measure(m) => {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(m) => {
                 if m.is_multi_stage() && m.measure_type() == "rank" {
                     let order_by = if !m.measure_order_by().is_empty() {
                         let sql = m
                             .measure_order_by()
                             .iter()
                             .map(|item| -> Result<String, CubeError> {
-                                let sql = visitor
-                                    .apply(item.evaluation_node(), node_processor.clone())?;
+                                let sql = item.sql_call().eval(
+                                    visitor,
+                                    node_processor.clone(),
+                                    query_tools.clone(),
+                                )?;
                                 Ok(format!("{} {}", sql, item.direction()))
                             })
                             .collect::<Result<Vec<_>, _>>()?

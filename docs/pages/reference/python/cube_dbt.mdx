@@ -400,16 +400,10 @@ print(column.type)
 # For example, 'string'
 ```
 
-Column types should match [dimension types][ref-dimension-types] or a few
-supported aliases:
-
-| Column types                            | Dimension type |
-| --------------------------------------- | -------------- |
-| `time`, `date`, `datetime`, `timestamp` | `time`         |
-| `string`                                | `string`       |
-| `number`, `numeric`                     | `number`       |
-| `boolean`, `bool`                       | `boolean`      |
-| `geo`, `geography`                      | `geo`          |
+`cube_dbt` package applies a set of heuristics to map database-specific
+types to [dimension types][ref-dimension-types]. You can check the [source
+code](https://github.com/cube-js/cube_dbt/blob/main/src/cube_dbt/column.py#L217-L233)
+for implementation details.
 
 If a column type is not defined in the metadata of a dbt project, `string`
 is used by default.

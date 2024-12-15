@@ -19,7 +19,7 @@ use std::rc::Rc;
 pub struct MemberSqlStruct {
     pub sql_fn: Option<String>,
     pub to_string_fn: Option<String>,
-    pub properties: HashMap<String, String>,
+    pub properties: HashMap<String, MemberSqlArg>,
 }
 
 pub enum ContextSymbolArg {
@@ -64,6 +64,39 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlStruct {
     }
 }
 
+impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlArg {
+    fn to_native(
+        &self,
+        context_holder: NativeContextHolder<IT>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError> {
+        let res = match self {
+            MemberSqlArg::String(s) => s.to_native(context_holder.clone()),
+            MemberSqlArg::Struct(s) => s.to_native(context_holder.clone()),
+            MemberSqlArg::ContextSymbol(symbol) => match symbol {
+                ContextSymbolArg::SecurityContext(context) => context
+                    .clone()
+                    .as_any()
+                    .downcast::<NativeSecurityContext<IT>>()
+                    .unwrap()
+                    .to_native(context_holder.clone()),
+                ContextSymbolArg::FilterParams(params) => params
+                    .clone()
+                    .as_any()
+                    .downcast::<NativeFilterParams<IT>>()
+                    .unwrap()
+                    .to_native(context_holder.clone()),
+                ContextSymbolArg::FilterGroup(group) => group
+                    .clone()
+                    .as_any()
+                    .downcast::<NativeFilterGroup<IT>>()
+                    .unwrap()
+                    .to_native(context_holder.clone()),
+            },
+        }?;
+        Ok(NativeObjectHandle::new(res.into_object()))
+    }
+}
+
 impl<IT: InnerTypes> NativeMemberSql<IT> {
     pub fn try_new(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
         let args_names = native_object.to_function()?.args_names()?;
@@ -89,27 +122,7 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
         let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
         let native_args = args
             .into_iter()
-            .map(|a| match a {
-                MemberSqlArg::String(s) => s.to_native(context_holder.clone()),
-                MemberSqlArg::Struct(s) => s.to_native(context_holder.clone()),
-                MemberSqlArg::ContextSymbol(symbol) => match symbol {
-                    ContextSymbolArg::SecurityContext(context) => context
-                        .as_any()
-                        .downcast::<NativeSecurityContext<IT>>()
-                        .unwrap()
-                        .to_native(context_holder.clone()),
-                    ContextSymbolArg::FilterParams(params) => params
-                        .as_any()
-                        .downcast::<NativeFilterParams<IT>>()
-                        .unwrap()
-                        .to_native(context_holder.clone()),
-                    ContextSymbolArg::FilterGroup(group) => group
-                        .as_any()
-                        .downcast::<NativeFilterGroup<IT>>()
-                        .unwrap()
-                        .to_native(context_holder.clone()),
-                },
-            })
+            .map(|a| a.to_native(context_holder.clone()))
             .collect::<Result<Vec<_>, _>>()?;
 
         let res = self.native_object.to_function()?.call(native_args)?;

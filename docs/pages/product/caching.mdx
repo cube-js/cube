@@ -257,21 +257,26 @@ versions.
 
 Any query that is fulfilled by Cube will use one of the following cache types:
 
-- **[Pre-aggregations](#pre-aggregations) in Cube Store.** This is the most
-advantageous and performant option.
+- **[Pre-aggregations](#pre-aggregations) in Cube Store.** This cache type 
+indicates that the query utilized existing pre-aggregations in Cube Store, 
+so it did not need to go to the database for processing.
 - **Pre-aggregations in Cube Store with a suboptimal query plan.** This cache
-type indicates that queries still benefit from pre-aggregations in Cube Store
-but it's possible to get a performance boost by [using indexes][ref-indexes].
+type indicates that the query ultilized pre-aggregations in Cube Store,
+but that it's possible to get a performance boost by [using indexes][ref-indexes].
 - **Pre-aggregations in the data source.** This cache type indicates that
-queries don't benefit from pre-aggregations in Cube Store and it's possible
-to get a massive performance boost by using Cube Store as [pre-aggregation
+the query utilized pre-aggregations from in the upstream data source. 
+These queries could gain a performance boost by using Cube Store as [pre-aggregation
 storage][ref-storage].
-- **[In-memory cache.](#in-memory-cache)** This cache type indicates that
-queries don't benefit from pre-aggregations at all. Queries directly hit the
-upstream data source and in-memory cache is used to speed up the execution of
-identical queries that arrive within a short period of time.
-- **No cache.** This cache type indicates queries that directly hit the
-upstream data source and have the worst performance possible.
+- **[In-memory cache.](#in-memory-cache)** This cache type indicates that the 
+results were retrieved from Cube's in-memory cache. All query results 
+are stored in Cube's in-memory cache, and if the same query is 
+run within a certain time frame, the results will be retrieved from in-memory 
+cache instead of being processed on the database or in Cube Store. This is the 
+fastest query retrieval method, but it requires that the exact same query was 
+run very recently.
+- **No cache.** This cache type indicates that the query was processed in the upstream 
+data source and was not accelrated using pre-aggregations. These queries could have 
+a significant performance boost if pre-aggregations and Cube Store were utilized.
 
 In [Query History][ref-query-history] and throughout Cube Cloud, colored bolt
 icons are used to indicate the cache type. Also, [Performance
