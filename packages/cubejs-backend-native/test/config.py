@@ -20,6 +20,23 @@ async def check_auth(req, authorization):
     }
 
 
+@config('extend_context')
+def extend_context(req):
+  print("[python] extend_context req=", req)
+  if "securityContext" not in req:
+    return {
+      "security_context": {
+        "error": "missing",
+      }
+    }
+
+  req["securityContext"]["extended_by_config"] = True
+
+  return {
+    "security_context": req["securityContext"],
+  }
+
+
 @config
 async def repository_factory(ctx):
     print("[python] repository_factory ctx=", ctx)
