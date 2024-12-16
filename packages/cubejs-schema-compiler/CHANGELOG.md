@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.10](https://github.com/cube-js/cube/compare/v1.1.9...v1.1.10) (2024-12-16)
+
+
+### Bug Fixes
+
+* **schema-compiler:** join relationship aliases ([ad4e8e3](https://github.com/cube-js/cube/commit/ad4e8e3872307ab77e035709e5208b0191f87f5b))
+
+
+### Features
+
+* **tesseract:** Support multiple join paths within single query ([#9047](https://github.com/cube-js/cube/issues/9047)) ([b62446e](https://github.com/cube-js/cube/commit/b62446e3c3893068f8dd8aa32d7204ea06a16f98))
+
+
+
+
+
 ## [1.1.9](https://github.com/cube-js/cube/compare/v1.1.8...v1.1.9) (2024-12-08)
 
 
