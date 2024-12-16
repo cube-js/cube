@@ -48,14 +48,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("float_merge", float_merge),
         t("join", join),
         t("filtered_join", filtered_join),
-        // TODO upgrade DF stack overflow
-        // t("three_tables_join", three_tables_join),
+        t("three_tables_join", three_tables_join),
         t(
             "three_tables_join_with_filter",
             three_tables_join_with_filter,
         ),
-        // TODO upgrade DF stack overflow
-        // t("three_tables_join_with_union", three_tables_join_with_union),
+        t("three_tables_join_with_union", three_tables_join_with_union),
         t("in_list", in_list),
         t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
