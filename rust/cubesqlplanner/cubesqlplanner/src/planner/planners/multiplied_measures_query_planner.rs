@@ -1,4 +1,5 @@
 use super::{CommonUtils, JoinPlanner};
+use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::plan::{
     Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
     SelectBuilder,
@@ -50,8 +51,21 @@ impl MultipliedMeasuresQueryPlanner {
         let mut joins = Vec::new();
 
         if !measures.regular_measures.is_empty() {
-            let regular_subquery = self.regular_measures_subquery(&measures.regular_measures)?;
-            joins.push(regular_subquery);
+            let join_multi_fact_groups = self
+                .query_properties
+                .compute_join_multi_fact_groups_with_measures(&measures.regular_measures)?;
+            for (i, (join, measures)) in join_multi_fact_groups.iter().enumerate() {
+                let regular_subquery = self.regular_measures_subquery(
+                    measures,
+                    join.clone(),
+                    if i == 0 {
+                        "main".to_string()
+                    } else {
+                        format!("main_{}", i)
+                    },
+                )?;
+                joins.push(regular_subquery);
+            }
         }
 
         for (cube_name, measures) in measures
@@ -60,7 +74,22 @@ impl MultipliedMeasuresQueryPlanner {
             .into_iter()
             .into_group_map_by(|m| m.cube_name().clone())
         {
-            let aggregate_subquery = self.aggregate_subquery(&cube_name, &measures)?;
+            let join_multi_fact_groups = self
+                .query_properties
+                .compute_join_multi_fact_groups_with_measures(&measures)?;
+            if join_multi_fact_groups.len() != 1 {
+                return Err(CubeError::internal(
+                    format!(
+                        "Expected just one multi-fact join group for aggregate measures but got multiple: {}",
+                        join_multi_fact_groups.into_iter().map(|(_, measures)| format!("({})", measures.iter().map(|m| m.full_name()).join(", "))).join(", ")
+                    )
+                ));
+            }
+            let aggregate_subquery = self.aggregate_subquery(
+                &cube_name,
+                &measures,
+                join_multi_fact_groups.into_iter().next().unwrap().0,
+            )?;
             joins.push(aggregate_subquery);
         }
         Ok(joins)
@@ -70,9 +99,10 @@ impl MultipliedMeasuresQueryPlanner {
         &self,
         key_cube_name: &String,
         measures: &Vec<Rc<BaseMeasure>>,
+        key_join: Rc<dyn JoinDefinition>,
     ) -> Result<Rc<Select>, CubeError> {
         let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
-        let keys_query = self.key_query(&primary_keys_dimensions, key_cube_name)?;
+        let keys_query = self.key_query(&primary_keys_dimensions, key_join, key_cube_name)?;
         let keys_query_alias = format!("keys");
         let should_build_join_for_measure_select =
             self.check_should_build_join_for_measure_select(measures, key_cube_name)?;
@@ -205,6 +235,7 @@ impl MultipliedMeasuresQueryPlanner {
         }
         Ok(false)
     }
+
     fn aggregate_subquery_measure_join(
         &self,
         _key_cube_name: &String,
@@ -230,10 +261,12 @@ impl MultipliedMeasuresQueryPlanner {
     fn regular_measures_subquery(
         &self,
         measures: &Vec<Rc<BaseMeasure>>,
+        join: Rc<dyn JoinDefinition>,
+        alias_prefix: String,
     ) -> Result<Rc<Select>, CubeError> {
         let source = self
             .join_planner
-            .make_join_node_with_prefix(&Some(format!("main")))?;
+            .make_join_node_impl(&Some(alias_prefix), join)?;
 
         let mut select_builder = SelectBuilder::new(source.clone());
         let mut context_factory = self.context_factory.clone();
@@ -259,11 +292,12 @@ impl MultipliedMeasuresQueryPlanner {
     fn key_query(
         &self,
         dimensions: &Vec<Rc<dyn BaseMember>>,
+        key_join: Rc<dyn JoinDefinition>,
         key_cube_name: &String,
     ) -> Result<Rc<Select>, CubeError> {
         let source = self
             .join_planner
-            .make_join_node_with_prefix(&Some(format!("{}_key", key_cube_name)))?;
+            .make_join_node_impl(&Some(format!("{}_key", key_cube_name)), key_join)?;
         let dimensions = self
             .query_properties
             .dimensions_for_select_append(dimensions);

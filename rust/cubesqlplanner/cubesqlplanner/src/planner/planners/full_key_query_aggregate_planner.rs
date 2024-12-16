@@ -4,6 +4,7 @@ use crate::plan::{
 };
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::BaseMeasure;
 use crate::planner::BaseMemberHelper;
 use crate::planner::QueryProperties;
@@ -16,14 +17,21 @@ pub struct FullKeyAggregateQueryPlanner {
     query_properties: Rc<QueryProperties>,
     order_planner: OrderPlanner,
     context_factory: SqlNodesFactory,
+    plan_sql_templates: PlanSqlTemplates,
 }
 
 impl FullKeyAggregateQueryPlanner {
-    pub fn new(query_properties: Rc<QueryProperties>, context_factory: SqlNodesFactory) -> Self {
+    pub fn new(
+        query_properties: Rc<QueryProperties>,
+        context_factory: SqlNodesFactory,
+        // TODO get rid of this dependency
+        plan_sql_templates: PlanSqlTemplates,
+    ) -> Self {
         Self {
             order_planner: OrderPlanner::new(query_properties.clone()),
             query_properties,
             context_factory,
+            plan_sql_templates,
         }
     }
 
@@ -56,6 +64,7 @@ impl FullKeyAggregateQueryPlanner {
             let right_alias = format!("q_{}", i);
             let left_schema = joins[i - 1].schema();
             let right_schema = joins[i].schema();
+            // TODO every next join should join to all previous dimensions through OR: q_0.a = q_1.a, q_0.a = q_2.a OR q_1.a = q_2.a, ...
             let conditions = dimensions_to_select
                 .iter()
                 .map(|dim| {
@@ -73,7 +82,12 @@ impl FullKeyAggregateQueryPlanner {
                 })
                 .collect_vec();
             let on = JoinCondition::new_dimension_join(conditions, true);
-            join_builder.inner_join_subselect(join.clone(), format!("q_{}", i), on);
+            let next_alias = format!("q_{}", i);
+            if self.plan_sql_templates.supports_is_not_distinct_from() {
+                join_builder.inner_join_subselect(join.clone(), next_alias, on);
+            } else {
+                join_builder.full_join_subselect(join.clone(), next_alias, on);
+            }
         }
 
         let from = From::new_from_join(join_builder.build());

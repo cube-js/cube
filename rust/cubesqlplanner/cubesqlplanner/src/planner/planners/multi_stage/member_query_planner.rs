@@ -12,12 +12,14 @@ use crate::planner::planners::{
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
+
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
     _query_properties: Rc<QueryProperties>,
@@ -381,6 +383,7 @@ impl MultiStageMemberQueryPlanner {
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
                 cte_query_properties.clone(),
                 node_factory.clone(),
+                PlanSqlTemplates::new(self.query_tools.templates_render()),
             );
             let subqueries = multiplied_measures_query_planner.plan_queries()?;
             let result = full_key_aggregate_planner.plan(subqueries, vec![])?;

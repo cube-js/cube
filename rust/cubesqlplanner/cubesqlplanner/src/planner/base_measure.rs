@@ -7,6 +7,7 @@ use crate::cube_bridge::measure_definition::{
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -69,6 +70,15 @@ pub struct BaseMeasure {
     time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
     name: String,
+}
+
+impl Debug for BaseMeasure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BaseMeasure")
+            .field("measure", &self.measure)
+            .field("time_shifts", &self.time_shifts)
+            .finish()
+    }
 }
 
 impl BaseMember for BaseMeasure {
