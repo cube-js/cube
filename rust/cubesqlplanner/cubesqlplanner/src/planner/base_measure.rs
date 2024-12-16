@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
-use super::{evaluate_with_context, BaseMember, VisitorContext};
+use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
 };
@@ -70,6 +70,7 @@ pub struct BaseMeasure {
     time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
     name: String,
+    default_alias: String,
 }
 
 impl Debug for BaseMeasure {
@@ -77,6 +78,7 @@ impl Debug for BaseMeasure {
         f.debug_struct("BaseMeasure")
             .field("measure", &self.measure)
             .field("time_shifts", &self.time_shifts)
+            .field("default_alias", &self.default_alias)
             .finish()
     }
 }
@@ -87,7 +89,7 @@ impl BaseMember for BaseMeasure {
     }
 
     fn alias_name(&self) -> String {
-        self.unescaped_alias_name()
+        self.default_alias.clone()
     }
 
     fn member_evaluator(&self) -> Rc<MemberSymbol> {
@@ -115,6 +117,12 @@ impl BaseMeasure {
         let res = match evaluation_node.as_ref() {
             MemberSymbol::Measure(s) => {
                 let time_shifts = Self::parse_time_shifts(&s.definition())?;
+                let default_alias = BaseMemberHelper::default_alias(
+                    &s.cube_name(),
+                    &s.name(),
+                    &None,
+                    query_tools.clone(),
+                )?;
                 Some(Rc::new(Self {
                     measure: s.full_name(),
                     query_tools: query_tools.clone(),
@@ -123,6 +131,7 @@ impl BaseMeasure {
                     cube_name: s.cube_name().clone(),
                     name: s.name().clone(),
                     time_shifts,
+                    default_alias,
                 }))
             }
             _ => None,
@@ -223,9 +232,5 @@ impl BaseMeasure {
 
     pub fn is_multi_stage_ungroupped(&self) -> bool {
         self.is_calculated() || self.definition.static_data().measure_type == "rank"
-    }
-
-    fn unescaped_alias_name(&self) -> String {
-        self.query_tools.alias_name(&self.measure)
     }
 }
