@@ -397,7 +397,7 @@ impl TransformedData {
         let res_type = request_data.res_type.clone();
 
         let members_to_alias_map = get_members(
-            &query_type,
+            query_type,
             query,
             cube_store_result,
             alias_to_member_name_map,
@@ -414,7 +414,7 @@ impl TransformedData {
                         get_compact_row(
                             &members_to_alias_map,
                             annotation,
-                            &query_type,
+                            query_type,
                             &members,
                             query.time_dimensions.as_ref(),
                             row,
@@ -432,7 +432,7 @@ impl TransformedData {
                         get_vanilla_row(
                             alias_to_member_name_map,
                             annotation,
-                            &query_type,
+                            query_type,
                             query,
                             row,
                             &cube_store_result.columns_pos,

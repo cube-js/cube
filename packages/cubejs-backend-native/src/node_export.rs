@@ -35,6 +35,7 @@ use cubeorchestrator::cubestore_message_parser::CubeStoreResult;
 
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
+use crate::node_obj_deserializer::JsValueDeserializer;
 use cubeorchestrator::cubestore_result_transform::{
     get_final_cubestore_result_array, RequestResultArray, RequestResultData,
     RequestResultDataMulti, TransformedData,
@@ -42,6 +43,7 @@ use cubeorchestrator::cubestore_result_transform::{
 use cubeorchestrator::transport::TransformDataRequest;
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
+use serde::Deserialize;
 
 struct SQLInterface {
     services: Arc<NodeCubeServices>,
@@ -553,18 +555,19 @@ fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
 }
 
 fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let json_str = cx.argument::<JsString>(0)?.value(&mut cx);
+    let transform_data_js_object = cx.argument::<JsValue>(0)?;
+    let deserializer = JsValueDeserializer::new(&mut cx, transform_data_js_object);
+
+    let request_data: TransformDataRequest = match Deserialize::deserialize(deserializer) {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
 
     let cube_store_result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(1)?;
     let cube_store_result = Arc::clone(&cube_store_result);
 
     let promise = cx
         .task(move || {
-            let request_data = match serde_json::from_str::<TransformDataRequest>(&json_str) {
-                Ok(data) => data,
-                Err(err) => return Err(anyhow::Error::from(err)),
-            };
-
             let transformed = TransformedData::transform(&request_data, &cube_store_result)?;
 
             match serde_json::to_string(&transformed) {
@@ -588,25 +591,25 @@ fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
 }
 
 fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let transform_data_str = cx.argument::<JsString>(0)?.value(&mut cx);
+    let transform_data_js_object = cx.argument::<JsValue>(0)?;
+    let deserializer = JsValueDeserializer::new(&mut cx, transform_data_js_object);
+    let transform_request_data: TransformDataRequest = match Deserialize::deserialize(deserializer)
+    {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
+
     let cube_store_result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(1)?;
     let cube_store_result = Arc::clone(&cube_store_result);
-    let result_data_str = cx.argument::<JsString>(2)?.value(&mut cx);
+    let result_data_js_object = cx.argument::<JsValue>(2)?;
+    let deserializer = JsValueDeserializer::new(&mut cx, result_data_js_object);
+    let mut result_data: RequestResultData = match Deserialize::deserialize(deserializer) {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
 
     let promise = cx
         .task(move || {
-            let transform_request_data =
-                match serde_json::from_str::<TransformDataRequest>(&transform_data_str) {
-                    Ok(data) => data,
-                    Err(err) => return Err(anyhow::Error::from(err)),
-                };
-
-            let mut result_data = match serde_json::from_str::<RequestResultData>(&result_data_str)
-            {
-                Ok(data) => data,
-                Err(err) => return Err(anyhow::Error::from(err)),
-            };
-
             result_data.prepare_results(&transform_request_data, &cube_store_result)?;
 
             match serde_json::to_string(&result_data) {
@@ -633,16 +636,13 @@ fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
 }
 
 fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let transform_data_array = cx.argument::<JsArray>(0)?;
-    let transform_request_strings: Vec<String> = transform_data_array
-        .to_vec(&mut cx)?
-        .into_iter()
-        .map(|js_value| {
-            js_value
-                .downcast_or_throw::<JsString, _>(&mut cx)
-                .map(|js_string| js_string.value(&mut cx))
-        })
-        .collect::<Result<_, _>>()?;
+    let transform_data_array = cx.argument::<JsValue>(0)?;
+    let deserializer = JsValueDeserializer::new(&mut cx, transform_data_array);
+    let transform_requests: Vec<TransformDataRequest> = match Deserialize::deserialize(deserializer)
+    {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
 
     let cube_store_array = cx.argument::<JsArray>(1)?;
     let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
@@ -655,39 +655,15 @@ fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> 
         .map(|handle| (**handle).clone())
         .collect();
 
-    let results_data_array = cx.argument::<JsArray>(2)?;
-    let request_result_strings: Vec<String> = results_data_array
-        .to_vec(&mut cx)?
-        .into_iter()
-        .map(|js_value| {
-            js_value
-                .downcast_or_throw::<JsString, _>(&mut cx)
-                .map(|js_string| js_string.value(&mut cx))
-        })
-        .collect::<Result<_, _>>()?;
+    let results_data_array = cx.argument::<JsValue>(2)?;
+    let deserializer = JsValueDeserializer::new(&mut cx, results_data_array);
+    let mut request_results: Vec<RequestResultData> = match Deserialize::deserialize(deserializer) {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
 
     let promise = cx
         .task(move || {
-            let transform_requests: Vec<TransformDataRequest> = transform_request_strings
-                .into_iter()
-                .map(
-                    |req_str| match serde_json::from_str::<TransformDataRequest>(&req_str) {
-                        Ok(request) => Ok(request),
-                        Err(err) => Err(anyhow::Error::from(err)),
-                    },
-                )
-                .collect::<Result<_, _>>()?;
-
-            let mut request_results: Vec<RequestResultData> = request_result_strings
-                .into_iter()
-                .map(
-                    |req_str| match serde_json::from_str::<RequestResultData>(&req_str) {
-                        Ok(request) => Ok(request),
-                        Err(err) => Err(anyhow::Error::from(err)),
-                    },
-                )
-                .collect::<Result<_, _>>()?;
-
             get_final_cubestore_result_array(
                 &transform_requests,
                 &cube_store_results,
@@ -722,16 +698,13 @@ fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> 
 }
 
 fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let transform_data_array = cx.argument::<JsArray>(0)?;
-    let transform_request_strings: Vec<String> = transform_data_array
-        .to_vec(&mut cx)?
-        .into_iter()
-        .map(|js_value| {
-            js_value
-                .downcast_or_throw::<JsString, _>(&mut cx)
-                .map(|js_string| js_string.value(&mut cx))
-        })
-        .collect::<Result<_, _>>()?;
+    let transform_data_array = cx.argument::<JsValue>(0)?;
+    let deserializer = JsValueDeserializer::new(&mut cx, transform_data_array);
+    let transform_requests: Vec<TransformDataRequest> = match Deserialize::deserialize(deserializer)
+    {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
 
     let cube_store_array = cx.argument::<JsArray>(1)?;
     let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
@@ -744,26 +717,15 @@ fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> 
         .map(|handle| (**handle).clone())
         .collect();
 
-    let result_data_str = cx.argument::<JsString>(2)?.value(&mut cx);
+    let result_data_js_object = cx.argument::<JsValue>(2)?;
+    let deserializer = JsValueDeserializer::new(&mut cx, result_data_js_object);
+    let mut result_data: RequestResultDataMulti = match Deserialize::deserialize(deserializer) {
+        Ok(data) => data,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
 
     let promise = cx
         .task(move || {
-            let transform_requests: Vec<TransformDataRequest> = transform_request_strings
-                .into_iter()
-                .map(
-                    |req_str| match serde_json::from_str::<TransformDataRequest>(&req_str) {
-                        Ok(request) => Ok(request),
-                        Err(err) => Err(anyhow::Error::from(err)),
-                    },
-                )
-                .collect::<Result<_, _>>()?;
-
-            let mut result_data =
-                match serde_json::from_str::<RequestResultDataMulti>(&result_data_str) {
-                    Ok(data) => data,
-                    Err(err) => return Err(anyhow::Error::from(err)),
-                };
-
             result_data.prepare_results(&transform_requests, &cube_store_results)?;
 
             match serde_json::to_string(&result_data) {

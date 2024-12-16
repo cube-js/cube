@@ -383,28 +383,28 @@ export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => 
   return native.getCubestoreResult(ref);
 };
 
-export const transformData = (transformDataJson: string, rows: any): Promise<TransformDataResponseNative> => {
+export const transformData = (transformDataObj: Object, rows: any): Promise<TransformDataResponseNative> => {
   const native = loadNative();
 
-  return native.transformQueryData(transformDataJson, rows);
+  return native.transformQueryData(transformDataObj, rows);
 };
 
-export const getFinalCubestoreResult = (transformDataJson: string, rows: any, resultData: string): Promise<ArrayBuffer> => {
+export const getFinalCubestoreResult = (transformDataObj: Object, rows: any, resultData: Object): Promise<ArrayBuffer> => {
   const native = loadNative();
 
-  return native.getFinalCubestoreResult(transformDataJson, rows, resultData);
+  return native.getFinalCubestoreResult(transformDataObj, rows, resultData);
 };
 
-export const getFinalCubestoreResultArray = (transformDataJson: string[], rows: any[], resultDataJson: string[]): Promise<ArrayBuffer> => {
+export const getFinalCubestoreResultArray = (transformDataArr: Object[], rows: any[], resultDataArr: Object[]): Promise<ArrayBuffer> => {
   const native = loadNative();
 
-  return native.getFinalCubestoreResultArray(transformDataJson, rows, resultDataJson);
+  return native.getFinalCubestoreResultArray(transformDataArr, rows, resultDataArr);
 };
 
-export const getFinalCubestoreResultMulti = (transformDataJson: string[], rows: any[], responseData: string): Promise<ArrayBuffer> => {
+export const getFinalCubestoreResultMulti = (transformDataArr: Object[], rows: any[], responseData: Object): Promise<ArrayBuffer> => {
   const native = loadNative();
 
-  return native.getFinalCubestoreResultMulti(transformDataJson, rows, responseData);
+  return native.getFinalCubestoreResultMulti(transformDataArr, rows, responseData);
 };
 
 export interface PyConfiguration {
