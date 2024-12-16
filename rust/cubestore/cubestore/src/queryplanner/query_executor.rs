@@ -93,6 +93,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{instrument, Instrument};
 
+use super::serialized_plan::PreSerializedPlan;
 use super::udfs::{
     aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_arc_aggregate_udfs,
     registerable_arc_scalar_udfs, CubeAggregateUDFKind,
@@ -287,19 +288,19 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(
+        let pre_serialized_plan = plan.to_pre_serialized(
             HashMap::new(),
             HashMap::new(),
             NoopParquetMetadataCache::new(),
         )?;
-        let serialized_plan = Arc::new(plan);
-        let ctx = self.router_context(cluster.clone(), serialized_plan.clone())?;
+        let pre_serialized_plan = Arc::new(pre_serialized_plan);
+        let ctx = self.router_context(cluster.clone(), pre_serialized_plan.clone())?;
         Ok((
             ctx.clone()
                 .state()
-                .create_physical_plan(&plan_to_move.clone())
+                .create_physical_plan(pre_serialized_plan.logical_plan())
                 .await?,
-            plan_to_move,
+            pre_serialized_plan.logical_plan().clone(),
         ))
     }
 
@@ -310,20 +311,20 @@ impl QueryExecutor for QueryExecutorImpl {
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        let plan_to_move = plan.logical_plan(
+        let pre_serialized_plan = plan.to_pre_serialized(
             remote_to_local_names,
             chunk_id_to_record_batches,
             self.parquet_metadata_cache.cache().clone(),
         )?;
-        let plan = Arc::new(plan);
-        let ctx = self.worker_context(plan.clone(), data_loaded_size)?;
+        let pre_serialized_plan = Arc::new(pre_serialized_plan);
+        let ctx = self.worker_context(pre_serialized_plan.clone(), data_loaded_size)?;
         let plan_ctx = ctx.clone();
         Ok((
             plan_ctx
                 .state()
-                .create_physical_plan(&plan_to_move.clone())
+                .create_physical_plan(pre_serialized_plan.logical_plan())
                 .await?,
-            plan_to_move,
+            pre_serialized_plan.logical_plan().clone(),
         ))
     }
 
@@ -372,7 +373,7 @@ impl QueryExecutorImpl {
     fn router_context(
         &self,
         cluster: Arc<dyn Cluster>,
-        serialized_plan: Arc<SerializedPlan>,
+        serialized_plan: Arc<PreSerializedPlan>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
         let config = Self::session_config();
@@ -424,7 +425,7 @@ impl QueryExecutorImpl {
 
     fn worker_context(
         &self,
-        serialized_plan: Arc<SerializedPlan>,
+        serialized_plan: Arc<PreSerializedPlan>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
@@ -1228,7 +1229,7 @@ pub struct ClusterSendExec {
     /// Never executed, only stored to allow consistent optimization on router and worker.
     pub input_for_optimizations: Arc<dyn ExecutionPlan>,
     pub cluster: Arc<dyn Cluster>,
-    pub serialized_plan: Arc<SerializedPlan>,
+    pub serialized_plan: Arc<PreSerializedPlan>,
     pub use_streaming: bool,
 }
 
@@ -1247,7 +1248,7 @@ pub enum InlineCompoundPartition {
 impl ClusterSendExec {
     pub fn new(
         cluster: Arc<dyn Cluster>,
-        serialized_plan: Arc<SerializedPlan>,
+        serialized_plan: Arc<PreSerializedPlan>,
         union_snapshots: &[Snapshots],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
@@ -1502,7 +1503,7 @@ impl ClusterSendExec {
         }
     }
 
-    pub fn worker_plans(&self) -> Vec<(String, SerializedPlan)> {
+    pub fn worker_plans(&self) -> Vec<(String, PreSerializedPlan)> {
         let mut res = Vec::new();
         for (node_name, partitions) in self.partitions.iter() {
             res.push((
@@ -1516,7 +1517,7 @@ impl ClusterSendExec {
     fn serialized_plan_for_partitions(
         &self,
         partitions: &(Vec<(u64, RowRange)>, Vec<InlineTableId>),
-    ) -> SerializedPlan {
+    ) -> PreSerializedPlan {
         let (partitions, inline_table_ids) = partitions;
         let mut ps = HashMap::<_, RowFilter>::new();
         for (id, range) in partitions {
@@ -1582,13 +1583,21 @@ impl ExecutionPlan for ClusterSendExec {
         let node_name = node_name.to_string();
         if self.use_streaming {
             // A future that yields a stream
-            let fut = async move { cluster.run_select_stream(&node_name, plan).await };
+            let fut = async move {
+                cluster
+                    .run_select_stream(&node_name, plan.to_serialized_plan()?)
+                    .await
+            };
             // Use TryStreamExt::try_flatten to flatten the stream of streams
             let stream = futures::stream::once(fut).try_flatten();
 
             Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
         } else {
-            let record_batches = async move { cluster.run_select(&node_name, plan).await };
+            let record_batches = async move {
+                cluster
+                    .run_select(&node_name, plan.to_serialized_plan()?)
+                    .await
+            };
             let stream = futures::stream::once(record_batches).flat_map(|r| match r {
                 Ok(vec) => stream::iter(vec.into_iter().map(|b| Ok(b)).collect::<Vec<_>>()),
                 Err(e) => stream::iter(vec![Err(DataFusionError::Execution(e.to_string()))]),

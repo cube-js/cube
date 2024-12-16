@@ -14,6 +14,7 @@ pub mod serialized_plan;
 mod tail_limit;
 mod topk;
 pub mod trace_data_loaded;
+use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 use udfs::{aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_scalar_udfs};
 mod filter_by_key_range;
@@ -126,7 +127,7 @@ crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
 
 pub enum QueryPlan {
     Meta(LogicalPlan),
-    Select(SerializedPlan, /*workers*/ Vec<String>),
+    Select(PreSerializedPlan, /*workers*/ Vec<String>),
 }
 
 #[async_trait]
@@ -195,7 +196,7 @@ impl QueryPlanner for QueryPlannerImpl {
                 &meta.multi_part_subtree,
             )?;
             QueryPlan::Select(
-                SerializedPlan::try_new(logical_plan, meta, trace_obj).await?,
+                PreSerializedPlan::try_new(logical_plan, meta, trace_obj)?,
                 workers,
             )
         } else {
