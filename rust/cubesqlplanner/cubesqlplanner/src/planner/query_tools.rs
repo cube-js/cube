@@ -24,8 +24,11 @@ pub struct QueryToolsCachedData {
     join_key_to_join: HashMap<Rc<JoinKey>, Rc<dyn JoinDefinition>>,
 }
 
-#[derive(Hash, PartialEq, Eq)]
-pub struct JoinKey(Vec<JoinItemStatic>);
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct JoinKey {
+    root: String,
+    joins: Vec<JoinItemStatic>,
+}
 
 impl QueryToolsCachedData {
     pub fn new() -> Self {
@@ -96,13 +99,15 @@ impl QueryToolsCachedData {
                     .flat_map(|h| h.as_ref().iter().cloned())
                     .collect(),
             )?;
-            let join_key = Rc::new(JoinKey(
-                join.joins()?
+            let join_key = Rc::new(JoinKey {
+                root: join.static_data().root.to_string(),
+                joins: join
+                    .joins()?
                     .items()
                     .iter()
                     .map(|i| i.static_data().clone())
                     .collect(),
-            ));
+            });
             self.join_hints_to_join_key.insert(hints, join_key.clone());
             self.join_key_to_join.insert(join_key.clone(), join.clone());
             Ok((join_key, join))

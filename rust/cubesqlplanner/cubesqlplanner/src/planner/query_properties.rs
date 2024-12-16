@@ -32,7 +32,7 @@ impl OrderByItem {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<BaseMeasure>>,
     pub regular_measures: Vec<Rc<BaseMeasure>>,
