@@ -315,16 +315,6 @@ pub struct NormalizedQuery {
     pub query_type: Option<QueryType>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum TransformedData {
-    Compact {
-        members: Vec<String>,
-        dataset: Vec<Vec<String>>,
-    },
-    Vanilla(Vec<HashMap<String, String>>),
-}
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct TransformDataRequest {
     #[serde(rename = "aliasToMemberNameMap")]
@@ -335,47 +325,4 @@ pub struct TransformDataRequest {
     pub query_type: Option<QueryType>,
     #[serde(rename = "resType")]
     pub res_type: Option<ResultType>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestResultData {
-    pub query: NormalizedQuery,
-    #[serde(rename = "lastRefreshTime")]
-    pub last_refresh_time: Option<String>,
-    #[serde(rename = "refreshKeyValues")]
-    pub refresh_key_values: Option<Value>,
-    #[serde(rename = "usedPreAggregations")]
-    pub used_pre_aggregations: Option<Value>,
-    #[serde(rename = "transformedQuery")]
-    pub transformed_query: Option<Value>,
-    #[serde(rename = "requestId")]
-    pub request_id: Option<String>,
-    pub annotation: HashMap<String, HashMap<String, ConfigItem>>,
-    #[serde(rename = "dataSource")]
-    pub data_source: String,
-    #[serde(rename = "dbType")]
-    pub db_type: String,
-    #[serde(rename = "extDbType")]
-    pub ext_db_type: Option<String>,
-    pub external: bool,
-    #[serde(rename = "slowQuery")]
-    pub slow_query: bool,
-    pub total: Option<u64>,
-    pub data: Option<TransformedData>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestResultDataMulti {
-    #[serde(rename = "queryType")]
-    pub query_type: QueryType,
-    pub results: Vec<RequestResultData>,
-    #[serde(rename = "pivotQuery")]
-    pub pivot_query: Option<NormalizedQuery>,
-    #[serde(rename = "slowQuery")]
-    pub slow_query: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestResultArray {
-    pub results: Vec<RequestResultData>,
 }
