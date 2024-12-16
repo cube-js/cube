@@ -1,9 +1,9 @@
-import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
-import { dbRunner } from './PostgresDBRunner';
 import {
   getEnv,
 } from '@cubejs-backend/shared';
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
+import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { dbRunner } from './PostgresDBRunner';
 
 describe('Multi-fact join', () => {
   jest.setTimeout(200000);
