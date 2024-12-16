@@ -30,9 +30,11 @@ use rewrite_plan::rewrite_physical_plan;
 use std::sync::Arc;
 use trace_data_loaded::add_trace_data_loaded_exec;
 
+use super::serialized_plan::PreSerializedPlan;
+
 pub struct CubeQueryPlanner {
     cluster: Option<Arc<dyn Cluster>>,
-    serialized_plan: Arc<SerializedPlan>,
+    serialized_plan: Arc<PreSerializedPlan>,
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,
 }
@@ -40,7 +42,7 @@ pub struct CubeQueryPlanner {
 impl CubeQueryPlanner {
     pub fn new_on_router(
         cluster: Arc<dyn Cluster>,
-        serialized_plan: Arc<SerializedPlan>,
+        serialized_plan: Arc<PreSerializedPlan>,
         memory_handler: Arc<dyn MemoryHandler>,
     ) -> CubeQueryPlanner {
         CubeQueryPlanner {
@@ -52,7 +54,7 @@ impl CubeQueryPlanner {
     }
 
     pub fn new_on_worker(
-        serialized_plan: Arc<SerializedPlan>,
+        serialized_plan: Arc<PreSerializedPlan>,
         memory_handler: Arc<dyn MemoryHandler>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> CubeQueryPlanner {
