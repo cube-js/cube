@@ -261,7 +261,10 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
-    this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    if (!getEnv('nativeSqlPlanner')) {
+      // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
+      this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    }
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
@@ -349,7 +352,8 @@ export class BaseQuery {
   initUngrouped() {
     this.ungrouped = this.options.ungrouped;
     if (this.ungrouped) {
-      if (!this.options.allowUngroupedWithoutPrimaryKey) {
+      // this.join is not defined for Tesseract
+      if (!this.options.allowUngroupedWithoutPrimaryKey && !getEnv('nativeSqlPlanner')) {
         const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
         const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
         const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
@@ -616,7 +620,6 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       timeDimensions: this.options.timeDimensions,
       timezone: this.options.timezone,
-      joinRoot: this.join.root,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       order,
@@ -3312,6 +3315,7 @@ export class BaseQuery {
         always_true: '1 = 1'
 
       },
+      operators: {},
       quotes: {
         identifiers: '"',
         escape: '""'
@@ -3321,7 +3325,8 @@ export class BaseQuery {
       },
       join_types: {
         inner: 'INNER',
-        left: 'LEFT'
+        left: 'LEFT',
+        full: 'FULL',
       },
       window_frame_types: {
         rows: 'ROWS',

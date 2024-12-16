@@ -179,12 +179,18 @@ impl JoinCondition {
 pub struct JoinItem {
     pub from: SingleAliasedSource,
     pub on: JoinCondition,
-    pub is_inner: bool,
+    pub join_type: JoinType,
 }
 
 pub struct Join {
     pub root: SingleAliasedSource,
     pub joins: Vec<JoinItem>,
+}
+
+pub enum JoinType {
+    Inner,
+    Left,
+    Full,
 }
 
 impl JoinItem {
@@ -197,7 +203,7 @@ impl JoinItem {
         let result = templates.join(
             &self.from.to_sql(templates, context)?,
             &on_sql,
-            self.is_inner,
+            &self.join_type,
         )?;
         Ok(result)
     }

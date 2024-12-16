@@ -1,4 +1,5 @@
 use crate::planner::filter::BaseFilter;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
@@ -78,6 +79,23 @@ impl FilterItem {
             }
         };
         Ok(res)
+    }
+
+    pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut result = Vec::new();
+        self.find_all_member_evaluators(&mut result);
+        result
+    }
+
+    pub fn find_all_member_evaluators(&self, result: &mut Vec<Rc<MemberSymbol>>) {
+        match self {
+            FilterItem::Group(group) => {
+                for item in group.items.iter() {
+                    item.find_all_member_evaluators(result)
+                }
+            }
+            FilterItem::Item(item) => result.push(item.member_evaluator().clone()),
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
 use crate::planner::BaseMeasure;
@@ -65,13 +66,19 @@ pub struct MultipliedMeasuresCollector {
     query_tools: Rc<QueryTools>,
     composite_measures: HashSet<String>,
     colllected_measures: Vec<MeasureResult>,
+    join: Rc<dyn JoinDefinition>,
 }
 
 impl MultipliedMeasuresCollector {
-    pub fn new(query_tools: Rc<QueryTools>, composite_measures: HashSet<String>) -> Self {
+    pub fn new(
+        query_tools: Rc<QueryTools>,
+        composite_measures: HashSet<String>,
+        join: Rc<dyn JoinDefinition>,
+    ) -> Self {
         Self {
             query_tools,
             composite_measures,
+            join,
             colllected_measures: vec![],
         }
     }
@@ -91,8 +98,8 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
         let res = match node.as_ref() {
             MemberSymbol::Measure(e) => {
                 let full_name = e.full_name();
-                let join = self.query_tools.cached_data().join()?;
-                let multiplied = join
+                let multiplied = self
+                    .join
                     .static_data()
                     .multiplication_factor
                     .get(e.cube_name())
@@ -123,11 +130,12 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
 pub fn collect_multiplied_measures(
     query_tools: Rc<QueryTools>,
     node: &Rc<MemberSymbol>,
+    join: Rc<dyn JoinDefinition>,
 ) -> Result<Vec<MeasureResult>, CubeError> {
     let mut composite_collector = CompositeMeasuresCollector::new();
     composite_collector.apply(node, &CompositeMeasureCollectorState::new(None))?;
     let composite_measures = composite_collector.extract_result();
-    let mut visitor = MultipliedMeasuresCollector::new(query_tools, composite_measures);
+    let mut visitor = MultipliedMeasuresCollector::new(query_tools, composite_measures, join);
     visitor.apply(node, &())?;
     Ok(visitor.extract_result())
 }

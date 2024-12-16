@@ -36,7 +36,9 @@ impl SimpleQueryPlanner {
             })
         };
         let mut context_factory = self.context_factory.clone();
-        let from = self.join_planner.make_join_node()?;
+        let from = self
+            .join_planner
+            .make_join_node_impl(&None, self.query_properties.simple_query_join()?)?;
         let mut select_builder = SelectBuilder::new(from.clone());
         for time_dim in self.query_properties.time_dimensions() {
             if let Some(granularity) = time_dim.get_granularity() {

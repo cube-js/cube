@@ -1,10 +1,12 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
+use crate::plan::join::JoinType;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
 }
@@ -74,6 +76,7 @@ impl PlanSqlTemplates {
             context! { expr => expr, negate => negate },
         )
     }
+
     pub fn always_true(&self) -> Result<String, CubeError> {
         Ok(self.render.get_template("filters/always_true")?.clone())
     }
@@ -168,15 +171,27 @@ impl PlanSqlTemplates {
         )
     }
 
-    pub fn join(&self, source: &str, condition: &str, is_inner: bool) -> Result<String, CubeError> {
-        let join_type = if is_inner {
-            self.render.get_template("join_types/inner")?
-        } else {
-            self.render.get_template("join_types/left")?
+    pub fn join(
+        &self,
+        source: &str,
+        condition: &str,
+        join_type: &JoinType,
+    ) -> Result<String, CubeError> {
+        let join_type = match join_type {
+            JoinType::Full => self.render.get_template("join_types/full")?,
+            JoinType::Inner => self.render.get_template("join_types/inner")?,
+            JoinType::Left => self.render.get_template("join_types/left")?,
         };
         self.render.render_template(
             "statements/join",
             context! { source => source, condition => condition, join_type => join_type },
+        )
+    }
+
+    pub fn binary_expr(&self, left: &str, op: &str, right: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/binary",
+            context! { left => left, op => op, right => right },
         )
     }
 
@@ -187,6 +202,13 @@ impl PlanSqlTemplates {
         null_check: bool,
     ) -> Result<String, CubeError> {
         let null_check = if null_check {
+            if self.supports_is_not_distinct_from() {
+                let is_not_distinct_from_op = self
+                    .render
+                    .render_template("operators/is_not_distinct_from", context! {})?;
+
+                return self.binary_expr(left_column, &is_not_distinct_from_op, right_column);
+            }
             format!(
                 " OR ({} AND {})",
                 self.is_null_expr(&left_column, false)?,
@@ -200,5 +222,10 @@ impl PlanSqlTemplates {
             "({} = {}{})",
             left_column, right_column, null_check
         ))
+    }
+
+    pub fn supports_is_not_distinct_from(&self) -> bool {
+        self.render
+            .contains_template("operators/is_not_distinct_from")
     }
 }
