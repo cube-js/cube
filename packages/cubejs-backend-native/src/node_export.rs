@@ -36,12 +36,10 @@ use cubeorchestrator::cubestore_message_parser::CubeStoreResult;
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use cubeorchestrator::cubestore_result_transform::{
-    get_final_cubestore_result, get_final_cubestore_result_array, get_final_cubestore_result_multi,
-    transform_data,
+    get_final_cubestore_result_array, RequestResultArray, RequestResultData,
+    RequestResultDataMulti, TransformedData,
 };
-use cubeorchestrator::types::{
-    RequestResultArray, RequestResultData, RequestResultDataMulti, TransformDataRequest,
-};
+use cubeorchestrator::transport::TransformDataRequest;
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 
@@ -567,20 +565,7 @@ fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 Err(err) => return Err(anyhow::Error::from(err)),
             };
 
-            let alias_to_member_name_map = &request_data.alias_to_member_name_map;
-            let annotation = &request_data.annotation;
-            let query = &request_data.query;
-            let query_type = &request_data.query_type.unwrap_or_default();
-            let res_type = &request_data.res_type;
-
-            let transformed = transform_data(
-                alias_to_member_name_map,
-                annotation,
-                &cube_store_result,
-                query,
-                query_type,
-                res_type.clone(),
-            )?;
+            let transformed = TransformedData::transform(&request_data, &cube_store_result)?;
 
             match serde_json::to_string(&transformed) {
                 Ok(json) => Ok(json),
@@ -622,11 +607,7 @@ fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 Err(err) => return Err(anyhow::Error::from(err)),
             };
 
-            get_final_cubestore_result(
-                &transform_request_data,
-                &cube_store_result,
-                &mut result_data,
-            )?;
+            result_data.prepare_results(&transform_request_data, &cube_store_result)?;
 
             match serde_json::to_string(&result_data) {
                 Ok(json) => Ok(json),
@@ -783,11 +764,7 @@ fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> 
                     Err(err) => return Err(anyhow::Error::from(err)),
                 };
 
-            get_final_cubestore_result_multi(
-                &transform_requests,
-                &cube_store_results,
-                &mut result_data,
-            )?;
+            result_data.prepare_results(&transform_requests, &cube_store_results)?;
 
             match serde_json::to_string(&result_data) {
                 Ok(json) => Ok(json),
