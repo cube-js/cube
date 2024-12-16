@@ -72,6 +72,8 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 
+use super::serialized_plan::PreSerializedPlan;
+
 #[cfg(test)]
 pub async fn choose_index(
     p: LogicalPlan,
@@ -1585,7 +1587,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
 
 pub struct CubeExtensionPlanner {
     pub cluster: Option<Arc<dyn Cluster>>,
-    pub serialized_plan: Arc<SerializedPlan>,
+    pub serialized_plan: Arc<PreSerializedPlan>,
 }
 
 #[async_trait]
