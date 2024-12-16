@@ -224,8 +224,37 @@ impl PlanSqlTemplates {
         ))
     }
 
+    pub fn supports_full_join(&self) -> bool {
+        self.render.contains_template("join_types/full")
+    }
+
     pub fn supports_is_not_distinct_from(&self) -> bool {
         self.render
             .contains_template("operators/is_not_distinct_from")
+    }
+
+    pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
+        self.render
+            .render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn scalar_function(
+        &self,
+        scalar_function: String,
+        args: Vec<String>,
+        date_part: Option<String>,
+        interval: Option<String>,
+    ) -> Result<String, CubeError> {
+        let function = scalar_function.to_string().to_uppercase();
+        let args_concat = args.join(", ");
+        self.render.render_template(
+            &format!("functions/{}", function),
+            context! {
+                args_concat => args_concat,
+                args => args,
+                date_part => date_part,
+                interval => interval,
+            },
+        )
     }
 }

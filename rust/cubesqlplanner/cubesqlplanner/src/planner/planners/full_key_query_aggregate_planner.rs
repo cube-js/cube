@@ -60,7 +60,6 @@ impl FullKeyAggregateQueryPlanner {
         let mut join_builder = JoinBuilder::new_from_subselect(joins[0].clone(), format!("q_0"));
         let dimensions_to_select = self.query_properties.dimensions_for_select();
         for (i, join) in joins.iter().enumerate().skip(1) {
-            let left_alias = format!("q_{}", i - 1);
             let right_alias = format!("q_{}", i);
             let left_schema = joins[i - 1].schema();
             let right_schema = joins[i].schema();
@@ -68,25 +67,31 @@ impl FullKeyAggregateQueryPlanner {
             let conditions = dimensions_to_select
                 .iter()
                 .map(|dim| {
-                    let alias_in_left_query = left_schema.resolve_member_alias(dim);
-                    let left_ref = Expr::Reference(QualifiedColumnName::new(
-                        Some(left_alias.clone()),
-                        alias_in_left_query,
-                    ));
-                    let alias_in_right_query = right_schema.resolve_member_alias(dim);
-                    let right_ref = Expr::Reference(QualifiedColumnName::new(
-                        Some(right_alias.clone()),
-                        alias_in_right_query,
-                    ));
-                    (left_ref, right_ref)
+                    (0..i)
+                        .map(|left_i| {
+                            let left_alias = format!("q_{}", left_i);
+                            let alias_in_left_query = left_schema.resolve_member_alias(dim);
+                            let left_ref = Expr::Reference(QualifiedColumnName::new(
+                                Some(left_alias.clone()),
+                                alias_in_left_query,
+                            ));
+                            let alias_in_right_query = right_schema.resolve_member_alias(dim);
+                            let right_ref = Expr::Reference(QualifiedColumnName::new(
+                                Some(right_alias.clone()),
+                                alias_in_right_query,
+                            ));
+                            (left_ref, right_ref)
+                        })
+                        .collect::<Vec<_>>()
                 })
                 .collect_vec();
             let on = JoinCondition::new_dimension_join(conditions, true);
             let next_alias = format!("q_{}", i);
-            if self.plan_sql_templates.supports_is_not_distinct_from() {
-                join_builder.inner_join_subselect(join.clone(), next_alias, on);
-            } else {
+            if self.plan_sql_templates.supports_full_join() {
                 join_builder.full_join_subselect(join.clone(), next_alias, on);
+            } else {
+                // TODO in case of full join is not supported there should be correct blending query that keeps NULL values
+                join_builder.inner_join_subselect(join.clone(), next_alias, on);
             }
         }
 
@@ -103,9 +108,26 @@ impl FullKeyAggregateQueryPlanner {
                 &dimensions_source,
                 &mut render_references,
             )?;
+            let references = (0..joins.len())
+                .map(|i| {
+                    let alias = format!("q_{}", i);
+                    references_builder
+                        .find_reference_for_member(
+                            &member.member_evaluator().full_name(),
+                            &Some(alias.clone()),
+                        )
+                        .ok_or_else(|| {
+                            CubeError::internal(format!(
+                                "Reference for join not found for {} in {}",
+                                member.member_evaluator().full_name(),
+                                alias
+                            ))
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             let alias = references_builder
                 .resolve_alias_for_member(&member.full_name(), &dimensions_source);
-            select_builder.add_projection_member(member, alias);
+            select_builder.add_projection_coalesce_member(member, references, alias);
         }
 
         for member in BaseMemberHelper::iter_as_base_member(&outer_measures) {

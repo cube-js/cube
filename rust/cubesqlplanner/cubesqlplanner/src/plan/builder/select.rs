@@ -1,8 +1,9 @@
 use crate::plan::{
-    AliasedExpr, Cte, Expr, Filter, From, MemberExpression, OrderBy, Schema, SchemaColumn, Select,
-    SingleAliasedSource, SingleSource,
+    AliasedExpr, Cte, Expr, Filter, From, MemberExpression, OrderBy, QualifiedColumnName, Schema,
+    SchemaColumn, Select, SingleAliasedSource, SingleSource,
 };
 
+use crate::plan::expression::FunctionExpression;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::{BaseMember, VisitorContext};
 use std::collections::HashMap;
@@ -47,6 +48,36 @@ impl SelectBuilder {
         };
 
         let expr = Expr::Member(MemberExpression::new(member.clone()));
+        let aliased_expr = AliasedExpr {
+            expr,
+            alias: alias.clone(),
+        };
+
+        self.projection_columns.push(aliased_expr);
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+    }
+
+    pub fn add_projection_coalesce_member(
+        &mut self,
+        member: &Rc<dyn BaseMember>,
+        references: Vec<QualifiedColumnName>,
+        alias: Option<String>,
+    ) {
+        let alias = if let Some(alias) = alias {
+            alias
+        } else {
+            member.alias_name()
+        };
+
+        let expr = Expr::Function(FunctionExpression {
+            function: "COALESCE".to_string(),
+            arguments: references
+                .into_iter()
+                // TODO unwrap
+                .map(|r| Expr::Reference(r))
+                .collect(),
+        });
         let aliased_expr = AliasedExpr {
             expr,
             alias: alias.clone(),

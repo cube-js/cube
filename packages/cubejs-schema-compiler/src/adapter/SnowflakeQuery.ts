@@ -116,6 +116,7 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    templates.join_types.full = 'FULL';
     delete templates.types.interval;
     return templates;
   }

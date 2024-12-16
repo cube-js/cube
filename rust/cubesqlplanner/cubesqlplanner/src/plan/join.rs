@@ -88,12 +88,13 @@ impl RollingWindowJoinCondition {
 }
 
 pub struct DimensionJoinCondition {
-    conditions: Vec<(Expr, Expr)>,
+    // AND (... OR ...)
+    conditions: Vec<Vec<(Expr, Expr)>>,
     null_check: bool,
 }
 
 impl DimensionJoinCondition {
-    pub fn new(conditions: Vec<(Expr, Expr)>, null_check: bool) -> Self {
+    pub fn new(conditions: Vec<Vec<(Expr, Expr)>>, null_check: bool) -> Self {
         Self {
             conditions,
             null_check,
@@ -110,8 +111,17 @@ impl DimensionJoinCondition {
         } else {
             self.conditions
                 .iter()
-                .map(|(left, right)| -> Result<String, CubeError> {
-                    self.dimension_condition(templates, context.clone(), left, right)
+                .map(|or_conditions| -> Result<_, CubeError> {
+                    Ok(format!(
+                        "({})",
+                        or_conditions
+                            .iter()
+                            .map(|(left, right)| -> Result<String, CubeError> {
+                                self.dimension_condition(templates, context.clone(), left, right)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?
+                            .join(" OR ")
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .join(" AND ")
@@ -139,7 +149,7 @@ pub enum JoinCondition {
 }
 
 impl JoinCondition {
-    pub fn new_dimension_join(conditions: Vec<(Expr, Expr)>, null_check: bool) -> Self {
+    pub fn new_dimension_join(conditions: Vec<Vec<(Expr, Expr)>>, null_check: bool) -> Self {
         Self::DimensionJoinCondition(DimensionJoinCondition::new(conditions, null_check))
     }
 
