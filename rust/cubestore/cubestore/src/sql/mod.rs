@@ -50,7 +50,7 @@ use crate::metastore::{
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::query_executor::{batches_to_dataframe, ClusterSendExec, QueryExecutor};
-use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
+use crate::queryplanner::serialized_plan::{PreSerializedPlan, RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
@@ -382,7 +382,7 @@ impl SqlServiceImpl {
     ) -> Result<Arc<DataFrame>, CubeError> {
         fn extract_worker_plans(
             p: &Arc<dyn ExecutionPlan>,
-        ) -> Option<Vec<(String, SerializedPlan)>> {
+        ) -> Option<Vec<(String, PreSerializedPlan)>> {
             if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
                 Some(p.worker_plans())
             } else {
@@ -407,11 +407,7 @@ impl SqlServiceImpl {
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
                 let res = if !analyze {
-                    let logical_plan = serialized.logical_plan(
-                        HashMap::new(),
-                        HashMap::new(),
-                        NoopParquetMetadataCache::new(),
-                    )?;
+                    let logical_plan = serialized.logical_plan();
 
                     DataFrame::new(
                         vec![Column::new(
@@ -431,7 +427,10 @@ impl SqlServiceImpl {
                     ];
                     let mut rows = Vec::new();
 
-                    let router_plan = executor.router_plan(serialized.clone(), cluster).await?.0;
+                    let router_plan = executor
+                        .router_plan(serialized.to_serialized_plan()?, cluster)
+                        .await?
+                        .0;
                     rows.push(Row::new(vec![
                         TableValue::String("router".to_string()),
                         TableValue::String("".to_string()),
@@ -443,7 +442,7 @@ impl SqlServiceImpl {
                             .into_iter()
                             .map(|(name, plan)| async move {
                                 self.cluster
-                                    .run_explain_analyze(&name, plan.clone())
+                                    .run_explain_analyze(&name, plan.to_serialized_plan()?)
                                     .await
                                     .map(|p| (name, p))
                             })
@@ -1083,28 +1082,37 @@ impl SqlService for SqlServiceImpl {
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(query, context, serialized, async move |plan| {
-                                    let records;
-                                    if workers.len() == 0 {
-                                        records =
-                                            executor.execute_router_plan(plan, cluster).await?.1;
-                                    } else {
-                                        // Pick one of the workers to run as main for the request.
-                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
-                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
-                                        records = rs
-                                            .into_iter()
-                                            .map(|r| r.read())
-                                            .collect::<Result<Vec<_>, _>>()?;
-                                    }
-                                    Ok(cube_ext::spawn_blocking(
-                                        move || -> Result<DataFrame, CubeError> {
-                                            let df = batches_to_dataframe(records)?;
-                                            Ok(df)
-                                        },
-                                    )
-                                    .await??)
-                                })
+                                .get(
+                                    query,
+                                    context,
+                                    serialized.to_serialized_plan()?,
+                                    async move |plan| {
+                                        let records;
+                                        if workers.len() == 0 {
+                                            records = executor
+                                                .execute_router_plan(plan, cluster)
+                                                .await?
+                                                .1;
+                                        } else {
+                                            // Pick one of the workers to run as main for the request.
+                                            let i =
+                                                thread_rng().sample(Uniform::new(0, workers.len()));
+                                            let rs =
+                                                cluster.route_select(&workers[i], plan).await?.1;
+                                            records = rs
+                                                .into_iter()
+                                                .map(|r| r.read())
+                                                .collect::<Result<Vec<_>, _>>()?;
+                                        }
+                                        Ok(cube_ext::spawn_blocking(
+                                            move || -> Result<DataFrame, CubeError> {
+                                                let df = batches_to_dataframe(records)?;
+                                                Ok(df)
+                                            },
+                                        )
+                                        .await??)
+                                    },
+                                )
                                 .with_current_subscriber(),
                         )
                         .await??
@@ -1159,18 +1167,20 @@ impl SqlService for SqlServiceImpl {
                 match logical_plan {
                     QueryPlan::Select(router_plan, _) => {
                         // For tests, pretend we have all partitions on the same worker.
-                        let worker_plan = router_plan.with_partition_id_to_execute(
-                            router_plan
-                                .index_snapshots()
-                                .iter()
-                                .flat_map(|i| {
-                                    i.partitions
-                                        .iter()
-                                        .map(|p| (p.partition.get_id(), RowFilter::default()))
-                                })
-                                .collect(),
-                            context.inline_tables.into_iter().map(|i| i.id).collect(),
-                        );
+                        let worker_plan: PreSerializedPlan = router_plan
+                            .with_partition_id_to_execute(
+                                router_plan
+                                    .index_snapshots()
+                                    .iter()
+                                    .flat_map(|i| {
+                                        i.partitions
+                                            .iter()
+                                            .map(|p| (p.partition.get_id(), RowFilter::default()))
+                                    })
+                                    .collect(),
+                                context.inline_tables.into_iter().map(|i| i.id).collect(),
+                            );
+                        let worker_plan: SerializedPlan = worker_plan.to_serialized_plan()?;
                         let mut mocked_names = HashMap::new();
                         for (_, f, _, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(f.clone()).await?;
@@ -1184,7 +1194,10 @@ impl SqlService for SqlServiceImpl {
                         return Ok(QueryPlans {
                             router: self
                                 .query_executor
-                                .router_plan(router_plan, self.cluster.clone())
+                                .router_plan(
+                                    router_plan.to_serialized_plan()?,
+                                    self.cluster.clone(),
+                                )
                                 .await?
                                 .0,
                             worker: self
