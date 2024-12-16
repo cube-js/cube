@@ -134,7 +134,7 @@ impl MultipliedMeasuresQueryPlanner {
                         Some(pk_cube_alias.clone()),
                         alias_in_subquery,
                     ));
-                    (keys_query_ref, subquery_ref)
+                    vec![(keys_query_ref, subquery_ref)]
                 })
                 .collect_vec();
 
@@ -165,7 +165,7 @@ impl MultipliedMeasuresQueryPlanner {
                         alias_in_keys_query,
                     ));
                     let pk_cube_expr = Expr::Member(MemberExpression::new(dim.clone()));
-                    (keys_query_ref, pk_cube_expr)
+                    vec![(keys_query_ref, pk_cube_expr)]
                 })
                 .collect_vec();
             join_builder.left_join_cube(

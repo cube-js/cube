@@ -8,6 +8,7 @@ use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::FilterItem;
 use crate::planner::sql_evaluator::collectors::collect_join_hints;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
@@ -144,12 +145,13 @@ impl QueryTools {
         } else {
             None
         };
+        let sql_templates = PlanSqlTemplates::new(templates_render.clone());
         Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
             join_graph,
             templates_render,
-            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new())),
+            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(sql_templates))),
             evaluator_compiler,
             cached_data: RefCell::new(QueryToolsCachedData::new()),
             timezone,

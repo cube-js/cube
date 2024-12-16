@@ -3326,7 +3326,6 @@ export class BaseQuery {
       join_types: {
         inner: 'INNER',
         left: 'LEFT',
-        full: 'FULL',
       },
       window_frame_types: {
         rows: 'ROWS',

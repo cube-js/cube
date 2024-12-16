@@ -295,10 +295,9 @@ impl QueryProperties {
                         .cached_data_mut()
                         .join_hints_for_member(m.member_evaluator())?;
                     let join = query_tools.cached_data_mut().join_by_hints(
-                        dimension_and_filter_join_hints_concat
-                            .clone()
+                        vec![measure_join_hints]
                             .into_iter()
-                            .chain(vec![measure_join_hints].into_iter())
+                            .chain(dimension_and_filter_join_hints_concat.clone().into_iter())
                             .collect::<Vec<_>>(),
                         |hints| query_tools.join_graph().build_join(hints),
                     )?;

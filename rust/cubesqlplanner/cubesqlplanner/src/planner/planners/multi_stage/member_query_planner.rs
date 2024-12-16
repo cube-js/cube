@@ -267,24 +267,28 @@ impl MultiStageMemberQueryPlanner {
             Some(root_alias.clone()),
         );
         for (i, input) in inputs.iter().enumerate().skip(1) {
-            let left_alias = format!("q_{}", i - 1);
             let right_alias = format!("q_{}", i);
             let left_schema = cte_schemas.get(&inputs[i - 1]).unwrap().clone();
             let cte_schema = cte_schemas.get(input).unwrap().clone();
             let conditions = dimensions
                 .iter()
                 .map(|dim| {
-                    let alias_in_left_query = left_schema.resolve_member_alias(dim);
-                    let left_ref = Expr::Reference(QualifiedColumnName::new(
-                        Some(left_alias.clone()),
-                        alias_in_left_query,
-                    ));
-                    let alias_in_right_query = cte_schema.resolve_member_alias(dim);
-                    let right_ref = Expr::Reference(QualifiedColumnName::new(
-                        Some(right_alias.clone()),
-                        alias_in_right_query,
-                    ));
-                    (left_ref, right_ref)
+                    (0..i)
+                        .map(|left_alias| {
+                            let left_alias = format!("q_{}", left_alias);
+                            let alias_in_left_query = left_schema.resolve_member_alias(dim);
+                            let left_ref = Expr::Reference(QualifiedColumnName::new(
+                                Some(left_alias.clone()),
+                                alias_in_left_query,
+                            ));
+                            let alias_in_right_query = cte_schema.resolve_member_alias(dim);
+                            let right_ref = Expr::Reference(QualifiedColumnName::new(
+                                Some(right_alias.clone()),
+                                alias_in_right_query,
+                            ));
+                            (left_ref, right_ref)
+                        })
+                        .collect()
                 })
                 .collect_vec();
             let on = JoinCondition::new_dimension_join(conditions, true);
