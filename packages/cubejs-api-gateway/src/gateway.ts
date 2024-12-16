@@ -1651,7 +1651,7 @@ class ApiGateway {
     const dataCb: TransformDataResponseCb = response.data.isNative ?
       async () => {
         const jsonData = await transformDataNative(
-          JSON.stringify(transformDataParams), response.data.getNativeRef()
+          transformDataParams, response.data.getNativeRef()
         );
         return JSON.parse(jsonData.result) as TransformDataResponse;
       }
@@ -1850,9 +1850,9 @@ class ApiGateway {
         // If all query results are from Cubestore (are native)
         // we prepare the final json result on native side
         if (allNative) {
-          const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[string[], any[], any[]]>(
+          const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[Object[], any[], Object[]]>(
             ([transformList, rawList, resultList], r) => {
-              transformList.push(JSON.stringify(r.transformDataParams));
+              transformList.push(r.transformDataParams);
               rawList.push(r.rawData.getNativeRef());
               resultList.push(cleanupResult(r));
               return [transformList, rawList, resultList];
@@ -1865,9 +1865,8 @@ class ApiGateway {
             results: cleanResultList,
             slowQuery
           };
-          const resultDataJson = JSON.stringify(responseDataObj);
 
-          res(await getFinalCubestoreResultMulti(transformDataJson, rawDataRef, resultDataJson));
+          res(await getFinalCubestoreResultMulti(transformDataJson, rawDataRef, responseDataObj));
         } else {
           // if we have mixed query results (there are js and native)
           // we prepare results separately: on js and native sides
@@ -1888,10 +1887,8 @@ class ApiGateway {
       } else if (allNative) {
         // We prepare the full final json result on native side
         const r = results[0];
-        const transformDataJson = JSON.stringify(r.transformDataParams);
         const rawDataRef = r.rawData.getNativeRef();
-        const resultDataJson = JSON.stringify(cleanupResult(r));
-        res(await getFinalCubestoreResult(transformDataJson, rawDataRef, resultDataJson));
+        res(await getFinalCubestoreResult(r.transformDataParams, rawDataRef, cleanupResult(r)));
       } else {
         const data = await results[0].dataCb();
         res({
@@ -2036,11 +2033,11 @@ class ApiGateway {
             const [transformDataJson, rawDataRef, resultDataJson] = (results as {
               transformDataParams: any;
               rawData: { getNativeRef: () => any };
-            }[]).reduce<[string[], any[], string[]]>(
+            }[]).reduce<[Object[], any[], Object[]]>(
               ([transformList, rawList, resultList], r) => {
-                transformList.push(JSON.stringify(r.transformDataParams));
+                transformList.push(r.transformDataParams);
                 rawList.push(r.rawData.getNativeRef());
-                resultList.push(JSON.stringify(cleanupResult(r)));
+                resultList.push(cleanupResult(r));
                 return [transformList, rawList, resultList];
               },
               [[], [], []]
