@@ -979,7 +979,7 @@ declare module '@cubejs-client/core' {
 
   export type TCubeHierarchy = {
     name: string;
-    title: string;
+    title?: string;
     levels: string[];
     public?: boolean;
   };
