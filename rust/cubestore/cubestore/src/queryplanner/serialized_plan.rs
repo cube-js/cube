@@ -79,6 +79,16 @@ impl RowFilter {
     }
 }
 
+/// SerializedPlan, but before we actually serialize the LogicalPlan.
+#[derive(Debug)]
+pub struct PreSerializedPlan {
+    logical_plan: LogicalPlan,
+    schema_snapshot: Arc<SchemaSnapshot>,
+    partition_ids_to_execute: Vec<(u64, RowFilter)>,
+    inline_table_ids_to_execute: Vec<InlineTableId>,
+    trace_obj: Option<String>,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializedPlan {
     logical_plan: Arc<Vec<u8>>,
@@ -1052,21 +1062,31 @@ pub enum SerializedTableSource {
     InlineTable(InlineTableProvider),
 }
 
-impl SerializedPlan {
-    pub async fn try_new(
-        plan: LogicalPlan,
-        index_snapshots: PlanningMeta,
-        trace_obj: Option<String>,
-    ) -> Result<Self, CubeError> {
+impl PreSerializedPlan {
+    pub fn to_serialized_plan(&self) -> Result<SerializedPlan, CubeError> {
         let serialized_logical_plan =
             datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
-                &plan,
+                &self.logical_plan,
                 &CubeExtensionCodec {
                     worker_context: None,
                 },
             )?;
         Ok(SerializedPlan {
             logical_plan: Arc::new(serialized_logical_plan.to_vec()),
+            schema_snapshot: self.schema_snapshot.clone(),
+            partition_ids_to_execute: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
+            trace_obj: self.trace_obj.clone(),
+        })
+    }
+
+    pub fn try_new(
+        plan: LogicalPlan,
+        index_snapshots: PlanningMeta,
+        trace_obj: Option<String>,
+    ) -> Result<Self, CubeError> {
+        Ok(PreSerializedPlan {
+            logical_plan: plan,
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
             partition_ids_to_execute: Vec::new(),
             inline_table_ids_to_execute: Vec::new(),
@@ -1091,6 +1111,124 @@ impl SerializedPlan {
             inline_table_ids_to_execute,
             trace_obj: self.trace_obj.clone(),
         }
+    }
+
+    /// Note: avoid during normal execution, workers must filter the partitions they execute.
+    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
+        self.list_files_to_download(|_| true)
+    }
+
+    fn list_files_to_download(
+        &self,
+        include_partition: impl Fn(u64) -> bool,
+    ) -> Vec<(
+        IdRow<Partition>,
+        /* file_name */ String,
+        /* size */ Option<u64>,
+        /* chunk_id */ Option<u64>,
+    )> {
+        let indexes = self.index_snapshots();
+        Self::list_files_to_download_given_index_snapshots(indexes, include_partition)
+    }
+
+    fn list_files_to_download_given_index_snapshots(
+        indexes: &Vec<IndexSnapshot>,
+        include_partition: impl Fn(u64) -> bool,
+    ) -> Vec<(
+        IdRow<Partition>,
+        /* file_name */ String,
+        /* size */ Option<u64>,
+        /* chunk_id */ Option<u64>,
+    )> {
+        let mut files = Vec::new();
+
+        for index in indexes.iter() {
+            for partition in index.partitions() {
+                if !include_partition(partition.partition.get_id()) {
+                    continue;
+                }
+                if let Some(file) = partition
+                    .partition
+                    .get_row()
+                    .get_full_name(partition.partition.get_id())
+                {
+                    files.push((
+                        partition.partition.clone(),
+                        file,
+                        partition.partition.get_row().file_size(),
+                        None,
+                    ));
+                }
+
+                for chunk in partition.chunks() {
+                    if !chunk.get_row().in_memory() {
+                        files.push((
+                            partition.partition.clone(),
+                            chunk.get_row().get_full_name(chunk.get_id()),
+                            chunk.get_row().file_size(),
+                            Some(chunk.get_id()),
+                        ))
+                    }
+                }
+            }
+        }
+
+        files
+    }
+
+    pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {
+        &self.schema_snapshot.index_snapshots.indices
+    }
+
+    pub fn planning_meta(&self) -> &PlanningMeta {
+        &self.schema_snapshot.index_snapshots
+    }
+
+    pub fn logical_plan(&self) -> &LogicalPlan {
+        &self.logical_plan
+    }
+}
+
+impl SerializedPlan {
+    pub async fn try_new(
+        plan: LogicalPlan,
+        index_snapshots: PlanningMeta,
+        trace_obj: Option<String>,
+    ) -> Result<Self, CubeError> {
+        let serialized_logical_plan =
+            datafusion_proto::bytes::logical_plan_to_bytes_with_extension_codec(
+                &plan,
+                &CubeExtensionCodec {
+                    worker_context: None,
+                },
+            )?;
+        Ok(SerializedPlan {
+            logical_plan: Arc::new(serialized_logical_plan.to_vec()),
+            schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
+            partition_ids_to_execute: Vec::new(),
+            inline_table_ids_to_execute: Vec::new(),
+            trace_obj,
+        })
+    }
+
+    pub fn to_pre_serialized(
+        &self,
+        remote_to_local_names: HashMap<String, String>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        parquet_metadata_cache: Arc<dyn ParquetFileReaderFactory>,
+    ) -> Result<PreSerializedPlan, CubeError> {
+        let plan = self.logical_plan(
+            remote_to_local_names,
+            chunk_id_to_record_batches,
+            parquet_metadata_cache,
+        )?;
+        Ok(PreSerializedPlan {
+            logical_plan: plan,
+            schema_snapshot: self.schema_snapshot.clone(),
+            partition_ids_to_execute: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
+            trace_obj: self.trace_obj.clone(),
+        })
     }
 
     pub fn logical_plan(
@@ -1139,63 +1277,12 @@ impl SerializedPlan {
     }
 
     pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
-        self.list_files_to_download(|id| {
+        let indexes: &Vec<IndexSnapshot> = self.index_snapshots();
+        PreSerializedPlan::list_files_to_download_given_index_snapshots(indexes, |id| {
             self.partition_ids_to_execute
                 .binary_search_by_key(&id, |(id, _)| *id)
                 .is_ok()
         })
-    }
-
-    /// Note: avoid during normal execution, workers must filter the partitions they execute.
-    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
-        self.list_files_to_download(|_| true)
-    }
-
-    fn list_files_to_download(
-        &self,
-        include_partition: impl Fn(u64) -> bool,
-    ) -> Vec<(
-        IdRow<Partition>,
-        /* file_name */ String,
-        /* size */ Option<u64>,
-        /* chunk_id */ Option<u64>,
-    )> {
-        let indexes = self.index_snapshots();
-
-        let mut files = Vec::new();
-
-        for index in indexes.iter() {
-            for partition in index.partitions() {
-                if !include_partition(partition.partition.get_id()) {
-                    continue;
-                }
-                if let Some(file) = partition
-                    .partition
-                    .get_row()
-                    .get_full_name(partition.partition.get_id())
-                {
-                    files.push((
-                        partition.partition.clone(),
-                        file,
-                        partition.partition.get_row().file_size(),
-                        None,
-                    ));
-                }
-
-                for chunk in partition.chunks() {
-                    if !chunk.get_row().in_memory() {
-                        files.push((
-                            partition.partition.clone(),
-                            chunk.get_row().get_full_name(chunk.get_id()),
-                            chunk.get_row().file_size(),
-                            Some(chunk.get_id()),
-                        ))
-                    }
-                }
-            }
-        }
-
-        files
     }
 
     pub fn in_memory_chunks_to_load(&self) -> Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)> {
