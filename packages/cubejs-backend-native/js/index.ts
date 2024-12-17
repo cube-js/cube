@@ -118,23 +118,27 @@ export type TransformDataResponseNative = {
   result: string
 };
 
+let loadedNative: any = null;
+
 export function loadNative() {
+  if (loadedNative) {
+    return loadedNative;
+  }
+
   // Development version
   if (fs.existsSync(path.join(__dirname, '/../../index.node'))) {
-    return require(path.join(__dirname, '/../../index.node'));
+    loadedNative = require(path.join(__dirname, '/../../index.node'));
+    return loadedNative;
   }
 
   if (fs.existsSync(path.join(__dirname, '/../../native/index.node'))) {
-    return require(path.join(__dirname, '/../../native/index.node'));
+    loadedNative = require(path.join(__dirname, '/../../native/index.node'));
+    return loadedNative;
   }
 
   throw new Error(
     `Unable to load @cubejs-backend/native, probably your system (${process.arch}-${process.platform}) with Node.js ${process.version} is not supported.`,
   );
-}
-
-export function isSupported(): boolean {
-  return fs.existsSync(path.join(__dirname, '/../../index.node')) || fs.existsSync(path.join(__dirname, '/../../native/index.node'));
 }
 
 function wrapNativeFunctionWithChannelCallback(
