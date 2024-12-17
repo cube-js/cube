@@ -1,4 +1,4 @@
-ARG DEV_BUILD_IMAGE=cubejs/cube:build
+ARG DEV_BUILD_IMAGE=cubejs/cube:dev
 
 FROM $DEV_BUILD_IMAGE as build
 FROM node:20.17.0-bookworm-slim
