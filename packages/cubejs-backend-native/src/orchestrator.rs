@@ -1,10 +1,10 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
-use cubeorchestrator::cubestore_message_parser::CubeStoreResult;
-use cubeorchestrator::cubestore_result_transform::{
+use cubeorchestrator::query_message_parser::QueryResult;
+use cubeorchestrator::query_result_transform::{
     get_final_cubestore_result_array, RequestResultArray, RequestResultData,
     RequestResultDataMulti, TransformedData,
 };
-use cubeorchestrator::transport::TransformDataRequest;
+use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::handle::Handle;
 use neon::object::Object;
@@ -22,9 +22,9 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     )?;
     cx.export_function("getCubestoreResult", get_cubestore_result)?;
     cx.export_function("transformQueryData", transform_query_data)?;
-    cx.export_function("getFinalCubestoreResult", final_cubestore_result)?;
-    cx.export_function("getFinalCubestoreResultMulti", final_cubestore_result_multi)?;
-    cx.export_function("getFinalCubestoreResultArray", final_cubestore_result_array)?;
+    cx.export_function("getFinalQueryResult", final_query_result)?;
+    cx.export_function("getFinalQueryResultMulti", final_query_result_multi)?;
+    cx.export_function("getFinalQueryResultArray", final_query_result_array)?;
 
     Ok(())
 }
@@ -50,12 +50,32 @@ where
     }
 }
 
+fn extract_query_result(
+    cx: &mut FunctionContext<'_>,
+    data_arg: Handle<JsValue>,
+) -> Result<Arc<QueryResult>, anyhow::Error> {
+    if let Ok(js_box) = data_arg.downcast::<JsBox<Arc<QueryResult>>, _>(cx) {
+        Ok(Arc::clone(&js_box))
+    } else if let Ok(js_array) = data_arg.downcast::<JsArray, _>(cx) {
+        let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
+        let js_raw_data: JsRawData = Deserialize::deserialize(deserializer)?;
+
+        QueryResult::from_js_raw_data(js_raw_data)
+            .map(Arc::new)
+            .map_err(anyhow::Error::from)
+    } else {
+        Err(anyhow::anyhow!(
+            "Second argument must be an Array of JsBox<Arc<QueryResult>> or JsArray"
+        ))
+    }
+}
+
 pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let msg = cx.argument::<JsBuffer>(0)?;
     let msg_data = msg.as_slice(&cx).to_vec();
 
     let promise = cx
-        .task(move || CubeStoreResult::from_fb(&msg_data))
+        .task(move || QueryResult::from_cubestore_fb(&msg_data))
         .promise(move |mut cx, res| match res {
             Ok(result) => Ok(cx.boxed(Arc::new(result))),
             Err(err) => cx.throw_error(err.to_string()),
@@ -65,7 +85,7 @@ pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPro
 }
 
 pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
-    let result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(0)?;
+    let result = cx.argument::<JsBox<Arc<QueryResult>>>(0)?;
 
     let js_array = cx.execute_scoped(|mut cx| {
         let js_array = JsArray::new(&mut cx, result.rows.len());
@@ -99,7 +119,7 @@ pub fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
-    let cube_store_result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(1)?;
+    let cube_store_result = cx.argument::<JsBox<Arc<QueryResult>>>(1)?;
     let cube_store_result = Arc::clone(&cube_store_result);
 
     let promise = cx
@@ -126,7 +146,7 @@ pub fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-pub fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
+pub fn final_query_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transform_data_js_object = cx.argument::<JsValue>(0)?;
     let deserializer = JsValueDeserializer::new(&mut cx, transform_data_js_object);
     let transform_request_data: TransformDataRequest = match Deserialize::deserialize(deserializer)
@@ -135,8 +155,12 @@ pub fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
-    let cube_store_result = cx.argument::<JsBox<Arc<CubeStoreResult>>>(1)?;
-    let cube_store_result = Arc::clone(&cube_store_result);
+    let data_arg = cx.argument::<JsValue>(1)?;
+    let cube_store_result: Arc<QueryResult> = match extract_query_result(&mut cx, data_arg) {
+        Ok(query_result) => query_result,
+        Err(err) => return cx.throw_error(err.to_string()),
+    };
+
     let result_data_js_object = cx.argument::<JsValue>(2)?;
     let deserializer = JsValueDeserializer::new(&mut cx, result_data_js_object);
     let mut result_data: RequestResultData = match Deserialize::deserialize(deserializer) {
@@ -158,7 +182,7 @@ pub fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-pub fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> {
+pub fn final_query_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transform_data_array = cx.argument::<JsValue>(0)?;
     let deserializer = JsValueDeserializer::new(&mut cx, transform_data_array);
     let transform_requests: Vec<TransformDataRequest> = match Deserialize::deserialize(deserializer)
@@ -167,16 +191,14 @@ pub fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromi
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
-    let cube_store_array = cx.argument::<JsArray>(1)?;
-    let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
-        .to_vec(&mut cx)?
-        .into_iter()
-        .map(|js_value| js_value.downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx))
-        .collect::<Result<_, _>>()?;
-    let cube_store_results: Vec<Arc<CubeStoreResult>> = cube_store_results_boxed
-        .iter()
-        .map(|handle| (**handle).clone())
-        .collect();
+    let data_array = cx.argument::<JsArray>(1)?;
+    let mut cube_store_results: Vec<Arc<QueryResult>> = vec![];
+    for data_arg in data_array.to_vec(&mut cx)? {
+        match extract_query_result(&mut cx, data_arg) {
+            Ok(query_result) => cube_store_results.push(query_result),
+            Err(err) => return cx.throw_error(err.to_string()),
+        };
+    }
 
     let results_data_array = cx.argument::<JsValue>(2)?;
     let deserializer = JsValueDeserializer::new(&mut cx, results_data_array);
@@ -207,7 +229,7 @@ pub fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromi
     Ok(promise)
 }
 
-pub fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> {
+pub fn final_query_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transform_data_array = cx.argument::<JsValue>(0)?;
     let deserializer = JsValueDeserializer::new(&mut cx, transform_data_array);
     let transform_requests: Vec<TransformDataRequest> = match Deserialize::deserialize(deserializer)
@@ -216,16 +238,14 @@ pub fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromi
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
-    let cube_store_array = cx.argument::<JsArray>(1)?;
-    let cube_store_results_boxed: Vec<Handle<JsBox<Arc<CubeStoreResult>>>> = cube_store_array
-        .to_vec(&mut cx)?
-        .into_iter()
-        .map(|js_value| js_value.downcast_or_throw::<JsBox<Arc<CubeStoreResult>>, _>(&mut cx))
-        .collect::<Result<_, _>>()?;
-    let cube_store_results: Vec<Arc<CubeStoreResult>> = cube_store_results_boxed
-        .iter()
-        .map(|handle| (**handle).clone())
-        .collect();
+    let data_array = cx.argument::<JsArray>(1)?;
+    let mut cube_store_results: Vec<Arc<QueryResult>> = vec![];
+    for data_arg in data_array.to_vec(&mut cx)? {
+        match extract_query_result(&mut cx, data_arg) {
+            Ok(query_result) => cube_store_results.push(query_result),
+            Err(err) => return cx.throw_error(err.to_string()),
+        };
+    }
 
     let result_data_js_object = cx.argument::<JsValue>(2)?;
     let deserializer = JsValueDeserializer::new(&mut cx, result_data_js_object);

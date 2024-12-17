@@ -1,7 +1,9 @@
-use crate::cubestore_result_transform::{DBResponsePrimitive, DBResponseValue};
+use crate::{
+    query_result_transform::{DBResponsePrimitive, DBResponseValue},
+    transport::JsRawData,
+};
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
 use neon::prelude::Finalize;
-use serde::Deserialize;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -29,18 +31,18 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct CubeStoreResult {
+#[derive(Debug, Clone)]
+pub struct QueryResult {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<DBResponseValue>>,
     pub columns_pos: HashMap<String, usize>,
 }
 
-impl Finalize for CubeStoreResult {}
+impl Finalize for QueryResult {}
 
-impl CubeStoreResult {
-    pub fn from_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
-        let mut result = CubeStoreResult {
+impl QueryResult {
+    pub fn from_cubestore_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
+        let mut result = QueryResult {
             columns: vec![],
             rows: vec![],
             columns_pos: HashMap::new(),
@@ -100,5 +102,40 @@ impl CubeStoreResult {
             }
             _ => Err(ParseError::UnsupportedCommand),
         }
+    }
+
+    pub fn from_js_raw_data(js_raw_data: JsRawData) -> Result<Self, ParseError> {
+        if js_raw_data.is_empty() {
+            return Err(ParseError::EmptyResultSet);
+        }
+
+        let first_row = &js_raw_data[0];
+        let columns: Vec<String> = first_row.keys().cloned().collect();
+        let columns_pos: HashMap<String, usize> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, column)| (column.clone(), index))
+            .collect();
+
+        let rows: Vec<Vec<DBResponseValue>> = js_raw_data
+            .into_iter()
+            .map(|row_map| {
+                columns
+                    .iter()
+                    .map(|col| {
+                        row_map
+                            .get(col)
+                            .map(|val| DBResponseValue::Primitive(val.clone()))
+                            .unwrap_or(DBResponseValue::Primitive(DBResponsePrimitive::Null))
+                    })
+                    .collect()
+            })
+            .collect();
+
+        Ok(QueryResult {
+            columns,
+            rows,
+            columns_pos,
+        })
     }
 }

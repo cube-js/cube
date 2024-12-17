@@ -1,3 +1,4 @@
+use crate::query_result_transform::DBResponsePrimitive;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Display};
@@ -242,15 +243,16 @@ pub struct Query {
     pub renew_query: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "responseFormat")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResultType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
     // pub measures: Vec<MemberOrMemberExpression>,
-    pub measures: Vec<String>,
+    pub measures: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
     pub dimensions: Option<Vec<String>>,
@@ -301,3 +303,5 @@ pub struct TransformDataRequest {
     #[serde(rename = "resType")]
     pub res_type: Option<ResultType>,
 }
+
+pub type JsRawData = Vec<HashMap<String, DBResponsePrimitive>>;

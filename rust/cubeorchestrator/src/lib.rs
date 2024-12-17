@@ -1,3 +1,3 @@
-pub mod cubestore_message_parser;
-pub mod cubestore_result_transform;
+pub mod query_message_parser;
+pub mod query_result_transform;
 pub mod transport;

@@ -389,22 +389,22 @@ export const transformData = (transformDataObj: Object, rows: any): Promise<Tran
   return native.transformQueryData(transformDataObj, rows);
 };
 
-export const getFinalCubestoreResult = (transformDataObj: Object, rows: any, resultData: Object): Promise<ArrayBuffer> => {
+export const getFinalQueryResult = (transformDataObj: Object, rows: any, resultData: Object): Promise<ArrayBuffer> => {
   const native = loadNative();
 
-  return native.getFinalCubestoreResult(transformDataObj, rows, resultData);
+  return native.getFinalQueryResult(transformDataObj, rows, resultData);
 };
 
-export const getFinalCubestoreResultArray = (transformDataArr: Object[], rows: any[], resultDataArr: Object[]): Promise<ArrayBuffer> => {
+export const getFinalQueryResultArray = (transformDataArr: Object[], rows: any[], resultDataArr: Object[]): Promise<ArrayBuffer> => {
   const native = loadNative();
 
-  return native.getFinalCubestoreResultArray(transformDataArr, rows, resultDataArr);
+  return native.getFinalQueryResultArray(transformDataArr, rows, resultDataArr);
 };
 
-export const getFinalCubestoreResultMulti = (transformDataArr: Object[], rows: any[], responseData: Object): Promise<ArrayBuffer> => {
+export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[], responseData: Object): Promise<ArrayBuffer> => {
   const native = loadNative();
 
-  return native.getFinalCubestoreResultMulti(transformDataArr, rows, responseData);
+  return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
 };
 
 export interface PyConfiguration {
