@@ -87,7 +87,6 @@ import { createJWKsFetcher } from './jwk';
 import { SQLServer, SQLServerConstructorOptions } from './sql-server';
 import { getJsonQueryFromGraphQLQuery, makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
-import transformData from './helpers/transformData';
 import {
   transformCube,
   transformMeasure,
@@ -96,7 +95,6 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
-import { TransformDataResponseCb } from './types/responses';
 
 type HandleErrorOptions = {
     e: any,
