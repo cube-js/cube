@@ -36,7 +36,7 @@ pub struct CubeStoreResult {
 impl Finalize for CubeStoreResult {}
 
 impl CubeStoreResult {
-    pub fn new(msg_data: &[u8]) -> Result<Self, ParseError> {
+    pub fn from_fb(msg_data: &[u8]) -> Result<Self, ParseError> {
         let mut result = CubeStoreResult {
             columns: vec![],
             rows: vec![],
