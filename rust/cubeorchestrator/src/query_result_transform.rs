@@ -562,7 +562,7 @@ pub struct RequestResultArray {
     pub results: Vec<RequestResultData>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum DBResponsePrimitive {
     Null,
@@ -600,4 +600,296 @@ impl Display for DBResponseValue {
         };
         write!(f, "{}", str)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{TimeZone, Utc, Timelike};
+    use anyhow::Result;
+
+    #[test]
+    fn test_transform_value_datetime_to_time() {
+        let dt = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
+            .unwrap()
+            .with_nanosecond(123_000_000)
+            .unwrap();
+        let value = DBResponseValue::DateTime(dt);
+        let result = transform_value(value, "time");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123Z".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_datetime_empty_type() {
+        let dt = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
+            .unwrap()
+            .with_nanosecond(123_000_000)
+            .unwrap();
+        let value = DBResponseValue::DateTime(dt);
+        let result = transform_value(value, "");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123Z".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_string_to_time_valid_rfc3339() {
+        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
+            "2024-01-01T12:30:15.123Z".to_string(),
+        ));
+        let result = transform_value(value, "time");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123Z".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_string_to_time_invalid_rfc3339() {
+        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
+            "invalid-date".to_string(),
+        ));
+        let result = transform_value(value, "time");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("invalid-date".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_primitive_string_type_not_time() {
+        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
+            "some-string".to_string(),
+        ));
+        let result = transform_value(value, "other");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("some-string".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_object() {
+        let obj_value = DBResponsePrimitive::String("object-value".to_string());
+        let value = DBResponseValue::Object { value: obj_value.clone() };
+        let result = transform_value(value, "time");
+
+        assert_eq!(result, obj_value);
+    }
+
+    #[test]
+    fn test_transform_value_fallback_to_null() {
+        let value = DBResponseValue::DateTime(Utc::now());
+        let result = transform_value(value, "unknown");
+
+        assert_eq!(result, DBResponsePrimitive::Null);
+    }
+
+    #[test]
+    fn test_get_date_range_value_valid_range() -> Result<()> {
+        let time_dimensions = vec![QueryTimeDimension {
+            dimension: "some-dim".to_string(),
+            date_range: Some(vec![
+                "2024-01-01T00:00:00Z".to_string(),
+                "2024-01-31T23:59:59Z".to_string(),
+            ]),
+            compare_date_range: None,
+            granularity: None,
+        }];
+
+        let result = get_date_range_value(Some(&time_dimensions))?;
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T00:00:00Z - 2024-01-31T23:59:59Z".to_string())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_date_range_value_no_time_dimensions() {
+        let result = get_date_range_value(None);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "QueryTimeDimension should be specified for the compare date range query."
+        );
+    }
+
+    #[test]
+    fn test_get_date_range_value_empty_time_dimensions() {
+        let time_dimensions: Vec<QueryTimeDimension> = vec![];
+
+        let result = get_date_range_value(Some(&time_dimensions));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "No time dimension provided."
+        );
+    }
+
+    #[test]
+    fn test_get_date_range_value_missing_date_range() {
+        let time_dimensions = vec![QueryTimeDimension {
+            dimension: "dim".to_string(),
+            date_range: None,
+            compare_date_range: None,
+            granularity: None,
+        }];
+
+        let result = get_date_range_value(Some(&time_dimensions));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Inconsistent QueryTimeDimension configuration: dateRange required."
+        );
+    }
+
+    #[test]
+    fn test_get_date_range_value_single_date_range() {
+        let time_dimensions = vec![QueryTimeDimension {
+            dimension: "dim".to_string(),
+            date_range: Some(vec!["2024-01-01T00:00:00Z".to_string()]),
+            compare_date_range: None,
+            granularity: None,
+        }];
+
+        let result = get_date_range_value(Some(&time_dimensions));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Inconsistent dateRange configuration for the compare date range query: 2024-01-01T00:00:00Z"
+        );
+    }
+
+    #[test]
+    fn test_get_blending_query_key_valid_granularity() -> Result<()> {
+        let time_dimensions = vec![QueryTimeDimension {
+            dimension: "dim".to_string(),
+            granularity: Some("day".to_string()),
+            date_range: None,
+            compare_date_range: None,
+        }];
+
+        let result = get_blending_query_key(Some(&time_dimensions))?;
+        assert_eq!(result, "time.day");
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_blending_query_key_no_time_dimensions() {
+        let result = get_blending_query_key(None);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "QueryTimeDimension should be specified for the blending query."
+        );
+    }
+
+    #[test]
+    fn test_get_blending_query_key_empty_time_dimensions() {
+        let time_dimensions: Vec<QueryTimeDimension> = vec![];
+
+        let result = get_blending_query_key(Some(&time_dimensions));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "QueryTimeDimension should be specified for the blending query."
+        );
+    }
+
+    #[test]
+    fn test_get_blending_query_key_missing_granularity() {
+        let time_dimensions = vec![QueryTimeDimension {
+            dimension: "dim".to_string(),
+            granularity: None,
+            date_range: None,
+            compare_date_range: None,
+        }];
+
+        let result = get_blending_query_key(Some(&time_dimensions));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            format!(
+                "Inconsistent QueryTimeDimension configuration for the blending query, granularity required: {:?}",
+                QueryTimeDimension {
+                    dimension: "dim".to_string(),
+                    granularity: None,
+                    date_range: None,
+                    compare_date_range: None,
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn test_get_blending_response_key_valid_dimension_and_granularity() -> Result<()> {
+        let time_dimensions = vec![QueryTimeDimension {
+            dimension: "orders.created_at".to_string(),
+            granularity: Some("day".to_string()),
+            date_range: None,
+            compare_date_range: None,
+        }];
+
+        let result = get_blending_response_key(Some(&time_dimensions))?;
+        assert_eq!(result, "orders.created_at.day");
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_blending_response_key_no_time_dimensions() {
+        let result = get_blending_response_key(None);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "QueryTimeDimension should be specified for the blending query."
+        );
+    }
+
+    #[test]
+    fn test_get_blending_response_key_empty_time_dimensions() {
+        let time_dimensions: Vec<QueryTimeDimension> = vec![];
+
+        let result = get_blending_response_key(Some(&time_dimensions));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "QueryTimeDimension should be specified for the blending query."
+        );
+    }
+
+    #[test]
+    fn test_get_blending_response_key_missing_granularity() {
+        let time_dimensions = vec![QueryTimeDimension {
+            dimension: "orders.created_at".to_string(),
+            granularity: None,
+            date_range: None,
+            compare_date_range: None,
+        }];
+
+        let result = get_blending_response_key(Some(&time_dimensions));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            format!(
+                "Inconsistent QueryTimeDimension configuration for the blending query, granularity required: {:?}",
+                QueryTimeDimension {
+                    dimension: "orders.created_at".to_string(),
+                    granularity: None,
+                    date_range: None,
+                    compare_date_range: None,
+                }
+            )
+        );
+    }
+
 }
