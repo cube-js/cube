@@ -45,7 +45,7 @@ use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::{SessionStateBuilder, TaskContext};
-use datafusion::logical_expr::{Expr, LogicalPlan};
+use datafusion::logical_expr::{Expr, LogicalPlan, TableSource};
 use datafusion::physical_expr;
 use datafusion::physical_expr::{
     expressions, Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr,
@@ -1584,13 +1584,21 @@ impl ExecutionPlan for ClusterSendExec {
         let node_name = node_name.to_string();
         if self.use_streaming {
             // A future that yields a stream
-            let fut = async move { cluster.run_select_stream(&node_name, plan.to_serialized_plan()?).await };
+            let fut = async move {
+                cluster
+                    .run_select_stream(&node_name, plan.to_serialized_plan()?)
+                    .await
+            };
             // Use TryStreamExt::try_flatten to flatten the stream of streams
             let stream = futures::stream::once(fut).try_flatten();
 
             Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
         } else {
-            let record_batches = async move { cluster.run_select(&node_name, plan.to_serialized_plan()?).await };
+            let record_batches = async move {
+                cluster
+                    .run_select(&node_name, plan.to_serialized_plan()?)
+                    .await
+            };
             let stream = futures::stream::once(record_batches).flat_map(|r| match r {
                 Ok(vec) => stream::iter(vec.into_iter().map(|b| Ok(b)).collect::<Vec<_>>()),
                 Err(e) => stream::iter(vec![Err(DataFusionError::Execution(e.to_string()))]),

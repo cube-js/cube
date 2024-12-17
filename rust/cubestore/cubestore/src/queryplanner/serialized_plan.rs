@@ -16,6 +16,8 @@ use crate::table::Row;
 use crate::CubeError;
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::logical_expr::expr::{Alias, InSubquery};
+use datafusion::logical_expr::expr_rewriter::coerce_plan_expr_for_schema;
 use datafusion::physical_plan::aggregates;
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
@@ -24,12 +26,16 @@ use serde_derive::{Deserialize, Serialize};
 use bytes::Bytes;
 use datafusion::catalog::TableProvider;
 use datafusion::catalog_common::TableReference;
-use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
+use datafusion::common::tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::{Column, DFSchemaRef, JoinConstraint, JoinType};
 use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
-use datafusion::logical_expr::{Aggregate, CrossJoin, EmptyRelation, Expr, Extension, Filter, Join, Limit, LogicalPlan, Projection, Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union};
+use datafusion::logical_expr::{
+    wrap_projection_for_join_if_necessary, Aggregate, CrossJoin, Distinct, DistinctOn,
+    EmptyRelation, Expr, Extension, Filter, Join, Limit, LogicalPlan, Projection, RecursiveQuery,
+    Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union, Unnest, Values, Window,
+};
 use datafusion::prelude::SessionContext;
 use datafusion_proto::bytes::{
     logical_plan_from_bytes, logical_plan_from_bytes_with_extension_codec,
@@ -521,6 +527,53 @@ fn is_empty_relation(plan: &LogicalPlan) -> Option<DFSchemaRef> {
     }
 }
 
+/// Takes an inner LogicalPlan, whose schema has the same length and names as
+/// `union_schema`, but (perhaps) different table qualifiers.  Assumes the
+/// DataTypes are the same.  Wraps the inner LogicalPlan with a Projection
+/// having the correct alias expressions for the output schema.
+fn wrap_pruned_union_if_necessary(
+    inner: LogicalPlan,
+    union_schema: &DFSchemaRef,
+) -> Result<LogicalPlan, CubeError> {
+    let inner_schema = inner.schema();
+    if inner_schema.fields().len() != union_schema.fields().len() {
+        return Err(CubeError::internal(format!("inner schema incompatible with union_schema (len): inner_schema = {:?}; union_schema = {:?}", inner_schema, union_schema)));
+    }
+
+    let mut expr_list = Vec::<Expr>::with_capacity(inner_schema.fields().len());
+    let mut projection_needed = false;
+    for (
+        i,
+        (up @ (union_table_reference, union_field), ip @ (inner_table_reference, inner_field)),
+    ) in union_schema.iter().zip(inner_schema.iter()).enumerate()
+    {
+        if union_field.name() != inner_field.name() {
+            return Err(CubeError::internal(format!("inner schema incompatible with union schema (name mismatch at index {}): inner_schema = {:?}; union_schema = {:?}", i, inner_schema, union_schema)));
+        }
+
+        let expr = Expr::from(ip);
+
+        if union_table_reference != inner_table_reference {
+            projection_needed = true;
+            expr_list.push(expr.alias_qualified(
+                union_table_reference.map(|tr| tr.clone()),
+                union_field.name(),
+            ));
+        } else {
+            expr_list.push(expr);
+        }
+    }
+
+    if projection_needed {
+        Ok(LogicalPlan::Projection(Projection::try_new(
+            expr_list,
+            Arc::new(inner),
+        )?))
+    } else {
+        Ok(inner)
+    }
+}
+
 impl PreSerializedPlan {
     fn remove_unused_tables(
         plan: &LogicalPlan,
@@ -537,8 +590,11 @@ impl PreSerializedPlan {
                 schema,
                 ..
             }) => {
-                let input =
-                    PreSerializedPlan::remove_unused_tables(&input, partition_ids_to_execute, inline_tables_to_execute)?;
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
                 if is_empty_relation(&input).is_some() {
                     LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
@@ -552,9 +608,17 @@ impl PreSerializedPlan {
                     )?)
                 }
             }
-            LogicalPlan::Filter(Filter { predicate, input, having, .. }) => {
-                let input =
-                    PreSerializedPlan::remove_unused_tables(&input, partition_ids_to_execute, inline_tables_to_execute)?;
+            LogicalPlan::Filter(Filter {
+                predicate,
+                input,
+                having,
+                ..
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
                 if let Some(schema) = is_empty_relation(&input) {
                     LogicalPlan::EmptyRelation(EmptyRelation {
@@ -563,15 +627,9 @@ impl PreSerializedPlan {
                     })
                 } else {
                     LogicalPlan::Filter(if *having {
-                        Filter::try_new_with_having(
-                            predicate.clone(),
-                            Arc::new(input),
-                        )
+                        Filter::try_new_with_having(predicate.clone(), Arc::new(input))
                     } else {
-                        Filter::try_new(
-                            predicate.clone(),
-                            Arc::new(input),
-                        )
+                        Filter::try_new(predicate.clone(), Arc::new(input))
                     }?)
                 }
             }
@@ -582,8 +640,11 @@ impl PreSerializedPlan {
                 schema,
                 ..
             }) => {
-                let input =
-                    PreSerializedPlan::remove_unused_tables(&input, partition_ids_to_execute, inline_tables_to_execute)?;
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
                 LogicalPlan::Aggregate(Aggregate::try_new_with_schema(
                     Arc::new(input),
                     group_expr.clone(),
@@ -592,8 +653,11 @@ impl PreSerializedPlan {
                 )?)
             }
             LogicalPlan::Sort(Sort { expr, input, fetch }) => {
-                let input =
-                    PreSerializedPlan::remove_unused_tables(&input, partition_ids_to_execute, inline_tables_to_execute)?;
+                let input = PreSerializedPlan::remove_unused_tables(
+                    &input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
                 if let Some(schema) = is_empty_relation(&input) {
                     LogicalPlan::EmptyRelation(EmptyRelation {
@@ -608,11 +672,8 @@ impl PreSerializedPlan {
                     })
                 }
             }
-            LogicalPlan::Union(Union {
-                inputs,
-                schema,
-            }) => {
-                let mut new_inputs: Vec<Arc<LogicalPlan>> = Vec::with_capacity(inputs.len());
+            LogicalPlan::Union(Union { inputs, schema }) => {
+                let mut new_inputs: Vec<LogicalPlan> = Vec::with_capacity(inputs.len());
                 for input in inputs {
                     let i = PreSerializedPlan::remove_unused_tables(
                         &input,
@@ -620,21 +681,29 @@ impl PreSerializedPlan {
                         inline_tables_to_execute,
                     )?;
                     if !is_empty_relation(&i).is_some() {
-                        new_inputs.push(Arc::new(i));
+                        new_inputs.push(i);
                     }
                 }
 
-                if new_inputs.is_empty() {
-                    LogicalPlan::EmptyRelation(EmptyRelation {
+                let res = match new_inputs.len() {
+                    0 => LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: schema.clone(),
-                    })
-                } else {
-                    LogicalPlan::Union(Union {
-                        inputs: new_inputs,
-                        schema: schema.clone(),
-                    })
-                }
+                    }),
+                    1 => {
+                        // Union _requires_ 2 or more inputs.
+                        let plan = new_inputs.pop().unwrap();
+                        wrap_pruned_union_if_necessary(plan, schema)?
+                    }
+                    _ => {
+                        let plan = LogicalPlan::Union(Union {
+                            inputs: new_inputs.into_iter().map(Arc::new).collect(),
+                            schema: schema.clone(),
+                        });
+                        wrap_pruned_union_if_necessary(plan, schema)?
+                    }
+                };
+                res
             }
             LogicalPlan::TableScan(TableScan {
                 table_name,
@@ -644,16 +713,32 @@ impl PreSerializedPlan {
                 filters,
                 fetch,
             }) => {
-                // TODO upgrade DF
-                let is_empty = false;
-                // let is_empty = match source {
-                //     SerializedTableSource::CubeTable(table) => {
-                //         !table.has_partitions(partition_ids_to_execute)
-                //     }
-                //     SerializedTableSource::InlineTable(table) => {
-                //         !table.has_inline_table_id(inline_tables_to_execute)
-                //     }
-                // };
+                let is_empty = if let Some(default_source) =
+                    source.as_any().downcast_ref::<DefaultTableSource>()
+                {
+                    if let Some(table) = default_source
+                        .table_provider
+                        .as_any()
+                        .downcast_ref::<CubeTable>()
+                    {
+                        !table.has_partitions(partition_ids_to_execute)
+                    } else if let Some(table) = default_source
+                        .table_provider
+                        .as_any()
+                        .downcast_ref::<InlineTableProvider>()
+                    {
+                        !table.has_inline_table_id(inline_tables_to_execute)
+                    } else {
+                        return Err(CubeError::internal(
+                            "remove_unused_tables called with unexpected table provider"
+                                .to_string(),
+                        ));
+                    }
+                } else {
+                    return Err(CubeError::internal(
+                        "remove_unused_tables called with unexpected table source".to_string(),
+                    ));
+                };
                 if is_empty {
                     LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
@@ -678,8 +763,11 @@ impl PreSerializedPlan {
                 schema: schema.clone(),
             }),
             LogicalPlan::Limit(Limit { skip, fetch, input }) => {
-                let input =
-                    PreSerializedPlan::remove_unused_tables(input, partition_ids_to_execute, inline_tables_to_execute)?;
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
                 if let Some(schema) = is_empty_relation(&input) {
                     LogicalPlan::EmptyRelation(EmptyRelation {
@@ -704,10 +792,16 @@ impl PreSerializedPlan {
                 schema,
                 null_equals_null,
             }) => {
-                let left =
-                    PreSerializedPlan::remove_unused_tables(left, partition_ids_to_execute, inline_tables_to_execute)?;
-                let right =
-                    PreSerializedPlan::remove_unused_tables(right, partition_ids_to_execute, inline_tables_to_execute)?;
+                let left = PreSerializedPlan::remove_unused_tables(
+                    left,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                let right = PreSerializedPlan::remove_unused_tables(
+                    right,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
                 LogicalPlan::Join(Join {
                     left: Arc::new(left),
@@ -724,8 +818,11 @@ impl PreSerializedPlan {
                 input,
                 partitioning_scheme,
             }) => {
-                let input =
-                    PreSerializedPlan::remove_unused_tables(input, partition_ids_to_execute, inline_tables_to_execute)?;
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
                 if let Some(schema) = is_empty_relation(&input) {
                     LogicalPlan::EmptyRelation(EmptyRelation {
@@ -742,12 +839,14 @@ impl PreSerializedPlan {
             LogicalPlan::Subquery(Subquery {
                 subquery,
                 outer_ref_columns,
-                ..
             }) => {
-                let subquery: LogicalPlan =
-                    PreSerializedPlan::remove_unused_tables(subquery, partition_ids_to_execute, inline_tables_to_execute)?;
+                let subquery: LogicalPlan = PreSerializedPlan::remove_unused_tables(
+                    subquery,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
-                if let Some(schema) = is_empty_relation(&subquery) {
+                if is_empty_relation(&subquery).is_some() {
                     LogicalPlan::EmptyRelation(EmptyRelation {
                         produce_one_row: false,
                         schema: subquery.schema().clone(),
@@ -765,8 +864,11 @@ impl PreSerializedPlan {
                 schema,
                 ..
             }) => {
-                let input =
-                    PreSerializedPlan::remove_unused_tables(input, partition_ids_to_execute, inline_tables_to_execute)?;
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
                 if is_empty_relation(&input).is_some() {
                     LogicalPlan::EmptyRelation(EmptyRelation {
@@ -785,10 +887,16 @@ impl PreSerializedPlan {
                 right,
                 schema,
             }) => {
-                let left =
-                    PreSerializedPlan::remove_unused_tables(left, partition_ids_to_execute, inline_tables_to_execute)?;
-                let right =
-                    PreSerializedPlan::remove_unused_tables(right, partition_ids_to_execute, inline_tables_to_execute)?;
+                let left = PreSerializedPlan::remove_unused_tables(
+                    left,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                let right = PreSerializedPlan::remove_unused_tables(
+                    right,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
 
                 LogicalPlan::CrossJoin(CrossJoin {
                     left: Arc::new(left),
@@ -796,25 +904,155 @@ impl PreSerializedPlan {
                     schema: schema.clone(),
                 })
             }
-            LogicalPlan::Extension(Extension {
-                node
+            LogicalPlan::Window(Window {
+                input,
+                window_expr,
+                schema,
             }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::Window(Window {
+                        input: Arc::new(input),
+                        window_expr: window_expr.clone(),
+                        schema: schema.clone(),
+                    })
+                }
+            }
+            LogicalPlan::Distinct(Distinct::All(input)) => {
+                let schema = input.schema();
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::Distinct(Distinct::All(Arc::new(input)))
+                }
+            }
+            LogicalPlan::Distinct(Distinct::On(DistinctOn {
+                on_expr,
+                select_expr,
+                sort_expr,
+                input,
+                schema,
+            })) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::Distinct(Distinct::On(DistinctOn {
+                        on_expr: on_expr.clone(),
+                        select_expr: select_expr.clone(),
+                        sort_expr: sort_expr.clone(),
+                        input: Arc::new(input),
+                        schema: schema.clone(),
+                    }))
+                }
+            }
+            LogicalPlan::RecursiveQuery(RecursiveQuery {
+                name,
+                static_term,
+                recursive_term,
+                is_distinct,
+            }) => {
+                let static_term = PreSerializedPlan::remove_unused_tables(
+                    static_term,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                let recursive_term = PreSerializedPlan::remove_unused_tables(
+                    recursive_term,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                LogicalPlan::RecursiveQuery(RecursiveQuery {
+                    name: name.clone(),
+                    static_term: Arc::new(static_term),
+                    recursive_term: Arc::new(recursive_term),
+                    is_distinct: *is_distinct,
+                })
+            }
+            LogicalPlan::Values(Values { schema, values }) => LogicalPlan::Values(Values {
+                schema: schema.clone(),
+                values: values.clone(),
+            }),
+            LogicalPlan::Unnest(Unnest {
+                input,
+                exec_columns,
+                list_type_columns,
+                struct_type_columns,
+                dependency_indices,
+                schema,
+                options,
+            }) => {
+                let input = PreSerializedPlan::remove_unused_tables(
+                    input,
+                    partition_ids_to_execute,
+                    inline_tables_to_execute,
+                )?;
+                if is_empty_relation(&input).is_some() {
+                    LogicalPlan::EmptyRelation(EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    })
+                } else {
+                    LogicalPlan::Unnest(Unnest {
+                        input: Arc::new(input),
+                        exec_columns: exec_columns.clone(),
+                        list_type_columns: list_type_columns.clone(),
+                        struct_type_columns: struct_type_columns.clone(),
+                        dependency_indices: dependency_indices.clone(),
+                        schema: schema.clone(),
+                        options: options.clone(),
+                    })
+                }
+            }
+            LogicalPlan::Extension(Extension { node }) => {
                 if let Some(cluster_send) = node.as_any().downcast_ref::<ClusterSendNode>() {
-                    let ClusterSendNode { input, snapshots, limit_and_reverse } = cluster_send;
-                    let input = PreSerializedPlan::remove_unused_tables(&input, partition_ids_to_execute, inline_tables_to_execute)?;
+                    let ClusterSendNode {
+                        input,
+                        snapshots,
+                        limit_and_reverse,
+                    } = cluster_send;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        &input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
                     LogicalPlan::Extension(Extension {
                         node: Arc::new(ClusterSendNode {
                             input: Arc::new(input),
                             snapshots: snapshots.clone(),
                             limit_and_reverse: *limit_and_reverse,
-                        })
+                        }),
                     })
                 } else if let Some(panic_worker) = node.as_any().downcast_ref::<PanicWorkerNode>() {
-                    let PanicWorkerNode{} = panic_worker; // (No fields to recurse; just clone the existing Arc `node`.)
-                    LogicalPlan::Extension(Extension {
-                        node: node.clone(),
-                    })
-                } else if let Some(cluster_agg_topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+                    let PanicWorkerNode {} = panic_worker; // (No fields to recurse; just clone the existing Arc `node`.)
+                    LogicalPlan::Extension(Extension { node: node.clone() })
+                } else if let Some(cluster_agg_topk) =
+                    node.as_any().downcast_ref::<ClusterAggregateTopK>()
+                {
                     let ClusterAggregateTopK {
                         limit,
                         input,
@@ -825,7 +1063,11 @@ impl PreSerializedPlan {
                         schema,
                         snapshots,
                     } = cluster_agg_topk;
-                    let input = PreSerializedPlan::remove_unused_tables(input, partition_ids_to_execute, inline_tables_to_execute)?;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
                     LogicalPlan::Extension(Extension {
                         node: Arc::new(ClusterAggregateTopK {
                             limit: *limit,
@@ -839,70 +1081,105 @@ impl PreSerializedPlan {
                         }),
                     })
                 } else {
-                    // TODO upgrade DF
-                    todo!("remove_unused_tables not handling Extension case: {:?}", node);
+                    // TODO upgrade DF: Ensure any uture backported plan extensions are implemented.
+                    return Err(CubeError::internal(format!(
+                        "remove_unused_tables not handling Extension case: {:?}",
+                        node
+                    )));
                 }
             }
-            LogicalPlan::Window(_) | LogicalPlan::Values(_) | LogicalPlan::Distinct(_) |
-              LogicalPlan::RecursiveQuery(_) | LogicalPlan::Explain(_) |
-              LogicalPlan::Statement(_) | LogicalPlan::Analyze(_) | LogicalPlan::Prepare(_) |
-              LogicalPlan::Dml(_) | LogicalPlan::Ddl(_) | LogicalPlan::Copy(_) | LogicalPlan::DescribeTable(_) |
-              LogicalPlan::Unnest(_) => {
-                todo!("remove_unused_tables not handling case: {}", pretty_printers::pp_plan(plan));
-            }
-            // TODO upgrade DF
-            // SerializedLogicalPlan::CrossJoinAgg {
-            //     left,
-            //     right,
-            //     on,
-            //     join_schema,
-            //     group_expr,
-            //     agg_expr,
-            //     schema,
-            // } => {
-            //     let left =
-            //         left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-            //     let right =
-            //         right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+            LogicalPlan::Explain(_)
+            | LogicalPlan::Statement(_)
+            | LogicalPlan::Analyze(_)
+            | LogicalPlan::Prepare(_)
+            | LogicalPlan::Dml(_)
+            | LogicalPlan::Ddl(_)
+            | LogicalPlan::Copy(_)
+            | LogicalPlan::DescribeTable(_) => {
+                return Err(CubeError::internal(format!(
+                    "remove_unused_tables not handling case: {}",
+                    pretty_printers::pp_plan(plan)
+                )));
+            } // TODO upgrade DF
+              // SerializedLogicalPlan::CrossJoinAgg {
+              //     left,
+              //     right,
+              //     on,
+              //     join_schema,
+              //     group_expr,
+              //     agg_expr,
+              //     schema,
+              // } => {
+              //     let left =
+              //         left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+              //     let right =
+              //         right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
-            //     SerializedLogicalPlan::CrossJoinAgg {
-            //         left: Arc::new(left),
-            //         right: Arc::new(right),
-            //         on: on.clone(),
-            //         join_schema: join_schema.clone(),
-            //         group_expr: group_expr.clone(),
-            //         agg_expr: agg_expr.clone(),
-            //         schema: schema.clone(),
-            //     }
-            // }
-            // SerializedLogicalPlan::RollingWindowAgg {
-            //     schema,
-            //     input,
-            //     dimension,
-            //     partition_by,
-            //     from,
-            //     to,
-            //     every,
-            //     rolling_aggs,
-            //     group_by_dimension,
-            //     aggs,
-            // } => {
-            //     let input =
-            //         input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
-            //     SerializedLogicalPlan::RollingWindowAgg {
-            //         schema: schema.clone(),
-            //         input: Arc::new(input),
-            //         dimension: dimension.clone(),
-            //         partition_by: partition_by.clone(),
-            //         from: from.clone(),
-            //         to: to.clone(),
-            //         every: every.clone(),
-            //         rolling_aggs: rolling_aggs.clone(),
-            //         group_by_dimension: group_by_dimension.clone(),
-            //         aggs: aggs.clone(),
-            //     }
-            // }
+              //     SerializedLogicalPlan::CrossJoinAgg {
+              //         left: Arc::new(left),
+              //         right: Arc::new(right),
+              //         on: on.clone(),
+              //         join_schema: join_schema.clone(),
+              //         group_expr: group_expr.clone(),
+              //         agg_expr: agg_expr.clone(),
+              //         schema: schema.clone(),
+              //     }
+              // }
+              // SerializedLogicalPlan::RollingWindowAgg {
+              //     schema,
+              //     input,
+              //     dimension,
+              //     partition_by,
+              //     from,
+              //     to,
+              //     every,
+              //     rolling_aggs,
+              //     group_by_dimension,
+              //     aggs,
+              // } => {
+              //     let input =
+              //         input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+              //     SerializedLogicalPlan::RollingWindowAgg {
+              //         schema: schema.clone(),
+              //         input: Arc::new(input),
+              //         dimension: dimension.clone(),
+              //         partition_by: partition_by.clone(),
+              //         from: from.clone(),
+              //         to: to.clone(),
+              //         every: every.clone(),
+              //         rolling_aggs: rolling_aggs.clone(),
+              //         group_by_dimension: group_by_dimension.clone(),
+              //         aggs: aggs.clone(),
+              //     }
+              // }
         };
+        // Now, for this node, we go through every Expr in the node and remove unused tables from the Subquery.
+        // This wraps a LogicalPlan::Subquery node and expects the same result.
+        let res: LogicalPlan = res
+            .map_subqueries(|node: LogicalPlan| {
+                match node {
+                    LogicalPlan::Subquery(Subquery {
+                        subquery,
+                        outer_ref_columns,
+                    }) => {
+                        let subquery: LogicalPlan = PreSerializedPlan::remove_unused_tables(
+                            &subquery,
+                            partition_ids_to_execute,
+                            inline_tables_to_execute,
+                        )?;
+
+                        // We must return a LogicalPlan::Subquery.
+                        Ok(Transformed::yes(LogicalPlan::Subquery(Subquery {
+                            subquery: Arc::new(subquery),
+                            outer_ref_columns,
+                        })))
+                    }
+                    node => Err(DataFusionError::Internal(
+                        "map_subqueries should pass a subquery node".to_string(),
+                    )),
+                }
+            })?
+            .data;
         Ok(res)
     }
 }
