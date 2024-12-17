@@ -64,38 +64,39 @@ impl QueryResult {
                     .command_as_http_result_set()
                     .ok_or(ParseError::EmptyResultSet)?;
 
-                let result_set_columns = result_set.columns().ok_or(ParseError::EmptyResultSet)?;
+                if let Some(result_set_columns) = result_set.columns() {
+                    if result_set_columns.iter().any(|c| c.is_empty()) {
+                        return Err(ParseError::ColumnNameNotDefined);
+                    }
 
-                if result_set_columns.iter().any(|c| c.is_empty()) {
-                    return Err(ParseError::ColumnNameNotDefined);
+                    let (columns, columns_pos): (Vec<_>, HashMap<_, _>) = result_set_columns
+                        .iter()
+                        .enumerate()
+                        .map(|(index, column_name)| {
+                            (column_name.to_owned(), (column_name.to_owned(), index))
+                        })
+                        .unzip();
+
+                    result.columns = columns;
+                    result.columns_pos = columns_pos;
                 }
 
-                let (columns, columns_pos): (Vec<_>, HashMap<_, _>) = result_set_columns
-                    .iter()
-                    .enumerate()
-                    .map(|(index, column_name)| {
-                        (column_name.to_owned(), (column_name.to_owned(), index))
-                    })
-                    .unzip();
+                if let Some(result_set_rows) = result_set.rows() {
+                    result.rows = Vec::with_capacity(result_set_rows.len());
 
-                result.columns = columns;
-                result.columns_pos = columns_pos;
+                    for row in result_set_rows.iter() {
+                        let values = row.values().ok_or(ParseError::NullRow)?;
+                        let row_obj: Vec<_> = values
+                            .iter()
+                            .map(|val| {
+                                DBResponseValue::Primitive(DBResponsePrimitive::String(
+                                    val.string_value().unwrap_or("").to_owned(),
+                                ))
+                            })
+                            .collect();
 
-                let result_set_rows = result_set.rows().ok_or(ParseError::EmptyResultSet)?;
-                result.rows = Vec::with_capacity(result_set_rows.len());
-
-                for row in result_set_rows.iter() {
-                    let values = row.values().ok_or(ParseError::NullRow)?;
-                    let row_obj: Vec<_> = values
-                        .iter()
-                        .map(|val| {
-                            DBResponseValue::Primitive(DBResponsePrimitive::String(
-                                val.string_value().unwrap_or("").to_owned(),
-                            ))
-                        })
-                        .collect();
-
-                    result.rows.push(row_obj);
+                        result.rows.push(row_obj);
+                    }
                 }
 
                 Ok(result)
@@ -106,7 +107,11 @@ impl QueryResult {
 
     pub fn from_js_raw_data(js_raw_data: JsRawData) -> Result<Self, ParseError> {
         if js_raw_data.is_empty() {
-            return Err(ParseError::EmptyResultSet);
+            return Ok(QueryResult {
+                columns: vec![],
+                rows: vec![],
+                columns_pos: HashMap::new(),
+            });
         }
 
         let first_row = &js_raw_data[0];
