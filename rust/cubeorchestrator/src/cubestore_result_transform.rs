@@ -1,9 +1,10 @@
 use crate::{
     cubestore_message_parser::CubeStoreResult,
     transport::{
-        ConfigItem, MembersMap, NormalizedQuery, QueryTimeDimension, QueryType, ResultType,
-        TransformDataRequest, BLENDING_QUERY_KEY_PREFIX, BLENDING_QUERY_RES_SEPARATOR,
-        COMPARE_DATE_RANGE_FIELD, COMPARE_DATE_RANGE_SEPARATOR, MEMBER_SEPARATOR,
+        ConfigItem, DBResponsePrimitive, DBResponseValue, MembersMap, NormalizedQuery,
+        QueryTimeDimension, QueryType, ResultType, TransformDataRequest, BLENDING_QUERY_KEY_PREFIX,
+        BLENDING_QUERY_RES_SEPARATOR, COMPARE_DATE_RANGE_FIELD, COMPARE_DATE_RANGE_SEPARATOR,
+        MEMBER_SEPARATOR,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -17,18 +18,28 @@ use std::{
 };
 
 /// Transform specified `value` with specified `type` to the network protocol type.
-pub fn transform_value(value: String, type_: &str) -> String {
-    if type_ == "time" || type_.is_empty() {
-        DateTime::parse_from_rfc3339(&value)
-            .map(|dt| dt.to_rfc3339_opts(SecondsFormat::Millis, true))
-            .unwrap_or_else(|_| value)
-    } else {
-        value
+pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimitive {
+    match value {
+        DBResponseValue::DateTime(dt) if type_ == "time" || type_.is_empty() => {
+            let formatted = dt.to_rfc3339_opts(SecondsFormat::Millis, true);
+            DBResponsePrimitive::String(formatted)
+        }
+        DBResponseValue::Primitive(DBResponsePrimitive::String(ref s)) if type_ == "time" => {
+            let formatted = DateTime::parse_from_rfc3339(s)
+                .map(|dt| dt.to_rfc3339_opts(SecondsFormat::Millis, true))
+                .unwrap_or_else(|_| s.clone());
+            DBResponsePrimitive::String(formatted)
+        }
+        DBResponseValue::Primitive(p) => p,
+        DBResponseValue::Object { value } => value,
+        _ => DBResponsePrimitive::Null,
     }
 }
 
 /// Parse date range value from time dimension.
-pub fn get_date_range_value(time_dimensions: Option<&Vec<QueryTimeDimension>>) -> Result<String> {
+pub fn get_date_range_value(
+    time_dimensions: Option<&Vec<QueryTimeDimension>>,
+) -> Result<DBResponsePrimitive> {
     let time_dimensions = match time_dimensions {
         Some(time_dimensions) => time_dimensions,
         None => bail!("QueryTimeDimension should be specified for the compare date range query."),
@@ -51,7 +62,9 @@ pub fn get_date_range_value(time_dimensions: Option<&Vec<QueryTimeDimension>>) -
         );
     }
 
-    Ok(date_range.join(COMPARE_DATE_RANGE_SEPARATOR))
+    Ok(DBResponsePrimitive::String(
+        date_range.join(COMPARE_DATE_RANGE_SEPARATOR),
+    ))
 }
 
 /// Parse blending query key from time dimension for query.
@@ -169,10 +182,10 @@ pub fn get_compact_row(
     query_type: &QueryType,
     members: &[String],
     time_dimensions: Option<&Vec<QueryTimeDimension>>,
-    db_row: &[String],
+    db_row: &[DBResponseValue],
     columns_pos: &HashMap<String, usize>,
-) -> Result<Vec<String>> {
-    let mut row: Vec<String> = Vec::with_capacity(members.len());
+) -> Result<Vec<DBResponsePrimitive>> {
+    let mut row: Vec<DBResponsePrimitive> = Vec::with_capacity(members.len());
 
     for m in members {
         if let Some(annotation_item) = annotation.get(m) {
@@ -217,9 +230,9 @@ pub fn get_vanilla_row(
     annotation: &HashMap<String, ConfigItem>,
     query_type: &QueryType,
     query: &NormalizedQuery,
-    db_row: &[String],
+    db_row: &[DBResponseValue],
     columns_pos: &HashMap<String, usize>,
-) -> Result<HashMap<String, String>> {
+) -> Result<HashMap<String, DBResponsePrimitive>> {
     let mut row = HashMap::new();
 
     for (alias, &index) in columns_pos {
@@ -379,9 +392,9 @@ pub fn get_final_cubestore_result_array(
 pub enum TransformedData {
     Compact {
         members: Vec<String>,
-        dataset: Vec<Vec<String>>,
+        dataset: Vec<Vec<DBResponsePrimitive>>,
     },
-    Vanilla(Vec<HashMap<String, String>>),
+    Vanilla(Vec<HashMap<String, DBResponsePrimitive>>),
 }
 
 impl TransformedData {

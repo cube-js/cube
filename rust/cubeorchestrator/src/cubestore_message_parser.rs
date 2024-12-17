@@ -1,5 +1,7 @@
+use crate::transport::{DBResponsePrimitive, DBResponseValue};
 use cubeshared::codegen::{root_as_http_message, HttpCommand};
 use neon::prelude::Finalize;
+use serde::Deserialize;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -27,9 +29,10 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
+#[derive(Debug, Clone, Deserialize)]
 pub struct CubeStoreResult {
     pub columns: Vec<String>,
-    pub rows: Vec<Vec<String>>,
+    pub rows: Vec<Vec<DBResponseValue>>,
     pub columns_pos: HashMap<String, usize>,
 }
 
@@ -83,7 +86,11 @@ impl CubeStoreResult {
                     let values = row.values().ok_or(ParseError::NullRow)?;
                     let row_obj: Vec<_> = values
                         .iter()
-                        .map(|val| val.string_value().unwrap_or("").to_owned())
+                        .map(|val| {
+                            DBResponseValue::Primitive(DBResponsePrimitive::String(
+                                val.string_value().unwrap_or("").to_owned(),
+                            ))
+                        })
                         .collect();
 
                     result.rows.push(row_obj);
