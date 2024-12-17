@@ -972,6 +972,18 @@ declare module '@cubejs-client/core' {
 
   export type CubeMember = TCubeMeasure | TCubeDimension | TCubeSegment;
 
+  export type TCubeFolder = {
+    name: string;
+    members: string[];
+  };
+
+  export type TCubeHierarchy = {
+    name: string;
+    title?: string;
+    levels: string[];
+    public?: boolean;
+  };
+
   /**
    * @deprecated use DryRunResponse
    */
@@ -998,6 +1010,8 @@ declare module '@cubejs-client/core' {
     measures: TCubeMeasure[];
     dimensions: TCubeDimension[];
     segments: TCubeSegment[];
+    folders: TCubeFolder[];
+    hierarchies: TCubeHierarchy[];
     connectedComponent?: number;
     type?: 'view' | 'cube';
     /**

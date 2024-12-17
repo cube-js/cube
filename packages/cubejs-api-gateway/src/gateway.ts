@@ -1207,16 +1207,16 @@ class ApiGateway {
           }
 
           // First apply cube/view level security policies
-          const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
+          const { query: queryWithRlsFilters, denied } = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
             evaluatedQuery,
             context
           );
           // Then apply user-supplied queryRewrite
-          let rewrittenQuery = await this.queryRewrite(
+          let rewrittenQuery = !denied ? await this.queryRewrite(
             queryWithRlsFilters,
             context
-          );
+          ) : queryWithRlsFilters;
 
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
           // if that's the case, we should run an extra pass of parsing here to make sure

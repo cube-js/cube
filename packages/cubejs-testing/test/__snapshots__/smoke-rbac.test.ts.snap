@@ -8,6 +8,22 @@ Array [
 ]
 `;
 
+exports[`Cube RBAC Engine [Python config][dev mode] products with no matching policy: products_no_policy_python 1`] = `
+Array [
+  Object {
+    "products.count": "0",
+  },
+]
+`;
+
+exports[`Cube RBAC Engine [dev mode] products with no matching policy: products_no_policy 1`] = `
+Array [
+  Object {
+    "products.count": "0",
+  },
+]
+`;
+
 exports[`Cube RBAC Engine RBAC via REST API line_items hidden price_dim: line_items_view_no_policy_rest 1`] = `
 Array [
   Object {

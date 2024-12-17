@@ -106,7 +106,7 @@ export class CubeSymbols {
       },
       set segments(v) {
         // Dont allow to modify
-      }
+      },
     }, cubeDefinition);
 
     if (cubeDefinition.extends) {

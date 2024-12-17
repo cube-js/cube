@@ -64,7 +64,7 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
-        revenueRolling3day: {
+        revenueRollingThreeDay: {
           type: 'sum',
           sql: 'amount',
           rollingWindow: {
@@ -780,7 +780,7 @@ describe('SQL Generation', () => {
 
   it('rolling month', async () => runQueryTest({
     measures: [
-      'visitors.revenueRolling3day'
+      'visitors.revenueRollingThreeDay'
     ],
     timeDimensions: [{
       dimension: 'visitors.created_at',
@@ -792,7 +792,7 @@ describe('SQL Generation', () => {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling3day: '900' }
+    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling_three_day: '900' }
   ]));
 
   it('rolling count', async () => runQueryTest({
@@ -1791,7 +1791,7 @@ describe('SQL Generation', () => {
   ]));
 
   it(
-    'contains filter',
+    'contains filter 1',
     () => runQueryTest({
       measures: [],
       dimensions: [
@@ -2583,7 +2583,7 @@ describe('SQL Generation', () => {
     ]
   ));
 
-  it('rank measure', async () => runQueryTest(
+  it('rank measure 1', async () => runQueryTest(
     {
       measures: ['visitors.revenue_rank'],
     },

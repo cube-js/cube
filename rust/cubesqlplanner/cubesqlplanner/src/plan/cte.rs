@@ -1,4 +1,4 @@
-use super::{QueryPlan, Schema, Select};
+use super::{QueryPlan, Select};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 
@@ -20,10 +20,6 @@ impl Cte {
             query: Rc::new(QueryPlan::Select(select)),
             name,
         }
-    }
-
-    pub fn make_schema(&self) -> Schema {
-        self.query.make_schema(Some(self.name().clone()))
     }
 
     pub fn query(&self) -> &Rc<QueryPlan> {

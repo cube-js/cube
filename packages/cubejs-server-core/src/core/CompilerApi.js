@@ -276,7 +276,7 @@ export class CompilerApi {
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
-      return query;
+      return { query, denied: false };
     }
 
     const queryCubes = await this.getCubesFromQuery(evaluatedQuery, context);
@@ -322,7 +322,7 @@ export class CompilerApi {
             name: 'rlsAccessDenied',
           });
           // If we hit this condition there's no need to evaluate the rest of the policy
-          break;
+          return { query, denied: true };
         }
       }
     }
@@ -334,7 +334,7 @@ export class CompilerApi {
     );
     query.filters = query.filters || [];
     query.filters.push(rlsFilter);
-    return query;
+    return { query, denied: false };
   }
 
   buildFinalRlsFilter(cubeFiltersPerCubePerRole, viewFiltersPerCubePerRole, hasAllowAllForCube) {

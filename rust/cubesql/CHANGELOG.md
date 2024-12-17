@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.10](https://github.com/cube-js/cube/compare/v1.1.9...v1.1.10) (2024-12-16)
+
+
+### Features
+
+* **cubesql:** Basic VALUES support in rewrite engine ([#9041](https://github.com/cube-js/cube/issues/9041)) ([368671f](https://github.com/cube-js/cube/commit/368671fd1b53b2ed5ad8df6af113492982f23c0c))
+
+
+
+
+
 ## [1.1.9](https://github.com/cube-js/cube/compare/v1.1.8...v1.1.9) (2024-12-08)
 
 

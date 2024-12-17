@@ -30,7 +30,7 @@ impl OrderPlanner {
                 .find(|(_, m)| m.full_name().to_lowercase() == itm.name().to_lowercase())
             {
                 result.push(OrderBy::new(
-                    Expr::Member(MemberExpression::new(member.clone(), None)),
+                    Expr::Member(MemberExpression::new(member.clone())),
                     pos + 1,
                     itm.desc(),
                 ));

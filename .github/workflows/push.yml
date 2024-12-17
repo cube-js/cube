@@ -316,6 +316,7 @@ jobs:
     env:
       CLOUD_DATABASES: >
         firebolt
+        dremio
       # Athena (just to check for secrets availability)
       DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
 
@@ -324,7 +325,7 @@ jobs:
         node-version: [20.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt'
+            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio'
         ]
       fail-fast: false
 
@@ -386,6 +387,10 @@ jobs:
           DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ACCOUNT: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ACCOUNT }}
           DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_USER }}
           DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_PASS }}
+          # Dremio Integration
+          DRIVERS_TESTS_DREMIO_CUBEJS_DB_URL: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_URL }}
+          DRIVERS_TESTS_DREMIO_CUBEJS_DB_NAME: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_NAME }}
+          DRIVERS_TESTS_DREMIO_CUBEJS_DB_DREMIO_AUTH_TOKEN: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_DREMIO_AUTH_TOKEN }}
 
   integration-smoke:
     needs: [ latest-tag-sha, build-cubestore ]

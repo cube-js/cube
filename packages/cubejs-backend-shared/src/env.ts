@@ -1661,6 +1661,23 @@ duckdbExtensions: ({
   ),
 
   /** ****************************************************************
+   * Dremio Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Dremio Auth Token
+   */
+  dremioAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DREMIO_AUTH_TOKEN', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
    * Cube Store Driver                                               *
    ***************************************************************** */
 
