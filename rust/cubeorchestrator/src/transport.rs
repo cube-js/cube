@@ -9,7 +9,6 @@ pub const BLENDING_QUERY_KEY_PREFIX: &str = "time.";
 pub const BLENDING_QUERY_RES_SEPARATOR: &str = ".";
 pub const MEMBER_SEPARATOR: &str = ".";
 
-// TODO: Seems to be unused
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DBResponsePrimitive {
     Null,
@@ -18,13 +17,35 @@ pub enum DBResponsePrimitive {
     String(String),
 }
 
-// TODO: Seems to be unused
+impl Display for DBResponsePrimitive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            DBResponsePrimitive::Null => "null".to_string(),
+            DBResponsePrimitive::Boolean(b) => b.to_string(),
+            DBResponsePrimitive::Number(n) => n.to_string(),
+            DBResponsePrimitive::String(s) => s.clone(),
+        };
+        write!(f, "{}", str)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub enum DBResponseValue {
     DateTime(DateTime<Utc>),
     Primitive(DBResponsePrimitive),
     // TODO: Is this variant still used?
     Object { value: DBResponsePrimitive },
+}
+
+impl Display for DBResponseValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            DBResponseValue::DateTime(dt) => dt.to_rfc3339(),
+            DBResponseValue::Primitive(p) => p.to_string(),
+            DBResponseValue::Object { value } => value.to_string(),
+        };
+        write!(f, "{}", str)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -75,7 +75,7 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
                 let js_row = JsObject::new(&mut cx);
                 for (key, value) in result.columns.iter().zip(row.iter()) {
                     let js_key = cx.string(key);
-                    let js_value = cx.string(value);
+                    let js_value = cx.string(value.to_string());
                     js_row.set(&mut cx, js_key, js_value)?;
                 }
                 Ok(js_row)
