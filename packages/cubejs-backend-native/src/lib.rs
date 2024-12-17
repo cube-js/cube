@@ -13,6 +13,7 @@ pub mod logger;
 pub mod node_export;
 pub mod node_obj_deserializer;
 pub mod node_obj_serializer;
+pub mod orchestrator;
 #[cfg(feature = "python")]
 pub mod python;
 pub mod stream;
