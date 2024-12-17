@@ -514,6 +514,27 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
 
 //============ sql orchestrator ===================
 
+fn json_to_array_buffer<'a, C>(
+    mut cx: C,
+    json_data: Result<String, anyhow::Error>,
+) -> JsResult<'a, JsArrayBuffer>
+where
+    C: Context<'a>,
+{
+    match json_data {
+        Ok(json_data) => {
+            let json_bytes = json_data.as_bytes();
+            let mut js_buffer = cx.array_buffer(json_bytes.len())?;
+            {
+                let buffer = js_buffer.as_mut_slice(&mut cx);
+                buffer.copy_from_slice(json_bytes);
+            }
+            Ok(js_buffer)
+        }
+        Err(err) => cx.throw_error(err.to_string()),
+    }
+}
+
 fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let msg = cx.argument::<JsBuffer>(0)?;
     let msg_data = msg.as_slice(&cx).to_vec();
@@ -617,20 +638,7 @@ fn final_cubestore_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 Err(err) => Err(anyhow::Error::from(err)),
             }
         })
-        .promise(move |mut cx, json_string| match json_string {
-            Ok(json_string) => {
-                let json_bytes = json_string.as_bytes();
-
-                let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-                {
-                    let buffer = js_buffer.as_mut_slice(&mut cx);
-                    buffer.copy_from_slice(json_bytes);
-                }
-
-                Ok(js_buffer)
-            }
-            Err(err) => cx.throw_error(err.to_string()),
-        });
+        .promise(move |cx, json_data| json_to_array_buffer(cx, json_data));
 
     Ok(promise)
 }
@@ -679,20 +687,7 @@ fn final_cubestore_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> 
                 Err(err) => Err(anyhow::Error::from(err)),
             }
         })
-        .promise(move |mut cx, json_data| match json_data {
-            Ok(json_data) => {
-                let json_bytes = json_data.as_bytes();
-
-                let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-                {
-                    let buffer = js_buffer.as_mut_slice(&mut cx);
-                    buffer.copy_from_slice(json_bytes);
-                }
-
-                Ok(js_buffer)
-            }
-            Err(err) => cx.throw_error(err.to_string()),
-        });
+        .promise(move |cx, json_data| json_to_array_buffer(cx, json_data));
 
     Ok(promise)
 }
@@ -733,20 +728,7 @@ fn final_cubestore_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> 
                 Err(err) => Err(anyhow::Error::from(err)),
             }
         })
-        .promise(move |mut cx, json_data| match json_data {
-            Ok(json_data) => {
-                let json_bytes = json_data.as_bytes();
-
-                let mut js_buffer = cx.array_buffer(json_bytes.len())?;
-                {
-                    let buffer = js_buffer.as_mut_slice(&mut cx);
-                    buffer.copy_from_slice(json_bytes);
-                }
-
-                Ok(js_buffer)
-            }
-            Err(err) => cx.throw_error(err.to_string()),
-        });
+        .promise(move |cx, json_data| json_to_array_buffer(cx, json_data));
 
     Ok(promise)
 }
