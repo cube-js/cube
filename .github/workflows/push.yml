@@ -95,6 +95,8 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build native (no python)
+        run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Build client
         run: yarn build
       - name: Build cubejs-backend-native (with Python)
