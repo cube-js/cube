@@ -14,8 +14,6 @@ import {
   getFinalQueryResult,
   getFinalQueryResultArray,
   getFinalQueryResultMulti,
-  transformData as transformDataNative,
-  TransformDataResponse
 } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,

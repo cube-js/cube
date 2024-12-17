@@ -107,17 +107,6 @@ export type DBResponsePrimitive =
   number |
   string;
 
-export type TransformDataResponse = {
-  members: string[],
-  dataset: DBResponsePrimitive[][]
-} | {
-  [member: string]: DBResponsePrimitive
-}[];
-
-export type TransformDataResponseNative = {
-  result: string
-};
-
 let loadedNative: any = null;
 
 export function loadNative() {
@@ -385,12 +374,6 @@ export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => 
   const native = loadNative();
 
   return native.getCubestoreResult(ref);
-};
-
-export const transformData = (transformDataObj: Object, rows: any): Promise<TransformDataResponseNative> => {
-  const native = loadNative();
-
-  return native.transformQueryData(transformDataObj, rows);
 };
 
 export const getFinalQueryResult = (transformDataObj: Object, rows: any, resultData: Object): Promise<ArrayBuffer> => {

@@ -1,8 +1,7 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    get_final_cubestore_result_array, RequestResultArray, RequestResultData,
-    RequestResultDataMulti, TransformedData,
+    get_final_cubestore_result_array, RequestResultArray, RequestResultData, RequestResultDataMulti,
 };
 use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
 use neon::context::{Context, FunctionContext, ModuleContext};
@@ -21,7 +20,6 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
         parse_cubestore_result_message,
     )?;
     cx.export_function("getCubestoreResult", get_cubestore_result)?;
-    cx.export_function("transformQueryData", transform_query_data)?;
     cx.export_function("getFinalQueryResult", final_query_result)?;
     cx.export_function("getFinalQueryResultMulti", final_query_result_multi)?;
     cx.export_function("getFinalQueryResultArray", final_query_result_array)?;
@@ -108,42 +106,6 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     })?;
 
     Ok(js_array.upcast())
-}
-
-pub fn transform_query_data(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let transform_data_js_object = cx.argument::<JsValue>(0)?;
-    let deserializer = JsValueDeserializer::new(&mut cx, transform_data_js_object);
-
-    let request_data: TransformDataRequest = match Deserialize::deserialize(deserializer) {
-        Ok(data) => data,
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
-
-    let cube_store_result = cx.argument::<JsBox<Arc<QueryResult>>>(1)?;
-    let cube_store_result = Arc::clone(&cube_store_result);
-
-    let promise = cx
-        .task(move || {
-            let transformed = TransformedData::transform(&request_data, &cube_store_result)?;
-
-            match serde_json::to_string(&transformed) {
-                Ok(json) => Ok(json),
-                Err(err) => Err(anyhow::Error::from(err)),
-            }
-        })
-        .promise(move |mut cx, json_data| match json_data {
-            Ok(json_data) => {
-                let js_string = cx.string(json_data);
-
-                let js_result = cx.empty_object();
-                js_result.set(&mut cx, "result", js_string)?;
-
-                Ok(js_result)
-            }
-            Err(err) => cx.throw_error(err.to_string()),
-        });
-
-    Ok(promise)
 }
 
 pub fn final_query_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
