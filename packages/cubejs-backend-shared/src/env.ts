@@ -1613,14 +1613,14 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
-duckdbExtensions: ({
+  duckdbExtensions: ({
     dataSource
   }: {
     dataSource: string,
   }) => {
     const extensions = process.env[
       keyByDataSource('CUBEJS_DB_DUCKDB_EXTENSIONS', dataSource)
-    ]
+    ];
     if (extensions) {
       return extensions.split(',').map(e => e.trim());
     }

@@ -138,10 +138,10 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     const extensions = getEnv('duckdbExtensions', this.config);
     for (const extension of extensions) {
       try {
-        await execAsync('INSTALL ' + extension);
+        await execAsync(`INSTALL ${extension}`);
       } catch (e) {
         if (this.logger) {
-          console.error('DuckDB - error on installing ' + extension, {
+          console.error(`DuckDB - error on installing ${extension}`, {
             e
           });
         }
@@ -151,10 +151,10 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       }
 
       try {
-        await execAsync('LOAD ' + extension);
+        await execAsync(`LOAD ${extension}`);
       } catch (e) {
         if (this.logger) {
-          console.error('DuckDB - error on loading ' + extension, {
+          console.error(`DuckDB - error on loading ${extension}`, {
             e
           });
         }
