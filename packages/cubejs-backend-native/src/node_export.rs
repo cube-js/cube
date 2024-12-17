@@ -540,7 +540,7 @@ fn parse_cubestore_ws_result_message(mut cx: FunctionContext) -> JsResult<JsProm
     let msg_data = msg.as_slice(&cx).to_vec();
 
     let promise = cx
-        .task(move || CubeStoreResult::new(&msg_data))
+        .task(move || CubeStoreResult::from_fb(&msg_data))
         .promise(move |mut cx, res| match res {
             Ok(result) => Ok(cx.boxed(Arc::new(result))),
             Err(err) => cx.throw_error(err.to_string()),
