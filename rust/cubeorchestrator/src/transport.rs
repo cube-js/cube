@@ -4,21 +4,18 @@ use serde_json::Value;
 use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ResultType {
-    #[serde(rename = "default")]
     Default,
-    #[serde(rename = "compact")]
     Compact,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum QueryType {
-    #[serde(rename = "regularQuery")]
     #[default]
     RegularQuery,
-    #[serde(rename = "compareDateRangeQuery")]
     CompareDateRangeQuery,
-    #[serde(rename = "blendingQuery")]
     BlendingQuery,
 }
 
@@ -34,56 +31,35 @@ impl Display for QueryType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum MemberType {
-    #[serde(rename = "measures")]
     Measures,
-    #[serde(rename = "dimensions")]
     Dimensions,
-    #[serde(rename = "segments")]
     Segments,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FilterOperator {
-    #[serde(rename = "equals")]
     Equals,
-    #[serde(rename = "notEquals")]
     NotEquals,
-    #[serde(rename = "contains")]
     Contains,
-    #[serde(rename = "notContains")]
     NotContains,
-    #[serde(rename = "in")]
     In,
-    #[serde(rename = "notIn")]
     NotIn,
-    #[serde(rename = "gt")]
     Gt,
-    #[serde(rename = "gte")]
     Gte,
-    #[serde(rename = "lt")]
     Lt,
-    #[serde(rename = "lte")]
     Lte,
-    #[serde(rename = "set")]
     Set,
-    #[serde(rename = "notSet")]
     NotSet,
-    #[serde(rename = "inDateRange")]
     InDateRange,
-    #[serde(rename = "notInDateRange")]
     NotInDateRange,
-    #[serde(rename = "onTheDate")]
     OnTheDate,
-    #[serde(rename = "beforeDate")]
     BeforeDate,
-    #[serde(rename = "beforeOrOnDate")]
     BeforeOrOnDate,
-    #[serde(rename = "afterDate")]
     AfterDate,
-    #[serde(rename = "afterOrOnDate")]
     AfterOrOnDate,
-    #[serde(rename = "measureFilter")]
     MeasureFilter,
 }
 
@@ -95,6 +71,7 @@ pub struct QueryFilter {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct GroupingSet {
     pub group_type: String,
     pub id: u32,
@@ -102,25 +79,22 @@ pub struct GroupingSet {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ParsedMemberExpression {
     pub expression: Vec<String>,
-    #[serde(rename = "cubeName")]
     pub cube_name: String,
     pub name: String,
-    #[serde(rename = "expressionName")]
     pub expression_name: String,
     pub definition: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "groupingSet")]
     pub grouping_set: Option<GroupingSet>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QueryTimeDimension {
     pub dimension: String,
-    #[serde(rename = "dateRange")]
     pub date_range: Option<Vec<String>>,
-    #[serde(rename = "compareDateRange")]
     pub compare_date_range: Option<Vec<String>>,
     pub granularity: Option<String>,
 }
@@ -141,6 +115,7 @@ pub struct GranularityMeta {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -156,16 +131,15 @@ pub struct ConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "drillMembers")]
     pub drill_members: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "drillMembersGrouped")]
     pub drill_members_grouped: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub granularities: Option<Vec<GranularityMeta>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AnnotatedConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -181,10 +155,8 @@ pub struct AnnotatedConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "drillMembers")]
     pub drill_members: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "drillMembersGrouped")]
     pub drill_members_grouped: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub granularity: Option<GranularityMeta>,
@@ -209,6 +181,7 @@ pub struct NormalizedQueryFilter {
 // TODO: Not used, as all members are made as Strings for now
 // XXX: Omitted function variant
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[serde(untagged)]
 pub enum MemberOrMemberExpression {
     Member(String),
     MemberExpression(ParsedMemberExpression),
@@ -240,6 +213,7 @@ pub enum LogicalFilter {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Query {
     // pub measures: Vec<MemberOrMemberExpression>,
     pub measures: Vec<String>,
@@ -248,7 +222,6 @@ pub struct Query {
     pub dimensions: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<Vec<LogicalFilter>>,
-    #[serde(rename = "timeDimensions")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -261,23 +234,21 @@ pub struct Query {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "totalQuery")]
     pub total_query: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
-    #[serde(rename = "renewQuery")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub renew_query: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
-    #[serde(rename = "responseFormat")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResultType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NormalizedQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     // pub measures: Vec<MemberOrMemberExpression>,
@@ -286,7 +257,6 @@ pub struct NormalizedQuery {
     // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
     pub dimensions: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
     // pub segments: Option<Vec<MemberOrMemberExpression>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -298,38 +268,32 @@ pub struct NormalizedQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "totalQuery")]
     pub total_query: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "renewQuery")]
     pub renew_query: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ungrouped: Option<bool>,
-    #[serde(rename = "responseFormat")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResultType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filters: Option<Vec<NormalizedQueryFilter>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "rowLimit")]
     pub row_limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Vec<Order>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "queryType")]
     pub query_type: Option<QueryType>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransformDataRequest {
-    #[serde(rename = "aliasToMemberNameMap")]
     pub alias_to_member_name_map: HashMap<String, String>,
     pub annotation: HashMap<String, ConfigItem>,
     pub query: NormalizedQuery,
-    #[serde(rename = "queryType")]
     pub query_type: Option<QueryType>,
-    #[serde(rename = "resType")]
     pub res_type: Option<ResultType>,
 }
 
