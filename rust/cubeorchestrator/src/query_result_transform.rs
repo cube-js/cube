@@ -1,5 +1,5 @@
 use crate::{
-    cubestore_message_parser::CubeStoreResult,
+    query_message_parser::QueryResult,
     transport::{
         ConfigItem, MembersMap, NormalizedQuery, QueryTimeDimension, QueryType, ResultType,
         TransformDataRequest,
@@ -115,7 +115,7 @@ pub fn get_blending_response_key(
 pub fn get_members(
     query_type: &QueryType,
     query: &NormalizedQuery,
-    db_data: &CubeStoreResult,
+    db_data: &QueryResult,
     alias_to_member_name_map: &HashMap<String, String>,
     annotation: &HashMap<String, ConfigItem>,
 ) -> Result<MembersMap> {
@@ -337,13 +337,19 @@ pub fn get_pivot_query(
             let mut merged_dimensions = HashSet::new();
 
             for query in queries {
-                merged_measures.extend(query.measures.iter().cloned());
+                if let Some(measures) = &query.measures {
+                    merged_measures.extend(measures.iter().cloned());
+                }
                 if let Some(dimensions) = &query.dimensions {
                     merged_dimensions.extend(dimensions.iter().cloned());
                 }
             }
 
-            pivot_query.measures = merged_measures.into_iter().collect();
+            pivot_query.measures = if !merged_measures.is_empty() {
+                Some(merged_measures.into_iter().collect())
+            } else {
+                None
+            };
             pivot_query.dimensions = if !merged_dimensions.is_empty() {
                 Some(merged_dimensions.into_iter().collect())
             } else {
@@ -378,7 +384,7 @@ pub fn get_pivot_query(
 
 pub fn get_final_cubestore_result_array(
     transform_requests: &[TransformDataRequest],
-    cube_store_results: &[Arc<CubeStoreResult>],
+    cube_store_results: &[Arc<QueryResult>],
     result_data: &mut [RequestResultData],
 ) -> Result<()> {
     for (transform_data, cube_store_result, result) in multizip((
@@ -406,7 +412,7 @@ impl TransformedData {
     /// Transforms queried data array to the output format.
     pub fn transform(
         request_data: &TransformDataRequest,
-        cube_store_result: &CubeStoreResult,
+        cube_store_result: &QueryResult,
     ) -> Result<Self> {
         let alias_to_member_name_map = &request_data.alias_to_member_name_map;
         let annotation = &request_data.annotation;
@@ -469,6 +475,7 @@ pub struct RequestResultDataMulti {
     pub query_type: QueryType,
     pub results: Vec<RequestResultData>,
     #[serde(rename = "pivotQuery")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pivot_query: Option<NormalizedQuery>,
     #[serde(rename = "slowQuery")]
     pub slow_query: bool,
@@ -480,7 +487,7 @@ impl RequestResultDataMulti {
     pub fn prepare_results(
         &mut self,
         request_data: &[TransformDataRequest],
-        cube_store_result: &[Arc<CubeStoreResult>],
+        cube_store_result: &[Arc<QueryResult>],
     ) -> Result<()> {
         for (transform_data, cube_store_result, result) in multizip((
             request_data.iter(),
@@ -506,14 +513,19 @@ impl RequestResultDataMulti {
 pub struct RequestResultData {
     pub query: NormalizedQuery,
     #[serde(rename = "lastRefreshTime")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub last_refresh_time: Option<String>,
     #[serde(rename = "refreshKeyValues")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_key_values: Option<Value>,
     #[serde(rename = "usedPreAggregations")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub used_pre_aggregations: Option<Value>,
     #[serde(rename = "transformedQuery")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub transformed_query: Option<Value>,
     #[serde(rename = "requestId")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
     pub annotation: HashMap<String, HashMap<String, ConfigItem>>,
     #[serde(rename = "dataSource")]
@@ -521,11 +533,14 @@ pub struct RequestResultData {
     #[serde(rename = "dbType")]
     pub db_type: String,
     #[serde(rename = "extDbType")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ext_db_type: Option<String>,
     pub external: bool,
     #[serde(rename = "slowQuery")]
     pub slow_query: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<TransformedData>,
 }
 
@@ -534,7 +549,7 @@ impl RequestResultData {
     pub fn prepare_results(
         &mut self,
         request_data: &TransformDataRequest,
-        cube_store_result: &CubeStoreResult,
+        cube_store_result: &QueryResult,
     ) -> Result<()> {
         let transformed = TransformedData::transform(request_data, cube_store_result)?;
         self.data = Some(transformed);
@@ -549,6 +564,7 @@ pub struct RequestResultArray {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum DBResponsePrimitive {
     Null,
     Boolean(bool),

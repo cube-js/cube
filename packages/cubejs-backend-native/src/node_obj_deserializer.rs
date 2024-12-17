@@ -103,7 +103,7 @@ impl<'de, 'a, 'b> Deserializer<'de> for JsValueDeserializer<'a, 'b> {
             }
 
             Err(JsDeserializationError(
-                "Unsupported type for deserialization".to_string(),
+                "Unsupported number type for deserialization".to_string(),
             ))
         } else if self.value.is_a::<JsBoolean, _>(self.cx) {
             let value = self
