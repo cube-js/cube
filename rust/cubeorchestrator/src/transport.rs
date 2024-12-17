@@ -61,6 +61,10 @@ pub enum FilterOperator {
     AfterDate,
     AfterOrOnDate,
     MeasureFilter,
+    EndsWith,
+    NotEndsWith,
+    StartsWith,
+    NotStartsWith,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

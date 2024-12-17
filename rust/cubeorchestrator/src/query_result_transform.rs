@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Context, Result};
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, NaiveDateTime, SecondsFormat, TimeZone, Utc};
 use itertools::multizip;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -27,13 +27,20 @@ pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimiti
     match value {
         DBResponseValue::DateTime(dt) if type_ == "time" || type_.is_empty() => {
             let formatted = dt.to_rfc3339_opts(SecondsFormat::Millis, true);
-            DBResponsePrimitive::String(formatted)
+            DBResponsePrimitive::String(formatted.trim_end_matches('Z').to_string())
         }
         DBResponseValue::Primitive(DBResponsePrimitive::String(ref s)) if type_ == "time" => {
             let formatted = DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.to_rfc3339_opts(SecondsFormat::Millis, true))
-                .unwrap_or_else(|_| s.clone());
-            DBResponsePrimitive::String(formatted)
+                .unwrap_or_else(|_| {
+                    match NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f") {
+                        Ok(dt) => Utc
+                            .from_utc_datetime(&dt)
+                            .to_rfc3339_opts(SecondsFormat::Millis, true),
+                        Err(_) => s.clone(),
+                    }
+                });
+            DBResponsePrimitive::String(formatted.trim_end_matches('Z').to_string())
         }
         DBResponseValue::Primitive(p) => p,
         DBResponseValue::Object { value } => value,
@@ -272,6 +279,8 @@ pub fn get_vanilla_row(
                     .unwrap_or(&"".to_string()),
             );
 
+            row.insert(member_name.clone(), transformed_value.clone());
+
             // Handle deprecated time dimensions without granularity
             let path: Vec<&str> = member_name.split(MEMBER_SEPARATOR).collect();
             let member_name_without_granularity =
@@ -284,8 +293,6 @@ pub fn get_vanilla_row(
                 })
             {
                 row.insert(member_name_without_granularity, transformed_value);
-            } else {
-                row.insert(member_name.clone(), transformed_value);
             }
         }
     }
@@ -605,12 +612,13 @@ impl Display for DBResponseValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{TimeZone, Utc, Timelike};
     use anyhow::Result;
+    use chrono::{TimeZone, Timelike, Utc};
 
     #[test]
     fn test_transform_value_datetime_to_time() {
-        let dt = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
+        let dt = Utc
+            .with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
             .unwrap()
             .with_nanosecond(123_000_000)
             .unwrap();
@@ -619,13 +627,14 @@ mod tests {
 
         assert_eq!(
             result,
-            DBResponsePrimitive::String("2024-01-01T12:30:15.123Z".to_string())
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
         );
     }
 
     #[test]
     fn test_transform_value_datetime_empty_type() {
-        let dt = Utc.with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
+        let dt = Utc
+            .with_ymd_and_hms(2024, 1, 1, 12, 30, 15)
             .unwrap()
             .with_nanosecond(123_000_000)
             .unwrap();
@@ -634,28 +643,40 @@ mod tests {
 
         assert_eq!(
             result,
-            DBResponsePrimitive::String("2024-01-01T12:30:15.123Z".to_string())
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
         );
     }
 
     #[test]
     fn test_transform_value_string_to_time_valid_rfc3339() {
         let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "2024-01-01T12:30:15.123Z".to_string(),
+            "2024-01-01T12:30:15.123".to_string(),
         ));
         let result = transform_value(value, "time");
 
         assert_eq!(
             result,
-            DBResponsePrimitive::String("2024-01-01T12:30:15.123Z".to_string())
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_string_wo_t_to_time_valid_rfc3339() {
+        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
+            "2024-01-01 12:30:15.123".to_string(),
+        ));
+        let result = transform_value(value, "time");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
         );
     }
 
     #[test]
     fn test_transform_value_string_to_time_invalid_rfc3339() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "invalid-date".to_string(),
-        ));
+        let value =
+            DBResponseValue::Primitive(DBResponsePrimitive::String("invalid-date".to_string()));
         let result = transform_value(value, "time");
 
         assert_eq!(
@@ -666,9 +687,8 @@ mod tests {
 
     #[test]
     fn test_transform_value_primitive_string_type_not_time() {
-        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
-            "some-string".to_string(),
-        ));
+        let value =
+            DBResponseValue::Primitive(DBResponsePrimitive::String("some-string".to_string()));
         let result = transform_value(value, "other");
 
         assert_eq!(
@@ -680,7 +700,9 @@ mod tests {
     #[test]
     fn test_transform_value_object() {
         let obj_value = DBResponsePrimitive::String("object-value".to_string());
-        let value = DBResponseValue::Object { value: obj_value.clone() };
+        let value = DBResponseValue::Object {
+            value: obj_value.clone(),
+        };
         let result = transform_value(value, "time");
 
         assert_eq!(result, obj_value);
@@ -891,5 +913,4 @@ mod tests {
             )
         );
     }
-
 }
