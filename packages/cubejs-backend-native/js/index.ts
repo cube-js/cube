@@ -376,18 +376,42 @@ export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => 
   return native.getCubestoreResult(ref);
 };
 
+/**
+ * Transform and prepare single query final result data that is sent to the client.
+ *
+ * @param transformDataObj Data needed to transform raw query results
+ * @param rows Raw data received from the source DB via driver or reference to a native CubeStore response result
+ * @param resultData Final query result structure without actual data
+ * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
+ */
 export const getFinalQueryResult = (transformDataObj: Object, rows: any, resultData: Object): Promise<ArrayBuffer> => {
   const native = loadNative();
 
   return native.getFinalQueryResult(transformDataObj, rows, resultData);
 };
 
+/**
+ * Transform and prepare multiple query final results data that is sent to the client (used in sqlApiLoad).
+ *
+ * @param transformDataArr Array of data needed to transform raw query results
+ * @param rows Array of raw data received from the source DB via driver or reference to native CubeStore response results
+ * @param resultDataArr Array of final query result structures without actual data
+ * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
+ */
 export const getFinalQueryResultArray = (transformDataArr: Object[], rows: any[], resultDataArr: Object[]): Promise<ArrayBuffer> => {
   const native = loadNative();
 
   return native.getFinalQueryResultArray(transformDataArr, rows, resultDataArr);
 };
 
+/**
+ * Transform and prepare multiple query final results data into a single response structure.
+ *
+ * @param transformDataArr Array of data needed to transform raw query results
+ * @param rows Array of raw data received from the source DB via driver or reference to native CubeStore response results
+ * @param responseData Final combined query result structure without actual data
+ * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
+ */
 export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[], responseData: Object): Promise<ArrayBuffer> => {
   const native = loadNative();
 
