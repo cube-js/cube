@@ -605,6 +605,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Build native (no python)
+        run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Build client
         run: yarn build
       - name: Lerna tsc
