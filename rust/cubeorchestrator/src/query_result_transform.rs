@@ -1,8 +1,8 @@
 use crate::{
     query_message_parser::QueryResult,
     transport::{
-        ConfigItem, MembersMap, NormalizedQuery, QueryTimeDimension, QueryType, ResultType,
-        TransformDataRequest,
+        AnnotatedConfigItem, ConfigItem, MembersMap, NormalizedQuery, QueryTimeDimension,
+        QueryType, ResultType, TransformDataRequest,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -197,7 +197,8 @@ pub fn get_compact_row(
             if let Some(alias) = members_to_alias_map.get(m) {
                 if let Some(key) = columns_pos.get(alias) {
                     if let Some(value) = db_row.get(*key) {
-                        row.push(transform_value(value.clone(), &annotation_item.member_type));
+                        let mtype = annotation_item.member_type.as_deref().unwrap_or("");
+                        row.push(transform_value(value.clone(), mtype));
                     }
                 }
             }
@@ -214,9 +215,9 @@ pub fn get_compact_row(
             if let Some(alias) = members_to_alias_map.get(&blending_key) {
                 if let Some(key) = columns_pos.get(alias) {
                     if let Some(value) = db_row.get(*key) {
-                        let member_type = annotation
-                            .get(alias)
-                            .map_or("", |annotation_item| &annotation_item.member_type);
+                        let member_type = annotation.get(alias).map_or("", |annotation_item| {
+                            annotation_item.member_type.as_deref().unwrap_or("")
+                        });
 
                         row.push(transform_value(value.clone(), member_type));
                     }
@@ -263,8 +264,13 @@ pub fn get_vanilla_row(
                 }
             };
 
-            let transformed_value =
-                transform_value(value.clone(), &annotation_for_member.member_type);
+            let transformed_value = transform_value(
+                value.clone(),
+                annotation_for_member
+                    .member_type
+                    .as_ref()
+                    .unwrap_or(&"".to_string()),
+            );
 
             // Handle deprecated time dimensions without granularity
             let path: Vec<&str> = member_name.split(MEMBER_SEPARATOR).collect();
@@ -527,15 +533,18 @@ pub struct RequestResultData {
     #[serde(rename = "requestId")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
-    pub annotation: HashMap<String, HashMap<String, ConfigItem>>,
+    pub annotation: HashMap<String, HashMap<String, AnnotatedConfigItem>>,
     #[serde(rename = "dataSource")]
-    pub data_source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_source: Option<String>,
     #[serde(rename = "dbType")]
-    pub db_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub db_type: Option<String>,
     #[serde(rename = "extDbType")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ext_db_type: Option<String>,
-    pub external: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external: Option<bool>,
     #[serde(rename = "slowQuery")]
     pub slow_query: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

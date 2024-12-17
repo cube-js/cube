@@ -118,7 +118,9 @@ pub struct ParsedMemberExpression {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryTimeDimension {
     pub dimension: String,
+    #[serde(rename = "dateRange")]
     pub date_range: Option<Vec<String>>,
+    #[serde(rename = "compareDateRange")]
     pub compare_date_range: Option<Vec<String>>,
     pub granularity: Option<String>,
 }
@@ -140,13 +142,15 @@ pub struct GranularityMeta {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigItem {
-    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub short_title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(rename = "type")]
-    pub member_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -162,6 +166,31 @@ pub struct ConfigItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnnotatedConfigItem {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub short_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "drillMembers")]
+    pub drill_members: Option<Vec<Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "drillMembersGrouped")]
+    pub drill_members_grouped: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub granularity: Option<GranularityMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
     pub id: String,
     pub desc: bool,
@@ -172,7 +201,7 @@ pub struct NormalizedQueryFilter {
     pub member: String,
     pub operator: FilterOperator,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub values: Option<Vec<String>>,
+    pub values: Option<Vec<DBResponsePrimitive>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dimension: Option<String>,
 }

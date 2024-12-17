@@ -28,7 +28,7 @@ type MetaConfigMap = {
 };
 
 /**
- * Convert cpecified array of MetaConfig objects to the
+ * Convert specified array of MetaConfig objects to the
  * MetaConfigMap.
  */
 function toConfigMap(metaConfig: MetaConfig[]): MetaConfigMap {
