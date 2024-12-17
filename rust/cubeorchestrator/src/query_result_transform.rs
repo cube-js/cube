@@ -476,14 +476,12 @@ impl TransformedData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestResultDataMulti {
-    #[serde(rename = "queryType")]
     pub query_type: QueryType,
     pub results: Vec<RequestResultData>,
-    #[serde(rename = "pivotQuery")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pivot_query: Option<NormalizedQuery>,
-    #[serde(rename = "slowQuery")]
     pub slow_query: bool,
 }
 
@@ -516,36 +514,28 @@ impl RequestResultDataMulti {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestResultData {
     pub query: NormalizedQuery,
-    #[serde(rename = "lastRefreshTime")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_refresh_time: Option<String>,
-    #[serde(rename = "refreshKeyValues")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_key_values: Option<Value>,
-    #[serde(rename = "usedPreAggregations")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub used_pre_aggregations: Option<Value>,
-    #[serde(rename = "transformedQuery")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transformed_query: Option<Value>,
-    #[serde(rename = "requestId")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
     pub annotation: HashMap<String, HashMap<String, AnnotatedConfigItem>>,
-    #[serde(rename = "dataSource")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_source: Option<String>,
-    #[serde(rename = "dbType")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub db_type: Option<String>,
-    #[serde(rename = "extDbType")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ext_db_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external: Option<bool>,
-    #[serde(rename = "slowQuery")]
     pub slow_query: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<u64>,
