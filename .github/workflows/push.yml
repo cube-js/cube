@@ -567,17 +567,6 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Build image
-        uses: docker/build-push-action@v6
-        timeout-minutes: 30
-        with:
-          context: .
-          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
-          platforms: linux/amd64
-          push: true
-          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Use Node.js 20.x
         uses: actions/setup-node@v4
         with:
@@ -605,12 +594,28 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
-      - name: Build native (no python)
-        run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Build client
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build native (no python)
+        run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      # current .dockerignore prevents use of native build
+      - name: Unignore native from .dockerignore
+        run: |
+          grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
+          mv .dockerignore.tmp .dockerignore
+      - name: Build image
+        uses: docker/build-push-action@v6
+        timeout-minutes: 30
+        with:
+          context: .
+          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
