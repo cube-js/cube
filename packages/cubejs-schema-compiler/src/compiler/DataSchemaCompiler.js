@@ -23,7 +23,9 @@ export class DataSchemaCompiler {
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
     this.transpilers = options.transpilers || [];
+    this.viewCompilers = options.viewCompilers || [];
     this.preTranspileCubeCompilers = options.preTranspileCubeCompilers || [];
+    this.viewCompilationGate = options.viewCompilationGate;
     this.cubeNameCompilers = options.cubeNameCompilers || [];
     this.extensions = options.extensions || {};
     this.cubeFactory = options.cubeFactory;
@@ -93,7 +95,10 @@ export class DataSchemaCompiler {
     const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers })
-      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
+      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }))
+      .then(() => (this.viewCompilationGate.shouldCompileViews() ?
+        compilePhase({ cubeCompilers: this.viewCompilers })
+        : Promise.resolve()))
       .then(() => compilePhase({
         cubeCompilers: this.cubeCompilers,
         contextCompilers: this.contextCompilers,
