@@ -22,6 +22,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         "?date",
@@ -29,6 +30,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                 ],
             ),
@@ -41,6 +43,7 @@ impl WrapperRules {
                 "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
+                "?grouped_subqueries",
             ),
             self.transform_date_part_expr("?alias_to_cube"),
         )]);

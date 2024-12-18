@@ -2121,6 +2121,11 @@ impl LanguageToLogicalPlanConverter {
                     from.schema()
                         .fields()
                         .iter()
+                        .chain(
+                            joins
+                                .iter()
+                                .flat_map(|(j, _, _)| j.schema().fields().iter()),
+                        )
                         .map(|f| Expr::Column(f.qualified_column()))
                         .collect::<Vec<_>>()
                 } else {
@@ -2158,7 +2163,14 @@ impl LanguageToLogicalPlanConverter {
                 for subquery in subqueries.iter() {
                     subqueries_schema.merge(subquery.schema());
                 }
-                let schema_with_subqueries = from.schema().join(&subqueries_schema)?;
+                let mut joins_schema = DFSchema::empty();
+                for join in joins.iter() {
+                    joins_schema.merge(join.0.schema());
+                }
+                let schema_with_subqueries = from
+                    .schema()
+                    .join(&subqueries_schema)?
+                    .join(&joins_schema)?;
 
                 let without_window_fields = exprlist_to_fields_from_schema(
                     all_expr_without_window.iter(),

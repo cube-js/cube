@@ -2716,77 +2716,14 @@ impl MemberRules {
         let left_aliases_var = var!(left_aliases_var);
         let right_aliases_var = var!(right_aliases_var);
         move |egraph, subst| {
-            if egraph
-                .index(subst[left_aliases_var])
-                .data
-                .member_name_to_expr
-                .is_some()
-            {
-                if egraph
-                    .index(subst[right_aliases_var])
-                    .data
-                    .member_name_to_expr
-                    .is_some()
-                {
-                    let left_join_ons: Vec<Vec<_>> =
-                        var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
-                            .map(|elem| elem.iter().cloned().collect())
-                            .collect();
-                    for left_join_on in left_join_ons {
-                        for join_on in left_join_on {
-                            let member_names_to_expr_left = &mut egraph
-                                .index_mut(subst[left_aliases_var])
-                                .data
-                                .member_name_to_expr
-                                .as_mut()
-                                .unwrap();
-
-                            // TODO: Avoid the join_on.*.clone() calls (should be trivial).
-                            let mut column_name = join_on.name.clone();
-                            if let Some(name) = find_column_by_alias(
-                                &column_name,
-                                member_names_to_expr_left,
-                                &join_on.relation.clone().unwrap_or_default(),
-                            ) {
-                                column_name = name.split(".").last().unwrap().to_string();
-                            }
-
-                            if column_name == "__cubeJoinField" {
-                                let right_join_ons: Vec<Vec<_>> =
-                                    var_iter!(egraph[subst[right_on_var]], JoinRightOn)
-                                        .map(|elem| elem.iter().cloned().collect())
-                                        .collect();
-                                for right_join_on in right_join_ons {
-                                    for join_on in right_join_on.iter() {
-                                        let member_names_to_expr_right = &mut egraph
-                                            .index_mut(subst[right_aliases_var])
-                                            .data
-                                            .member_name_to_expr
-                                            .as_mut()
-                                            .unwrap();
-
-                                        let mut column_name = join_on.name.clone();
-                                        if let Some(name) = find_column_by_alias(
-                                            &column_name,
-                                            member_names_to_expr_right,
-                                            &join_on.relation.clone().unwrap_or_default(),
-                                        ) {
-                                            column_name =
-                                                name.split(".").last().unwrap().to_string();
-                                        }
-
-                                        if column_name == "__cubeJoinField" {
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            false
+            is_proper_cube_join_condition(
+                egraph,
+                subst,
+                left_aliases_var,
+                left_on_var,
+                right_aliases_var,
+                right_on_var,
+            )
         }
     }
 
@@ -2950,18 +2887,111 @@ pub fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option
     }
 }
 
-fn find_column_by_alias(
-    column_name: &String,
-    member_names_to_expr: &mut MemberNamesToExpr,
-    cube_alias: &String,
-) -> Option<String> {
+fn find_column_by_alias<'mn>(
+    column_name: &str,
+    member_names_to_expr: &'mn mut MemberNamesToExpr,
+    cube_alias: &str,
+) -> Option<&'mn str> {
     if let Some((tuple, _)) = LogicalPlanData::do_find_member_by_alias(
         member_names_to_expr,
         &format!("{}.{}", cube_alias, column_name),
     ) {
-        return tuple.0.clone();
+        return tuple.0.as_deref();
     }
     None
+}
+
+fn is_proper_cube_join_condition(
+    egraph: &mut CubeEGraph,
+    subst: &Subst,
+    left_cube_members_var: Var,
+    left_on_var: Var,
+    right_cube_members_var: Var,
+    right_on_var: Var,
+) -> bool {
+    if egraph[subst[left_cube_members_var]]
+        .data
+        .member_name_to_expr
+        .is_none()
+    {
+        return false;
+    }
+
+    if egraph[subst[right_cube_members_var]]
+        .data
+        .member_name_to_expr
+        .is_none()
+    {
+        return false;
+    }
+
+    let left_join_ons = var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
+        .cloned()
+        .collect::<Vec<_>>();
+    let right_join_ons = var_iter!(egraph[subst[right_on_var]], JoinRightOn)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    // For now this allows only exact left.__cubeJoinField = right.__cubeJoinField
+    // TODO implement more complex conditions
+
+    for left_join_on in &left_join_ons {
+        if left_join_on.len() != 1 {
+            continue;
+        }
+
+        let left_join_on = &left_join_on[0];
+
+        let left_member_names_to_expr = &mut egraph[subst[left_cube_members_var]]
+            .data
+            .member_name_to_expr
+            .as_mut()
+            .unwrap();
+
+        let mut left_column_name = left_join_on.name.as_str();
+        if let Some(name) = find_column_by_alias(
+            left_column_name,
+            left_member_names_to_expr,
+            left_join_on.relation.as_deref().unwrap_or_default(),
+        ) {
+            left_column_name = name.rsplit_once(".").unwrap().1;
+        }
+
+        if left_column_name != "__cubeJoinField" {
+            continue;
+        }
+
+        for right_join_on in &right_join_ons {
+            if right_join_on.len() != 1 {
+                continue;
+            }
+
+            let right_join_on = &right_join_on[0];
+
+            let right_member_names_to_expr = &mut egraph[subst[right_cube_members_var]]
+                .data
+                .member_name_to_expr
+                .as_mut()
+                .unwrap();
+
+            let mut right_column_name = right_join_on.name.as_str();
+            if let Some(name) = find_column_by_alias(
+                right_column_name,
+                right_member_names_to_expr,
+                right_join_on.relation.as_deref().unwrap_or_default(),
+            ) {
+                right_column_name = name.rsplit_once(".").unwrap().1;
+            }
+
+            if right_column_name != "__cubeJoinField" {
+                continue;
+            }
+
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]

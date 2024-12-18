@@ -58,6 +58,11 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        let joins = match enode {
+            LogicalPlanLanguage::Join(_) => 1,
+            _ => 0,
+        };
+
         let wrapper_nodes = match enode {
             LogicalPlanLanguage::CubeScanWrapper(_) => 1,
             _ => 0,
@@ -209,6 +214,7 @@ impl BestCubePlan {
             structure_points,
             ungrouped_aggregates: 0,
             wrapper_nodes,
+            joins,
             wrapped_select_ungrouped_scan,
             empty_wrappers: 0,
             ast_size_outside_wrapper: 0,
@@ -247,6 +253,7 @@ pub struct CubePlanCost {
     non_pushed_down_window: i64,
     non_pushed_down_grouping_sets: i64,
     non_pushed_down_limit_sort: i64,
+    joins: usize,
     wrapper_nodes: i64,
     wrapped_select_ungrouped_scan: usize,
     ast_size_outside_wrapper: usize,
@@ -369,6 +376,7 @@ impl CubePlanCost {
             cube_members: self.cube_members + other.cube_members,
             errors: self.errors + other.errors,
             structure_points: self.structure_points + other.structure_points,
+            joins: self.joins + other.joins,
             empty_wrappers: self.empty_wrappers + other.empty_wrappers,
             ast_size_outside_wrapper: self.ast_size_outside_wrapper
                 + other.ast_size_outside_wrapper,
@@ -424,6 +432,7 @@ impl CubePlanCost {
             cube_members: self.cube_members,
             errors: self.errors,
             structure_points: self.structure_points,
+            joins: self.joins,
             ast_size_outside_wrapper: match state {
                 CubePlanState::Wrapped => 0,
                 CubePlanState::Unwrapped(size) => *size,

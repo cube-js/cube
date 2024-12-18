@@ -61,6 +61,23 @@ const SecondsDurations = {
  */
 
 /**
+ * @typedef {Object} JoinRoot
+ * @property {string} sql
+ * @property {string} alias
+ */
+
+/**
+ * @typedef {Object} JoinItem
+ * @property {string} sql
+ * @property {string} alias
+ * @property {string} on
+ */
+
+/**
+ * @typedef {[JoinRoot, ...JoinItem]} JoinChain
+ */
+
+/**
  * BaseQuery class. BaseQuery object encapsulates the logic of
  * transforming an incoming to a specific cube request to the
  * SQL-query string.
@@ -224,6 +241,7 @@ export class BaseQuery {
       multiStageQuery: this.options.multiStageQuery,
       multiStageDimensions: this.options.multiStageDimensions,
       multiStageTimeDimensions: this.options.multiStageTimeDimensions,
+      subqueryJoins: this.options.subqueryJoins,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -268,6 +286,11 @@ export class BaseQuery {
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
+
+    /**
+     * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
+     */
+    this.customSubQueryJoins = this.options.subqueryJoins ?? [];
 
     // Set the default order only when options.order is not provided at all
     // if options.order is set (empty array [] or with data) - use it as is
@@ -1604,19 +1627,44 @@ export class BaseQuery {
     return this.joinSql([
       { sql: cubeSql, alias: cubeAlias },
       ...(subQueryDimensionsByCube[join.root] || []).map(d => this.subQueryJoin(d)),
-      ...joins
+      ...joins,
+      ...this.customSubQueryJoins.map((customJoin) => this.customSubQueryJoin(customJoin)),
     ]);
   }
 
   joinSql(toJoin) {
     const [root, ...rest] = toJoin;
     const joins = rest.map(
-      j => `LEFT JOIN ${j.sql} ${this.asSyntaxJoin} ${j.alias} ON ${j.on}`
+      j => {
+        const joinType = j.joinType ?? 'LEFT';
+        return `${joinType} JOIN ${j.sql} ${this.asSyntaxJoin} ${j.alias} ON ${j.on}`;
+      }
     );
 
     return [`${root.sql} ${this.asSyntaxJoin} ${root.alias}`, ...joins].join('\n');
   }
 
+  /**
+   *
+   * @param {{sql: string, on: {cubeName: string, expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}} customJoin
+   * @returns {JoinItem}
+   */
+  customSubQueryJoin(customJoin) {
+    const on = this.evaluateSql(customJoin.on.cubeName, customJoin.on.expression);
+
+    return {
+      sql: `(${customJoin.sql})`,
+      alias: customJoin.alias,
+      on,
+      joinType: customJoin.joinType,
+    };
+  }
+
+  /**
+   *
+   * @param {string} dimension
+   * @returns {JoinItem}
+   */
   subQueryJoin(dimension) {
     const { prefix, subQuery, cubeName } = this.subQueryDescription(dimension);
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
