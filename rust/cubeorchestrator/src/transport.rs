@@ -67,7 +67,7 @@ pub enum FilterOperator {
     NotStartsWith,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryFilter {
     pub member: String,
     pub operator: FilterOperator,
@@ -135,11 +135,19 @@ pub struct ConfigItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub drill_members: Option<Vec<Value>>,
+    pub drill_members: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub drill_members_grouped: Option<Value>,
+    pub drill_members_grouped: Option<DrillMembersGrouped>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub granularities: Option<Vec<GranularityMeta>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DrillMembersGrouped {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub measures: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,29 +199,23 @@ pub enum MemberOrMemberExpression {
     MemberExpression(ParsedMemberExpression),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogicalAndFilter {
-    pub and: Vec<LogicalFilter>,
+    pub and: Vec<QueryFilterOrLogicalFilter>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogicalOrFilter {
-    pub or: Vec<LogicalFilter>,
+    pub or: Vec<QueryFilterOrLogicalFilter>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum QueryFilterOrLogicalFilter {
     QueryFilter(QueryFilter),
     LogicalAndFilter(LogicalAndFilter),
     LogicalOrFilter(LogicalOrFilter),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum LogicalFilter {
-    QueryFilter(QueryFilter),
-    LogicalAndFilter(LogicalAndFilter),
-    LogicalOrFilter(LogicalOrFilter),
+    NormalizedQueryFilter(NormalizedQueryFilter),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -225,7 +227,7 @@ pub struct Query {
     // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
     pub dimensions: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<LogicalFilter>>,
+    pub filters: Option<Vec<QueryFilterOrLogicalFilter>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -282,7 +284,7 @@ pub struct NormalizedQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_format: Option<ResultType>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<NormalizedQueryFilter>>,
+    pub filters: Option<Vec<QueryFilterOrLogicalFilter>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub row_limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
