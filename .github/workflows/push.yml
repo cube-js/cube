@@ -42,6 +42,7 @@ jobs:
       matrix:
         # Current docker version + next LTS
         node-version: [20.x, 22.x]
+        python-version: [3.11]
       fail-fast: false
 
     steps:
@@ -65,6 +66,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -92,6 +97,12 @@ jobs:
         run: yarn tsc
       - name: Build client
         run: yarn build
+      - name: Build cubejs-backend-native (with Python)
+        run: yarn run native:build-release-python
+        working-directory: ./packages/cubejs-backend-native
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
 #      - uses: codecov/codecov-action@v1

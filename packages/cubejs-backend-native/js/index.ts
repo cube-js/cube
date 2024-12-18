@@ -355,6 +355,8 @@ export interface PyConfiguration {
   extendContext?: (req: unknown) => Promise<unknown>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>
+  scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
+  scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
   contextToRoles?: (ctx: unknown) => Promise<string[]>
 }
 

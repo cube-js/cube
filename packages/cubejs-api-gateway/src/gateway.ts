@@ -456,7 +456,7 @@ class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, systemAsyncHandler(async (req, res) => {
         this.resToResultFn(res)({
-          timezones: this.scheduledRefreshTimeZones || []
+          timezones: this.scheduledRefreshTimeZones ? this.scheduledRefreshTimeZones(req.context) : []
         });
       }));
 
@@ -625,12 +625,13 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const preAggregations = await compilerApi.preAggregations();
 
+      const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
           normalizeQueryPreAggregations(
             {
-              timezones: this.scheduledRefreshTimeZones,
+              timezones: refreshTimezones.length > 0 ? refreshTimezones : undefined,
               preAggregations: preAggregations.map(p => ({
                 id: p.id,
                 cacheOnly,
@@ -652,9 +653,10 @@ class ApiGateway {
   ) {
     const requestStarted = new Date();
     try {
+      const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
       query = normalizeQueryPreAggregations(
         this.parseQueryParam(query),
-        { timezones: this.scheduledRefreshTimeZones }
+        { timezones: refreshTimezones.length > 0 ? refreshTimezones : undefined }
       );
       const orchestratorApi = await this.getAdapterApi(context);
       const compilerApi = await this.getCompilerApi(context);
