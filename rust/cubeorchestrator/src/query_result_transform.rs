@@ -50,6 +50,13 @@ pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimiti
                     })
                 })
                 .or_else(|_| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").map(|dt| {
+                        Utc.from_utc_datetime(&dt)
+                            .format("%Y-%m-%dT%H:%M:%S%.3f")
+                            .to_string()
+                    })
+                })
+                .or_else(|_| {
                     NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %Z").map(|dt| {
                         Utc.from_utc_datetime(&dt)
                             .format("%Y-%m-%dT%H:%M:%S%.3f")
@@ -706,6 +713,19 @@ mod tests {
     fn test_transform_value_string_wo_mssec_to_time_valid_rfc3339() {
         let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
             "2024-01-01 12:30:15".to_string(),
+        ));
+        let result = transform_value(value, "time");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T12:30:15.000".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_string_wo_mssec_w_t_to_time_valid_rfc3339() {
+        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
+            "2024-01-01T12:30:15".to_string(),
         ));
         let result = transform_value(value, "time");
 
