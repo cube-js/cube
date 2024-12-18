@@ -117,8 +117,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./packages/cubejs-backend-native
-          key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
-          shared-key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
+          key: native-${{ runner.OS }}-${{ matrix.target }}
+          shared-key: native-${{ runner.OS }}-${{ matrix.target }}
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         env:
