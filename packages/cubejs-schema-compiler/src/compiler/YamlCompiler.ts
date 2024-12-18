@@ -33,6 +33,7 @@ export class YamlCompiler {
     private readonly cubeSymbols: CubeSymbols,
     private readonly cubeDictionary: CubeDictionary,
     private readonly nativeInstance: NativeInstance,
+    private readonly viewCompiler: CubeSymbols,
   ) {
   }
 
@@ -288,7 +289,9 @@ export class YamlCompiler {
       },
     );
 
-    resolveSymbol = resolveSymbol || (n => this.cubeSymbols.resolveSymbol(cubeName, n) || this.cubeSymbols.isCurrentCube(n));
+    resolveSymbol = resolveSymbol || (n => this.viewCompiler.resolveSymbol(cubeName, n) ||
+      this.cubeSymbols.resolveSymbol(cubeName, n) ||
+      this.cubeSymbols.isCurrentCube(n));
 
     const traverseObj = {
       Program: (babelPath) => {
