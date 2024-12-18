@@ -1,11 +1,13 @@
-use cubeclient::models::V1LoadRequestQuery;
-use datafusion::physical_plan::displayable;
+use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use datafusion::{physical_plan::displayable, scalar::ScalarValue};
 use pretty_assertions::assert_eq;
+use regex::Regex;
 use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
     compile::{
+        engine::df::scan::MemberField,
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
@@ -807,7 +809,7 @@ async fn test_case_wrapper_alias_with_order() {
         .wrapped_sql
         .unwrap()
         .sql
-        .contains("ORDER BY \"case_when_a_cust\""));
+        .contains("ORDER BY \"a\".\"case_when_a_cust\""));
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
     println!(
@@ -935,7 +937,7 @@ async fn test_case_wrapper_ungrouped_sorted_aliased() {
         .unwrap()
         .sql
         // TODO test without depend on column name
-        .contains("ORDER BY \"case_when"));
+        .contains("ORDER BY \"a\".\"case_when"));
 }
 
 #[tokio::test]
@@ -1147,6 +1149,138 @@ async fn test_case_wrapper_escaping() {
         .contains("\\\\\\\\\\\\`"));
 }
 
+/// Test aliases for grouped CubeScan in wrapper
+/// qualifiers from join should get remapped to single from alias
+/// long generated aliases from Datafusion should get shortened
+#[tokio::test]
+async fn test_join_wrapper_cubescan_aliasing() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+WITH
+-- This subquery should be represented as CubeScan(ungrouped=false) inside CubeScanWrapper
+cube_scan_subq AS (
+    SELECT
+        logs_alias.content logs_content,
+        DATE_TRUNC('month', kibana_alias.last_mod) last_mod_month,
+        kibana_alias.__user AS cube_user,
+        1 AS literal,
+        -- Columns without aliases should also work
+        DATE_TRUNC('month', kibana_alias.order_date),
+        kibana_alias.__cubeJoinField,
+        2,
+        CASE
+            WHEN sum(kibana_alias."sumPrice") IS NOT NULL
+                THEN sum(kibana_alias."sumPrice")
+            ELSE 0
+            END sum_price
+    FROM KibanaSampleDataEcommerce kibana_alias
+    JOIN Logs logs_alias
+    ON kibana_alias.__cubeJoinField = logs_alias.__cubeJoinField
+    GROUP BY 1,2,3,4,5,6,7
+),
+filter_subq AS (
+    SELECT
+        Logs.content logs_content_filter
+    FROM Logs
+    GROUP BY
+        logs_content_filter
+)
+SELECT
+    -- Should use SELECT * here to reference columns without aliases.
+    -- But it's broken ATM in DF, initial plan contains `Projection: ... #__subquery-0.logs_content_filter` on top, but it should not be there
+    -- TODO fix it
+    logs_content,
+    cube_user,
+    literal
+FROM cube_scan_subq
+WHERE
+    -- This subquery filter should trigger wrapping of whole query
+    logs_content IN (
+        SELECT
+            logs_content_filter
+        FROM filter_subq
+    )
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql;
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+            dimensions: Some(vec!["Logs.content".to_string(),]),
+            time_dimensions: Some(vec![
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                },
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                },
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+
+    assert_eq!(
+        logical_plan.find_cube_scan().member_fields,
+        vec![
+            MemberField::Member("Logs.content".to_string()),
+            MemberField::Member("KibanaSampleDataEcommerce.last_mod.month".to_string()),
+            MemberField::Literal(ScalarValue::Utf8(None)),
+            MemberField::Literal(ScalarValue::Int64(Some(1))),
+            MemberField::Member("KibanaSampleDataEcommerce.order_date.month".to_string()),
+            MemberField::Literal(ScalarValue::Utf8(None)),
+            MemberField::Literal(ScalarValue::Int64(Some(2))),
+            MemberField::Member("KibanaSampleDataEcommerce.sumPrice".to_string()),
+        ],
+    );
+
+    // Check that all aliases from different tables have same qualifier, and that names are simple and short
+    // logs_content => logs_alias.content
+    // last_mod_month => DATE_TRUNC('month', kibana_alias.last_mod),
+    // sum_price => CASE WHEN sum(kibana_alias."sumPrice") ... END
+    let content_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "logs_content""#).unwrap();
+    assert!(content_re.is_match(&sql));
+    let last_mod_month_re =
+        Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "last_mod_month""#).unwrap();
+    assert!(last_mod_month_re.is_match(&sql));
+    let sum_price_re = Regex::new(r#"CASE WHEN "logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
+        .unwrap();
+    assert!(sum_price_re.is_match(&sql));
+    let cube_user_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "cube_user""#).unwrap();
+    assert!(cube_user_re.is_match(&sql));
+    let literal_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "literal""#).unwrap();
+    assert!(literal_re.is_match(&sql));
+}
+
 /// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
 #[tokio::test]
 async fn test_wrapper_limit_zero() {
@@ -1261,6 +1395,7 @@ async fn test_wrapper_filter_flatten() {
 }
 
 /// Regular aggregation over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+/// and inner ungrouped CubeScan should have both proper members and limit
 #[tokio::test]
 async fn wrapper_agg_over_limit() {
     if !Rewriter::sql_push_down_enabled() {
@@ -1299,7 +1434,9 @@ async fn wrapper_agg_over_limit() {
         logical_plan.find_cube_scan().request,
         V1LoadRequestQuery {
             measures: Some(vec![]),
-            dimensions: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
             segments: Some(vec![]),
             order: Some(vec![]),
             limit: Some(5),
@@ -1324,6 +1461,7 @@ async fn wrapper_agg_over_limit() {
 }
 
 /// Aggregation(dimension) over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+/// and inner ungrouped CubeScan should have both proper members and limit
 #[tokio::test]
 async fn wrapper_agg_dimension_over_limit() {
     if !Rewriter::sql_push_down_enabled() {
@@ -1360,7 +1498,9 @@ async fn wrapper_agg_dimension_over_limit() {
         logical_plan.find_cube_scan().request,
         V1LoadRequestQuery {
             measures: Some(vec![]),
-            dimensions: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
             segments: Some(vec![]),
             order: Some(vec![]),
             limit: Some(5),
