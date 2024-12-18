@@ -1,3 +1,4 @@
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
@@ -8,12 +9,16 @@ lazy_static! {
     static ref PARAMS_MATCH_RE: Regex = Regex::new(r"\$_(\d+)_\$").unwrap();
 }
 pub struct ParamsAllocator {
+    sql_templates: PlanSqlTemplates,
     params: Vec<String>,
 }
 
 impl ParamsAllocator {
-    pub fn new() -> ParamsAllocator {
-        ParamsAllocator { params: Vec::new() }
+    pub fn new(sql_templates: PlanSqlTemplates) -> ParamsAllocator {
+        ParamsAllocator {
+            sql_templates,
+            params: Vec::new(),
+        }
     }
 
     pub fn make_placeholder(&self, index: usize) -> String {
@@ -38,6 +43,7 @@ impl ParamsAllocator {
         let (sql, params) = self.add_native_allocated_params(sql, &native_allocated_params)?;
         let mut params_in_sql_order = Vec::new();
         let mut param_index_map: HashMap<usize, usize> = HashMap::new();
+        let mut error = None;
         let result_sql = if should_reuse_params {
             PARAMS_MATCH_RE
                 .replace_all(&sql, |caps: &Captures| {
@@ -45,24 +51,43 @@ impl ParamsAllocator {
                     let new_index = if let Some(index) = param_index_map.get(&ind) {
                         index.clone()
                     } else {
-                        params_in_sql_order.push(params[ind].clone());
                         let index = params_in_sql_order.len();
+                        params_in_sql_order.push(params[ind].clone());
                         param_index_map.insert(ind, index);
                         index
                     };
-                    format!("${}", new_index) //TODO get placeholder from js part
+                    match self.sql_templates.param(new_index) {
+                        Ok(res) => res,
+                        Err(e) => {
+                            if error.is_none() {
+                                error = Some(e);
+                            }
+                            "$error$".to_string()
+                        }
+                    }
                 })
                 .to_string()
         } else {
             PARAMS_MATCH_RE
                 .replace_all(&sql, |caps: &Captures| {
                     let ind: usize = caps[1].to_string().parse().unwrap();
-                    params_in_sql_order.push(params[ind].clone());
                     let index = params_in_sql_order.len();
-                    format!("${}", index) //TODO get placeholder from js part
+                    params_in_sql_order.push(params[ind].clone());
+                    match self.sql_templates.param(index) {
+                        Ok(res) => res,
+                        Err(e) => {
+                            if error.is_none() {
+                                error = Some(e);
+                            }
+                            "$error$".to_string()
+                        }
+                    }
                 })
                 .to_string()
         };
+        if let Some(error) = error {
+            return Err(error);
+        }
         Ok((result_sql, params_in_sql_order))
     }
 

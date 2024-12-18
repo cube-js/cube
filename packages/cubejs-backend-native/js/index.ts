@@ -352,8 +352,11 @@ export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,
   checkAuth?: (req: unknown, authorization: string) => Promise<{ 'security_context'?: unknown }>
+  extendContext?: (req: unknown) => Promise<unknown>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>
+  scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
+  scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
   contextToRoles?: (ctx: unknown) => Promise<string[]>
 }
 
@@ -365,6 +368,11 @@ function simplifyExpressRequest(req: ExpressRequest) {
     method: req.method,
     headers: req.headers,
     ip: req.ip,
+
+    // req.securityContext is an extension of request done by api-gateway
+    // But its typings currently live in api-gateway package, which has native-backend (this package) as it's dependency
+    // TODO extract typings to separate package and drop as any
+    ...(Object.hasOwn(req, 'securityContext') ? { securityContext: (req as any).securityContext } : {}),
   };
 }
 

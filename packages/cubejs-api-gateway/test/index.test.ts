@@ -849,7 +849,7 @@ describe('API Gateway', () => {
           playgroundAuthSecret,
           refreshScheduler: () => new RefreshSchedulerMock(),
           scheduledRefreshContexts: () => Promise.resolve(scheduledRefreshContextsFactory()),
-          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
+          scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory
         }
       );
       const token = generateAuthToken({ uid: 5, scope }, {}, playgroundAuthSecret);

@@ -1,5 +1,5 @@
 import R from 'ramda';
-import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, getEnv, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 
@@ -57,6 +57,10 @@ export class PreAggregations {
   }
 
   preAggregationCubes() {
+    if (getEnv('nativeSqlPlanner')) {
+      // No join defined in Tesseract
+      return [];
+    }
     const { join } = this.query;
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }

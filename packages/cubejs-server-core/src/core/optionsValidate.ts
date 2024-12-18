@@ -92,7 +92,10 @@ const schemaOptions = Joi.object().keys({
     Joi.boolean(),
     Joi.number().min(0).integer()
   ),
-  scheduledRefreshTimeZones: Joi.array().items(Joi.string()),
+  scheduledRefreshTimeZones: Joi.alternatives().try(
+    Joi.array().items(Joi.string()),
+    Joi.func()
+  ),
   scheduledRefreshContexts: Joi.func(),
   scheduledRefreshConcurrency: Joi.number().min(1).integer(),
   scheduledRefreshBatchSize: Joi.number().min(1).integer(),

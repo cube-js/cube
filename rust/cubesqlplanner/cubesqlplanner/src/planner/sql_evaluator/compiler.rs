@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    /* (type, name) */
     members: HashMap<(String, String), Rc<MemberSymbol>>,
 }
 

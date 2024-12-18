@@ -1,3 +1,4 @@
+use crate::plan::join::JoinType;
 use crate::plan::{Join, JoinCondition, JoinItem, QueryPlan, Schema, Select, SingleAliasedSource};
 use crate::planner::BaseCube;
 use std::rc::Rc;
@@ -41,15 +42,19 @@ impl JoinBuilder {
     }
 
     pub fn left_join_subselect(&mut self, subquery: Rc<Select>, alias: String, on: JoinCondition) {
-        self.join_subselect(subquery, alias, on, false)
+        self.join_subselect(subquery, alias, on, JoinType::Left)
     }
 
     pub fn inner_join_subselect(&mut self, subquery: Rc<Select>, alias: String, on: JoinCondition) {
-        self.join_subselect(subquery, alias, on, true)
+        self.join_subselect(subquery, alias, on, JoinType::Inner)
+    }
+
+    pub fn full_join_subselect(&mut self, subquery: Rc<Select>, alias: String, on: JoinCondition) {
+        self.join_subselect(subquery, alias, on, JoinType::Full)
     }
 
     pub fn left_join_cube(&mut self, cube: Rc<BaseCube>, alias: Option<String>, on: JoinCondition) {
-        self.join_cube(cube, alias, on, false)
+        self.join_cube(cube, alias, on, JoinType::Left)
     }
 
     pub fn inner_join_cube(
@@ -58,7 +63,7 @@ impl JoinBuilder {
         alias: Option<String>,
         on: JoinCondition,
     ) {
-        self.join_cube(cube, alias, on, true)
+        self.join_cube(cube, alias, on, JoinType::Inner)
     }
 
     pub fn left_join_table_reference(
@@ -68,7 +73,7 @@ impl JoinBuilder {
         alias: Option<String>,
         on: JoinCondition,
     ) {
-        self.join_table_reference(reference, schema, alias, on, false)
+        self.join_table_reference(reference, schema, alias, on, JoinType::Left)
     }
 
     pub fn inner_join_table_reference(
@@ -78,7 +83,7 @@ impl JoinBuilder {
         alias: Option<String>,
         on: JoinCondition,
     ) {
-        self.join_table_reference(reference, schema, alias, on, true)
+        self.join_table_reference(reference, schema, alias, on, JoinType::Inner)
     }
 
     pub fn build(self) -> Rc<Join> {
@@ -93,11 +98,15 @@ impl JoinBuilder {
         subquery: Rc<Select>,
         alias: String,
         on: JoinCondition,
-        is_inner: bool,
+        join_type: JoinType,
     ) {
         let subquery = Rc::new(QueryPlan::Select(subquery));
         let from = SingleAliasedSource::new_from_subquery(subquery, alias);
-        self.joins.push(JoinItem { from, on, is_inner })
+        self.joins.push(JoinItem {
+            from,
+            on,
+            join_type,
+        })
     }
 
     fn join_cube(
@@ -105,10 +114,14 @@ impl JoinBuilder {
         cube: Rc<BaseCube>,
         alias: Option<String>,
         on: JoinCondition,
-        is_inner: bool,
+        join_type: JoinType,
     ) {
         let from = SingleAliasedSource::new_from_cube(cube, alias);
-        self.joins.push(JoinItem { from, on, is_inner })
+        self.joins.push(JoinItem {
+            from,
+            on,
+            join_type,
+        })
     }
 
     fn join_table_reference(
@@ -117,9 +130,13 @@ impl JoinBuilder {
         schema: Rc<Schema>,
         alias: Option<String>,
         on: JoinCondition,
-        is_inner: bool,
+        join_type: JoinType,
     ) {
         let from = SingleAliasedSource::new_from_table_reference(reference, schema, alias);
-        self.joins.push(JoinItem { from, on, is_inner })
+        self.joins.push(JoinItem {
+            from,
+            on,
+            join_type,
+        })
     }
 }

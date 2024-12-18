@@ -24,9 +24,16 @@ impl MemberExpression {
 }
 
 #[derive(Clone)]
+pub struct FunctionExpression {
+    pub function: String,
+    pub arguments: Vec<Expr>,
+}
+
+#[derive(Clone)]
 pub enum Expr {
     Member(MemberExpression),
     Reference(QualifiedColumnName),
+    Function(FunctionExpression),
 }
 
 impl Expr {
@@ -46,6 +53,18 @@ impl Expr {
             Self::Reference(reference) => {
                 templates.column_reference(reference.source(), &reference.name())
             }
+            Expr::Function(FunctionExpression {
+                function,
+                arguments,
+            }) => templates.scalar_function(
+                function.to_string(),
+                arguments
+                    .iter()
+                    .map(|e| e.to_sql(&templates, context.clone()))
+                    .collect::<Result<Vec<_>, _>>()?,
+                None,
+                None,
+            ),
         }
     }
 }

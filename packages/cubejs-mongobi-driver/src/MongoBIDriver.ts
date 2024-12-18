@@ -78,15 +78,6 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       // mysql2 uses own typings for ssl property, which is not correct
       // Types of property 'pfx' are incompatible. Skipping validation with any cast
       ssl: this.getSslOptions(dataSource) as any,
-      authPlugins: {
-        mysql_clear_password: () => async () => {
-          const password =
-            config.password ||
-            getEnv('dbPass', { dataSource }) ||
-            '';
-          return Buffer.from((password).concat('\0')).toString();
-        }
-      },
       typeCast: (field: Field, next) => {
         if (field.type === 'DATETIME') {
           // Example value 1998-08-02 00:00:00
@@ -97,6 +88,10 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
 
         return next();
       },
+      // mysql2 v3.x uses this flag by default and sends some connection attributes like:
+      // version, app-name. But mongosql which is based on mysql 5.7 is not able to proceed them, resulting in:
+      // Error: recv handshake response error: invalid connection attribute at index 0: EOF
+      flags: ['-CONNECT_ATTRS'],
       ...mongoBIDriverConfiguration
     };
     this.pool = genericPool.createPool({
