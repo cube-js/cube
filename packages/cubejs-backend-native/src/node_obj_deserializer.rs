@@ -132,15 +132,7 @@ impl<'de, 'a, 'b> Deserializer<'de> for JsValueDeserializer<'a, 'b> {
             visitor.visit_none()
         } else if self.value.is_a::<JsFunction, _>(self.cx) {
             // We can do nothing with the JS functions in native
-            // so let's save them as string for potential usage later
-            // in JS side if needed
-            let value = self
-                .value
-                .downcast::<JsFunction, _>(self.cx)
-                .or_throw(self.cx)?
-                .to_string(self.cx)?
-                .value(self.cx);
-            visitor.visit_string(value)
+            visitor.visit_none()
         } else {
             Err(JsDeserializationError(
                 "Unsupported type for deserialization".to_string(),

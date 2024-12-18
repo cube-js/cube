@@ -82,11 +82,15 @@ pub struct GroupingSet {
     pub sub_id: Option<u32>,
 }
 
+// We can do nothing with JS functions here,
+// but to keep DTOs in sync with reality, let's keep it.
+type JsFunction = String;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MemberExpression {
-    #[serde(skip_deserializing)]
-    pub expression: Option<Value>,
+    // Made as Option and JsValueDeserializer set's it to None.
+    pub expression: Option<JsFunction>,
     pub cube_name: String,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
