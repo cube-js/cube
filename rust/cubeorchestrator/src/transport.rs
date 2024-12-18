@@ -84,7 +84,7 @@ pub struct GroupingSet {
 
 // We can do nothing with JS functions here,
 // but to keep DTOs in sync with reality, let's keep it.
-type JsFunction = String;
+pub type JsFunction = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]

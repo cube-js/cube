@@ -1975,7 +1975,9 @@ class ApiGateway {
           })
         );
 
-        if (!request.streaming) {
+        if (request.streaming) {
+          res(results[0]);
+        } else {
           // We prepare the final json result on native side
           const [transformDataJson, rawData, resultDataJson] = (results as {
             transformDataParams: any;
@@ -1991,8 +1993,6 @@ class ApiGateway {
           );
 
           res(await getFinalQueryResultArray(transformDataJson, rawData, resultDataJson));
-        } else {
-          res(results[0]);
         }
       }
     } catch (e: any) {
