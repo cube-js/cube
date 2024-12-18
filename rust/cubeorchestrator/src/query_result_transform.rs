@@ -26,26 +26,42 @@ pub const MEMBER_SEPARATOR: &str = ".";
 pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimitive {
     match value {
         DBResponseValue::DateTime(dt) if type_ == "time" || type_.is_empty() => {
-            DBResponsePrimitive::String(dt.with_timezone(&Utc).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+            DBResponsePrimitive::String(
+                dt.with_timezone(&Utc)
+                    .format("%Y-%m-%dT%H:%M:%S%.3f")
+                    .to_string(),
+            )
         }
         DBResponseValue::Primitive(DBResponsePrimitive::String(ref s)) if type_ == "time" => {
             let formatted = DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f")
-                        .map(|dt| Utc.from_utc_datetime(&dt).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f").map(|dt| {
+                        Utc.from_utc_datetime(&dt)
+                            .format("%Y-%m-%dT%H:%M:%S%.3f")
+                            .to_string()
+                    })
                 })
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-                        .map(|dt| Utc.from_utc_datetime(&dt).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").map(|dt| {
+                        Utc.from_utc_datetime(&dt)
+                            .format("%Y-%m-%dT%H:%M:%S%.3f")
+                            .to_string()
+                    })
                 })
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %Z")
-                        .map(|dt| Utc.from_utc_datetime(&dt).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %Z").map(|dt| {
+                        Utc.from_utc_datetime(&dt)
+                            .format("%Y-%m-%dT%H:%M:%S%.3f")
+                            .to_string()
+                    })
                 })
                 .or_else(|_| {
-                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %:z")
-                        .map(|dt| Utc.from_utc_datetime(&dt).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %:z").map(|dt| {
+                        Utc.from_utc_datetime(&dt)
+                            .format("%Y-%m-%dT%H:%M:%S%.3f")
+                            .to_string()
+                    })
                 })
                 .unwrap_or_else(|_| s.clone());
             DBResponsePrimitive::String(formatted)

@@ -130,8 +130,7 @@ impl<'de, 'a, 'b> Deserializer<'de> for JsValueDeserializer<'a, 'b> {
             || self.value.is_a::<JsUndefined, _>(self.cx)
         {
             visitor.visit_none()
-        } else if self.value.is_a::<JsFunction, _>(self.cx)
-        {
+        } else if self.value.is_a::<JsFunction, _>(self.cx) {
             // We can do nothing with the JS functions in native
             // so let's save them as string for potential usage later
             // in JS side if needed
