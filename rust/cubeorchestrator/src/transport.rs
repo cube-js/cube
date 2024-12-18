@@ -84,12 +84,29 @@ pub struct GroupingSet {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct MemberExpression {
+    #[serde(skip_deserializing)]
+    pub expression: Option<Value>,
+    pub cube_name: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expression_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub definition: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grouping_set: Option<GroupingSet>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ParsedMemberExpression {
     pub expression: Vec<String>,
     pub cube_name: String,
     pub name: String,
-    pub expression_name: String,
-    pub definition: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expression_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub definition: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grouping_set: Option<GroupingSet>,
 }
@@ -196,7 +213,8 @@ pub struct NormalizedQueryFilter {
 #[serde(untagged)]
 pub enum MemberOrMemberExpression {
     Member(String),
-    MemberExpression(ParsedMemberExpression),
+    ParsedMemberExpression(ParsedMemberExpression),
+    MemberExpression(MemberExpression),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,55 +236,17 @@ pub enum QueryFilterOrLogicalFilter {
     NormalizedQueryFilter(NormalizedQueryFilter),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Query {
-    // pub measures: Vec<MemberOrMemberExpression>,
-    pub measures: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
-    pub dimensions: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<QueryFilterOrLogicalFilter>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_dimensions: Option<Vec<QueryTimeDimension>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    // pub segments: Option<Vec<MemberOrMemberExpression>>,
-    pub segments: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub limit: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub offset: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_query: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub order: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timezone: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub renew_query: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ungrouped: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_format: Option<ResultType>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalizedQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
-    // pub measures: Vec<MemberOrMemberExpression>,
-    pub measures: Option<Vec<String>>,
+    pub measures: Option<Vec<MemberOrMemberExpression>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    // pub dimensions: Option<Vec<MemberOrMemberExpression>>,
-    pub dimensions: Option<Vec<String>>,
+    pub dimensions: Option<Vec<MemberOrMemberExpression>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_dimensions: Option<Vec<QueryTimeDimension>>,
-    // pub segments: Option<Vec<MemberOrMemberExpression>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub segments: Option<Vec<String>>,
+    pub segments: Option<Vec<MemberOrMemberExpression>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]

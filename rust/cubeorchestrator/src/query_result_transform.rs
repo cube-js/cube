@@ -1,8 +1,8 @@
 use crate::{
     query_message_parser::QueryResult,
     transport::{
-        AnnotatedConfigItem, ConfigItem, MembersMap, NormalizedQuery, QueryTimeDimension,
-        QueryType, ResultType, TransformDataRequest,
+        AnnotatedConfigItem, ConfigItem, MemberOrMemberExpression, MembersMap, NormalizedQuery,
+        QueryTimeDimension, QueryType, ResultType, TransformDataRequest,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -162,10 +162,11 @@ pub fn get_members(
         let calc_member = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
 
         if path.len() == 3
-            && query
-                .dimensions
-                .as_ref()
-                .map_or(true, |dims| !dims.iter().any(|dim| *dim == calc_member))
+            && query.dimensions.as_ref().map_or(true, |dims| {
+                !dims
+                    .iter()
+                    .any(|dim| *dim == MemberOrMemberExpression::Member(calc_member.clone()))
+            })
         {
             members.insert(calc_member, column.clone());
         }
@@ -295,9 +296,11 @@ pub fn get_vanilla_row(
                 format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
             if path.len() == 3
                 && query.dimensions.as_ref().map_or(true, |dims| {
-                    !dims
-                        .iter()
-                        .any(|dim| *dim == member_name_without_granularity)
+                    !dims.iter().any(|dim| {
+                        *dim == MemberOrMemberExpression::Member(
+                            member_name_without_granularity.clone(),
+                        )
+                    })
                 })
             {
                 row.insert(member_name_without_granularity, transformed_value);
@@ -389,7 +392,9 @@ pub fn get_pivot_query(
             }
         }
         QueryType::CompareDateRangeQuery => {
-            let mut dimensions = vec!["compareDateRange".to_string()];
+            let mut dimensions = vec![MemberOrMemberExpression::Member(
+                "compareDateRange".to_string(),
+            )];
             if let Some(dims) = pivot_query.dimensions {
                 dimensions.extend(dims.clone());
             }
