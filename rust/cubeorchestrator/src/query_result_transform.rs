@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Context, Result};
-use chrono::{DateTime, NaiveDateTime, SecondsFormat, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use itertools::multizip;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -26,21 +26,25 @@ pub const MEMBER_SEPARATOR: &str = ".";
 pub fn transform_value(value: DBResponseValue, type_: &str) -> DBResponsePrimitive {
     match value {
         DBResponseValue::DateTime(dt) if type_ == "time" || type_.is_empty() => {
-            let formatted = dt.to_rfc3339_opts(SecondsFormat::Millis, true);
-            DBResponsePrimitive::String(formatted.trim_end_matches('Z').to_string())
+            DBResponsePrimitive::String(dt.with_timezone(&Utc).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
         }
         DBResponseValue::Primitive(DBResponsePrimitive::String(ref s)) if type_ == "time" => {
             let formatted = DateTime::parse_from_rfc3339(s)
-                .map(|dt| dt.to_rfc3339_opts(SecondsFormat::Millis, true))
-                .unwrap_or_else(|_| {
-                    match NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f") {
-                        Ok(dt) => Utc
-                            .from_utc_datetime(&dt)
-                            .to_rfc3339_opts(SecondsFormat::Millis, true),
-                        Err(_) => s.clone(),
-                    }
-                });
-            DBResponsePrimitive::String(formatted.trim_end_matches('Z').to_string())
+                .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                .or_else(|_| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f")
+                        .map(|dt| Utc.from_utc_datetime(&dt).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                })
+                .or_else(|_| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %Z")
+                        .map(|dt| Utc.from_utc_datetime(&dt).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                })
+                .or_else(|_| {
+                    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.3f %:z")
+                        .map(|dt| Utc.from_utc_datetime(&dt).format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
+                })
+                .unwrap_or_else(|_| s.clone());
+            DBResponsePrimitive::String(formatted)
         }
         DBResponseValue::Primitive(p) => p,
         DBResponseValue::Object { value } => value,
@@ -664,6 +668,32 @@ mod tests {
     fn test_transform_value_string_wo_t_to_time_valid_rfc3339() {
         let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
             "2024-01-01 12:30:15.123".to_string(),
+        ));
+        let result = transform_value(value, "time");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_string_with_tz_offset_to_time_valid_rfc3339() {
+        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
+            "2024-01-01 12:30:15.123 +00:00".to_string(),
+        ));
+        let result = transform_value(value, "time");
+
+        assert_eq!(
+            result,
+            DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string())
+        );
+    }
+
+    #[test]
+    fn test_transform_value_string_with_tz_to_time_valid_rfc3339() {
+        let value = DBResponseValue::Primitive(DBResponsePrimitive::String(
+            "2024-01-01 12:30:15.123 UTC".to_string(),
         ));
         let result = transform_value(value, "time");
 
