@@ -258,7 +258,7 @@ declare module '@cubejs-client/core' {
     /**
      * Value to autofill all the missing date's measure.
      */
-    fillWithValue?: string | null;
+    fillWithValue?: string | number | null;
     /**
      * Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#result-set-chart-pivot)
      */
