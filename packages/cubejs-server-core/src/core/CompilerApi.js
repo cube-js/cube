@@ -271,15 +271,15 @@ export class CompilerApi {
    * - combining all filters for different roles with OR
    * - combining cube and view filters with AND
   */
-  async applyRowLevelSecurity(query, context) {
+  async applyRowLevelSecurity(query, evaluatedQuery, context) {
     const compilers = await this.getCompilers({ requestId: context.requestId });
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
-      return query;
+      return { query, denied: false };
     }
 
-    const queryCubes = await this.getCubesFromQuery(query, context);
+    const queryCubes = await this.getCubesFromQuery(evaluatedQuery, context);
 
     // We collect Cube and View filters separately because they have to be
     // applied in "two layers": first Cube filters, then View filters on top
@@ -322,7 +322,7 @@ export class CompilerApi {
             name: 'rlsAccessDenied',
           });
           // If we hit this condition there's no need to evaluate the rest of the policy
-          break;
+          return { query, denied: true };
         }
       }
     }
@@ -334,7 +334,7 @@ export class CompilerApi {
     );
     query.filters = query.filters || [];
     query.filters.push(rlsFilter);
-    return query;
+    return { query, denied: false };
   }
 
   buildFinalRlsFilter(cubeFiltersPerCubePerRole, viewFiltersPerCubePerRole, hasAllowAllForCube) {

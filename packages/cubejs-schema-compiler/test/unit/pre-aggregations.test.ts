@@ -217,8 +217,8 @@ describe('pre-aggregations', () => {
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
     expect(preAggregationsDescription.length).toEqual(2);
-    expect(preAggregationsDescription[0].preAggregationId).toEqual("Orders.simple1");
-    expect(preAggregationsDescription[1].preAggregationId).toEqual("Orders.simple2");
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('Orders.simple1');
+    expect(preAggregationsDescription[1].preAggregationId).toEqual('Orders.simple2');
   });
 
   // @link https://github.com/cube-js/cube/issues/6623

@@ -1,50 +1,21 @@
-use super::{dependecy::Dependency, EvaluationNode};
+use super::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub trait TraversalVisitor {
-    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError>;
-
-    fn apply(&mut self, node: &Rc<EvaluationNode>) -> Result<(), CubeError> {
-        if self.on_node_traverse(node)? {
-            self.travese_deps(node)?;
-        }
-        Ok(())
-    }
-
-    fn travese_deps(&mut self, node: &Rc<EvaluationNode>) -> Result<(), CubeError> {
-        for dep in node.deps() {
-            self.traverse_single_dep(dep, node)?;
-        }
-        Ok(())
-    }
-
-    fn traverse_single_dep(
+    type State;
+    fn on_node_traverse(
         &mut self,
-        dep: &Dependency,
-        node: &Rc<EvaluationNode>,
-    ) -> Result<(), CubeError> {
-        match dep {
-            Dependency::SingleDependency(dep) => self.apply(dep),
-            Dependency::StructDependency(dep) => {
-                if dep.sql_fn.is_some() {
-                    self.apply(node)?;
-                }
-                if let Some(to_string_fn) = &dep.to_string_fn {
-                    self.apply(to_string_fn)?;
-                }
-                for (_, v) in dep.properties.iter() {
-                    match v {
-                        Dependency::SingleDependency(dep) => {
-                            self.apply(dep)?;
-                        }
-                        Dependency::StructDependency(_) => unimplemented!(),
-                        Dependency::ContextDependency(_) => {}
-                    }
-                }
-                Ok(())
+        node: &Rc<MemberSymbol>,
+        state: &Self::State,
+    ) -> Result<Option<Self::State>, CubeError>;
+
+    fn apply(&mut self, node: &Rc<MemberSymbol>, state: &Self::State) -> Result<(), CubeError> {
+        if let Some(state) = self.on_node_traverse(node, state)? {
+            for dep in node.get_dependencies() {
+                self.apply(&dep, &state)?
             }
-            Dependency::ContextDependency(_) => Ok(()),
         }
+        Ok(())
     }
 }

@@ -13,8 +13,11 @@ import { toSnakeCase } from '../utils';
 
 const JOIN_RELATIONSHIP_MAP = {
   hasOne: 'one_to_one',
+  has_one: 'one_to_one',
   hasMany: 'one_to_many',
+  has_many: 'one_to_many',
   belongsTo: 'many_to_one',
+  belongs_to: 'many_to_one',
 };
 
 export type SchemaFile = {
@@ -107,7 +110,7 @@ export abstract class BaseSchemaFormatter {
     let table = `${
       tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
     }${this.escapeName(tableSchema.table)}`;
-    
+
     if (this.options.catalog) {
       table = `${this.escapeName(this.options.catalog)}.${table}`;
     }
@@ -126,7 +129,7 @@ export abstract class BaseSchemaFormatter {
       : {
         sql: `SELECT * FROM ${table}`,
       };
-      
+
     return {
       cube: tableSchema.cube,
       ...sqlOption,
@@ -139,7 +142,7 @@ export abstract class BaseSchemaFormatter {
               j.thisTableColumn
             )} = ${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`,
             relationship: this.options.snakeCase
-              ? JOIN_RELATIONSHIP_MAP[j.relationship]
+              ? (JOIN_RELATIONSHIP_MAP[j.relationship] ?? j.relationship)
               : j.relationship,
           },
         }))

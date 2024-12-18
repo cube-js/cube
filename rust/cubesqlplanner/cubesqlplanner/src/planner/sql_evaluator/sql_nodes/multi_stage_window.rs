@@ -1,6 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -40,13 +40,13 @@ impl MultiStageWindowNode {
 impl SqlNode for MultiStageWindowNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Measure(m) => {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(m) => {
                 if m.is_multi_stage() && !m.is_calculated() {
                     let input_sql = self.input.to_sql(
                         visitor,

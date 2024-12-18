@@ -1,10 +1,12 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
+use crate::plan::join::JoinType;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
 }
@@ -74,6 +76,7 @@ impl PlanSqlTemplates {
             context! { expr => expr, negate => negate },
         )
     }
+
     pub fn always_true(&self) -> Result<String, CubeError> {
         Ok(self.render.get_template("filters/always_true")?.clone())
     }
@@ -121,6 +124,22 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn time_series_select(
+        &self,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        seria: Vec<Vec<String>>,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/time_series_select",
+            context! {
+                from_date => from_date,
+                to_date => to_date,
+                seria => seria
+            },
+        )
+    }
+
     pub fn select(
         &self,
         ctes: Vec<String>,
@@ -152,68 +171,27 @@ impl PlanSqlTemplates {
         )
     }
 
-    /* pub fn select(
+    pub fn join(
         &self,
-        from: String,
-        projection: Vec<AliasedColumn>,
-        group_by: Vec<AliasedColumn>,
-        group_descs: Vec<Option<GroupingSetDesc>>,
-        aggregate: Vec<AliasedColumn>,
-        alias: String,
-        filter: Option<String>,
-        _having: Option<String>,
-        order_by: Vec<AliasedColumn>,
-        limit: Option<usize>,
-        offset: Option<usize>,
-        distinct: bool,
+        source: &str,
+        condition: &str,
+        join_type: &JoinType,
     ) -> Result<String, CubeError> {
-        let group_by = self.to_template_columns(group_by)?;
-        let aggregate = self.to_template_columns(aggregate)?;
-        let projection = self.to_template_columns(projection)?;
-        let order_by = self.to_template_columns(order_by)?;
-        let select_concat = group_by
-            .iter()
-            .chain(aggregate.iter())
-            .chain(projection.iter())
-            .map(|c| c.clone())
-            .collect::<Vec<_>>();
-        let quoted_from_alias = self.quote_identifier(&alias)?;
-        let has_grouping_sets = group_descs.iter().any(|d| d.is_some());
-        let group_by_expr = if has_grouping_sets {
-            self.group_by_with_grouping_sets(&group_by, &group_descs)?
-        } else {
-            self.render_template(
-                "statements/group_by_exprs",
-                context! { group_by => group_by },
-            )?
-        };
-        self.render.render_template(
-            "statements/select",
-            context! {
-                from => from,
-                select_concat => select_concat,
-                group_by => group_by_expr,
-                aggregate => aggregate,
-                projection => projection,
-                order_by => order_by,
-                filter => filter,
-                from_alias => quoted_from_alias,
-                limit => limit,
-                offset => offset,
-                distinct => distinct,
-            },
-        )
-    } */
-
-    pub fn join(&self, source: &str, condition: &str, is_inner: bool) -> Result<String, CubeError> {
-        let join_type = if is_inner {
-            self.render.get_template("join_types/inner")?
-        } else {
-            self.render.get_template("join_types/left")?
+        let join_type = match join_type {
+            JoinType::Full => self.render.get_template("join_types/full")?,
+            JoinType::Inner => self.render.get_template("join_types/inner")?,
+            JoinType::Left => self.render.get_template("join_types/left")?,
         };
         self.render.render_template(
             "statements/join",
             context! { source => source, condition => condition, join_type => join_type },
+        )
+    }
+
+    pub fn binary_expr(&self, left: &str, op: &str, right: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/binary",
+            context! { left => left, op => op, right => right },
         )
     }
 
@@ -224,6 +202,13 @@ impl PlanSqlTemplates {
         null_check: bool,
     ) -> Result<String, CubeError> {
         let null_check = if null_check {
+            if self.supports_is_not_distinct_from() {
+                let is_not_distinct_from_op = self
+                    .render
+                    .render_template("operators/is_not_distinct_from", context! {})?;
+
+                return self.binary_expr(left_column, &is_not_distinct_from_op, right_column);
+            }
             format!(
                 " OR ({} AND {})",
                 self.is_null_expr(&left_column, false)?,
@@ -237,5 +222,39 @@ impl PlanSqlTemplates {
             "({} = {}{})",
             left_column, right_column, null_check
         ))
+    }
+
+    pub fn supports_full_join(&self) -> bool {
+        self.render.contains_template("join_types/full")
+    }
+
+    pub fn supports_is_not_distinct_from(&self) -> bool {
+        self.render
+            .contains_template("operators/is_not_distinct_from")
+    }
+
+    pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
+        self.render
+            .render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn scalar_function(
+        &self,
+        scalar_function: String,
+        args: Vec<String>,
+        date_part: Option<String>,
+        interval: Option<String>,
+    ) -> Result<String, CubeError> {
+        let function = scalar_function.to_string().to_uppercase();
+        let args_concat = args.join(", ");
+        self.render.render_template(
+            &format!("functions/{}", function),
+            context! {
+                args_concat => args_concat,
+                args => args,
+                date_part => date_part,
+                interval => interval,
+            },
+        )
     }
 }

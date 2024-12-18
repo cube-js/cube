@@ -1,10 +1,10 @@
-use super::MultiStageAppliedState;
-use crate::planner::sql_evaluator::EvaluationNode;
+use super::{MultiStageAppliedState, MultiStageMember};
+use crate::planner::sql_evaluator::MemberSymbol;
 use std::fmt::Debug;
 use std::rc::Rc;
 
 pub struct MultiStageQueryDescription {
-    member_node: Rc<EvaluationNode>,
+    member: Rc<MultiStageMember>,
     state: Rc<MultiStageAppliedState>,
     input: Vec<Rc<MultiStageQueryDescription>>,
     alias: String,
@@ -15,7 +15,7 @@ impl Debug for MultiStageQueryDescription {
         f.debug_struct("MultiStageQueryDescription")
             .field(
                 "member_node",
-                &format!("node with path {}", self.member_node.full_name()),
+                &format!("node with path {}", self.member_node().full_name()),
             )
             .field("state", &self.state)
             .field("input", &self.input)
@@ -26,21 +26,25 @@ impl Debug for MultiStageQueryDescription {
 
 impl MultiStageQueryDescription {
     pub fn new(
-        member_node: Rc<EvaluationNode>,
+        member: Rc<MultiStageMember>,
         state: Rc<MultiStageAppliedState>,
         input: Vec<Rc<MultiStageQueryDescription>>,
         alias: String,
     ) -> Rc<Self> {
         Rc::new(Self {
-            member_node,
+            member,
             state,
             input,
             alias,
         })
     }
 
-    pub fn member_node(&self) -> &Rc<EvaluationNode> {
-        &self.member_node
+    pub fn member_node(&self) -> &Rc<MemberSymbol> {
+        &self.member.evaluation_node()
+    }
+
+    pub fn member(&self) -> &Rc<MultiStageMember> {
+        &self.member
     }
 
     pub fn state(&self) -> Rc<MultiStageAppliedState> {
@@ -48,7 +52,7 @@ impl MultiStageQueryDescription {
     }
 
     pub fn member_name(&self) -> String {
-        self.member_node.full_name()
+        self.member_node().full_name()
     }
 
     pub fn alias(&self) -> &String {
@@ -65,7 +69,7 @@ impl MultiStageQueryDescription {
 
     pub fn is_match_member_and_state(
         &self,
-        member_node: &Rc<EvaluationNode>,
+        member_node: &Rc<MemberSymbol>,
         state: &Rc<MultiStageAppliedState>,
     ) -> bool {
         member_node.full_name() == self.member_name() && state == &self.state

@@ -1,11 +1,13 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
+use super::sql_evaluator::MemberSymbol;
 use super::{evaluate_with_context, BaseMember, VisitorContext};
-use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
-use crate::plan::Schema;
+use crate::cube_bridge::measure_definition::{
+    MeasureDefinition, RollingWindow, TimeShiftReference,
+};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -63,29 +65,32 @@ impl MeasureTimeShift {
 pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
-    member_evaluator: Rc<EvaluationNode>,
+    member_evaluator: Rc<MemberSymbol>,
     definition: Rc<dyn MeasureDefinition>,
     time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
     name: String,
 }
 
+impl Debug for BaseMeasure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BaseMeasure")
+            .field("measure", &self.measure)
+            .field("time_shifts", &self.time_shifts)
+            .finish()
+    }
+}
+
 impl BaseMember for BaseMeasure {
-    fn to_sql(&self, context: Rc<VisitorContext>, schema: Rc<Schema>) -> Result<String, CubeError> {
-        evaluate_with_context(
-            &self.member_evaluator,
-            self.query_tools.clone(),
-            context,
-            schema,
-        )
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 
     fn alias_name(&self) -> String {
-        self.query_tools
-            .escape_column_name(&self.unescaped_alias_name())
+        self.unescaped_alias_name()
     }
 
-    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+    fn member_evaluator(&self) -> Rc<MemberSymbol> {
         self.member_evaluator.clone()
     }
 
@@ -104,11 +109,11 @@ impl BaseMember for BaseMeasure {
 
 impl BaseMeasure {
     pub fn try_new(
-        evaluation_node: Rc<EvaluationNode>,
+        evaluation_node: Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Option<Rc<Self>>, CubeError> {
-        let res = match evaluation_node.symbol() {
-            MemberSymbolType::Measure(s) => {
+        let res = match evaluation_node.as_ref() {
+            MemberSymbol::Measure(s) => {
                 let time_shifts = Self::parse_time_shifts(&s.definition())?;
                 Some(Rc::new(Self {
                     measure: s.full_name(),
@@ -126,7 +131,7 @@ impl BaseMeasure {
     }
 
     pub fn try_new_required(
-        evaluation_node: Rc<EvaluationNode>,
+        evaluation_node: Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Rc<Self>, CubeError> {
         if let Some(result) = Self::try_new(evaluation_node, query_tools)? {
@@ -151,7 +156,7 @@ impl BaseMeasure {
         }
     }
 
-    pub fn member_evaluator(&self) -> &Rc<EvaluationNode> {
+    pub fn member_evaluator(&self) -> &Rc<MemberSymbol> {
         &self.member_evaluator
     }
 
@@ -193,6 +198,22 @@ impl BaseMeasure {
 
     pub fn is_multi_stage(&self) -> bool {
         self.definition.static_data().multi_stage.unwrap_or(false)
+    }
+
+    pub fn rolling_window(&self) -> &Option<RollingWindow> {
+        &self.definition.static_data().rolling_window
+    }
+
+    pub fn is_rolling_window(&self) -> bool {
+        self.rolling_window().is_some()
+    }
+
+    pub fn is_running_total(&self) -> bool {
+        self.measure_type() == "runningTotal"
+    }
+
+    pub fn is_cumulative(&self) -> bool {
+        self.is_rolling_window() || self.is_running_total()
     }
 
     //FIXME dublicate with symbol

@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv, timeSeries as timeSeriesBase } from '@cubejs-backend/shared';
 
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
@@ -261,7 +261,10 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
-    this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    if (!getEnv('nativeSqlPlanner')) {
+      // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
+      this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    }
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
@@ -349,7 +352,8 @@ export class BaseQuery {
   initUngrouped() {
     this.ungrouped = this.options.ungrouped;
     if (this.ungrouped) {
-      if (!this.options.allowUngroupedWithoutPrimaryKey) {
+      // this.join is not defined for Tesseract
+      if (!this.options.allowUngroupedWithoutPrimaryKey && !getEnv('nativeSqlPlanner')) {
         const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
         const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
         const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
@@ -606,26 +610,46 @@ export class BaseQuery {
   }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
+    const order = this.options.order && R.pipe(
+      R.map((hash) => ((!hash || !hash.id) ? null : hash)),
+      R.reject(R.isNil),
+    )(this.options.order);
+
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
       timeDimensions: this.options.timeDimensions,
       timezone: this.options.timezone,
-      joinRoot: this.join.root,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
-      order: this.options.order,
+      order,
       filters: this.options.filters,
       limit: this.options.limit ? this.options.limit.toString() : null,
       rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
+      ungrouped: this.options.ungrouped
 
     };
     const res = nativeBuildSqlAndParams(queryParams);
     // FIXME
     res[1] = [...res[1]];
     return res;
+  }
+
+  allCubeMembers(path) {
+    const fromPath = this.cubeEvaluator.cubeFromPath(path);
+
+    return Object.keys(fromPath.measures).concat(Object.keys(fromPath.dimensions));
+  }
+
+  getAllocatedParams() {
+    return this.paramAllocator.getParams();
+  }
+
+  // FIXME helper for native generator, maybe should be moved entire to rust
+  generateTimeSeries(granularity, dateRange) {
+    return timeSeriesBase(granularity, dateRange);
   }
 
   get shouldReuseParams() {
@@ -3236,7 +3260,16 @@ export class BaseQuery {
           '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
         join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
-        cte: '{{ alias }} AS ({{ query | indent(2, true) }})'
+        cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
+        time_series_select: 'SELECT date_from::timestamp AS "date_from",\n' +
+        'date_to::timestamp AS "date_to" \n' +
+        'FROM(\n' +
+        '    VALUES ' +
+        '{% for time_item in seria  %}' +
+        '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
+        '{% if not loop.last %}, {% endif %}' +
+        '{% endfor %}' +
+        ') AS dates (date_from, date_to)'
       },
       expressions: {
         column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',
@@ -3257,6 +3290,8 @@ export class BaseQuery {
         cube: 'CUBE({{ exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
+        add_interval: '{{ date }} + interval \'{{ interval }}\'',
+        sub_interval: '{{ date }} - interval \'{{ interval }}\'',
         true: 'TRUE',
         false: 'FALSE',
         like: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}',
@@ -3276,9 +3311,11 @@ export class BaseQuery {
         gte: '{{ column }} >= {{ param }}',
         lt: '{{ column }} < {{ param }}',
         lte: '{{ column }} <= {{ param }}',
-        always_true: '1 == 1'
+        like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
+        always_true: '1 = 1'
 
       },
+      operators: {},
       quotes: {
         identifiers: '"',
         escape: '""'
@@ -3288,7 +3325,7 @@ export class BaseQuery {
       },
       join_types: {
         inner: 'INNER',
-        left: 'LEFT'
+        left: 'LEFT',
       },
       window_frame_types: {
         rows: 'ROWS',

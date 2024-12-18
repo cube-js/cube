@@ -1,7 +1,7 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -48,25 +48,25 @@ impl RootSqlNode {
 impl SqlNode for RootSqlNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Dimension(_) => self.dimension_processor.to_sql(
+        let res = match node.as_ref() {
+            MemberSymbol::Dimension(_) => self.dimension_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),
                 node_processor.clone(),
             )?,
-            MemberSymbolType::Measure(_) => self.measure_processor.to_sql(
+            MemberSymbol::Measure(_) => self.measure_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),
                 node_processor.clone(),
             )?,
-            MemberSymbolType::CubeName(_) => self.cube_name_processor.to_sql(
+            MemberSymbol::CubeName(_) => self.cube_name_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

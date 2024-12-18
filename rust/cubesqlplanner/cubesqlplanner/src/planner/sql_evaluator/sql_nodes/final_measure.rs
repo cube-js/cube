@@ -1,7 +1,7 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -23,24 +23,30 @@ impl FinalMeasureSqlNode {
 impl SqlNode for FinalMeasureSqlNode {
     fn to_sql(
         &self,
-        visitor: &mut SqlEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
+        visitor: &SqlEvaluatorVisitor,
+        node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
     ) -> Result<String, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Measure(ev) => {
+        let res = match node.as_ref() {
+            MemberSymbol::Measure(ev) => {
                 let input = self.input.to_sql(
                     visitor,
                     node,
                     query_tools.clone(),
                     node_processor.clone(),
                 )?;
+                //};
 
                 if ev.is_calculated() {
                     input
                 } else {
-                    let measure_type = ev.measure_type();
+                    let measure_type = if ev.measure_type() == "runningTotal" {
+                        "sum"
+                    } else {
+                        &ev.measure_type()
+                    };
+
                     format!("{}({})", measure_type, input)
                 }
             }

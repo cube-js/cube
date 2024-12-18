@@ -157,6 +157,9 @@ crate::plan_to_language! {
             location: String,
             has_header: bool,
         },
+        Values {
+            values: Vec<Vec<Expr>>,
+        },
         Extension {
             node: Arc<LogicalPlan>,
         },

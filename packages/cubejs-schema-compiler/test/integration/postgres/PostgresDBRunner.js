@@ -125,7 +125,7 @@ export class PostgresDBRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    const version = process.env.TEST_PGSQL_VERSION || '9.6.8';
+    const version = process.env.TEST_PGSQL_VERSION || '12.22';
 
     return new GenericContainer(`postgres:${version}`)
       .withEnvironment({

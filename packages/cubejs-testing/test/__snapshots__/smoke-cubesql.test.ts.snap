@@ -232,6 +232,84 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) select __user and literal grouped under wrapper: select __user and literal in wrapper 1`] = `
+Array [
+  Object {
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "new",
+    "my_user": null,
+  },
+  Object {
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "processed",
+    "my_user": null,
+  },
+  Object {
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "shipped",
+    "my_user": null,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) select __user and literal grouped: select __user and literal 1`] = `
+Array [
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-01T00:00:00.000Z,
+    "id": 1,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "new",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-02T00:00:00.000Z,
+    "id": 2,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "new",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-03T00:00:00.000Z,
+    "id": 3,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "processed",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-04T00:00:00.000Z,
+    "id": 4,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "processed",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-05T00:00:00.000Z,
+    "id": 5,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "shipped",
+    "my_user": null,
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) select null in subquery with streaming 1`] = `
 Array [
   Object {

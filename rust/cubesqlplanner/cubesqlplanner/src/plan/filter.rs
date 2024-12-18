@@ -1,12 +1,12 @@
-use super::Schema;
 use crate::planner::filter::BaseFilter;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::fmt;
 use std::rc::Rc;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum FilterGroupOperator {
     Or,
     And,
@@ -18,13 +18,19 @@ pub struct FilterGroup {
     pub items: Vec<FilterItem>,
 }
 
+impl PartialEq for FilterGroup {
+    fn eq(&self, other: &Self) -> bool {
+        self.operator == other.operator && self.items == other.items
+    }
+}
+
 impl FilterGroup {
     pub fn new(operator: FilterGroupOperator, items: Vec<FilterItem>) -> Self {
         Self { operator, items }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum FilterItem {
     Group(Rc<FilterGroup>),
     Item(Rc<BaseFilter>),
@@ -48,7 +54,6 @@ impl FilterItem {
         &self,
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
-        schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
         let res = match self {
             FilterItem::Group(group) => {
@@ -56,21 +61,41 @@ impl FilterItem {
                 let items_sql = group
                     .items
                     .iter()
-                    .map(|itm| itm.to_sql(templates, context.clone(), schema.clone()))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let result = if items_sql.is_empty() {
-                    templates.always_true()?
+                    .map(|itm| itm.to_sql(templates, context.clone()))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .filter(|itm| !itm.is_empty())
+                    .collect::<Vec<_>>();
+                if items_sql.is_empty() {
+                    "".to_string()
                 } else {
-                    items_sql.join(&operator)
-                };
-                format!("({})", result)
+                    let result = items_sql.join(&operator);
+                    format!("({})", result)
+                }
             }
             FilterItem::Item(item) => {
-                let sql = item.to_sql(context.clone(), schema)?;
+                let sql = item.to_sql(context.clone())?;
                 format!("({})", sql)
             }
         };
         Ok(res)
+    }
+
+    pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut result = Vec::new();
+        self.find_all_member_evaluators(&mut result);
+        result
+    }
+
+    pub fn find_all_member_evaluators(&self, result: &mut Vec<Rc<MemberSymbol>>) {
+        match self {
+            FilterItem::Group(group) => {
+                for item in group.items.iter() {
+                    item.find_all_member_evaluators(result)
+                }
+            }
+            FilterItem::Item(item) => result.push(item.member_evaluator().clone()),
+        }
     }
 }
 
@@ -79,12 +104,11 @@ impl Filter {
         &self,
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
-        schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
         let res = self
             .items
             .iter()
-            .map(|itm| itm.to_sql(templates, context.clone(), schema.clone()))
+            .map(|itm| itm.to_sql(templates, context.clone()))
             .collect::<Result<Vec<_>, _>>()?
             .join(" AND ");
         Ok(res)
