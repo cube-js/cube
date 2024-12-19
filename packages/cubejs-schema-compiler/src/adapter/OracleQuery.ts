@@ -97,12 +97,4 @@ export class OracleQuery extends BaseQuery {
     // eslint-disable-next-line quotes
     return `((cast (systimestamp at time zone 'UTC' as date) - date '1970-01-01') * 86400)`;
   }
-
-  public preAggregationTableName(cube, preAggregationName, skipSchema) {
-    const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
-    if (name.length > 128) {
-      throw new UserError(`Oracle can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
-    }
-    return name;
-  }
 }
