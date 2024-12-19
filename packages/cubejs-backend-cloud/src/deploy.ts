@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs-extra';
+import { DotenvParseOutput } from '@cubejs-backend/dotenv';
 import { CubeCloudClient } from './cloud';
 
 type DeployDirectoryOptions = {
@@ -73,6 +74,7 @@ type DeployHooks = {
 export class DeployController {
   public constructor(
     protected readonly cubeCloudClient: CubeCloudClient,
+    protected envVariables: DotenvParseOutput = {},
     protected readonly hooks: DeployHooks = {}
   ) {
   }
@@ -84,6 +86,10 @@ export class DeployController {
 
     const upstreamHashes = await this.cubeCloudClient.getUpstreamHashes();
     const { transaction, deploymentName } = await this.cubeCloudClient.startUpload();
+
+    if (Object.keys(this.envVariables).length) {
+      await this.cubeCloudClient.setEnvVars({ envVariables: this.envVariables });
+    }
 
     const files = Object.keys(fileHashes);
     const fileHashesPosix: Record<string, any> = {};
