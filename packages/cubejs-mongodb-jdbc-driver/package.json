@@ -1,0 +1,49 @@
+{
+  "name": "@cubejs-backend/mongodb-jdbc-driver",
+  "description": "Cube.js MongoDB database driver",
+  "version": "1.1.9",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.git",
+    "directory": "packages/cubejs-mongodb-jdbc-driver"
+  },
+  "engines": {
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+  },
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "files": [
+    "README.md",
+    "dist/src/*"
+  ],
+  "dependencies": {
+    "@cubejs-backend/jdbc-driver": "1.1.10",
+    "@cubejs-backend/schema-compiler": "1.1.10",
+    "@cubejs-backend/shared": "1.1.10",
+    "moment-timezone": "^0.5.46",
+    "node-fetch": "2"
+  },
+  "devDependencies": {
+    "@cubejs-backend/linter": "^1.0.0",
+    "@types/node": "^18",
+    "@types/node-fetch": "2",
+    "typescript": "~5.2.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}

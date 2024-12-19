@@ -29,4 +29,5 @@ module.exports = {
   pinot: '@cubejs-backend/pinot-driver',
   // List for JDBC drivers
   'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
+  'mongodb-jdbc': '@cubejs-backend/mongodb-jdbc-driver',
 };
