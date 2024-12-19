@@ -83,7 +83,7 @@ impl PostgresIntegrationTestSuite {
             services.wait_processing_loops().await.unwrap();
         });
 
-        sleep(Duration::from_millis(1 * 1000)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let client = PostgresIntegrationTestSuite::create_client(
             format!("host=127.0.0.1 port={} user=test password=test", port)
@@ -142,7 +142,7 @@ impl PostgresIntegrationTestSuite {
                         column.type_().oid(),
                         PgType::get_by_tid(
                             PgTypeId::from_oid(column.type_().oid())
-                                .expect(&format!("Unknown oid {}", column.type_().oid()))
+                                .unwrap_or_else(|| panic!("Unknown oid {}", column.type_().oid()))
                         )
                         .typname,
                     ));
@@ -150,7 +150,7 @@ impl PostgresIntegrationTestSuite {
 
                 // We dont need data when with_rows = false, but it's useful for testing that data type is correct
                 match PgTypeId::from_oid(column.type_().oid())
-                    .expect(&format!("Unknown type oid: {}", column.type_().oid()))
+                    .unwrap_or_else(|| panic!("Unknown type oid: {}", column.type_().oid()))
                 {
                     PgTypeId::INT8 => {
                         let value: Option<i64> = row.get(idx);
@@ -1269,7 +1269,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
             |rows| {
                 assert_eq!(rows.len(), 1);
 
-                let columns = rows.get(0).unwrap().columns();
+                let columns = rows.first().unwrap().columns();
                 assert_eq!(
                     columns
                         .into_iter()
