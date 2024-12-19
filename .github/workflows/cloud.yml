@@ -59,15 +59,31 @@ jobs:
       matrix:
         node-version: [ 20.x ]
         db: [ 'athena', 'bigquery', 'snowflake' ]
+        target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-07-15
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
+          target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install cargo-cp-artifact
+        run: npm install -g cargo-cp-artifact@0.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./packages/cubejs-backend-native
+          key: native-${{ runner.OS }}-${{ matrix.target }}
+          shared-key: native-${{ runner.OS }}-${{ matrix.target }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -87,6 +103,8 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build native (no python)
+        run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Run Integration tests for ${{ matrix.db }} matrix
         timeout-minutes: 30
         env:

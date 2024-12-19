@@ -1,13 +1,14 @@
 use super::error::NativeObjSerializerError;
-use crate::wrappers::inner_types::InnerTypes;
-use crate::wrappers::object::{
-    NativeArray, NativeBoolean, NativeNumber, NativeString, NativeStruct,
+use crate::wrappers::{
+    inner_types::InnerTypes,
+    object::{NativeArray, NativeBoolean, NativeNumber, NativeString, NativeStruct},
+    object_handle::NativeObjectHandle,
 };
-use crate::wrappers::object_handle::NativeObjectHandle;
-use serde;
-use serde::de::{DeserializeOwned, DeserializeSeed, MapAccess, SeqAccess, Visitor};
-use serde::forward_to_deserialize_any;
-use serde::Deserializer;
+use serde::{
+    self,
+    de::{DeserializeOwned, DeserializeSeed, MapAccess, SeqAccess, Visitor},
+    forward_to_deserialize_any, Deserializer,
+};
 
 pub struct NativeSerdeDeserializer<IT: InnerTypes> {
     input: NativeObjectHandle<IT>,

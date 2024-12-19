@@ -1,7 +1,8 @@
 use super::deserializer::NativeSerdeDeserializer;
-use crate::wrappers::inner_types::InnerTypes;
-use crate::wrappers::NativeObjectHandle;
-use crate::CubeError;
+use crate::{
+    wrappers::{inner_types::InnerTypes, NativeObjectHandle},
+    CubeError,
+};
 use serde::de::DeserializeOwned;
 
 pub trait NativeDeserialize<IT: InnerTypes>: Sized {

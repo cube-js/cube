@@ -36,7 +36,21 @@ export class WebSocketServer {
         throw new Error(`Socket for ${connectionId} is not found found`);
       }
 
-      connectionIdToSocket[connectionId].send(JSON.stringify(message));
+      let messageStr: string;
+
+      if (message.message instanceof ArrayBuffer) {
+        // In case we already have a JSON-serialized query result, we don't want to parse/stringify
+        // it again - it's too expensive, instead we serialize the rest of the message and then
+        // inject query result json into message.
+        const resMsg = new TextDecoder().decode(message.message);
+        message.message = "~XXXXX~";
+        messageStr = JSON.stringify(message);
+        messageStr = messageStr.replace(`"~XXXXX~"`, resMsg);
+      } else {
+        messageStr = JSON.stringify(message);
+      }
+
+      connectionIdToSocket[connectionId].send(messageStr);
     });
 
     this.wsServer.on('connection', (ws) => {
