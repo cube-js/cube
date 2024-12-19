@@ -33,6 +33,7 @@
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/schema-compiler": "1.1.11",
     "@cubejs-backend/shared": "1.1.10",
+    "@cubejs-backend/cloud": "1.1.10",
     "chalk": "^2.4.2",
     "cli-progress": "^3.10",
     "commander": "^2.19.0",
