@@ -64,10 +64,10 @@ export class DeployDirectory {
 }
 
 type DeployHooks = {
-  onStart?: Function,
-  onUpdate?: Function,
-  onUpload?: Function,
-  onFinally?: Function
+  onStart?: (deploymentName: string, files: string[]) => void,
+  onUpdate?: (i: number, { file }: { file: string}) => void,
+  onUpload?: (files: string[], file: string) => void,
+  onFinally?: () => void
 };
 
 export class DeployController {
