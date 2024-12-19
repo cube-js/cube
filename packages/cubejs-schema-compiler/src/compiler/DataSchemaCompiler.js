@@ -23,6 +23,7 @@ export class DataSchemaCompiler {
     this.cubeCompilers = options.cubeCompilers || [];
     this.contextCompilers = options.contextCompilers || [];
     this.transpilers = options.transpilers || [];
+    this.viewCompilers = options.viewCompilers || [];
     this.preTranspileCubeCompilers = options.preTranspileCubeCompilers || [];
     this.cubeNameCompilers = options.cubeNameCompilers || [];
     this.extensions = options.extensions || {};
@@ -94,6 +95,7 @@ export class DataSchemaCompiler {
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers })
       .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
+      .then(() => compilePhase({ cubeCompilers: this.viewCompilers }))
       .then(() => compilePhase({
         cubeCompilers: this.cubeCompilers,
         contextCompilers: this.contextCompilers,

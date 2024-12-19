@@ -152,6 +152,12 @@ describe('Cube RBAC Engine', () => {
       // Querying a cube with nested filters and mixed values should not cause any issues
       expect(res.rows).toMatchSnapshot('users');
     });
+
+    test('SELECT * from users_view', async () => {
+      const res = await connection.query('SELECT * FROM users_view limit 10');
+      // Make sure view policies are evaluated correctly in yaml schemas
+      expect(res.rows).toMatchSnapshot('users_view_js');
+    });
   });
 
   describe('RBAC via SQL API manager', () => {
@@ -397,6 +403,12 @@ describe('Cube RBAC Engine [Python config]', () => {
       // This query should return all rows because of the `allow_all` statement
       // It should also exclude the `created_at` dimension as per memberLevel policy
       expect(res.rows).toMatchSnapshot('users_python');
+    });
+
+    test('SELECT * from users_view', async () => {
+      const res = await connection.query('SELECT * FROM users_view limit 10');
+      // Make sure view policies are evaluated correctly in yaml schemas
+      expect(res.rows).toMatchSnapshot('users_view_python');
     });
   });
 });
