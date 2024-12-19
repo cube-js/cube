@@ -17,9 +17,6 @@ import {
   ResultType as ResultTypeEnum,
 } from '../../src/types/enums';
 import {
-  DBResponseValue,
-} from '../../src/helpers/transformValue';
-import {
   ConfigItem,
 } from '../../src/helpers/prepareAnnotation';
 import transformDataDefault
@@ -35,12 +32,13 @@ import {
   getBlendingResponseKey,
   getMembers,
   getCompactRow,
-  getVanilaRow,
+  getVanillaRow,
   transformData,
 } from '../../src/helpers/transformData';
 import {
   QueryType,
 } from '../../src/types/strings';
+import { DBResponseValue } from '../../src/types/responses';
 
 const mockData = {
   regular_discount_by_city: {
@@ -693,7 +691,7 @@ describe('transformData helpers', () => {
     expect(getBlendingResponseKey).toBeDefined();
     expect(getMembers).toBeDefined();
     expect(getCompactRow).toBeDefined();
-    expect(getVanilaRow).toBeDefined();
+    expect(getVanillaRow).toBeDefined();
     expect(transformData).toBeDefined();
     expect(transformData).toEqual(transformDataDefault);
   });
@@ -792,7 +790,7 @@ describe('transformData helpers', () => {
           .timeDimensions
       )
     ) as QueryTimeDimension[];
-    
+
     expect(() => {
       getBlendingResponseKey();
     }).toThrow(
@@ -1112,7 +1110,7 @@ describe('transformData helpers', () => {
       JSON.stringify(mockData.regular_discount_by_city.data)
     );
     delete data.aliasToMemberNameMap.e_commerce_records_us2021__avg_discount;
-    expect(() => getVanilaRow(
+    expect(() => getVanillaRow(
       data.aliasToMemberNameMap,
       data.annotation as unknown as { [member: string]: ConfigItem },
       data.queryType as QueryType,
@@ -1135,25 +1133,25 @@ describe('transformData default mode', () => {
       JSON.stringify(mockData.regular_discount_by_city.data)
     );
     delete data.aliasToMemberNameMap.e_commerce_records_us2021__avg_discount;
-    expect(() => transformData(
-      data.aliasToMemberNameMap,
-      data.annotation as unknown as { [member: string]: ConfigItem },
-      data.data,
-      data.query as unknown as NormalizedQuery,
-      data.queryType as QueryType,
-    )).toThrow();
+    expect(() => transformData({
+      aliasToMemberNameMap: data.aliasToMemberNameMap,
+      annotation: data.annotation as unknown as { [member: string]: ConfigItem },
+      data: data.data,
+      query: data.query as unknown as NormalizedQuery,
+      queryType: data.queryType as QueryType,
+    })).toThrow();
 
     data = JSON.parse(
       JSON.stringify(mockData.regular_discount_by_city.data)
     );
     expect(
-      transformData(
-        data.aliasToMemberNameMap,
-        data.annotation as unknown as { [member: string]: ConfigItem },
-        data.data,
-        data.query as unknown as NormalizedQuery,
-        data.queryType as QueryType,
-      )
+      transformData({
+        aliasToMemberNameMap: data.aliasToMemberNameMap,
+        annotation: data.annotation as unknown as { [member: string]: ConfigItem },
+        data: data.data,
+        query: data.query as unknown as NormalizedQuery,
+        queryType: data.queryType as QueryType,
+      })
     ).toEqual(data.result_default);
   });
 
@@ -1162,13 +1160,13 @@ describe('transformData default mode', () => {
       JSON.stringify(mockData.regular_profit_by_postal_code.data)
     );
     expect(
-      transformData(
-        data.aliasToMemberNameMap,
-        data.annotation as unknown as { [member: string]: ConfigItem },
-        data.data,
-        data.query as unknown as NormalizedQuery,
-        data.queryType as QueryType,
-      )
+      transformData({
+        aliasToMemberNameMap: data.aliasToMemberNameMap,
+        annotation: data.annotation as unknown as { [member: string]: ConfigItem },
+        data: data.data,
+        query: data.query as unknown as NormalizedQuery,
+        queryType: data.queryType as QueryType,
+      })
     ).toEqual(data.result_default);
   });
 
@@ -1178,23 +1176,23 @@ describe('transformData default mode', () => {
     );
 
     expect(
-      transformData(
-        data[0].aliasToMemberNameMap,
-        data[0].annotation as unknown as { [member: string]: ConfigItem },
-        data[0].data,
-        data[0].query as unknown as NormalizedQuery,
-        data[0].queryType as QueryType,
-      )
+      transformData({
+        aliasToMemberNameMap: data[0].aliasToMemberNameMap,
+        annotation: data[0].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[0].data,
+        query: data[0].query as unknown as NormalizedQuery,
+        queryType: data[0].queryType as QueryType,
+      })
     ).toEqual(data[0].result_default);
 
     expect(
-      transformData(
-        data[1].aliasToMemberNameMap,
-        data[1].annotation as unknown as { [member: string]: ConfigItem },
-        data[1].data,
-        data[1].query as unknown as NormalizedQuery,
-        data[1].queryType as QueryType,
-      )
+      transformData({
+        aliasToMemberNameMap: data[1].aliasToMemberNameMap,
+        annotation: data[1].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[1].data,
+        query: data[1].query as unknown as NormalizedQuery,
+        queryType: data[1].queryType as QueryType,
+      })
     ).toEqual(data[1].result_default);
   });
 
@@ -1208,23 +1206,23 @@ describe('transformData default mode', () => {
     );
 
     expect(
-      transformData(
-        data[0].aliasToMemberNameMap,
-        data[0].annotation as unknown as { [member: string]: ConfigItem },
-        data[0].data,
-        data[0].query as unknown as NormalizedQuery,
-        data[0].queryType as QueryType,
-      )
+      transformData({
+        aliasToMemberNameMap: data[0].aliasToMemberNameMap,
+        annotation: data[0].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[0].data,
+        query: data[0].query as unknown as NormalizedQuery,
+        queryType: data[0].queryType as QueryType,
+      })
     ).toEqual(data[0].result_default);
 
     expect(
-      transformData(
-        data[1].aliasToMemberNameMap,
-        data[1].annotation as unknown as { [member: string]: ConfigItem },
-        data[1].data,
-        data[1].query as unknown as NormalizedQuery,
-        data[1].queryType as QueryType,
-      )
+      transformData({
+        aliasToMemberNameMap: data[1].aliasToMemberNameMap,
+        annotation: data[1].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[1].data,
+        query: data[1].query as unknown as NormalizedQuery,
+        queryType: data[1].queryType as QueryType,
+      })
     ).toEqual(data[1].result_default);
   });
 });
@@ -1237,27 +1235,27 @@ describe('transformData compact mode', () => {
       JSON.stringify(mockData.regular_discount_by_city.data)
     );
     delete data.aliasToMemberNameMap.e_commerce_records_us2021__avg_discount;
-    expect(() => transformData(
-      data.aliasToMemberNameMap,
-      data.annotation as unknown as { [member: string]: ConfigItem },
-      data.data,
-      data.query as unknown as NormalizedQuery,
-      data.queryType as QueryType,
-      ResultTypeEnum.COMPACT,
-    )).toThrow();
+    expect(() => transformData({
+      aliasToMemberNameMap: data.aliasToMemberNameMap,
+      annotation: data.annotation as unknown as { [member: string]: ConfigItem },
+      data: data.data,
+      query: data.query as unknown as NormalizedQuery,
+      queryType: data.queryType as QueryType,
+      resType: ResultTypeEnum.COMPACT,
+    })).toThrow();
 
     data = JSON.parse(
       JSON.stringify(mockData.regular_discount_by_city.data)
     );
     expect(
-      transformData(
-        data.aliasToMemberNameMap,
-        data.annotation as unknown as { [member: string]: ConfigItem },
-        data.data,
-        data.query as unknown as NormalizedQuery,
-        data.queryType as QueryType,
-        ResultTypeEnum.COMPACT,
-      )
+      transformData({
+        aliasToMemberNameMap: data.aliasToMemberNameMap,
+        annotation: data.annotation as unknown as { [member: string]: ConfigItem },
+        data: data.data,
+        query: data.query as unknown as NormalizedQuery,
+        queryType: data.queryType as QueryType,
+        resType: ResultTypeEnum.COMPACT,
+      })
     ).toEqual(data.result_compact);
   });
 
@@ -1266,14 +1264,14 @@ describe('transformData compact mode', () => {
       JSON.stringify(mockData.regular_profit_by_postal_code.data)
     );
     expect(
-      transformData(
-        data.aliasToMemberNameMap,
-        data.annotation as unknown as { [member: string]: ConfigItem },
-        data.data,
-        data.query as unknown as NormalizedQuery,
-        data.queryType as QueryType,
-        ResultTypeEnum.COMPACT,
-      )
+      transformData({
+        aliasToMemberNameMap: data.aliasToMemberNameMap,
+        annotation: data.annotation as unknown as { [member: string]: ConfigItem },
+        data: data.data,
+        query: data.query as unknown as NormalizedQuery,
+        queryType: data.queryType as QueryType,
+        resType: ResultTypeEnum.COMPACT,
+      })
     ).toEqual(data.result_compact);
   });
 
@@ -1283,25 +1281,25 @@ describe('transformData compact mode', () => {
     );
 
     expect(
-      transformData(
-        data[0].aliasToMemberNameMap,
-        data[0].annotation as unknown as { [member: string]: ConfigItem },
-        data[0].data,
-        data[0].query as unknown as NormalizedQuery,
-        data[0].queryType as QueryType,
-        ResultTypeEnum.COMPACT,
-      )
+      transformData({
+        aliasToMemberNameMap: data[0].aliasToMemberNameMap,
+        annotation: data[0].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[0].data,
+        query: data[0].query as unknown as NormalizedQuery,
+        queryType: data[0].queryType as QueryType,
+        resType: ResultTypeEnum.COMPACT,
+      })
     ).toEqual(data[0].result_compact);
 
     expect(
-      transformData(
-        data[1].aliasToMemberNameMap,
-        data[1].annotation as unknown as { [member: string]: ConfigItem },
-        data[1].data,
-        data[1].query as unknown as NormalizedQuery,
-        data[1].queryType as QueryType,
-        ResultTypeEnum.COMPACT,
-      )
+      transformData({
+        aliasToMemberNameMap: data[1].aliasToMemberNameMap,
+        annotation: data[1].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[1].data,
+        query: data[1].query as unknown as NormalizedQuery,
+        queryType: data[1].queryType as QueryType,
+        resType: ResultTypeEnum.COMPACT,
+      })
     ).toEqual(data[1].result_compact);
   });
 
@@ -1315,25 +1313,25 @@ describe('transformData compact mode', () => {
     );
 
     expect(
-      transformData(
-        data[0].aliasToMemberNameMap,
-        data[0].annotation as unknown as { [member: string]: ConfigItem },
-        data[0].data,
-        data[0].query as unknown as NormalizedQuery,
-        data[0].queryType as QueryType,
-        ResultTypeEnum.COMPACT,
-      )
+      transformData({
+        aliasToMemberNameMap: data[0].aliasToMemberNameMap,
+        annotation: data[0].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[0].data,
+        query: data[0].query as unknown as NormalizedQuery,
+        queryType: data[0].queryType as QueryType,
+        resType: ResultTypeEnum.COMPACT,
+      })
     ).toEqual(data[0].result_compact);
 
     expect(
-      transformData(
-        data[1].aliasToMemberNameMap,
-        data[1].annotation as unknown as { [member: string]: ConfigItem },
-        data[1].data,
-        data[1].query as unknown as NormalizedQuery,
-        data[1].queryType as QueryType,
-        ResultTypeEnum.COMPACT,
-      )
+      transformData({
+        aliasToMemberNameMap: data[1].aliasToMemberNameMap,
+        annotation: data[1].annotation as unknown as { [member: string]: ConfigItem },
+        data: data[1].data,
+        query: data[1].query as unknown as NormalizedQuery,
+        queryType: data[1].queryType as QueryType,
+        resType: ResultTypeEnum.COMPACT,
+      })
     ).toEqual(data[1].result_compact);
   });
 });
