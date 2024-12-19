@@ -30,6 +30,7 @@ import type { nextFn } from './QueryStream';
 const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
 const Connection = require('@cubejs-backend/jdbc/lib/connection');
 const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
+const ResultSet = require('@cubejs-backend/jdbc/lib/resultset');
 const jinst = require('@cubejs-backend/jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
@@ -71,6 +72,9 @@ Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaDa
 // promisify DatabaseMetaData methods
 DatabaseMetaData.prototype.getSchemasAsync = promisify(DatabaseMetaData.prototype.getSchemas);
 DatabaseMetaData.prototype.getTablesAsync = promisify(DatabaseMetaData.prototype.getTables);
+DatabaseMetaData.prototype.getColumnsAsync = promisify(DatabaseMetaData.prototype.getColumns);
+// promisify ResultSet methods
+ResultSet.prototype.toObjArrayAsync = promisify(ResultSet.prototype.toObjArray);
 
 interface ExtendedPool extends Pool<any> {
   _factory: Factory<any>;
