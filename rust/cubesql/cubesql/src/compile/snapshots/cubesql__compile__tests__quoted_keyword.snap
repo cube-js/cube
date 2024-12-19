@@ -5,5 +5,5 @@ expression: result
 +----------------+
 | quoted_keyword |
 +----------------+
-| select         |
+| "select"       |
 +----------------+

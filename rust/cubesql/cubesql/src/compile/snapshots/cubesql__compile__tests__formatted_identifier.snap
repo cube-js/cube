@@ -5,5 +5,5 @@ expression: result
 +----------------------+
 | formatted_identifier |
 +----------------------+
-| column_name          |
+| "column_name"        |
 +----------------------+

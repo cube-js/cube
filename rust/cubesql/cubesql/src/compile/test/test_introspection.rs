@@ -3143,9 +3143,12 @@ async fn test_metabase_introspection_indoption() -> Result<(), CubeError> {
 
 #[tokio::test]
 async fn test_metabase_v0_51_2_introspection_field_indoption() -> Result<(), CubeError> {
+    init_testing_logger();
+
     insta::assert_snapshot!(
         "test_metabase_v0_51_2_introspection_field_indoption",
         execute_query(
+            // language=PostgreSQL
             r#"
             SELECT
             c.column_name AS name,

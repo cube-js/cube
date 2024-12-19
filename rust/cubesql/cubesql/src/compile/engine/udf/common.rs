@@ -3088,8 +3088,9 @@ pub fn create_cube_regclass_cast_udf() -> ScalarUDF {
                             match PgType::get_all().iter().find(|e| e.typname == as_str) {
                                 None => {
                                     // If the type name contains a dot, it's a schema-qualified name
-                                    // and we should return return the approprate RegClass to be converted to OID
+                                    // and we should return the approprate RegClass to be converted to OID
                                     // For now, we'll return 0 so metabase can sync without failing
+                                    // TODO actually read `pg_type`
                                     if as_str.contains('.') {
                                         builder.append_value(0)?;
                                     } else {
@@ -3156,6 +3157,7 @@ pub fn create_pg_get_serial_sequence_udf() -> ScalarUDF {
 }
 
 // Return a NOOP for this so metabase can sync without failing
+// See https://www.postgresql.org/docs/17/functions-info.html#FUNCTIONS-INFO-COMMENT here
 // TODO: Implement this
 pub fn create_col_description_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
@@ -3174,15 +3176,26 @@ pub fn create_col_description_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "col_description",
+        // Correct signature for col_description should be `(oid, integer) → text`
+        // We model oid as UInt32, so [DataType::UInt32, DataType::Int32] is a proper arguments
+        // However, it seems that coercion rules in DF differs from PostgreSQL at the moment
+        // And metabase uses col_description(CAST(CAST(... AS regclass) AS oid), cardinal_number)
+        // And we model regclass as Int64, and cardinal_number as UInt32
+        // Which is why second signature is necessary
         &Signature::one_of(
-            vec![TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8])],
-            Volatility::Immutable,
+            vec![
+                TypeSignature::Exact(vec![DataType::UInt32, DataType::Int32]),
+                // TODO remove this signature in favor of proper model/coercion
+                TypeSignature::Exact(vec![DataType::Int64, DataType::UInt32]),
+            ],
+            Volatility::Stable,
         ),
         &return_type,
         &fun,
     )
 }
 
+// See https://www.postgresql.org/docs/17/functions-string.html#FUNCTIONS-STRING-FORMAT
 pub fn create_format_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         // Ensure at least one argument is provided
@@ -3255,11 +3268,11 @@ pub fn create_format_udf() -> ScalarUDF {
                             }
                         };
 
-                        // Quote identifier if necessary
-                        let needs_quoting = !value
-                            .chars()
-                            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-                            || value.is_empty();
+                        // Quote any identifier for now
+                        // That's a safety-first approach: it would quote too much, but every edge-case would be covered
+                        // Like `1` or `1a` or `select`
+                        // TODO Quote identifier only if necessary
+                        let needs_quoting = true;
 
                         if needs_quoting {
                             result.push('"');
@@ -3298,6 +3311,10 @@ pub fn create_format_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "format",
+        // Actually, format should be variadic with types (Utf8, any*)
+        // But ATM DataFusion does not support those signatures
+        // And this would work through implicit casting to Utf8
+        // TODO migrate to proper custom signature once it's supported by DF
         &Signature::variadic(vec![DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
