@@ -10,6 +10,11 @@ import {
   getRealType,
   QueryAlias,
 } from '@cubejs-backend/shared';
+import {
+  getFinalQueryResult,
+  getFinalQueryResultArray,
+  getFinalQueryResultMulti,
+} from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -82,7 +87,6 @@ import { createJWKsFetcher } from './jwk';
 import { SQLServer, SQLServerConstructorOptions } from './sql-server';
 import { getJsonQueryFromGraphQLQuery, makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
-import transformData from './helpers/transformData';
 import {
   transformCube,
   transformMeasure,
@@ -109,6 +113,14 @@ function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestCon
 function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
     handler(req as any, res).catch(next);
+  };
+}
+
+function cleanupResult(result) {
+  return {
+    ...result,
+    rawData: undefined,
+    transformDataParams: undefined,
   };
 }
 
@@ -1570,11 +1582,11 @@ class ApiGateway {
   }
 
   /**
-   * Convert adapter's result and other request paramters to a final
+   * Convert adapter's result and other request parameters to a final
    * result object.
    * @internal
    */
-  private getResultInternal(
+  private async getResultInternal(
     context: RequestContext,
     queryType: QueryType,
     normalizedQuery: NormalizedQuery,
@@ -1596,20 +1608,23 @@ class ApiGateway {
     response: any,
     responseType?: ResultType,
   ) {
+    const transformDataParams = {
+      aliasToMemberNameMap: sqlQuery.aliasNameToMember,
+      annotation: {
+        ...annotation.measures,
+        ...annotation.dimensions,
+        ...annotation.timeDimensions
+      } as { [member: string]: ConfigItem },
+      query: normalizedQuery,
+      queryType,
+      resType: responseType,
+    };
+
+    // We postpone data transformation until the last minute
     return {
       query: normalizedQuery,
-      data: transformData(
-        sqlQuery.aliasNameToMember,
-        {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        } as { [member: string]: ConfigItem },
-        response.data,
-        normalizedQuery,
-        queryType,
-        responseType,
-      ),
+      rawData: response.data,
+      transformDataParams,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||
@@ -1713,6 +1728,17 @@ class ApiGateway {
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
+      if (
+        queryType !== QueryTypeEnum.REGULAR_QUERY &&
+        props.queryType == null
+      ) {
+        throw new UserError(
+          `'${queryType
+          }' query type is not supported by the client.` +
+          'Please update the client.'
+        );
+      }
+
       let metaConfigResult = await (await this
         .getCompilerApi(context)).metaConfig(request.context, {
         requestId: context.requestId
@@ -1729,14 +1755,14 @@ class ApiGateway {
           slowQuery = slowQuery ||
             Boolean(sqlQueries[index].slowQuery);
 
-          const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery
-          );
-
           const response = await this.getSqlResponseInternal(
             context,
             normalizedQuery,
             sqlQueries[index],
+          );
+
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQuery
           );
 
           return this.getResultInternal(
@@ -1767,33 +1793,39 @@ class ApiGateway {
                 r.usedPreAggregations || {}
               ).length
             ).length,
-          queriesWithData:
-            results.filter((r: any) => r.data?.length).length,
+          // Have to omit because data could be processed natively
+          // so it is not known at this point
+          // queriesWithData:
+          //   results.filter((r: any) => r.data?.length).length,
           dbType: results.map(r => r.dbType),
         },
         context,
       );
 
-      if (
-        queryType !== QueryTypeEnum.REGULAR_QUERY &&
-        props.queryType == null
-      ) {
-        throw new UserError(
-          `'${queryType
-          }' query type is not supported by the client.` +
-          'Please update the client.'
-        );
-      }
-
       if (props.queryType === 'multi') {
-        res({
+        // We prepare the final json result on native side
+        const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[Object[], any[], Object[]]>(
+          ([transformList, rawList, resultList], r) => {
+            transformList.push(r.transformDataParams);
+            rawList.push(r.rawData.isNative ? r.rawData.getNativeRef() : r.rawData);
+            resultList.push(cleanupResult(r));
+            return [transformList, rawList, resultList];
+          },
+          [[], [], []]
+        );
+
+        const responseDataObj = {
           queryType,
-          results,
-          pivotQuery: getPivotQuery(queryType, normalizedQueries),
+          results: cleanResultList,
           slowQuery
-        });
+        };
+
+        res(await getFinalQueryResultMulti(transformDataJson, rawDataRef, responseDataObj));
       } else {
-        res(results[0]);
+        // We prepare the full final json result on native side
+        const r = results[0];
+        const rawData = r.rawData.isNative ? r.rawData.getNativeRef() : r.rawData;
+        res(await getFinalQueryResult(r.transformDataParams, rawData, cleanupResult(r)));
       }
     } catch (e: any) {
       this.handleError({
@@ -1889,6 +1921,8 @@ class ApiGateway {
             annotation
           }];
         }
+
+        res(request.streaming ? results[0] : { results });
       } else {
         results = await Promise.all(
           normalizedQueries.map(async (normalizedQuery, index) => {
@@ -1920,11 +1954,27 @@ class ApiGateway {
             );
           })
         );
-      }
 
-      res(request.streaming ? results[0] : {
-        results,
-      });
+        if (request.streaming) {
+          res(results[0]);
+        } else {
+          // We prepare the final json result on native side
+          const [transformDataJson, rawData, resultDataJson] = (results as {
+            transformDataParams: any;
+            rawData: { isNative: boolean, getNativeRef: () => any };
+          }[]).reduce<[Object[], any[], Object[]]>(
+            ([transformList, rawList, resultList], r) => {
+              transformList.push(r.transformDataParams);
+              rawList.push(r.rawData.isNative ? r.rawData.getNativeRef() : r.rawData);
+              resultList.push(cleanupResult(r));
+              return [transformList, rawList, resultList];
+            },
+            [[], [], []]
+          );
+
+          res(await getFinalQueryResultArray(transformDataJson, rawData, resultDataJson));
+        }
+      }
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
@@ -1994,7 +2044,18 @@ class ApiGateway {
   }
 
   protected resToResultFn(res: ExpressResponse) {
-    return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
+    return (message, { status }: { status?: number } = {}) => {
+      if (status) {
+        res.status(status);
+      }
+
+      if (message instanceof ArrayBuffer) {
+        res.set('Content-Type', 'application/json');
+        res.send(Buffer.from(message));
+      } else {
+        res.json(message);
+      }
+    };
   }
 
   protected parseQueryParam(query): Query | Query[] {
