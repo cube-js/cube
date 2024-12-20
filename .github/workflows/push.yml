@@ -120,48 +120,18 @@ jobs:
 #          files: ./packages/*/coverage/clover.xml
 #          flags: cube-backend
 #          verbose: true # optional (default = false)
-      - name: Cargo fmt cubeorchestrator
-        run: |
-          cargo fmt --manifest-path rust/cubeorchestrator/Cargo.toml -- --check
-      - name: Cargo build cubeorchestrator
-        run: |
-          cargo build --manifest-path rust/cubeorchestrator/Cargo.toml -j 4
       - name: Cargo test cubeorchestrator
         run: |
           cargo test --manifest-path rust/cubeorchestrator/Cargo.toml -j 1
-      - name: Cargo fmt cubenativeutils
-        run: |
-          cargo fmt --manifest-path rust/cubenativeutils/Cargo.toml -- --check
-      - name: Cargo build cubenativeutils
-        run: |
-          cargo build --manifest-path rust/cubenativeutils/Cargo.toml -j 4
       - name: Cargo test cubenativeutils
         run: |
           cargo test --manifest-path rust/cubenativeutils/Cargo.toml -j 1
-      - name: Cargo fmt cubeshared
-        run: |
-          cargo fmt --manifest-path rust/cubeshared/Cargo.toml -- --check
-      - name: Cargo build cubeshared
-        run: |
-          cargo build --manifest-path rust/cubeshared/Cargo.toml -j 4
       - name: Cargo test cubeshared
         run: |
           cargo test --manifest-path rust/cubeshared/Cargo.toml -j 1
-#      - name: Cargo fmt cubesql
-#        run: |
-#          cargo fmt --manifest-path rust/cubesql/Cargo.toml -- --check
-#      - name: Cargo build cubesql
-#        run: |
-#          cargo build --manifest-path rust/cubesql/Cargo.toml -j 4
 #      - name: Cargo test cubesql
 #        run: |
 #          cargo test --manifest-path rust/cubesql/Cargo.toml -j 1
-#      - name: Cargo fmt cubesqlplanner
-#        run: |
-#          cargo fmt --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -- --check
-#      - name: Cargo build cubesqlplanner
-#        run: |
-#          cargo build --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 4
 #      - name: Cargo test cubesqlplanner
 #        run: |
 #          cargo test --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 1
@@ -213,6 +183,21 @@ jobs:
         run: yarn lint:npm
       - name: Lerna lint
         run: yarn lerna run --concurrency 1 lint
+      - name: Cargo fmt cubeorchestrator
+        run: |
+          cargo fmt --manifest-path rust/cubeorchestrator/Cargo.toml -- --check
+      - name: Cargo fmt cubenativeutils
+        run: |
+          cargo fmt --manifest-path rust/cubenativeutils/Cargo.toml -- --check
+      - name: Cargo fmt cubeshared
+        run: |
+          cargo fmt --manifest-path rust/cubeshared/Cargo.toml -- --check
+#      - name: Cargo fmt cubesql
+#        run: |
+#          cargo fmt --manifest-path rust/cubesql/Cargo.toml -- --check
+#      - name: Cargo fmt cubesqlplanner
+#        run: |
+#          cargo fmt --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -- --check
 
   build:
     runs-on: ubuntu-20.04
@@ -265,6 +250,21 @@ jobs:
         run: yarn lerna run --concurrency 1 build
         env:
           NODE_OPTIONS: --max_old_space_size=4096
+      - name: Cargo build cubeorchestrator
+        run: |
+          cargo build --manifest-path rust/cubeorchestrator/Cargo.toml -j 4
+      - name: Cargo build cubenativeutils
+        run: |
+          cargo build --manifest-path rust/cubenativeutils/Cargo.toml -j 4
+      - name: Cargo build cubeshared
+        run: |
+          cargo build --manifest-path rust/cubeshared/Cargo.toml -j 4
+#      - name: Cargo build cubesql
+#        run: |
+#          cargo build --manifest-path rust/cubesql/Cargo.toml -j 4
+#      - name: Cargo build cubesqlplanner
+#        run: |
+#          cargo build --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 4
 
   build-cubestore:
     needs: [latest-tag-sha]
