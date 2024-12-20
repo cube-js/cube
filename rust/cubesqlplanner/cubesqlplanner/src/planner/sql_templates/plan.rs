@@ -20,7 +20,7 @@ impl PlanSqlTemplates {
         name.to_case(Case::Snake).replace(".", "__")
     }
 
-    pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: Option<String>) -> String {
+    pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
         let suffix = if let Some(suffix) = suffix {
             format!("_{}", suffix)
         } else {

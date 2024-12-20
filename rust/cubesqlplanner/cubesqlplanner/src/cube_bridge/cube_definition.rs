@@ -12,6 +12,8 @@ use std::rc::Rc;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CubeDefinitionStatic {
     pub name: String,
+    #[serde(rename = "sqlAlias")]
+    pub sql_alias: Option<String>,
 }
 
 #[nativebridge::native_bridge(CubeDefinitionStatic)]

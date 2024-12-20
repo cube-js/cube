@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
 use super::BaseDimension;
-use super::{BaseMember, VisitorContext};
+use super::{BaseMember, BaseMemberHelper, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -10,6 +10,7 @@ pub struct BaseTimeDimension {
     query_tools: Rc<QueryTools>,
     granularity: Option<String>,
     date_range: Option<Vec<String>>,
+    default_alias: String,
     alias_suffix: String,
 }
 
@@ -19,7 +20,7 @@ impl BaseMember for BaseTimeDimension {
     }
 
     fn alias_name(&self) -> String {
-        self.unescaped_alias_name()
+        self.default_alias.clone()
     }
 
     fn member_evaluator(&self) -> Rc<MemberSymbol> {
@@ -55,12 +56,20 @@ impl BaseTimeDimension {
         } else {
             "day".to_string()
         };
+        let dimension = BaseDimension::try_new_required(member_evaluator, query_tools.clone())?;
+        let default_alias = BaseMemberHelper::default_alias(
+            &dimension.cube_name(),
+            &dimension.name(),
+            &Some(alias_suffix.clone()),
+            query_tools.clone(),
+        )?;
         Ok(Rc::new(Self {
-            dimension: BaseDimension::try_new_required(member_evaluator, query_tools.clone())?,
+            dimension,
             query_tools,
             granularity,
             date_range,
             alias_suffix,
+            default_alias,
         }))
     }
 
@@ -71,6 +80,7 @@ impl BaseTimeDimension {
             granularity: new_granularity,
             date_range: self.date_range.clone(),
             alias_suffix: self.alias_suffix.clone(),
+            default_alias: self.default_alias.clone(),
         })
     }
 

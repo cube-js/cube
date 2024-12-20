@@ -1,5 +1,4 @@
 use super::SchemaColumn;
-use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::BaseMember;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -39,11 +38,7 @@ impl Schema {
         if let Some(column) = self.find_column_for_member(&member.full_name()) {
             column.name().clone()
         } else {
-            PlanSqlTemplates::memeber_alias_name(
-                member.cube_name(),
-                member.name(),
-                member.alias_suffix(),
-            )
+            member.alias_name()
         }
     }
 
