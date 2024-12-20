@@ -173,17 +173,14 @@ pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     message: Message,
 ) -> Result<(), ProtocolError> {
     let mut bytes_mut = BytesMut::new();
-    match message.serialize() {
-        Some(buffer) => {
-            // TODO: Yet another memory copy.
-            bytes_mut.extend_from_slice(&buffer);
-            *partial_write = bytes_mut;
-            writer.write_all_buf(partial_write).await?;
-            *partial_write = BytesMut::new();
-            writer.flush().await?;
-        }
-        _ => {}
-    };
+    if let Some(buffer) = message.serialize() {
+        // TODO: Yet another memory copy.
+        bytes_mut.extend_from_slice(&buffer);
+        *partial_write = bytes_mut;
+        writer.write_all_buf(partial_write).await?;
+        *partial_write = BytesMut::new();
+        writer.flush().await?;
+    }
 
     Ok(())
 }
@@ -196,19 +193,16 @@ fn message_serialize<Message: Serialize>(
         packet_buffer.put_u8(message.code());
     }
 
-    match message.serialize() {
-        Some(buffer) => {
-            let size = u32::try_from(buffer.len() + 4).map_err(|_| {
-                ErrorResponse::error(
-                    ErrorCode::InternalError,
-                    "Unable to convert buffer length to a suitable memory size".to_string(),
-                )
-            })?;
-            packet_buffer.extend_from_slice(&size.to_be_bytes());
-            packet_buffer.extend_from_slice(&buffer);
-        }
-        _ => (),
-    };
+    if let Some(buffer) = message.serialize() {
+        let size = u32::try_from(buffer.len() + 4).map_err(|_| {
+            ErrorResponse::error(
+                ErrorCode::InternalError,
+                "Unable to convert buffer length to a suitable memory size".to_string(),
+            )
+        })?;
+        packet_buffer.extend_from_slice(&size.to_be_bytes());
+        packet_buffer.extend_from_slice(&buffer);
+    }
 
     Ok(())
 }

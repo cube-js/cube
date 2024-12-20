@@ -401,7 +401,7 @@ impl Portal {
 
                 batch
             } else {
-                *left = *left - batch.num_rows();
+                *left -= batch.num_rows();
                 batch
             }
         };

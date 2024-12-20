@@ -33,7 +33,3 @@ hex = "0.4.3"
 [lints.clippy]
 len_without_is_empty = "allow"
 new_without_default = "allow"
-redundant_slicing = "allow"
-single_char_add_str = "allow"
-single_match = "allow"
-to_string_trait_impl = "allow"
