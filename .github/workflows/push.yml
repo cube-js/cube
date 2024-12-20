@@ -9,6 +9,10 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubeorchestrator/**'
+      - 'rust/cubeshared/**'
+      - 'rust/cubesqlplanner/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -24,6 +28,10 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubeorchestrator/**'
+      - 'rust/cubeshared/**'
+      - 'rust/cubesqlplanner/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -104,7 +112,6 @@ jobs:
         working-directory: ./packages/cubejs-backend-native
         env:
           PYO3_PYTHON: python${{ matrix.python-version }}
-
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
 #      - uses: codecov/codecov-action@v1
@@ -113,6 +120,51 @@ jobs:
 #          files: ./packages/*/coverage/clover.xml
 #          flags: cube-backend
 #          verbose: true # optional (default = false)
+      - name: Cargo fmt cubeorchestrator
+        run: |
+          cargo fmt --manifest-path rust/cubeorchestrator/Cargo.toml -- --check
+      - name: Cargo build cubeorchestrator
+        run: |
+          cargo build --manifest-path rust/cubeorchestrator/Cargo.toml -j 4
+      - name: Cargo test cubeorchestrator
+        run: |
+          cargo test --manifest-path rust/cubeorchestrator/Cargo.toml -j 1
+      - name: Cargo fmt cubenativeutils
+        run: |
+          cargo fmt --manifest-path rust/cubenativeutils/Cargo.toml -- --check
+      - name: Cargo build cubenativeutils
+        run: |
+          cargo build --manifest-path rust/cubenativeutils/Cargo.toml -j 4
+      - name: Cargo test cubenativeutils
+        run: |
+          cargo test --manifest-path rust/cubenativeutils/Cargo.toml -j 1
+      - name: Cargo fmt cubeshared
+        run: |
+          cargo fmt --manifest-path rust/cubeshared/Cargo.toml -- --check
+      - name: Cargo build cubeshared
+        run: |
+          cargo build --manifest-path rust/cubeshared/Cargo.toml -j 4
+      - name: Cargo test cubeshared
+        run: |
+          cargo test --manifest-path rust/cubeshared/Cargo.toml -j 1
+      - name: Cargo fmt cubesql
+        run: |
+          cargo fmt --manifest-path rust/cubesql/Cargo.toml -- --check
+      - name: Cargo build cubesql
+        run: |
+          cargo build --manifest-path rust/cubesql/Cargo.toml -j 4
+      - name: Cargo test cubesql
+        run: |
+          cargo test --manifest-path rust/cubesql/Cargo.toml -j 1
+      - name: Cargo fmt cubesqlplanner
+        run: |
+          cargo fmt --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -- --check
+      - name: Cargo build cubesqlplanner
+        run: |
+          cargo build --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 4
+      - name: Cargo test cubesqlplanner
+        run: |
+          cargo test --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 1
 
   lint:
     runs-on: ubuntu-20.04
