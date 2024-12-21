@@ -8,6 +8,7 @@
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
+[![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20Cube%20Guru-006BFF)](https://gurubase.io/g/cube)
 
 __Cube is the semantic layer for building data applications.__ It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
