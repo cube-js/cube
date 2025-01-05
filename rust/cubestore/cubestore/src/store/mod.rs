@@ -2,6 +2,7 @@ pub mod compaction;
 
 use async_trait::async_trait;
 use datafusion::arrow::compute::{concat_batches, lexsort_to_indices, SortColumn, SortOptions};
+use datafusion::physical_expr::PhysicalSortExpr;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::common::collect as common_collect;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -1319,16 +1320,20 @@ impl ChunkStore {
 
                 let batch = RecordBatch::try_new(schema.clone(), data)?;
 
-                let input = Arc::new(MemoryExec::try_new(&[vec![batch]], schema.clone(), None)?);
+                let memory_exec = MemoryExec::try_new(&[vec![batch]], schema.clone(), None)?;
 
                 let key_size = index.get_row().sort_key_size() as usize;
                 let mut groups = Vec::with_capacity(key_size);
+                let mut lex_ordering = Vec::<PhysicalSortExpr>::with_capacity(key_size);
                 for i in 0..key_size {
                     let f = schema.field(i);
                     let col: Arc<dyn PhysicalExpr> =
                         Arc::new(FusionColumn::new(f.name().as_str(), i));
-                    groups.push((col, f.name().clone()));
+                    groups.push((col.clone(), f.name().clone()));
+                    lex_ordering.push(PhysicalSortExpr::new(col, SortOptions::default()));
                 }
+
+                let input = Arc::new(memory_exec.with_sort_information(vec![lex_ordering]));
 
                 let aggregates = table
                     .get_row()
@@ -1337,15 +1342,8 @@ impl ChunkStore {
                     .map(|aggr_col| aggr_col.aggregate_expr(&schema))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                // TODO upgrade DF
-                // let output_sort_order = (0..index.get_row().sort_key_size())
-                //     .map(|x| x as usize)
-                //     .collect();
-
-                // TODO upgrade DF:  this is probably correct, but find out if we now need to supply some filter_expr from some loose end.
                 let filter_expr: Vec<Option<Arc<dyn PhysicalExpr>>> = vec![None; aggregates.len()];
 
-                // TODO merge sort
                 let aggregate = Arc::new(AggregateExec::try_new(
                     AggregateMode::Single,
                     PhysicalGroupBy::new_single(groups),
@@ -1354,6 +1352,11 @@ impl ChunkStore {
                     input,
                     schema.clone(),
                 )?);
+
+                assert!(aggregate
+                    .properties()
+                    .output_ordering()
+                    .is_some_and(|ordering| ordering.len() == key_size));
 
                 let batches = collect(aggregate, Arc::new(TaskContext::default())).await?;
                 if batches.is_empty() {
