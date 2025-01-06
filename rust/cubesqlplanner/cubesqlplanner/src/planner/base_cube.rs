@@ -1,6 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
 use super::{evaluate_with_context, VisitorContext};
+use crate::cube_bridge::cube_definition::CubeDefinition;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -9,6 +10,7 @@ pub struct BaseCube {
     cube_name: String,
     members: HashSet<String>,
     member_evaluator: Rc<MemberSymbol>,
+    definition: Rc<dyn CubeDefinition>,
     query_tools: Rc<QueryTools>,
 }
 impl BaseCube {
@@ -17,6 +19,9 @@ impl BaseCube {
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<MemberSymbol>,
     ) -> Result<Rc<Self>, CubeError> {
+        let definition = query_tools
+            .cube_evaluator()
+            .cube_from_path(cube_name.clone())?;
         let members = query_tools
             .base_tools()
             .all_cube_members(cube_name.clone())?
@@ -27,6 +32,7 @@ impl BaseCube {
             cube_name,
             members,
             member_evaluator,
+            definition,
             query_tools,
         }))
     }
@@ -50,7 +56,15 @@ impl BaseCube {
     }
 
     pub fn default_alias(&self) -> String {
-        self.query_tools.alias_name(&self.cube_name)
+        if let Some(alias) = self.sql_alias() {
+            alias.clone()
+        } else {
+            self.query_tools.alias_name(&self.cube_name)
+        }
+    }
+
+    pub fn sql_alias(&self) -> &Option<String> {
+        &self.definition.static_data().sql_alias
     }
 
     pub fn default_alias_with_prefix(&self, prefix: &Option<String>) -> String {
