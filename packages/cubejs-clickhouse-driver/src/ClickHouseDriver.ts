@@ -173,7 +173,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       },
     };
 
-    const maxPoolSize = config.maxPoolSize ?? getEnv("dbMaxPoolSize", { dataSource }) ?? 8;
+    const maxPoolSize = config.maxPoolSize ?? getEnv('dbMaxPoolSize', { dataSource }) ?? 8;
 
     this.client = this.createClient(maxPoolSize);
   }
