@@ -1594,11 +1594,11 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .exec_query(
             "INSERT INTO s.strings(t, pat) \
              VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT'),\
-             ('some_underscore', '%some\\\\_underscore%'),\
+             ('some_underscore', '%some\\_underscore%'),\
              ('test [ special 1', '%test [%'),\
              ('test ( special 2', '%test (%'),\
              ('111 test {)?*|+aaa', '%test {)?*|+aaa'),\
-             ('test2 }]\\\\222 ', 'test2 }]\\\\\\\\%'),\
+             ('test2 }]\\222 ', 'test2 }]\\\\%'),\
              ('test2 -[]{}()*+?.,^$|# 2', '%-[]{}()*+?.,^$|#%')\
              ",
 
@@ -1631,7 +1631,7 @@ async fn ilike(service: Box<dyn SqlClient>) {
 
     let r = service
         .exec_query(
-            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', 'some\\\\_underscore', '%') ORDER BY t",
+            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', 'some\\_underscore', '%') ORDER BY t",
         )
         .await
         .unwrap();
