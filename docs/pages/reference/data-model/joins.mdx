@@ -654,6 +654,16 @@ Joins `a → b` and `b → c` will be resolved automatically. Cube uses the
 [Dijkstra algorithm][wiki-djikstra-alg] to find a join path between cubes given
 requested members.
 
+In case there are multiple join paths that can be used to join the same set of cubes, Cube will collect cube names from members in the following order:
+
+1. Measures
+2. Dimensions
+3. Segments
+4. Time dimensions
+
+Cube makes join trees as predictable and stable as possible, but this isn't guaranteed in case multiple join paths exist.
+Please use views to address join predictability and stability.
+
 [ref-restapi-query-filter-op-set]:
   /product/apis-integrations/rest-api/query-format#set
 [ref-schema-fundamentals-join-dir]:
