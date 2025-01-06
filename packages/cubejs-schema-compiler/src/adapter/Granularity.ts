@@ -13,6 +13,8 @@ export class Granularity {
 
   public readonly granularityInterval: string;
 
+  public readonly queryTimezone: string;
+
   public readonly granularityOffset: string | undefined;
 
   public readonly origin: moment.Moment;
@@ -25,6 +27,7 @@ export class Granularity {
   ) {
     this.granularity = timeDimension.granularity;
     this.predefinedGranularity = isPredefinedGranularity(this.granularity);
+    this.queryTimezone = query.timezone;
     this.origin = moment.tz(query.timezone).startOf('year'); // Defaults to current year start
 
     if (this.predefinedGranularity) {
@@ -59,7 +62,7 @@ export class Granularity {
    * @returns origin date string in Query timezone
    */
   public originLocalFormatted(): string {
-    return this.origin.format('YYYY-MM-DDTHH:mm:ss.SSS');
+    return this.origin.tz(this.queryTimezone).format('YYYY-MM-DDTHH:mm:ss.SSS');
   }
 
   /**
