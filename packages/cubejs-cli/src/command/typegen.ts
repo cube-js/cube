@@ -66,7 +66,12 @@ const generateQueryTypes = async (apiUrl, { token }) => {
   try {
     const response = await fetch(
       `${apiUrl}/meta`,
-      { headers: { authorization: token } }
+      { 
+        headers: { 
+           authorization: token,
+           'Content-type': 'application/json',
+         }
+       }
     );
     meta = await response.json();
   } catch (e: any) {
