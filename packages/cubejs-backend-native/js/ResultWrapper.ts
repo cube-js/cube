@@ -10,7 +10,11 @@ export interface DataResult {
   getFinalResult(): Promise<any>;
 }
 
-export class ResultWrapper implements DataResult {
+class BaseWrapper {
+    public readonly isWrapper: boolean = true;
+}
+
+export class ResultWrapper extends BaseWrapper implements DataResult {
   private readonly proxy: any;
 
   private cache: any;
@@ -24,6 +28,8 @@ export class ResultWrapper implements DataResult {
   private rootResultObject: any = {};
 
   public constructor(private readonly nativeReference: any, private readonly jsResult: any = null) {
+    super();
+
     if (nativeReference) {
       this.isNative = true;
     }
@@ -128,8 +134,9 @@ export class ResultWrapper implements DataResult {
   }
 }
 
-export class ResultMultiWrapper implements DataResult {
+export class ResultMultiWrapper extends BaseWrapper implements DataResult {
   public constructor(private readonly results: ResultWrapper[], private rootResultObject: any) {
+    super();
   }
 
   public async getFinalResult(): Promise<any> {
@@ -153,8 +160,9 @@ export class ResultMultiWrapper implements DataResult {
   }
 }
 
-export class ResultArrayWrapper implements DataResult {
+export class ResultArrayWrapper extends BaseWrapper implements DataResult {
   public constructor(private readonly results: ResultWrapper[]) {
+    super();
   }
 
   public async getFinalResult(): Promise<any> {
