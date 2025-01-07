@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
-import { CubeStoreResultWrapper } from './CubeStoreResultWrapper';
+import { ResultWrapper } from './ResultWrapper';
 
-export * from './CubeStoreResultWrapper';
+export * from './ResultWrapper';
 
 export interface BaseMeta {
   // postgres or mysql
@@ -363,14 +363,14 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
 
 export type ResultRow = Record<string, string>;
 
-export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<CubeStoreResultWrapper> => {
+export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
   const native = loadNative();
 
   const msg = await native.parseCubestoreResultMessage(message);
-  return new CubeStoreResultWrapper(msg);
+  return new ResultWrapper(msg);
 };
 
-export const getCubestoreResult = (ref: CubeStoreResultWrapper): ResultRow[] => {
+export const getCubestoreResult = (ref: ResultWrapper): ResultRow[] => {
   const native = loadNative();
 
   return native.getCubestoreResult(ref);

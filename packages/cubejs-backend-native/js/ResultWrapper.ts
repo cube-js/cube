@@ -1,6 +1,6 @@
 import { getCubestoreResult, ResultRow } from './index';
 
-export class CubeStoreResultWrapper {
+export class ResultWrapper {
   private readonly proxy: any;
 
   private cache: any;
