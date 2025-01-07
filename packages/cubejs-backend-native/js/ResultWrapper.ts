@@ -7,7 +7,13 @@ export class ResultWrapper {
 
   public cached: Boolean = false;
 
+  private readonly isNative: Boolean = false;
+
   public constructor(private readonly nativeReference: any) {
+    if (nativeReference) {
+      this.isNative = true;
+    }
+
     this.proxy = new Proxy(this, {
       get: (target, prop: string | symbol) => {
         // intercept indexes
@@ -18,7 +24,7 @@ export class ResultWrapper {
 
         // intercept isNative
         if (prop === 'isNative') {
-          return true;
+          return this.isNative;
         }
 
         // intercept array props and methods
