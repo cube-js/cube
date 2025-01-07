@@ -1,6 +1,16 @@
-import { getCubestoreResult, ResultRow } from './index';
+import {
+  getCubestoreResult,
+  getFinalQueryResult,
+  getFinalQueryResultArray,
+  getFinalQueryResultMulti,
+  ResultRow
+} from './index';
 
-export class ResultWrapper {
+export interface DataResult {
+  getFinalResult(): Promise<any>;
+}
+
+export class ResultWrapper implements DataResult {
   private readonly proxy: any;
 
   private cache: any;
@@ -111,5 +121,53 @@ export class ResultWrapper {
 
   public getRootResultObject(): any {
     return this.rootResultObject;
+  }
+
+  public async getFinalResult(): Promise<any> {
+    return getFinalQueryResult(this.transformData, this.getRawData(), this.rootResultObject);
+  }
+}
+
+export class ResultMultiWrapper implements DataResult {
+  public constructor(private readonly results: ResultWrapper[], private rootResultObject: any) {
+  }
+
+  public async getFinalResult(): Promise<any> {
+    const [transformDataJson, rawDataRef, cleanResultList] = this.results.reduce<[Object[], any[], Object[]]>(
+      ([transformList, rawList, resultList], r) => {
+        transformList.push(r.getTransformData());
+        rawList.push(r.getRawData());
+        resultList.push(r.getRootResultObject());
+        return [transformList, rawList, resultList];
+      },
+      [[], [], []]
+    );
+
+    const responseDataObj = {
+      queryType: this.rootResultObject.queryType,
+      results: cleanResultList,
+      slowQuery: this.rootResultObject.slowQuery,
+    };
+
+    return getFinalQueryResultMulti(transformDataJson, rawDataRef, responseDataObj);
+  }
+}
+
+export class ResultArrayWrapper implements DataResult {
+  public constructor(private readonly results: ResultWrapper[]) {
+  }
+
+  public async getFinalResult(): Promise<any> {
+    const [transformDataJson, rawData, resultDataJson] = this.results.reduce<[Object[], any[], Object[]]>(
+      ([transformList, rawList, resultList], r) => {
+        transformList.push(r.getTransformData());
+        rawList.push(r.getRawData());
+        resultList.push(r.getRootResultObject());
+        return [transformList, rawList, resultList];
+      },
+      [[], [], []]
+    );
+
+    return getFinalQueryResultArray(transformDataJson, rawData, resultDataJson);
   }
 }

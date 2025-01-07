@@ -11,9 +11,8 @@ import {
   QueryAlias,
 } from '@cubejs-backend/shared';
 import {
-  getFinalQueryResult,
-  getFinalQueryResultArray,
-  getFinalQueryResultMulti,
+  ResultArrayWrapper,
+  ResultMultiWrapper,
   ResultWrapper,
 } from '@cubejs-backend/native';
 import type {
@@ -1834,29 +1833,12 @@ class ApiGateway {
 
       if (props.queryType === 'multi') {
         // We prepare the final json result on native side
-        const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[Object[], any[], Object[]]>(
-          ([transformList, rawList, resultList], r) => {
-            transformList.push(r.getTransformData());
-            rawList.push(r.getRawData());
-            resultList.push(r.getRootResultObject());
-            return [transformList, rawList, resultList];
-          },
-          [[], [], []]
-        );
-
-        const responseDataObj = {
-          queryType,
-          results: cleanResultList,
-          slowQuery
-        };
-
-        res(await getFinalQueryResultMulti(transformDataJson, rawDataRef, responseDataObj));
+        const resultMulti = new ResultMultiWrapper(results, { queryType, slowQuery });
+        res(await resultMulti.getFinalResult());
       } else {
         // We prepare the full final json result on native side
         const r = results[0];
-        res(await getFinalQueryResult(
-          r.getTransformData(), r.getRawData(), r.getRootResultObject()
-        ));
+        res(await r.getFinalResult());
       }
     } catch (e: any) {
       this.handleError({
@@ -1990,17 +1972,8 @@ class ApiGateway {
           res(results[0]);
         } else {
           // We prepare the final json result on native side
-          const [transformDataJson, rawData, resultDataJson] = (results as ResultWrapper[]).reduce<[Object[], any[], Object[]]>(
-            ([transformList, rawList, resultList], r) => {
-              transformList.push(r.getTransformData());
-              rawList.push(r.getRawData());
-              resultList.push(r.getRootResultObject());
-              return [transformList, rawList, resultList];
-            },
-            [[], [], []]
-          );
-
-          res(await getFinalQueryResultArray(transformDataJson, rawData, resultDataJson));
+          const resultArray = new ResultArrayWrapper(results);
+          res(await resultArray.getFinalResult());
         }
       }
     } catch (e: any) {
