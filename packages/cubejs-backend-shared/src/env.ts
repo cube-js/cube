@@ -9,7 +9,7 @@ export class InvalidConfiguration extends Error {
   }
 }
 
-export function convertTimeStrToMs(
+export function convertTimeStrToSeconds(
   input: string,
   envName: string,
   description: string = 'Must be a number in seconds or duration string (1s, 1m, 1h).',
@@ -126,7 +126,7 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
     return false;
   }
 
-  return convertTimeStrToMs(
+  return convertTimeStrToSeconds(
     input,
     envName,
     'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
@@ -510,7 +510,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => {
     const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
     const value = process.env[key] || '5s';
-    return convertTimeStrToMs(value, key);
+    return convertTimeStrToSeconds(value, key);
   },
 
   /**
@@ -525,14 +525,14 @@ const variables: Record<string, (...args: any) => any> = {
     const key = keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource);
     const value = process.env[key];
     if (value) {
-      return convertTimeStrToMs(value, key);
+      return convertTimeStrToSeconds(value, key);
     } else {
       return null;
     }
   },
 
   /**
-   * Query timeout. Currently used in BigQuery, Dremio, Postgres, Snowflake
+   * Query timeout. Currently used in BigQuery, ClickHouse, Dremio, Postgres, Snowflake
    * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *
@@ -546,7 +546,7 @@ const variables: Record<string, (...args: any) => any> = {
   } = {}) => {
     const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
     const value = process.env[key] || '10m';
-    return convertTimeStrToMs(value, key);
+    return convertTimeStrToSeconds(value, key);
   },
 
   /**
@@ -1613,6 +1613,23 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbExtensions: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const extensions = process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_EXTENSIONS', dataSource)
+    ];
+    if (extensions) {
+      return extensions.split(',').map(e => e.trim());
+    }
+    return [];
+  },
+  /** ***************************************************************
+   * Presto Driver                                                  *
+   **************************************************************** */
+
   /**
    * Presto catalog.
    */
@@ -1623,6 +1640,40 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
+    ]
+  ),
+
+  /** ***************************************************************
+   * Pinot Driver                                                  *
+   **************************************************************** */
+
+  /**
+   * Pinot / Startree Auth Token
+   */
+  pinotAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PINOT_AUTH_TOKEN', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Dremio Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Dremio Auth Token
+   */
+  dremioAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DREMIO_AUTH_TOKEN', dataSource)
     ]
   ),
 

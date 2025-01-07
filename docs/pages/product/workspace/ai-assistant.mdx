@@ -58,6 +58,54 @@ The query will automatically run in the sidebar and can be opened in the [Playgr
 
 <Screenshot src="https://ucarecdn.com/4249ff1e-fae1-42c8-ad3a-b9e406ea2022/Screenshot20240624at34327PM.png" />
 
+## Advanced Usage
+
+<InfoBox>
+    The advanced features discussed here are available on Cube version 1.1.7 and above.
+</InfoBox>
+
+### Custom prompts
+
+You can prompt the AI Assistant with custom instructions. For example, you may want it to always
+respond in a particular language, or to refer to itself by a name matching your brand.
+Custom prompts also allow you to give the model more context on your company and data model,
+for example if it should usually prefer a particular view.
+
+To use a custom prompt, set the `CUBE_CLOUD_AI_ASSISTANT_PROMPT` environment variable in your deployment.
+
+<InfoBox>
+  Custom prompts add to, rather than overwrite, the AI Assistant's existing prompting.
+</InfoBox>
+
+### Meta tags
+
+The AI Assistant can read [meta tags](/reference/data-model/view#meta) on your dimensions, measures, 
+segments, and views.
+
+Use the `ai` meta tag to give context that is specific to AI and goes beyond what is 
+included in the description. This can have any keys that you want. For example, you can use it
+to give the AI context on possible values in a categorical dimension:
+```yaml
+      - name: status
+        sql: status
+        type: string
+        meta:
+          ai:
+            values:
+              - shipped
+              - processing
+              - completed
+```
+
+### Value search
+
+Value Search can be enabled for AI Assistant in the same way as for the AI API. See the 
+[AI API's documentation][ref-ai-api-value-search] for details and instructions.
+
+### Other LLM providers
+
+See the [AI API's documentation][ref-ai-api-providers] for information on how to "bring your own" LLM. 
+
 ## FAQ and limitations
 
 ### 1. What language model(s) does the AI Assistant use?
@@ -83,3 +131,5 @@ The query will automatically run in the sidebar and can be opened in the [Playgr
 [ref-catalog]: /product/workspace/semantic-catalog
 [ref-playground]: /product/workspace/playground
 [ref-catalog-downstream]: /product/workspace/semantic-catalog#connecting-downstream-tools
+[ref-ai-api-providers]: /product/apis-integrations/ai-api#other-llm-providers
+[ref-ai-api-value-search]: /product/apis-integrations/ai-api#value-search

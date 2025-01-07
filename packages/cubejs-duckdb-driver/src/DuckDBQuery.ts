@@ -35,11 +35,11 @@ export class DuckDBQuery extends BaseQuery {
    */
   public dateBin(interval: string, source: string, origin: string): string {
     const timeUnit = this.diffTimeUnitForInterval(interval);
-    const beginOfTime = this.timeStampCast('\'1970-01-01 00:00:00.000\'');
+    const beginOfTime = this.dateTimeCast('\'1970-01-01 00:00:00.000\'');
 
-    return `${this.timeStampCast(`'${origin}'`)}' + INTERVAL '${interval}' *
+    return `${this.dateTimeCast(`'${origin}'`)}' + INTERVAL '${interval}' *
       floor(
-        date_diff('${timeUnit}', ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+        date_diff('${timeUnit}', ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
         date_diff('${timeUnit}', ${beginOfTime}, ${beginOfTime} + INTERVAL '${interval}')
       )::int`;
   }

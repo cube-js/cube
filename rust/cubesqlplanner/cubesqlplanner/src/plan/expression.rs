@@ -1,26 +1,70 @@
+use super::QualifiedColumnName;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 #[derive(Clone)]
+pub struct MemberExpression {
+    pub member: Rc<dyn BaseMember>,
+}
+
+impl MemberExpression {
+    pub fn new(member: Rc<dyn BaseMember>) -> Self {
+        Self { member }
+    }
+
+    pub fn to_sql(
+        &self,
+        _templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
+        self.member.to_sql(context)
+    }
+}
+
+#[derive(Clone)]
+pub struct FunctionExpression {
+    pub function: String,
+    pub arguments: Vec<Expr>,
+}
+
+#[derive(Clone)]
 pub enum Expr {
-    Field(Rc<dyn BaseMember>),
-    Reference(Option<String>, String),
-    Asterix,
+    Member(MemberExpression),
+    Reference(QualifiedColumnName),
+    Function(FunctionExpression),
 }
 
 impl Expr {
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn new_member(member: Rc<dyn BaseMember>) -> Self {
+        Self::Member(MemberExpression::new(member))
+    }
+    pub fn new_reference(source: Option<String>, reference: String) -> Self {
+        Self::Reference(QualifiedColumnName::new(source, reference))
+    }
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
         match self {
-            Expr::Field(field) => field.to_sql(context),
-            Expr::Reference(cube_alias, field_alias) => {
-                if let Some(cube_alias) = cube_alias {
-                    Ok(format!("{}.{}", cube_alias, field_alias))
-                } else {
-                    Ok(field_alias.clone())
-                }
+            Self::Member(member) => member.to_sql(templates, context),
+            Self::Reference(reference) => {
+                templates.column_reference(reference.source(), &reference.name())
             }
-            Expr::Asterix => Ok("*".to_string()),
+            Expr::Function(FunctionExpression {
+                function,
+                arguments,
+            }) => templates.scalar_function(
+                function.to_string(),
+                arguments
+                    .iter()
+                    .map(|e| e.to_sql(&templates, context.clone()))
+                    .collect::<Result<Vec<_>, _>>()?,
+                None,
+                None,
+            ),
         }
     }
 }

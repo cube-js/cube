@@ -6020,7 +6020,7 @@ Array [
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: metabase count cast to float32 from push down: metabase_count_cast_to_float32_from_push_down 1`] = `
 Array [
   Object {
-    "a0": null,
+    "a0": 41,
   },
 ]
 `;
@@ -6052,9 +6052,195 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: reuse params: reuse_params 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: reuse params: reuse_params 1`] = `
+Array [
+  Object {
+    "c0": 2020-01-01T00:00:00.000Z,
+    "m0": 17372,
+  },
+]
+`;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: ungrouped pre-agg: ungrouped_pre_agg 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: ungrouped pre-agg: ungrouped_pre_agg 1`] = `
+Array [
+  Object {
+    "productName": "Canon PC1080F Personal Copier",
+    "totalSales": 2399.96,
+  },
+  Object {
+    "productName": "Logitech di_Novo Edge Keyboard",
+    "totalSales": 2249.91,
+  },
+  Object {
+    "productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "totalSales": 2154.9,
+  },
+  Object {
+    "productName": "Google Nexus 5",
+    "totalSales": 1979.89,
+  },
+  Object {
+    "productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "totalSales": 1292.94,
+  },
+  Object {
+    "productName": "Canon PC1080F Personal Copier",
+    "totalSales": 1199.98,
+  },
+  Object {
+    "productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "totalSales": 899.982,
+  },
+  Object {
+    "productName": "Okidata C610n Printer",
+    "totalSales": 649,
+  },
+  Object {
+    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "totalSales": 600,
+  },
+  Object {
+    "productName": "Google Nexus 6",
+    "totalSales": 539.97,
+  },
+  Object {
+    "productName": "Google Nexus 7",
+    "totalSales": 539.97,
+  },
+  Object {
+    "productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "totalSales": 498.26,
+  },
+  Object {
+    "productName": "DMI Eclipse Executive Suite Bookcases",
+    "totalSales": 400.784,
+  },
+  Object {
+    "productName": "HTC One",
+    "totalSales": 239.976,
+  },
+  Object {
+    "productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "totalSales": 232.88,
+  },
+  Object {
+    "productName": "Balt Solid Wood Rectangular Table",
+    "totalSales": 210.98,
+  },
+  Object {
+    "productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "totalSales": 180.96,
+  },
+  Object {
+    "productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "totalSales": 179.9,
+  },
+  Object {
+    "productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "totalSales": 128.124,
+  },
+  Object {
+    "productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "totalSales": 113.888,
+  },
+  Object {
+    "productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "totalSales": 86.352,
+  },
+  Object {
+    "productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "totalSales": 71.6,
+  },
+  Object {
+    "productName": "Linden 10 Round Wall Clock, Black",
+    "totalSales": 48.896,
+  },
+  Object {
+    "productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "totalSales": 45.92,
+  },
+  Object {
+    "productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "totalSales": 45.92,
+  },
+  Object {
+    "productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "totalSales": 44.75,
+  },
+  Object {
+    "productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "totalSales": 44.75,
+  },
+  Object {
+    "productName": "Recycled Eldon Regeneration Jumbo File",
+    "totalSales": 39.296,
+  },
+  Object {
+    "productName": "Linden 10 Round Wall Clock, Black",
+    "totalSales": 36.672,
+  },
+  Object {
+    "productName": "Linden 10 Round Wall Clock, Black",
+    "totalSales": 30.56,
+  },
+  Object {
+    "productName": "Linden 10 Round Wall Clock, Black",
+    "totalSales": 30.56,
+  },
+  Object {
+    "productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "totalSales": 24.368,
+  },
+  Object {
+    "productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "totalSales": 23.55,
+  },
+  Object {
+    "productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "totalSales": 18.368,
+  },
+  Object {
+    "productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "totalSales": 14.352,
+  },
+  Object {
+    "productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "totalSales": 14.13,
+  },
+  Object {
+    "productName": "Project Tote Personal File",
+    "totalSales": 14.03,
+  },
+  Object {
+    "productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "totalSales": 11.304,
+  },
+  Object {
+    "productName": "Magna Visual Magnetic Picture Hangers",
+    "totalSales": 9.64,
+  },
+  Object {
+    "productName": "OIC #2 Pencils, Medium Soft",
+    "totalSales": 9.4,
+  },
+  Object {
+    "productName": "Magna Visual Magnetic Picture Hangers",
+    "totalSales": 7.712,
+  },
+  Object {
+    "productName": "OIC #2 Pencils, Medium Soft",
+    "totalSales": 3.76,
+  },
+  Object {
+    "productName": "OIC #2 Pencils, Medium Soft",
+    "totalSales": 3.76,
+  },
+  Object {
+    "productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "totalSales": null,
+  },
+]
+`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure filtering Customers: contains + dimensions, first 1`] = `
 Array [
@@ -8334,7 +8520,7 @@ exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-a
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure pre-aggregations Customers: running total without time dimension 1`] = `
 Array [
   Object {
-    "Customers.runningTotal": null,
+    "Customers.runningTotal": "41",
   },
 ]
 `;
@@ -8355,9 +8541,533 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: partitioned pre-agg 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: partitioned pre-agg 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "BigECommerce.totalQuantity": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.productName": "Canon PC1080F Personal Copier",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "BigECommerce.totalQuantity": "8",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.productName": "Google Nexus 6",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.productName": "Google Nexus 7",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+    "BigECommerce.totalQuantity": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.productName": "HTC One",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "BigECommerce.totalQuantity": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.productName": "Project Tote Personal File",
+    "BigECommerce.totalQuantity": "1",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "BigECommerce.totalQuantity": "7",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "BigECommerce.totalQuantity": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Google Nexus 5",
+    "BigECommerce.totalQuantity": "11",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "BigECommerce.totalQuantity": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Logitech di_Novo Edge Keyboard",
+    "BigECommerce.totalQuantity": "9",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "BigECommerce.totalQuantity": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "BigECommerce.totalQuantity": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "BigECommerce.totalQuantity": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.productName": "Canon PC1080F Personal Copier",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "BigECommerce.totalQuantity": "4",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "BigECommerce.totalQuantity": "5",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.productName": "Okidata C610n Printer",
+    "BigECommerce.totalQuantity": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "BigECommerce.totalQuantity": "5",
+  },
+]
+`;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: partitioned pre-agg with multi time dimension 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: partitioned pre-agg with multi time dimension 1`] = `
+Array [
+  Object {
+    "BigECommerce.completedDate": "2020-01-02T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-01-02T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-01-24T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-01-24T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-01-23T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-01-23T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-02-17T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-02-17T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-02-16T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-02-16T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-03-18T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-03-18T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-03-17T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-03-17T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-03-27T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-03-27T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-03-26T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-03-26T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-04-11T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-04-11T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-04-10T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-04-10T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-05-14T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-05-14T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-05-13T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-05-13T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-05-15T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-05-15T00:00:00.000",
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-05-14T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-05-14T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-05-28T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-05-28T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-05-27T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-05-27T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-05-30T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-05-30T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-05-29T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-05-29T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-06-04T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-06-04T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-06-03T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-06-03T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-06-11T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-06-11T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-06-10T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-06-10T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-06-12T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-06-12T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-06-11T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-06-11T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-06-16T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-06-16T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-06-15T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-06-15T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-06-18T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-06-18T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-06-17T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-06-17T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-06-26T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-06-26T00:00:00.000",
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-06-25T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-06-25T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-09-02T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-09-02T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-09-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-09-03T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-09-03T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-09-02T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-09-02T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-09-09T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-09-09T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-09-08T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-09-08T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-09-18T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-09-18T00:00:00.000",
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-09-17T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-09-17T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-09-24T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-09-24T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-09-23T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-09-23T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-10-13T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-10-13T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-10-12T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-10-12T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-10-20T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-10-20T00:00:00.000",
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-10-19T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-01T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-10-30T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-10-30T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-03T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-03T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-11-02T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-02T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-06T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-06T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-11-05T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-05T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-07T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-07T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-11-06T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-06T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-12T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-12T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-11-11T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-11T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-13T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-13T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-11-12T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-12T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-17T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-17T00:00:00.000",
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-16T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-22T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-22T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-11-21T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-21T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-11-29T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-11-29T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-11-28T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-11-28T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-12-02T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-12-02T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-12-01T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-12-03T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-12-03T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-12-02T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-12-02T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-12-05T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-12-05T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-12-04T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-12-04T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-12-15T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-12-15T00:00:00.000",
+    "BigECommerce.count": "2",
+    "BigECommerce.orderDate": "2020-12-14T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-12-14T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-12-25T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-12-25T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-12-24T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-12-24T00:00:00.000",
+  },
+  Object {
+    "BigECommerce.completedDate": "2020-12-26T00:00:00.000",
+    "BigECommerce.completedDate.day": "2020-12-26T00:00:00.000",
+    "BigECommerce.count": "1",
+    "BigECommerce.orderDate": "2020-12-25T00:00:00.000",
+    "BigECommerce.orderDate.day": "2020-12-25T00:00:00.000",
+  },
+]
+`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: rolling count_distinct_approx window by 2 day 1`] = `
 Array [
@@ -11991,9 +12701,435 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying ECommerce: partitioned pre-agg 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying ECommerce: partitioned pre-agg 1`] = `
+Array [
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "ECommerce.totalQuantity": "8",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+    "ECommerce.totalQuantity": "1",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.totalQuantity": "6",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+    "ECommerce.totalQuantity": "1",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.totalQuantity": "7",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
+    "ECommerce.totalQuantity": "9",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.totalQuantity": "5",
+  },
+]
+`;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying ECommerce: partitioned pre-agg higher granularity 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying ECommerce: partitioned pre-agg higher granularity 1`] = `
+Array [
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "ECommerce.totalQuantity": "7",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+    "ECommerce.totalQuantity": "1",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "ECommerce.totalQuantity": "8",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "ECommerce.totalQuantity": "8",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "ECommerce.totalQuantity": "6",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "14",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
+    "ECommerce.totalQuantity": "9",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.totalQuantity": "9",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.totalQuantity": "8",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+    "ECommerce.totalQuantity": "1",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "ECommerce.totalQuantity": "3",
+  },
+]
+`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying Products: dimensions + order + limit + total 1`] = `
 Array [
@@ -12395,9 +13531,228 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+    "ECommerce.totalQuantity": "1",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+    "ECommerce.totalQuantity": "8",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+    "ECommerce.totalQuantity": "1",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+    "ECommerce.totalQuantity": "8",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.totalQuantity": "11",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+    "ECommerce.totalQuantity": "3",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+    "ECommerce.totalQuantity": "6",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.totalQuantity": "7",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
+    "ECommerce.totalQuantity": "9",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.totalQuantity": "5",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+    "ECommerce.totalQuantity": "2",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.totalQuantity": "8",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.totalQuantity": "4",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+    "ECommerce.totalQuantity": "9",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+    "ECommerce.totalQuantity": "3",
+  },
+]
+`;
 
-exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-01-01T00:00:00.000",
+    "ECommerce.totalQuantity": "6",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2020-07-01T00:00:00.000",
+    "ECommerce.totalQuantity": "51",
+  },
+  Object {
+    "ECommerce.orderDate": "2021-01-01T00:00:00.000",
+    "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
+    "ECommerce.totalQuantity": "103",
+  },
+]
+`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities ECommerce: count by half_year + dimension 1`] = `
 Array [

@@ -34,6 +34,8 @@ pub trait Configurator: Send + Sync + 'static {
             dyn Callable<Request = Self::ServicesRequest, Response = Self::ServicesResponse>,
         >,
     ) -> Result<Self::Config, CubeError>;
+
+    fn teardown();
 }
 
 #[async_trait]

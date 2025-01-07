@@ -1356,7 +1356,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIME2) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
+          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
           [
             '__TO_PARTITION_RANGE',
           ],
@@ -1596,7 +1596,7 @@ describe('SQL Generation', () => {
               sql: 'product_id',
               type: 'avg',
               filters: [
-                { sql: `{FILTER_PARAMS.Order.category.filter('category')}` }
+                { sql: '{FILTER_PARAMS.Order.category.filter(\'category\')}' }
               ]
             }
           ],
@@ -1613,7 +1613,7 @@ describe('SQL Generation', () => {
             },
             {
               name: 'proxied',
-              sql: `{FILTER_PARAMS.Order.type.filter("x => type = 'online'")}`,
+              sql: '{FILTER_PARAMS.Order.type.filter("x => type = \'online\'")}',
               type: 'boolean',
             }
           ]
@@ -1782,6 +1782,84 @@ describe('SQL Generation', () => {
       });
       const cubeSQL = query.cubeSql('Order');
       expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
+    });
+
+    it('equals NULL filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'equals',
+                values: [null],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NULL)))');
+    });
+
+    it('notSet(IS NULL) filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'notSet',
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NULL)))');
+    });
+
+    it('notEquals NULL filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'notEquals',
+                values: [null],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NOT NULL)))');
+    });
+
+    it('set(IS NOT NULL) filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'set',
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NOT NULL)))');
     });
 
     it('propagate filter params from view into cube\'s query', async () => {

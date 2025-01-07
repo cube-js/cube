@@ -539,6 +539,69 @@ LEFT JOIN contacts "contacts"
   ON "users".contact_id = "contacts".id
 ```
 
+### `{cube.sql()}` function
+
+When defining a cube, you can reference the `sql` parameter of another cube,
+effectively reusing the SQL query it's defined on. This is particularly useful
+when defining [polymorphic cubes][ref-polymorphism] or using [data blending][ref-data-blending].
+
+Consider the following data model:
+
+```javascript
+cube(`organisms`, {
+  sql_table: `organisms`
+})
+
+cube(`animals`, {
+  sql: `
+    SELECT *
+    FROM ${organisms.sql()}
+    WHERE kingdom = 'animals'
+  `
+})
+
+cube(`dogs`, {
+  sql: `
+    SELECT *
+    FROM ${animals.sql()}
+    WHERE species = 'dogs' 
+  `,
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+If you query for `dogs.count`, Cube will generate the following SQL:
+
+```sql
+SELECT count(*) "dogs__count"
+FROM (
+  SELECT *
+  FROM (
+    SELECT *
+    FROM organisms
+    WHERE kingdom = 'animals'
+  )
+  WHERE species = 'dogs'
+) AS "dogs"
+```
+
+<ReferenceBox>
+
+Currently, `{cube.sql()}` function is only supported in JavaScript data models.
+It is not supported in YAML data models.
+Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+
+As a workaround, you can use JavaScript data models, put a SQL query in a
+[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
+the [template context](/reference/python/cube#templatecontext-class).
+
+</ReferenceBox>
+
 ### Non-SQL references
 
 Outside [SQL expressions][self-sql-expressions], `column` is not recognized
@@ -629,3 +692,5 @@ defining dynamic data models.
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
 [ref-custom-granularities]: /reference/data-model/dimensions#granularities
 [ref-style-guide]: /guides/style-guide
+[ref-polymorphism]: /product/data-modeling/concepts/polymorphic-cubes
+[ref-data-blending]: /product/data-modeling/concepts/data-blending

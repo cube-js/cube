@@ -13,40 +13,49 @@ import {
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
 } from './smoke-tests';
 
+const PG_PORT = 5656;
+let connectionId = 0;
+
+const DEFAULT_API_TOKEN = sign({
+  auth: {
+    username: 'nobody',
+    userAttributes: {},
+    roles: [],
+  },
+}, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
+  expiresIn: '2 days'
+});
+
+async function createPostgresClient(user: string, password: string) {
+  connectionId++;
+  const currentConnId = connectionId;
+
+  console.debug(`[pg] new connection ${currentConnId}`);
+
+  const conn = new PgClient({
+    database: 'db',
+    port: PG_PORT,
+    host: '127.0.0.1',
+    user,
+    password,
+    ssl: false,
+  });
+  conn.on('error', (err) => {
+    console.log(err);
+  });
+  conn.on('end', () => {
+    console.debug(`[pg] end ${currentConnId}`);
+  });
+
+  await conn.connect();
+
+  return conn;
+}
+
 describe('Cube RBAC Engine', () => {
   jest.setTimeout(60 * 5 * 1000);
-
-  let birdbox: BirdBox;
   let db: StartedTestContainer;
-
-  const pgPort = 5656;
-  let connectionId = 0;
-
-  async function createPostgresClient(user: string, password: string) {
-    connectionId++;
-    const currentConnId = connectionId;
-
-    console.debug(`[pg] new connection ${currentConnId}`);
-
-    const conn = new PgClient({
-      database: 'db',
-      port: pgPort,
-      host: '127.0.0.1',
-      user,
-      password,
-      ssl: false,
-    });
-    conn.on('error', (err) => {
-      console.log(err);
-    });
-    conn.on('end', () => {
-      console.debug(`[pg] end ${currentConnId}`);
-    });
-
-    await conn.connect();
-
-    return conn;
-  }
+  let birdbox: BirdBox;
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
@@ -55,8 +64,8 @@ describe('Cube RBAC Engine', () => {
       'postgres',
       {
         ...DEFAULT_CONFIG,
-        //
-        CUBESQL_LOG_LEVEL: 'trace',
+        CUBEJS_DEV_MODE: 'false',
+        NODE_ENV: 'production',
         //
         CUBEJS_DB_TYPE: 'postgres',
         CUBEJS_DB_HOST: db.getHost(),
@@ -65,9 +74,7 @@ describe('Cube RBAC Engine', () => {
         CUBEJS_DB_USER: 'test',
         CUBEJS_DB_PASS: 'test',
         //
-        CUBEJS_PG_SQL_PORT: `${pgPort}`,
-        CUBESQL_SQL_PUSH_DOWN: 'true',
-        CUBESQL_STREAM_MODE: 'true',
+        CUBEJS_PG_SQL_PORT: `${PG_PORT}`,
       },
       {
         schemaDir: 'rbac/model',
@@ -99,7 +106,6 @@ describe('Cube RBAC Engine', () => {
       expect(res.rows).toMatchSnapshot('line_items');
     });
 
-    // ???
     test('SELECT * from line_items_view_no_policy', async () => {
       const res = await connection.query('SELECT * FROM line_items_view_no_policy limit 10');
       // This should query the line_items cube through the view that should
@@ -148,6 +154,44 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  describe('RBAC via SQL API manager', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('manager', 'manager_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT * from line_items', async () => {
+      const res = await connection.query('SELECT * FROM line_items limit 10');
+      // This query should return rows allowed by the default policy
+      // because the manager security context has a wrong city and should not match
+      // two conditions defined on the manager policy
+      expect(res.rows).toMatchSnapshot('line_items_manager');
+    });
+  });
+
+  describe('RBAC via SQL API default policy', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('default', 'default_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT with member expressions', async () => {
+      const res = await connection.query('SELECT COUNT(city) as count from "users" HAVING (COUNT(1) > 0)');
+      // Pushed SQL queries should not fail
+      expect(res.rows).toMatchSnapshot('users_member_expression');
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;
@@ -167,16 +211,6 @@ describe('Cube RBAC Engine', () => {
       expiresIn: '2 days'
     });
 
-    const DEFAULT_API_TOKEN = sign({
-      auth: {
-        username: 'nobody',
-        userAttributes: {},
-        roles: [],
-      },
-    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
-      expiresIn: '2 days'
-    });
-
     beforeAll(async () => {
       client = cubejs(async () => ADMIN_API_TOKEN, {
         apiUrl: birdbox.configuration.apiUrl,
@@ -186,12 +220,12 @@ describe('Cube RBAC Engine', () => {
       });
     });
 
-    test('line_items hidden created_at', async () => {
+    test('line_items hidden price_dim', async () => {
       let query: Query = {
         measures: ['line_items.count'],
-        dimensions: ['line_items.created_at'],
+        dimensions: ['line_items.price_dim'],
         order: {
-          'line_items.created_at': 'asc',
+          'line_items.price_dim': 'asc',
         },
       };
       let error = '';
@@ -203,9 +237,9 @@ describe('Cube RBAC Engine', () => {
       expect(error).toContain('You requested hidden member');
       query = {
         measures: ['line_items_view_no_policy.count'],
-        dimensions: ['line_items_view_no_policy.created_at'],
+        dimensions: ['line_items_view_no_policy.price_dim'],
         order: {
-          'line_items_view_no_policy.created_at': 'asc',
+          'line_items_view_no_policy.price_dim': 'asc',
         },
         limit: 10,
       };
@@ -245,5 +279,174 @@ describe('Cube RBAC Engine', () => {
       // order_open should return all values since it has no access policy
       expect(result.rawData()).toMatchSnapshot('orders_open_rest');
     });
+  });
+});
+
+describe('Cube RBAC Engine [dev mode]', () => {
+  jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
+  let birdbox: BirdBox;
+  let client: CubeApi;
+
+  const pgPort = 5656;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    await PostgresDBRunner.loadEcom(db);
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DEV_MODE: 'true',
+        NODE_ENV: 'dev',
+        //
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        //
+        CUBEJS_PG_SQL_PORT: `${pgPort}`,
+      },
+      {
+        schemaDir: 'rbac/model',
+        cubejsConfig: 'rbac/cube.js',
+      }
+    );
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
+      apiUrl: birdbox.configuration.apiUrl,
+    });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  test('line_items hidden created_at', async () => {
+    const meta = await client.meta();
+    const dimensions = meta.meta.cubes.find(c => c.name === 'orders')?.dimensions;
+    expect(dimensions?.length).toBe(2);
+    for (const dim of dimensions || []) {
+      expect(dim.isVisible).toBe(false);
+      expect(dim.public).toBe(false);
+    }
+  });
+
+  test('products with no matching policy', async () => {
+    const result = await client.load({
+      measures: ['products.count'],
+    });
+
+    // Querying a cube with no matching access policy should return no data
+    expect(result.rawData()).toMatchSnapshot('products_no_policy');
+  });
+});
+
+describe('Cube RBAC Engine [Python config]', () => {
+  jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
+  let birdbox: BirdBox;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    await PostgresDBRunner.loadEcom(db);
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DEV_MODE: 'false',
+        NODE_ENV: 'production',
+        //
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        //
+        CUBEJS_PG_SQL_PORT: `${PG_PORT}`,
+      },
+      {
+        schemaDir: 'rbac-python/model',
+        cubejsConfig: 'rbac-python/cube.py',
+      }
+    );
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  describe('RBAC via SQL API [python config]', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('admin', 'admin_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('SELECT * from users', async () => {
+      const res = await connection.query('SELECT COUNT(city) as count from "users" HAVING (COUNT(1) > 0)');
+      // const res = await connection.query('SELECT * FROM users limit 10');
+      // This query should return all rows because of the `allow_all` statement
+      // It should also exclude the `created_at` dimension as per memberLevel policy
+      expect(res.rows).toMatchSnapshot('users_python');
+    });
+  });
+});
+
+describe('Cube RBAC Engine [Python config][dev mode]', () => {
+  jest.setTimeout(60 * 5 * 1000);
+  let db: StartedTestContainer;
+  let birdbox: BirdBox;
+  let client: CubeApi;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    await PostgresDBRunner.loadEcom(db);
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DEV_MODE: 'true',
+        NODE_ENV: 'dev',
+        //
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        //
+        CUBEJS_PG_SQL_PORT: `${PG_PORT}`,
+      },
+      {
+        schemaDir: 'rbac-python/model',
+        cubejsConfig: 'rbac-python/cube.py',
+      }
+    );
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
+      apiUrl: birdbox.configuration.apiUrl,
+    });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  test('products with no matching policy', async () => {
+    const result = await client.load({
+      measures: ['products.count'],
+    });
+
+    // Querying a cube with no matching access policy should return no data
+    expect(result.rawData()).toMatchSnapshot('products_no_policy_python');
   });
 });

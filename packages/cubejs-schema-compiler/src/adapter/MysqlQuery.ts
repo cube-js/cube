@@ -72,10 +72,10 @@ export class MysqlQuery extends BaseQuery {
 
     return `TIMESTAMPADD(${timeUnit},
         FLOOR(
-          TIMESTAMPDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          TIMESTAMPDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
           TIMESTAMPDIFF(${timeUnit}, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${intervalFormatted})
         ) * TIMESTAMPDIFF(${timeUnit}, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${intervalFormatted}),
-        ${this.timeStampCast(`'${origin}'`)}
+        ${this.dateTimeCast(`'${origin}'`)}
     )`;
   }
 

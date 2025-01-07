@@ -1,51 +1,69 @@
-use crate::planner::sql_evaluator::{
-    EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor,
-};
+use crate::planner::sql_evaluator::{MemberSymbol, TraversalVisitor};
+use crate::planner::BaseMeasure;
 use cubenativeutils::CubeError;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct JoinHintsCollector {
-    hints: HashSet<String>,
+    hints: Vec<String>,
 }
 
 impl JoinHintsCollector {
     pub fn new() -> Self {
-        Self {
-            hints: HashSet::new(),
-        }
+        Self { hints: Vec::new() }
     }
 
     pub fn extract_result(self) -> Vec<String> {
-        self.hints.into_iter().collect()
+        self.hints
     }
 }
 
 impl TraversalVisitor for JoinHintsCollector {
-    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
-        let res = match node.symbol() {
-            MemberSymbolType::Dimension(e) => {
+    type State = ();
+    fn on_node_traverse(
+        &mut self,
+        node: &Rc<MemberSymbol>,
+        _: &Self::State,
+    ) -> Result<Option<Self::State>, CubeError> {
+        match node.as_ref() {
+            MemberSymbol::Dimension(e) => {
                 if e.owned_by_cube() {
-                    self.hints.insert(e.cube_name().clone());
+                    self.hints.push(e.cube_name().clone());
                 }
-                true
+                for name in e.get_dependent_cubes().into_iter() {
+                    self.hints.push(name);
+                }
             }
-            MemberSymbolType::Measure(e) => {
+            MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
-                    self.hints.insert(e.cube_name().clone());
+                    self.hints.push(e.cube_name().clone());
                 }
-                true
+                for name in e.get_dependent_cubes().into_iter() {
+                    self.hints.push(name);
+                }
             }
-            MemberSymbolType::CubeName(e) => {
-                self.hints.insert(e.cube_name().clone());
-                true
+            MemberSymbol::CubeName(e) => {
+                self.hints.push(e.cube_name().clone());
             }
-            MemberSymbolType::CubeTable(e) => {
-                self.hints.insert(e.cube_name().clone());
-                true
+            MemberSymbol::CubeTable(e) => {
+                self.hints.push(e.cube_name().clone());
             }
-            _ => false,
         };
-        Ok(res)
+        Ok(Some(()))
     }
+}
+
+pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<Vec<String>, CubeError> {
+    let mut visitor = JoinHintsCollector::new();
+    visitor.apply(node, &())?;
+    Ok(visitor.extract_result())
+}
+
+pub fn collect_join_hints_for_measures(
+    measures: &Vec<Rc<BaseMeasure>>,
+) -> Result<Vec<String>, CubeError> {
+    let mut visitor = JoinHintsCollector::new();
+    for meas in measures.iter() {
+        visitor.apply(&meas.member_evaluator(), &())?;
+    }
+    Ok(visitor.extract_result())
 }

@@ -1,541 +1,70 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Cube RBAC Engine RBAC through SQL API SELECT * from line_items: line_items 1`] = `
+exports[`Cube RBAC Engine [Python config] RBAC via SQL API [python config] SELECT * from users: users_python 1`] = `
 Array [
   Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 267,
-    "price_dim": 267,
-    "quantity": 2,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 263,
-    "price_dim": 263,
-    "quantity": 7,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 180,
-    "price_dim": 180,
-    "quantity": 8,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 169,
-    "price_dim": 169,
-    "quantity": 6,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 156,
-    "price_dim": 156,
-    "quantity": 1,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 36,
-    "price_dim": 36,
-    "quantity": 5,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 245,
-    "price_dim": 245,
-    "quantity": 4,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 232,
-    "price_dim": 232,
-    "quantity": 8,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 63,
-    "price_dim": 63,
-    "quantity": 8,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "price": 68,
-    "price_dim": 68,
-    "quantity": 6,
+    "count": "551",
   },
 ]
 `;
 
-exports[`Cube RBAC Engine RBAC through SQL API SELECT * from line_items_view_joined_orders: orders_view 1`] = `
+exports[`Cube RBAC Engine [Python config][dev mode] products with no matching policy: products_no_policy_python 1`] = `
 Array [
   Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-10-23T07:54:39.000Z,
-    "id": 1,
-    "orders_count": "1",
-    "orders_created_at": 2018-10-23T07:54:39.000Z,
-    "orders_id": 1,
-    "price": 267,
-    "price_dim": 267,
-    "quantity": 2,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-12-16T08:09:36.000Z,
-    "id": 10,
-    "orders_count": "1",
-    "orders_created_at": 2019-12-16T08:09:36.000Z,
-    "orders_id": 10,
-    "price": 68,
-    "price_dim": 68,
-    "quantity": 6,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-04-22T15:52:17.000Z,
-    "id": 11,
-    "orders_count": "1",
-    "orders_created_at": 2019-04-22T15:52:17.000Z,
-    "orders_id": 11,
-    "price": 170,
-    "price_dim": 170,
-    "quantity": 1,
+    "products.count": "0",
   },
 ]
 `;
 
-exports[`Cube RBAC Engine RBAC through SQL API SELECT * from line_items_view_no_policy: line_items_view_no_policy 1`] = `
+exports[`Cube RBAC Engine [dev mode] products with no matching policy: products_no_policy 1`] = `
 Array [
   Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-10-23T07:54:39.000Z,
-    "id": 1,
-    "price": 267,
-    "price_dim": 267,
-    "quantity": 2,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-01-01T13:50:20.000Z,
-    "id": 2,
-    "price": 263,
-    "price_dim": 263,
-    "quantity": 7,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-05-13T21:23:08.000Z,
-    "id": 3,
-    "price": 180,
-    "price_dim": 180,
-    "quantity": 8,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-04-10T22:51:15.000Z,
-    "id": 4,
-    "price": 169,
-    "price_dim": 169,
-    "quantity": 6,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-07-16T15:00:34.000Z,
-    "id": 5,
-    "price": 156,
-    "price_dim": 156,
-    "quantity": 1,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-05-23T04:25:27.000Z,
-    "id": 6,
-    "price": 36,
-    "price_dim": 36,
-    "quantity": 5,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-09-29T20:29:30.000Z,
-    "id": 7,
-    "price": 245,
-    "price_dim": 245,
-    "quantity": 4,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-04-17T03:32:54.000Z,
-    "id": 8,
-    "price": 232,
-    "price_dim": 232,
-    "quantity": 8,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-11-15T18:22:17.000Z,
-    "id": 9,
-    "price": 63,
-    "price_dim": 63,
-    "quantity": 8,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-12-16T08:09:36.000Z,
-    "id": 10,
-    "price": 68,
-    "price_dim": 68,
-    "quantity": 6,
+    "products.count": "0",
   },
 ]
 `;
 
-exports[`Cube RBAC Engine RBAC through SQL API SELECT * from line_items_view_price_gt_200: line_items_view_price_gt_200 1`] = `
+exports[`Cube RBAC Engine RBAC via REST API line_items hidden price_dim: line_items_view_no_policy_rest 1`] = `
 Array [
   Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-10-23T07:54:39.000Z,
-    "id": 1,
-    "price": 267,
-    "price_dim": 267,
-    "quantity": 2,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-01-01T13:50:20.000Z,
-    "id": 2,
-    "price": 263,
-    "price_dim": 263,
-    "quantity": 7,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-09-29T20:29:30.000Z,
-    "id": 7,
-    "price": 245,
-    "price_dim": 245,
-    "quantity": 4,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-04-17T03:32:54.000Z,
-    "id": 8,
-    "price": 232,
-    "price_dim": 232,
-    "quantity": 8,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-12-04T06:39:17.000Z,
-    "id": 12,
-    "price": 266,
-    "price_dim": 266,
-    "quantity": 9,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-01-28T20:03:53.000Z,
-    "id": 13,
-    "price": 286,
-    "price_dim": 286,
-    "quantity": 6,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-08-04T21:41:23.000Z,
-    "id": 15,
-    "price": 237,
-    "price_dim": 237,
-    "quantity": 6,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-01-14T05:31:34.000Z,
-    "id": 25,
-    "price": 262,
-    "price_dim": 262,
-    "quantity": 1,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2016-01-01T23:00:21.000Z,
-    "id": 29,
-    "price": 241,
-    "price_dim": 241,
-    "quantity": 7,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-07-05T18:07:39.000Z,
-    "id": 34,
-    "price": 249,
-    "price_dim": 249,
-    "quantity": 8,
-  },
-]
-`;
-
-exports[`Cube RBAC Engine RBAC through SQL API SELECT * from orders: orders_open 1`] = `
-Array [
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-01-01T13:50:20.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-05-13T21:23:08.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-04-10T22:51:15.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-07-16T15:00:34.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-09-29T20:29:30.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-04-17T03:32:54.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-11-15T18:22:17.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-12-16T08:09:36.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-04-22T15:52:17.000Z,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2017-12-04T06:39:17.000Z,
-  },
-]
-`;
-
-exports[`Cube RBAC Engine RBAC through SQL API SELECT * from orders_view: orders_view 1`] = `
-Array [
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-12-16T08:09:36.000Z,
-    "id": 10,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2019-04-22T15:52:17.000Z,
-    "id": 11,
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "count": "1",
-    "created_at": 2018-10-23T07:54:39.000Z,
-    "id": 1,
-  },
-]
-`;
-
-exports[`Cube RBAC Engine RBAC through SQL API SELECT * from users: users 1`] = `
-Array [
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-  Object {
-    "__cubeJoinField": null,
-    "__user": null,
-    "city": "Austin",
-    "count": "1",
-  },
-]
-`;
-
-exports[`Cube RBAC Engine RBAC via REST API line_items hidden created_at: line_items_view_no_policy_rest 1`] = `
-Array [
-  Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-01-01T23:00:21.000",
+    "line_items_view_no_policy.count": "3",
+    "line_items_view_no_policy.price_dim": 33,
   },
   Object {
     "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-02-27T06:09:59.000",
+    "line_items_view_no_policy.price_dim": 34,
   },
   Object {
     "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-02-27T11:38:04.000",
+    "line_items_view_no_policy.price_dim": 35,
   },
   Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-03-06T17:41:43.000",
+    "line_items_view_no_policy.count": "7",
+    "line_items_view_no_policy.price_dim": 36,
   },
   Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-03-07T19:41:43.000",
+    "line_items_view_no_policy.count": "3",
+    "line_items_view_no_policy.price_dim": 37,
   },
   Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-03-13T22:34:22.000",
+    "line_items_view_no_policy.count": "3",
+    "line_items_view_no_policy.price_dim": 38,
   },
   Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-03-21T21:13:47.000",
+    "line_items_view_no_policy.count": "2",
+    "line_items_view_no_policy.price_dim": 39,
   },
   Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-05-01T07:26:55.000",
+    "line_items_view_no_policy.count": "3",
+    "line_items_view_no_policy.price_dim": 40,
   },
   Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-05-13T07:03:15.000",
+    "line_items_view_no_policy.count": "5",
+    "line_items_view_no_policy.price_dim": 41,
   },
   Object {
-    "line_items_view_no_policy.count": "1",
-    "line_items_view_no_policy.created_at": "2016-05-15T22:44:26.000",
+    "line_items_view_no_policy.count": "2",
+    "line_items_view_no_policy.price_dim": 42,
   },
 ]
 `;
@@ -593,80 +122,80 @@ Array [
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2018-10-23T07:54:39.000Z,
     "price": 267,
-    "price_dim": 267,
     "quantity": 2,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2018-01-01T13:50:20.000Z,
     "price": 263,
-    "price_dim": 263,
     "quantity": 7,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2017-05-13T21:23:08.000Z,
     "price": 180,
-    "price_dim": 180,
     "quantity": 8,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2018-04-10T22:51:15.000Z,
     "price": 169,
-    "price_dim": 169,
     "quantity": 6,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2017-07-16T15:00:34.000Z,
     "price": 156,
-    "price_dim": 156,
     "quantity": 1,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2019-05-23T04:25:27.000Z,
     "price": 36,
-    "price_dim": 36,
     "quantity": 5,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2018-09-29T20:29:30.000Z,
     "price": 245,
-    "price_dim": 245,
     "quantity": 4,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2019-04-17T03:32:54.000Z,
     "price": 232,
-    "price_dim": 232,
     "quantity": 8,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2019-11-15T18:22:17.000Z,
     "price": 63,
-    "price_dim": 63,
     "quantity": 8,
   },
   Object {
     "__cubeJoinField": null,
     "__user": null,
     "count": "1",
+    "created_at": 2019-12-16T08:09:36.000Z,
     "price": 68,
-    "price_dim": 68,
     "quantity": 6,
   },
 ]
@@ -1081,3 +610,13 @@ Array [
   },
 ]
 `;
+
+exports[`Cube RBAC Engine RBAC via SQL API default policy SELECT with member expressions: users_member_expression 1`] = `
+Array [
+  Object {
+    "count": "149",
+  },
+]
+`;
+
+exports[`Cube RBAC Engine RBAC via SQL API manager SELECT * from line_items: line_items_manager 1`] = `Array []`;

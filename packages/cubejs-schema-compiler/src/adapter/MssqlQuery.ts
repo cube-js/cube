@@ -71,7 +71,7 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public timeStampCast(value: string) {
-    return this.dateTimeCast(value);
+    return `CAST(${value} AS DATETIMEOFFSET)`;
   }
 
   public dateTimeCast(value: string) {
@@ -88,16 +88,16 @@ export class MssqlQuery extends BaseQuery {
    * The formula operates with seconds diffs so it won't produce human-expected dates aligned with offset date parts.
    */
   public dateBin(interval: string, source: string, origin: string): string {
-    const beginOfTime = this.timeStampCast('DATEFROMPARTS(1970, 1, 1)');
+    const beginOfTime = this.dateTimeCast('DATEFROMPARTS(1970, 1, 1)');
     const timeUnit = this.diffTimeUnitForInterval(interval);
 
     // Need to explicitly cast one argument of floor to float to trigger correct sign logic
     return `DATEADD(${timeUnit},
         FLOOR(
-          CAST(DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) AS FLOAT) /
+          CAST(DATEDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) AS FLOAT) /
           DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})
         ) * DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)}),
-        ${this.timeStampCast(`'${origin}'`)}
+        ${this.dateTimeCast(`'${origin}'`)}
     )`;
   }
 

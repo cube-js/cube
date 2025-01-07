@@ -55,7 +55,10 @@ cube('line_items', {
           // This is to test dynamic values based on security context
           values: [`${security_context.auth?.userAttributes?.minDefaultId || 20000}`],
         }]
-      }
+      },
+      memberLevel: {
+        excludes: ['count', 'price', 'price_dim'],
+      },
     },
     {
       role: 'admin',
@@ -66,6 +69,24 @@ cube('line_items', {
       ],
       rowLevel: {
         // The "allowAll" flag should negate the default `id` filter
+        allowAll: true,
+      },
+      memberLevel: {
+        excludes: ['price_dim'],
+      },
+    },
+    {
+      role: 'manager',
+      conditions: [
+        {
+          if: security_context.auth?.userAttributes?.region === 'CA',
+        },
+        {
+          // This condition should not match the one defined in the "manager" mock context
+          if: security_context.auth?.userAttributes?.region === 'San Francisco',
+        },
+      ],
+      rowLevel: {
         allowAll: true,
       },
       memberLevel: {

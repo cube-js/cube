@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { v4 as uuidv4 } from 'uuid';
 import { NativeInstance } from '@cubejs-backend/native';
@@ -205,14 +204,14 @@ export class CompilerApi {
         if (typeof b !== 'boolean') {
           throw new Error(`Access policy condition must return boolean, got ${JSON.stringify(b)}`);
         }
-        return a || b;
+        return a && b;
       });
     }
     return true;
   }
 
-  async getCubesFromQuery(query) {
-    const sql = await this.getSql(query, { requestId: query.requestId });
+  async getCubesFromQuery(query, context) {
+    const sql = await this.getSql(query, { requestId: context.requestId });
     return new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
   }
 
@@ -244,7 +243,6 @@ export class CompilerApi {
     const result = {
     };
     if (filter.memberReference) {
-      // TODO(maxim): will it work with different data types?
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
         filter.values,
@@ -273,15 +271,15 @@ export class CompilerApi {
    * - combining all filters for different roles with OR
    * - combining cube and view filters with AND
   */
-  async applyRowLevelSecurity(query, context) {
-    const compilers = await this.getCompilers({ requestId: query.requestId });
+  async applyRowLevelSecurity(query, evaluatedQuery, context) {
+    const compilers = await this.getCompilers({ requestId: context.requestId });
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
-      return query;
+      return { query, denied: false };
     }
 
-    const queryCubes = await this.getCubesFromQuery(query);
+    const queryCubes = await this.getCubesFromQuery(evaluatedQuery, context);
 
     // We collect Cube and View filters separately because they have to be
     // applied in "two layers": first Cube filters, then View filters on top
@@ -324,7 +322,7 @@ export class CompilerApi {
             name: 'rlsAccessDenied',
           });
           // If we hit this condition there's no need to evaluate the rest of the policy
-          break;
+          return { query, denied: true };
         }
       }
     }
@@ -336,7 +334,7 @@ export class CompilerApi {
     );
     query.filters = query.filters || [];
     query.filters.push(rlsFilter);
-    return query;
+    return { query, denied: false };
   }
 
   buildFinalRlsFilter(cubeFiltersPerCubePerRole, viewFiltersPerCubePerRole, hasAllowAllForCube) {
@@ -439,17 +437,18 @@ export class CompilerApi {
         const applicablePolicies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
 
         const computeMemberVisibility = (item) => {
-          let isIncluded = false;
-          let isExplicitlyExcluded = false;
           for (const policy of applicablePolicies) {
             if (policy.memberLevel) {
-              isIncluded = policy.memberLevel.includesMembers.includes(item.name) || isIncluded;
-              isExplicitlyExcluded = policy.memberLevel.excludesMembers.includes(item.name) || isExplicitlyExcluded;
+              if (policy.memberLevel.includesMembers.includes(item.name) &&
+               !policy.memberLevel.excludesMembers.includes(item.name)) {
+                return true;
+              }
             } else {
-              isIncluded = true;
+              // If there's no memberLevel policy, we assume that all members are visible
+              return true;
             }
           }
-          return isIncluded && !isExplicitlyExcluded;
+          return false;
         };
 
         for (const dimension of cube.config.dimensions) {
@@ -463,6 +462,10 @@ export class CompilerApi {
         for (const segment of cube.config.segments) {
           isMemberVisibleInContext[segment.name] = computeMemberVisibility(segment);
         }
+
+        for (const hierarchy of cube.config.hierarchies) {
+          isMemberVisibleInContext[hierarchy.name] = computeMemberVisibility(hierarchy);
+        }
       }
     }
 
@@ -473,7 +476,8 @@ export class CompilerApi {
       }
       return (item) => ({
         ...item,
-        isVisible: item.isVisible && isMemberVisibleInContext[item.name]
+        isVisible: item.isVisible && isMemberVisibleInContext[item.name],
+        public: item.public && isMemberVisibleInContext[item.name]
       });
     };
 
@@ -484,6 +488,7 @@ export class CompilerApi {
           measures: cube.config.measures?.map(visibilityPatcherForCube(cube)),
           dimensions: cube.config.dimensions?.map(visibilityPatcherForCube(cube)),
           segments: cube.config.segments?.map(visibilityPatcherForCube(cube)),
+          hierarchies: cube.config.hierarchies?.map(visibilityPatcherForCube(cube)),
         },
       }));
   }

@@ -157,6 +157,9 @@ crate::plan_to_language! {
             location: String,
             has_header: bool,
         },
+        Values {
+            values: Vec<Vec<Expr>>,
+        },
         Extension {
             node: Arc<LogicalPlan>,
         },
@@ -2101,7 +2104,7 @@ fn cube_scan(
     ungrouped: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {} {}))",
+        "(CubeScan {} {} {} {} {} {} {} {} {} {})",
         alias_to_cube,
         members,
         filters,
