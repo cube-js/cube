@@ -453,7 +453,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
       await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
-      if (this.ignoreCase) {
+      
+      // We only want to ignore the case if someone sets the value to false explicitly since the default assumption
+      // is that casing matters
+      if (!this.ignoreCase) {
         await this.execute(connection, 'ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = FALSE', [], false);
       }
       return connection;
