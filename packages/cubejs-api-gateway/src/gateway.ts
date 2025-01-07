@@ -1834,11 +1834,10 @@ class ApiGateway {
       if (props.queryType === 'multi') {
         // We prepare the final json result on native side
         const resultMulti = new ResultMultiWrapper(results, { queryType, slowQuery });
-        res(await resultMulti.getFinalResult());
+        res(resultMulti);
       } else {
         // We prepare the full final json result on native side
-        const r = results[0];
-        res(await r.getFinalResult());
+        res(results[0]);
       }
     } catch (e: any) {
       this.handleError({
@@ -1973,7 +1972,7 @@ class ApiGateway {
         } else {
           // We prepare the final json result on native side
           const resultArray = new ResultArrayWrapper(results);
-          res(await resultArray.getFinalResult());
+          res(resultArray);
         }
       }
     } catch (e: any) {
@@ -2021,7 +2020,7 @@ class ApiGateway {
         query,
         context,
         res: (message, opts) => {
-          if (!Array.isArray(message) && message.error) {
+          if (!Array.isArray(message) && 'error' in message && message.error) {
             error = { message, opts };
           } else {
             result = { message, opts };
@@ -2045,14 +2044,14 @@ class ApiGateway {
   }
 
   protected resToResultFn(res: ExpressResponse) {
-    return (message, { status }: { status?: number } = {}) => {
+    return async (message, { status }: { status?: number } = {}) => {
       if (status) {
         res.status(status);
       }
 
-      if (message instanceof ArrayBuffer) {
+      if (message.isWrapper) {
         res.set('Content-Type', 'application/json');
-        res.send(Buffer.from(message));
+        res.send(Buffer.from(await message.getFinalResult()));
       } else {
         res.json(message);
       }

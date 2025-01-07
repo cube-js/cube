@@ -193,12 +193,7 @@ export class SQLServer {
                   return;
                 }
 
-                if (response instanceof ArrayBuffer) {
-                  const json = JSON.parse(new TextDecoder().decode(response));
-                  resolve(json);
-                } else {
-                  resolve(response);
-                }
+                resolve(response);
               },
               apiType: 'sql',
             });

@@ -7,6 +7,7 @@ import {
 } from './index';
 
 export interface DataResult {
+  isWrapper: boolean;
   getFinalResult(): Promise<any>;
 }
 

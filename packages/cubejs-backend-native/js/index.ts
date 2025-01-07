@@ -266,8 +266,11 @@ function wrapNativeFunctionWithStream(
         });
       } else if (response.error) {
         writerOrChannel.reject(errorString(response));
+      } else if (response.isWrapper) { // Native wrapped result
+        const resArBuf = await response.getFinalResult();
+        const resStr = new TextDecoder().decode(resArBuf);
+        writerOrChannel.resolve(resStr);
       } else {
-        // TODO remove JSON.stringify()
         writerOrChannel.resolve(JSON.stringify(response));
       }
     } catch (e: any) {
