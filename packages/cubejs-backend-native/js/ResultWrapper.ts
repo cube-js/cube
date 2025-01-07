@@ -72,7 +72,11 @@ export class ResultWrapper {
 
   private getArray(): ResultRow[] {
     if (!this.cache) {
-      this.cache = getCubestoreResult(this.nativeReference);
+      if (this.isNative) {
+        this.cache = getCubestoreResult(this.nativeReference);
+      } else {
+        this.cache = this.jsResult;
+      }
       this.cached = true;
     }
     return this.cache;
