@@ -456,7 +456,7 @@ class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, systemAsyncHandler(async (req, res) => {
         this.resToResultFn(res)({
-          timezones: this.scheduledRefreshTimeZones || []
+          timezones: this.scheduledRefreshTimeZones ? this.scheduledRefreshTimeZones(req.context) : []
         });
       }));
 
@@ -625,12 +625,13 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const preAggregations = await compilerApi.preAggregations();
 
+      const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
           normalizeQueryPreAggregations(
             {
-              timezones: this.scheduledRefreshTimeZones,
+              timezones: refreshTimezones.length > 0 ? refreshTimezones : undefined,
               preAggregations: preAggregations.map(p => ({
                 id: p.id,
                 cacheOnly,
@@ -652,9 +653,10 @@ class ApiGateway {
   ) {
     const requestStarted = new Date();
     try {
+      const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
       query = normalizeQueryPreAggregations(
         this.parseQueryParam(query),
-        { timezones: this.scheduledRefreshTimeZones }
+        { timezones: refreshTimezones.length > 0 ? refreshTimezones : undefined }
       );
       const orchestratorApi = await this.getAdapterApi(context);
       const compilerApi = await this.getCompilerApi(context);
@@ -1185,7 +1187,8 @@ class ApiGateway {
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => {
-          const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+          const hasExpressionsInQuery =
+            this.hasExpressionsInQuery(currentQuery);
 
           if (hasExpressionsInQuery) {
             if (!memberExpressions) {
@@ -1196,25 +1199,36 @@ class ApiGateway {
           }
 
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
+          let evaluatedQuery = normalizedQuery;
+
+          if (hasExpressionsInQuery) {
+            // We need to parse/eval all member expressions early as applyRowLevelSecurity
+            // needs to access the full SQL query in order to evaluate rules
+            evaluatedQuery =
+              this.evalMemberExpressionsInQuery(normalizedQuery);
+          }
+
           // First apply cube/view level security policies
-          const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
+          const { query: queryWithRlsFilters, denied } = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
+            evaluatedQuery,
             context
           );
           // Then apply user-supplied queryRewrite
-          let rewrittenQuery = await this.queryRewrite(
+          let rewrittenQuery = !denied ? await this.queryRewrite(
             queryWithRlsFilters,
-            context,
-          );
+            context
+          ) : queryWithRlsFilters;
 
-          if (hasExpressionsInQuery) {
+          // applyRowLevelSecurity may add new filters which may contain raw member expressions
+          // if that's the case, we should run an extra pass of parsing here to make sure
+          // nothing breaks down the road
+          if (hasExpressionsInQuery || this.hasExpressionsInQuery(rewrittenQuery)) {
+            rewrittenQuery = this.parseMemberExpressionsInQuery(rewrittenQuery);
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(
-            rewrittenQuery,
-            persistent,
-          );
+          return normalizeQuery(rewrittenQuery, persistent);
         }
       )
     );
@@ -2310,8 +2324,10 @@ class ApiGateway {
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
-    if (typeof req.headers.authorization === 'string') {
-      const parts = req.headers.authorization.split(' ', 2);
+    const authHeader = req.headers?.['x-cube-authorization'] || req.headers?.authorization;
+
+    if (typeof authHeader === 'string') {
+      const parts = authHeader.split(' ', 2);
       if (parts.length === 1) {
         return parts[0];
       }

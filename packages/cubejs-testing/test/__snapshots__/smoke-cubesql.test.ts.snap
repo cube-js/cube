@@ -111,6 +111,17 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) query views with deep joins: query-view-deep-joins 1`] = `
+Array [
+  Object {
+    "Calculation_1055547778125863": 2024-01-01T00:00:00.000Z,
+    "Orders_arpu": null,
+    "Orders_netCollectionCompleted": null,
+    "Orders_refundRate": 0,
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) query with intervals (SQL PUSH DOWN): timestamps 1`] = `
 Array [
   Object {
@@ -217,6 +228,84 @@ Array [
     "c3": 2024-01-10T12:01:50.000Z,
     "c4": 2025-10-05T00:04:19.245Z,
     "timestamp": 2024-01-05T00:00:00.000Z,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) select __user and literal grouped under wrapper: select __user and literal in wrapper 1`] = `
+Array [
+  Object {
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "new",
+    "my_user": null,
+  },
+  Object {
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "processed",
+    "my_user": null,
+  },
+  Object {
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "shipped",
+    "my_user": null,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) select __user and literal grouped: select __user and literal 1`] = `
+Array [
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-01T00:00:00.000Z,
+    "id": 1,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "new",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-02T00:00:00.000Z,
+    "id": 2,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "new",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-03T00:00:00.000Z,
+    "id": 3,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "processed",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-04T00:00:00.000Z,
+    "id": 4,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "processed",
+    "my_user": null,
+  },
+  Object {
+    "Int64(2)": "2",
+    "__cubeJoinField": null,
+    "datetrunc(Utf8(\\"day\\"),Orders.createdAt)": 2024-01-05T00:00:00.000Z,
+    "id": 5,
+    "my_created_at": 2024-01-01T00:00:00.000Z,
+    "my_literal": "1",
+    "my_status": "shipped",
+    "my_user": null,
   },
 ]
 `;

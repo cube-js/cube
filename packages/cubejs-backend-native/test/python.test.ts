@@ -43,9 +43,13 @@ suite('Python Config', () => {
       pgSqlPort: 5555,
       preAggregationsSchema: expect.any(Function),
       checkAuth: expect.any(Function),
+      extendContext: expect.any(Function),
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
+      contextToRoles: expect.any(Function),
+      scheduledRefreshContexts: expect.any(Function),
+      scheduledRefreshTimeZones: expect.any(Function),
     });
 
     if (!config.checkAuth) {
@@ -66,12 +70,77 @@ suite('Python Config', () => {
     });
   });
 
+  test('context_to_roles', async () => {
+    if (!config.contextToRoles) {
+      throw new Error('contextToRoles was not defined in config.py');
+    }
+
+    expect(await config.contextToRoles({})).toEqual(['admin']);
+  });
+
   test('context_to_api_scopes', async () => {
     if (!config.contextToApiScopes) {
       throw new Error('contextToApiScopes was not defined in config.py');
     }
 
     expect(await config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
+  });
+
+  test('scheduled_refresh_time_zones', async () => {
+    if (!config.scheduledRefreshTimeZones) {
+      throw new Error('scheduledRefreshTimeZones was not defined in config.py');
+    }
+
+    expect(await config.scheduledRefreshTimeZones({})).toEqual(['Europe/Kyiv', 'Antarctica/Troll', 'Australia/Sydney']);
+  });
+
+  test('scheduled_refresh_contexts', async () => {
+    if (!config.scheduledRefreshContexts) {
+      throw new Error('scheduledRefreshContexts was not defined in config.py');
+    }
+
+    expect(await config.scheduledRefreshContexts({})).toEqual([
+      {
+        securityContext: {
+          appid: 'test1', u: { prop1: 'value1' }
+        }
+      },
+      {
+        securityContext: {
+          appid: 'test2', u: { prop1: 'value2' }
+        }
+      },
+      {
+        securityContext: {
+          appid: 'test3', u: { prop1: 'value3' }
+        }
+      },
+    ]);
+  });
+
+  test('extend_context', async () => {
+    if (!config.extendContext) {
+      throw new Error('extendContext was not defined in config.py');
+    }
+
+    // Without security context
+    expect(await config.extendContext({})).toEqual({
+      security_context: {
+        error: 'missing',
+      },
+    });
+
+    // With security context
+    expect(await config.extendContext({
+      securityContext: { sub: '1234567890', iat: 1516239022, user_id: 42 }
+    })).toEqual({
+      security_context: {
+        extended_by_config: true,
+        sub: '1234567890',
+        iat: 1516239022,
+        user_id: 42
+      },
+    });
   });
 
   test('repository factory', async () => {
@@ -151,6 +220,9 @@ darwinSuite('Old Python Config', () => {
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
+      contextToRoles: expect.any(Function),
+      scheduledRefreshContexts: expect.any(Function),
+      scheduledRefreshTimeZones: expect.any(Function),
     });
 
     if (!config.checkAuth) {

@@ -145,6 +145,13 @@ Example response:
 }
 ```
 
+<InfoBox>
+
+Note that a generated query can contain placeholders, e.g., `?` or `$1`, for parameters
+that Cube passes to an underlying data source driver later when executing the query.
+
+</InfoBox>
+
 ## `/v1/meta`
 
 Get meta-information for cubes and views defined in the data model. Information about cubes and views with `public: false` will not be returned.
@@ -310,6 +317,15 @@ Example response:
 To retrieve statuses of previously triggered jobs, send a `POST` request with a
 payload including the `tokens` property.
 
+In the `status` property of the payload, you can get the following statuses:
+
+| Status | Description |
+| --- | --- |
+| `scheduled` | The job hasn't run yet |
+| `processing` | The job is currently running |
+| `missing_partition` | The job has failed |
+| `done` | The job has successfully completed |
+
 Example request:
 
 ```bash{outputLines: 2-14}
@@ -318,9 +334,7 @@ curl \
     "action": "get",
     "tokens": [
       "e9a6a0c55885cea5371348500ce7d7dc",
-      "d1329b6c8d152e734fc4dcf7307b1b58",
-      "6f4ea38373663fffc4334a576574845b",
-      "ea903b10634b2f3141b35a2529870e89"
+      "d1329b6c8d152e734fc4dcf7307b1b58"
     ]
   }' \
   -H "Authorization: EXAMPLE-API-TOKEN" \
@@ -349,30 +363,6 @@ Example response:
     "token": "d1329b6c8d152e734fc4dcf7307b1b58",
     "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
     "status": "processing",
-    "selector": {
-      "cubes": ["orders"],
-      "preAggregations": ["orders.category_and_date"],
-      "contexts": [{ "securityContext": { "tenant": "tenant_1" } }],
-      "timezones": ["UTC"],
-      "dataSources": ["default"]
-    }
-  },
-  {
-    "token": "6f4ea38373663fffc4334a576574845b",
-    "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
-    "status": "missing_partition",
-    "selector": {
-      "cubes": ["orders"],
-      "preAggregations": ["orders.category_and_date"],
-      "contexts": [{ "securityContext": { "tenant": "tenant_1" } }],
-      "timezones": ["UTC"],
-      "dataSources": ["default"]
-    }
-  },
-  {
-    "token": "ea903b10634b2f3141b35a2529870e89",
-    "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
-    "status": "missing_partition",
     "selector": {
       "cubes": ["orders"],
       "preAggregations": ["orders.category_and_date"],

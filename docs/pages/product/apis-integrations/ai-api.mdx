@@ -11,13 +11,16 @@ Specifically, you can send the AI API a message (or conversation of messages) an
   your Cube representative to have it enabled for your account.
 </WarningBox>
 
+See [AI API reference][ref-ref-ai-api] for the list of supported API endpoinsts.
+
 ## Configuration
 
 While the AI API is in preview, your Cube account team will enable and configure it for you.
 
 If you wish to enable or disable the AI API on a specific Cube deployment, you may do so by going to "Settings" in the Cube Cloud sidebar, then "Configuration", and then toggling the "AI API" configuration flag switch.
 
-To find your AI API base URL, go to "Settings" in the Cube Cloud sidebar, then "Connections and APIs"
+To find your AI API endpoint in Cube Cloud, go to the <Btn>Overview</Btn> page,
+click <Btn>API credentials</Btn>, and choose the <Btn>AI API</Btn> tab.
 
 ## Getting Started
 
@@ -137,3 +140,124 @@ One way of handling this is to pass the error message back into the AI API; it m
 #### 3. Continue wait
 
 When using `"runQuery": true`, you might sometimes receive a query result containing `{ "error": "Continue wait" }`. If this happens, you should use `/load` ([described above](#2-load)) instead of `runQuery` to run the query, and handle retries as described in the [REST API documentation](/product/apis-integrations/rest-api#continue-wait).
+
+## Advanced Usage
+
+<InfoBox>
+    The advanced features discussed here are available on Cube version 1.1.7 and above.
+</InfoBox>
+
+### Custom prompts
+
+You can prompt the AI API with custom instructions. For example, you may want it to always
+respond in a particular language, or to refer to itself by a name matching your brand.
+Custom prompts also allow you to give the model more context on your company and data model,
+for example if it should usually prefer a particular view.
+
+To use a custom prompt, set the `CUBE_CLOUD_AI_API_PROMPT` environment variable in your deployment.
+
+<InfoBox>
+  Custom prompts add to, rather than overwrite, the AI API's existing prompting, so you
+  do not need to re-write instructions around how to generate the query itself.
+</InfoBox>
+
+### Meta tags
+
+The AI API can read [meta tags](/reference/data-model/view#meta) on your dimensions, measures, 
+segments, and views.
+
+Use the `ai` meta tag to give context that is specific to AI and goes beyond what is 
+included in the description. This can have any keys that you want. For example, you can use it
+to give the AI context on possible values in a categorical dimension:
+```yaml
+      - name: status
+        sql: status
+        type: string
+        meta:
+          ai:
+            values:
+              - shipped
+              - processing
+              - completed
+```
+
+### Value search
+
+By default, the AI API has no ability to see the contents of your data (for privacy reasons).
+However, this makes it difficult for the AI API to generate correct filters for some queries.
+
+Imagine you have a categorical `order_status` dimension with the possible values "shipped",
+"processing", and "completed". Without value search, asking "how many complete orders did
+we have today" might get you a query filtering on `order_status = 'Complete'` instead of
+the correct `order_status = 'completed'`.
+
+To solve this, the AI API can perform "value searches" where it introspects the values in
+selected categorical dimensions before running a query. Value search is opt-in and dimensions
+must be enabled for it individually. Currently, the AI API performs value search by running
+Cube queries using the `contains` filter operator against one or more chosen dimensions.
+The LLM will select dimensions from among those you have based on the question asked and
+generate possible values dynamically.
+
+<InfoBox>
+  When running value search queries, the AI API passes through the security context used
+  for the AI API request, so security is maintained and only dimensions the end user has
+  access to are able to be searched.
+</InfoBox>
+
+To enable value search on a dimension, set the `searchable` field to true under the `ai`
+meta tag, as shown below:
+```yaml
+    - name: order_status
+      sql: order_status
+      type: string
+      meta:
+        ai:
+          searchable: true
+```
+
+Note that enabling Value Search may lead to slightly longer AI API response times when it
+is used but should result in significantly more accurate queries in many situations. Value
+Search can only be used on string dimensions.
+
+### Other LLM providers
+
+<InfoBox>
+  These environment variables also apply to the [AI Assistant](/product/workspace/ai-assistant),
+  if it is enabled on your deployment.
+</InfoBox>
+
+If desired, you may "bring your own" LLM model by providing a model and API credentials
+for a supported model provider. Do this by setting environment variables in your Cube
+deployment. See below for required variables by provider (required unless noted):
+
+#### AWS Bedrock
+
+<WarningBox>
+  The AI API currently supports only Anthropic Claude models on AWS Bedrock. Other
+  models may work but are not fully supported.
+</WarningBox>
+
+- `CUBE_BEDROCK_MODEL_ID` - A supported [AWS Bedrock chat model](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html), for example `anthropic.claude-3-5-sonnet-20241022-v2:0`
+- `CUBE_BEDROCK_ACCESS_KEY` - An access key for an IAM user with `InvokeModelWithResponseStream` permissions on the desired region/model.
+- `CUBE_BEDROCK_ACCESS_SECRET` - The corresponding access secret
+- `CUBE_BEDROCK_REGION_ID` - A supported AWS Bedrock region, for example `us-west-2`
+
+#### GCP Vertex
+
+<WarningBox>
+  The AI API currently supports only Anthropic Claude models on GCP Vertex. Other
+  models may work but are not fully supported.
+</WarningBox>
+
+- `CUBE_VERTEX_MODEL_ID` - A supported GCP Vertex chat model, for example `claude-3-5-sonnet@20240620`
+- `CUBE_VERTEX_PROJECT_ID` - The GCP project the model is deployed in
+- `CUBE_VERTEX_REGION` - The GCP region the model is deployed in, for example `us-east5`
+- `CUBE_VERTEX_CREDENTIALS` - The private key for a service account with permissions to run the chosen model
+
+#### OpenAI
+
+- `OPENAI_MODEL` - An OpenAI chat model ID, for example `gpt-4o`
+- `OPENAI_API_KEY` - An OpenAI API key (we recommend creating a service account for the AI API)
+
+
+[ref-ref-ai-api]: /reference/ai-api

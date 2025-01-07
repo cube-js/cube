@@ -404,6 +404,119 @@ cubes:
 
 </CodeTabs>
 
+## Chasm and fan traps
+
+Cube automatically detects chasm and fan traps based on the `many_to_one` and `one_to_many` relationships defined in join.
+When detected, Cube generates a deduplication query that evaluates all distinct primary keys within the multiplied measure's cube and then joins distinct primary keys to this cube on itself to calculate the aggregation result.
+If there's more than one multiplied measure in a query, then such query is generated for every such multiplied measure, and results are joined.
+Cube solves for chasm and fan traps during query time.
+If there's pre-aggregregation that fits measure multiplication requirements it'd be leveraged to serve such a query.
+Such pre-aggregations and queries are always considered non-additive for the purpose of pre-aggregation matching.
+
+Let's consider an example data model:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+    city: {
+      sql: `city`,
+      type: `string`
+    }
+  },
+
+  joins: {
+    customers: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.customer_id = ${customers.id}`,
+    },
+  },
+});
+
+cube(`customers`, {
+  sql_table: `customers`
+
+  measures: {
+    count: {
+      type: `count`,
+    }
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    }
+  }
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{orders}.customer_id = {customers.id}"
+
+- name: customers
+    sql_table: customers
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: average_age
+        sql: age
+        type: avg
+
+```
+
+</CodeTabs>
+
+If we try to query `customers.average_age` by `orders.city`, the Cube detects that the `average_age` measure in the `customers` cube would be multiplied by `orders` to `customers` and would generate SQL similar to:
+
+```sql
+SELECT
+  "keys"."orders__city",
+  avg("customers_key__customers".age) "customers__average_age"
+FROM
+  (
+    SELECT
+      DISTINCT "customers_key__orders".city "orders__city",
+      "customers_key__customers".id "customers__id"
+    FROM
+      orders AS "customers_key__orders"
+      LEFT JOIN customers AS "customers_key__customers" ON "customers_key__orders".customer_id = "customers_key__customers".id
+  ) AS "keys"
+  LEFT JOIN customers AS "customers_key__customers" ON "keys"."customers__id" = "customers_key__customers".id
+GROUP BY
+  1
+```
+
 ## CUBE reference
 
 When you have several joined cubes, you should accurately use columns’ names to
@@ -540,6 +653,16 @@ Assume that the following query is run:
 Joins `a → b` and `b → c` will be resolved automatically. Cube uses the
 [Dijkstra algorithm][wiki-djikstra-alg] to find a join path between cubes given
 requested members.
+
+In case there are multiple join paths that can be used to join the same set of cubes, Cube will collect cube names from members in the following order:
+
+1. Measures
+2. Dimensions
+3. Segments
+4. Time dimensions
+
+Cube makes join trees as predictable and stable as possible, but this isn't guaranteed in case multiple join paths exist.
+Please use views to address join predictability and stability.
 
 [ref-restapi-query-filter-op-set]:
   /product/apis-integrations/rest-api/query-format#set

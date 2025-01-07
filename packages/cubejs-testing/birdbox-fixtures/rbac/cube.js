@@ -22,6 +22,48 @@ module.exports = {
         },
       };
     }
+    if (user === 'manager') {
+      if (password && password !== 'manager_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'manager',
+            userAttributes: {
+              region: 'CA',
+              city: 'Fresno',
+              canHaveAdmin: false,
+              minDefaultId: 10000,
+            },
+            roles: ['manager'],
+          },
+        },
+      };
+    }
+    if (user === 'default') {
+      if (password && password !== 'default_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'default',
+            userAttributes: {
+              region: 'CA',
+              city: 'San Francisco',
+              canHaveAdmin: false,
+              minDefaultId: 20000,
+            },
+            roles: [],
+          },
+        },
+      };
+    }
     throw new Error(`User "${user}" doesn't exist`);
   }
 };

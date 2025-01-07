@@ -1,10 +1,13 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
-use super::{evaluate_with_context, BaseMember, VisitorContext};
-use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
+use super::sql_evaluator::MemberSymbol;
+use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
+use crate::cube_bridge::measure_definition::{
+    MeasureDefinition, RollingWindow, TimeShiftReference,
+};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -62,84 +65,91 @@ impl MeasureTimeShift {
 pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
-    member_evaluator: Rc<EvaluationNode>,
+    member_evaluator: Rc<MemberSymbol>,
     definition: Rc<dyn MeasureDefinition>,
     time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
+    name: String,
+    default_alias: String,
+}
+
+impl Debug for BaseMeasure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BaseMeasure")
+            .field("measure", &self.measure)
+            .field("time_shifts", &self.time_shifts)
+            .field("default_alias", &self.default_alias)
+            .finish()
+    }
 }
 
 impl BaseMember for BaseMeasure {
     fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        let sql = evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
-        let alias_name = self.alias_name();
-
-        Ok(format!("{} {}", sql, alias_name))
+        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 
     fn alias_name(&self) -> String {
-        self.query_tools
-            .escape_column_name(&self.unescaped_alias_name())
+        self.default_alias.clone()
     }
 
-    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+    fn member_evaluator(&self) -> Rc<MemberSymbol> {
         self.member_evaluator.clone()
     }
 
     fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember> {
         self.clone()
     }
+
+    fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+
+    fn name(&self) -> &String {
+        &self.name
+    }
 }
 
 impl BaseMeasure {
     pub fn try_new(
-        measure: String,
-        query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<EvaluationNode>,
-    ) -> Result<Rc<Self>, CubeError> {
-        let cube_name = query_tools
-            .cube_evaluator()
-            .cube_from_path(measure.clone())?
-            .static_data()
-            .name
-            .clone();
-        let definition = match member_evaluator.symbol() {
-            MemberSymbolType::Measure(m) => Ok(m.definition().clone()),
-            _ => Err(CubeError::internal(format!(
-                "wrong type of member_evaluator for measure: {}",
-                measure
-            ))),
-        }?;
-
-        let time_shifts = Self::parse_time_shifts(&definition)?;
-        Ok(Rc::new(Self {
-            measure,
-            query_tools,
-            definition,
-            member_evaluator,
-            cube_name,
-            time_shifts,
-        }))
-    }
-
-    pub fn try_new_from_precompiled(
-        evaluation_node: Rc<EvaluationNode>,
+        evaluation_node: Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
     ) -> Result<Option<Rc<Self>>, CubeError> {
-        let res = match evaluation_node.symbol() {
-            MemberSymbolType::Measure(s) => {
+        let res = match evaluation_node.as_ref() {
+            MemberSymbol::Measure(s) => {
                 let time_shifts = Self::parse_time_shifts(&s.definition())?;
+                let default_alias = BaseMemberHelper::default_alias(
+                    &s.cube_name(),
+                    &s.name(),
+                    &None,
+                    query_tools.clone(),
+                )?;
                 Some(Rc::new(Self {
                     measure: s.full_name(),
                     query_tools: query_tools.clone(),
                     member_evaluator: evaluation_node.clone(),
                     definition: s.definition().clone(),
                     cube_name: s.cube_name().clone(),
+                    name: s.name().clone(),
                     time_shifts,
+                    default_alias,
                 }))
             }
             _ => None,
         };
         Ok(res)
+    }
+
+    pub fn try_new_required(
+        evaluation_node: Rc<MemberSymbol>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Rc<Self>, CubeError> {
+        if let Some(result) = Self::try_new(evaluation_node, query_tools)? {
+            Ok(result)
+        } else {
+            Err(CubeError::internal(format!(
+                "MeasureSymbol expected as evaluation node for BaseMeasure"
+            )))
+        }
     }
 
     fn parse_time_shifts(
@@ -155,7 +165,7 @@ impl BaseMeasure {
         }
     }
 
-    pub fn member_evaluator(&self) -> &Rc<EvaluationNode> {
+    pub fn member_evaluator(&self) -> &Rc<MemberSymbol> {
         &self.member_evaluator
     }
 
@@ -199,6 +209,22 @@ impl BaseMeasure {
         self.definition.static_data().multi_stage.unwrap_or(false)
     }
 
+    pub fn rolling_window(&self) -> &Option<RollingWindow> {
+        &self.definition.static_data().rolling_window
+    }
+
+    pub fn is_rolling_window(&self) -> bool {
+        self.rolling_window().is_some()
+    }
+
+    pub fn is_running_total(&self) -> bool {
+        self.measure_type() == "runningTotal"
+    }
+
+    pub fn is_cumulative(&self) -> bool {
+        self.is_rolling_window() || self.is_running_total()
+    }
+
     //FIXME dublicate with symbol
     pub fn measure_type(&self) -> &String {
         &self.definition.static_data().measure_type
@@ -206,9 +232,5 @@ impl BaseMeasure {
 
     pub fn is_multi_stage_ungroupped(&self) -> bool {
         self.is_calculated() || self.definition.static_data().measure_type == "rank"
-    }
-
-    fn unescaped_alias_name(&self) -> String {
-        self.query_tools.alias_name(&self.measure)
     }
 }

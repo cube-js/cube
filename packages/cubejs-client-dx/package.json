@@ -37,7 +37,12 @@
     "jest": "^27"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "verbose": true,
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    }
+
   },
   "publishConfig": {
     "access": "public"

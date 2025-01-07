@@ -201,7 +201,7 @@ impl HllInstance {
                 let mut values = Vec::with_capacity(num_hashes);
                 let mut data = Cursor::new(data);
                 let maxval = (1 << reg_width) as u32 - 1;
-                while !data.is_empty() {
+                while data.position() < data.get_ref().len() as u64 {
                     let hash = data.read_u64::<BigEndian>().unwrap();
                     let ind = hash & mask;
                     let val = hash >> log_num_buckets;

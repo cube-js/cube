@@ -80,6 +80,7 @@ export class CubeToMetaTransformer {
               ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
               : false,
             primaryKey: !!nameToDimension[1].primaryKey,
+            aliasMember: nameToDimension[1].aliasMember,
             granularities:
               nameToDimension[1].granularities
                 ? R.compose(R.map((g) => ({
@@ -105,7 +106,15 @@ export class CubeToMetaTransformer {
           })),
           R.toPairs
         )(cube.segments || {}),
-        hierarchies: cube.hierarchies || []
+        hierarchies: (cube.hierarchies || []).map((it) => ({
+          ...it,
+          public: it.public ?? true,
+          name: `${cube.name}.${it.name}`,
+        })),
+        folders: (cube.folders || []).map((it) => ({
+          name: it.name,
+          members: it.includes.map(member => `${cube.name}.${member.name}`),
+        })),
       },
     };
   }

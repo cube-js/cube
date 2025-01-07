@@ -47,7 +47,7 @@ checked for additivity.
 - **Does every member of the query exist in the pre-aggregation?** Cube checks
 that the pre-aggregation contains all dimensions, filter dimensions, and leaf
 measures from the query.
-- **Are any query measures multiplied in the cube's data schema?** Cube checks
+- **Are any query measures multiplied in the cube's data model?** Cube checks
 if any measures are multiplied via a [`one_to_many`
 relationship][ref-schema-joins-rel] between cubes in the query.
 - **Does the query specify granularity for its time dimension?** Cube checks

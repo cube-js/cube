@@ -60,6 +60,7 @@ pub struct BaseQueryOptionsStatic {
     #[serde(rename = "rowLimit")]
     pub row_limit: Option<String>,
     pub offset: Option<String>,
+    pub ungrouped: Option<bool>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

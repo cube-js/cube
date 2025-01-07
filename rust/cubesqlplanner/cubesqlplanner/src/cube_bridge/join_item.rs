@@ -11,7 +11,7 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct JoinItemStatic {
     pub from: String,
     pub to: String,

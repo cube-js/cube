@@ -25,7 +25,7 @@ export class Granularity {
   ) {
     this.granularity = timeDimension.granularity;
     this.predefinedGranularity = isPredefinedGranularity(this.granularity);
-    this.origin = moment.tz('UTC').startOf('year'); // Defaults to current year start
+    this.origin = moment.tz(query.timezone).startOf('year'); // Defaults to current year start
 
     if (this.predefinedGranularity) {
       this.granularityInterval = `1 ${this.granularity}`;
@@ -43,7 +43,7 @@ export class Granularity {
       this.granularityInterval = customGranularity.interval;
 
       if (customGranularity.origin) {
-        this.origin = moment.tz(customGranularity.origin, 'UTC');
+        this.origin = moment.tz(customGranularity.origin, query.timezone);
       } else if (customGranularity.offset) {
         this.granularityOffset = customGranularity.offset;
         this.origin = addInterval(this.origin, parseSqlInterval(customGranularity.offset));
@@ -55,8 +55,18 @@ export class Granularity {
     return this.predefinedGranularity;
   }
 
-  public originFormatted(): string {
+  /**
+   * @returns origin date string in Query timezone
+   */
+  public originLocalFormatted(): string {
     return this.origin.format('YYYY-MM-DDTHH:mm:ss.SSS');
+  }
+
+  /**
+   * @returns origin date string in UTC timezone
+   */
+  public originUtcFormatted(): string {
+    return this.origin.clone().utc().format('YYYY-MM-DDTHH:mm:ss.SSSZ');
   }
 
   public minGranularity(): string {
@@ -86,7 +96,10 @@ export class Granularity {
       return timeSeries(this.granularity, dateRange, options);
     }
 
-    return timeSeriesFromCustomInterval(this.granularityInterval, dateRange, this.origin, options);
+    // Interval range doesn't take timezone into account and operate in kinda local timezone,
+    // but origin is treated as a timestamp in query timezone, so we pass it as the naive timestamp
+    // to be in sync with date range during calculation.
+    return timeSeriesFromCustomInterval(this.granularityInterval, dateRange, moment(this.originLocalFormatted()), options);
   }
 
   public resolvedGranularity(): string {
