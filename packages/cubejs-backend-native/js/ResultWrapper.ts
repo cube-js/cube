@@ -11,6 +11,8 @@ export class ResultWrapper {
 
   private transformData: any;
 
+  private rootResultObject: any = {};
+
   public constructor(private readonly nativeReference: any, private readonly jsResult: any = null) {
     if (nativeReference) {
       this.isNative = true;
@@ -101,5 +103,13 @@ export class ResultWrapper {
 
   public getTransformData(): any {
     return this.transformData;
+  }
+
+  public setRootResultObject(obj: any) {
+    this.rootResultObject = obj;
+  }
+
+  public getRootResultObject(): any {
+    return this.rootResultObject;
   }
 }

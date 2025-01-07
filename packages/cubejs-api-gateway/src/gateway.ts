@@ -117,13 +117,6 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
-function cleanupResult(result) {
-  return {
-    ...result,
-    rawData: undefined,
-  };
-}
-
 // Prepared CheckAuthFn, default or from config: always async, returns nothing
 type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<void>;
 
@@ -1621,7 +1614,7 @@ class ApiGateway {
    * result object.
    * @internal
    */
-  private async prepareResultTransformData(
+  private prepareResultTransformData(
     context: RequestContext,
     queryType: QueryType,
     normalizedQuery: NormalizedQuery,
@@ -1642,7 +1635,9 @@ class ApiGateway {
     },
     response: any,
     responseType?: ResultType,
-  ) {
+  ): ResultWrapper {
+    const resultWrapper = response.data;
+
     const transformDataParams = {
       aliasToMemberNameMap: sqlQuery.aliasNameToMember,
       annotation: {
@@ -1655,12 +1650,8 @@ class ApiGateway {
       resType: responseType,
     };
 
-    response.data.setTransformData(transformDataParams);
-
-    // We postpone data transformation until the last minute
-    return {
+    const resObj = {
       query: normalizedQuery,
-      rawData: response.data,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||
@@ -1681,6 +1672,11 @@ class ApiGateway {
       slowQuery: Boolean(response.slowQuery),
       total: normalizedQuery.total ? response.total : null,
     };
+
+    resultWrapper.setTransformData(transformDataParams);
+    resultWrapper.setRootResultObject(resObj);
+
+    return resultWrapper;
   }
 
   /**
@@ -1825,15 +1821,13 @@ class ApiGateway {
           queries: results.length,
           queriesWithPreAggregations:
             results.filter(
-              (r: any) => Object.keys(
-                r.usedPreAggregations || {}
-              ).length
+              (r: any) => Object.keys(r.getRootResultObject().usedPreAggregations || {}).length
             ).length,
           // Have to omit because data could be processed natively
           // so it is not known at this point
           // queriesWithData:
           //   results.filter((r: any) => r.data?.length).length,
-          dbType: results.map(r => r.dbType),
+          dbType: results.map(r => r.getRootResultObject().dbType),
         },
         context,
       );
@@ -1842,9 +1836,9 @@ class ApiGateway {
         // We prepare the final json result on native side
         const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[Object[], any[], Object[]]>(
           ([transformList, rawList, resultList], r) => {
-            transformList.push(r.rawData.getTransformData());
-            rawList.push(r.rawData.getRawData());
-            resultList.push(cleanupResult(r));
+            transformList.push(r.getTransformData());
+            rawList.push(r.getRawData());
+            resultList.push(r.getRootResultObject());
             return [transformList, rawList, resultList];
           },
           [[], [], []]
@@ -1861,7 +1855,7 @@ class ApiGateway {
         // We prepare the full final json result on native side
         const r = results[0];
         res(await getFinalQueryResult(
-          r.rawData.getTransformData(), r.rawData.getRawData(), cleanupResult(r)
+          r.getTransformData(), r.getRawData(), r.getRootResultObject()
         ));
       }
     } catch (e: any) {
@@ -1996,13 +1990,11 @@ class ApiGateway {
           res(results[0]);
         } else {
           // We prepare the final json result on native side
-          const [transformDataJson, rawData, resultDataJson] = (results as {
-            rawData: { getTransformData: () => any, getRawData: () => any };
-          }[]).reduce<[Object[], any[], Object[]]>(
+          const [transformDataJson, rawData, resultDataJson] = (results as ResultWrapper[]).reduce<[Object[], any[], Object[]]>(
             ([transformList, rawList, resultList], r) => {
-              transformList.push(r.rawData.getTransformData());
-              rawList.push(r.rawData.getRawData());
-              resultList.push(cleanupResult(r));
+              transformList.push(r.getTransformData());
+              rawList.push(r.getRawData());
+              resultList.push(r.getRootResultObject());
               return [transformList, rawList, resultList];
             },
             [[], [], []]
