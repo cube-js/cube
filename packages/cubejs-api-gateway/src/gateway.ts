@@ -14,6 +14,7 @@ import {
   getFinalQueryResult,
   getFinalQueryResultArray,
   getFinalQueryResultMulti,
+  ResultWrapper,
 } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
@@ -120,7 +121,6 @@ function cleanupResult(result) {
   return {
     ...result,
     rawData: undefined,
-    transformDataParams: undefined,
   };
 }
 
@@ -1553,7 +1553,7 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
-  ) {
+  ): Promise<ResultWrapper> {
     const queries = [{
       ...sqlQuery,
       query: sqlQuery.sql[0],
@@ -1598,7 +1598,22 @@ class ApiGateway {
     response.total = normalizedQuery.total
       ? Number(total.data[0][QueryAlias.TOTAL_COUNT])
       : undefined;
-    return response;
+
+    return this.wrapAdapterQueryResultIfNeeded(response);
+  }
+
+  /**
+   * Wraps the adapter's response in unified ResultWrapper if it comes from
+   * a common driver (not a Cubestore's one, cause Cubestore Driver internally creates ResultWrapper)
+   * @param res Adapter's response
+   * @private
+   */
+  private wrapAdapterQueryResultIfNeeded(res: any): ResultWrapper {
+    if (!(res.data instanceof ResultWrapper)) {
+      res.data = new ResultWrapper(null, res.data);
+    }
+
+    return res;
   }
 
   /**
@@ -1640,11 +1655,12 @@ class ApiGateway {
       resType: responseType,
     };
 
+    response.data.setTransformData(transformDataParams);
+
     // We postpone data transformation until the last minute
     return {
       query: normalizedQuery,
       rawData: response.data,
-      transformDataParams,
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||
@@ -1826,8 +1842,8 @@ class ApiGateway {
         // We prepare the final json result on native side
         const [transformDataJson, rawDataRef, cleanResultList] = results.reduce<[Object[], any[], Object[]]>(
           ([transformList, rawList, resultList], r) => {
-            transformList.push(r.transformDataParams);
-            rawList.push(r.rawData.isNative ? r.rawData.getNativeRef() : r.rawData);
+            transformList.push(r.rawData.getTransformData());
+            rawList.push(r.rawData.getRawData());
             resultList.push(cleanupResult(r));
             return [transformList, rawList, resultList];
           },
@@ -1844,8 +1860,9 @@ class ApiGateway {
       } else {
         // We prepare the full final json result on native side
         const r = results[0];
-        const rawData = r.rawData.isNative ? r.rawData.getNativeRef() : r.rawData;
-        res(await getFinalQueryResult(r.transformDataParams, rawData, cleanupResult(r)));
+        res(await getFinalQueryResult(
+          r.rawData.getTransformData(), r.rawData.getRawData(), cleanupResult(r)
+        ));
       }
     } catch (e: any) {
       this.handleError({
@@ -1980,12 +1997,11 @@ class ApiGateway {
         } else {
           // We prepare the final json result on native side
           const [transformDataJson, rawData, resultDataJson] = (results as {
-            transformDataParams: any;
-            rawData: { isNative: boolean, getNativeRef: () => any };
+            rawData: { getTransformData: () => any, getRawData: () => any };
           }[]).reduce<[Object[], any[], Object[]]>(
             ([transformList, rawList, resultList], r) => {
-              transformList.push(r.transformDataParams);
-              rawList.push(r.rawData.isNative ? r.rawData.getNativeRef() : r.rawData);
+              transformList.push(r.rawData.getTransformData());
+              rawList.push(r.rawData.getRawData());
               resultList.push(cleanupResult(r));
               return [transformList, rawList, resultList];
             },

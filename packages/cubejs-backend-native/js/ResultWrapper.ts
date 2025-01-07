@@ -9,7 +9,9 @@ export class ResultWrapper {
 
   private readonly isNative: Boolean = false;
 
-  public constructor(private readonly nativeReference: any) {
+  private transformData: any;
+
+  public constructor(private readonly nativeReference: any, private readonly jsResult: any = null) {
     if (nativeReference) {
       this.isNative = true;
     }
@@ -81,7 +83,19 @@ export class ResultWrapper {
     return (array as any)[method](...args);
   }
 
-  public getNativeRef() {
-    return this.nativeReference;
+  public getRawData() {
+    if (this.isNative) {
+      return this.nativeReference;
+    }
+
+    return this.jsResult;
+  }
+
+  public setTransformData(td: any) {
+    this.transformData = td;
+  }
+
+  public getTransformData(): any {
+    return this.transformData;
   }
 }
