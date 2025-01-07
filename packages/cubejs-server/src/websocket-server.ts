@@ -45,7 +45,7 @@ export class WebSocketServer {
         const resMsg = new TextDecoder().decode(message.message);
         message.message = "~XXXXX~";
         messageStr = JSON.stringify(message);
-        messageStr = messageStr.replace(`"~XXXXX~"`, resMsg);
+        messageStr = messageStr.replace('"~XXXXX~"', resMsg);
       } else {
         messageStr = JSON.stringify(message);
       }
