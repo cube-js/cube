@@ -347,10 +347,13 @@ impl TransportService for NodeBridgeTransport {
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
 
+        let mut req_seq_id: u32 = 0;
+
         loop {
+            req_seq_id += 1;
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, 1),
+                    id: format!("{}-span-{}", request_id, req_seq_id),
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -433,7 +436,11 @@ impl TransportService for NodeBridgeTransport {
             .as_ref()
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+        let mut req_seq_id: u32 = 0;
+
         loop {
+            req_seq_id += 1;
             let native_auth = ctx
                 .as_any()
                 .downcast_ref::<NativeAuthContext>()
@@ -441,7 +448,7 @@ impl TransportService for NodeBridgeTransport {
 
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, 1),
+                    id: format!("{}-span-{}", request_id, req_seq_id),
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),

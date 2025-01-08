@@ -5,6 +5,8 @@ set -e
 CURRENT_DIR=$(pwd)
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
+IGNORED_PACKAGES=("cubejs-testing*" "cubejs-linter" "cubejs-docker")
+
 # Function to install dependencies in root
 install_root_dependencies() {
     echo "Running 'yarn install' in the root directory..."
@@ -35,6 +37,21 @@ link_packages() {
     cd "$SCRIPT_DIR"
     for package in packages/*; do
         if [ -d "$package" ]; then
+            package_name=$(basename "$package")
+
+            skip_package="false"
+            for pattern in "${IGNORED_PACKAGES[@]}"; do
+                # shellcheck disable=SC2053
+                if [[ "$package_name" == $pattern ]]; then
+                    echo "Skipping $package_name..."
+                    skip_package="true"
+                fi
+            done
+
+            if [ "$skip_package" = "true" ]; then
+                continue
+            fi
+
             echo "Linking $package..."
             cd "$package"
             yarn link
@@ -106,6 +123,21 @@ link_project_packages() {
     cd "$CURRENT_DIR/$app_name"
     for package in "$SCRIPT_DIR"/packages/*; do
         if [ -d "$package" ]; then
+            package_name=$(basename "$package")
+
+            skip_package="false"
+            for pattern in "${IGNORED_PACKAGES[@]}"; do
+                # shellcheck disable=SC2053
+                if [[ "$package_name" == $pattern ]]; then
+                    echo "Skipping $package_name..."
+                    skip_package="true"
+                fi
+            done
+
+            if [ "$skip_package" = "true" ]; then
+                continue
+            fi
+
             package_name=$(node -p "require('$package/package.json').name")
             echo "Linking $package_name..."
             yarn link "$package_name"
@@ -146,6 +178,7 @@ show_help() {
     echo ""
     echo "  link           Link all packages and link them to a project"
     echo "                  Usage: ./dev-env.sh link [app_name]"
+    echo "                  If argument is omitted, cube packages will be marked as linked"
     echo ""
     echo "  setup          Run all steps (install, build, link, create project)"
     echo "                  Usage: ./dev-env.sh setup [app_name] [db_type]"
@@ -177,7 +210,9 @@ case "$command" in
         ;;
     "link")
         link_packages
-        link_project_packages "$2"
+        if [ -n "$2" ]; then
+            link_project_packages "$2"
+        fi
         ;;
     "drivers")
         get_db_types
