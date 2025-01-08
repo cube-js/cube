@@ -43,7 +43,7 @@ export class WebSocketServer {
         // it again - it's too expensive, instead we serialize the rest of the message and then
         // inject query result json into message.
         const resMsg = new TextDecoder().decode(message.message);
-        message.message = "~XXXXX~";
+        message.message = '~XXXXX~';
         messageStr = JSON.stringify(message);
         messageStr = messageStr.replace('"~XXXXX~"', resMsg);
       } else {

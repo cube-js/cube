@@ -12,7 +12,7 @@ export interface DataResult {
 }
 
 class BaseWrapper {
-    public readonly isWrapper: boolean = true;
+  public readonly isWrapper: boolean = true;
 }
 
 export class ResultWrapper extends BaseWrapper implements DataResult {
