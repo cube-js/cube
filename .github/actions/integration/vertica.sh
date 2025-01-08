@@ -4,7 +4,7 @@ set -eo pipefail
 # Debug log for test containers
 export DEBUG=testcontainers
 
-export TEST_VERTICA_VERSION=11.1.1-0
+export TEST_VERTICA_VERSION=12.0.4-0
 
 echo "::group::Vertica ${TEST_VERTICA_VERSION}"
 docker pull vertica/vertica-ce:${TEST_VERTICA_VERSION}
