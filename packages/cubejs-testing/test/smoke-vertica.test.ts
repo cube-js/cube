@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { StartedTestContainer } from 'testcontainers';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { VerticaDBRunner } from '@knowitall/testing-shared';
+import { VerticaDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubeApi, Query } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';

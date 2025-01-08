@@ -1,5 +1,5 @@
 /* globals describe, afterAll, beforeAll, test, expect, jest */
-const { VerticaDBRunner } = require('@knowitall/testing-shared');
+const { VerticaDBRunner } = require('@cubejs-backend/testing-shared');
 const VerticaDriver = require('../src/VerticaDriver.js');
 
 describe('VerticaDriver', () => {
