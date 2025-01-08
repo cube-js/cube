@@ -5084,6 +5084,20 @@
     throttle-debounce "^3.0.1"
     uuid "^8.3.2"
 
+"@cubejs-backend/testing-shared@1.1.8":
+  version "1.1.8"
+  resolved "https://registry.npmjs.org/@cubejs-backend/testing-shared/-/testing-shared-1.1.8.tgz#2a8b2c7c5ae16d311980f6198f85586f067f7555"
+  integrity sha512-Gq1n+Q85aoQyn5/STitWpLh3243tQWBId3C+52HTAVdbaHGKJMm05G7O5EXLFt7Nc5NGHBROP2WTOCkkoxTNoQ==
+  dependencies:
+    "@cubejs-backend/dotenv" "^9.0.2"
+    "@cubejs-backend/query-orchestrator" "1.1.8"
+    "@cubejs-backend/schema-compiler" "1.1.8"
+    "@cubejs-backend/shared" "1.1.8"
+    "@testcontainers/kafka" "~10.13.0"
+    dedent "^0.7.0"
+    node-fetch "^2.6.7"
+    testcontainers "^10.13.0"
+
 "@cubejs-infra/post-installer@^0.0.7":
   version "0.0.7"
   resolved "https://registry.yarnpkg.com/@cubejs-infra/post-installer/-/post-installer-0.0.7.tgz#a28d2d03e5b7b69a64020d75194a7078cf911d2d"
@@ -19845,7 +19859,7 @@ jest-worker@^28.0.2:
     merge-stream "^2.0.0"
     supports-color "^8.0.0"
 
-jest@27, jest@^27, jest@^27.1.0:
+jest@27, jest@^27, jest@^27.1.0, jest@^27.5.1:
   version "27.5.1"
   resolved "https://registry.yarnpkg.com/jest/-/jest-27.5.1.tgz#dadf33ba70a779be7a6fc33015843b51494f63fc"
   integrity sha512-Yn0mADZB89zTtjkPJEXwrac3LHudkQMR+Paqa8uxJHCBr9agxztUifWCyiYrjhMPBoUVBjyny0I7XH6ozDr7QQ==
@@ -21601,6 +21615,13 @@ moment-timezone@^0.5.15, moment-timezone@^0.5.27, moment-timezone@^0.5.31, momen
   version "0.5.45"
   resolved "https://registry.yarnpkg.com/moment-timezone/-/moment-timezone-0.5.45.tgz#cb685acd56bac10e69d93c536366eb65aa6bcf5c"
   integrity sha512-HIWmqA86KcmCAhnMAN0wuDOARV/525R2+lOLotuGFzn4HO+FH+/645z2wx0Dt3iDv6/p61SIvKnDstISainhLQ==
+  dependencies:
+    moment "^2.29.4"
+
+moment-timezone@^0.5.45:
+  version "0.5.46"
+  resolved "https://registry.npmjs.org/moment-timezone/-/moment-timezone-0.5.46.tgz#a21aa6392b3c6b3ed916cd5e95858a28d893704a"
+  integrity sha512-ZXm9b36esbe7OmdABqIWJuBBiLLwAjrN7CE+7sYdCCx82Nabt1wHDj8TVseS59QIlfFPbOoiBPm6ca9BioG4hw==
   dependencies:
     moment "^2.29.4"
 
@@ -28873,6 +28894,21 @@ uuid@^9.0.0, uuid@^9.0.1:
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-9.0.1.tgz#e188d4c8853cc722220392c424cd637f32293f30"
   integrity sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==
 
+v-connection-string@1.1.1:
+  version "1.1.1"
+  resolved "https://registry.npmjs.org/v-connection-string/-/v-connection-string-1.1.1.tgz#db8d50473e276511320bfed742cdf8ed05d537b5"
+  integrity sha512-FqxtfwiMQekIqFMMXCDrrLbmGBEEHzm8HD0O2CZcCCQbBFsD+KaHkCRpkLE1j+bBWreYfeI1b0MjzGHNx9Bs1w==
+
+v-pool@1.1.4:
+  version "1.1.4"
+  resolved "https://registry.npmjs.org/v-pool/-/v-pool-1.1.4.tgz#a65e5e15e06f6c4a642b389d264d67ae8ae6afd8"
+  integrity sha512-qJiYI40fibbKUWT3zonUHlG32qqvyZ5ya0YJduRogLBXQAEJhwvA5Kaw0gFg2uEMLjTBEY9QkP+w7uhU2I+zTA==
+
+v-protocol@1.1.1:
+  version "1.1.1"
+  resolved "https://registry.npmjs.org/v-protocol/-/v-protocol-1.1.1.tgz#03a817757326c16ae5f54dcab14b196d01d594f3"
+  integrity sha512-HkIPshuFEK0awxmLN2ECTzBqncxDSBjzJ2U89u3BhykNSJ8uumYj9g74l59i2K/2lRO5t0gm40iUHuJkpEnvGw==
+
 v8-compile-cache@^2.0.3:
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/v8-compile-cache/-/v8-compile-cache-2.3.0.tgz#2de19618c66dc247dcfb6f99338035d8245a2cee"
@@ -28925,6 +28961,20 @@ verror@1.10.0:
     assert-plus "^1.0.0"
     core-util-is "1.0.2"
     extsprintf "^1.2.0"
+
+vertica-nodejs@^1.0.3:
+  version "1.1.4"
+  resolved "https://registry.npmjs.org/vertica-nodejs/-/vertica-nodejs-1.1.4.tgz#9df8c9f7f39b9067d518cec0f19f78fbd51b08f8"
+  integrity sha512-4nMNNjOQvImakYnN253SYYpkyvO2dx25ILlEbgMhZqx7yEOzCCxq8Ekh4VbPj1T6bCzR+3nQGKtAgy1wER3F/A==
+  dependencies:
+    buffer-writer "2.0.0"
+    glob "^7.1.6"
+    packet-reader "1.0.0"
+    pg-types "^2.1.0"
+    pgpass "1.x"
+    v-connection-string "1.1.1"
+    v-pool "1.1.4"
+    v-protocol "1.1.1"
 
 victory-vendor@^36.6.8:
   version "36.9.2"
