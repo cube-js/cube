@@ -14,6 +14,7 @@ pub mod serialized_plan;
 mod tail_limit;
 mod topk;
 pub mod trace_data_loaded;
+use rewrite_inlist_literals::RewriteInListLiterals;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 use udfs::{aggregate_udf_by_kind, registerable_aggregate_udfs, registerable_scalar_udfs};
@@ -23,6 +24,7 @@ pub mod info_schema;
 pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
+mod rewrite_inlist_literals;
 #[cfg(test)]
 mod test_utils;
 // pub mod udf_xirr;
@@ -251,6 +253,7 @@ impl QueryPlannerImpl {
         for udf in registerable_scalar_udfs() {
             context.register_udf(udf);
         }
+        context.add_analyzer_rule(Arc::new(RewriteInListLiterals {}));
 
         // TODO upgrade DF
         // context
