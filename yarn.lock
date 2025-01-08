@@ -5084,20 +5084,6 @@
     throttle-debounce "^3.0.1"
     uuid "^8.3.2"
 
-"@cubejs-backend/testing-shared@1.1.8":
-  version "1.1.8"
-  resolved "https://registry.npmjs.org/@cubejs-backend/testing-shared/-/testing-shared-1.1.8.tgz#2a8b2c7c5ae16d311980f6198f85586f067f7555"
-  integrity sha512-Gq1n+Q85aoQyn5/STitWpLh3243tQWBId3C+52HTAVdbaHGKJMm05G7O5EXLFt7Nc5NGHBROP2WTOCkkoxTNoQ==
-  dependencies:
-    "@cubejs-backend/dotenv" "^9.0.2"
-    "@cubejs-backend/query-orchestrator" "1.1.8"
-    "@cubejs-backend/schema-compiler" "1.1.8"
-    "@cubejs-backend/shared" "1.1.8"
-    "@testcontainers/kafka" "~10.13.0"
-    dedent "^0.7.0"
-    node-fetch "^2.6.7"
-    testcontainers "^10.13.0"
-
 "@cubejs-infra/post-installer@^0.0.7":
   version "0.0.7"
   resolved "https://registry.yarnpkg.com/@cubejs-infra/post-installer/-/post-installer-0.0.7.tgz#a28d2d03e5b7b69a64020d75194a7078cf911d2d"
