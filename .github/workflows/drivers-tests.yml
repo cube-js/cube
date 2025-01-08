@@ -51,7 +51,7 @@ on:
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
-      
+
       # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
@@ -205,7 +205,6 @@ jobs:
         snowflake-export-bucket-azure
         snowflake-export-bucket-azure-via-storage-integration
         snowflake-export-bucket-gcs
-        vertica
       # As per docs:
       # Secrets cannot be directly referenced in if: conditionals. Instead, consider setting
       # secrets as job-level environment variables, then referencing the environment variables

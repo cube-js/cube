@@ -11,7 +11,7 @@ services:
       CUBEJS_DB_PORT: 5433
       CUBEJS_DB_NAME: vmart
       CUBEJS_DB_USER: dbadmin
-      CUBEJS_DB_PASS: 
+      CUBEJS_DB_PASS:
 
       CUBEJS_DEV_MODE: "true"
       CUBEJS_WEB_SOCKETS: "true"
@@ -33,7 +33,7 @@ services:
 
   db:
     container_name: birdbox-db
-    image: vertica/vertica-ce:11.1.1-0
+    image: vertica/vertica-ce:12.0.4-0
     ports:
       - "5433"
     restart: always
