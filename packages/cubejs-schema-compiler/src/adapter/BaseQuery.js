@@ -1855,7 +1855,14 @@ export class BaseQuery {
   keyDimensions(primaryKeyDimensions) {
     // The same dimension with different granularities maybe requested, so it's not enough to filter only by dimension
     return R.uniqBy(
-      (d) => `${d.dimension}${d.granularity ?? ''}`, this.dimensionsForSelect()
+      (d) => {
+        if (d.isMemberExpression) {
+          return d.dimension.definition;
+        }
+
+        return `${d.dimension}${d.granularity ?? ''}`;
+      },
+      this.dimensionsForSelect()
         .concat(primaryKeyDimensions)
     );
   }

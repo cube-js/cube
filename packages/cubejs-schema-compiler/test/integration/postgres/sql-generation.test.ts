@@ -2974,6 +2974,63 @@ describe('SQL Generation', () => {
     }]
   ));
 
+  // Subquery aggregation for multiplied measure (and any `keysSelect` for that matter)
+  // should pick up all dimensions, even through member expressions
+  it('multiplied sum with dimension member expressions', async () => runQueryTest(
+    {
+      measures: [
+        'visitors_visitors_checkins_view.revenue',
+        'visitors_visitors_checkins_view.visitor_checkins_count',
+      ],
+      dimensions: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitors_visitors_checkins_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `LOWER(${visitors_visitors_checkins_view.source})`'
+          ),
+          expressionName: 'lower_source',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'LOWER(${visitors_visitors_checkins_view.source})',
+          cubeName: 'visitors_visitors_checkins_view',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitors_visitors_checkins_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `UPPER(${visitors_visitors_checkins_view.source})`'
+          ),
+          expressionName: 'upper_source',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'UPPER(${visitors_visitors_checkins_view.source})',
+          cubeName: 'visitors_visitors_checkins_view',
+        },
+      ],
+    },
+    [
+      {
+        lower_source: null,
+        upper_source: null,
+        visitors_visitors_checkins_view__revenue: '1400',
+        visitors_visitors_checkins_view__visitor_checkins_count: '0',
+      },
+      {
+        lower_source: 'google',
+        upper_source: 'GOOGLE',
+        visitors_visitors_checkins_view__revenue: '300',
+        visitors_visitors_checkins_view__visitor_checkins_count: '1',
+      },
+      {
+        lower_source: 'some',
+        upper_source: 'SOME',
+        visitors_visitors_checkins_view__revenue: '300',
+        visitors_visitors_checkins_view__visitor_checkins_count: '5',
+      },
+    ]
+  ));
+
   // TODO not implemented
   // it('multi stage bucketing', async () => runQueryTest(
   //   {
