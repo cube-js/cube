@@ -924,13 +924,13 @@ cubes:
 To have a pre-aggregation rebuild at a specific time of day, you can use a CRON string with some limitations. For more details about values that can be used with the `every` parameter, please refer to the
 [`refreshKey`][ref-cube-refreshkey] documentation.
 
+You can also use `every` with `sql`:
+
 <WarningBox>
 
 Using CRON strings and `sql` is not supported and will result in a compilation error.
 
 </WarningBox>
-
-You can also use `every` with `sql`:
 
 <CodeTabs>
 
