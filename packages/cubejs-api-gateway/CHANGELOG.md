@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.14](https://github.com/cube-js/cube/compare/v1.1.13...v1.1.14) (2025-01-09)
+
+
+### Bug Fixes
+
+* **cubesql:** add title field to Dimension Metadata ([#9084](https://github.com/cube-js/cube/issues/9084)) ([9653a23](https://github.com/cube-js/cube/commit/9653a23d9f477b391627755a533b2d6e8eae5656))
+
+
+
+
+
 ## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
 
 
