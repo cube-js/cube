@@ -66,8 +66,11 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
       url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
       method: 'POST',
       body: JSON.stringify({
-        envVariables,
+        envVariables: JSON.stringify(envVariables),
       }),
+      headers: {
+        'Content-type': 'application/json'
+      },
       auth
     });
   }
@@ -115,6 +118,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
         transaction,
         files: fileHashesPosix
       }),
+      headers: { 'Content-type': 'application/json' },
       auth
     });
   } finally {
