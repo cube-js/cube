@@ -41,6 +41,7 @@ export class CubeCloudClient {
     restOptions.headers = restOptions.headers || {};
     // Add authorization to headers
     (restOptions.headers as any).authorization = authorization.auth;
+    (restOptions.headers as any)['Content-type'] = 'application/json';
 
     const response = await fetch(
       `${authorization.url}/${url(authorization.deploymentId || '')}`,
@@ -141,6 +142,9 @@ export class CubeCloudClient {
       url: (deploymentId: string) => `build/deploy/${deploymentId}/finish-upload${this.extendRequestByLivePreview()}`,
       method: 'POST',
       body: JSON.stringify({ transaction, files }),
+      headers: {
+        'Content-type': 'application/json'
+      },
       auth,
     });
   }
@@ -149,7 +153,10 @@ export class CubeCloudClient {
     return this.request({
       url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
       method: 'POST',
-      body: JSON.stringify({ envVariables }),
+      body: JSON.stringify({ envVariables: JSON.stringify(envVariables) }),
+      headers: {
+        'Content-type': 'application/json'
+      },
       auth
     });
   }
@@ -172,6 +179,9 @@ export class CubeCloudClient {
       url: (deploymentId) => `devmode/${deploymentId}/token`,
       method: 'POST',
       body: JSON.stringify(payload),
+      headers: {
+        'Content-type': 'application/json'
+      },
       auth
     });
   }
