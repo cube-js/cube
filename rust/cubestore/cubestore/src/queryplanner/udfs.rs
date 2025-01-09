@@ -2,8 +2,9 @@ use crate::queryplanner::hll::{Hll, HllUnion};
 use crate::CubeError;
 use chrono::{Datelike, Duration, Months, NaiveDateTime};
 use datafusion::arrow::array::{
-    Array, ArrayRef, BinaryArray, TimestampNanosecondArray, UInt64Builder,
+    Array, ArrayRef, BinaryArray, StringArray, TimestampNanosecondArray, UInt64Builder,
 };
+use datafusion::arrow::buffer::ScalarBuffer;
 use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::function::AccumulatorArgs;
@@ -25,6 +26,7 @@ pub enum CubeScalarUDFKind {
     DateAdd,
     DateSub,
     DateBin,
+    ConvertTz,
 }
 
 pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
@@ -36,6 +38,7 @@ pub fn scalar_udf_by_kind(k: CubeScalarUDFKind) -> Arc<ScalarUDF> {
         CubeScalarUDFKind::DateAdd => Arc::new(ScalarUDF::new_from_impl(DateAddSub::new_add())),
         CubeScalarUDFKind::DateSub => Arc::new(ScalarUDF::new_from_impl(DateAddSub::new_sub())),
         CubeScalarUDFKind::DateBin => Arc::new(ScalarUDF::new_from_impl(DateBin::new())),
+        CubeScalarUDFKind::ConvertTz => Arc::new(ScalarUDF::new_from_impl(ConvertTz::new())),
     }
 }
 
@@ -46,6 +49,7 @@ pub fn registerable_scalar_udfs() -> Vec<ScalarUDF> {
         ScalarUDF::new_from_impl(DateAddSub::new_add()),
         ScalarUDF::new_from_impl(DateAddSub::new_sub()),
         ScalarUDF::new_from_impl(UnixTimestamp::new()),
+        ScalarUDF::new_from_impl(ConvertTz::new()),
     ]
 }
 
@@ -719,4 +723,178 @@ impl HllMergeAccumulator {
 
 pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
     return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
+}
+
+#[derive(Debug)]
+struct ConvertTz {
+    signature: Signature,
+}
+
+impl ConvertTz {
+    fn new() -> ConvertTz {
+        ConvertTz {
+            signature: Signature {
+                type_signature: TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Utf8,
+                ]),
+                volatility: Volatility::Immutable,
+            },
+        }
+    }
+}
+
+impl ScalarUDFImpl for ConvertTz {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn name(&self) -> &str {
+        "convert_tz"
+    }
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    }
+    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+        match (&inputs[0], &inputs[1]) {
+            (
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(t, _)),
+                ColumnarValue::Scalar(ScalarValue::Utf8(shift)),
+            ) => {
+                let t: Arc<TimestampNanosecondArray> =
+                    Arc::new(std::iter::repeat(t).take(1).collect());
+                let shift: Arc<StringArray> = Arc::new(std::iter::repeat(shift).take(1).collect());
+                let t: ArrayRef = t;
+                let shift: ArrayRef = shift;
+                let result = convert_tz(&t, &shift)?;
+                let ts_array = result
+                    .as_any()
+                    .downcast_ref::<TimestampNanosecondArray>()
+                    .ok_or_else(|| {
+                        DataFusionError::Internal("Wrong type returned in convert_tz".to_string())
+                    })?;
+                let ts_native = ts_array.value(0);
+                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                    Some(ts_native),
+                    None,
+                )))
+            }
+            (ColumnarValue::Array(t), ColumnarValue::Scalar(ScalarValue::Utf8(shift))) => {
+                let shift =
+                    convert_tz_compute_shift_nanos(shift.as_ref().map_or("", |s| s.as_str()))?;
+
+                convert_tz_precomputed_shift(t, shift).map(|arr| ColumnarValue::Array(arr))
+            }
+            (
+                ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(t, _)),
+                ColumnarValue::Array(shift),
+            ) => {
+                let t: Arc<TimestampNanosecondArray> =
+                    Arc::new(std::iter::repeat(t).take(shift.len()).collect());
+                let t: ArrayRef = t;
+                convert_tz(&t, shift).map(|arr| ColumnarValue::Array(arr))
+            }
+            (ColumnarValue::Array(t), ColumnarValue::Array(shift)) => {
+                convert_tz(t, shift).map(|arr| ColumnarValue::Array(arr))
+            }
+            _ => Err(DataFusionError::Internal(
+                "Unsupported input type in convert_tz".to_string(),
+            )),
+        }
+    }
+}
+
+fn convert_tz_compute_shift_nanos(shift: &str) -> Result<i64, DataFusionError> {
+    let hour_min = shift.split(':').collect::<Vec<_>>();
+    if hour_min.len() != 2 {
+        return Err(DataFusionError::Execution(format!(
+            "Can't parse timezone shift '{}'",
+            shift
+        )));
+    }
+    let hour = hour_min[0].parse::<i64>().map_err(|e| {
+        DataFusionError::Execution(format!(
+            "Can't parse hours of timezone shift '{}': {}",
+            hour_min[0], e
+        ))
+    })?;
+    let minute = hour_min[1].parse::<i64>().map_err(|e| {
+        DataFusionError::Execution(format!(
+            "Can't parse minutes of timezone shift '{}': {}",
+            hour_min[1], e
+        ))
+    })?;
+    let shift = (hour * 60 + hour.signum() * minute) * 60 * 1_000_000_000;
+    Ok(shift)
+}
+
+/// convert_tz SQL function
+pub fn convert_tz(args_0: &ArrayRef, args_1: &ArrayRef) -> Result<ArrayRef, DataFusionError> {
+    let timestamps = args_0
+        .as_any()
+        .downcast_ref::<TimestampNanosecondArray>()
+        .ok_or_else(|| {
+            DataFusionError::Execution(
+                "Could not cast convert_tz timestamp input to TimestampNanosecondArray".to_string(),
+            )
+        })?;
+
+    let shift = args_1
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| {
+            DataFusionError::Execution(
+                "Could not cast convert_tz shift input to StringArray".to_string(),
+            )
+        })?;
+
+    let range = 0..timestamps.len();
+    let result = range
+        .map(|i| {
+            if timestamps.is_null(i) {
+                Ok(0_i64)
+            } else {
+                let shift: i64 = convert_tz_compute_shift_nanos(shift.value(i))?;
+                Ok(timestamps.value(i) + shift)
+            }
+        })
+        .collect::<Result<Vec<_>, DataFusionError>>()?;
+
+    Ok(Arc::new(TimestampNanosecondArray::new(
+        ScalarBuffer::<i64>::from(result),
+        timestamps.nulls().map(|null_buffer| null_buffer.clone()),
+    )))
+}
+
+pub fn convert_tz_precomputed_shift(
+    args_0: &ArrayRef,
+    shift: i64,
+) -> Result<ArrayRef, DataFusionError> {
+    let timestamps = args_0
+        .as_any()
+        .downcast_ref::<TimestampNanosecondArray>()
+        .ok_or_else(|| {
+            DataFusionError::Execution(
+                "Could not cast convert_tz timestamp input to TimestampNanosecondArray".to_string(),
+            )
+        })?;
+
+    // TODO: This could be faster.
+    let range = 0..timestamps.len();
+    let result = range
+        .map(|i| {
+            if timestamps.is_null(i) {
+                Ok(0_i64)
+            } else {
+                Ok(timestamps.value(i) + shift)
+            }
+        })
+        .collect::<Result<Vec<_>, DataFusionError>>()?;
+
+    Ok(Arc::new(TimestampNanosecondArray::new(
+        ScalarBuffer::<i64>::from(result),
+        timestamps.nulls().map(|null_buffer| null_buffer.clone()),
+    )))
 }
