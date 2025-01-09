@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
+
+
+### Bug Fixes
+
+* **dremio-driver:** Fix stale version of testing-shared dependency ([#9079](https://github.com/cube-js/cube/issues/9079)) ([ee826e1](https://github.com/cube-js/cube/commit/ee826e10c4e1a078083d32580a5d63bcdeb16628))
+
+
+
+
+
 ## [1.1.11](https://github.com/cube-js/cube/compare/v1.1.10...v1.1.11) (2024-12-16)
 
 **Note:** Version bump only for package @cubejs-backend/dremio-driver

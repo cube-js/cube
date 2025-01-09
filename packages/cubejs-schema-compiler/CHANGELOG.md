@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
+
+
+### Bug Fixes
+
+* **schema-compiler:** fix time dimension granularity origin formatting in local timezone ([#9071](https://github.com/cube-js/cube/issues/9071)) ([c97526f](https://github.com/cube-js/cube/commit/c97526ff9145195786d4ec9617bcf298567bce7e))
+
+
+### Features
+
+* **cubesql:** Penalize zero members in wrapper ([#8927](https://github.com/cube-js/cube/issues/8927)) ([171ea35](https://github.com/cube-js/cube/commit/171ea351e739f705ddbf0d803a34b944cb8c9da5))
+* **tesseract:** Make measure an entry point for multi-fact join for now and support template for params ([#9053](https://github.com/cube-js/cube/issues/9053)) ([cb507c1](https://github.com/cube-js/cube/commit/cb507c1ab345828435d192d1f783998bbc5130b3))
+
+
+
+
+
 ## [1.1.11](https://github.com/cube-js/cube/compare/v1.1.10...v1.1.11) (2024-12-16)
 
 

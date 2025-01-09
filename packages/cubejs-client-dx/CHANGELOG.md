@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
+
+
+### Features
+
+* **server-core:** Support for scheduledRefreshTimeZones as function, passing securityContext ([#9002](https://github.com/cube-js/cube/issues/9002)) ([10e47fc](https://github.com/cube-js/cube/commit/10e47fc5472a3532a8f40f6f980f9802536a39de))
+
+
+
+
+
 # [1.0.0](https://github.com/cube-js/cube/compare/v0.36.11...v1.0.0) (2024-10-15)
 
 **Note:** Version bump only for package @cubejs-client/dx
