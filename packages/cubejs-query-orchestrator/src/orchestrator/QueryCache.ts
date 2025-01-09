@@ -104,9 +104,9 @@ export type PreAggTableToTempTable = [
 export type CacheKey =
   | string
   | [
-      query: string | QueryTuple,
-      options?: string[]
-    ];
+    query: string | QueryTuple,
+    options?: string[]
+  ];
 
 type CacheEntry = {
   time: number;
@@ -176,6 +176,9 @@ export class QueryCache {
 
     if (redisUrl && redisNamespace) {
       this.redisCache = new RedisQueryCacheClient({ url: redisUrl, namespace: redisNamespace, logger: this.logger });
+    }
+    else {
+      this.logger('Redis cache is disabled', { redisUrl, redisNamespace })
     }
   }
 
@@ -686,7 +689,7 @@ export class QueryCache {
   /**
    * Returns registered queries queues hash table.
    */
-  public getQueues(): {[dataSource: string]: QueryQueue} {
+  public getQueues(): { [dataSource: string]: QueryQueue } {
     return this.queue;
   }
 
