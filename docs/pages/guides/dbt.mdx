@@ -299,7 +299,7 @@ cubes:
         type: count
 
       - name: statuses
-        sql: "STRING_AGG({status})"
+        sql: "STRING_AGG({status}, ',')"
         type: string
 
     # Model-specific joins
