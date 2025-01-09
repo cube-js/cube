@@ -145,8 +145,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const protocol = config.protocol ?? getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:';
     const url = `${protocol}//${host}:${port}`;
 
-    const username = getEnv('dbUser', { dataSource });
-    const password = getEnv('dbPass', { dataSource });
+    const username = config.username ?? getEnv('dbUser', { dataSource });
+    const password = config.password ?? getEnv('dbPass', { dataSource });
     const database = config.database ?? (getEnv('dbName', { dataSource }) as string) ?? 'default';
 
     // TODO this is a bit inconsistent with readOnly
