@@ -336,7 +336,7 @@ jobs:
         node-version: [20.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio'
+            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
         ]
       fail-fast: false
 
