@@ -125,6 +125,8 @@ components:
       properties:
         name:
           type: "string"
+        title:
+          type: "string"
         description:
           type: "string"
         type:
