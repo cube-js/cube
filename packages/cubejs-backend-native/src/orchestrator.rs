@@ -144,51 +144,78 @@ pub fn final_query_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-pub fn final_query_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let transform_data_array = cx.argument::<JsValue>(0)?;
-    let deserializer = JsValueDeserializer::new(&mut cx, transform_data_array);
+pub type JsResultDataVectors = (
+    Vec<TransformDataRequest>,
+    Vec<Arc<QueryResult>>,
+    Vec<RequestResultData>,
+);
+
+pub fn convert_final_query_result_array_from_js(
+    cx: &mut FunctionContext<'_>,
+    transform_data_array: Handle<JsValue>,
+    data_array: Handle<JsArray>,
+    results_data_array: Handle<JsValue>,
+) -> NeonResult<JsResultDataVectors> {
+    let deserializer = JsValueDeserializer::new(cx, transform_data_array);
     let transform_requests: Vec<TransformDataRequest> = match Deserialize::deserialize(deserializer)
     {
         Ok(data) => data,
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
-    let data_array = cx.argument::<JsArray>(1)?;
     let mut cube_store_results: Vec<Arc<QueryResult>> = vec![];
-    for data_arg in data_array.to_vec(&mut cx)? {
-        match extract_query_result(&mut cx, data_arg) {
+    for data_arg in data_array.to_vec(cx)? {
+        match extract_query_result(cx, data_arg) {
             Ok(query_result) => cube_store_results.push(query_result),
             Err(err) => return cx.throw_error(err.to_string()),
         };
     }
 
-    let results_data_array = cx.argument::<JsValue>(2)?;
-    let deserializer = JsValueDeserializer::new(&mut cx, results_data_array);
-    let mut request_results: Vec<RequestResultData> = match Deserialize::deserialize(deserializer) {
+    let deserializer = JsValueDeserializer::new(cx, results_data_array);
+    let request_results: Vec<RequestResultData> = match Deserialize::deserialize(deserializer) {
         Ok(data) => data,
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
-    let promise = cx
-        .task(move || {
-            get_final_cubestore_result_array(
-                &transform_requests,
-                &cube_store_results,
-                &mut request_results,
-            )?;
+    Ok((transform_requests, cube_store_results, request_results))
+}
 
-            let final_obj = RequestResultArray {
-                results: request_results,
-            };
+pub fn final_query_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    let transform_data_array = cx.argument::<JsValue>(0)?;
+    let data_array = cx.argument::<JsArray>(1)?;
+    let results_data_array = cx.argument::<JsValue>(2)?;
 
-            match serde_json::to_string(&final_obj) {
-                Ok(json) => Ok(json),
-                Err(err) => Err(anyhow::Error::from(err)),
-            }
-        })
-        .promise(move |cx, json_data| json_to_array_buffer(cx, json_data));
+    let convert_res = convert_final_query_result_array_from_js(
+        &mut cx,
+        transform_data_array,
+        data_array,
+        results_data_array,
+    );
+    match convert_res {
+        Ok((transform_requests, cube_store_results, mut request_results)) => {
+            let promise = cx
+                .task(move || {
+                    get_final_cubestore_result_array(
+                        &transform_requests,
+                        &cube_store_results,
+                        &mut request_results,
+                    )?;
 
-    Ok(promise)
+                    let final_obj = RequestResultArray {
+                        results: request_results,
+                    };
+
+                    match serde_json::to_string(&final_obj) {
+                        Ok(json) => Ok(json),
+                        Err(err) => Err(anyhow::Error::from(err)),
+                    }
+                })
+                .promise(move |cx, json_data| json_to_array_buffer(cx, json_data));
+
+            Ok(promise)
+        }
+        Err(err) => cx.throw_error(err.to_string()),
+    }
 }
 
 pub fn final_query_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> {

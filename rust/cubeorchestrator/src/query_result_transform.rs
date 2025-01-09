@@ -572,7 +572,7 @@ pub struct RequestResultData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_refresh_time: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub refresh_key_values: Option<Value>,
+    pub refresh_key_values: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub used_pre_aggregations: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]

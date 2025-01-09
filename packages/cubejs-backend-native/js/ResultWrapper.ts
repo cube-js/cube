@@ -161,6 +161,7 @@ export class ResultMultiWrapper extends BaseWrapper implements DataResult {
   }
 }
 
+// This is consumed by native side via Transport Bridge
 export class ResultArrayWrapper extends BaseWrapper implements DataResult {
   public constructor(private readonly results: ResultWrapper[]) {
     super();
@@ -177,6 +178,9 @@ export class ResultArrayWrapper extends BaseWrapper implements DataResult {
       [[], [], []]
     );
 
-    return getFinalQueryResultArray(transformDataJson, rawData, resultDataJson);
+    // It seems this is not needed anymore
+    // return getFinalQueryResultArray(transformDataJson, rawData, resultDataJson);
+
+    return [transformDataJson, rawData, resultDataJson];
   }
 }

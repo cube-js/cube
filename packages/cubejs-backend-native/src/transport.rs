@@ -3,7 +3,18 @@ use neon::prelude::*;
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use crate::auth::NativeAuthContext;
+use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator, ValueFromJs};
+use crate::node_obj_serializer::NodeObjSerializer;
+use crate::orchestrator::convert_final_query_result_array_from_js;
+use crate::{
+    auth::TransportRequest, channel::call_js_with_channel_as_callback,
+    stream::call_js_with_stream_as_callback,
+};
 use async_trait::async_trait;
+use cubeorchestrator::query_result_transform::{
+    get_final_cubestore_result_array, RequestResultArray,
+};
 use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
@@ -19,14 +30,6 @@ use cubesql::{
 use serde::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
-
-use crate::auth::NativeAuthContext;
-use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator};
-use crate::node_obj_serializer::NodeObjSerializer;
-use crate::{
-    auth::TransportRequest, channel::call_js_with_channel_as_callback,
-    stream::call_js_with_stream_as_callback,
-};
 
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
@@ -369,54 +372,116 @@ impl TransportService for NodeBridgeTransport {
                 streaming: false,
             })?;
 
-            let result = call_js_with_channel_as_callback(
+            let result = call_raw_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.on_sql_api_load.clone(),
-                Some(extra),
+                extra,
+                Box::new(|cx, v| Ok(cx.string(v).as_value(cx))),
+                Box::new(move |cx, v| {
+                    // It's too heavy/slow to get instance of ResultArrayWrapper from JS
+                    // and then call/await the .getFinalResult() method which needs be
+                    // executed again on JS side to get the actual needed date,
+                    // instead we pass it directly from JS side.
+                    // In case of wrapped result it's actually a tuple of
+                    // (transformDataJson[], rawData[], resultDataJson[])
+                    if let Ok(result_wrapped) = v.downcast::<JsArray, _>(cx) {
+                        let res_wrapped_vec = result_wrapped.to_vec(cx).map_cube_err("Can't convert JS result to array")?;
+
+                        if res_wrapped_vec.len() != 3 {
+                            return Err(CubeError::internal("Expected a tuple with 3 elements: transformDataJson[], rawData[], resultDataJson[]".to_string()));
+                        }
+
+                        let transform_data_array = res_wrapped_vec.first().unwrap();
+                        let data_array = res_wrapped_vec.get(1).unwrap()
+                            .downcast_or_throw::<JsArray, _>(cx).map_cube_err("Can't downcast js data to array")?;
+                        let results_data_array = res_wrapped_vec.get(2).unwrap();
+
+                        match convert_final_query_result_array_from_js(
+                            cx,
+                            *transform_data_array,
+                            data_array,
+                            *results_data_array,
+                        ) {
+                            Ok((transform_requests, cube_store_results, mut request_results)) => {
+                                get_final_cubestore_result_array(
+                                    &transform_requests,
+                                    &cube_store_results,
+                                    &mut request_results,
+                                ).map_cube_err("Can't build result array")?;
+
+                                Ok(ValueFromJs::RequestResultArray(RequestResultArray {
+                                    results: request_results,
+                                }))
+                            }
+                            Err(err) => {
+                                Err(CubeError::internal(format!("Error converting result data: {:?}", err.to_string())))
+                            }
+                        }
+
+                    } else if let Ok(str) = v.downcast::<JsString, _>(cx) {
+                        Ok(ValueFromJs::String(str.value(cx)))
+                    } else {
+                        Err(CubeError::internal("Can't downcast callback argument to string or resultWrapper object".to_string()))
+                    }
+                })
             )
             .await;
+
             if let Err(e) = &result {
                 if e.message.to_lowercase().contains("continue wait") {
                     continue;
                 }
             }
 
-            let response: serde_json::Value = result?;
+            match result? {
+                ValueFromJs::String(result) => {
+                    let response: serde_json::Value = serde_json::Value::String(result);
 
-            #[cfg(debug_assertions)]
-            trace!("[transport] Request <- {:?}", response);
-            #[cfg(not(debug_assertions))]
-            trace!("[transport] Request <- <hidden>");
+                    #[cfg(debug_assertions)]
+                    trace!("[transport] Request <- {:?}", response);
+                    #[cfg(not(debug_assertions))]
+                    trace!("[transport] Request <- <hidden>");
 
-            if let Some(error_value) = response.get("error") {
-                match error_value {
-                    serde_json::Value::String(error) => {
-                        if error.to_lowercase() == *"continue wait" {
-                            debug!(
+                    if let Some(error_value) = response.get("error") {
+                        match error_value {
+                            serde_json::Value::String(error) => {
+                                if error.to_lowercase() == *"continue wait" {
+                                    debug!(
                                 "[transport] load - retrying request (continue wait) requestId: {}",
                                 request_id
                             );
 
-                            continue;
-                        } else {
-                            return Err(CubeError::user(error.clone()));
-                        }
-                    }
-                    other => {
-                        error!(
+                                    continue;
+                                } else {
+                                    return Err(CubeError::user(error.clone()));
+                                }
+                            }
+                            other => {
+                                error!(
                             "[transport] load - strange response, success which contains error: {:?}",
                             other
                         );
 
-                        return Err(CubeError::internal(
-                            "Error response with broken data inside".to_string(),
-                        ));
-                    }
-                }
-            };
+                                return Err(CubeError::internal(
+                                    "Error response with broken data inside".to_string(),
+                                ));
+                            }
+                        }
+                    };
 
-            break serde_json::from_value::<TransportLoadResponse>(response)
-                .map_err(|err| CubeError::user(err.to_string()));
+                    break serde_json::from_value::<TransportLoadResponse>(response)
+                        .map_err(|err| CubeError::user(err.to_string()));
+                }
+                ValueFromJs::RequestResultArray(result) => {
+                    let response = TransportLoadResponse {
+                        pivot_query: None,
+                        slow_query: None,
+                        query_type: None,
+                        results: result.results.into_iter().map(|v| v.into()).collect(),
+                    };
+                    break Ok(response);
+                }
+            }
         }
     }
 
