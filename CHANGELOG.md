@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.13](https://github.com/cube-js/cube/compare/v1.1.12...v1.1.13) (2025-01-09)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Support overriding Username & Password from Driver Config ([#9085](https://github.com/cube-js/cube/issues/9085)) ([c5aa6cc](https://github.com/cube-js/cube/commit/c5aa6cc4aca0c22dacd24253fe116f8619f96601))
+* **cubejs-cli:** Fix content type and body after switching from request to node-fetch ([#9088](https://github.com/cube-js/cube/issues/9088)) ([bf332ef](https://github.com/cube-js/cube/commit/bf332ef6761e8354115cc485d7d762abc9268181))
+* **schema-compiler:** Handle member expressions in keyDimensions ([#9083](https://github.com/cube-js/cube/issues/9083)) ([056a1d8](https://github.com/cube-js/cube/commit/056a1d88b4fd8055575dbb07967bc64b7065ce86))
+
+
+
+
+
 ## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
 
 
