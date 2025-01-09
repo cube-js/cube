@@ -1,6 +1,6 @@
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
-import rp, { RequestPromiseOptions } from 'request-promise';
+import fetch, { RequestInit } from 'node-fetch';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import os from 'os';
@@ -170,7 +170,7 @@ export class Config {
     });
 
     if (!Array.isArray(deployments)) {
-      throw new Error(deployments.toString());
+      throw new Error(JSON.stringify(deployments));
     }
 
     if (!deployments.length) {
@@ -217,10 +217,10 @@ export class Config {
     await fs.writeJson(this.dotCubeCloudFile(), config);
   }
 
-  public async cloudReq(options: {
+  public async cloudReq<T>(options: {
     url: (deploymentId: string) => string,
     auth: { auth: string, deploymentId?: string, url?: string },
-  } & RequestPromiseOptions) {
+  } & RequestInit): Promise<T> {
     const { url, auth, ...restOptions } = options;
 
     const authorization = auth || await this.deployAuthForCurrentDir();
@@ -228,33 +228,43 @@ export class Config {
       throw new Error('Auth isn\'t set');
     }
 
-    return rp({
-      headers: {
-        authorization: authorization.auth
-      },
-      ...restOptions,
-      url: `${authorization.url}/${url(authorization.deploymentId)}`,
-      json: true
-    });
+    // Ensure headers object exists in restOptions
+    restOptions.headers = restOptions.headers || {};
+    // Add authorization to headers
+    (restOptions.headers as any).authorization = authorization.auth;
+
+    const response = await fetch(
+      `${authorization.url}/${url(authorization.deploymentId || '')}`,
+      restOptions,
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json() as Promise<T>;
   }
 
   protected async cloudTokenReq(authToken: string) {
-    const res = await rp({
-      url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
-      method: 'POST',
-      headers: {
-        'Content-type': 'application/json'
-      },
-      json: true,
-      body: {
-        token: authToken
+    const res = await fetch(
+      `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
+      {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({ token: authToken })
       }
-    });
+    );
 
-    if (res && res.error) {
-      throw res.error;
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
     }
 
-    return res.jwt;
+    const response = await res.json() as any;
+
+    if (!response.jwt) {
+      throw new Error('JWT token is not present in the response');
+    }
+
+    return response.jwt;
   }
 }

@@ -59,7 +59,7 @@ export class KsqlDBRunner extends DbRunnerAbstract {
       method: 'POST',
       headers: { Accept: 'application/json' },
       body: JSON.stringify({
-        ksql: "CREATE OR REPLACE STREAM REQUESTS (ID STRING, TIMESTAMP TIMESTAMP, TENANT_ID INTEGER, REQUEST_ID STRING) WITH (KAFKA_TOPIC = 'REQUESTS', KEY_FORMAT = 'JSON', PARTITIONS = 1, REPLICAS = 1, VALUE_FORMAT = 'JSON');",
+        ksql: 'CREATE OR REPLACE STREAM REQUESTS (ID STRING, TIMESTAMP TIMESTAMP, TENANT_ID INTEGER, REQUEST_ID STRING) WITH (KAFKA_TOPIC = \'REQUESTS\', KEY_FORMAT = \'JSON\', PARTITIONS = 1, REPLICAS = 1, VALUE_FORMAT = \'JSON\');',
         streamsProperties: {}
       })
     });

@@ -24,9 +24,10 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^1.0.0",
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
-    "@types/request-promise": "^4.1.46",
     "jest": "^27",
     "typescript": "~5.2.2"
   },
@@ -35,10 +36,10 @@
     "@cubejs-backend/shared": "1.1.10",
     "chokidar": "^3.5.1",
     "env-var": "^6.3.0",
+    "form-data": "^4.0.0",
     "fs-extra": "^9.1.0",
     "jsonwebtoken": "^9.0.2",
-    "request": "^2.88.2",
-    "request-promise": "^4.2.5"
+    "node-fetch": "^2.7.0"
   },
   "publishConfig": {
     "access": "public"
