@@ -31,18 +31,18 @@ export class WebSocketServer {
 
     const connectionIdToSocket: Record<string, any> = {};
 
-    this.subscriptionServer = this.serverCore.initSubscriptionServer((connectionId: string, message: any) => {
+    this.subscriptionServer = this.serverCore.initSubscriptionServer(async (connectionId: string, message: any) => {
       if (!connectionIdToSocket[connectionId]) {
         throw new Error(`Socket for ${connectionId} is not found found`);
       }
 
       let messageStr: string;
 
-      if (message.message instanceof ArrayBuffer) {
-        // In case we already have a JSON-serialized query result, we don't want to parse/stringify
+      if (message.message && message.message.isWrapper) {
+        // In case we have a wrapped query result, we don't want to parse/stringify
         // it again - it's too expensive, instead we serialize the rest of the message and then
         // inject query result json into message.
-        const resMsg = new TextDecoder().decode(message.message);
+        const resMsg = new TextDecoder().decode(await message.message.getFinalResult());
         message.message = '~XXXXX~';
         messageStr = JSON.stringify(message);
         messageStr = messageStr.replace('"~XXXXX~"', resMsg);
