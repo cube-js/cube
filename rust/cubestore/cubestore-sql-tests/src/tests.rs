@@ -1101,7 +1101,7 @@ async fn cast_timestamp_to_utf8(service: Box<dyn SqlClient>) {
 
     assert_eq!(
         to_rows(&r),
-        rows(&[("a", "2022-01-01 00:00:00"), ("b", "2021-01-01 00:00:00"),])
+        rows(&[("a", "2022-01-01T00:00:00"), ("b", "2021-01-01T00:00:00"),])
     );
 }
 
