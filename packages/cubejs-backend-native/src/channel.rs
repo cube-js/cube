@@ -4,10 +4,10 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+use crate::orchestrator::ResultWrapper;
 use crate::transport::MapCubeErrExt;
 use crate::utils::bind_method;
 use async_trait::async_trait;
-use cubeorchestrator::query_result_transform::RequestResultArray;
 use cubesql::transport::{SqlGenerator, SqlTemplates};
 use cubesql::CubeError;
 #[cfg(debug_assertions)]
@@ -197,7 +197,7 @@ where
 #[derive(Debug)]
 pub enum ValueFromJs {
     String(String),
-    RequestResultArray(RequestResultArray),
+    ResultWrapper(Vec<ResultWrapper>),
 }
 
 #[allow(clippy::type_complexity)]

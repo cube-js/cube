@@ -1,14 +1,18 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
+use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    get_final_cubestore_result_array, RequestResultArray, RequestResultData, RequestResultDataMulti,
+    get_final_cubestore_result_array, RequestResultArray, RequestResultData,
+    RequestResultDataMulti, TransformedData,
 };
 use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
+use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::handle::Handle;
 use neon::object::Object;
 use neon::prelude::{
-    JsArray, JsArrayBuffer, JsBox, JsBuffer, JsObject, JsPromise, JsResult, JsValue, NeonResult,
+    JsArray, JsArrayBuffer, JsBox, JsBuffer, JsFunction, JsObject, JsPromise, JsResult, JsValue,
+    NeonResult,
 };
 use neon::types::buffer::TypedArray;
 use serde::Deserialize;
@@ -26,6 +30,108 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
 
     Ok(())
 }
+
+// #[derive(Debug, Clone)]
+// pub enum ResultWrapperData {
+//     JsObj(RecordBatch),
+//     Native()
+// }
+
+#[derive(Debug, Clone)]
+pub struct ResultWrapper {
+    transform_data: TransformDataRequest,
+    data: Arc<QueryResult>,
+}
+
+impl ResultWrapper {
+    pub fn from_js_result_wrapper(
+        cx: &mut FunctionContext<'_>,
+        js_result_wrapper_val: Handle<JsValue>,
+    ) -> Result<Self, CubeError> {
+        let js_result_wrapper = js_result_wrapper_val
+            .downcast::<JsObject, _>(cx)
+            .map_cube_err("Can't downcast JS ResultWrapper to object")?;
+
+        let get_transform_data_js_method: Handle<JsFunction> = js_result_wrapper
+            .get(cx, "getTransformData")
+            .map_cube_err("Can't get getTransformData() method from JS ResultWrapper object")?;
+
+        let transform_data_js_arr = get_transform_data_js_method
+            .call(cx, js_result_wrapper.upcast::<JsValue>(), [])
+            .map_cube_err("Error calling getTransformData() method of ResultWrapper object")?
+            .downcast::<JsArray, _>(cx)
+            .map_cube_err("Can't downcast JS transformData to array")?
+            .to_vec(cx)
+            .map_cube_err("Can't convert JS transformData to array")?;
+
+        let transform_data_js = transform_data_js_arr.first().unwrap();
+
+        let deserializer = JsValueDeserializer::new(cx, *transform_data_js);
+        let transform_request: TransformDataRequest = match Deserialize::deserialize(deserializer) {
+            Ok(data) => data,
+            Err(_) => {
+                return Err(CubeError::internal(
+                    "Can't deserialize transformData from JS ResultWrapper object".to_string(),
+                ))
+            }
+        };
+
+        let get_raw_data_js_method: Handle<JsFunction> = js_result_wrapper
+            .get(cx, "getRawData")
+            .map_cube_err("Can't get getRawData() method from JS ResultWrapper object")?;
+
+        let raw_data_js_arr = get_raw_data_js_method
+            .call(cx, js_result_wrapper.upcast::<JsValue>(), [])
+            .map_cube_err("Error calling getRawData() method of ResultWrapper object")?
+            .downcast::<JsArray, _>(cx)
+            .map_cube_err("Can't downcast JS rawData to array")?
+            .to_vec(cx)
+            .map_cube_err("Can't convert JS rawData to array")?;
+
+        let raw_data_js = raw_data_js_arr.first().unwrap();
+
+        let query_result =
+            if let Ok(js_box) = raw_data_js.downcast::<JsBox<Arc<QueryResult>>, _>(cx) {
+                Arc::clone(&js_box)
+            } else if let Ok(js_array) = raw_data_js.downcast::<JsArray, _>(cx) {
+                let deserializer = JsValueDeserializer::new(cx, js_array.upcast());
+                let js_raw_data: JsRawData = match Deserialize::deserialize(deserializer) {
+                    Ok(data) => data,
+                    Err(_) => {
+                        return Err(CubeError::internal(
+                            "Can't deserialize results raw data from JS ResultWrapper object".to_string(),
+                        ));
+                    }
+                };
+
+                QueryResult::from_js_raw_data(js_raw_data)
+                    .map(Arc::new)
+                    .map_cube_err("Can't build results data from JS rawData")?
+            } else {
+                return Err(CubeError::internal(
+                    "Can't deserialize results raw data from JS ResultWrapper object".to_string(),
+                ));
+            };
+
+        Ok(Self {
+            transform_data: transform_request,
+            data: query_result,
+        })
+    }
+
+    pub fn transform_result(&self) -> Result<TransformedData, CubeError> {
+        let transformed = TransformedData::transform(&self.transform_data, &self.data)
+            .map_cube_err("Can't prepare transformed data")?;
+
+        Ok(transformed)
+    }
+}
+
+pub type JsResultDataVectors = (
+    Vec<TransformDataRequest>,
+    Vec<Arc<QueryResult>>,
+    Vec<RequestResultData>,
+);
 
 fn json_to_array_buffer<'a, C>(
     mut cx: C,
@@ -143,12 +249,6 @@ pub fn final_query_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     Ok(promise)
 }
-
-pub type JsResultDataVectors = (
-    Vec<TransformDataRequest>,
-    Vec<Arc<QueryResult>>,
-    Vec<RequestResultData>,
-);
 
 pub fn convert_final_query_result_array_from_js(
     cx: &mut FunctionContext<'_>,

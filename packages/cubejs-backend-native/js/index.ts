@@ -267,7 +267,7 @@ function wrapNativeFunctionWithStream(
       } else if (response.error) {
         writerOrChannel.reject(errorString(response));
       } else if (response.isWrapper) { // Native wrapped result
-        writerOrChannel.resolve(await response.getFinalResult());
+        writerOrChannel.resolve(response);
       } else {
         writerOrChannel.resolve(JSON.stringify(response));
       }

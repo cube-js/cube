@@ -186,6 +186,8 @@ class BaseWrapperArray extends BaseWrapper {
     return [transformDataJson, rawData, resultDataJson];
   }
 
+  // Is invoked from the native side to get
+  // an array of all raw wrapped results
   public getResults(): ResultWrapper[] {
     return this.results;
   }

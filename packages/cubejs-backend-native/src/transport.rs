@@ -6,15 +6,12 @@ use std::fmt::Display;
 use crate::auth::NativeAuthContext;
 use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator, ValueFromJs};
 use crate::node_obj_serializer::NodeObjSerializer;
-use crate::orchestrator::convert_final_query_result_array_from_js;
+use crate::orchestrator::ResultWrapper;
 use crate::{
     auth::TransportRequest, channel::call_js_with_channel_as_callback,
     stream::call_js_with_stream_as_callback,
 };
 use async_trait::async_trait;
-use cubeorchestrator::query_result_transform::{
-    get_final_cubestore_result_array, RequestResultArray,
-};
 use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
@@ -337,6 +334,7 @@ impl TransportService for NodeBridgeTransport {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
+    // ) -> Result<Vec<RecordBatch>, CubeError> {
     ) -> Result<TransportLoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
@@ -378,52 +376,43 @@ impl TransportService for NodeBridgeTransport {
                 extra,
                 Box::new(|cx, v| Ok(cx.string(v).as_value(cx))),
                 Box::new(move |cx, v| {
-                    // It's too heavy/slow to get instance of ResultArrayWrapper from JS
-                    // and then call/await the .getFinalResult() method which needs be
-                    // executed again on JS side to get the actual needed date,
-                    // instead we pass it directly from JS side.
-                    // In case of wrapped result it's actually a tuple of
-                    // (transformDataJson[], rawData[], resultDataJson[])
-                    if let Ok(result_wrapped) = v.downcast::<JsArray, _>(cx) {
-                        let res_wrapped_vec = result_wrapped.to_vec(cx).map_cube_err("Can't convert JS result to array")?;
+                    if let Ok(js_result_wrapped) = v.downcast::<JsObject, _>(cx) {
+                        let get_results_js_method: Handle<JsFunction> = js_result_wrapped
+                            .get(cx, "getResults")
+                            .map_cube_err(
+                                "Can't get getResults() method from JS ResultWrapper object",
+                            )?;
 
-                        if res_wrapped_vec.len() != 3 {
-                            return Err(CubeError::internal("Expected a tuple with 3 elements: transformDataJson[], rawData[], resultDataJson[]".to_string()));
-                        }
+                        let results = get_results_js_method
+                            .call(cx, js_result_wrapped.upcast::<JsValue>(), [])
+                            .map_cube_err(
+                                "Error calling getResults() method of ResultWrapper object",
+                            )?;
 
-                        let transform_data_array = res_wrapped_vec.first().unwrap();
-                        let data_array = res_wrapped_vec.get(1).unwrap()
-                            .downcast_or_throw::<JsArray, _>(cx).map_cube_err("Can't downcast js data to array")?;
-                        let results_data_array = res_wrapped_vec.get(2).unwrap();
+                        let js_res_wrapped_vec = results
+                            .downcast::<JsArray, _>(cx)
+                            .map_cube_err("Can't downcast JS result to array")?
+                            .to_vec(cx)
+                            .map_cube_err("Can't convert JS result to array")?;
 
-                        match convert_final_query_result_array_from_js(
-                            cx,
-                            *transform_data_array,
-                            data_array,
-                            *results_data_array,
-                        ) {
-                            Ok((transform_requests, cube_store_results, mut request_results)) => {
-                                get_final_cubestore_result_array(
-                                    &transform_requests,
-                                    &cube_store_results,
-                                    &mut request_results,
-                                ).map_cube_err("Can't build result array")?;
+                        let native_wrapped_results = js_res_wrapped_vec
+                            .iter()
+                            .map(|r| ResultWrapper::from_js_result_wrapper(cx, *r))
+                            .collect::<Result<Vec<_>, _>>()
+                            .map_cube_err(
+                                "Can't construct result wrapper from JS ResultWrapper object",
+                            )?;
 
-                                Ok(ValueFromJs::RequestResultArray(RequestResultArray {
-                                    results: request_results,
-                                }))
-                            }
-                            Err(err) => {
-                                Err(CubeError::internal(format!("Error converting result data: {:?}", err.to_string())))
-                            }
-                        }
-
+                        Ok(ValueFromJs::ResultWrapper(native_wrapped_results))
                     } else if let Ok(str) = v.downcast::<JsString, _>(cx) {
                         Ok(ValueFromJs::String(str.value(cx)))
                     } else {
-                        Err(CubeError::internal("Can't downcast callback argument to string or resultWrapper object".to_string()))
+                        Err(CubeError::internal(
+                            "Can't downcast callback argument to string or resultWrapper object"
+                                .to_string(),
+                        ))
                     }
-                })
+                }),
             )
             .await;
 
@@ -475,12 +464,15 @@ impl TransportService for NodeBridgeTransport {
                     break serde_json::from_value::<TransportLoadResponse>(response)
                         .map_err(|err| CubeError::user(err.to_string()));
                 }
-                ValueFromJs::RequestResultArray(result) => {
+                ValueFromJs::ResultWrapper(result_wrappers) => {
                     let response = TransportLoadResponse {
                         pivot_query: None,
                         slow_query: None,
                         query_type: None,
-                        results: result.results.into_iter().map(|v| v.into()).collect(),
+                        results: result_wrappers
+                            .into_iter()
+                            .map(|v| v.transform_result().unwrap().into())
+                            .collect(),
                     };
                     break Ok(response);
                 }
