@@ -51,6 +51,18 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
 
     this.proxy = new Proxy(this, {
       get: (target, prop: string | symbol) => {
+        // To support iterative access
+        if (prop === Symbol.iterator) {
+          const array = this.getArray();
+          const l = array.length;
+
+          return function* () {
+            for (let i = 0; i < l; i++) {
+              yield array[i];
+            }
+          };
+        }
+
         // intercept indexes
         if (typeof prop === 'string' && !Number.isNaN(Number(prop))) {
           const array = this.getArray();
