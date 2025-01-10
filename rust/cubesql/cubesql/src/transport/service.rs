@@ -142,6 +142,7 @@ pub trait TransportService: Send + Sync + Debug {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
+        schema: SchemaRef,
     ) -> Result<TransportLoadResponse, CubeError>;
 
     async fn load_stream(
@@ -280,6 +281,7 @@ impl TransportService for HttpTransport {
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
+        _schema: SchemaRef,
     ) -> Result<TransportLoadResponse, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(

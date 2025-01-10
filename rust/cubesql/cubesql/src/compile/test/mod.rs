@@ -804,6 +804,7 @@ impl TransportService for TestConnectionTransport {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
+        _schema: SchemaRef,
     ) -> Result<TransportLoadResponse, CubeError> {
         {
             let mut calls = self.load_calls.lock().await;

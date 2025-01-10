@@ -662,6 +662,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 self.auth_context.clone(),
                 self.transport.clone(),
                 meta.clone(),
+                self.schema.clone(),
                 self.options.clone(),
                 self.wrapped_sql.clone(),
             )
@@ -840,6 +841,7 @@ async fn load_data(
     auth_context: AuthContextRef,
     transport: Arc<dyn TransportService>,
     meta: LoadRequestMeta,
+    schema: SchemaRef,
     options: CubeScanOptions,
     sql_query: Option<SqlQuery>,
 ) -> ArrowResult<V1LoadResult> {
@@ -871,7 +873,7 @@ async fn load_data(
         )
     } else {
         let result = transport
-            .load(span_id, request, sql_query, auth_context, meta)
+            .load(span_id, request, sql_query, auth_context, meta, schema)
             .await;
         let mut response = result.map_err(|err| ArrowError::ComputeError(err.to_string()))?;
         if let Some(data) = response.results.pop() {
@@ -899,6 +901,7 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     let auth = one_shot_stream.auth_context.clone();
     let transport = one_shot_stream.transport.clone();
     let meta = one_shot_stream.meta.clone();
+    let schema = one_shot_stream.schema.clone();
     let options = one_shot_stream.options.clone();
     let wrapped_sql = one_shot_stream.wrapped_sql.clone();
 
@@ -910,6 +913,7 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
             auth,
             transport,
             meta,
+            schema,
             options,
             wrapped_sql,
         ))
@@ -1394,6 +1398,7 @@ mod tests {
                 _sql_query: Option<SqlQuery>,
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
+                _schema: SchemaRef,
             ) -> Result<V1LoadResponse, CubeError> {
                 let response = r#"
                     {

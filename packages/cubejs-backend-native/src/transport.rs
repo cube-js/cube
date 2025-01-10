@@ -334,6 +334,7 @@ impl TransportService for NodeBridgeTransport {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
+        _schema: SchemaRef,
         // ) -> Result<Vec<RecordBatch>, CubeError> {
     ) -> Result<TransportLoadResponse, CubeError> {
         trace!("[transport] Request ->");
