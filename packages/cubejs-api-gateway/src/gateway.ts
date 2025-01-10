@@ -1818,13 +1818,13 @@ class ApiGateway {
           queries: results.length,
           queriesWithPreAggregations:
             results.filter(
-              (r: any) => Object.keys(r.getRootResultObject().usedPreAggregations || {}).length
+              (r: any) => Object.keys(r.getRootResultObject()[0].usedPreAggregations || {}).length
             ).length,
           // Have to omit because data could be processed natively
           // so it is not known at this point
           // queriesWithData:
           //   results.filter((r: any) => r.data?.length).length,
-          dbType: results.map(r => r.getRootResultObject().dbType),
+          dbType: results.map(r => r.getRootResultObject()[0].dbType),
         },
         context,
       );

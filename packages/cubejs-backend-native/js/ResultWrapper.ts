@@ -9,6 +9,9 @@ import {
 export interface DataResult {
   isWrapper: boolean;
   getFinalResult(): Promise<any>;
+  getRawData(): any[];
+  getTransformData(): any[];
+  getRootResultObject(): any[];
 }
 
 class BaseWrapper {
@@ -117,32 +120,32 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
     return (array as any)[method](...args);
   }
 
-  public getRawData() {
+  public getRawData(): any[] {
     if (this.isNative) {
-      return this.nativeReference;
+      return [this.nativeReference];
     }
 
-    return this.jsResult;
+    return [this.jsResult];
   }
 
   public setTransformData(td: any) {
     this.transformData = td;
   }
 
-  public getTransformData(): any {
-    return this.transformData;
+  public getTransformData(): any[] {
+    return [this.transformData];
   }
 
   public setRootResultObject(obj: any) {
     this.rootResultObject = obj;
   }
 
-  public getRootResultObject(): any {
-    return this.rootResultObject;
+  public getRootResultObject(): any[] {
+    return [this.rootResultObject];
   }
 
   public async getFinalResult(): Promise<any> {
-    return getFinalQueryResult(this.transformData, this.getRawData(), this.rootResultObject);
+    return getFinalQueryResult(this.transformData, this.getRawData()[0], this.rootResultObject);
   }
 }
 
@@ -154,9 +157,9 @@ export class ResultMultiWrapper extends BaseWrapper implements DataResult {
   public async getFinalResult(): Promise<any> {
     const [transformDataJson, rawDataRef, cleanResultList] = this.results.reduce<[Object[], any[], Object[]]>(
       ([transformList, rawList, resultList], r) => {
-        transformList.push(r.getTransformData());
-        rawList.push(r.getRawData());
-        resultList.push(r.getRootResultObject());
+        transformList.push(r.getTransformData()[0]);
+        rawList.push(r.getRawData()[0]);
+        resultList.push(r.getRootResultObject()[0]);
         return [transformList, rawList, resultList];
       },
       [[], [], []]
@@ -170,6 +173,18 @@ export class ResultMultiWrapper extends BaseWrapper implements DataResult {
 
     return getFinalQueryResultMulti(transformDataJson, rawDataRef, responseDataObj);
   }
+
+  public getTransformData(): any[] {
+    return this.results.map(r => r.getTransformData()[0]);
+  }
+
+  public getRawData(): any[] {
+    return this.results.map(r => r.getRawData()[0]);
+  }
+
+  public getRootResultObject(): any[] {
+    return this.results.map(r => r.getRootResultObject()[0]);
+  }
 }
 
 // This is consumed by native side via Transport Bridge
@@ -181,9 +196,9 @@ export class ResultArrayWrapper extends BaseWrapper implements DataResult {
   public async getFinalResult(): Promise<any> {
     const [transformDataJson, rawData, resultDataJson] = this.results.reduce<[Object[], any[], Object[]]>(
       ([transformList, rawList, resultList], r) => {
-        transformList.push(r.getTransformData());
-        rawList.push(r.getRawData());
-        resultList.push(r.getRootResultObject());
+        transformList.push(r.getTransformData()[0]);
+        rawList.push(r.getRawData()[0]);
+        resultList.push(r.getRootResultObject()[0]);
         return [transformList, rawList, resultList];
       },
       [[], [], []]
@@ -193,5 +208,17 @@ export class ResultArrayWrapper extends BaseWrapper implements DataResult {
     // return getFinalQueryResultArray(transformDataJson, rawData, resultDataJson);
 
     return [transformDataJson, rawData, resultDataJson];
+  }
+
+  public getTransformData(): any[] {
+    return this.results.map(r => r.getTransformData()[0]);
+  }
+
+  public getRawData(): any[] {
+    return this.results.map(r => r.getRawData()[0]);
+  }
+
+  public getRootResultObject(): any[] {
+    return this.results.map(r => r.getRootResultObject()[0]);
   }
 }
