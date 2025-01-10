@@ -1832,17 +1832,15 @@ class ApiGateway {
       if (props.queryType === 'multi') {
         // We prepare the final json result on native side
         const resultMulti = new ResultMultiWrapper(results, { queryType, slowQuery });
-        return res(resultMulti);
+        await res(resultMulti);
       } else {
         // We prepare the full final json result on native side
-        return res(results[0]);
+        await res(results[0]);
       }
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
-
-      return null;
     }
   }
 
@@ -1934,7 +1932,7 @@ class ApiGateway {
           }];
         }
 
-        return res(request.streaming ? results[0] : { results });
+        await res(request.streaming ? results[0] : { results });
       } else {
         results = await Promise.all(
           normalizedQueries.map(async (normalizedQuery, index) => {
@@ -1968,19 +1966,17 @@ class ApiGateway {
         );
 
         if (request.streaming) {
-          return res(results[0]);
+          await res(results[0]);
         } else {
           // We prepare the final json result on native side
           const resultArray = new ResultArrayWrapper(results);
-          return res(resultArray);
+          await res(resultArray);
         }
       }
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
-
-      return null;
     }
   }
 
