@@ -12,6 +12,8 @@ export interface DataResult {
   getRawData(): any[];
   getTransformData(): any[];
   getRootResultObject(): any[];
+  // eslint-disable-next-line no-use-before-define
+  getResults(): ResultWrapper[];
 }
 
 class BaseWrapper {
@@ -159,53 +161,18 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
   public async getFinalResult(): Promise<any> {
     return getFinalQueryResult(this.transformData, this.getRawData()[0], this.rootResultObject);
   }
-}
 
-export class ResultMultiWrapper extends BaseWrapper implements DataResult {
-  public constructor(private readonly results: ResultWrapper[], private rootResultObject: any) {
-    super();
-  }
-
-  public async getFinalResult(): Promise<any> {
-    const [transformDataJson, rawDataRef, cleanResultList] = this.results.reduce<[Object[], any[], Object[]]>(
-      ([transformList, rawList, resultList], r) => {
-        transformList.push(r.getTransformData()[0]);
-        rawList.push(r.getRawData()[0]);
-        resultList.push(r.getRootResultObject()[0]);
-        return [transformList, rawList, resultList];
-      },
-      [[], [], []]
-    );
-
-    const responseDataObj = {
-      queryType: this.rootResultObject.queryType,
-      results: cleanResultList,
-      slowQuery: this.rootResultObject.slowQuery,
-    };
-
-    return getFinalQueryResultMulti(transformDataJson, rawDataRef, responseDataObj);
-  }
-
-  public getTransformData(): any[] {
-    return this.results.map(r => r.getTransformData()[0]);
-  }
-
-  public getRawData(): any[] {
-    return this.results.map(r => r.getRawData()[0]);
-  }
-
-  public getRootResultObject(): any[] {
-    return this.results.map(r => r.getRootResultObject()[0]);
+  public getResults(): ResultWrapper[] {
+    return [this];
   }
 }
 
-// This is consumed by native side via Transport Bridge
-export class ResultArrayWrapper extends BaseWrapper implements DataResult {
-  public constructor(private readonly results: ResultWrapper[]) {
+class BaseWrapperArray extends BaseWrapper {
+  public constructor(protected readonly results: ResultWrapper[]) {
     super();
   }
 
-  public async getFinalResult(): Promise<any> {
+  protected getInternalDataArrays(): any[] {
     const [transformDataJson, rawData, resultDataJson] = this.results.reduce<[Object[], any[], Object[]]>(
       ([transformList, rawList, resultList], r) => {
         transformList.push(r.getTransformData()[0]);
@@ -216,10 +183,11 @@ export class ResultArrayWrapper extends BaseWrapper implements DataResult {
       [[], [], []]
     );
 
-    // It seems this is not needed anymore
-    // return getFinalQueryResultArray(transformDataJson, rawData, resultDataJson);
-
     return [transformDataJson, rawData, resultDataJson];
+  }
+
+  public getResults(): ResultWrapper[] {
+    return this.results;
   }
 
   public getTransformData(): any[] {
@@ -232,5 +200,36 @@ export class ResultArrayWrapper extends BaseWrapper implements DataResult {
 
   public getRootResultObject(): any[] {
     return this.results.map(r => r.getRootResultObject()[0]);
+  }
+}
+
+export class ResultMultiWrapper extends BaseWrapperArray implements DataResult {
+  public constructor(results: ResultWrapper[], private rootResultObject: any) {
+    super(results);
+  }
+
+  public async getFinalResult(): Promise<any> {
+    const [transformDataJson, rawDataRef, cleanResultList] = this.getInternalDataArrays();
+
+    const responseDataObj = {
+      queryType: this.rootResultObject.queryType,
+      results: cleanResultList,
+      slowQuery: this.rootResultObject.slowQuery,
+    };
+
+    return getFinalQueryResultMulti(transformDataJson, rawDataRef, responseDataObj);
+  }
+}
+
+// This is consumed by native side via Transport Bridge
+export class ResultArrayWrapper extends BaseWrapperArray implements DataResult {
+  public constructor(results: ResultWrapper[]) {
+    super(results);
+  }
+
+  public async getFinalResult(): Promise<any> {
+    const [transformDataJson, rawDataRef, cleanResultList] = this.getInternalDataArrays();
+
+    return [transformDataJson, rawDataRef, cleanResultList];
   }
 }
