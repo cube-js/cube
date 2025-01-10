@@ -24,15 +24,26 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
 
   private readonly isNative: Boolean = false;
 
+  private readonly nativeReference: any;
+
+  private readonly jsResult: any = null;
+
   private transformData: any;
 
   private rootResultObject: any = {};
 
-  public constructor(private readonly nativeReference: any, private readonly jsResult: any = null) {
+  public constructor(input: any) {
     super();
 
-    if (nativeReference) {
+    if (input.isWrapper) {
+      return input;
+    }
+
+    if (Array.isArray(input)) {
+      this.jsResult = input;
+    } else {
       this.isNative = true;
+      this.nativeReference = input;
     }
 
     this.proxy = new Proxy(this, {

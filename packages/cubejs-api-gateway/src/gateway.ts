@@ -1601,9 +1601,7 @@ class ApiGateway {
    * @private
    */
   private wrapAdapterQueryResultIfNeeded(res: any): ResultWrapper {
-    if (!(res.data instanceof ResultWrapper)) {
-      res.data = new ResultWrapper(null, res.data);
-    }
+    res.data = new ResultWrapper(res.data);
 
     return res;
   }
