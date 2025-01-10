@@ -435,7 +435,10 @@ impl TransportService for NodeBridgeTransport {
 
             match result? {
                 ValueFromJs::String(result) => {
-                    let response: serde_json::Value = serde_json::Value::String(result);
+                    let response: serde_json::Value = match serde_json::from_str(&result) {
+                        Ok(json) => json,
+                        Err(err) => return Err(CubeError::internal(err.to_string())),
+                    };
 
                     #[cfg(debug_assertions)]
                     trace!("[transport] Request <- {:?}", response);
