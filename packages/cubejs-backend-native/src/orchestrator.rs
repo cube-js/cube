@@ -2,8 +2,7 @@ use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    get_final_cubestore_result_array, RequestResultArray, RequestResultData,
-    RequestResultDataMulti, TransformedData,
+    RequestResultData, RequestResultDataMulti, TransformedData,
 };
 use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
 use cubesql::CubeError;
@@ -26,7 +25,6 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("getCubestoreResult", get_cubestore_result)?;
     cx.export_function("getFinalQueryResult", final_query_result)?;
     cx.export_function("getFinalQueryResultMulti", final_query_result_multi)?;
-    cx.export_function("getFinalQueryResultArray", final_query_result_array)?;
 
     Ok(())
 }
@@ -99,7 +97,8 @@ impl ResultWrapper {
                     Ok(data) => data,
                     Err(_) => {
                         return Err(CubeError::internal(
-                            "Can't deserialize results raw data from JS ResultWrapper object".to_string(),
+                            "Can't deserialize results raw data from JS ResultWrapper object"
+                                .to_string(),
                         ));
                     }
                 };
@@ -126,12 +125,6 @@ impl ResultWrapper {
         Ok(transformed)
     }
 }
-
-pub type JsResultDataVectors = (
-    Vec<TransformDataRequest>,
-    Vec<Arc<QueryResult>>,
-    Vec<RequestResultData>,
-);
 
 fn json_to_array_buffer<'a, C>(
     mut cx: C,
@@ -248,74 +241,6 @@ pub fn final_query_result(mut cx: FunctionContext) -> JsResult<JsPromise> {
         .promise(move |cx, json_data| json_to_array_buffer(cx, json_data));
 
     Ok(promise)
-}
-
-pub fn convert_final_query_result_array_from_js(
-    cx: &mut FunctionContext<'_>,
-    transform_data_array: Handle<JsValue>,
-    data_array: Handle<JsArray>,
-    results_data_array: Handle<JsValue>,
-) -> NeonResult<JsResultDataVectors> {
-    let deserializer = JsValueDeserializer::new(cx, transform_data_array);
-    let transform_requests: Vec<TransformDataRequest> = match Deserialize::deserialize(deserializer)
-    {
-        Ok(data) => data,
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
-
-    let mut cube_store_results: Vec<Arc<QueryResult>> = vec![];
-    for data_arg in data_array.to_vec(cx)? {
-        match extract_query_result(cx, data_arg) {
-            Ok(query_result) => cube_store_results.push(query_result),
-            Err(err) => return cx.throw_error(err.to_string()),
-        };
-    }
-
-    let deserializer = JsValueDeserializer::new(cx, results_data_array);
-    let request_results: Vec<RequestResultData> = match Deserialize::deserialize(deserializer) {
-        Ok(data) => data,
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
-
-    Ok((transform_requests, cube_store_results, request_results))
-}
-
-pub fn final_query_result_array(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let transform_data_array = cx.argument::<JsValue>(0)?;
-    let data_array = cx.argument::<JsArray>(1)?;
-    let results_data_array = cx.argument::<JsValue>(2)?;
-
-    let convert_res = convert_final_query_result_array_from_js(
-        &mut cx,
-        transform_data_array,
-        data_array,
-        results_data_array,
-    );
-    match convert_res {
-        Ok((transform_requests, cube_store_results, mut request_results)) => {
-            let promise = cx
-                .task(move || {
-                    get_final_cubestore_result_array(
-                        &transform_requests,
-                        &cube_store_results,
-                        &mut request_results,
-                    )?;
-
-                    let final_obj = RequestResultArray {
-                        results: request_results,
-                    };
-
-                    match serde_json::to_string(&final_obj) {
-                        Ok(json) => Ok(json),
-                        Err(err) => Err(anyhow::Error::from(err)),
-                    }
-                })
-                .promise(move |cx, json_data| json_to_array_buffer(cx, json_data));
-
-            Ok(promise)
-        }
-        Err(err) => cx.throw_error(err.to_string()),
-    }
 }
 
 pub fn final_query_result_multi(mut cx: FunctionContext) -> JsResult<JsPromise> {

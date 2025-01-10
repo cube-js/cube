@@ -1,7 +1,6 @@
 import {
   getCubestoreResult,
   getFinalQueryResult,
-  getFinalQueryResultArray,
   getFinalQueryResultMulti,
   ResultRow
 } from './index';

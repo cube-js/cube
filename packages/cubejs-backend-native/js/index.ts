@@ -392,20 +392,6 @@ export const getFinalQueryResult = (transformDataObj: Object, rows: any, resultD
 };
 
 /**
- * Transform and prepare multiple query final results data that is sent to the client (used in sqlApiLoad).
- *
- * @param transformDataArr Array of data needed to transform raw query results
- * @param rows Array of raw data received from the source DB via driver or reference to native CubeStore response results
- * @param resultDataArr Array of final query result structures without actual data
- * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
- */
-export const getFinalQueryResultArray = (transformDataArr: Object[], rows: any[], resultDataArr: Object[]): Promise<ArrayBuffer> => {
-  const native = loadNative();
-
-  return native.getFinalQueryResultArray(transformDataArr, rows, resultDataArr);
-};
-
-/**
  * Transform and prepare multiple query final results data into a single response structure.
  *
  * @param transformDataArr Array of data needed to transform raw query results

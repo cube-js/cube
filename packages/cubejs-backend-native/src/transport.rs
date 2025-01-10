@@ -334,7 +334,7 @@ impl TransportService for NodeBridgeTransport {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    // ) -> Result<Vec<RecordBatch>, CubeError> {
+        // ) -> Result<Vec<RecordBatch>, CubeError> {
     ) -> Result<TransportLoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
@@ -377,9 +377,8 @@ impl TransportService for NodeBridgeTransport {
                 Box::new(|cx, v| Ok(cx.string(v).as_value(cx))),
                 Box::new(move |cx, v| {
                     if let Ok(js_result_wrapped) = v.downcast::<JsObject, _>(cx) {
-                        let get_results_js_method: Handle<JsFunction> = js_result_wrapped
-                            .get(cx, "getResults")
-                            .map_cube_err(
+                        let get_results_js_method: Handle<JsFunction> =
+                            js_result_wrapped.get(cx, "getResults").map_cube_err(
                                 "Can't get getResults() method from JS ResultWrapper object",
                             )?;
 
