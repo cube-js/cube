@@ -1161,6 +1161,7 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
     memberExpressions: boolean = false,
+    skipQueryRewrite: boolean = false,
   ): Promise<[QueryType, NormalizedQuery[]]> {
     let query = this.parseQueryParam(inputQuery);
 
@@ -1199,6 +1200,11 @@ class ApiGateway {
           }
 
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
+
+          if (skipQueryRewrite) {
+            return normalizedQuery;
+          }
+
           let evaluatedQuery = normalizedQuery;
 
           if (hasExpressionsInQuery) {
@@ -1454,7 +1460,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('data', context.securityContext);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context, undefined, undefined, true);
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
