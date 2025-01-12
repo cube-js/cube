@@ -60,7 +60,7 @@ pub fn parse_sql_to_statements(
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
-    // DBEver
+    // DBeaver
     let query = query.replace(
         "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
         "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
