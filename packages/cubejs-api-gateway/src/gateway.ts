@@ -1184,25 +1184,32 @@ class ApiGateway {
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
 
-    const normalizedQueriesPreRewrite: NormalizedQuery[] = queries.map((currentQuery) => remapToQueryAdapterFormat(normalizeQuery(currentQuery, persistent)));
+    const queryNormalizationResult: Array<{
+      query: Query,
+      normalizedQuery: NormalizedQuery,
+      hasExpressionsInQuery: boolean
+    }> = queries.map((currentQuery) => {
+      const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+
+      if (hasExpressionsInQuery) {
+        if (!memberExpressions) {
+          throw new Error('Expressions are not allowed in this context');
+        }
+
+        currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+      }
+
+      return {
+        query: currentQuery,
+        normalizedQuery: (normalizeQuery(currentQuery, persistent)),
+        hasExpressionsInQuery
+      };
+    });
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
-      queries.map(
-        async (currentQuery) => {
-          const hasExpressionsInQuery =
-            this.hasExpressionsInQuery(currentQuery);
-
-          if (hasExpressionsInQuery) {
-            if (!memberExpressions) {
-              throw new Error('Expressions are not allowed in this context');
-            }
-
-            currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
-          }
-
-          const normalizedQuery = normalizeQuery(currentQuery, persistent);
-
-          let evaluatedQuery = normalizedQuery;
+      queryNormalizationResult.map(
+        async ({ query: currentQuery, normalizedQuery, hasExpressionsInQuery }) => {
+          let evaluatedQuery = currentQuery;
 
           if (hasExpressionsInQuery) {
             // We need to parse/eval all member expressions early as applyRowLevelSecurity
@@ -1260,7 +1267,7 @@ class ApiGateway {
       }
     }
 
-    return [queryType, normalizedQueries, normalizedQueriesPreRewrite];
+    return [queryType, normalizedQueries, queryNormalizationResult.map((it) => remapToQueryAdapterFormat(it.normalizedQuery))];
   }
 
   public async sql({
