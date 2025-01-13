@@ -994,6 +994,14 @@ impl CubeScanWrapperNode {
                                                     "Unsupported ungrouped CubeScan as join subquery: {join_cube_scan:?}"
                                                 )));
                                             }
+                                        } else if let Some(wrapped_select) =
+                                            node.as_any().downcast_ref::<WrappedSelectNode>()
+                                        {
+                                            if wrapped_select.push_to_cube {
+                                                return Err(CubeError::internal(format!(
+                                                    "Unsupported push_to_cube WrappedSelect as join subquery: {wrapped_select:?}"
+                                                )));
+                                            }
                                         } else {
                                             // TODO support more grouped cases here
                                             return Err(CubeError::internal(format!(
