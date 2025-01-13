@@ -1184,7 +1184,7 @@ class ApiGateway {
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
 
-    const normalizedQueriesPreRewrite: NormalizedQuery[] = queries.map((currentQuery) => normalizeQuery(currentQuery, persistent));
+    const normalizedQueriesPreRewrite: NormalizedQuery[] = queries.map((currentQuery) => remapToQueryAdapterFormat(normalizeQuery(currentQuery, persistent)));
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
