@@ -222,14 +222,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return dataSetsColumns.reduce((prev, current) => Object.assign(prev, current), {});
   }
 
-  public async getSchemas(): Promise<QuerySchemasResult[]> {
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
     const dataSets = await this.bigquery.getDatasets();
     return dataSets[0].filter((dataSet) => dataSet.id).map((dataSet) => ({
       schema_name: dataSet.id!,
     }));
   }
 
-  public async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     try {
       const allTablePromises = schemas.map(async schema => {
         const tables = await this.getTablesQuery(schema.schema_name);
@@ -247,7 +247,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     try {
       const allColumnPromises = tables.map(async table => {
         const tableName = `${table.schema_name}.${table.table_name}`;
