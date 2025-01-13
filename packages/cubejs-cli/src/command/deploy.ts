@@ -65,8 +65,8 @@ export function configureDeployCommand(program: CommanderStatic) {
   program
     .command('deploy')
     .description('Deploy project to Cube Cloud')
-    .option('--upload-env', 'Upload .env file to CubeCloud')
-    .option('--replace-env', 'Upload .env file to CubeCloud, allowing to replace existing variables')
+    .option('--upload-env', 'Use .env file to populate environment variables in Cube Cloud. Only set them once during the very first upload for this deployment')
+    .option('--replace-env', 'Use .env file to populate environment variables in Cube Cloud. Replace them with new ones during every upload for this deployment')
     .option('--token <token>', 'Add auth token to CubeCloud')
     .option('--directory [path]', 'Specify path to conf directory', './')
     .action(
