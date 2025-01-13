@@ -1161,8 +1161,7 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
     memberExpressions: boolean = false,
-    skipQueryRewrite: boolean = false,
-  ): Promise<[QueryType, NormalizedQuery[]]> {
+  ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[]]> {
     let query = this.parseQueryParam(inputQuery);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
@@ -1185,6 +1184,8 @@ class ApiGateway {
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
 
+    const normalizedQueriesPreRewrite: NormalizedQuery[] = queries.map((currentQuery) => normalizeQuery(currentQuery, persistent));
+
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => {
@@ -1200,10 +1201,6 @@ class ApiGateway {
           }
 
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
-
-          if (skipQueryRewrite) {
-            return normalizedQuery;
-          }
 
           let evaluatedQuery = normalizedQuery;
 
@@ -1263,7 +1260,7 @@ class ApiGateway {
       }
     }
 
-    return [queryType, normalizedQueries];
+    return [queryType, normalizedQueries, normalizedQueriesPreRewrite];
   }
 
   public async sql({
@@ -1460,7 +1457,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('data', context.securityContext);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context, undefined, undefined, true);
+      const [queryType, _, normalizedQueries] = await this.getNormalizedQueries(query, context, undefined, undefined);
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
