@@ -1,4 +1,6 @@
+use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
+use super::sql_templates::PlanSqlTemplates;
 use super::VisitorContext;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -36,5 +38,26 @@ impl BaseMemberHelper {
 
     pub fn to_alias_vec(members: &Vec<Rc<dyn BaseMember>>) -> Vec<String> {
         members.iter().map(|m| m.alias_name()).collect_vec()
+    }
+
+    pub fn default_alias(
+        cube_name: &String,
+        member_name: &String,
+        member_suffix: &Option<String>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<String, CubeError> {
+        let cube_definition = query_tools
+            .cube_evaluator()
+            .cube_from_path(cube_name.clone())?;
+        let cube_alias = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
+            sql_alias
+        } else {
+            cube_name
+        };
+        Ok(PlanSqlTemplates::memeber_alias_name(
+            &cube_alias,
+            &member_name,
+            member_suffix,
+        ))
     }
 }

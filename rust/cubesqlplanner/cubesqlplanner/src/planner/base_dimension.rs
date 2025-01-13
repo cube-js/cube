@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
-use super::{evaluate_with_context, BaseMember, VisitorContext};
+use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -10,6 +10,7 @@ pub struct BaseDimension {
     member_evaluator: Rc<MemberSymbol>,
     cube_name: String,
     name: String,
+    default_alias: String,
 }
 
 impl BaseMember for BaseDimension {
@@ -18,7 +19,7 @@ impl BaseMember for BaseDimension {
     }
 
     fn alias_name(&self) -> String {
-        self.unescaped_alias_name()
+        self.default_alias.clone()
     }
 
     fn member_evaluator(&self) -> Rc<MemberSymbol> {
@@ -44,13 +45,22 @@ impl BaseDimension {
         query_tools: Rc<QueryTools>,
     ) -> Result<Option<Rc<Self>>, CubeError> {
         let result = match evaluation_node.as_ref() {
-            MemberSymbol::Dimension(s) => Some(Rc::new(Self {
-                dimension: s.full_name(),
-                query_tools: query_tools.clone(),
-                member_evaluator: evaluation_node.clone(),
-                cube_name: s.cube_name().clone(),
-                name: s.name().clone(),
-            })),
+            MemberSymbol::Dimension(s) => {
+                let default_alias = BaseMemberHelper::default_alias(
+                    &s.cube_name(),
+                    &s.name(),
+                    &None,
+                    query_tools.clone(),
+                )?;
+                Some(Rc::new(Self {
+                    dimension: s.full_name(),
+                    query_tools: query_tools.clone(),
+                    member_evaluator: evaluation_node.clone(),
+                    cube_name: s.cube_name().clone(),
+                    name: s.name().clone(),
+                    default_alias,
+                }))
+            }
             _ => None,
         };
         Ok(result)
@@ -75,9 +85,5 @@ impl BaseDimension {
 
     pub fn dimension(&self) -> &String {
         &self.dimension
-    }
-
-    pub fn unescaped_alias_name(&self) -> String {
-        self.query_tools.alias_name(&self.dimension)
     }
 }

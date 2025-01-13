@@ -52,7 +52,7 @@ export class ConfigCli extends Config {
     const deployments = await this.cubeCloudClient.getDeploymentsList({ auth: { ...authToken, url } });
 
     if (!Array.isArray(deployments)) {
-      throw new Error(deployments.toString());
+      throw new Error(JSON.stringify(deployments));
     }
 
     if (!deployments.length) {

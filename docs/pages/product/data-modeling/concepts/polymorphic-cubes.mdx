@@ -46,7 +46,7 @@ dimensions:
 ```yaml
 cubes:
   - name: users
-    sql_table: users
+    sql: SELECT * FROM users
 
     measures:
       - name: count
@@ -64,7 +64,7 @@ cubes:
 
 ```javascript
 cube(`users`, {
-  sql_table: `users`,
+  sql: `SELECT * FROM users`,
 
   measures: {
     count: {

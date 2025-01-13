@@ -145,6 +145,13 @@ Example response:
 }
 ```
 
+<InfoBox>
+
+Note that a generated query can contain placeholders, e.g., `?` or `$1`, for parameters
+that Cube passes to an underlying data source driver later when executing the query.
+
+</InfoBox>
+
 ## `/v1/meta`
 
 Get meta-information for cubes and views defined in the data model. Information about cubes and views with `public: false` will not be returned.

@@ -71,6 +71,11 @@ type DeployHooks = {
   onFinally?: () => void
 };
 
+export interface DeployResponse {
+  lastHash?: string;
+  [key: string]: any; // for other properties
+}
+
 export class DeployController {
   public constructor(
     protected readonly cubeCloudClient: CubeCloudClient,
@@ -79,7 +84,7 @@ export class DeployController {
   ) {
   }
 
-  public async deploy(directory: string) {
+  public async deploy(directory: string): Promise<DeployResponse> {
     let result;
     const deployDir = new DeployDirectory({ directory });
     const fileHashes: any = await deployDir.fileHashes();

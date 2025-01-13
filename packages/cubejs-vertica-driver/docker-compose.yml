@@ -1,0 +1,19 @@
+version: "2.2"
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 15432:15432
+    environment:
+      - CUBEJS_DB_TYPE=vertica
+      - CUBEJS_DB_HOST= #host
+      - CUBEJS_DB_NAME= #database name 
+      - CUBEJS_DB_PORT=5433
+      - CUBEJS_DB_USER= #database user
+      - CUBEJS_DB_PASS= #database password
+      - CUBEJS_DEV_MODE=true #if running locally
+    volumes:
+      - .:/cube/conf
+
