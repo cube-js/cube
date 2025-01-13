@@ -2,6 +2,7 @@ import fetch, { RequestInit } from 'node-fetch';
 import FormData from 'form-data';
 import path from 'path';
 import { ReadStream } from 'fs';
+import { DotenvParseOutput } from '@cubejs-backend/dotenv';
 
 export type AuthObject = {
   auth: string,
@@ -113,22 +114,18 @@ export class CubeCloudClient {
     const formData = new FormData();
     formData.append('transaction', JSON.stringify(transaction));
     formData.append('fileName', fileName);
-    formData.append('file', {
-      value: data,
-      options: {
-        filename: path.basename(fileName),
-        contentType: 'application/octet-stream'
-      }
+    formData.append('file', data, {
+      filename: path.basename(fileName),
+      contentType: 'application/octet-stream'
     });
 
     // Get the form data buffer and headers
-    const formDataBuffer = formData.getBuffer();
     const formDataHeaders = formData.getHeaders();
 
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file${this.extendRequestByLivePreview()}`,
       method: 'POST',
-      body: formDataBuffer,
+      body: formData,
       headers: {
         ...formDataHeaders,
       },
@@ -149,9 +146,10 @@ export class CubeCloudClient {
     });
   }
 
-  public setEnvVars({ envVariables, auth }: { envVariables: any, auth?: AuthObject }) {
+  public setEnvVars({ envVariables, auth, replaceEnv }: { envVariables: DotenvParseOutput, auth?: AuthObject, replaceEnv?: boolean }) {
+    const params = new URLSearchParams({ replaceEnv: Boolean(replaceEnv).toString() });
     return this.request({
-      url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
+      url: (deploymentId) => `build/deploy/${deploymentId}/set-env?${params.toString()}`,
       method: 'POST',
       body: JSON.stringify({ envVariables: JSON.stringify(envVariables) }),
       headers: {
