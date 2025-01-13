@@ -2274,7 +2274,7 @@ from
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
@@ -7362,7 +7362,10 @@ ORDER BY "source"."str0" ASC
             query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec![
+                    "WideCube.dim1".to_string(),
+                    "WideCube.dim2".to_string(),
+                ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
@@ -16332,5 +16335,20 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             .unwrap()
             .sql;
         assert!(sql.contains(" IS NULL DESC, "));
+    }
+
+    #[tokio::test]
+    async fn test_values_literal_table() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "values_literal_table",
+            execute_query(
+                r#"SELECT a AS a, b AS b FROM (VALUES (1, 2), (3, 4), (5, 6)) AS t(a, b)"#
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }

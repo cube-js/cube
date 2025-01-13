@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "1.0.0",
+  "version": "1.1.12",
   "author": "Cube Dev, Inc.",
   "engines": {},
   "repository": {
@@ -27,15 +27,15 @@
     "tslib": "^2.0.0"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^12.1.2",
-    "@angular/cli": "^12.1.2",
-    "@angular/compiler": "^12.1.2",
-    "@angular/compiler-cli": "^12.1.2",
-    "@angular/core": "^12.1.2",
-    "ng-packagr": "^12.1.2",
+    "@angular-devkit/build-angular": "^13.3.11",
+    "@angular/cli": "^13.3.11",
+    "@angular/compiler": "^13.3.11",
+    "@angular/compiler-cli": "^13.3.11",
+    "@angular/core": "^13.3.11",
+    "ng-packagr": "^13.3.1",
     "npm-watch": "^0.7.0",
     "tsickle": "^0.39.1",
-    "typescript": "~4.3.5"
+    "typescript": "~4.5.5"
   },
   "peerDependencies": {
     "@cubejs-client/core": ">=0.28.1",

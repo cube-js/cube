@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cloud",
-  "version": "1.1.7",
+  "version": "1.1.13",
   "description": "Cube Cloud package",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -23,22 +23,23 @@
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
     "@cubejs-backend/linter": "^1.0.0",
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
-    "@types/request-promise": "^4.1.46",
     "jest": "^27",
     "typescript": "~5.2.2"
   },
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/shared": "1.1.7",
+    "@cubejs-backend/shared": "1.1.12",
     "chokidar": "^3.5.1",
     "env-var": "^6.3.0",
+    "form-data": "^4.0.0",
     "fs-extra": "^9.1.0",
     "jsonwebtoken": "^9.0.2",
-    "request": "^2.88.2",
-    "request-promise": "^4.2.5"
+    "node-fetch": "^2.7.0"
   },
   "publishConfig": {
     "access": "public"

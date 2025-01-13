@@ -1613,6 +1613,19 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbExtensions: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const extensions = process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_EXTENSIONS', dataSource)
+    ];
+    if (extensions) {
+      return extensions.split(',').map(e => e.trim());
+    }
+    return [];
+  },
   /** ***************************************************************
    * Presto Driver                                                  *
    **************************************************************** */
@@ -1644,6 +1657,23 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_PINOT_AUTH_TOKEN', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Dremio Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Dremio Auth Token
+   */
+  dremioAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DREMIO_AUTH_TOKEN', dataSource)
     ]
   ),
 

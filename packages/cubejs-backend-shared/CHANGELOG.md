@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
+
+
+### Features
+
+* **duckdb-driver:** Add support for installing and loading DuckDB Extensions. ([#8744](https://github.com/cube-js/cube/issues/8744)) ([0e6ecd9](https://github.com/cube-js/cube/commit/0e6ecd925fc342bd4ac692e3ee364f29ee6b20df))
+
+
+
+
+
+## [1.1.10](https://github.com/cube-js/cube/compare/v1.1.9...v1.1.10) (2024-12-16)
+
+
+### Features
+
+* **dremio-driver:** Add Dremio Cloud Support ([#8956](https://github.com/cube-js/cube/issues/8956)) ([d2c2fcd](https://github.com/cube-js/cube/commit/d2c2fcdaf8944ea7dd27e73b63c0b151c317022e))
+
+
+
+
+
+## [1.1.8](https://github.com/cube-js/cube/compare/v1.1.7...v1.1.8) (2024-12-05)
+
+
+### Features
+
+* **pinot-driver:** add optional oAuth headers ([#8953](https://github.com/cube-js/cube/issues/8953)) ([7b1f797](https://github.com/cube-js/cube/commit/7b1f7975102d204c8ca5cf08d91acb9352d63a08))
+
+
+
+
+
 ## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
 
 

@@ -3,6 +3,72 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.15](https://github.com/cube-js/cube/compare/v1.1.14...v1.1.15) (2025-01-13)
+
+
+### Bug Fixes
+
+* **cubesql:** Add folders to Cube Metadata ([#9089](https://github.com/cube-js/cube/issues/9089)) ([8d714d6](https://github.com/cube-js/cube/commit/8d714d6637862b36024aee5c3857267c0c167dbf))
+
+
+
+
+
+## [1.1.14](https://github.com/cube-js/cube/compare/v1.1.13...v1.1.14) (2025-01-09)
+
+
+### Bug Fixes
+
+* **cubesql:** add title field to Dimension Metadata ([#9084](https://github.com/cube-js/cube/issues/9084)) ([9653a23](https://github.com/cube-js/cube/commit/9653a23d9f477b391627755a533b2d6e8eae5656))
+
+
+
+
+
+## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
+
+
+### Features
+
+* **cubesql:** Penalize zero members in wrapper ([#8927](https://github.com/cube-js/cube/issues/8927)) ([171ea35](https://github.com/cube-js/cube/commit/171ea351e739f705ddbf0d803a34b944cb8c9da5))
+
+
+
+
+
+## [1.1.10](https://github.com/cube-js/cube/compare/v1.1.9...v1.1.10) (2024-12-16)
+
+
+### Features
+
+* **cubesql:** Basic VALUES support in rewrite engine ([#9041](https://github.com/cube-js/cube/issues/9041)) ([368671f](https://github.com/cube-js/cube/commit/368671fd1b53b2ed5ad8df6af113492982f23c0c))
+
+
+
+
+
+## [1.1.9](https://github.com/cube-js/cube/compare/v1.1.8...v1.1.9) (2024-12-08)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow aggregation pushdown only for unlimited CubeScan ([#8929](https://github.com/cube-js/cube/issues/8929)) ([5b10a68](https://github.com/cube-js/cube/commit/5b10a68b4aca8e5050291fa3ca85dd5f3edc6614))
+
+
+
+
+
+## [1.1.8](https://github.com/cube-js/cube/compare/v1.1.7...v1.1.8) (2024-12-05)
+
+
+### Bug Fixes
+
+* **cubesql:** fix unhandled timestamp unwrapping in df/transform_response ([#8952](https://github.com/cube-js/cube/issues/8952)) ([4ea0740](https://github.com/cube-js/cube/commit/4ea0740a4001767ab1863c21c062a7e1487fc4e6))
+
+
+
+
+
 ## [1.1.7](https://github.com/cube-js/cube/compare/v1.1.6...v1.1.7) (2024-11-20)
 
 

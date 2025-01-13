@@ -64,7 +64,7 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
-        revenueRolling3day: {
+        revenueRollingThreeDay: {
           type: 'sum',
           sql: 'amount',
           rollingWindow: {
@@ -407,7 +407,7 @@ describe('SQL Generation', () => {
 
     cube('visitor_checkins_sources', {
       sql: \`
-      select id, source from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins_sources.source.filter('source')}
+      select id, visitor_id, source from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins_sources.source.filter('source')}
       \`,
 
       rewriteQueries: true,
@@ -419,11 +419,21 @@ describe('SQL Generation', () => {
         }
       },
 
+      measures: {
+        count: {
+          type: 'count'
+        }
+      },
+
       dimensions: {
         id: {
           type: 'number',
           sql: 'id',
           primaryKey: true
+        },
+        visitor_id: {
+          type: 'number',
+          sql: 'visitor_id'
         },
         source: {
           type: 'string',
@@ -770,7 +780,7 @@ describe('SQL Generation', () => {
 
   it('rolling month', async () => runQueryTest({
     measures: [
-      'visitors.revenueRolling3day'
+      'visitors.revenueRollingThreeDay'
     ],
     timeDimensions: [{
       dimension: 'visitors.created_at',
@@ -782,7 +792,7 @@ describe('SQL Generation', () => {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling3day: '900' }
+    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling_three_day: '900' }
   ]));
 
   it('rolling count', async () => runQueryTest({
@@ -1781,7 +1791,7 @@ describe('SQL Generation', () => {
   ]));
 
   it(
-    'contains filter',
+    'contains filter 1',
     () => runQueryTest({
       measures: [],
       dimensions: [
@@ -1894,6 +1904,171 @@ describe('SQL Generation', () => {
     }, [
       { visitors__source: 'some' },
       { visitors__source: null },
+    ])
+  );
+
+  it(
+    'equals NULL filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'equals',
+        values: [null]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'notSet(IS NULL) filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'notSet',
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'notEquals NULL filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'notEquals',
+        values: [null]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'set(IS NOT NULL) filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'set',
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'source is notSet(IS NULL) "or" source is google filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            dimension: 'visitor_checkins_sources.source',
+            operator: 'notSet',
+          },
+          {
+            dimension: 'visitor_checkins_sources.source',
+            operator: 'equals',
+            values: ['google']
+          }
+        ]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '3'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
     ])
   );
 
@@ -2408,7 +2583,7 @@ describe('SQL Generation', () => {
     ]
   ));
 
-  it('rank measure', async () => runQueryTest(
+  it('rank measure 1', async () => runQueryTest(
     {
       measures: ['visitors.revenue_rank'],
     },
@@ -2797,6 +2972,63 @@ describe('SQL Generation', () => {
       visitors_visitors_checkins_view__revenue: '2000',
       visitors_visitors_checkins_view__id_sum: '21'
     }]
+  ));
+
+  // Subquery aggregation for multiplied measure (and any `keysSelect` for that matter)
+  // should pick up all dimensions, even through member expressions
+  it('multiplied sum with dimension member expressions', async () => runQueryTest(
+    {
+      measures: [
+        'visitors_visitors_checkins_view.revenue',
+        'visitors_visitors_checkins_view.visitor_checkins_count',
+      ],
+      dimensions: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitors_visitors_checkins_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `LOWER(${visitors_visitors_checkins_view.source})`'
+          ),
+          expressionName: 'lower_source',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'LOWER(${visitors_visitors_checkins_view.source})',
+          cubeName: 'visitors_visitors_checkins_view',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitors_visitors_checkins_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `UPPER(${visitors_visitors_checkins_view.source})`'
+          ),
+          expressionName: 'upper_source',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'UPPER(${visitors_visitors_checkins_view.source})',
+          cubeName: 'visitors_visitors_checkins_view',
+        },
+      ],
+    },
+    [
+      {
+        lower_source: null,
+        upper_source: null,
+        visitors_visitors_checkins_view__revenue: '1400',
+        visitors_visitors_checkins_view__visitor_checkins_count: '0',
+      },
+      {
+        lower_source: 'google',
+        upper_source: 'GOOGLE',
+        visitors_visitors_checkins_view__revenue: '300',
+        visitors_visitors_checkins_view__visitor_checkins_count: '1',
+      },
+      {
+        lower_source: 'some',
+        upper_source: 'SOME',
+        visitors_visitors_checkins_view__revenue: '300',
+        visitors_visitors_checkins_view__visitor_checkins_count: '5',
+      },
+    ]
   ));
 
   // TODO not implemented

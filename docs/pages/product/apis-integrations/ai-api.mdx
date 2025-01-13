@@ -11,6 +11,8 @@ Specifically, you can send the AI API a message (or conversation of messages) an
   your Cube representative to have it enabled for your account.
 </WarningBox>
 
+See [AI API reference][ref-ref-ai-api] for the list of supported API endpoinsts.
+
 ## Configuration
 
 While the AI API is in preview, your Cube account team will enable and configure it for you.
@@ -179,6 +181,44 @@ to give the AI context on possible values in a categorical dimension:
               - completed
 ```
 
+### Value search
+
+By default, the AI API has no ability to see the contents of your data (for privacy reasons).
+However, this makes it difficult for the AI API to generate correct filters for some queries.
+
+Imagine you have a categorical `order_status` dimension with the possible values "shipped",
+"processing", and "completed". Without value search, asking "how many complete orders did
+we have today" might get you a query filtering on `order_status = 'Complete'` instead of
+the correct `order_status = 'completed'`.
+
+To solve this, the AI API can perform "value searches" where it introspects the values in
+selected categorical dimensions before running a query. Value search is opt-in and dimensions
+must be enabled for it individually. Currently, the AI API performs value search by running
+Cube queries using the `contains` filter operator against one or more chosen dimensions.
+The LLM will select dimensions from among those you have based on the question asked and
+generate possible values dynamically.
+
+<InfoBox>
+  When running value search queries, the AI API passes through the security context used
+  for the AI API request, so security is maintained and only dimensions the end user has
+  access to are able to be searched.
+</InfoBox>
+
+To enable value search on a dimension, set the `searchable` field to true under the `ai`
+meta tag, as shown below:
+```yaml
+    - name: order_status
+      sql: order_status
+      type: string
+      meta:
+        ai:
+          searchable: true
+```
+
+Note that enabling Value Search may lead to slightly longer AI API response times when it
+is used but should result in significantly more accurate queries in many situations. Value
+Search can only be used on string dimensions.
+
 ### Other LLM providers
 
 <InfoBox>
@@ -218,3 +258,6 @@ deployment. See below for required variables by provider (required unless noted)
 
 - `OPENAI_MODEL` - An OpenAI chat model ID, for example `gpt-4o`
 - `OPENAI_API_KEY` - An OpenAI API key (we recommend creating a service account for the AI API)
+
+
+[ref-ref-ai-api]: /reference/ai-api

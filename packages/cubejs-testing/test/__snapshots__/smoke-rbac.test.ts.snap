@@ -1,5 +1,29 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Cube RBAC Engine [Python config] RBAC via SQL API [python config] SELECT * from users: users_python 1`] = `
+Array [
+  Object {
+    "count": "551",
+  },
+]
+`;
+
+exports[`Cube RBAC Engine [Python config][dev mode] products with no matching policy: products_no_policy_python 1`] = `
+Array [
+  Object {
+    "products.count": "0",
+  },
+]
+`;
+
+exports[`Cube RBAC Engine [dev mode] products with no matching policy: products_no_policy 1`] = `
+Array [
+  Object {
+    "products.count": "0",
+  },
+]
+`;
+
 exports[`Cube RBAC Engine RBAC via REST API line_items hidden price_dim: line_items_view_no_policy_rest 1`] = `
 Array [
   Object {
@@ -583,6 +607,14 @@ Array [
     "__user": null,
     "city": "Austin",
     "count": "1",
+  },
+]
+`;
+
+exports[`Cube RBAC Engine RBAC via SQL API default policy SELECT with member expressions: users_member_expression 1`] = `
+Array [
+  Object {
+    "count": "149",
   },
 ]
 `;
