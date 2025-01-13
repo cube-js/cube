@@ -12,7 +12,9 @@ use crate::{
     stream::call_js_with_stream_as_callback,
 };
 use async_trait::async_trait;
-use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
+use cubesql::compile::engine::df::scan::{
+    convert_transport_response, transform_response, MemberField, RecordBatch, SchemaRef,
+};
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
     SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
@@ -334,9 +336,9 @@ impl TransportService for NodeBridgeTransport {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-        _schema: SchemaRef,
-        // ) -> Result<Vec<RecordBatch>, CubeError> {
-    ) -> Result<TransportLoadResponse, CubeError> {
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         trace!("[transport] Request ->");
 
         let native_auth = ctx
@@ -461,20 +463,23 @@ impl TransportService for NodeBridgeTransport {
                         }
                     };
 
-                    break serde_json::from_value::<TransportLoadResponse>(response)
+                    let response = match serde_json::from_value::<TransportLoadResponse>(response) {
+                        Ok(v) => v,
+                        Err(err) => {
+                            return Err(CubeError::user(err.to_string()));
+                        }
+                    };
+
+                    break convert_transport_response(response, schema.clone(), member_fields)
                         .map_err(|err| CubeError::user(err.to_string()));
                 }
                 ValueFromJs::ResultWrapper(result_wrappers) => {
-                    let response = TransportLoadResponse {
-                        pivot_query: None,
-                        slow_query: None,
-                        query_type: None,
-                        results: result_wrappers
-                            .into_iter()
-                            .map(|v| v.transform_result().unwrap().into())
-                            .collect(),
-                    };
-                    break Ok(response);
+                    break result_wrappers
+                        .into_iter()
+                        .map(|mut wrapper| {
+                            transform_response(&mut wrapper, schema.clone(), &member_fields)
+                        })
+                        .collect::<Result<Vec<_>, _>>();
                 }
             }
         }

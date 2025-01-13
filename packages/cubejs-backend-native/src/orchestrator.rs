@@ -2,9 +2,10 @@ use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::transport::MapCubeErrExt;
 use cubeorchestrator::query_message_parser::QueryResult;
 use cubeorchestrator::query_result_transform::{
-    RequestResultData, RequestResultDataMulti, TransformedData,
+    DBResponsePrimitive, RequestResultData, RequestResultDataMulti, TransformedData,
 };
 use cubeorchestrator::transport::{JsRawData, TransformDataRequest};
+use cubesql::compile::engine::df::scan::{FieldValue, ValueObject};
 use cubesql::CubeError;
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::handle::Handle;
@@ -15,6 +16,7 @@ use neon::prelude::{
 };
 use neon::types::buffer::TypedArray;
 use serde::Deserialize;
+use std::borrow::Cow;
 use std::sync::Arc;
 
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
@@ -39,6 +41,7 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
 pub struct ResultWrapper {
     transform_data: TransformDataRequest,
     data: Arc<QueryResult>,
+    transformed_data: Option<TransformedData>,
 }
 
 impl ResultWrapper {
@@ -115,14 +118,80 @@ impl ResultWrapper {
         Ok(Self {
             transform_data: transform_request,
             data: query_result,
+            transformed_data: None,
         })
     }
 
-    pub fn transform_result(&self) -> Result<TransformedData, CubeError> {
-        let transformed = TransformedData::transform(&self.transform_data, &self.data)
-            .map_cube_err("Can't prepare transformed data")?;
+    pub fn transform_result(&mut self) -> Result<(), CubeError> {
+        self.transformed_data = Some(
+            TransformedData::transform(&self.transform_data, &self.data)
+                .map_cube_err("Can't prepare transformed data")?,
+        );
 
-        Ok(transformed)
+        Ok(())
+    }
+}
+
+impl ValueObject for ResultWrapper {
+    fn len(&mut self) -> Result<usize, CubeError> {
+        if self.transformed_data.is_none() {
+            self.transform_result()?;
+        }
+
+        let data = self.transformed_data.as_ref().unwrap();
+
+        match data {
+            TransformedData::Compact {
+                members: _members,
+                dataset,
+            } => Ok(dataset.len()),
+            TransformedData::Vanilla(dataset) => Ok(dataset.len()),
+        }
+    }
+
+    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue, CubeError> {
+        if self.transformed_data.is_none() {
+            self.transform_result()?;
+        }
+
+        let data = self.transformed_data.as_ref().unwrap();
+
+        let value = match data {
+            TransformedData::Compact { members, dataset } => {
+                let Some(row) = dataset.get(index) else {
+                    return Err(CubeError::user(format!(
+                        "Unexpected response from Cube, can't get {} row",
+                        index
+                    )));
+                };
+
+                let Some(member_index) = members.iter().position(|m| m == field_name) else {
+                    return Err(CubeError::user(format!(
+                        "Field name '{}' not found in members",
+                        field_name
+                    )));
+                };
+
+                row.get(member_index).unwrap_or(&DBResponsePrimitive::Null)
+            }
+            TransformedData::Vanilla(dataset) => {
+                let Some(row) = dataset.get(index) else {
+                    return Err(CubeError::user(format!(
+                        "Unexpected response from Cube, can't get {} row",
+                        index
+                    )));
+                };
+
+                row.get(field_name).unwrap_or(&DBResponsePrimitive::Null)
+            }
+        };
+
+        Ok(match value {
+            DBResponsePrimitive::String(s) => FieldValue::String(Cow::Borrowed(s)),
+            DBResponsePrimitive::Number(n) => FieldValue::Number(*n),
+            DBResponsePrimitive::Boolean(b) => FieldValue::Bool(*b),
+            DBResponsePrimitive::Null => FieldValue::Null,
+        })
     }
 }
 

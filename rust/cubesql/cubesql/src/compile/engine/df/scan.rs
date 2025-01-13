@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotation};
+use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse};
 pub use datafusion::{
     arrow::{
         array::{
@@ -52,7 +52,7 @@ use datafusion::{
     logical_plan::JoinType,
     scalar::ScalarValue,
 };
-use serde_json::{json, Value};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MemberField {
@@ -655,28 +655,22 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             )));
         }
 
-        let mut response = JsonValueObject::new(
-            load_data(
-                self.span_id.clone(),
-                request,
-                self.auth_context.clone(),
-                self.transport.clone(),
-                meta.clone(),
-                self.schema.clone(),
-                self.options.clone(),
-                self.wrapped_sql.clone(),
-            )
-            .await?
-            .data,
-        );
-        one_shot_stream.data = Some(
-            transform_response(
-                &mut response,
-                one_shot_stream.schema.clone(),
-                &one_shot_stream.member_fields,
-            )
-            .map_err(|e| DataFusionError::Execution(e.message.to_string()))?,
-        );
+        let response = load_data(
+            self.span_id.clone(),
+            request,
+            self.auth_context.clone(),
+            self.transport.clone(),
+            meta.clone(),
+            self.schema.clone(),
+            self.member_fields.clone(),
+            self.options.clone(),
+            self.wrapped_sql.clone(),
+        )
+        .await?;
+
+        // For now execute method executes only one query at a time, so we
+        // take the first result
+        one_shot_stream.data = Some(response.first().unwrap().clone());
 
         Ok(Box::pin(CubeScanStreamRouter::new(
             None,
@@ -842,9 +836,10 @@ async fn load_data(
     transport: Arc<dyn TransportService>,
     meta: LoadRequestMeta,
     schema: SchemaRef,
+    member_fields: Vec<MemberField>,
     options: CubeScanOptions,
     sql_query: Option<SqlQuery>,
-) -> ArrowResult<V1LoadResult> {
+) -> ArrowResult<Vec<RecordBatch>> {
     let no_members_query = request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
         && request.dimensions.as_ref().map(|v| v.len()).unwrap_or(0) == 0
         && request
@@ -862,22 +857,27 @@ async fn load_data(
             data.push(serde_json::Value::Null)
         }
 
-        V1LoadResult::new(
-            V1LoadResultAnnotation {
-                measures: json!(Vec::<serde_json::Value>::new()),
-                dimensions: json!(Vec::<serde_json::Value>::new()),
-                segments: json!(Vec::<serde_json::Value>::new()),
-                time_dimensions: json!(Vec::<serde_json::Value>::new()),
-            },
-            data,
-        )
+        let mut response = JsonValueObject::new(data);
+        let rec = transform_response(&mut response, schema.clone(), &member_fields)
+            .map_err(|e| DataFusionError::Execution(e.message.to_string()))?;
+
+        rec
     } else {
         let result = transport
-            .load(span_id, request, sql_query, auth_context, meta, schema)
-            .await;
-        let mut response = result.map_err(|err| ArrowError::ComputeError(err.to_string()))?;
-        if let Some(data) = response.results.pop() {
-            match (options.max_records, data.data.len()) {
+            .load(
+                span_id,
+                request,
+                sql_query,
+                auth_context,
+                meta,
+                schema,
+                member_fields,
+            )
+            .await
+            .map_err(|err| ArrowError::ComputeError(err.to_string()))?;
+        let response = result.first();
+        if let Some(data) = response.cloned() {
+            match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ComputeError(format!("One of the Cube queries exceeded the maximum row limit ({}). JOIN/UNION is not possible as it will produce incorrect results. Try filtering the results more precisely or moving post-processing functions to an outer query.", max_records)));
                 }
@@ -892,7 +892,7 @@ async fn load_data(
         }
     };
 
-    Ok(result)
+    Ok(vec![result])
 }
 
 fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()> {
@@ -902,6 +902,7 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     let transport = one_shot_stream.transport.clone();
     let meta = one_shot_stream.meta.clone();
     let schema = one_shot_stream.schema.clone();
+    let member_fields = one_shot_stream.member_fields.clone();
     let options = one_shot_stream.options.clone();
     let wrapped_sql = one_shot_stream.wrapped_sql.clone();
 
@@ -914,22 +915,16 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
             transport,
             meta,
             schema,
+            member_fields,
             options,
             wrapped_sql,
         ))
     })
     .join()
-    .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))?;
+    .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))??;
 
-    let mut response = JsonValueObject::new(res.unwrap().data);
-    one_shot_stream.data = Some(
-        transform_response(
-            &mut response,
-            one_shot_stream.schema.clone(),
-            &one_shot_stream.member_fields,
-        )
-        .map_err(|e| DataFusionError::Execution(e.message.to_string()))?,
-    );
+    let response = res.first();
+    one_shot_stream.data = Some(response.cloned().unwrap());
 
     Ok(())
 }
@@ -1335,6 +1330,21 @@ pub fn transform_response<V: ValueObject>(
     Ok(RecordBatch::try_new(schema.clone(), columns)?)
 }
 
+pub fn convert_transport_response(
+    response: V1LoadResponse,
+    schema: SchemaRef,
+    member_fields: Vec<MemberField>,
+) -> std::result::Result<Vec<RecordBatch>, CubeError> {
+    response
+        .results
+        .into_iter()
+        .map(|r| {
+            let mut response = JsonValueObject::new(r.data.clone());
+            transform_response(&mut response, schema.clone(), &member_fields)
+        })
+        .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1398,10 +1408,12 @@ mod tests {
                 _sql_query: Option<SqlQuery>,
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
-                _schema: SchemaRef,
-            ) -> Result<V1LoadResponse, CubeError> {
+                schema: SchemaRef,
+                member_fields: Vec<MemberField>,
+            ) -> Result<Vec<RecordBatch>, CubeError> {
                 let response = r#"
-                    {
+                {
+                    "results": [{
                         "annotation": {
                             "measures": [],
                             "dimensions": [],
@@ -1415,17 +1427,13 @@ mod tests {
                             {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 4"},
                             {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
                         ]
-                    }
+                    }]
+                }
                 "#;
 
-                let result: V1LoadResult = serde_json::from_str(response).unwrap();
-
-                Ok(V1LoadResponse {
-                    pivot_query: None,
-                    slow_query: None,
-                    query_type: None,
-                    results: vec![result],
-                })
+                let result: V1LoadResponse = serde_json::from_str(response).unwrap();
+                convert_transport_response(result, schema.clone(), member_fields)
+                    .map_err(|err| CubeError::user(err.to_string()))
             }
 
             async fn load_stream(
