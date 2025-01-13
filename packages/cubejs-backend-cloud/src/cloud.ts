@@ -147,7 +147,7 @@ export class CubeCloudClient {
   }
 
   public setEnvVars({ envVariables, auth, replaceEnv }: { envVariables: DotenvParseOutput, auth?: AuthObject, replaceEnv?: boolean }) {
-    const params = new URLSearchParams({ replaceEnv: replaceEnv ? 'true' : 'false' });
+    const params = new URLSearchParams({ replaceEnv: Boolean(replaceEnv).toString() });
     return this.request({
       url: (deploymentId) => `build/deploy/${deploymentId}/set-env?${params.toString()}`,
       method: 'POST',
