@@ -113,22 +113,18 @@ export class CubeCloudClient {
     const formData = new FormData();
     formData.append('transaction', JSON.stringify(transaction));
     formData.append('fileName', fileName);
-    formData.append('file', {
-      value: data,
-      options: {
-        filename: path.basename(fileName),
-        contentType: 'application/octet-stream'
-      }
+    formData.append('file', data, {
+      filename: path.basename(fileName),
+      contentType: 'application/octet-stream'
     });
 
     // Get the form data buffer and headers
-    const formDataBuffer = formData.getBuffer();
     const formDataHeaders = formData.getHeaders();
 
     return this.request({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file${this.extendRequestByLivePreview()}`,
       method: 'POST',
-      body: formDataBuffer,
+      body: formData,
       headers: {
         ...formDataHeaders,
       },
