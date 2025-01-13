@@ -79,7 +79,7 @@ export interface DeployResponse {
 export class DeployController {
   public constructor(
     protected readonly cubeCloudClient: CubeCloudClient,
-    protected envVariables: DotenvParseOutput = {},
+    protected readonly envVariables: DotenvParseOutput = {},
     protected readonly hooks: DeployHooks = {}
   ) {
   }
