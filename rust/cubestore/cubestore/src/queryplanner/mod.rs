@@ -243,9 +243,9 @@ impl QueryPlannerImpl {
 }
 
 impl QueryPlannerImpl {
-    async fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
+    pub fn make_execution_context() -> SessionContext {
         let context = SessionContext::new();
-        // TODO upgrade DF: build SessionContexts consistently
+        // TODO upgrade DF: build SessionContexts consistently -- that now means check all appropriate SessionContext constructors use this make_execution_context or execution_context function.
         for udaf in registerable_aggregate_udfs() {
             context.register_udaf(udaf);
         }
@@ -260,7 +260,11 @@ impl QueryPlannerImpl {
         // TODO upgrade DF
         // context
         // .add_optimizer_rule(Arc::new(ProjectionAboveLimit {})),
-        Ok(Arc::new(context))
+        context
+    }
+
+    async fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
+        Ok(Arc::new(Self::make_execution_context()))
     }
 }
 
@@ -504,10 +508,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 
     fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
+        // TODO upgrade DF: Should this also use .to_ascii_lowercase?
         self.session_state.window_functions().get(name).cloned()
     }
 
-    fn get_variable_type(&self, variable_names: &[String]) -> Option<DataType> {
+    fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
         None
     }
 
@@ -516,6 +521,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 
     fn udf_names(&self) -> Vec<String> {
+        // TODO upgrade DF: Because we register the scalar functions (see get_function_meta) we shouldn't need to prepend the list here.
         let mut res = vec![
             "date_add".to_string(),
             "date_sub".to_string(),
@@ -526,6 +532,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 
     fn udaf_names(&self) -> Vec<String> {
+        // TODO upgrade DF: We shouldn't need "merge" here because we registered it (see get_aggregate_meta).
         let mut res = vec!["merge".to_string()];
         res.extend(self.session_state.aggregate_functions().keys().cloned());
         res
