@@ -2,6 +2,7 @@ import fetch, { RequestInit } from 'node-fetch';
 import FormData from 'form-data';
 import path from 'path';
 import { ReadStream } from 'fs';
+import { DotenvParseOutput } from '@cubejs-backend/dotenv';
 
 export type AuthObject = {
   auth: string,
@@ -145,9 +146,10 @@ export class CubeCloudClient {
     });
   }
 
-  public setEnvVars({ envVariables, auth }: { envVariables: any, auth?: AuthObject }) {
+  public setEnvVars({ envVariables, auth, replaceEnv }: { envVariables: DotenvParseOutput, auth?: AuthObject, replaceEnv?: boolean }) {
+    const params = new URLSearchParams({ replaceEnv: replaceEnv ? 'true' : 'false' });
     return this.request({
-      url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
+      url: (deploymentId) => `build/deploy/${deploymentId}/set-env?${params.toString()}`,
       method: 'POST',
       body: JSON.stringify({ envVariables: JSON.stringify(envVariables) }),
       headers: {

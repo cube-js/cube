@@ -79,7 +79,7 @@ export interface DeployResponse {
 export class DeployController {
   public constructor(
     protected readonly cubeCloudClient: CubeCloudClient,
-    protected readonly envVariables: DotenvParseOutput = {},
+    protected readonly envs: { envVariables?: DotenvParseOutput, replaceEnv?: boolean } = {},
     protected readonly hooks: DeployHooks = {}
   ) {
   }
@@ -92,8 +92,11 @@ export class DeployController {
     const upstreamHashes = await this.cubeCloudClient.getUpstreamHashes();
     const { transaction, deploymentName } = await this.cubeCloudClient.startUpload();
 
-    if (Object.keys(this.envVariables).length) {
-      await this.cubeCloudClient.setEnvVars({ envVariables: this.envVariables });
+    if (this.envs.envVariables) {
+      const { envVariables, replaceEnv } = this.envs;
+      if (Object.keys(this.envs.envVariables).length) {
+        await this.cubeCloudClient.setEnvVars({ envVariables, replaceEnv });
+      }
     }
 
     const files = Object.keys(fileHashes);
