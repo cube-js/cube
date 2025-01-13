@@ -118,7 +118,7 @@ dependencies = [
  "chrono",
  "comfy-table 5.0.1",
  "csv",
- "flatbuffers 2.1.2",
+ "flatbuffers",
  "half",
  "hex",
  "indexmap 1.9.3",
@@ -440,7 +440,6 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
- "serde",
  "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
@@ -644,7 +643,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "cubeorchestrator",
  "log",
  "reqwest",
  "reqwest-middleware",
@@ -676,26 +674,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cubeorchestrator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "cubeshared",
- "itertools 0.13.0",
- "neon",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "cubeshared"
-version = "0.1.0"
-dependencies = [
- "flatbuffers 23.5.26",
-]
-
-[[package]]
 name = "cubesql"
 version = "0.28.0"
 dependencies = [
@@ -721,7 +699,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.14.5",
  "indexmap 1.9.3",
- "itertools 0.10.5",
+ "itertools",
  "log",
  "lru",
  "minijinja",
@@ -762,7 +740,7 @@ dependencies = [
  "datafusion-physical-expr",
  "futures",
  "hashbrown 0.12.3",
- "itertools 0.10.5",
+ "itertools",
  "lazy_static",
  "log",
  "num_cpus",
@@ -957,16 +935,6 @@ dependencies = [
  "bitflags 1.3.2",
  "smallvec",
  "thiserror",
-]
-
-[[package]]
-name = "flatbuffers"
-version = "23.5.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dac53e22462d78c16d64a1cd22371b54cc3fe94aa15e7886a2fa6e5d1ab8640"
-dependencies = [
- "bitflags 1.3.2",
- "rustc_version",
 ]
 
 [[package]]
@@ -1448,15 +1416,6 @@ name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -2507,15 +2466,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "rustc_version"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
-dependencies = [
- "semver",
-]
 
 [[package]]
 name = "rustix"
