@@ -48,7 +48,7 @@ impl WrapperRules {
                                 // Rule would place ?left_cube_scan_input to `from` position of WrappedSelect(WrappedSelectPushToCube:true)
                                 // So it need to support push-to-Cube
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "?left_in_projection",
                                 // Going to use this in RHS of rule
                                 // RHS of join is grouped, so it shouldn't have any cubes or members
                                 "?left_cube_members",
@@ -65,7 +65,7 @@ impl WrapperRules {
                                 // Going to ignore this
                                 "?right_alias_to_cube",
                                 "?right_push_to_cube",
-                                "?in_projection",
+                                "?right_in_projection",
                                 // Going to ignore this
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
@@ -80,6 +80,9 @@ impl WrapperRules {
                     "?join_constraint",
                     "JoinNullEqualsNull:false",
                 ),
+                // RHS is using WrapperReplacerContextInProjection:false because only part
+                // that should have push down replacer is join condition, and it should only contain dimensions
+                // Other way of thinking about it: join condition is more like filter than projection
                 cube_scan_wrapper(
                     wrapped_select(
                         "WrappedSelectSelectType:Projection",
@@ -88,7 +91,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 // Can use it, because we've checked that left input allows push-to-Cube,
@@ -101,7 +104,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
@@ -112,7 +115,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
@@ -123,7 +126,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
@@ -134,7 +137,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
@@ -147,7 +150,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
@@ -161,7 +164,7 @@ impl WrapperRules {
                                     wrapper_replacer_context(
                                         "?left_alias_to_cube",
                                         "WrapperReplacerContextPushToCube:true",
-                                        "?in_projection",
+                                        "WrapperReplacerContextInProjection:false",
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
@@ -175,7 +178,7 @@ impl WrapperRules {
                                         // On other: RHS is grouped, so any column is just a column
                                         // Right now, it is relying on grouped_subqueries + PushToCube:true, to allow both dimensions and grouped columns
                                         "WrapperReplacerContextPushToCube:true",
-                                        "?in_projection",
+                                        "WrapperReplacerContextInProjection:false",
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
                                         "WrapperReplacerContextUngroupedScan:true",
@@ -189,7 +192,7 @@ impl WrapperRules {
                                 wrapper_replacer_context(
                                     "?left_alias_to_cube",
                                     "WrapperReplacerContextPushToCube:true",
-                                    "?in_projection",
+                                    "WrapperReplacerContextInProjection:false",
                                     "?left_cube_members",
                                     "?out_grouped_subqueries",
                                     "WrapperReplacerContextUngroupedScan:true",
@@ -201,7 +204,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
@@ -215,7 +218,7 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 "?left_alias_to_cube",
                                 "WrapperReplacerContextPushToCube:true",
-                                "?in_projection",
+                                "WrapperReplacerContextInProjection:false",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
                                 "WrapperReplacerContextUngroupedScan:true",
