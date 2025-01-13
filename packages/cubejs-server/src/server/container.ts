@@ -443,7 +443,7 @@ export class ServerContainer {
               process.exit(1);
             }
           } else {
-            console.log(`Recevied ${signal} signal, terminating with process exit`);
+            console.log(`Received ${signal} signal, terminating with process exit`);
             process.exit(0);
           }
         });
