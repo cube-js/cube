@@ -57,7 +57,7 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
           const array = this.getArray();
           const l = array.length;
 
-          return function* yieldArrayItem () {
+          return function* yieldArrayItem() {
             for (let i = 0; i < l; i++) {
               yield array[i];
             }
