@@ -1161,7 +1161,7 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
     memberExpressions: boolean = false,
-  ): Promise<[QueryType, NormalizedQuery[]]> {
+  ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[]]> {
     let query = this.parseQueryParam(inputQuery);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
@@ -1184,28 +1184,35 @@ class ApiGateway {
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
 
+    const queryNormalizationResult: Array<{
+      normalizedQuery: NormalizedQuery,
+      hasExpressionsInQuery: boolean
+    }> = queries.map((currentQuery) => {
+      const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+
+      if (hasExpressionsInQuery) {
+        if (!memberExpressions) {
+          throw new Error('Expressions are not allowed in this context');
+        }
+
+        currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+      }
+
+      return {
+        normalizedQuery: (normalizeQuery(currentQuery, persistent)),
+        hasExpressionsInQuery
+      };
+    });
+
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
-      queries.map(
-        async (currentQuery) => {
-          const hasExpressionsInQuery =
-            this.hasExpressionsInQuery(currentQuery);
-
-          if (hasExpressionsInQuery) {
-            if (!memberExpressions) {
-              throw new Error('Expressions are not allowed in this context');
-            }
-
-            currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
-          }
-
-          const normalizedQuery = normalizeQuery(currentQuery, persistent);
-          let evaluatedQuery = normalizedQuery;
+      queryNormalizationResult.map(
+        async ({ normalizedQuery, hasExpressionsInQuery }) => {
+          let evaluatedQuery: Query | NormalizedQuery = normalizedQuery;
 
           if (hasExpressionsInQuery) {
             // We need to parse/eval all member expressions early as applyRowLevelSecurity
             // needs to access the full SQL query in order to evaluate rules
-            evaluatedQuery =
-              this.evalMemberExpressionsInQuery(normalizedQuery);
+            evaluatedQuery = this.evalMemberExpressionsInQuery(normalizedQuery);
           }
 
           // First apply cube/view level security policies
@@ -1257,7 +1264,7 @@ class ApiGateway {
       }
     }
 
-    return [queryType, normalizedQueries];
+    return [queryType, normalizedQueries, queryNormalizationResult.map((it) => remapToQueryAdapterFormat(it.normalizedQuery))];
   }
 
   public async sql({
@@ -1454,7 +1461,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('data', context.securityContext);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, _, normalizedQueries] = await this.getNormalizedQueries(query, context, undefined, undefined);
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
