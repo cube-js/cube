@@ -404,14 +404,14 @@ impl QueryExecutorImpl {
                 self.memory_handler.clone(),
                 data_loaded_size,
             )),
-            // DF rules without EnforceDistribution
+            // DF rules without EnforceDistribution.  We do need to keep EnforceSorting.
             Arc::new(OutputRequirements::new_add_mode()),
             Arc::new(AggregateStatistics::new()),
             Arc::new(JoinSelection::new()),
             Arc::new(LimitedDistinctAggregation::new()),
             // Arc::new(EnforceDistribution::new()),
             Arc::new(CombinePartialFinalAggregate::new()),
-            // Arc::new(EnforceSorting::new()),
+            Arc::new(EnforceSorting::new()),
             Arc::new(OptimizeAggregateOrder::new()),
             Arc::new(ProjectionPushdown::new()),
             Arc::new(CoalesceBatches::new()),
