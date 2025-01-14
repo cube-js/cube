@@ -612,7 +612,7 @@ jobs:
           cd packages/cubejs-testing/
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
           export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
-          export DEBUG=testcontainers
+          export DEBUG="testcontainers*"
           yarn run dataset:minimal
           yarn run birdbox:postgresql
           yarn run birdbox:postgresql-pre-aggregations

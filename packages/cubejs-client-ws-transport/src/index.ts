@@ -90,6 +90,8 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
   }
 
   public async close(): Promise<void> {
+    // TODO sync with timeout in sendMessage: either flush or drop
+    console.log("close call, left queue", this.messageQueue);
     if (this.ws) {
       this.ws.close();
     }
@@ -191,7 +193,12 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
       this.messageQueue.push(message);
     }
 
+    console.log("sendMessage call, message", message);
+    console.log("sendMessage call, queue before timeout", this.messageQueue);
+
     setTimeout(async () => {
+      console.log("sendMessage call, message", message);
+      console.log("sendMessage call, queue after timeout", this.messageQueue);
       await this.initSocket();
       this.ws.sendQueue();
     }, 100);
@@ -242,6 +249,8 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
         return callback(result, () => this.subscribe(callback));
       },
       async unsubscribe() {
+        // TODO await unsub from server
+        console.log("unsubscribe call: ", message.messageId);
         transport.sendMessage({ unsubscribe: message.messageId });
         delete transport.messageIdToSubscription[message.messageId];
       }
