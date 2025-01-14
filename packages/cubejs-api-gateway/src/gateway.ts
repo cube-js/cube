@@ -1185,7 +1185,6 @@ class ApiGateway {
     const compilerApi = await this.getCompilerApi(context);
 
     const queryNormalizationResult: Array<{
-      query: Query,
       normalizedQuery: NormalizedQuery,
       hasExpressionsInQuery: boolean
     }> = queries.map((currentQuery) => {
@@ -1200,7 +1199,6 @@ class ApiGateway {
       }
 
       return {
-        query: currentQuery,
         normalizedQuery: (normalizeQuery(currentQuery, persistent)),
         hasExpressionsInQuery
       };
@@ -1208,14 +1206,13 @@ class ApiGateway {
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queryNormalizationResult.map(
-        async ({ query: currentQuery, normalizedQuery, hasExpressionsInQuery }) => {
-          let evaluatedQuery = currentQuery;
+        async ({ normalizedQuery, hasExpressionsInQuery }) => {
+          let evaluatedQuery: Query | NormalizedQuery = normalizedQuery;
 
           if (hasExpressionsInQuery) {
             // We need to parse/eval all member expressions early as applyRowLevelSecurity
             // needs to access the full SQL query in order to evaluate rules
-            evaluatedQuery =
-              this.evalMemberExpressionsInQuery(normalizedQuery);
+            evaluatedQuery = this.evalMemberExpressionsInQuery(normalizedQuery);
           }
 
           // First apply cube/view level security policies
