@@ -470,12 +470,12 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  public getSchemas() {
+  public getSchemas(): Promise<QuerySchemasResult[]> {
     const query = this.getSchemasQuery();
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]) {
+  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
     const schemaNames = schemas.map(s => s.schema_name);
 
@@ -483,7 +483,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public async getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     const groupedBySchema: Record<string, string[]> = {};
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {

@@ -4,6 +4,7 @@ src/models/mod.rs
 src/models/v1_cube_meta.rs
 src/models/v1_cube_meta_dimension.rs
 src/models/v1_cube_meta_dimension_granularity.rs
+src/models/v1_cube_meta_folder.rs
 src/models/v1_cube_meta_join.rs
 src/models/v1_cube_meta_measure.rs
 src/models/v1_cube_meta_segment.rs
@@ -15,6 +16,7 @@ src/models/v1_load_request_query_filter_base.rs
 src/models/v1_load_request_query_filter_item.rs
 src/models/v1_load_request_query_filter_logical_and.rs
 src/models/v1_load_request_query_filter_logical_or.rs
+src/models/v1_load_request_query_join_subquery.rs
 src/models/v1_load_request_query_time_dimension.rs
 src/models/v1_load_response.rs
 src/models/v1_load_result.rs
