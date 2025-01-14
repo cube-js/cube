@@ -4118,8 +4118,8 @@ impl FilterRules {
             };
 
             let (Some(start_date), Some(end_date)) = (
-                start_date.timestamp_nanos_opt(),
-                end_date.timestamp_nanos_opt(),
+                start_date.and_utc().timestamp_nanos_opt(),
+                end_date.and_utc().timestamp_nanos_opt(),
             ) else {
                 return false;
             };

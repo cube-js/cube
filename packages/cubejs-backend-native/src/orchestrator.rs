@@ -31,12 +31,6 @@ pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     Ok(())
 }
 
-// #[derive(Debug, Clone)]
-// pub enum ResultWrapperData {
-//     JsObj(RecordBatch),
-//     Native()
-// }
-
 #[derive(Debug, Clone)]
 pub struct ResultWrapper {
     transform_data: TransformDataRequest,
