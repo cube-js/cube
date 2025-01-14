@@ -19,11 +19,13 @@ impl PartitionFilter {
     const SIZE_LIMIT: usize = 50;
 
     pub fn extract(s: &Schema, filters: &[Expr]) -> PartitionFilter {
+        println!("Calling extract on filters {:?}", filters);
         let builder = Builder { schema: s };
 
         let mut r = vec![];
         for f in filters {
             r = builder.extract_filter(f, r);
+            println!("Extracted.  r = {:?}", r);
         }
 
         PartitionFilter { min_max: r }
@@ -155,71 +157,56 @@ impl Builder<'_> {
     #[must_use]
     fn extract_filter(&self, e: &Expr, mut r: Vec<MinMaxCondition>) -> Vec<MinMaxCondition> {
         match e {
-            Expr::BinaryExpr(BinaryExpr { left, op, right }) if Self::is_comparison(*op) => {
-                match left.as_ref() {
-                    Expr::Column(c) => {
-                        if let Some(cc) = self.extract_column_compare(c, *op, right) {
-                            self.apply_stat(&cc, &mut r);
-                        }
-                    }
-                    _ => {}
+            Expr::BinaryExpr(BinaryExpr {
+                left: box Expr::Column(c),
+                op,
+                right,
+            }) if Self::is_comparison(*op) => {
+                if let Some(cc) = self.extract_column_compare(c, *op, right) {
+                    self.apply_stat(&cc, &mut r);
                 }
 
                 return r;
             }
-            Expr::BinaryExpr(BinaryExpr { left, op, right }) if Self::is_comparison(*op) => {
-                match right.as_ref() {
-                    Expr::Column(c) => {
-                        if let Some(cc) =
-                            self.extract_column_compare(c, Self::invert_comparison(*op), left)
-                        {
-                            self.apply_stat(&cc, &mut r);
-                        }
-                    }
-                    _ => {}
+            Expr::BinaryExpr(BinaryExpr {
+                left,
+                op,
+                right: box Expr::Column(c),
+            }) if Self::is_comparison(*op) => {
+                if let Some(cc) = self.extract_column_compare(c, Self::invert_comparison(*op), left)
+                {
+                    self.apply_stat(&cc, &mut r);
                 }
 
                 return r;
             }
             Expr::InList(InList {
-                expr,
+                expr: box Expr::Column(c),
                 list,
                 negated: false,
             }) => {
                 // equivalent to <name> = <list_1> OR ... OR <name> = <list_n>.
-                match expr.as_ref() {
-                    Expr::Column(c) => {
-                        let elems = list.iter().map(|v| {
-                            let mut r = r.clone();
-                            if let Some(cc) = self.extract_column_compare(c, Operator::Eq, v) {
-                                self.apply_stat(&cc, &mut r);
-                                return r;
-                            }
-                            r
-                        });
-
-                        return self.handle_or(elems);
+                let elems = list.iter().map(|v| {
+                    let mut r = r.clone();
+                    if let Some(cc) = self.extract_column_compare(c, Operator::Eq, v) {
+                        self.apply_stat(&cc, &mut r);
+                        return r;
                     }
-                    _ => {}
-                }
+                    r
+                });
 
-                return r;
+                return self.handle_or(elems);
             }
             Expr::InList(InList {
-                expr,
+                expr: box Expr::Column(c),
                 list,
                 negated: true,
             }) => {
                 // equivalent to <name> != <list_1> AND ... AND <name> != <list_n>.
-                match expr.as_ref() {
-                    Expr::Column(c) => {
-                        for v in list {
-                            if let Some(cc) = self.extract_column_compare(c, Operator::NotEq, v) {
-                                self.apply_stat(&cc, &mut r);
-                            }
-                        }
+                for v in list {
+                    if let Some(cc) = self.extract_column_compare(c, Operator::NotEq, v) {
+                        self.apply_stat(&cc, &mut r);
                     }
-                    _ => {}
                 }
 
                 return r;
@@ -252,18 +239,12 @@ impl Builder<'_> {
                 r
             }
             // TODO: generic Not support with other expressions as children.
-            Expr::Not(e) => {
-                match e.as_ref() {
-                    Expr::Column(c) => {
-                        let true_expr = Expr::Literal(ScalarValue::Boolean(Some(false)));
-                        if let Some(cc) = self.extract_column_compare(c, Operator::Eq, &true_expr) {
-                            self.apply_stat(&cc, &mut r);
-                            return r;
-                        }
-                    }
-                    _ => {}
+            Expr::Not(box Expr::Column(c)) => {
+                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(false)));
+                if let Some(cc) = self.extract_column_compare(c, Operator::Eq, &true_expr) {
+                    self.apply_stat(&cc, &mut r);
+                    return r;
                 }
-
                 r
             }
             _ => r,
