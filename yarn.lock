@@ -5290,11 +5290,6 @@
     usehooks-ts "^3.1.0"
     valid-url "^1.0.9"
 
-"@cubejs-backend/cubesql@1.1.12":
-  version "1.1.12"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubesql/-/cubesql-1.1.12.tgz#d3be0c09b41864424e2c41341c6d286b1343f1f7"
-  integrity sha512-JTuxZHdz+8+Jyj8mFCkXsNcaw3n4J3BLCNuijwF+7dw6AD3ZO+LOExtB65lyMrE05VGD5YeYSXuRg9RY9wXVXA==
-
 "@cubejs-backend/dotenv@^9.0.2":
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
@@ -5310,15 +5305,6 @@
     lodash "4.17.21"
     uuid "9.0.0"
     winston "3.8.2"
-
-"@cubejs-backend/native@1.1.12":
-  version "1.1.12"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/native/-/native-1.1.12.tgz#150974208f7c7af2924ab7b1e834e00786e236b7"
-  integrity sha512-uKdUHjSEl4U2Maaq7Q/y14mDE0+pLvGrL43KbsTdS84ZaTt3nabOmoWfaZ8kUdJCu9ZvdTwbEKrdm1UcOC5WAQ==
-  dependencies:
-    "@cubejs-backend/cubesql" "1.1.12"
-    "@cubejs-backend/shared" "1.1.12"
-    "@cubejs-infra/post-installer" "^0.0.7"
 
 "@cubejs-backend/shared@0.33.20":
   version "0.33.20"
