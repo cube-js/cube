@@ -112,6 +112,7 @@ export class ResultWrapper extends BaseWrapper implements DataResult {
         return [...Object.keys(target), ...Object.keys(array), 'length', 'isNative'];
       }
     });
+    Object.setPrototypeOf(this.proxy, ResultWrapper.prototype);
 
     return this.proxy;
   }
