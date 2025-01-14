@@ -329,7 +329,7 @@ RUN npm install
 And this to the `.dockerignore`:
 
 ```gitignore
-schema
+model
 cube.py
 cube.js
 .env
@@ -371,7 +371,7 @@ installed with `npm install` reside, and result in errors like this:
 ```yaml
     # ...
     volumes:
-      - ./schema:/cube/conf/schema
+      - ./model:/cube/conf/model
       - ./cube.js:/cube/conf/cube.js
       # Other necessary files
 ```

@@ -7,38 +7,154 @@ redirect_from:
 
 Cube Cloud pricing is based on resource consumption which we measure
 using [Cube Consumption Units](#cube-consumption-unit) in 5 minute intervals.
-Each [pricing plan](#pricing-plans) has different features and functionality
+Each [product tier](#product-tiers) has different features and functionality
 that you should review as you think about what is right for your business.
 
 ## Cube Consumption Unit
 
-A **Cube Consumption Unit** (CCU) is a way to measure resource consumption
+_Cube Consumption Unit_ (CCU) is a way to measure resource consumption
 used to run Cube Cloud infrastructure and [resources](#resources) within it. 
 
-The price of a CCU is determined by the pricing plan you're subscribed to.
+The price of a CCU is determined by the [product tier](#product-tiers) you're subscribed to.
+Each product tier determines the features, scalability, availability, as well as
+the [speed and scope of support][ref-support] you may receive for your deployment.
 
-Each plan determines the features, scalability, availability, as well as the [speed and
-scope of support][ref-support] you may receive for your deployment.
-
-During your deployment, Premium, Enterprise, and Enterprise Premier customers can set
-[Budgets][ref-cloud-budgets] to make sure you know your usage is on track and as expected.
+You can also set [Budgets][ref-cloud-budgets] to make sure you know your usage
+is on track and as expected.
 
 [ref-cloud-budgets]: /product/workspace/budgets
 
-### Resources
+## Payment plans
+
+Payment plans determine whether you have a fixed-term contract or a recurring
+subscription:
+
+* _On-demand payment plan_ allows you to subscribe at any time, add your credit
+card, and start using Cube Cloud right away. [Starter](#starter) and [Premium](#premium)
+product tiers are available on the on-demand payment plan.
+* _Commit payment plan_ allows you to have a contract with a CCU amount specified
+in an order form. [Premium](#premium), [Enterprise](#enterprise), and
+[Enterprise Premier](#enterprise-premier) product tiers are available on the
+commit payment plan. [Contact us][link-contact-us] to learn more.
+
+## Product tiers
+
+### Free
+
+**Free product tier is designed for development and testing purposes.** It is not
+intended for production use.
+
+It offers up to two [Development Instances][ref-cloud-deployment-dev-instance].
+
+You can review its [support terms][ref-free-tier-support] and [limits][ref-cloud-limits].
+
+### Starter
+
+**Starter product tier targets low-scale production that is not business-critical.**
+
+It offers a [Production Cluster][ref-cloud-deployment-prod-cluster], the ability
+to use third-party packages from the npm registry, AWS and GCP support in select
+regions, pre-aggregations of up to 150GB in size, auto-suspend controls, and
+[Semantic Layer Sync][ref-sls] with a single BI tool (such as Preset or Metabase).
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-starter-tier-support], and [limits][ref-cloud-limits].
+
+### Premium
+
+**Premium product tier is designed for basic small-scale production deployments.**
+
+It offers everything in the [Starter product tier](#starter) as well as enabling
+the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
+support for [custom domains][ref-cloud-custom-domains], AWS and GCP support
+in all regions. Cube Cloud provides a 99.95% uptime SLA for this product tier.
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-premium-tier-support], and [limits][ref-cloud-limits].
+
+### Enterprise
+
+**Enterprise product tier is suitable for high-scale or mission-critical production
+deployments with more significant security and compliance needs.**
+
+It offers everything in the [Premium product tier](#premium) as well as [Semantic Layer
+Sync][ref-sls] with unlimited supported BI tools, SAML 2.0
+support for [single sign-on][ref-sso], Azure support for all regions, [dedicated
+infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering],
+[monitoring integrations][ref-monitoring-integrations], and [role-based access
+control][ref-cloud-acl]. Cube Cloud provides a 99.99% uptime SLA for this product tier.
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-enterprise-tier-support], and [limits][ref-cloud-limits].
+
+### Enterprise Premier
+
+**Enterprise Premier product tier caters to high-scale, high-availability
+mission-critical production deployments with security and compliance needs.**
+
+It offers everything in the [Enterprise product tier](#enterprise) as well as
+unlimited pre-aggregation sizes, and support for kSQL and Elasticsearch. Cube
+Cloud provides a 99.995% uptime SLA for this product tier.
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-enterprise-premier-tier-support], and [limits][ref-cloud-limits].
+
+## Resources
 
 The following resource types incur CCU consumption (measured in 5-minute intervals):
 
-| Resource type             | CCUs per hour                                  |
-| ------------------------- | :--------------------------------------------: |
-| Production Cluster        |                       4                        |
-| Development Instance      |                       1                        |
-| Cube Store Worker         |                       1                        |
-| Cube API Instance         |                       1                        |
-| Query History             | Depends on a [chosen tier](#query-history-tiers) |
+| Resource type             | CCUs per hour                                        |
+| ------------------------- | :--------------------------------------------------: |
+| [Production Cluster][ref-production-cluster] | Depends on a [chosen tier](#deployment-tiers)           |
+| [Development Instance][ref-development-instance] | Depends on a [chosen tier](#deployment-tiers)           |
+| Cube API Instance         | Depends on a [chosen tier](#deployment-tiers)           |
+| Cube Store Worker         | Depends on a [chosen tier](#cube-store-worker-tiers) |
+| [Semantic Catalog][ref-semantic-catalog] | Depends on a [chosen tier](#semantic-catalog-tiers) |
 | [Dedicated infrastructure][ref-dedicated-infra] | 3 |
-| [Audit Log][ref-audit-log] | 4 |
+| [Query History][ref-query-history] | Depends on a [chosen tier](#query-history-tiers)     |
 | [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) |
+| [Audit Log][ref-audit-log] | Depends on a [chosen tier](#audit-log-tiers) |
+
+### Deployment tiers
+
+[Production clusters][ref-production-cluster] (including individual API instances)
+and [development instances][ref-development-instance] are involved in serving
+requests through [APIs & integrations][ref-apis] under the following tiers:
+
+| Tier | <nobr>CCUs per hour</nobr> | <nobr>CPU and memory</nobr> | Dependent features |
+| ---- | :--- | --- | --- |
+| S    | <nobr>4 — _for Production Cluster_</nobr><br/><nobr>1 — _for Development Instance_</nobr><br/><nobr>1 — _for Cube API Instance_</nobr> | 100% | — |
+| M    | <nobr>8 — _for Production Cluster_</nobr><br/><nobr>2 — _for Development Instance_</nobr><br/><nobr>2 — _for Cube API Instance_</nobr> | 200% | <nobr>[MDX API][ref-mdx-api]</nobr> |
+
+You can upgrade to a chosen tier in the
+<Btn>Settings</Btn> of your deployment.
+Upgrading to the M tier is only available on [Enterprise and above][cube-pricing] product tiers.
+
+### Cube Store Worker tiers
+
+[Cube Store workers][ref-cube-store-architecture] are involved in building
+pre-aggregations and executing queries against them under the following tiers:
+
+| Tier | <nobr>CCUs per hour</nobr> | Throughput | Dependent features |
+| ---- | :-----------: | ---------- | ------------------ |
+| S    | 1             | 100%       | —                  |
+| M    | 2             | 200%       | [Data-at-rest encryption][ref-data-at-rest-encryption] with [customer-managed keys][ref-customer-managed-keys] in Cube Store |
+
+You can upgrade to a chosen tier in the
+<Btn>Settings</Btn> of your deployment.
+
+### Semantic Catalog tiers
+
+[Semantic Catalog][ref-semantic-catalog] provides observability into other data
+tools interoperating with your data model under the following tiers:
+
+| Tier | <nobr>CCUs per hour</nobr> | Data assets |
+| ---- | :-----------: | ---------- |
+| S    | 2             | Up to 30,000 |
+| M    | 4             | Up to 100,000 |
+
+You can upgrade to a chosen tier in the
+<Btn>Settings</Btn> of your deployment.
 
 ### Query History tiers
 
@@ -53,8 +169,8 @@ features analyze and visualize the data available under the following tiers:
 | L    | 10            | Up to 500,000/day   | 21 days        |
 | XL   | 20            | Up to 1,000,000/day | 30 days        |
 
-You can upgrade to the chosen tier by reaching out to your dedicated customer success
-manager (CSM).
+You can upgrade to a chosen tier in the
+<Btn>Settings</Btn> of your deployment.
 
 ### Monitoring Integrations tiers
 
@@ -69,75 +185,23 @@ manager (CSM).
 You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
 
-## Pricing plans
+### Audit Log tiers
 
-### Free
+[Audit Log][ref-audit-log] collects, stores, and displays security-related events
+under the following tiers:
 
-**Free plan is designed for development and testing purposes.** It is not
-intended for production use.
-
-It offers up to two [Development Instances][ref-cloud-deployment-dev-instance].
-
-You can review its [support terms][ref-free-plan-support] and [limits][ref-cloud-limits].
-
-### Starter
-
-**Starter plan targets low-scale production that is not business-critical.**
-
-It offers a [Production Cluster][ref-cloud-deployment-prod-cluster], the ability
-to use third-party packages from the npm registry, AWS and GCP support in select
-regions, pre-aggregations of up to 150GB in size, auto-suspend controls, and
-[semantic layer sync][ref-sls] with a single BI tool (such as Preset or Metabase).
-
-You can review its [pricing and minimums][cube-pricing], [support
-terms][ref-starter-plan-support], and [limits][ref-cloud-limits].
-
-### Premium
-
-**Premium plan is designed for basic small-scale production deployments.**
-
-It offers everything in the [Starter plan](#starter) as well as enabling
-the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
-support for [custom domains][ref-cloud-custom-domains], AWS and GCP support
-in all regions. Cube Cloud provides a 99.95% uptime SLA for this plan.
-
-You can review its [pricing and minimums][cube-pricing], [support
-terms][ref-premium-plan-support], and [limits][ref-cloud-limits].
-
-### Enterprise
-
-**Enterprise plan is suitable for high-scale or mission-critical production
-deployments with more significant security and compliance needs.**
-
-It offers everything in the [Premium plan](#premium) as well as [Semantic Layer
-Sync][ref-sls] with unlimited supported BI tools, SAML 2.0
-support for [single sign-on][ref-sso], Azure support for all regions, [dedicated
-infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering],
-[monitoring integrations][ref-monitoring-integrations], and [role-based access
-control][ref-cloud-acl]. Cube Cloud provides a 99.99% uptime SLA for this plan.
-
-You can review its [pricing and minimums][cube-pricing], [support
-terms][ref-enterprise-plan-support], and [limits][ref-cloud-limits].
-
-### Enterprise Premier
-
-**Enterprise Premier plan caters to high-scale, high-availability
-mission-critical production deployments with security and compliance needs.**
-
-It offers everything in the [Enterprise plan](#enterprise) as well as
-unlimited pre-aggregation sizes, and support for kSQL and Elasticsearch. Cube
-Cloud provides a 99.995% uptime SLA for this plan.
-
-You can review its [pricing and minimums][cube-pricing], [support
-terms][ref-enterprise-premier-plan-support], and [limits][ref-cloud-limits].
+| Tier | <nobr>CCUs per hour</nobr> | Dependent features |
+| ---- | :------------------------: | ------------------ |
+| S    | 4                          | —                  |
+| M    | 6                          | Audit Log data export |
 
 ## Total cost examples
 
 The following examples provide insight into the total cost to use Cube Cloud:
-- [Small-scale deployment](#small-scale-deployment) (production cluster, Premium plan).
-- [Medium-scale deployment](#medium-scale-deployment) (production cluster with auto-scaling, Enterprise plan).
+- [Small-scale deployment](#small-scale-deployment) (production cluster, Premium product tier).
+- [Medium-scale deployment](#medium-scale-deployment) (production cluster with auto-scaling, Enterprise product tier).
 - [Large-scale deployment](#large-scale-deployment) (production multi-cluster
-with dedicated infrastructure, Enterprise plan).
+with dedicated infrastructure, Enterprise product tier).
 
 ### Small-scale deployment
 
@@ -145,7 +209,7 @@ Suppose a company uses Cube Cloud to power self-serve business intelligence for
 a couple of teams in Eastern and Pacific time zones.
 
 This organization:
-* Uses the Premium plan of Cube Cloud.
+* Uses the Premium product tier of Cube Cloud.
 * Runs a single Production Cluster that is active 24/7 but never has to auto-scale
 its API instances because the usage is spread evenly with no bursts.
 * Operates on a small volume of data that requires the usage of just 2 Cube Store
@@ -155,14 +219,14 @@ being active approximately 50% of the time.
 Instance for testing purposes, with 2 data engineers spending just 1 hour a day each,
 in the development mode of the Production Cluster.
 
-| Resource                                        | Usage per month                                           | CCU per month                   | Cost per month                             |
-| ----------------------------------------------- | --------------------------------------------------------- | ------------------------------- | ------------------------------------------ |
-| Production Cluster                              | 1 Production Cluster ×<br/>24 hours per day ×<br/>30 days | 720 hours ×<br/>4 CCUs per hour | 2880 CCUs ×<br/>\$0.25 per CCU = **\$720** |
-| Additional Cube API Instance                    | —                                                         | —                               | —                                          |
-| Cube Store Worker                               | 2 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 720 hours ×<br/>1 CCU per hour  | 720 CCUs ×<br/>\$0.25 per CCU = **\$180**  |
-| Development Instance                            | —                                                         | —                               | —                                          |
-| Development Instance<br/>(for development mode) | 2 users ×<br/>1 hour per day ×<br/>30 days                | 60 hours ×<br/>1 CCU per hour   | 60 CCUs ×<br/>\$0.25 per CCU = **\$15**    |
-| **Total**                                       |                                                           |                                 | **\$915**                                  |
+| Resource                                        | Usage per month                                           | CCU per month                                       |
+| ----------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------- |
+| Production Cluster                              | 1 Production Cluster ×<br/>24 hours per day ×<br/>30 days | 720 hours ×<br/>4 CCUs per hour =<br/>**2880 CCUs** |
+| Additional Cube API Instance                    | —                                                         | —                                                   |
+| Cube Store Worker                               | 2 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 720 hours ×<br/>1 CCU per hour =<br/>**720 CCUs**   |
+| Development Instance                            | —                                                         | —                                                   |
+| Development Instance<br/>(for development mode) | 2 users ×<br/>1 hour per day ×<br/>30 days                | 60 hours ×<br/>1 CCU per hour =<br/>**60 CCUs**     |
+| **Total**                                       |                                                           | **3660 CCUs**                                       |
 
 ### Medium-scale deployment
 
@@ -171,7 +235,7 @@ exploration in multiple BI tools and AI agents; it also uses Cube Cloud to power
 analytics in its SaaS platform that caters to a vast worldwide customer base. 
 
 This organization:
-* Uses the Enterprise plan of Cube Cloud.
+* Uses the Enterprise product tier of Cube Cloud.
 * Runs two Production Clusters that are active 24/7 and auto-scale up to 8 API instances
 during a peak hour every day.
 * Operates on a moderate volume of data that requires the usage of 4 Cube Store
@@ -181,14 +245,14 @@ being active approximately 50% of the time.
 * Has a team of 5 data engineers who frequently update the data model, with each data engineer
 spending about 4 hours a day in the development mode of the dedicated Development Instance.
 
-| Resource                                        | Usage per month                                                                       | CCU per month                    | Cost per month                             |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------ |
-| Production Cluster                              | 2 Production Clusters ×<br/>24 hours per day ×<br/>30 days                            | 1440 hours ×<br/>4 CCUs per hour | 5760 CCUs ×<br/>\$0.4 per CCU = **\$2304** |
-| Additional Cube API Instance                    | 2 Production Clusters ×<br/>(8 – 2) API Instances ×<br/>1 hour per day ×<br/>30 days  | 360 hours ×<br/>1 CCU per hour   | 360 CCUs ×<br/>\$0.4 per CCU = **\$144**   |
-| Cube Store Worker                               | 2 Production Clusters ×<br/>4 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 2880 hours ×<br/>1 CCU per hour  | 2880 CCUs ×<br/>\$0.4 per CCU = **\$1152** |
-| Development Instance                            | 1 Development Instance ×<br/>12 hours per day ×<br/>30 days                           | 360 hours ×<br/>1 CCU per hour   | 360 CCUs ×<br/>\$0.4 per CCU = **\$144**   |
-| Development Instance<br/>(for development mode) | 5 users ×<br/>4 hours per day ×<br/>30 days                                           | 600 hours ×<br/>1 CCU per hour   | 600 CCUs ×<br/>\$0.4 per CCU = **\$240**   |
-| **Total**                                       |                                                                                       |                                  | **\$3984**                                 |
+| Resource                                        | Usage per month                                                                       | CCU per month                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Production Cluster                              | 2 Production Clusters ×<br/>24 hours per day ×<br/>30 days                            | 1440 hours ×<br/>4 CCUs per hour =<br/>**5760 CCUs** |
+| Additional Cube API Instance                    | 2 Production Clusters ×<br/>(8 – 2) API Instances ×<br/>1 hour per day ×<br/>30 days  | 360 hours ×<br/>1 CCU per hour =<br/>**360 CCUs**    |
+| Cube Store Worker                               | 2 Production Clusters ×<br/>4 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 2880 hours ×<br/>1 CCU per hour =<br/>**2880 CCUs**  |
+| Development Instance                            | 1 Development Instance ×<br/>12 hours per day ×<br/>30 days                           | 360 hours ×<br/>1 CCU per hour =<br/>**360 CCUs**    |
+| Development Instance<br/>(for development mode) | 5 users ×<br/>4 hours per day ×<br/>30 days                                           | 600 hours ×<br/>1 CCU per hour =<br/>**600 CCUs**    |
+| **Total**                                       |                                                                                       | **9960 CCUs**                                        |
 
 ### Large-scale deployment
 
@@ -196,7 +260,7 @@ Suppose a company uses Cube Cloud as a mission-critical part of their infrastruc
 its globally distributed workforce, customer base, and (or) partners to operate at scale.
 
 This organization:
-* Uses the Enterprise plan of Cube Cloud.
+* Uses the Enterprise product tier of Cube Cloud.
 * Uses [dedicated infrastructure][ref-dedicated-infra].
 * Runs a Production Multi-Cluster that is active 24/7, includes 3 Production Clusters, with each
 Production Cluster auto-scaling up to 10 API instances during a few peak hours every day.
@@ -208,42 +272,26 @@ spending about 4 hours a day in the development mode of the dedicated Developmen
 * Uses a [Query History tier](#query-history-tiers) with 14-day data retention to inform the work
 of data engineers.
 
-| Resource                                        | Usage per month                                                                             | CCU per month                    | Cost per month                             |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------ |
-| Dedicated infrastructure                        | 1 region ×<br/>24 hours per day ×<br/>30 days                                               | 720 hours ×<br/>3 CCUs per hour  | 2160 CCUs ×<br/>\$0.4 per CCU = **\$864**  |
-| Production Multi-Cluster                        | 3 Production Clusters ×<br/>24 hours per day ×<br/>30 days                                  | 2160 hours ×<br/>4 CCUs per hour | 8640 CCUs ×<br/>\$0.4 per CCU = **\$3456** |
-| Additional Cube API Instance                    | 3 Production Clusters ×<br/>(10 – 2) API Instances ×<br/>4 hours per day ×<br/>30 days      | 2880 hours ×<br/>1 CCU per hour  | 2880 CCUs ×<br/>\$0.4 per CCU = **\$1152** |
-| Cube Store Worker                               | 1 Production Multi-Cluster ×<br/>16 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 5760 hours ×<br/>1 CCU per hour  | 5760 CCUs ×<br/>\$0.4 per CCU = **\$2304** |
-| Development Instance                            | 1 Development Instance ×<br/>24 hours per day ×<br/>30 days                                 | 720 hours ×<br/>1 CCU per hour   | 720 CCUs ×<br/>\$0.4 per CCU = **\$288**   |
-| Development Instance<br/>(for development mode) | 10 users ×<br/>4 hours per day ×<br/>30 days                                                | 1200 hours ×<br/>1 CCU per hour  | 1200 CCUs ×<br/>\$0.4 per CCU = **\$480**  |
-| Query History (M tier)                          | 24 hours per day ×<br/>30 days                                                              | 720 hours ×<br/>5 CCUs per hour  | 3600 CCUs ×<br/>\$0.4 per CCU = **\$1440** |
-| **Total**                                       |                                                                                             |                                  | **\$9984**                                 |
+| Resource                                        | Usage per month                                                                             | CCU per month                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Dedicated infrastructure                        | 1 region ×<br/>24 hours per day ×<br/>30 days                                               | 720 hours ×<br/>3 CCUs per hour =<br/>**2160 CCUs**  |
+| Production Multi-Cluster                        | 3 Production Clusters ×<br/>24 hours per day ×<br/>30 days                                  | 2160 hours ×<br/>4 CCUs per hour =<br/>**8640 CCUs** |
+| Additional Cube API Instance                    | 3 Production Clusters ×<br/>(10 – 2) API Instances ×<br/>4 hours per day ×<br/>30 days      | 2880 hours ×<br/>1 CCU per hour =<br/>**2880 CCUs**  |
+| Cube Store Worker                               | 1 Production Multi-Cluster ×<br/>16 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 5760 hours ×<br/>1 CCU per hour =<br/>**5760 CCUs**  |
+| Development Instance                            | 1 Development Instance ×<br/>24 hours per day ×<br/>30 days                                 | 720 hours ×<br/>1 CCU per hour =<br/>**720 CCUs**    |
+| Development Instance<br/>(for development mode) | 10 users ×<br/>4 hours per day ×<br/>30 days                                                | 1200 hours ×<br/>1 CCU per hour =<br/>**1200 CCUs**  |
+| Query History (M tier)                          | 24 hours per day ×<br/>30 days                                                              | 720 hours ×<br/>5 CCUs per hour =<br/>**3600 CCUs**  |
+| **Total**                                       |                                                                                             | **24960 CCUs**                                       |
 
-## Overages and payment terms
-
-### Overages
-
-If your usage of resources exceeds the balance of CCUs in your account, the CCU
-price will revert from the Annual Commit Price (available on the [pricing
-page][cube-pricing]) to the Standard Retail Price shown below:
-
-| Subscription Plan  | CCU Price (Standard Retail Price) |
-| ------------------ | --------------------------------- |
-| Premium            | 0.45                              |
-| Enterprise         | 0.60                              |
-| Enterprise Premier | 0.90                              |
-
-Cube Cloud will show a message similar to the following one:
-
-<Screenshot src="https://ucarecdn.com/7f23d7be-f22d-46c4-b704-1c0be4a74d06/" />
+## Payment terms
 
 ### Upgrades
 
-You may upgrade your CCUs to a higher-level subscription plan at any time by
+You may upgrade your CCUs to a higher-level product tier at any time by
 paying the difference in per-Cube Consumption Unit pricing, or by asking to convert
-the price paid for the remaining CCUs into CCUs for the higher subscription plan
-at the CCU pricing for that plan (resulting in a lower number of available CCUs
-but upgraded to the higher subscription plan).
+the price paid for the remaining CCUs into CCUs for the higher product tier
+at the CCU pricing for that product tier (resulting in a lower number of available CCUs
+but upgraded to the higher product tier).
 
 ### Terms
 
@@ -253,12 +301,13 @@ account, services may degrade or be suspended until new CCUs are purchased.
 
 Future purchases and upgrades are subject to the pricing that is in effect at
 the time of the order. No credit is allowed for downgrading CCUs to a lower
-subscription plan level. Payments are non-refundable.
+product tier level. Payments are non-refundable.
 
 [ref-docs-intro]: /product/introduction
 [cube-webinars]: https://cube.dev/events
 [cube-slack]: https://slack.cube.dev
 [cube-pricing]: https://cube.dev/pricing
+[link-contact-us]: https://cube.dev/contact
 [ref-cloud-deployment-dev-instance]:
   /product/deployment/cloud/deployment-types#development-instance
 [ref-cloud-deployment-prod-cluster]:
@@ -273,13 +322,21 @@ subscription plan level. Payments are non-refundable.
 [ref-cloud-vpc-peering]: /product/deployment/cloud/vpc
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-support]: /product/deployment/cloud/support
-[ref-free-plan-support]: /product/deployment/cloud/support#free
-[ref-starter-plan-support]: /product/deployment/cloud/support#starter
-[ref-premium-plan-support]: /product/deployment/cloud/support#premium
-[ref-enterprise-plan-support]: /product/deployment/cloud/support#enterprise
-[ref-enterprise-premier-plan-support]: /product/deployment/cloud/support#enterprise-premier
+[ref-free-tier-support]: /product/deployment/cloud/support#free
+[ref-starter-tier-support]: /product/deployment/cloud/support#starter
+[ref-premium-tier-support]: /product/deployment/cloud/support#premium
+[ref-enterprise-tier-support]: /product/deployment/cloud/support#enterprise
+[ref-enterprise-premier-tier-support]: /product/deployment/cloud/support#enterprise-premier
 [ref-query-history]: /product/workspace/query-history
 [ref-performance-insights]: /product/workspace/performance
 [ref-audit-log]: /product/workspace/audit-log
 [ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
 [ref-sso]: /product/workspace/sso
+[ref-production-cluster]: /product/deployment/cloud/deployment-types#production-cluster
+[ref-development-instance]: /product/deployment/cloud/deployment-types#development-instance
+[ref-apis]: /product/apis-integrations
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-cube-store-architecture]: /product/caching/running-in-production#architecture
+[ref-data-at-rest-encryption]: /product/caching/running-in-production#data-at-rest-encryption
+[ref-customer-managed-keys]: /product/workspace/encryption-keys
+[ref-semantic-catalog]: /product/workspace/semantic-catalog

@@ -46,7 +46,7 @@ dimensions:
 ```yaml
 cubes:
   - name: users
-    sql_table: users
+    sql: SELECT * FROM users
 
     measures:
       - name: count
@@ -64,7 +64,7 @@ cubes:
 
 ```javascript
 cube(`users`, {
-  sql_table: `users`,
+  sql: `SELECT * FROM users`,
 
   measures: {
     count: {
@@ -90,21 +90,6 @@ cube(`users`, {
 
 Then you can derive the `teachers` and `students` cubes from `users`:
 
-<CodeTabs>
-
-```yaml
-cubes:
-  - name: teachers
-    extends: users
-    sql: >
-      SELECT * FROM {users.sql()} WHERE type = 'teacher'
-
-  - name: students
-    extends: users
-    sql: >
-      SELECT * FROM {users.sql()} WHERE type = 'student'
-```
-
 ```javascript
 cube(`teachers`, {
   extends: users,
@@ -125,11 +110,9 @@ cube(`students`, {
 });
 ```
 
-</CodeTabs>
-
 <ReferenceBox>
 
-Currently, `{cube.sql()}` is not supported in YAML data models.
+Currently, [`{cube.sql()}` function][ref-cube-sql-func] is not supported in YAML data models.
 Please [track this issue](https://github.com/cube-js/cube/issues/7484).
 
 As a workaround, you can use JavaScript data models, put a SQL query in a
@@ -180,3 +163,5 @@ cube(`lessons`, {
 [ref-schema-advanced-extend]:
   /product/data-modeling/concepts/code-reusability-extending-cubes
 [ref-schema-ref-cubes-extends]: /reference/data-model/cube#extends
+
+[ref-cube-sql-func]: /product/data-modeling/syntax#cubesql-function

@@ -259,7 +259,7 @@ cubes:
   - {{ model.as_cube() }}
 
     dimensions:
-      {% for column in model.columns() %}
+      {% for column in model.columns %}
       - name: "{{ column.name }}"
         sql: "{{ column.sql }}"
         type: "{{ column.type }}"
@@ -299,7 +299,7 @@ cubes:
         type: count
 
       - name: statuses
-        sql: "STRING_AGG({status})"
+        sql: "STRING_AGG({status}, ',')"
         type: string
 
     # Model-specific joins

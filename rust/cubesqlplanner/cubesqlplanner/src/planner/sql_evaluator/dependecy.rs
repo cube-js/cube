@@ -1,23 +1,34 @@
-use super::{Compiler, EvaluationNode};
-use crate::cube_bridge::evaluator::CubeEvaluator;
+use super::symbols::MemberSymbol;
+use super::Compiler;
+use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
 use crate::cube_bridge::memeber_sql::MemberSql;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub struct StructDependency {
-    pub sql_fn: Option<Rc<EvaluationNode>>,
-    pub to_string_fn: Option<Rc<EvaluationNode>>,
-    pub properties: HashMap<String, Dependency>,
+#[derive(Clone)]
+pub enum CubeDepProperty {
+    CubeDependency(CubeDependency),
+    SymbolDependency(Rc<MemberSymbol>),
 }
 
-impl StructDependency {
+#[derive(Clone)]
+pub struct CubeDependency {
+    pub cube_symbol: Rc<MemberSymbol>,
+    pub sql_fn: Option<Rc<MemberSymbol>>,
+    pub to_string_fn: Option<Rc<MemberSymbol>>,
+    pub properties: HashMap<String, CubeDepProperty>,
+}
+
+impl CubeDependency {
     pub fn new(
-        sql_fn: Option<Rc<EvaluationNode>>,
-        to_string_fn: Option<Rc<EvaluationNode>>,
-        properties: HashMap<String, Dependency>,
+        cube_symbol: Rc<MemberSymbol>,
+        sql_fn: Option<Rc<MemberSymbol>>,
+        to_string_fn: Option<Rc<MemberSymbol>>,
+        properties: HashMap<String, CubeDepProperty>,
     ) -> Self {
-        StructDependency {
+        CubeDependency {
+            cube_symbol,
             sql_fn,
             to_string_fn,
             properties,
@@ -25,15 +36,17 @@ impl StructDependency {
     }
 }
 
+#[derive(Clone)]
 pub enum ContextSymbolDep {
     SecurityContext,
     FilterParams,
     FilterGroup,
 }
 
+#[derive(Clone)]
 pub enum Dependency {
-    SingleDependency(Rc<EvaluationNode>),
-    StructDependency(StructDependency),
+    SymbolDependency(Rc<MemberSymbol>),
+    CubeDependency(CubeDependency),
     ContextDependency(ContextSymbolDep),
 }
 
@@ -53,14 +66,11 @@ impl<'a> DependenciesBuilder<'a> {
     pub fn build(
         mut self,
         cube_name: String,
-        member_sql: Option<Rc<dyn MemberSql>>,
+        member_sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<Dependency>, CubeError> {
-        let call_deps = if let Some(member_sql) = member_sql {
-            self.cube_evaluator
-                .resolve_symbols_call_deps(cube_name.clone(), member_sql)?
-        } else {
-            vec![]
-        };
+        let call_deps = self
+            .cube_evaluator
+            .resolve_symbols_call_deps(cube_name.clone(), member_sql)?;
 
         let mut childs = Vec::new();
         for (i, dep) in call_deps.iter().enumerate() {
@@ -69,6 +79,7 @@ impl<'a> DependenciesBuilder<'a> {
                 childs[parent].push(i);
             }
         }
+
         let mut result = Vec::new();
 
         for (i, dep) in call_deps.iter().enumerate() {
@@ -80,48 +91,69 @@ impl<'a> DependenciesBuilder<'a> {
                 continue;
             }
             if childs[i].is_empty() {
-                result.push(Dependency::SingleDependency(
+                result.push(Dependency::SymbolDependency(
                     self.build_evaluator(&cube_name, &dep.name)?,
                 ));
             } else {
-                let new_cube_name = if self.is_current_cube(&dep.name) {
-                    cube_name.clone()
-                } else {
-                    dep.name.clone()
-                };
-                let mut sql_fn = None;
-                let mut to_string_fn: Option<Rc<EvaluationNode>> = None;
-                let mut properties = HashMap::new();
-                for child_ind in childs[i].iter() {
-                    let name = &call_deps[*child_ind].name;
-                    if name.as_str() == "sql" {
-                        sql_fn = Some(
-                            self.compiler
-                                .add_cube_table_evaluator(new_cube_name.clone())?,
-                        );
-                    } else if name.as_str() == "toString" {
-                        to_string_fn = Some(
-                            self.compiler
-                                .add_cube_name_evaluator(new_cube_name.clone())?,
-                        );
-                    } else {
-                        properties.insert(
-                            name.clone(),
-                            Dependency::SingleDependency(
-                                self.build_evaluator(&new_cube_name, &name)?,
-                            ),
-                        );
-                    }
-                }
-                result.push(Dependency::StructDependency(StructDependency::new(
-                    sql_fn,
-                    to_string_fn,
-                    properties,
-                )));
+                let dep = self.build_cube_dependency(&cube_name, i, &call_deps, &childs)?;
+                result.push(Dependency::CubeDependency(dep));
             }
         }
 
         Ok(result)
+    }
+
+    fn build_cube_dependency(
+        &mut self,
+        cube_name: &String,
+        dep_index: usize,
+        call_deps: &Vec<CallDep>,
+        call_childs: &Vec<Vec<usize>>,
+    ) -> Result<CubeDependency, CubeError> {
+        let dep = &call_deps[dep_index];
+        let new_cube_name = if self.is_current_cube(&dep.name) {
+            cube_name.clone()
+        } else {
+            dep.name.clone()
+        };
+        let mut sql_fn = None;
+        let mut to_string_fn: Option<Rc<MemberSymbol>> = None;
+        let mut properties = HashMap::new();
+        let cube_symbol = self
+            .compiler
+            .add_cube_table_evaluator(new_cube_name.clone())?;
+        for child_ind in call_childs[dep_index].iter() {
+            let name = &call_deps[*child_ind].name;
+            if name.as_str() == "sql" {
+                sql_fn = Some(
+                    self.compiler
+                        .add_cube_table_evaluator(new_cube_name.clone())?,
+                );
+            } else if name.as_str() == "toString" {
+                to_string_fn = Some(
+                    self.compiler
+                        .add_cube_name_evaluator(new_cube_name.clone())?,
+                );
+            } else {
+                let child_dep = if call_childs[*child_ind].is_empty() {
+                    CubeDepProperty::SymbolDependency(self.build_evaluator(&new_cube_name, &name)?)
+                } else {
+                    CubeDepProperty::CubeDependency(self.build_cube_dependency(
+                        &new_cube_name,
+                        *child_ind,
+                        call_deps,
+                        call_childs,
+                    )?)
+                };
+                properties.insert(name.clone(), child_dep);
+            }
+        }
+        Ok(CubeDependency::new(
+            cube_symbol,
+            sql_fn,
+            to_string_fn,
+            properties,
+        ))
     }
 
     fn build_context_dep(&self, name: &str) -> Option<Dependency> {
@@ -149,7 +181,7 @@ impl<'a> DependenciesBuilder<'a> {
         &mut self,
         cube_name: &String,
         name: &String,
-    ) -> Result<Rc<EvaluationNode>, CubeError> {
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
         let dep_full_name = format!("{}.{}", cube_name, name);
         //FIXME avoid cloning
         let dep_path = vec![cube_name.clone(), name.clone()];

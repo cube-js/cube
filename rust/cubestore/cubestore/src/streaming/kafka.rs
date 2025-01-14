@@ -306,6 +306,13 @@ impl StreamingSource for KafkaStreamingSource {
         let unique_key_columns = self.unique_key_columns.clone();
         let seq_column_index_to_move = self.seq_column_index;
         let traffic_sender = TrafficSender::new(self.trace_obj.clone());
+        let hosts = self
+            .host
+            .clone()
+            .split(",")
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
         let stream = self
             .kafka_client
             .create_message_stream(
@@ -321,7 +328,7 @@ impl StreamingSource for KafkaStreamingSource {
                         })
                         .unwrap_or(Offset::End),
                 ),
-                vec![self.host.clone()],
+                hosts,
                 &self.user,
                 &self.password,
                 self.use_ssl,

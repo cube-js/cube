@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv, timeSeries as timeSeriesBase } from '@cubejs-backend/shared';
 
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
@@ -261,7 +261,10 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
-    this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    if (!getEnv('nativeSqlPlanner')) {
+      // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
+      this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    }
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
@@ -349,7 +352,8 @@ export class BaseQuery {
   initUngrouped() {
     this.ungrouped = this.options.ungrouped;
     if (this.ungrouped) {
-      if (!this.options.allowUngroupedWithoutPrimaryKey) {
+      // this.join is not defined for Tesseract
+      if (!this.options.allowUngroupedWithoutPrimaryKey && !getEnv('nativeSqlPlanner')) {
         const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
         const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
         const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
@@ -577,9 +581,9 @@ export class BaseQuery {
   }
 
   /**
-   * Returns an array of SQL query strings for the query.
+   * Returns a pair of SQL query string and parameter values for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
-   * @returns {Array<string>}
+   * @returns {[string, Array<unknown>]}
    */
   buildSqlAndParams(exportAnnotatedSql) {
     if (getEnv('nativeSqlPlanner')) {
@@ -606,26 +610,46 @@ export class BaseQuery {
   }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
+    const order = this.options.order && R.pipe(
+      R.map((hash) => ((!hash || !hash.id) ? null : hash)),
+      R.reject(R.isNil),
+    )(this.options.order);
+
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
       timeDimensions: this.options.timeDimensions,
       timezone: this.options.timezone,
-      joinRoot: this.join.root,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
-      order: this.options.order,
+      order,
       filters: this.options.filters,
       limit: this.options.limit ? this.options.limit.toString() : null,
       rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
+      ungrouped: this.options.ungrouped
 
     };
     const res = nativeBuildSqlAndParams(queryParams);
     // FIXME
     res[1] = [...res[1]];
     return res;
+  }
+
+  allCubeMembers(path) {
+    const fromPath = this.cubeEvaluator.cubeFromPath(path);
+
+    return Object.keys(fromPath.measures).concat(Object.keys(fromPath.dimensions));
+  }
+
+  getAllocatedParams() {
+    return this.paramAllocator.getParams();
+  }
+
+  // FIXME helper for native generator, maybe should be moved entire to rust
+  generateTimeSeries(granularity, dateRange) {
+    return timeSeriesBase(granularity, dateRange);
   }
 
   get shouldReuseParams() {
@@ -1521,13 +1545,13 @@ export class BaseQuery {
         this.queryCache
       );
       if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
-        throw new UserError(`Subquery dimension ${m.expressionName} should reference at least one measure`);
+        throw new UserError(`Subquery measure ${m.expressionName} should reference at least one member`);
       }
       if (!collectedMeasures.length && m.isMemberExpression && m.query.allCubeNames.length > 1 && m.measureSql() === 'COUNT(*)') {
         const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
         throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
       }
-      return [m.measure, collectedMeasures];
+      return [typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`, collectedMeasures];
     }));
   }
 
@@ -1831,7 +1855,14 @@ export class BaseQuery {
   keyDimensions(primaryKeyDimensions) {
     // The same dimension with different granularities maybe requested, so it's not enough to filter only by dimension
     return R.uniqBy(
-      (d) => `${d.dimension}${d.granularity ?? ''}`, this.dimensionsForSelect()
+      (d) => {
+        if (d.isMemberExpression) {
+          return d.dimension.definition;
+        }
+
+        return `${d.dimension}${d.granularity ?? ''}`;
+      },
+      this.dimensionsForSelect()
         .concat(primaryKeyDimensions)
     );
   }
@@ -2240,6 +2271,7 @@ export class BaseQuery {
         this.safeEvaluateSymbolContext().memberChildren[parentMember].push(memberPath);
       }
     }
+
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
       if (type === 'measure') {
@@ -2538,6 +2570,10 @@ export class BaseQuery {
       return evaluateSql === '*' ? '1' : evaluateSql;
     }
     if (this.ungrouped) {
+      if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
+        evaluateSql = this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative[measurePath];
+      }
+
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
         const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: '1' }]);
         return evaluateSql === '*' ? '1' : sql;
@@ -2780,7 +2816,7 @@ export class BaseQuery {
    * intervals relative to origin timestamp point
    * @param {string} interval (a value expression of type interval)
    * @param {string} source (a value expression of type timestamp/date)
-   * @param {string} origin (a value expression of type timestamp/date)
+   * @param {string} origin (a value expression of type timestamp/date without timezone)
    * @returns {string}
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -2838,7 +2874,7 @@ export class BaseQuery {
       return this.timeGroupedColumn(granularity.granularityFromInterval(), dimension);
     }
 
-    return this.dateBin(granularity.granularityInterval, dimension, granularity.originFormatted());
+    return this.dateBin(granularity.granularityInterval, dimension, granularity.originLocalFormatted());
   }
 
   /**
@@ -3213,24 +3249,44 @@ export class BaseQuery {
         DATE: 'DATE({{ args_concat }})',
       },
       statements: {
-        select: 'SELECT {% if distinct %}DISTINCT {% endif %}' +
+        select: '{% if ctes %} WITH \n' +
+          '{{ ctes | join(\',\n\') }}\n' +
+          '{% endif %}' +
+          'SELECT {% if distinct %}DISTINCT {% endif %}' +
           '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
-          ') AS {{ from_alias }}{% endif %}' +
+          ') AS {{ from_alias }}{% elif from_prepared %}\n' +
+          'FROM {{ from_prepared }}' +
+          '{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
+          '{% if having %}\nHAVING {{ having }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
+        join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
+        cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
+        time_series_select: 'SELECT date_from::timestamp AS "date_from",\n' +
+        'date_to::timestamp AS "date_to" \n' +
+        'FROM(\n' +
+        '    VALUES ' +
+        '{% for time_item in seria  %}' +
+        '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
+        '{% if not loop.last %}, {% endif %}' +
+        '{% endfor %}' +
+        ') AS dates (date_from, date_to)'
       },
       expressions: {
+        column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',
         column_aliased: '{{expr}} {{quoted_alias}}',
+        query_aliased: '{{ query }} AS {{ quoted_alias }}',
         case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',
         binary: '({{ left }} {{ op }} {{ right }})',
-        sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
+        sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}',
+        order_by: '{% if index %} {{ index }} {% else %} {{ expr }} {% endif %} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
         window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})',
         window_frame_bounds: '{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}',
@@ -3241,6 +3297,8 @@ export class BaseQuery {
         cube: 'CUBE({{ exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
+        add_interval: '{{ date }} + interval \'{{ interval }}\'',
+        sub_interval: '{{ date }} - interval \'{{ interval }}\'',
         true: 'TRUE',
         false: 'FALSE',
         like: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}',
@@ -3259,15 +3317,22 @@ export class BaseQuery {
         gt: '{{ column }} > {{ param }}',
         gte: '{{ column }} >= {{ param }}',
         lt: '{{ column }} < {{ param }}',
-        lte: '{{ column }} <= {{ param }}'
+        lte: '{{ column }} <= {{ param }}',
+        like_pattern: '{% if start_wild %}\'%\' || {% endif %}{{ value }}{% if end_wild %}|| \'%\'{% endif %}',
+        always_true: '1 = 1'
 
       },
+      operators: {},
       quotes: {
         identifiers: '"',
         escape: '""'
       },
       params: {
         param: '?'
+      },
+      join_types: {
+        inner: 'INNER',
+        left: 'LEFT',
       },
       window_frame_types: {
         rows: 'ROWS',
@@ -3784,7 +3849,7 @@ export class BaseQuery {
 
   static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases) {
     if (!filter) {
-      return '1 = 1';
+      return BaseFilter.ALWAYS_TRUE;
     }
 
     if (filter.operator === 'and' || filter.operator === 'or') {
@@ -3809,21 +3874,20 @@ export class BaseQuery {
     if (!filterParamArg) {
       throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
     }
-    if (
-      filterParams && filterParams.length
-    ) {
-      if (typeof filterParamArg.__column() === 'function') {
-        // eslint-disable-next-line prefer-spread
-        return filterParamArg.__column().apply(
-          null,
-          filterParams.map(allocateParam),
-        );
-      } else {
-        return filter.conditionSql(filterParamArg.__column());
-      }
-    } else {
-      return '1 = 1';
+
+    if (typeof filterParamArg.__column() !== 'function') {
+      return filter.conditionSql(filterParamArg.__column());
     }
+
+    if (!filterParams || !filterParams.length) {
+      return BaseFilter.ALWAYS_TRUE;
+    }
+
+    // eslint-disable-next-line prefer-spread
+    return filterParamArg.__column().apply(
+      null,
+      filterParams.map(allocateParam),
+    );
   }
 
   filterGroupFunction() {
@@ -3882,9 +3946,16 @@ export class BaseQuery {
                 // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
                 // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
                 // evaluateSymbolSql() -> evaluateSql()... -> and got here again
+                //
+                // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
+                // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+                // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
+                // and so on...
+                // For this case aliasGathering flag is added to the context in first iteration and
+                // is checked below to prevent looping.
                 const aliases = allFilters ?
                   allFilters
-                    .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
+                    .map(v => (v.query && !v.query.safeEvaluateSymbolContext().aliasGathering ? v.query.allBackAliasMembersExceptSegments() : {}))
                     .reduce((a, b) => ({ ...a, ...b }), {})
                   : {};
                 // Filtering aliases that somehow relate to this group member
@@ -3932,8 +4003,10 @@ export class BaseQuery {
     const query = this;
     return members.map(
       member => {
-        const collectedMembers = query
-          .collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor');
+        const collectedMembers = query.evaluateSymbolSqlWithContext(
+          () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
+          { aliasGathering: true }
+        );
         const memberPath = member.expressionPath();
         let nonAliasSeen = false;
         return collectedMembers

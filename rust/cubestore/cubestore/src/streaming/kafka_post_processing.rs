@@ -470,16 +470,45 @@ impl KafkaPostProcessPlanner {
     }
 
     fn get_source_unique_column(&self, expr: &Expr) -> Result<Column, CubeError> {
+        fn find_column_name(expr: &Expr) -> Result<Option<String>, CubeError> {
+            match expr {
+                Expr::Column(c) => Ok(Some(c.name.clone())),
+                Expr::Alias(e, _) => find_column_name(&**e),
+                Expr::ScalarUDF { args, .. } => {
+                    let mut column_name: Option<String> = None;
+                    for arg in args {
+                        if let Some(name) = find_column_name(arg)? {
+                            if let Some(existing_name) = &column_name {
+                                if existing_name != &name {
+                                    return Err(CubeError::user(
+                                        format!("Scalar function can only use a single column, expression: {:?}", expr),
+                                    ));
+                                }
+                            } else {
+                                column_name = Some(name);
+                            }
+                        }
+                    }
+                    Ok(column_name)
+                }
+                _ => Ok(None),
+            }
+        }
+
         let source_name = match expr {
             Expr::Column(c) => Ok(c.name.clone()),
             Expr::Alias(e, _) => match &**e {
                 Expr::Column(c) => Ok(c.name.clone()),
+                Expr::ScalarUDF { .. } => find_column_name(expr)?.ok_or_else(|| {
+                    CubeError::user(format!("Scalar function must contain at least one column, expression: {:?}", expr))
+                }),
                 _ => Err(CubeError::user(format!(
-                    "Unique key can't be an expression in kafka streaming queries"
+                    "Unique key can't be an expression in kafka streaming queries, expression: {:?}",
+                    expr
                 ))),
             },
             _ => Err(CubeError::user(
-                "All expressions must have aliases in kafka streaming queries".to_string(),
+                format!("All expressions must have aliases in kafka streaming queries, expression: {:?}", expr),
             )),
         }?;
 

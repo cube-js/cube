@@ -28,6 +28,8 @@ pub struct V1CubeMeta {
     pub segments: Vec<crate::models::V1CubeMetaSegment>,
     #[serde(rename = "joins", skip_serializing_if = "Option::is_none")]
     pub joins: Option<Vec<crate::models::V1CubeMetaJoin>>,
+    #[serde(rename = "folders", skip_serializing_if = "Option::is_none")]
+    pub folders: Option<Vec<crate::models::V1CubeMetaFolder>>,
 }
 
 impl V1CubeMeta {
@@ -48,6 +50,7 @@ impl V1CubeMeta {
             dimensions,
             segments,
             joins: None,
+            folders: None,
         }
     }
 }

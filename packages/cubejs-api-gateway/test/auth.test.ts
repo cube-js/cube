@@ -323,7 +323,7 @@ describe('test authorization', () => {
 
     const { app } = createApiGateway(handlerMock, loggerMock, {
       playgroundAuthSecret,
-      checkAuth: async (req: Request, auth?: string) => {
+      checkAuth: async (_req: Request, _auth?: string) => {
         throw new CubejsHandlerError(409, 'Error', 'Custom error');
       }
     });

@@ -23,9 +23,9 @@ use crate::{
         LimitFetch, LimitSkip, ListType, LiteralExprValue, LiteralMemberRelation,
         LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube,
         MemberErrorError, MemberErrorPriority, MemberPushdownReplacerAliasToCube,
-        MemberReplacerAliasToCube, ProjectionAlias, SegmentName, TableScanSourceTableName,
-        TableScanTableName, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-        VirtualFieldCube, VirtualFieldName,
+        MemberReplacerAliasToCube, ProjectionAlias, SegmentName, TableScanFetch,
+        TableScanProjection, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+        TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
     },
     config::ConfigObj,
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -81,6 +81,9 @@ impl RewriteRules for MemberRules {
                 self.transform_table_scan(
                     "?source_table_name",
                     "?table_name",
+                    "?projection",
+                    "?filters",
+                    "?fetch",
                     "?alias_to_cube",
                     "?cube_scan_members",
                 ),
@@ -134,8 +137,11 @@ impl RewriteRules for MemberRules {
                         "?old_members",
                         "?filters",
                         "?orders",
-                        "?limit",
-                        "?offset",
+                        // If CubeScan already have limit and offset it would be incorrect to push aggregation into it
+                        // Aggregate(CubeScan(limit, offset)) would run aggregation over limited rows
+                        // CubeScan(aggregation, limit, offset) would return limited groups
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
                         "?split",
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
@@ -161,8 +167,8 @@ impl RewriteRules for MemberRules {
                     ),
                     "?filters",
                     "?orders",
-                    "?limit",
-                    "?offset",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
                     "?split",
                     "?new_pushdown_join",
                     "CubeScanWrapped:false",
@@ -382,6 +388,7 @@ impl RewriteRules for MemberRules {
                     "?right_on",
                     "?join_type",
                     "?join_constraint",
+                    "?null_equals_null",
                 ),
                 cross_join(
                     cube_scan(
@@ -1134,15 +1141,49 @@ impl MemberRules {
         &self,
         source_table_name_var: &'static str,
         table_name_var: &'static str,
+        table_scan_projection_var: &'static str,
+        table_scan_filters_var: &'static str,
+        table_scan_fetch_var: &'static str,
         alias_to_cube_var: &'static str,
         cube_scan_members_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let source_table_name_var = var!(source_table_name_var);
         let table_name_var = var!(table_name_var);
+        let table_scan_projection_var = var!(table_scan_projection_var);
+        let table_scan_filters_var = var!(table_scan_filters_var);
+        let table_scan_fetch_var = var!(table_scan_fetch_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let cube_scan_members_var = var!(cube_scan_members_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
+            for table_projection in var_iter!(
+                egraph[subst[table_scan_projection_var]],
+                TableScanProjection
+            ) {
+                if table_projection.is_some() {
+                    // This rule always inserts AllMembersCube, so it does not support projection in TableScan
+                    // TODO support this and enable "push projection to scan" optimizer from DF, it should help many CubeScans without members
+                    return false;
+                }
+            }
+
+            for table_filters in
+                var_list_iter!(egraph[subst[table_scan_filters_var]], TableScanFilters)
+            {
+                if !table_filters.is_empty() {
+                    // This rule always inserts empty filters, so it does not support filters in TableScan
+                    return false;
+                }
+            }
+
+            for table_fetch in var_iter!(egraph[subst[table_scan_fetch_var]], TableScanFetch) {
+                if table_fetch.is_some() {
+                    // This rule always inserts limit:None, so it does not support fetch in TableScan
+                    // TODO support this
+                    return false;
+                }
+            }
+
             for name in var_iter!(
                 egraph[subst[source_table_name_var]],
                 TableScanSourceTableName

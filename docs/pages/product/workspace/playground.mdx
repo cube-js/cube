@@ -14,16 +14,17 @@ or use the [JavaScript SDKs][ref-js-sdk] to build your own query builder.
 
 <SuccessBox>
 
-Playground is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
+Playground is available in Cube Cloud on
+[all product tiers](https://cube.dev/pricing).
 
 </SuccessBox>
 
-<SuccessBox>
+<InfoBox>
 
 Playground is available in Cube Core at [localhost:4000](http://localhost:4000)
 when it's run in the [development mode][ref-dev-mode].
 
-</SuccessBox>
+</InfoBox>
 
 You can [view](#viewing-the-data-model) the data model entities or [search](#searching-the-data-model)
 for them, [compose](#composing-queries) a query from scratch or [paste](#pasting-a-query)
@@ -154,6 +155,13 @@ on the <Btn>Generated SQL</Btn> tab. Click <Btn>Copy</Btn> to put it into your c
   highlight="inset(7.5% 0 0 26% round 10px)"
   src="https://ucarecdn.com/d2b6e514-9219-49ea-bae6-bcd0f1936542/"
 />
+
+<InfoBox>
+
+Note that a generated query can contain placeholders, e.g., `?` or `$1`, for parameters
+that Cube passes to an underlying data source driver later when executing the query.
+
+</InfoBox>
 
 ## Copying API queries
 

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs-extra';
+import { DotenvParseOutput } from '@cubejs-backend/dotenv';
 import { CubeCloudClient } from './cloud';
 
 type DeployDirectoryOptions = {
@@ -64,26 +65,39 @@ export class DeployDirectory {
 }
 
 type DeployHooks = {
-  onStart?: Function,
-  onUpdate?: Function,
-  onUpload?: Function,
-  onFinally?: Function
+  onStart?: (deploymentName: string, files: string[]) => void,
+  onUpdate?: (i: number, { file }: { file: string}) => void,
+  onUpload?: (files: string[], file: string) => void,
+  onFinally?: () => void
 };
+
+export interface DeployResponse {
+  lastHash?: string;
+  [key: string]: any; // for other properties
+}
 
 export class DeployController {
   public constructor(
     protected readonly cubeCloudClient: CubeCloudClient,
+    protected readonly envs: { envVariables?: DotenvParseOutput, replaceEnv?: boolean } = {},
     protected readonly hooks: DeployHooks = {}
   ) {
   }
 
-  public async deploy(directory: string) {
+  public async deploy(directory: string): Promise<DeployResponse> {
     let result;
     const deployDir = new DeployDirectory({ directory });
     const fileHashes: any = await deployDir.fileHashes();
 
     const upstreamHashes = await this.cubeCloudClient.getUpstreamHashes();
     const { transaction, deploymentName } = await this.cubeCloudClient.startUpload();
+
+    if (this.envs.envVariables) {
+      const { envVariables, replaceEnv } = this.envs;
+      if (Object.keys(this.envs.envVariables).length) {
+        await this.cubeCloudClient.setEnvVars({ envVariables, replaceEnv });
+      }
+    }
 
     const files = Object.keys(fileHashes);
     const fileHashesPosix: Record<string, any> = {};

@@ -470,12 +470,12 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  public getSchemas() {
+  public getSchemas(): Promise<QuerySchemasResult[]> {
     const query = this.getSchemasQuery();
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]) {
+  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
     const schemaNames = schemas.map(s => s.schema_name);
 
@@ -483,7 +483,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public async getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     const groupedBySchema: Record<string, string[]> = {};
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {
@@ -614,9 +614,14 @@ export abstract class BaseDriver implements DriverInterface {
     return [];
   }
 
-  public createTable(quotedTableName: string, columns: TableColumn[]) {
+  // This is only for use in tests
+  public async createTableRaw(query: string): Promise<void> {
+    await this.query(query);
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
     const createTableSql = this.createTableSql(quotedTableName, columns);
-    return this.query(createTableSql, []).catch(e => {
+    await this.query(createTableSql, []).catch(e => {
       e.message = `Error during create table: ${createTableSql}: ${e.message}`;
       throw e;
     });
@@ -751,7 +756,8 @@ export abstract class BaseDriver implements DriverInterface {
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
-    const parts = bucketName.split('.blob.core.windows.net/');
+    const splitter = bucketName.includes('blob.core') ? '.blob.core.windows.net/' : '.dfs.core.windows.net/';
+    const parts = bucketName.split(splitter);
     const account = parts[0];
     const container = parts[1].split('/')[0];
     let credential: StorageSharedKeyCredential | DefaultAzureCredential;
@@ -805,7 +811,7 @@ export abstract class BaseDriver implements DriverInterface {
 
     const csvFiles: string[] = [];
     const containerClient = blobServiceClient.getContainerClient(container);
-    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}/` });
+    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}` });
     for await (const blob of blobsList) {
       if (blob.name && (blob.name.endsWith('.csv.gz') || blob.name.endsWith('.csv'))) {
         const starts = new Date();

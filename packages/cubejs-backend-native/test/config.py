@@ -20,6 +20,23 @@ async def check_auth(req, authorization):
     }
 
 
+@config('extend_context')
+def extend_context(req):
+  print("[python] extend_context req=", req)
+  if "securityContext" not in req:
+    return {
+      "security_context": {
+        "error": "missing",
+      }
+    }
+
+  req["securityContext"]["extended_by_config"] = True
+
+  return {
+    "security_context": req["securityContext"],
+  }
+
+
 @config
 async def repository_factory(ctx):
     print("[python] repository_factory ctx=", ctx)
@@ -31,6 +48,34 @@ async def repository_factory(ctx):
 async def context_to_api_scopes():
     print("[python] context_to_api_scopes")
     return ["meta", "data", "jobs"]
+
+
+@config
+async def scheduled_refresh_time_zones(ctx):
+    print("[python] scheduled_refresh_time_zones ctx=", ctx)
+    return ["Europe/Kyiv", "Antarctica/Troll", "Australia/Sydney"]
+
+
+@config
+async def scheduled_refresh_contexts(ctx):
+    print("[python] scheduled_refresh_contexts ctx=", ctx)
+    return [
+      {
+        "securityContext": {
+          "appid": 'test1', "u": { "prop1": "value1" }
+        }
+      },
+      {
+        "securityContext": {
+          "appid": 'test2', "u": { "prop1": "value2" }
+        }
+      },
+      {
+        "securityContext": {
+          "appid": 'test3', "u": { "prop1": "value3" }
+        }
+      },
+    ]
 
 
 @config

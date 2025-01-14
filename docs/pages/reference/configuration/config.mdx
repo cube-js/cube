@@ -46,7 +46,8 @@ module.exports = {
 
 </CodeTabs>
 
-Overrides `CUBEJS_SCHEMA_PATH`. The default value is `model`.
+This configuration option can also be set using the `CUBEJS_SCHEMA_PATH`
+environment variable. The default value is `model`.
 
 Use [`repositoryFactory`][self-repofactory] for [multitenancy][ref-multitenancy]
 or when a more flexible setup is needed.
@@ -309,6 +310,9 @@ module.exports = {
 
 </CodeTabs>
 
+This configuration option can also be set using the `CUBEJS_CACHE_AND_QUEUE_DRIVER`
+environment variable.
+
 ### `context_to_orchestrator_id`
 
 <WarningBox>
@@ -447,18 +451,18 @@ these values can result in application instability and/or downtime.
 
 You can pass this object to set advanced options for the query orchestrator.
 
-| Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                       | Default Value           |
-|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| continueWaitTimeout                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `5`                     |
-| rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                  | `false`                 |
-| queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
-| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [`refresh_key`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                     | `defined by DB dialect` |
-| queryCacheOptions.backgroundRenew            | Controls whether to wait in foreground for refreshed query data if `refresh_key` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [`refresh_key`][ref-schema-cube-ref-refresh-key] check to renew in foreground. | `false`                 |
-| queryCacheOptions.queueOptions               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
-| preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                          | `{}`                    |
-| preAggregationsOptions.maxPartitions         | The maximum number of partitions each pre-aggregation in a cube can use.                                                                                                                                                                                                                                                                                                                          | `10000`                 |
-| preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                          | `{}`                    |
-| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                           | `false`                 |
+| Option                                         | Description                                                                                                                                                                                                                                                                                                                                                                                       | Default Value           |
+|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
+| `continueWaitTimeout`                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `5`                     |
+| `rollupOnlyMode`                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                  | `false`                 |
+| `queryCacheOptions`                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
+| `queryCacheOptions.refreshKeyRenewalThreshold` | Time in seconds to cache the result of [`refresh_key`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                     | `defined by DB dialect` |
+| `queryCacheOptions.backgroundRenew`            | Controls whether to wait in foreground for refreshed query data if `refresh_key` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [`refresh_key`][ref-schema-cube-ref-refresh-key] check to renew in foreground. | `false`                 |
+| `queryCacheOptions.queueOptions`               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
+| `preAggregationsOptions`                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                          | `{}`                    |
+| `preAggregationsOptions.maxPartitions`         | The maximum number of partitions each pre-aggregation in a cube can use.                                                                                                                                                                                                                                                                                                                          | `10000`                 |
+| `preAggregationsOptions.queueOptions`          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                          | `{}`                    |
+| `preAggregationsOptions.externalRefresh`       | When running a separate instance of Cube to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                           | `false`                 |
 
 `queryCacheOptions` are used while querying database tables, while
 `preAggregationsOptions` settings are used to query pre-aggregated tables.
@@ -466,19 +470,19 @@ You can pass this object to set advanced options for the query orchestrator.
 <WarningBox>
 
 Setting these options is highly discouraged as these are considered to be
-system-level settings. Please use `CUBEJS_DB_QUERY_TIMEOUT` and
+system-level settings. Please use `CUBEJS_ROLLUP_ONLY`, `CUBEJS_DB_QUERY_TIMEOUT`, and
 `CUBEJS_CONCURRENCY` [environment variables][ref-environment-variables] instead.
 
 </WarningBox>
 
 Timeout and interval options' values are in seconds.
 
-| Option            | Description                                                                                                                                                                                                                        | Default Value |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| concurrency       | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
-| executionTimeout  | Total timeout of single query                                                                                                                                                                                                      | `600`         |
-| orphanedTimeout   | Query will be marked for cancellation if not requested during this period.                                                                                                                                                         | `120`         |
-| heartBeatInterval | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                                                                                                       | `30`          |
+| Option              | Description                                                                                                                                                                                                                        | Default Value |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `concurrency`       | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
+| `executionTimeout`  | Total timeout of single query                                                                                                                                                                                                      | `600`         |
+| `orphanedTimeout`   | Query will be marked for cancellation if not requested during this period.                                                                                                                                                         | `120`         |
+| `heartBeatInterval` | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                                                                                                       | `30`          |
 
 <CodeTabs>
 
@@ -554,7 +558,8 @@ the schema name dynamically depending on the security context.
 Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
 and `prod_pre_aggregations` in production.
 
-Can be also set via the `CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable.
+This configuration option can also be set using the `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
+environment variable.
 
 <WarningBox>
 
@@ -641,42 +646,71 @@ Best practice is to run `scheduled_refresh_timer` in a separate worker Cube
 instance.
 
 You may also need to configure
-[`scheduledRefreshTimeZones`][self-opts-sched-refresh-tz] and
-[`scheduledRefreshContexts`][self-opts-sched-refresh-ctxs].
+[`scheduledRefreshTimeZones`](#scheduled_refresh_time_zones) and
+[`scheduledRefreshContexts`](#scheduled_refresh_contexts).
 
 ### `scheduled_refresh_time_zones`
 
 This option specifies a list of time zones that pre-aggregations will be built
 for. It has impact on [pre-aggregation matching][ref-matching-preaggs].
 
-You can specify multiple timezones in the [TZ Database Name][link-wiki-tz]
-format, e.g., `America/Los_Angeles`:
+Either an array or function returning an array can be passed. Providing a function
+allows to set the time zones dynamically depending on the security context.
+
+Time zones should be specified in the [TZ Database Name][link-wiki-tz] format,
+e.g., `America/Los_Angeles`.
 
 <CodeTabs>
 
 ```python
 from cube import config
 
+# An array of time zones
 config.scheduled_refresh_time_zones = [
   'America/Vancouver',
   'America/Toronto'
 ]
+
+# Alternatively, a function returning an array of time zones
+@config('scheduled_refresh_time_zones')
+def scheduled_refresh_time_zones(ctx: dict) -> list[str]:
+  time_zones = {
+    'tenant_1': ['America/New_York'],
+    'tenant_2': ['America/Chicago'],
+    'tenant_3': ['America/Los_Angeles']
+  }
+  default_time_zones = ['UTC']
+  tenant_id = ctx['securityContext']['tenant_id']
+  return time_zones.get(tenant_id, default_time_zones)
 ```
 
 ```javascript
 module.exports = {
+  // An array of time zones
   scheduledRefreshTimeZones: [
     'America/Vancouver',
     'America/Toronto'
-  ]
+  ],
+
+  // Alternatively, a function returning an array of time zones
+  scheduledRefreshTimeZones: ({ securityContext }) => {
+    let time_zones = {
+      'tenant_1': ['America/New_York'],
+      'tenant_2': ['America/Chicago'],
+      'tenant_3': ['America/Los_Angeles']
+    }
+    let default_time_zones = ['UTC']  
+    let tenant_id = securityContext.tenant_id
+    return time_zones[tenant_id] || default_time_zones
+  }
 };
 ```
 
 </CodeTabs>
 
-The default value is a list of a single time zone. `UTC`.
+The default value is a list of a single time zone: `UTC`.
 
-This configuration option can be also set using the
+This configuration option can also be set using the
 `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
 
 ### `scheduled_refresh_contexts`
@@ -842,7 +876,7 @@ module.exports = {
 
 </CodeTabs>
 
-This configuration option can be also set using the
+This configuration option can also be set using the
 `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY` environment variable.
 
 <InfoBox>
@@ -1157,20 +1191,15 @@ Please [track this issue](https://github.com/cube-js/cube/issues/8136).
   };
 ```
 
-* `jwkUrl` — the URL from which JSON Web Key Sets (JWKS) can be retrieved. Can also be set
-using `CUBEJS_JWK_URL`.
-* `key` — a JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
-also be set using `CUBEJS_JWT_KEY`.
-* `algorithms` — [any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs]. Can also be
-set using `CUBEJS_JWT_ALGS`.
-* `issuer` — an issuer value which will be used to enforce the [`iss` claim from inbound
-JWTs][link-jwt-ref-iss]. Can also be set using `CUBEJS_JWT_ISSUER`.
-* `audience` — an audience value which will be used to enforce the [`aud` claim from inbound
-JWTs][link-jwt-ref-aud]. Can also be set using `CUBEJS_JWT_AUDIENCE`.
-* `subject` — a subject value which will be used to enforce the [`sub` claim from inbound
-JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
-* `claimsNamespace` — a namespace within the decoded JWT under which any custom claims can be found.
-Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+| Option | Description | Environment variable |
+| ------ | ----------- | -------------------- |
+| `jwkUrl` | URL from which JSON Web Key Sets (JWKS) can be retrieved | Can also be set using `CUBEJS_JWK_URL` |
+| `key` | JSON string that represents a cryptographic key. Similar to `CUBEJS_API_SECRET` | Can also be set using `CUBEJS_JWT_KEY` |
+| `algorithms` | [Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs] | Can also be set using `CUBEJS_JWT_ALGS` |
+| `issuer` | Issuer value which will be used to enforce the [`iss` claim from inbound JWTs][link-jwt-ref-iss] | Can also be set using `CUBEJS_JWT_ISSUER` |
+| `audience` | Audience value which will be used to enforce the [`aud` claim from inbound JWTs][link-jwt-ref-aud] | Can also be set using `CUBEJS_JWT_AUDIENCE` |
+| `subject` | Subject value which will be used to enforce the [`sub` claim from inbound JWTs][link-jwt-ref-sub] | Can also be set using `CUBEJS_JWT_SUBJECT` |
+| `claimsNamespace` | Namespace within the decoded JWT under which any custom claims can be found | Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE` |
 
 ### `check_sql_auth`
 
@@ -1236,9 +1265,8 @@ using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
 
 ### `can_switch_sql_user`
 
-Used in the [SQL API][ref-sql-api],. Default
-implementation depends on `CUBEJS_SQL_SUPER_USER` and return `true` when it's
-equal to session's user.
+Used in the [SQL API][ref-sql-api]. Default implementation depends on
+`CUBEJS_SQL_SUPER_USER` and returns `true` when it's equal to session's user.
 
 Called on each change request from Cube SQL API.
 
@@ -1309,6 +1337,8 @@ module.exports = {
 ```
 
 </CodeTabs>
+
+See also the `CUBEJS_LOG_LEVEL` environment variable.
 
 ### `telemetry`
 
@@ -1394,8 +1424,6 @@ If not defined, Cube will lookup for environment variable
 [self-opts-ctx-to-appid]: #context_to_app_id
 [self-driver-factory]: #driver_factory
 [ref-schema-ref-datasource]: /reference/data-model/cube#data_source
-[self-opts-sched-refresh-ctxs]: #scheduled_refresh_contexts
-[self-opts-sched-refresh-tz]: #scheduled_refresh_time_zones
 [self-repofactory]: #repository_factory
 [self-schemafilerepo]: #schema_file_repository
 [self-schemapath]: #schema_path

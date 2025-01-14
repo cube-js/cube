@@ -53,10 +53,10 @@ export class SnowflakeQuery extends BaseQuery {
 
     return `DATEADD(${timeUnit},
         FLOOR(
-          DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          DATEDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
           DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}'))
         ) * DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}')),
-        ${this.timeStampCast(`'${origin}'`)})`;
+        ${this.dateTimeCast(`'${origin}'`)})`;
   }
 
   /**
@@ -115,6 +115,8 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
+    templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    templates.join_types.full = 'FULL';
     delete templates.types.interval;
     return templates;
   }
