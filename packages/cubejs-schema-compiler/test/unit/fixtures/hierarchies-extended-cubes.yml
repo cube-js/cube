@@ -1,0 +1,54 @@
+cubes:
+  - name: base_orders
+    sql_table: orders
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: number
+        sql: number
+        type: number
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+    hierarchies:
+      - name: base_orders_hierarchy
+        title: Hello Hierarchy
+        levels:
+          - "{CUBE}.status"
+          - number
+  #
+  - name: orders
+    extends: base_orders
+    hierarchies:
+      - name: orders_hierarchy
+        levels:
+          - state
+          - city
+    dimensions:
+      - name: state
+        sql: state
+        type: string
+      - name: city
+        sql: city
+        type: string
+
+views:
+  - name: test_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+
+

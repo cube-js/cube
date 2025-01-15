@@ -65,16 +65,26 @@ export class CubeSymbols {
     let measures;
     let dimensions;
     let segments;
+    let hierarchies;
 
     const cubeObject = Object.assign({
-      allDefinitions(type) {
+      allDefinitions(type, asArray = false) {
         if (cubeDefinition.extends) {
+          if (asArray) {
+            return [
+              ...super.allDefinitions(type, asArray),
+              ...(cubeDefinition[type] || [])
+            ];
+          }
+
           return {
-            ...super.allDefinitions(type),
+            ...super.allDefinitions(type, asArray),
             ...cubeDefinition[type]
           };
-        } else {
+        } else if (asArray) {
+          return [...(cubeDefinition[type] || [])];
           // TODO We probably do not need this shallow copy
+        } else {
           return { ...cubeDefinition[type] };
         }
       },
@@ -107,7 +117,18 @@ export class CubeSymbols {
       set segments(v) {
         // Dont allow to modify
       },
-    }, cubeDefinition);
+
+      get hierarchies() {
+        if (!hierarchies) {
+          hierarchies = this.allDefinitions('hierarchies', true);
+        }
+        return hierarchies;
+      },
+      set hierarchies(v) {
+        //
+      }
+    },
+    cubeDefinition);
 
     if (cubeDefinition.extends) {
       const superCube = this.resolveSymbolsCall(cubeDefinition.extends, (name) => this.cubeReferenceProxy(name));
