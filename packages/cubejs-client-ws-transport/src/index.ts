@@ -93,6 +93,11 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
     // TODO sync with timeout in sendMessage: either flush or drop
     console.log("close call, left queue", this.messageQueue);
     if (this.ws) {
+      // Send everything queued
+      // This should be coherent with calling unsub and then close: unsub is async, but not actually synchonnizing, not on sendinig nor receiving ack
+      // TODO or drop it? Or unsubscribe cleanly?
+      this.ws.sendQueue();
+
       this.ws.close();
     }
   }
