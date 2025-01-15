@@ -102,4 +102,32 @@ describe('Cube hierarchies', () => {
 
     await expect(compiler.compile()).rejects.toThrow('Duplicate hierarchy name \'test_hierarchy\' in cube \'orders\'');
   });
+
+  it(('hierarchies on extended cubes'), async () => {
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/hierarchies-extended-cubes.yml'),
+      'utf8'
+    );
+    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+
+    await compiler.compile();
+
+    const testView = metaTransformer.cubes.find(
+      (it) => it.config.name === 'test_view'
+    );
+
+    expect(testView?.config.hierarchies).toEqual([
+      {
+        name: 'test_view.base_orders_hierarchy',
+        title: 'Hello Hierarchy',
+        levels: ['test_view.status', 'test_view.number'],
+        public: true
+      },
+      {
+        name: 'test_view.orders_hierarchy',
+        levels: ['test_view.state', 'test_view.city'],
+        public: true
+      }
+    ]);
+  });
 });
