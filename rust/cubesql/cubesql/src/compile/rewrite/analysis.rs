@@ -1039,6 +1039,7 @@ impl LogicalPlanAnalysis {
                         || &fun.name == "date_sub"
                         || &fun.name == "date"
                         || &fun.name == "date_to_timestamp"
+                        || &fun.name == "epoch_to_timestamp"
                     {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
