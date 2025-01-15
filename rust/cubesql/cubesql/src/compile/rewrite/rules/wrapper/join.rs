@@ -64,13 +64,12 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 // Going to ignore this
                                 "?right_alias_to_cube",
-                                // TODO depend on proper "ungrouped scan" flag (that is not a push-to-cube)
-                                "WrapperReplacerContextPushToCube:false",
+                                "?right_push_to_cube",
                                 "?in_projection",
                                 // Going to ignore this
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
-                                "?right_ungrouped_scan",
+                                "WrapperReplacerContextUngroupedScan:false",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
