@@ -338,7 +338,6 @@ describe('API Gateway', () => {
       });
   });
 
-
   test('custom granularities in annotation from dimensions', async () => {
     const { app } = await createApiGateway();
 
