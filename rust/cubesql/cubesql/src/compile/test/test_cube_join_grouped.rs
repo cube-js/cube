@@ -387,10 +387,8 @@ JOIN
    GROUP BY customer_gender
    ORDER BY mme_inner__ DESC
    LIMIT 20) AS anon_1 ON customer_gender = customer_gender__
--- filters here are not supported without filter flattening in wrapper
--- TODO enable it when ready
--- WHERE order_date >= TO_TIMESTAMP('2022-09-16 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
---   AND order_date < TO_TIMESTAMP('2024-09-16 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+WHERE order_date >= TO_TIMESTAMP('2022-09-16 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+  AND order_date < TO_TIMESTAMP('2024-09-16 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
 GROUP BY DATE_TRUNC('week', order_date)
 ORDER BY avgPrice DESC
 LIMIT 1000
@@ -424,6 +422,7 @@ LIMIT 1000
     let subquery = &wrapped_sql_node.request.subquery_joins.unwrap()[0];
 
     assert!(!subquery.sql.contains("ungrouped"));
+    // Inner order
     let re = Regex::new(
         r#""order":\s*\[\s*\[\s*"KibanaSampleDataEcommerce.avgPrice",\s*"desc"\s*\]\s*\]"#,
     )
@@ -434,6 +433,19 @@ LIMIT 1000
     assert!(subquery.on.contains(
         r#"${KibanaSampleDataEcommerce.customer_gender} = \"anon_1\".\"customer_gender_\""#
     ));
+
+    // Outer filter
+    assert_eq!(wrapped_sql_node.request.segments.as_ref().unwrap().len(), 1);
+    assert!(
+        wrapped_sql_node.request.segments.as_ref().unwrap()[0].contains(
+            r#"${KibanaSampleDataEcommerce.order_date} >= timestamptz '2022-09-16T00:00:00.000Z'"#
+        )
+    );
+    assert!(
+        wrapped_sql_node.request.segments.as_ref().unwrap()[0].contains(
+            r#"${KibanaSampleDataEcommerce.order_date} < timestamptz '2024-09-16T00:00:00.000Z'"#
+        )
+    );
 
     // Measure from top aggregation
     assert!(wrapped_sql_node
