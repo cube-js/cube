@@ -794,6 +794,7 @@ const viewSchema = inherit(baseSchema, {
     })
   ),
   accessPolicy: Joi.array().items(RolePolicySchema.required()),
+  hierarchies: Joi.any()
 });
 
 function formatErrorMessageFromDetails(explain, d) {

@@ -15,6 +15,8 @@ const repo = "https://github.com/cube-js/cube";
 const branch = "master";
 const path = "/docs/";
 
+const isProduction = process.env.NODE_ENV !== 'development'
+
 const GoogleTagManager = () => (
   <>
     <script dangerouslySetInnerHTML={{ __html: `
@@ -46,7 +48,7 @@ const config: DocsThemeConfig = {
   head: (
     <>
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <GoogleTagManager />
+      {isProduction && <GoogleTagManager />}
     </>
   ),
   useNextSeoProps: () => {

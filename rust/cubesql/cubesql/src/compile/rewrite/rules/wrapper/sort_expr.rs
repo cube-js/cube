@@ -14,6 +14,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
                 sort_expr(
                     wrapper_pushdown_replacer(
@@ -22,6 +23,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "?asc",
                     "?nulls_first",
@@ -36,6 +38,7 @@ impl WrapperRules {
                         "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "?asc",
                     "?nulls_first",
@@ -46,6 +49,7 @@ impl WrapperRules {
                     "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
+                    "?grouped_subqueries",
                 ),
             ),
         ]);

@@ -926,6 +926,12 @@ To have a pre-aggregation rebuild at a specific time of day, you can use a CRON 
 
 You can also use `every` with `sql`:
 
+<WarningBox>
+
+Using CRON strings and `sql` is not supported and will result in a compilation error.
+
+</WarningBox>
+
 <CodeTabs>
 
 ```javascript

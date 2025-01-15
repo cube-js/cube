@@ -470,6 +470,9 @@ crate::plan_to_language! {
             push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+            // Known qualifiers of grouped subqueries
+            // Used to allow to rewrite columns from them even with push to Cube enabled
+            grouped_subqueries: Vec<String>,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
@@ -485,6 +488,9 @@ crate::plan_to_language! {
             push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+            // Known qualifiers of grouped subqueries
+            // Used to allow to rewrite columns from them even with push to Cube enabled
+            grouped_subqueries: Vec<String>,
         },
         FlattenPushdownReplacer {
             expr: Arc<Expr>,
@@ -544,24 +550,41 @@ macro_rules! var {
 }
 
 #[macro_export]
-macro_rules! copy_flag {
-    ($egraph:expr, $subst:expr, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {{
+macro_rules! copy_value {
+    ($egraph:expr, $subst:expr, $ty:ty, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {{
         let mut found = false;
+        let mut found_value: Option<&$ty> = None;
         for in_value in $crate::var_iter!($egraph[$subst[$in_var]], $in_kind) {
-            // Typechecking for $in_kind, only booleans are supported for now
-            let in_value: bool = *in_value;
+            // Typechecking for $in_kind
+            let in_value: &$ty = in_value;
+            if found {
+                // Found many different unified representations of same kind for a single eclass, not safe to copy
+                found_value = None;
+            } else {
+                found = true;
+                found_value = Some(in_value);
+            }
+        }
+        if let Some(found_value) = found_value {
+            let out_value = found_value.clone();
             $subst.insert(
                 $out_var,
                 $egraph.add($crate::compile::rewrite::LogicalPlanLanguage::$out_kind(
-                    $out_kind(in_value),
+                    $out_kind(out_value),
                 )),
             );
-            found = true;
-            // This is safe, because we expect only enode with one child, with boolena inside, and expect that they would never unify
-            break;
+            true
+        } else {
+            false
         }
-        found
     }};
+}
+
+#[macro_export]
+macro_rules! copy_flag {
+    ($egraph:expr, $subst:expr, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {
+        $crate::copy_value!($egraph, $subst, bool, $in_var, $in_kind, $out_var, $out_kind)
+    };
 }
 
 pub struct WithColumnRelation(Option<String>);
@@ -626,6 +649,12 @@ pub fn column_name_to_member_vec(
 }
 
 impl LogicalPlanData {
+    // TODO use it instead of find_member_by_alias in more places
+    fn find_member_by_column(&mut self, column: &Column) -> Option<(&MemberNameToExpr, String)> {
+        let name = column.flat_name();
+        self.find_member_by_alias(&name)
+    }
+
     fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
         if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
             Self::do_find_member_by_alias(member_names_to_expr, name)
@@ -1486,12 +1515,15 @@ fn wrapped_select_window_expr_empty_tail() -> String {
     wrapped_select_window_expr(Vec::<String>::new())
 }
 
+fn wrapped_select_join(input: impl Display, expr: impl Display, join_type: impl Display) -> String {
+    format!("(WrappedSelectJoin {} {} {})", input, expr, join_type)
+}
+
 #[allow(dead_code)]
 fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectJoins {} {})", left, right)
 }
 
-#[allow(dead_code)]
 fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
 }
@@ -1950,10 +1982,10 @@ fn wrapper_pushdown_replacer(
     push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
+    grouped_subqueries: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {} {} {} {} {})",
-        members, alias_to_cube, push_to_cube, in_projection, cube_members
+        "(WrapperPushdownReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
     )
 }
 
@@ -1963,10 +1995,10 @@ fn wrapper_pullup_replacer(
     push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
+    grouped_subqueries: impl Display,
 ) -> String {
     format!(
-        "(WrapperPullupReplacer {} {} {} {} {})",
-        members, alias_to_cube, push_to_cube, in_projection, cube_members
+        "(WrapperPullupReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
     )
 }
 
