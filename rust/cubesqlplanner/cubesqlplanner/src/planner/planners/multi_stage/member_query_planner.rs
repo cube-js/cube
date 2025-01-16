@@ -393,7 +393,7 @@ impl MultiStageMemberQueryPlanner {
             let result = full_key_aggregate_planner.plan(subqueries, vec![])?;
             result
         };
-        let result = Cte::new_from_select(Rc::new(cte_select), self.description.alias().clone());
+        let result = Cte::new_from_select(cte_select, self.description.alias().clone());
         Ok(Rc::new(result))
     }
 

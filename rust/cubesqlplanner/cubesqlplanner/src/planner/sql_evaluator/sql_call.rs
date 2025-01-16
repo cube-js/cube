@@ -32,6 +32,12 @@ impl SqlCall {
         self.member_sql.call(args)
     }
 
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut deps = Vec::new();
+        self.extract_symbol_deps(&mut deps);
+        deps
+    }
+
     pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         for dep in self.deps.iter() {
             match dep {
@@ -42,6 +48,12 @@ impl SqlCall {
                 Dependency::ContextDependency(_) => {}
             }
         }
+    }
+
+    pub fn get_dependent_cubes(&self) -> Vec<String> {
+        let mut deps = Vec::new();
+        self.extract_cube_deps(&mut deps);
+        deps
     }
 
     pub fn extract_cube_deps(&self, result: &mut Vec<String>) {

@@ -1,12 +1,13 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::MemberSymbol;
+use super::sql_evaluator::{MemberSymbol, TimeDimensionSymbol};
 use super::BaseDimension;
-use super::{BaseMember, BaseMemberHelper, VisitorContext};
+use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct BaseTimeDimension {
     dimension: Rc<BaseDimension>,
+    member_evaluator: Rc<MemberSymbol>,
     query_tools: Rc<QueryTools>,
     granularity: Option<String>,
     date_range: Option<Vec<String>>,
@@ -16,7 +17,7 @@ pub struct BaseTimeDimension {
 
 impl BaseMember for BaseTimeDimension {
     fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        self.dimension.to_sql(context)
+        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 
     fn alias_name(&self) -> String {
@@ -24,7 +25,7 @@ impl BaseMember for BaseTimeDimension {
     }
 
     fn member_evaluator(&self) -> Rc<MemberSymbol> {
-        self.dimension.member_evaluator()
+        self.member_evaluator.clone()
     }
 
     fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember> {
@@ -56,13 +57,18 @@ impl BaseTimeDimension {
         } else {
             "day".to_string()
         };
-        let dimension = BaseDimension::try_new_required(member_evaluator, query_tools.clone())?;
+        let dimension =
+            BaseDimension::try_new_required(member_evaluator.clone(), query_tools.clone())?;
         let default_alias = BaseMemberHelper::default_alias(
             &dimension.cube_name(),
             &dimension.name(),
             &Some(alias_suffix.clone()),
             query_tools.clone(),
         )?;
+        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
+            member_evaluator.clone(),
+            granularity.clone(),
+        )));
         Ok(Rc::new(Self {
             dimension,
             query_tools,
@@ -70,10 +76,15 @@ impl BaseTimeDimension {
             date_range,
             alias_suffix,
             default_alias,
+            member_evaluator,
         }))
     }
 
     pub fn change_granularity(&self, new_granularity: Option<String>) -> Rc<Self> {
+        let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
+            self.dimension.member_evaluator(),
+            new_granularity.clone(),
+        )));
         Rc::new(Self {
             dimension: self.dimension.clone(),
             query_tools: self.query_tools.clone(),
@@ -81,6 +92,7 @@ impl BaseTimeDimension {
             date_range: self.date_range.clone(),
             alias_suffix: self.alias_suffix.clone(),
             default_alias: self.default_alias.clone(),
+            member_evaluator,
         })
     }
 

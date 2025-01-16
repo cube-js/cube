@@ -36,6 +36,7 @@ pub enum FilterItem {
     Item(Rc<BaseFilter>),
 }
 
+#[derive(Clone)]
 pub struct Filter {
     pub items: Vec<FilterItem>,
 }

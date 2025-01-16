@@ -7,6 +7,7 @@ use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct AliasedExpr {
     pub expr: Expr,
     pub alias: String,
@@ -32,6 +33,7 @@ impl AliasedExpr {
     }
 }
 
+#[derive(Clone)]
 pub struct Select {
     pub(super) projection_columns: Vec<AliasedExpr>,
     pub(super) from: Rc<From>,

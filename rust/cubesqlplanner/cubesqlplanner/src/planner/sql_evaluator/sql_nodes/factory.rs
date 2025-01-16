@@ -1,4 +1,3 @@
-use super::leaf_time_dimension::LeafTimeDimensionNode;
 use super::{
     AutoPrefixSqlNode, EvaluateSqlNode, FinalMeasureSqlNode, MeasureFilterSqlNode,
     MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode, RollingWindowNode,
@@ -16,7 +15,6 @@ pub struct SqlNodesFactory {
     ungrouped_measure: bool,
     render_references: HashMap<String, QualifiedColumnName>,
     ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
-    leaf_time_dimensions: HashMap<String, String>,
     cube_name_references: HashMap<String, String>,
     multi_stage_rank: Option<Vec<String>>,   //partition_by
     multi_stage_window: Option<Vec<String>>, //partition_by
@@ -32,7 +30,6 @@ impl SqlNodesFactory {
             render_references: HashMap::new(),
             ungrouped_measure_references: HashMap::new(),
             cube_name_references: HashMap::new(),
-            leaf_time_dimensions: HashMap::new(),
             multi_stage_rank: None,
             multi_stage_window: None,
             rolling_window: false,
@@ -65,11 +62,6 @@ impl SqlNodesFactory {
 
     pub fn set_multi_stage_rank(&mut self, partition_by: Vec<String>) {
         self.multi_stage_rank = Some(partition_by);
-    }
-
-    pub fn add_leaf_time_dimension(&mut self, dimension_name: &String, granularity: &String) {
-        self.leaf_time_dimensions
-            .insert(dimension_name.clone(), granularity.clone());
     }
 
     pub fn set_multi_stage_window(&mut self, partition_by: Vec<String>) {
@@ -174,11 +166,6 @@ impl SqlNodesFactory {
             input
         };
 
-        let input = if !&self.leaf_time_dimensions.is_empty() {
-            LeafTimeDimensionNode::new(input, self.leaf_time_dimensions.clone())
-        } else {
-            input
-        };
         input
     }
 }

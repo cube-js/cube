@@ -40,6 +40,10 @@ impl DimensionSymbol {
         Ok(sql)
     }
 
+    pub fn member_sql(&self) -> &Rc<SqlCall> {
+        &self.member_sql
+    }
+
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
     }
@@ -51,6 +55,11 @@ impl DimensionSymbol {
     pub fn is_multi_stage(&self) -> bool {
         self.definition.static_data().multi_stage.unwrap_or(false)
     }
+
+    pub fn is_sub_query(&self) -> bool {
+        self.definition.static_data().sub_query.unwrap_or(false)
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         self.member_sql.extract_symbol_deps(&mut deps);
@@ -65,6 +74,10 @@ impl DimensionSymbol {
 
     pub fn cube_name(&self) -> &String {
         &self.cube_name
+    }
+
+    pub fn definition(&self) -> &Rc<dyn DimensionDefinition> {
+        &self.definition
     }
 
     pub fn name(&self) -> &String {

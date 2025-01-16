@@ -1,5 +1,5 @@
 use crate::planner::query_tools::QueryTools;
-use crate::planner::{BaseCube, BaseDimension, BaseMember};
+use crate::planner::{BaseCube, BaseDimension};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -23,7 +23,7 @@ impl CommonUtils {
     pub fn primary_keys_dimensions(
         &self,
         cube_name: &String,
-    ) -> Result<Vec<Rc<dyn BaseMember>>, CubeError> {
+    ) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
         let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
         let primary_keys = self
@@ -40,7 +40,7 @@ impl CommonUtils {
                 let full_name = format!("{}.{}", cube_name, d);
                 let evaluator = evaluator_compiler.add_dimension_evaluator(full_name.clone())?;
                 let dim = BaseDimension::try_new_required(evaluator, self.query_tools.clone())?;
-                Ok(dim.as_base_member())
+                Ok(dim)
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(dims)

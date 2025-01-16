@@ -31,10 +31,14 @@ impl TraversalVisitor for CubeNamesCollector {
                 if e.owned_by_cube() {
                     self.names.insert(e.cube_name().clone());
                 }
+                if e.is_sub_query() {
+                    return Ok(None);
+                }
                 for name in e.get_dependent_cubes().into_iter() {
                     self.names.insert(name);
                 }
             }
+            MemberSymbol::TimeDimension(e) => self.apply(e.base_symbol(), &())?,
             MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
                     self.names.insert(e.cube_name().clone());
@@ -48,6 +52,11 @@ impl TraversalVisitor for CubeNamesCollector {
             }
             MemberSymbol::CubeTable(e) => {
                 self.names.insert(e.cube_name().clone());
+            }
+            MemberSymbol::SqlCall(s) => {
+                for name in s.get_dependent_cubes().into_iter() {
+                    self.names.insert(name);
+                }
             }
         };
         Ok(Some(()))

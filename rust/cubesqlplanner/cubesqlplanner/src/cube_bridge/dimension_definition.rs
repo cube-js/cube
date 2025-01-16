@@ -17,6 +17,10 @@ pub struct DimenstionDefinitionStatic {
     pub owned_by_cube: Option<bool>,
     #[serde(rename = "multiStage")]
     pub multi_stage: Option<bool>,
+    #[serde(rename = "subQuery")]
+    pub sub_query: Option<bool>,
+    #[serde(rename = "propagateFiltersToSubQuery")]
+    pub propagate_filters_to_sub_query: Option<bool>,
 }
 
 #[nativebridge::native_bridge(DimenstionDefinitionStatic)]

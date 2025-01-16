@@ -26,6 +26,18 @@ impl SqlNode for EvaluateSqlNode {
             MemberSymbol::Dimension(ev) => {
                 ev.evaluate_sql(visitor, node_processor.clone(), query_tools.clone())
             }
+            MemberSymbol::TimeDimension(ev) => {
+                let input_sql = visitor.apply(&ev.base_symbol(), node_processor.clone())?;
+                let res = if let Some(granularity) = ev.granularity() {
+                    let converted_tz = query_tools.base_tools().convert_tz(input_sql)?;
+                    query_tools
+                        .base_tools()
+                        .time_grouped_column(granularity.clone(), converted_tz)?
+                } else {
+                    input_sql
+                };
+                Ok(res)
+            }
             MemberSymbol::Measure(ev) => {
                 ev.evaluate_sql(visitor, node_processor.clone(), query_tools.clone())
             }
@@ -33,6 +45,9 @@ impl SqlNode for EvaluateSqlNode {
                 ev.evaluate_sql(visitor, node_processor.clone(), query_tools.clone())
             }
             MemberSymbol::CubeName(ev) => ev.evaluate_sql(),
+            MemberSymbol::SqlCall(s) => {
+                s.eval(visitor, node_processor.clone(), query_tools.clone())
+            }
         }
     }
 

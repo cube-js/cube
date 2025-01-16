@@ -35,7 +35,7 @@ impl FullKeyAggregateQueryPlanner {
         }
     }
 
-    pub fn plan(self, joins: Vec<Rc<Select>>, ctes: Vec<Rc<Cte>>) -> Result<Select, CubeError> {
+    pub fn plan(self, joins: Vec<Rc<Select>>, ctes: Vec<Rc<Cte>>) -> Result<Rc<Select>, CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
                 "FullKeyAggregateQueryPlanner should not be used for simple query"
@@ -56,7 +56,7 @@ impl FullKeyAggregateQueryPlanner {
         outer_measures: &Vec<Rc<BaseMeasure>>,
         joins: Vec<Rc<Select>>,
         ctes: Vec<Rc<Cte>>,
-    ) -> Result<Select, CubeError> {
+    ) -> Result<Rc<Select>, CubeError> {
         let mut join_builder = JoinBuilder::new_from_subselect(joins[0].clone(), format!("q_0"));
         let dimensions_to_select = self.query_properties.dimensions_for_select();
         for (i, join) in joins.iter().enumerate().skip(1) {
@@ -161,6 +161,6 @@ impl FullKeyAggregateQueryPlanner {
         let mut context_factory = self.context_factory.clone();
         context_factory.set_render_references(render_references);
 
-        Ok(select_builder.build(context_factory))
+        Ok(Rc::new(select_builder.build(context_factory)))
     }
 }
