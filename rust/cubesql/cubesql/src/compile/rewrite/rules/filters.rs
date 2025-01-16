@@ -4507,8 +4507,8 @@ impl FilterRules {
             if literals.is_empty() {
                 return false;
             }
-            for escape_char in escape_chars {
-                if let Some('!') = escape_char {
+            for escape_char in escape_chars.into_iter().flatten() {
+                if escape_char == '!' {
                     for literal in literals.iter() {
                         let literal_value = match &literal {
                             ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),

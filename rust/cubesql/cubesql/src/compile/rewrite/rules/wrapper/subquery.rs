@@ -81,36 +81,36 @@ impl WrapperRules {
             for name in var_iter!(
                 egraph[subst[source_table_name_var]],
                 EmptyRelationDerivedSourceTableName
-            ) {
-                if let Some(name) = name {
-                    if let Some(cube) = meta_context
-                        .cubes
-                        .iter()
-                        .find(|c| c.name.eq_ignore_ascii_case(name))
-                    {
-                        subst.insert(
-                            alias_to_cube_var,
-                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
-                                WrapperReplacerContextAliasToCube(vec![(
-                                    "".to_string(),
-                                    cube.name.to_string(),
-                                )]),
-                            )),
-                        );
-                        // We don't want to mark current query as a grouped, because we create pullup replacer out of thin air here
-                        // And it would need to match other replacers later
-                        // At the same time, this pullup replacer have no subqueries on its own
-                        // So whoever want to treat this as subquery would introduce it to grouped_subqueries
-                        subst.insert(
-                            grouped_subqueries_out_var,
-                            egraph.add(
-                                LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
-                                    WrapperReplacerContextGroupedSubqueries(vec![]),
-                                ),
+            )
+            .flatten()
+            {
+                if let Some(cube) = meta_context
+                    .cubes
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(name))
+                {
+                    subst.insert(
+                        alias_to_cube_var,
+                        egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
+                            WrapperReplacerContextAliasToCube(vec![(
+                                "".to_string(),
+                                cube.name.to_string(),
+                            )]),
+                        )),
+                    );
+                    // We don't want to mark current query as a grouped, because we create pullup replacer out of thin air here
+                    // And it would need to match other replacers later
+                    // At the same time, this pullup replacer have no subqueries on its own
+                    // So whoever want to treat this as subquery would introduce it to grouped_subqueries
+                    subst.insert(
+                        grouped_subqueries_out_var,
+                        egraph.add(
+                            LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                                WrapperReplacerContextGroupedSubqueries(vec![]),
                             ),
-                        );
-                        return true;
-                    }
+                        ),
+                    );
+                    return true;
                 }
             }
 
