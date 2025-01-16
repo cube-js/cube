@@ -803,7 +803,7 @@ impl AsyncPostgresShim {
             Ok((user, auth_context)) => {
                 let database = parameters
                     .get("database")
-                    .map(|v| v.clone())
+                    .cloned()
                     .unwrap_or("db".to_string());
                 self.session.state.set_database(Some(database));
                 self.session.state.set_user(Some(user));

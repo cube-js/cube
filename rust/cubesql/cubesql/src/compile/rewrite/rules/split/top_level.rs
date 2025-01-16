@@ -492,7 +492,7 @@ impl SplitRules {
             let projection_expr = group_expr_node
                 .iter()
                 .chain(aggr_expr_node.iter())
-                .map(|id| *id)
+                .copied()
                 .collect::<Vec<_>>();
             subst.insert(
                 projection_expr_var,
