@@ -346,11 +346,8 @@ impl ColumnRemapping {
     /// Replace every column expression in `expr` according to this remapping. Column expressions
     /// not present in `self` will stay the same.
     pub fn remap(&self, expr: &Expr) -> result::Result<Expr, CubeError> {
-        replace_col(
-            expr.clone(),
-            &self.column_remapping.iter().map(|(k, v)| (k, v)).collect(),
-        )
-        .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
+        replace_col(expr.clone(), &self.column_remapping.iter().collect())
+            .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
     }
 
     pub fn extend(&mut self, other: ColumnRemapping) {
