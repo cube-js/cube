@@ -285,7 +285,7 @@ impl WrapperRules {
                         // This is fixed to false for any LHS because we should only allow to push to Cube when from is ungrouped CubeSCan
                         // And after pulling replacer over this node it will be WrappedSelect(from=WrappedSelect), so it should not allow to push for whatever LP is on top of it
                         "WrapperPullupReplacerPushToCube:false",
-                        "?inner_projection_expr",
+                        "?in_projection",
                         "?cube_members",
                         "?grouped_subqueries",
                     ),
