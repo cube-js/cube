@@ -79,7 +79,7 @@ Download <Btn>Federation Metadata XML</Btn>:
 
 ## Complete configuration in Cube Cloud
 
-Upload it to Cube Cloud through <Btn>Advanced Settings</Btn> tab on the [SAML
+Upload the manifest file through the <Btn>Advanced Settings</Btn> tab on the [SAML
 configuration page](#enable-saml-in-cube-cloud) in Cube Cloud:
 
 <Screenshot src="https://ucarecdn.com/3ae24797-bd0a-477c-9b9a-420602694616/"/>
@@ -88,10 +88,19 @@ Select <Btn>SHA-256</Btn> as <Btn>Signature Algorithm</Btn>:
 
 <Screenshot src="https://ucarecdn.com/e0c8c608-9b1e-4b84-a51e-0613362c6aec/"/>
 
-Enter “[http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name](http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name)”
-or a preferred attribute to lookup email address in <Btn>Attributes → Email</Btn>:
+Enter the claim URI that corresponds to the user email address in <Btn>Attributes → Email</Btn>. This will vary based on your SAML configuration. 
+
+Examples:
+
+`http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`
+
+`http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name`
 
 <Screenshot src="https://ucarecdn.com/4fe50791-8203-49d4-9056-e5de6dc5643c/"/>
+
+To map a role attribute from Entra ID to an identically-named role defined in Cube, add the claim URI corresponding to role to the Role field in Cube Cloud, similar to above. Note that Admin status cannot be set via SSO.
+
+You can map the user's display name from Entra ID to Cube in the same manner.
 
 Save settings on the Cube Cloud side.
 
