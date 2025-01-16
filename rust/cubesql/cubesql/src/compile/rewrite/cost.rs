@@ -122,6 +122,9 @@ impl BestCubePlan {
             LogicalPlanLanguage::ProjectionSplitPushDownReplacer(_) => 1,
             LogicalPlanLanguage::ProjectionSplitPullUpReplacer(_) => 1,
             LogicalPlanLanguage::QueryParam(_) => 1,
+            LogicalPlanLanguage::JoinCheckStage(_) => 1,
+            LogicalPlanLanguage::JoinCheckPushDown(_) => 1,
+            LogicalPlanLanguage::JoinCheckPullUp(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as
             // there's always rewrite rule it's fine to have replacer cost.
             // Needs to be added as alias rewrite always more expensive than original function.
