@@ -1491,14 +1491,14 @@ fn date_addsub_day_time(
 }
 
 fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
-    debug_assert!(1 <= m && m <= 12);
+    debug_assert!((1..=12).contains(&m));
     let mut d = t.day();
     d = d.min(last_day_of_month(y, m));
     t.with_day(1)?.with_year(y)?.with_month(m)?.with_day(d)
 }
 
 fn last_day_of_month(y: i32, m: u32) -> u32 {
-    debug_assert!(1 <= m && m <= 12);
+    debug_assert!((1..=12).contains(&m));
     if m == 12 {
         return 31;
     }

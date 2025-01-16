@@ -3222,7 +3222,7 @@ impl FilterRules {
                 for aliases in aliases_es.iter() {
                     if let ScalarValue::Int64(Some(year)) = year {
                         let year = year.clone();
-                        if year < 1000 || year > 9999 {
+                        if !(1000..=9999).contains(&year) {
                             continue;
                         }
 
