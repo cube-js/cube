@@ -4234,19 +4234,17 @@ impl FilterRules {
                         for date_range_end_op in
                             var_iter!(egraph[subst[date_range_end_op_var]], FilterMemberOp)
                         {
-                            let valid_left_filters =
-                                vec!["afterDate".to_string(), "afterOrOnDate".to_string()];
-                            let valid_right_filters =
-                                vec!["beforeDate".to_string(), "beforeOrOnDate".to_string()];
+                            let valid_left_filters = ["afterDate", "afterOrOnDate"];
+                            let valid_right_filters = ["beforeDate", "beforeOrOnDate"];
 
                             let swap_left_and_right;
 
-                            if valid_left_filters.contains(date_range_start_op)
-                                && valid_right_filters.contains(date_range_end_op)
+                            if valid_left_filters.contains(&date_range_start_op.as_str())
+                                && valid_right_filters.contains(&date_range_end_op.as_str())
                             {
                                 swap_left_and_right = false;
-                            } else if valid_left_filters.contains(date_range_end_op)
-                                && valid_right_filters.contains(date_range_start_op)
+                            } else if valid_left_filters.contains(&date_range_end_op.as_str())
+                                && valid_right_filters.contains(&date_range_start_op.as_str())
                             {
                                 swap_left_and_right = true;
                             } else {

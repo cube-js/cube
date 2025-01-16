@@ -2783,7 +2783,7 @@ limit
 
     #[tokio::test]
     async fn test_select_error() {
-        let variants = vec![
+        let variants = [
             (
                 "SELECT AVG(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
                 CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
@@ -5803,8 +5803,8 @@ ORDER BY
     #[tokio::test]
     async fn test_interval_mul() -> Result<(), CubeError> {
         let base_timestamp = "TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')";
-        let units = vec!["year", "month", "week", "day", "hour", "minute", "second"];
-        let multiplicands = vec!["1", "5", "-10", "1.5"];
+        let units = ["year", "month", "week", "day", "hour", "minute", "second"];
+        let multiplicands = ["1", "5", "-10", "1.5"];
 
         let selects = units
             .iter()
@@ -5839,8 +5839,8 @@ ORDER BY
     #[tokio::test]
     async fn test_interval_div() -> Result<(), CubeError> {
         let base_timestamp = "TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')";
-        let units = vec!["year", "month", "week", "day", "hour", "minute", "second"];
-        let divisors = vec!["1.5"];
+        let units = ["year", "month", "week", "day", "hour", "minute", "second"];
+        let divisors = ["1.5"];
 
         let selects = units
             .iter()
@@ -7940,7 +7940,7 @@ ORDER BY "source"."str0" ASC
         }
         init_testing_logger();
 
-        for fun in vec!["Max", "Min"].iter() {
+        for fun in ["Max", "Min"].iter() {
             let logical_plan = convert_select_to_query_plan(
                 format!(
                     "
@@ -8592,8 +8592,7 @@ ORDER BY "source"."str0" ASC
     async fn test_holistics_group_by_date() {
         init_testing_logger();
 
-        for granularity in vec!["year", "quarter", "month", "week", "day", "hour", "minute"].iter()
-        {
+        for granularity in ["year", "quarter", "month", "week", "day", "hour", "minute"].iter() {
             let logical_plan = convert_select_to_query_plan(
                 format!("
                     SELECT
