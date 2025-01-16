@@ -6,12 +6,9 @@ pub mod rewriter;
 pub mod rules;
 
 use self::analysis::{LogicalPlanData, MemberNameToExpr};
-use crate::{
-    compile::rewrite::{
-        analysis::{LogicalPlanAnalysis, OriginalExpr},
-        rewriter::{CubeEGraph, CubeRewrite},
-    },
-    CubeError,
+use crate::compile::rewrite::{
+    analysis::{LogicalPlanAnalysis, OriginalExpr},
+    rewriter::{CubeEGraph, CubeRewrite},
 };
 use analysis::MemberNamesToExpr;
 use datafusion::{
