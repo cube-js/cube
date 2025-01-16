@@ -714,12 +714,12 @@ impl LogicalPlanAnalysis {
             }
             LogicalPlanLanguage::CubeScanMembers(params) => {
                 for id in params.iter() {
-                    map.extend(id_to_column_name_to_expr(*id)?.into_iter());
+                    map.extend(id_to_column_name_to_expr(*id)?);
                 }
                 Some(map)
             }
             LogicalPlanLanguage::CubeScan(params) => {
-                map.extend(id_to_column_name_to_expr(params[1])?.into_iter());
+                map.extend(id_to_column_name_to_expr(params[1])?);
                 Some(map)
             }
             _ => None,
@@ -843,7 +843,7 @@ impl LogicalPlanAnalysis {
                 let expr = Expr::Column(col);
                 columns.push(expr);
             } else {
-                columns.extend(referenced_columns(id)?.into_iter());
+                columns.extend(referenced_columns(id)?);
             }
             Some(())
         };

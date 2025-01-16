@@ -657,7 +657,7 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("types/interval".to_string(), "INTERVAL".to_string()),
                     ("types/binary".to_string(), "BINARY".to_string()),
                 ]
-                    .into_iter().chain(custom_templates.into_iter())
+                    .into_iter().chain(custom_templates)
                     .collect(),
                     false,
             )

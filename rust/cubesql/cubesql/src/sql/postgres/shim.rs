@@ -179,19 +179,19 @@ impl ConnectionError {
 
 impl From<CubeError> for ConnectionError {
     fn from(e: CubeError) -> Self {
-        ConnectionError::Cube(e.into(), None)
+        ConnectionError::Cube(e, None)
     }
 }
 
 impl From<CompilationError> for ConnectionError {
     fn from(e: CompilationError) -> Self {
-        ConnectionError::CompilationError(e.into(), None)
+        ConnectionError::CompilationError(e, None)
     }
 }
 
 impl From<ProtocolError> for ConnectionError {
     fn from(e: ProtocolError) -> Self {
-        ConnectionError::Protocol(e.into(), None)
+        ConnectionError::Protocol(e, None)
     }
 }
 

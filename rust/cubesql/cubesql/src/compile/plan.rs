@@ -138,15 +138,14 @@ pub async fn get_df_batches(
                         Ok(stream) => {
                             return Ok(stream);
                         }
-                        Err(err) => return Err(CubeError::panic(Box::new(err)).into()),
+                        Err(err) => return Err(CubeError::panic(Box::new(err))),
                     };
                 }
-                Err(err) => return Err(CubeError::panic(err).into()),
+                Err(err) => return Err(CubeError::panic(err)),
             }
         }
         _ => Err(CubeError::user(
             "Only SELECT queries are supported for Cube SQL over HTTP".to_string(),
-        )
-        .into()),
+        )),
     }
 }

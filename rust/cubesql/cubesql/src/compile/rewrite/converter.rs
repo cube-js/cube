@@ -1386,7 +1386,7 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlan::Join(Join {
                     left,
                     right,
-                    on: left_on.into_iter().zip_eq(right_on.into_iter()).collect(),
+                    on: left_on.into_iter().zip_eq(right_on).collect(),
                     join_type,
                     join_constraint,
                     schema,

@@ -415,25 +415,25 @@ pub fn get_expr_columns(expr: &Expr) -> Vec<Column> {
         Expr::BinaryExpr { left, right, .. } | Expr::AnyExpr { left, right, .. } => {
             get_expr_columns(left)
                 .into_iter()
-                .chain(get_expr_columns(right).into_iter())
+                .chain(get_expr_columns(right))
                 .collect()
         }
         Expr::Like(Like { expr, pattern, .. })
         | Expr::ILike(Like { expr, pattern, .. })
         | Expr::SimilarTo(Like { expr, pattern, .. }) => get_expr_columns(expr)
             .into_iter()
-            .chain(get_expr_columns(pattern).into_iter())
+            .chain(get_expr_columns(pattern))
             .collect(),
         Expr::GetIndexedField { expr, key } => get_expr_columns(expr)
             .into_iter()
-            .chain(get_expr_columns(key).into_iter())
+            .chain(get_expr_columns(key))
             .collect(),
         Expr::Between {
             expr, low, high, ..
         } => get_expr_columns(expr)
             .into_iter()
-            .chain(get_expr_columns(low).into_iter())
-            .chain(get_expr_columns(high).into_iter())
+            .chain(get_expr_columns(low))
+            .chain(get_expr_columns(high))
             .collect(),
         Expr::Case {
             expr,
@@ -447,15 +447,14 @@ pub fn get_expr_columns(expr: &Expr) -> Vec<Column> {
             .chain(when_then_expr.iter().flat_map(|(when, then)| {
                 get_expr_columns(when)
                     .into_iter()
-                    .chain(get_expr_columns(then).into_iter())
+                    .chain(get_expr_columns(then))
                     .collect::<Vec<_>>()
             }))
             .chain(
                 else_expr
                     .as_ref()
                     .map(|else_expr| get_expr_columns(else_expr))
-                    .unwrap_or(vec![])
-                    .into_iter(),
+                    .unwrap_or(vec![]),
             )
             .collect(),
         Expr::ScalarFunction { args, .. }

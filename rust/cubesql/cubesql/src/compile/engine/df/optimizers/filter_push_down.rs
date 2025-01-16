@@ -120,7 +120,7 @@ fn filter_push_down(
             // let predicates = split_predicates(predicate)
             let predicates = vec![predicate.clone()]
                 .into_iter()
-                .chain(predicates.into_iter())
+                .chain(predicates)
                 .collect::<Vec<_>>();
             let mut pushable_predicates = vec![];
             let mut non_pushable_predicates = vec![];

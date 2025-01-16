@@ -1416,7 +1416,7 @@ impl MemberRules {
                     if !aliases_to_cube.is_empty() && !projection_aliases.is_empty() {
                         // TODO: We could, more generally, cache referenced_columns(referenced_expr), which calls expr_column_name.
                         let mut columns = HashSet::new();
-                        columns.extend(referenced_columns(referenced_expr).into_iter());
+                        columns.extend(referenced_columns(referenced_expr));
 
                         for alias_to_cube in aliases_to_cube {
                             for projection_alias in &projection_aliases {
@@ -1633,8 +1633,8 @@ impl MemberRules {
             }
 
             let mut columns = HashSet::new();
-            columns.extend(referenced_columns(referenced_group_expr).into_iter());
-            columns.extend(referenced_columns(referenced_aggr_expr).into_iter());
+            columns.extend(referenced_columns(referenced_group_expr));
+            columns.extend(referenced_columns(referenced_aggr_expr));
 
             let new_pushdown_join = referenced_aggr_expr.is_empty();
 

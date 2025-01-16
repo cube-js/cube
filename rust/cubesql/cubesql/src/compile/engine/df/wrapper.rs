@@ -146,7 +146,7 @@ impl SqlQuery {
     }
 
     pub fn extend_values(&mut self, values: impl IntoIterator<Item = Option<String>>) {
-        self.values.extend(values.into_iter());
+        self.values.extend(values);
     }
 
     pub fn replace_sql(&mut self, sql: String) {
