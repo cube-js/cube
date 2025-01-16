@@ -352,8 +352,7 @@ impl LogicalPlanToLanguageConverter {
                 let expr = add_expr_list_node!(graph, expr, query_params, CaseExprExpr, flat_list);
                 let when_then_expr = when_then_expr
                     .iter()
-                    .map(|(when, then)| vec![when, then])
-                    .flatten()
+                    .flat_map(|(when, then)| [when, then])
                     .collect::<Vec<_>>();
                 let when_then_expr = add_expr_list_node!(
                     graph,

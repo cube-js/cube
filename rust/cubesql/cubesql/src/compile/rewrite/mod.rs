@@ -1722,8 +1722,7 @@ fn case_expr<D: Display>(
             "CaseExprWhenThenExpr",
             when_then
                 .into_iter()
-                .map(|(when, then)| vec![when, then])
-                .flatten()
+                .flat_map(|(when, then)| [when, then])
                 .collect(),
         ),
         case_expr_else_expr(else_expr),
