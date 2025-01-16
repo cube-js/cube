@@ -359,7 +359,8 @@ impl SplitRules {
                 Some(0) | Some(1)
             ) {
                 return false;
-            } else if matches!(
+            }
+            if matches!(
                 aggr_expr_var
                     .and_then(|v| egraph[subst[v]].data.trivial_push_down)
                     .zip(group_expr_var.and_then(|v| egraph[subst[v]].data.trivial_push_down))

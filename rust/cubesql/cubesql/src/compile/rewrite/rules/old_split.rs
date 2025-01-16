@@ -5624,7 +5624,8 @@ impl OldSplitRules {
                     Some(0) | Some(1)
                 ) {
                     continue;
-                } else if matches!(
+                }
+                if matches!(
                     aggr_expr_var
                         .and_then(|v| egraph[subst[v]].data.trivial_push_down)
                         .zip(group_expr_var.and_then(|v| egraph[subst[v]].data.trivial_push_down))
