@@ -828,7 +828,7 @@ impl TransportService for TestConnectionTransport {
                     "SELECT * FROM {}",
                     serde_json::to_string_pretty(&inputs).unwrap()
                 ),
-                expression_params.unwrap_or(Vec::new()),
+                expression_params.unwrap_or_default(),
             ),
         })
     }
