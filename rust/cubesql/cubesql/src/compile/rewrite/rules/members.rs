@@ -2013,7 +2013,7 @@ impl MemberRules {
             .cloned()
             {
                 // alias_to_cube at this point is already filtered to a single cube
-                let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                let cube_alias = alias_to_cube.first().unwrap().0 .1.to_string();
                 for cube in var_iter!(egraph[subst[cube_var]], AllMembersCube).cloned() {
                     let column_iter = if default_count {
                         vec![Column::from_name(Self::default_count_measure_name())]
@@ -2416,7 +2416,7 @@ impl MemberRules {
             {
                 for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                     // alias_to_cube at this point is already filtered to a single cube
-                    let alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                    let alias = alias_to_cube.first().unwrap().0 .1.to_string();
                     let alias_expr = Self::add_alias_column(
                         egraph,
                         column.name.to_string(),
@@ -2519,7 +2519,7 @@ impl MemberRules {
             {
                 for alias in var_iter!(egraph[subst[alias_var]], AliasExprAlias).cloned() {
                     // alias_to_cube at this point is already filtered to a single cube
-                    let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                    let cube_alias = alias_to_cube.first().unwrap().0 .1.to_string();
                     let alias_expr =
                         Self::add_alias_column(egraph, alias.to_string(), Some(cube_alias.clone()));
                     subst.insert(output_column_var, alias_expr);
