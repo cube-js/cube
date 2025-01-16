@@ -1021,7 +1021,7 @@ pub fn create_date_udf() -> ScalarUDF {
         assert!(args.len() == 1);
 
         let mut args = args
-            .into_iter()
+            .iter()
             .map(|i| -> Result<ColumnarValue> {
                 if let Some(strings) = i.as_any().downcast_ref::<StringArray>() {
                     let mut builder = TimestampNanosecondArray::builder(strings.len());

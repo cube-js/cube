@@ -3503,7 +3503,7 @@ impl FilterRules {
             for aliases in aliases_es {
                 if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
                     let values = list
-                        .into_iter()
+                        .iter()
                         .map(|literal| FilterRules::scalar_to_value(literal))
                         .collect::<Result<Vec<_>, _>>();
                     let Ok(values) = values else {
@@ -4717,7 +4717,7 @@ impl FilterRules {
 
                 for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
                     let Some(values) = list
-                        .into_iter()
+                        .iter()
                         .map(|literal| Self::scalar_dt_to_naive_datetime(literal))
                         .collect::<Option<HashSet<_>>>()
                         .map(|values| {
