@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: result
+---
++-----------------------------+
+| formatted_identifiers       |
++-----------------------------+
+| "table_name", "column_name" |
++-----------------------------+

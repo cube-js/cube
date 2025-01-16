@@ -3140,3 +3140,81 @@ async fn test_metabase_introspection_indoption() -> Result<(), CubeError> {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn test_metabase_v0_51_2_introspection_field_indoption() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "test_metabase_v0_51_2_introspection_field_indoption",
+        execute_query(
+            // language=PostgreSQL
+            r#"
+            SELECT
+            c.column_name AS name,
+            c.udt_name AS database_type,
+            c.ordinal_position - 1 AS database_position,
+            c.table_schema AS table_schema,
+            c.table_name AS table_name,
+            pk.column_name IS NOT NULL AS pk,
+            COL_DESCRIPTION(
+                CAST(
+                    CAST(
+                        FORMAT(
+                        '%I.%I',
+                        CAST(c.table_schema AS TEXT),
+                        CAST(c.table_name AS TEXT)
+                        ) AS REGCLASS
+                    ) AS OID
+                ),
+                c.ordinal_position
+            ) AS field_comment,
+            (
+                (column_default IS NULL)
+                OR (LOWER(column_default) = 'null')
+            )
+            AND (is_nullable = 'NO')
+            AND NOT (
+                (
+                (column_default IS NOT NULL)
+                AND (column_default LIKE '%nextval(%')
+                )
+                OR (is_identity <> 'NO')
+            ) AS database_required,
+            (
+                (column_default IS NOT NULL)
+                AND (column_default LIKE '%nextval(%')
+            )
+            OR (is_identity <> 'NO') AS database_is_auto_increment
+            FROM
+            information_schema.columns AS c
+            LEFT JOIN (
+                SELECT
+                tc.table_schema,
+                tc.table_name,
+                kc.column_name
+                FROM
+                information_schema.table_constraints AS tc
+                INNER JOIN information_schema.key_column_usage AS kc ON (tc.constraint_name = kc.constraint_name)
+                AND (tc.table_schema = kc.table_schema)
+                AND (tc.table_name = kc.table_name)
+                WHERE
+                tc.constraint_type = 'PRIMARY KEY'
+            ) AS pk ON (c.table_schema = pk.table_schema)
+            AND (c.table_name = pk.table_name)
+            AND (c.column_name = pk.column_name)
+            WHERE
+            c.table_schema !~ '^information_schema|catalog_history|pg_'
+            AND (c.table_schema IN ('public'))
+            ORDER BY
+            table_schema ASC,
+              table_name ASC,
+              database_position ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+    Ok(())
+}
