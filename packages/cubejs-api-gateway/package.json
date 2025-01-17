@@ -43,7 +43,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.4",
     "moment": "^2.24.0",
-    "moment-timezone": "^0.5.27",
+    "moment-timezone": "^0.5.46",
     "nexus": "^1.1.0",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.0",
