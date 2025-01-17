@@ -21786,13 +21786,6 @@ moment-timezone@^0.5.15, moment-timezone@^0.5.27, moment-timezone@^0.5.31, momen
   dependencies:
     moment "^2.29.4"
 
-moment-timezone@^0.5.45:
-  version "0.5.46"
-  resolved "https://registry.npmjs.org/moment-timezone/-/moment-timezone-0.5.46.tgz#a21aa6392b3c6b3ed916cd5e95858a28d893704a"
-  integrity sha512-ZXm9b36esbe7OmdABqIWJuBBiLLwAjrN7CE+7sYdCCx82Nabt1wHDj8TVseS59QIlfFPbOoiBPm6ca9BioG4hw==
-  dependencies:
-    moment "^2.29.4"
-
 moment@^2.17.1, moment@^2.24.0, moment@^2.25.3, moment@^2.29.1, moment@^2.29.4:
   version "2.29.4"
   resolved "https://registry.yarnpkg.com/moment/-/moment-2.29.4.tgz#3dbe052889fe7c1b2ed966fcb3a77328964ef108"
