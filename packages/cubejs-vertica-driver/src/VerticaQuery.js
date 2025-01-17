@@ -1,4 +1,3 @@
-const moment = require('moment-timezone');
 const { BaseFilter, BaseQuery } = require('@cubejs-backend/schema-compiler');
 
 const GRANULARITY_TO_INTERVAL = {
@@ -38,7 +37,7 @@ class VerticaQuery extends BaseQuery {
   }
 
   timestampFormat() {
-    return moment.HTML5_FMT.DATETIME_LOCAL_MS;
+    return 'YYYY-MM-DDTHH:mm:ss.SSS';
   }
 
   dateTimeCast(value) {
