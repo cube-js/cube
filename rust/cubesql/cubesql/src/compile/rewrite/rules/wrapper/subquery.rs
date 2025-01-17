@@ -4,11 +4,9 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        EmptyRelationDerivedSourceTableName, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
-        WrapperPullupReplacerGroupedSubqueries, WrapperPullupReplacerPushToCube,
-        WrapperPushdownReplacerGroupedSubqueries, WrapperPushdownReplacerPushToCube,
+        wrapper_replacer_context, EmptyRelationDerivedSourceTableName, LogicalPlanLanguage,
+        WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
     },
-    copy_flag, copy_value,
     transport::MetaContext,
     var, var_iter, var_list_iter,
 };
@@ -22,37 +20,13 @@ impl WrapperRules {
                 "wrapper-subqueries-wrapped-scan-to-pull",
                 wrapper_pushdown_replacer(
                     cube_scan_wrapper(
-                        wrapper_pullup_replacer(
-                            "?cube_scan_input",
-                            "?inner_alias_to_cube",
-                            "?nner_push_to_cube",
-                            "?inner_in_projection",
-                            "?inner_cube_members",
-                            "?inner_grouped_subqueries",
-                        ),
+                        wrapper_pullup_replacer("?cube_scan_input", "?inner_context"),
                         "CubeScanWrapperFinalized:false",
                     ),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    "?context",
                 ),
-                wrapper_pullup_replacer(
-                    "?cube_scan_input",
-                    "?alias_to_cube",
-                    "?pullup_push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?pullup_grouped_subqueries",
-                ),
-                self.transform_check_subquery_wrapped(
-                    "?cube_scan_input",
-                    "?push_to_cube",
-                    "?pullup_push_to_cube",
-                    "?grouped_subqueries",
-                    "?pullup_grouped_subqueries",
-                ),
+                wrapper_pullup_replacer("?cube_scan_input", "?context"),
+                self.transform_check_subquery_wrapped("?cube_scan_input"),
             ),
             transforming_rewrite(
                 "wrapper-subqueries-wrap-empty-rel",
@@ -68,11 +42,13 @@ impl WrapperRules {
                             "?derived_source_table_name",
                             "EmptyRelationIsWrappable:true",
                         ),
-                        "?alias_to_cube",
-                        "WrapperPullupReplacerPushToCube:false",
-                        "WrapperPullupReplacerInProjection:true",
-                        "CubeScanMembers",
-                        "?grouped_subqueries",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:false",
+                            "WrapperReplacerContextInProjection:true",
+                            "CubeScanMembers",
+                            "?grouped_subqueries",
+                        ),
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
@@ -113,8 +89,8 @@ impl WrapperRules {
                     {
                         subst.insert(
                             alias_to_cube_var,
-                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
-                                WrapperPullupReplacerAliasToCube(vec![(
+                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
+                                WrapperReplacerContextAliasToCube(vec![(
                                     "".to_string(),
                                     cube.name.to_string(),
                                 )]),
@@ -127,8 +103,8 @@ impl WrapperRules {
                         subst.insert(
                             grouped_subqueries_out_var,
                             egraph.add(
-                                LogicalPlanLanguage::WrapperPullupReplacerGroupedSubqueries(
-                                    WrapperPullupReplacerGroupedSubqueries(vec![]),
+                                LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                                    WrapperReplacerContextGroupedSubqueries(vec![]),
                                 ),
                             ),
                         );
@@ -149,7 +125,7 @@ impl WrapperRules {
     ) -> bool {
         for alias_to_cube in var_iter!(
             egraph[subst[alias_to_cube_var]],
-            WrapperPullupReplacerAliasToCube
+            WrapperReplacerContextAliasToCube
         )
         .cloned()
         {
@@ -169,40 +145,9 @@ impl WrapperRules {
     fn transform_check_subquery_wrapped(
         &self,
         cube_scan_input_var: &'static str,
-        push_to_cube_var: &'static str,
-        pullup_push_to_cube_var: &'static str,
-        grouped_subqueries_var: &'static str,
-        pullup_grouped_subqueries_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_scan_input_var = var!(cube_scan_input_var);
-        let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
-        let grouped_subqueries_var = var!(grouped_subqueries_var);
-        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
         move |egraph, subst| {
-            if !copy_flag!(
-                egraph,
-                subst,
-                push_to_cube_var,
-                WrapperPushdownReplacerPushToCube,
-                pullup_push_to_cube_var,
-                WrapperPullupReplacerPushToCube
-            ) {
-                return false;
-            }
-
-            if !copy_value!(
-                egraph,
-                subst,
-                Vec<String>,
-                grouped_subqueries_var,
-                WrapperPushdownReplacerGroupedSubqueries,
-                pullup_grouped_subqueries_var,
-                WrapperPullupReplacerGroupedSubqueries
-            ) {
-                return false;
-            }
-
             for _ in var_list_iter!(egraph[subst[cube_scan_input_var]], WrappedSelect).cloned() {
                 return true;
             }

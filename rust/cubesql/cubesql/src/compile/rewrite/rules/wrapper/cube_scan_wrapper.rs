@@ -3,9 +3,10 @@ use crate::{
         cube_scan, cube_scan_wrapper, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, CubeScanAliasToCube, CubeScanLimit,
-        CubeScanOffset, CubeScanUngrouped, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
-        WrapperPullupReplacerGroupedSubqueries, WrapperPullupReplacerPushToCube,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_replacer_context,
+        CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, LogicalPlanLanguage,
+        WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
+        WrapperReplacerContextPushToCube,
     },
     var, var_iter,
 };
@@ -42,11 +43,13 @@ impl WrapperRules {
                             "CubeScanWrapped:true",
                             "?ungrouped",
                         ),
-                        "?alias_to_cube_out",
-                        "?push_to_cube_out",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?members",
-                        "?grouped_subqueries_out",
+                        wrapper_replacer_context(
+                            "?alias_to_cube_out",
+                            "?push_to_cube_out",
+                            "WrapperReplacerContextInProjection:false",
+                            "?members",
+                            "?grouped_subqueries_out",
+                        ),
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
@@ -64,14 +67,7 @@ impl WrapperRules {
             rewrite(
                 "wrapper-finalize-pull-up-replacer",
                 cube_scan_wrapper(
-                    wrapper_pullup_replacer(
-                        "?cube_scan_input",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                    ),
+                    wrapper_pullup_replacer("?cube_scan_input", "?context"),
                     "CubeScanWrapperFinalized:false",
                 ),
                 cube_scan_wrapper("?cube_scan_input", "CubeScanWrapperFinalized:true"),
@@ -121,21 +117,21 @@ impl WrapperRules {
                         let push_to_cube_out = ungrouped && has_no_limit_or_offset;
                         subst.insert(
                             push_to_cube_out_var,
-                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerPushToCube(
-                                WrapperPullupReplacerPushToCube(push_to_cube_out),
+                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextPushToCube(
+                                WrapperReplacerContextPushToCube(push_to_cube_out),
                             )),
                         );
                         subst.insert(
                             alias_to_cube_var_out,
-                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
-                                WrapperPullupReplacerAliasToCube(alias_to_cube),
+                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
+                                WrapperReplacerContextAliasToCube(alias_to_cube),
                             )),
                         );
                         subst.insert(
                             grouped_subqueries_out_var,
                             egraph.add(
-                                LogicalPlanLanguage::WrapperPullupReplacerGroupedSubqueries(
-                                    WrapperPullupReplacerGroupedSubqueries(vec![]),
+                                LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                                    WrapperReplacerContextGroupedSubqueries(vec![]),
                                 ),
                             ),
                         );
