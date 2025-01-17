@@ -2818,10 +2818,6 @@ export class BaseQuery {
     return this.join && this.join.multiplicationFactor[cubeName];
   }
 
-  inIntegrationTimeZone(date) {
-    return moment.tz(date, this.timezone);
-  }
-
   inDbTimeZone(date) {
     return inDbTimeZone(this.timezone, this.timestampFormat(), date);
   }
