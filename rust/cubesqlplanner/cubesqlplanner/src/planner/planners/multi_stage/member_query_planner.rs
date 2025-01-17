@@ -379,11 +379,11 @@ impl MultiStageMemberQueryPlanner {
             );
             planner.plan()?
         } else {
-            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::new(
+            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::try_new(
                 self.query_tools.clone(),
                 cte_query_properties.clone(),
                 node_factory.clone(),
-            );
+            )?;
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
                 cte_query_properties.clone(),
                 node_factory.clone(),
@@ -393,7 +393,7 @@ impl MultiStageMemberQueryPlanner {
             let result = full_key_aggregate_planner.plan(subqueries, vec![])?;
             result
         };
-        let result = Cte::new_from_select(Rc::new(cte_select), self.description.alias().clone());
+        let result = Cte::new_from_select(cte_select, self.description.alias().clone());
         Ok(Rc::new(result))
     }
 

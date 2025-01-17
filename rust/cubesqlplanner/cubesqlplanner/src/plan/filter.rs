@@ -36,6 +36,7 @@ pub enum FilterItem {
     Item(Rc<BaseFilter>),
 }
 
+#[derive(Clone)]
 pub struct Filter {
     pub items: Vec<FilterItem>,
 }
@@ -74,7 +75,7 @@ impl FilterItem {
                 }
             }
             FilterItem::Item(item) => {
-                let sql = item.to_sql(context.clone())?;
+                let sql = item.to_sql(context.clone(), templates)?;
                 format!("({})", sql)
             }
         };

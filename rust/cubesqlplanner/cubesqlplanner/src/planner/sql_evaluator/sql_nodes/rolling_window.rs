@@ -1,6 +1,7 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{MemberSymbol, SqlEvaluatorVisitor};
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -26,12 +27,17 @@ impl SqlNode for RollingWindowNode {
         node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
-                let input =
-                    self.input
-                        .to_sql(visitor, node, query_tools.clone(), node_processor)?;
+                let input = self.input.to_sql(
+                    visitor,
+                    node,
+                    query_tools.clone(),
+                    node_processor,
+                    templates,
+                )?;
                 if m.is_cumulative() {
                     let aggregate_function = if m.measure_type() == "sum"
                         || m.measure_type() == "count"

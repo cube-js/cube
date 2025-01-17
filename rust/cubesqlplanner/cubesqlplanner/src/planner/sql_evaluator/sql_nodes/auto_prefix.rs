@@ -3,6 +3,7 @@ use crate::plan::Schema;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -63,10 +64,15 @@ impl SqlNode for AutoPrefixSqlNode {
         node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let input =
-            self.input
-                .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?;
+        let input = self.input.to_sql(
+            visitor,
+            node,
+            query_tools.clone(),
+            node_processor.clone(),
+            templates,
+        )?;
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 let cube_alias = self.resolve_cube_alias(&ev.cube_name());

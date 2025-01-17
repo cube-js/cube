@@ -1,4 +1,4 @@
-use super::memeber_sql::{MemberSql, NativeMemberSql};
+use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };

@@ -1,6 +1,8 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::MemberSymbol;
+use super::sql_evaluator::{MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
+use crate::cube_bridge::dimension_definition::DimensionDefinition;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -8,14 +10,24 @@ pub struct BaseDimension {
     dimension: String,
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
+    definition: Rc<dyn DimensionDefinition>,
     cube_name: String,
     name: String,
     default_alias: String,
 }
 
 impl BaseMember for BaseDimension {
-    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            templates,
+        )
     }
 
     fn alias_name(&self) -> String {
@@ -58,6 +70,7 @@ impl BaseDimension {
                     member_evaluator: evaluation_node.clone(),
                     cube_name: s.cube_name().clone(),
                     name: s.name().clone(),
+                    definition: s.definition().clone(),
                     default_alias,
                 }))
             }
@@ -83,7 +96,36 @@ impl BaseDimension {
         self.member_evaluator.clone()
     }
 
+    pub fn sql_call(&self) -> Result<Rc<SqlCall>, CubeError> {
+        match self.member_evaluator.as_ref() {
+            MemberSymbol::Dimension(d) => {
+                if let Some(sql) = d.member_sql() {
+                    Ok(sql.clone())
+                } else {
+                    Err(CubeError::user(format!(
+                        "Dimension {} hasn't sql evaluator",
+                        self.full_name()
+                    )))
+                }
+            }
+            _ => Err(CubeError::internal(format!(
+                "MemberSymbol::Dimension expected"
+            ))),
+        }
+    }
+
     pub fn dimension(&self) -> &String {
         &self.dimension
+    }
+
+    pub fn is_sub_query(&self) -> bool {
+        self.definition.static_data().sub_query.unwrap_or(false)
+    }
+
+    pub fn propagate_filters_to_sub_query(&self) -> bool {
+        self.definition
+            .static_data()
+            .propagate_filters_to_sub_query
+            .unwrap_or(false)
     }
 }

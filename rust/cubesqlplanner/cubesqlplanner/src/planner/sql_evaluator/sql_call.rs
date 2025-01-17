@@ -1,8 +1,9 @@
 use super::dependecy::{ContextSymbolDep, CubeDepProperty, CubeDependency, Dependency};
 use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
-use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSql, MemberSqlArg, MemberSqlStruct};
+use crate::cube_bridge::member_sql::{ContextSymbolArg, MemberSql, MemberSqlArg, MemberSqlStruct};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -21,15 +22,28 @@ impl SqlCall {
         visitor: &SqlEvaluatorVisitor,
         node_processor: Rc<dyn SqlNode>,
         query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let args = self
             .deps
             .iter()
             .map(|d| {
-                self.evaluate_single_dep(&d, visitor, node_processor.clone(), query_tools.clone())
+                self.evaluate_single_dep(
+                    &d,
+                    visitor,
+                    node_processor.clone(),
+                    query_tools.clone(),
+                    templates,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
         self.member_sql.call(args)
+    }
+
+    pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
+        let mut deps = Vec::new();
+        self.extract_symbol_deps(&mut deps);
+        deps
     }
 
     pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
@@ -42,6 +56,12 @@ impl SqlCall {
                 Dependency::ContextDependency(_) => {}
             }
         }
+    }
+
+    pub fn get_dependent_cubes(&self) -> Vec<String> {
+        let mut deps = Vec::new();
+        self.extract_cube_deps(&mut deps);
+        deps
     }
 
     pub fn extract_cube_deps(&self, result: &mut Vec<String>) {
@@ -90,14 +110,21 @@ impl SqlCall {
         visitor: &SqlEvaluatorVisitor,
         node_processor: Rc<dyn SqlNode>,
         query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
     ) -> Result<MemberSqlArg, CubeError> {
         match dep {
-            Dependency::SymbolDependency(dep) => Ok(MemberSqlArg::String(
-                visitor.apply(dep, node_processor.clone())?,
-            )),
-            Dependency::CubeDependency(dep) => {
-                self.evaluate_cube_dep(dep, visitor, node_processor.clone(), query_tools.clone())
-            }
+            Dependency::SymbolDependency(dep) => Ok(MemberSqlArg::String(visitor.apply(
+                dep,
+                node_processor.clone(),
+                templates,
+            )?)),
+            Dependency::CubeDependency(dep) => self.evaluate_cube_dep(
+                dep,
+                visitor,
+                node_processor.clone(),
+                query_tools.clone(),
+                templates,
+            ),
             Dependency::ContextDependency(contex_symbol) => {
                 self.apply_context_symbol(contex_symbol, query_tools.clone())
             }
@@ -110,24 +137,27 @@ impl SqlCall {
         visitor: &SqlEvaluatorVisitor,
         node_processor: Rc<dyn SqlNode>,
         query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
     ) -> Result<MemberSqlArg, CubeError> {
         let mut res = MemberSqlStruct::default();
         if let Some(sql_fn) = &dep.sql_fn {
-            res.sql_fn = Some(visitor.apply(sql_fn, node_processor.clone())?);
+            res.sql_fn = Some(visitor.apply(sql_fn, node_processor.clone(), templates)?);
         }
         if let Some(to_string_fn) = &dep.to_string_fn {
-            res.to_string_fn = Some(visitor.apply(to_string_fn, node_processor.clone())?);
+            res.to_string_fn =
+                Some(visitor.apply(to_string_fn, node_processor.clone(), templates)?);
         }
         for (k, v) in dep.properties.iter() {
             let prop_res = match v {
                 CubeDepProperty::SymbolDependency(dep) => {
-                    MemberSqlArg::String(visitor.apply(&dep, node_processor.clone())?)
+                    MemberSqlArg::String(visitor.apply(&dep, node_processor.clone(), templates)?)
                 }
                 CubeDepProperty::CubeDependency(dep) => self.evaluate_cube_dep(
                     &dep,
                     visitor,
                     node_processor.clone(),
                     query_tools.clone(),
+                    templates,
                 )?,
             };
             res.properties.insert(k.clone(), prop_res);

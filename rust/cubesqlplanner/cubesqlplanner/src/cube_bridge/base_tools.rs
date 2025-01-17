@@ -1,6 +1,6 @@
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
-use super::memeber_sql::{MemberSql, NativeMemberSql};
+use super::member_sql::{MemberSql, NativeMemberSql};
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use cubenativeutils::wrappers::serializer::{

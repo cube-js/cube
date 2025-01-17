@@ -19,7 +19,7 @@ impl SingleSource {
     ) -> Result<String, CubeError> {
         let sql = match &self {
             SingleSource::Cube(cube) => {
-                let cubesql = cube.to_sql(context.clone())?;
+                let cubesql = cube.to_sql(context.clone(), templates)?;
                 format!(" {} ", cubesql)
             }
             SingleSource::Subquery(s) => format!("({})", s.to_sql(templates)?),

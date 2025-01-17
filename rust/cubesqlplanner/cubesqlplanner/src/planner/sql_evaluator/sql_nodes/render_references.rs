@@ -3,6 +3,7 @@ use crate::plan::QualifiedColumnName;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -33,6 +34,7 @@ impl SqlNode for RenderReferencesSqlNode {
         node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let full_name = node.full_name();
         if let Some(reference) = self.references.get(&full_name) {
@@ -46,8 +48,13 @@ impl SqlNode for RenderReferencesSqlNode {
                 query_tools.escape_column_name(&reference.name())
             ))
         } else {
-            self.input
-                .to_sql(visitor, node, query_tools.clone(), node_processor.clone())
+            self.input.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )
         }
     }
 

@@ -16,10 +16,10 @@ impl MemberExpression {
 
     pub fn to_sql(
         &self,
-        _templates: &PlanSqlTemplates,
+        templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
-        self.member.to_sql(context)
+        self.member.to_sql(context, templates)
     }
 }
 

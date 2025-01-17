@@ -1,9 +1,10 @@
 use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -93,12 +94,15 @@ impl CubeTableSymbol {
         visitor: &SqlEvaluatorVisitor,
         node_processor: Rc<dyn SqlNode>,
         query_tools: Rc<QueryTools>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         lazy_static! {
             static ref SIMPLE_ASTERIX_RE: Regex =
                 Regex::new(r#"(?i)^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*$"#).unwrap();
         }
-        let sql = self.member_sql.eval(visitor, node_processor, query_tools)?;
+        let sql = self
+            .member_sql
+            .eval(visitor, node_processor, query_tools, templates)?;
         let res = if self.is_table_sql {
             sql
         } else {

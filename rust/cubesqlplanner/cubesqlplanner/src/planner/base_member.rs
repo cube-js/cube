@@ -7,7 +7,11 @@ use itertools::Itertools;
 use std::rc::Rc;
 
 pub trait BaseMember {
-    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError>;
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError>;
     fn alias_name(&self) -> String;
     fn member_evaluator(&self) -> Rc<MemberSymbol>;
     fn full_name(&self) -> String {

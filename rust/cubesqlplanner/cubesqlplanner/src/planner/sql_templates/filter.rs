@@ -152,6 +152,10 @@ impl FilterTemplates {
         )
     }
 
+    pub fn always_true(&self) -> Result<String, CubeError> {
+        Ok(self.render.get_template("filters/always_true")?.clone())
+    }
+
     pub fn gte(&self, column: String, param: String) -> Result<String, CubeError> {
         self.render.render_template(
             &"filters/gte",

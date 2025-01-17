@@ -40,6 +40,22 @@ impl SelectBuilder {
         }
     }
 
+    pub fn new_from_select(select: Rc<Select>) -> Self {
+        Self {
+            projection_columns: select.projection_columns.clone(),
+            from: select.from.clone(),
+            filter: select.filter.clone(),
+            group_by: select.group_by.clone(),
+            having: select.having.clone(),
+            order_by: select.order_by.clone(),
+            ctes: select.ctes.clone(),
+            is_distinct: select.is_distinct,
+            limit: select.limit,
+            offset: select.offset,
+            result_schema: Schema::clone(&select.schema),
+        }
+    }
+
     pub fn add_projection_member(&mut self, member: &Rc<dyn BaseMember>, alias: Option<String>) {
         let alias = if let Some(alias) = alias {
             alias

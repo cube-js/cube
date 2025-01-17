@@ -6,7 +6,7 @@ use super::{
     SqlCall, SymbolFactory, TraversalVisitor,
 };
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::member_sql::MemberSql;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
