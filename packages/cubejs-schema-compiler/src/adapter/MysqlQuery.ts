@@ -43,7 +43,7 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public timestampFormat() {
-    return moment.HTML5_FMT.DATETIME_LOCAL_MS;
+    return 'YYYY-MM-DDTHH:mm:ss.SSS';
   }
 
   public dateTimeCast(value) {
