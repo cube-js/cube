@@ -1322,13 +1322,13 @@ impl CubeScanWrapperNode {
                                                         let aliased_column = aggr_expr
                                                             .iter()
                                                             .find_position(|e| {
-                                                                expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                             })
                                                             .map(|(i, _)| aggregate[i].clone()).or_else(|| {
                                                             projection_expr
                                                                 .iter()
                                                                 .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                                 })
                                                                 .map(|(i, _)| {
                                                                     projection[i].clone()
@@ -1337,7 +1337,7 @@ impl CubeScanWrapperNode {
                                                             flat_group_expr
                                                                 .iter()
                                                                 .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                                 })
                                                                 .map(|(i, _)| group_by[i].clone())
                                                         }).ok_or_else(|| {

@@ -815,7 +815,7 @@ pub fn create_convert_tz_udf() -> ScalarUDF {
         }
 
         if let Some(tz) = input_tz {
-            if tz != &"UTC" {
+            if tz != "UTC" {
                 return Err(DataFusionError::NotImplemented(format!(
                     "convert_tz does not non UTC timezone as input, actual {}",
                     tz
