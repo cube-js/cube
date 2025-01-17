@@ -33,6 +33,5 @@ The above command will also overwrite `src/apis/default_api.rs`, remember to do 
 
 1. Revert block for long polling in `load_v1()`
 2. Revert block containing `tests` module
-3. Rename fields from `r#type` to `_type` (TODO: we can use `--name-mappings type=_type` on new `openapi-generator`)
 
 Finally, run `cargo fmt`

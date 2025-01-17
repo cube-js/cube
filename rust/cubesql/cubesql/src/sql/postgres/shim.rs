@@ -3,7 +3,7 @@ use std::{
     time::SystemTime,
 };
 
-use super::extended::PreparedStatement;
+use super::{extended::PreparedStatement, pg_auth_service::AuthenticationStatus};
 use crate::{
     compile::{
         convert_statement_to_cube_query,
@@ -12,6 +12,7 @@ use crate::{
         CommandCompletion, CompilationError, DatabaseProtocol, QueryPlan, StatusFlags,
     },
     sql::{
+        compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalBatch, PortalFrom},
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
@@ -24,8 +25,11 @@ use crate::{
 use futures::{pin_mut, FutureExt, StreamExt};
 use log::{debug, error, trace};
 use pg_srv::{
-    buffer, protocol,
-    protocol::{ErrorCode, ErrorResponse, Format, InitialMessage, PortalCompletion},
+    buffer,
+    protocol::{
+        self, AuthenticationRequest, ErrorCode, ErrorResponse, Format, InitialMessage,
+        PortalCompletion,
+    },
     PgType, PgTypeId, ProtocolError,
 };
 use sqlparser::ast::{self, CloseCursor, FetchDirection, Query, SetExpr, Statement, Value};
@@ -46,10 +50,9 @@ pub struct AsyncPostgresShim {
     logger: Arc<dyn ContextLogger>,
 }
 
-#[derive(PartialEq, Eq)]
 pub enum StartupState {
     // Initial parameters which client sends in the first message, we use it later in auth method
-    Success(HashMap<String, String>),
+    Success(HashMap<String, String>, AuthenticationRequest),
     SslRequested,
     Denied,
     CancelRequest,
@@ -70,7 +73,7 @@ impl QueryPlanExt for QueryPlan {
         required_format: protocol::Format,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self {
-            QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _, _) => Ok(None),
+            QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _) => Ok(None),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
@@ -84,7 +87,7 @@ impl QueryPlanExt for QueryPlan {
 
                 Ok(Some(protocol::RowDescription::new(result)))
             }
-            QueryPlan::DataFusionSelect(_, logical_plan, _) => {
+            QueryPlan::DataFusionSelect(logical_plan, _) => {
                 let mut result = vec![];
 
                 for field in logical_plan.schema().fields() {
@@ -238,6 +241,15 @@ impl AsyncPostgresShim {
         return Ok(());
     }
 
+    async fn get_cache_entry(&self) -> Result<Arc<CompilerCacheEntry>, CubeError> {
+        self.session
+            .session_manager
+            .server
+            .compiler_cache
+            .get_cache_entry(self.auth_context()?, self.session.state.protocol.clone())
+            .await
+    }
+
     pub async fn run_on(
         fast_shutdown_interruptor: CancellationToken,
         semifast_shutdown_interruptor: CancellationToken,
@@ -299,7 +311,7 @@ impl AsyncPostgresShim {
     fn is_semifast_shutdownable(&self) -> bool {
         return self.cursors.is_empty()
             && self.portals.is_empty()
-            && Self::session_state_is_semifast_shutdownable(&*self.session.state);
+            && Self::session_state_is_semifast_shutdownable(&self.session.state);
     }
 
     fn admin_shutdown_error() -> ConnectionError {
@@ -313,25 +325,23 @@ impl AsyncPostgresShim {
     }
 
     pub async fn run(&mut self) -> Result<(), ConnectionError> {
-        let initial_parameters = match self.process_initial_message().await? {
-            StartupState::Success(parameters) => parameters,
+        let (initial_parameters, auth_method) = match self.process_initial_message().await? {
+            StartupState::Success(parameters, auth_method) => (parameters, auth_method),
             StartupState::SslRequested => match self.process_initial_message().await? {
-                StartupState::Success(parameters) => parameters,
+                StartupState::Success(parameters, auth_method) => (parameters, auth_method),
                 _ => return Ok(()),
             },
             StartupState::Denied | StartupState::CancelRequest => return Ok(()),
         };
 
-        match buffer::read_message(&mut self.socket).await? {
-            protocol::FrontendMessage::PasswordMessage(password_message) => {
-                if !self
-                    .authenticate(password_message, initial_parameters)
-                    .await?
-                {
-                    return Ok(());
-                }
-            }
-            _ => return Ok(()),
+        let message_tag_parser = self.session.server.pg_auth.get_pg_message_tag_parser();
+        let auth_secret =
+            buffer::read_message(&mut self.socket, Arc::clone(&message_tag_parser)).await?;
+        if !self
+            .authenticate(auth_method, auth_secret, initial_parameters)
+            .await?
+        {
+            return Ok(());
         }
 
         self.ready().await?;
@@ -351,7 +361,7 @@ impl AsyncPostgresShim {
                 true = async { semifast_shutdownable && { semifast_shutdown_interruptor.cancelled().await; true } } => {
                     return Self::flush_and_write_admin_shutdown_fatal_message(self).await;
                 }
-                message_result = buffer::read_message(&mut self.socket) => message_result?
+                message_result = buffer::read_message(&mut self.socket, Arc::clone(&message_tag_parser)) => message_result?
             };
 
             let result = match message {
@@ -374,99 +384,132 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Terminate => return Ok(()),
                 // Extended
                 protocol::FrontendMessage::Parse(body) => {
-                    if tracked_error.is_none() {
-                        doing_extended_query_message = true;
-                        let mut qtrace = Qtrace::new(&body.query);
-                        let span_id = Self::new_span_id(body.query.clone());
-                        if let Some(qtrace) = &qtrace {
-                            debug!("Assigned query UUID: {}", qtrace.uuid())
-                        }
-                        if let Some(auth_context) = self.session.state.auth_context() {
-                            self.session
-                                .session_manager
-                                .server
-                                .transport
-                                .log_load_state(
-                                    span_id.clone(),
-                                    auth_context,
-                                    self.session.state.get_load_request_meta(),
-                                    "Load Request".to_string(),
-                                    serde_json::json!({
-                                        "query": span_id.as_ref().unwrap().query_key.clone(),
-                                    }),
-                                )
-                                .await?;
-                        }
-                        let result = self
-                            .parse(body, &mut qtrace, span_id.clone())
-                            .await
-                            .map_err(|e| e.with_span_id(span_id));
-                        if let Err(err) = &result {
-                            if let Some(qtrace) = &mut qtrace {
-                                qtrace.set_query_error_message(&err.to_string())
-                            }
-                        };
-                        if let Some(qtrace) = &qtrace {
-                            qtrace.save_json()
-                        }
-                        result
-                    } else {
+                    if tracked_error.is_some() {
                         continue;
                     }
+                    doing_extended_query_message = true;
+                    let mut qtrace = Qtrace::new(&body.query);
+                    let span_id = Self::new_span_id(body.query.clone());
+                    if let Some(qtrace) = &qtrace {
+                        debug!("Assigned query UUID: {}", qtrace.uuid())
+                    }
+                    if let Some(auth_context) = self.session.state.auth_context() {
+                        self.session
+                            .session_manager
+                            .server
+                            .transport
+                            .log_load_state(
+                                span_id.clone(),
+                                auth_context,
+                                self.session.state.get_load_request_meta(),
+                                "Load Request".to_string(),
+                                serde_json::json!({
+                                    "query": span_id.as_ref().unwrap().query_key.clone(),
+                                    // Hide query by default until Execute
+                                    "isDataQuery": false,
+                                }),
+                            )
+                            .await?;
+                    }
+                    let result = self
+                        .parse(body, &mut qtrace, span_id.clone())
+                        .await
+                        .map_err(|e| e.with_span_id(span_id));
+                    if let Err(err) = &result {
+                        if let Some(qtrace) = &mut qtrace {
+                            qtrace.set_query_error_message(&err.to_string())
+                        }
+                    };
+                    if let Some(qtrace) = &qtrace {
+                        qtrace.save_json()
+                    }
+                    result
                 }
                 protocol::FrontendMessage::Bind(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        let span_id = {
-                            let statements_guard = self.session.state.statements.read().await;
-                            statements_guard
-                                .get(&body.statement)
-                                .and_then(|s| s.span_id())
-                        };
-                        self.bind(body, span_id).await
-                    } else {
-                        continue;
                     }
+                    let span_id = {
+                        let statements_guard = self.session.state.statements.read().await;
+                        statements_guard
+                            .get(&body.statement)
+                            .and_then(|s| s.span_id())
+                    };
+                    self.bind(body, span_id).await
                 }
                 protocol::FrontendMessage::Execute(body) => {
-                    if tracked_error.is_none() {
-                        doing_extended_query_message = true;
-                        let span_id = if let Some(portal) = self.portals.get(&body.portal) {
-                            portal.span_id()
-                        } else {
-                            None
-                        };
-                        let result = self
-                            .execute(body)
-                            .await
-                            .map_err(|e| e.with_span_id(span_id.clone()));
-                        if result.is_ok() {
-                            if let Some(auth_context) = self.session.state.auth_context() {
-                                if let Some(span_id) = span_id {
-                                    self.session
-                                        .session_manager
-                                        .server
-                                        .transport
-                                        .log_load_state(
-                                            Some(span_id.clone()),
-                                            auth_context,
-                                            self.session.state.get_load_request_meta(),
-                                            "Load Request Success".to_string(),
-                                            serde_json::json!({
-                                                "query": span_id.query_key.clone(),
-                                                "apiType": "sql",
-                                                "duration": span_id.duration(),
-                                                "isDataQuery": span_id.is_data_query().await
-                                            }),
-                                        )
-                                        .await?;
-                                }
+                    let span_id = self
+                        .portals
+                        .get(&body.portal)
+                        .and_then(|portal| portal.span_id());
+                    if tracked_error.is_some() {
+                        if let Some(auth_context) = self.session.state.auth_context() {
+                            if let Some(span_id) = span_id {
+                                // If there was an error, always show the query
+                                self.session
+                                    .session_manager
+                                    .server
+                                    .transport
+                                    .log_load_state(
+                                        Some(span_id.clone()),
+                                        auth_context,
+                                        self.session.state.get_load_request_meta(),
+                                        "Data Query Status".to_string(),
+                                        serde_json::json!({
+                                            "isDataQuery": true
+                                        }),
+                                    )
+                                    .await?;
                             }
                         }
-                        result
-                    } else {
                         continue;
                     }
+                    doing_extended_query_message = true;
+                    let result = self
+                        .execute(body)
+                        .await
+                        .map_err(|e| e.with_span_id(span_id.clone()));
+                    if let Some(auth_context) = self.session.state.auth_context() {
+                        if let Some(span_id) = span_id {
+                            // Always indicate whether this is a data query
+                            // Errors are always visible ("data queries")
+                            if result.is_err() {
+                                self.session
+                                    .session_manager
+                                    .server
+                                    .transport
+                                    .log_load_state(
+                                        Some(span_id.clone()),
+                                        auth_context.clone(),
+                                        self.session.state.get_load_request_meta(),
+                                        "Data Query Status".to_string(),
+                                        serde_json::json!({
+                                            "isDataQuery": true,
+                                        }),
+                                    )
+                                    .await?;
+                            } else {
+                                self.session
+                                    .session_manager
+                                    .server
+                                    .transport
+                                    .log_load_state(
+                                        Some(span_id.clone()),
+                                        auth_context,
+                                        self.session.state.get_load_request_meta(),
+                                        "Load Request Success".to_string(),
+                                        serde_json::json!({
+                                            "query": span_id.query_key.clone(),
+                                            "apiType": "sql",
+                                            "duration": span_id.duration(),
+                                            "isDataQuery": span_id.is_data_query().await
+                                        }),
+                                    )
+                                    .await?;
+                            }
+                        }
+                    }
+                    result
                 }
                 protocol::FrontendMessage::Close(body) => {
                     if tracked_error.is_none() {
@@ -716,73 +759,62 @@ impl AsyncPostgresShim {
             return Ok(StartupState::Denied);
         }
 
-        self.write(protocol::Authentication::new(
-            protocol::AuthenticationRequest::CleartextPassword,
-        ))
-        .await?;
+        let auth_method = self.session.server.pg_auth.get_auth_method(&parameters);
+        self.write(protocol::Authentication::new(auth_method.clone()))
+            .await?;
 
-        Ok(StartupState::Success(parameters))
+        Ok(StartupState::Success(parameters, auth_method))
     }
 
     pub async fn authenticate(
         &mut self,
-        password_message: protocol::PasswordMessage,
+        auth_request: AuthenticationRequest,
+        auth_secret: protocol::FrontendMessage,
         parameters: HashMap<String, String>,
     ) -> Result<bool, ConnectionError> {
-        let user = parameters.get("user").unwrap().clone();
-        let authenticate_response = self
+        let auth_service = self.session.server.auth.clone();
+        let auth_status = self
             .session
             .server
-            .auth
-            .authenticate(Some(user.clone()), Some(password_message.password.clone()))
+            .pg_auth
+            .authenticate(auth_service, auth_request, auth_secret, &parameters)
             .await;
-
-        let mut auth_context: Option<AuthContextRef> = None;
-
-        let auth_success = match authenticate_response {
-            Ok(authenticate_response) => {
-                auth_context = Some(authenticate_response.context);
-                if !authenticate_response.skip_password_check {
-                    match authenticate_response.password {
-                        None => false,
-                        Some(password) => password == password_message.password,
-                    }
-                } else {
-                    true
-                }
-            }
-            _ => false,
+        let result = match auth_status {
+            AuthenticationStatus::UnexpectedFrontendMessage => Err((
+                "invalid authorization specification".to_string(),
+                protocol::ErrorCode::InvalidAuthorizationSpecification,
+            )),
+            AuthenticationStatus::Failed(err) => Err((err, protocol::ErrorCode::InvalidPassword)),
+            AuthenticationStatus::Success(user, auth_context) => Ok((user, auth_context)),
         };
 
-        if !auth_success {
-            let error_response = protocol::ErrorResponse::fatal(
-                protocol::ErrorCode::InvalidPassword,
-                format!("password authentication failed for user \"{}\"", &user),
-            );
-            buffer::write_message(
-                &mut self.partial_write_buf,
-                &mut self.socket,
-                error_response,
-            )
-            .await?;
+        match result {
+            Err((message, code)) => {
+                let error_response = protocol::ErrorResponse::fatal(code, message);
+                buffer::write_message(
+                    &mut self.partial_write_buf,
+                    &mut self.socket,
+                    error_response,
+                )
+                .await?;
 
-            return Ok(false);
+                Ok(false)
+            }
+            Ok((user, auth_context)) => {
+                let database = parameters
+                    .get("database")
+                    .map(|v| v.clone())
+                    .unwrap_or("db".to_string());
+                self.session.state.set_database(Some(database));
+                self.session.state.set_user(Some(user));
+                self.session.state.set_auth_context(Some(auth_context));
+
+                self.write(protocol::Authentication::new(AuthenticationRequest::Ok))
+                    .await?;
+
+                Ok(true)
+            }
         }
-
-        let database = parameters
-            .get("database")
-            .map(|v| v.clone())
-            .unwrap_or("db".to_string());
-        self.session.state.set_database(Some(database));
-        self.session.state.set_user(Some(user));
-        self.session.state.set_auth_context(auth_context);
-
-        self.write(protocol::Authentication::new(
-            protocol::AuthenticationRequest::Ok,
-        ))
-        .await?;
-
-        Ok(true)
     }
 
     pub async fn ready(&mut self) -> Result<(), ConnectionError> {
@@ -892,6 +924,10 @@ impl AsyncPostgresShim {
                         self.write(packet.clone()).await
                     }
                 },
+                PreparedStatement::Error { .. } => Err(CubeError::internal(
+                    "Describe called on errored prepared statement (it's a bug)".to_string(),
+                )
+                .into()),
             },
         }
     }
@@ -1032,12 +1068,8 @@ impl AsyncPostgresShim {
                     source_statement.bind(body.to_bind_values(&parameters)?)?;
                 drop(statements_guard);
 
-                let meta = self
-                    .session
-                    .server
-                    .compiler_cache
-                    .meta(self.auth_context()?, self.session.state.protocol.clone())
-                    .await?;
+                let cache_entry = self.get_cache_entry().await?;
+                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
                 let plan = convert_statement_to_cube_query(
                     prepared_statement,
@@ -1049,6 +1081,11 @@ impl AsyncPostgresShim {
                 .await?;
 
                 Portal::new(plan, format, PortalFrom::Extended, span_id)
+            }
+            PreparedStatement::Error { .. } => {
+                drop(statements_guard);
+
+                Portal::new_empty(format, PortalFrom::Extended, span_id)
             }
         };
 
@@ -1075,12 +1112,26 @@ impl AsyncPostgresShim {
                 },
             );
         } else {
-            let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL, qtrace)?;
-            if let Some(qtrace) = qtrace {
-                qtrace.push_statement(&query);
+            match parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL, qtrace) {
+                Ok(query) => {
+                    if let Some(qtrace) = qtrace {
+                        qtrace.push_statement(&query);
+                    }
+                    self.prepare_statement(parse.name, Ok(query), false, qtrace, span_id.clone())
+                        .await?;
+                }
+                Err(err) => {
+                    self.prepare_statement(
+                        parse.name,
+                        Err(parse.query.to_string()),
+                        false,
+                        qtrace,
+                        span_id.clone(),
+                    )
+                    .await?;
+                    Err(err)?;
+                }
             }
-            self.prepare_statement(parse.name, query, false, qtrace, span_id.clone())
-                .await?;
         }
 
         self.write(protocol::ParseComplete::new()).await?;
@@ -1091,7 +1142,7 @@ impl AsyncPostgresShim {
     pub async fn prepare_statement(
         &mut self,
         name: String,
-        query: Statement,
+        query: Result<Statement, String>,
         from_sql: bool,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
@@ -1117,49 +1168,74 @@ impl AsyncPostgresShim {
             ));
         }
 
-        let stmt_finder = PostgresStatementParamsFinder::new();
-        let parameters: Vec<PgTypeId> = stmt_finder
-            .find(&query)?
-            .into_iter()
-            .map(|param| param.coltype.to_pg_tid())
-            .collect();
+        let (pstmt, result) = match query {
+            Ok(query) => {
+                let stmt_finder = PostgresStatementParamsFinder::new();
+                let parameters: Vec<PgTypeId> = stmt_finder
+                    .find(&query)?
+                    .into_iter()
+                    .map(|param| param.coltype.to_pg_tid())
+                    .collect();
 
-        let meta = self
-            .session
-            .server
-            .compiler_cache
-            .meta(self.auth_context()?, self.session.state.protocol.clone())
-            .await?;
+                let cache_entry = self.get_cache_entry().await?;
+                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
-        let stmt_replacer = StatementPlaceholderReplacer::new();
-        let hacked_query = stmt_replacer.replace(query.clone())?;
+                let stmt_replacer = StatementPlaceholderReplacer::new();
+                let hacked_query = stmt_replacer.replace(query.clone())?;
 
-        let plan = convert_statement_to_cube_query(
-            hacked_query,
-            meta,
-            self.session.clone(),
-            qtrace,
-            span_id.clone(),
-        )
-        .await?;
+                let plan = convert_statement_to_cube_query(
+                    hacked_query,
+                    meta,
+                    self.session.clone(),
+                    qtrace,
+                    span_id.clone(),
+                )
+                .await;
 
-        let description = if let Some(description) = plan.to_row_description(Format::Text)? {
-            if description.len() > 0 {
-                Some(description)
-            } else {
-                None
+                match plan {
+                    Ok(plan) => {
+                        let description =
+                            plan.to_row_description(Format::Text)?
+                                .and_then(|description| {
+                                    if description.len() > 0 {
+                                        Some(description)
+                                    } else {
+                                        None
+                                    }
+                                });
+
+                        (
+                            PreparedStatement::Query {
+                                from_sql,
+                                created: chrono::offset::Utc::now(),
+                                query,
+                                parameters: protocol::ParameterDescription::new(parameters),
+                                description,
+                                span_id,
+                            },
+                            Ok(()),
+                        )
+                    }
+                    Err(err) => (
+                        PreparedStatement::Error {
+                            from_sql,
+                            sql: query.to_string(),
+                            created: chrono::offset::Utc::now(),
+                            span_id,
+                        },
+                        Err(err.into()),
+                    ),
+                }
             }
-        } else {
-            None
-        };
-
-        let pstmt = PreparedStatement::Query {
-            from_sql,
-            created: chrono::offset::Utc::now(),
-            query,
-            parameters: protocol::ParameterDescription::new(parameters),
-            description,
-            span_id,
+            Err(sql) => (
+                PreparedStatement::Error {
+                    from_sql,
+                    sql,
+                    created: chrono::offset::Utc::now(),
+                    span_id,
+                },
+                Ok(()),
+            ),
         };
         self.session
             .state
@@ -1168,7 +1244,7 @@ impl AsyncPostgresShim {
             .await
             .insert(name, pstmt);
 
-        Ok(())
+        result
     }
 
     pub fn end_transaction(&mut self) -> Result<bool, ConnectionError> {
@@ -1260,7 +1336,7 @@ impl AsyncPostgresShim {
                 .await?;
             }
             Statement::Rollback { .. } => {
-                if self.end_transaction()? == false {
+                if !self.end_transaction()? {
                     // PostgreSQL returns command completion anyway
                     self.write(protocol::NoticeResponse::warning(
                         ErrorCode::NoActiveSqlTransaction,
@@ -1279,7 +1355,7 @@ impl AsyncPostgresShim {
                 .await?;
             }
             Statement::Commit { .. } => {
-                if self.end_transaction()? == false {
+                if !self.end_transaction()? {
                     // PostgreSQL returns command completion anyway
                     self.write(protocol::NoticeResponse::warning(
                         ErrorCode::NoActiveSqlTransaction,
@@ -1569,17 +1645,10 @@ impl AsyncPostgresShim {
             Statement::Close { cursor } => {
                 let plan = match cursor {
                     CloseCursor::All => {
-                        let mut portals_to_remove = Vec::new();
-
-                        for (key, _) in &self.cursors {
-                            portals_to_remove.push(key.clone());
+                        for key in self.cursors.keys() {
+                            self.portals.remove(key);
                         }
-
-                        self.cursors = HashMap::new();
-
-                        for key in portals_to_remove {
-                            self.portals.remove(&key);
-                        }
+                        self.cursors.clear();
 
                         Ok(QueryPlan::MetaOk(
                             StatusFlags::empty(),
@@ -1634,7 +1703,7 @@ impl AsyncPostgresShim {
                     _ => *statement,
                 };
 
-                self.prepare_statement(name.value, statement, true, qtrace, span_id.clone())
+                self.prepare_statement(name.value, Ok(statement), true, qtrace, span_id.clone())
                     .await?;
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Prepare);
@@ -1720,12 +1789,8 @@ impl AsyncPostgresShim {
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<(), ConnectionError> {
-        let meta = self
-            .session
-            .server
-            .compiler_cache
-            .meta(self.auth_context()?, self.session.state.protocol.clone())
-            .await?;
+        let cache_entry = self.get_cache_entry().await?;
+        let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
         let statements =
             parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL, qtrace)?;

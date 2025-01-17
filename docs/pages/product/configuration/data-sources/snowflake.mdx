@@ -14,6 +14,11 @@ redirect_from:
 
 ## Setup
 
+<WarningBox>
+If you're having Network error and Snowflake can't be reached please make sure you tried 
+[format 2 for an account id][snowflake-format-2].
+</WarningBox>
+
 ### Manual
 
 Add the following to a `.env` file in your Cube project:
@@ -145,6 +150,26 @@ CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
 CUBEJS_DB_EXPORT_INTEGRATION=gcs_int
 ```
 
+#### Azure
+
+To use Azure Blob Storage as an export bucket, follow [the guide on 
+using a Snowflake storage integration (Option 1)][snowflake-docs-azure]. 
+Take note of the integration name (`azure_int` from the example link)
+as you'll need it to configure Cube.
+
+[Retrieve the storage account access key][azure-bs-docs-get-key] from your Azure
+account.
+
+Once the Snowflake integration is set up, configure Cube using the following:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=azure
+CUBEJS_DB_EXPORT_BUCKET=wasbs://my-bucket@my-account.blob.core.windows.net
+CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY=<AZURE_STORAGE_ACCOUNT_ACCESS_KEY>
+CUBEJS_DB_EXPORT_INTEGRATION=azure_int
+```
+
+
 ## SSL
 
 Cube does not require any additional configuration to enable SSL as Snowflake
@@ -170,3 +195,6 @@ connections are made over HTTPS.
   https://docs.snowflake.com/en/sql-reference/functions/approx_count_distinct.html
 [snowflake-docs-warehouse]:
   https://docs.snowflake.com/en/user-guide/warehouses.html
+[snowflake-format-2]: https://docs.snowflake.com/en/user-guide/admin-account-identifier#format-2-account-locator-in-a-region
+[snowflake-docs-azure]: https://docs.snowflake.com/en/user-guide/data-load-azure-config#option-1-configuring-a-snowflake-storage-integration
+[azure-bs-docs-get-key]: https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&tabs=azure-portal#view-account-access-keys

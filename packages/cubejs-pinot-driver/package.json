@@ -1,0 +1,55 @@
+{
+  "name": "@cubejs-backend/pinot-driver",
+  "description": "Cube.js Pinot database driver",
+  "author": "Julian Ronsse, InTheMemory, Cube Dev, Inc.",
+  "version": "1.1.15",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.git",
+    "directory": "packages/cubejs-pinot-driver"
+  },
+  "engines": {
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+  },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "integration": "npm run integration:pinot",
+    "integration:pinot": "jest --verbose dist/test",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "dependencies": {
+    "@cubejs-backend/base-driver": "1.1.12",
+    "@cubejs-backend/schema-compiler": "1.1.15",
+    "@cubejs-backend/shared": "1.1.12",
+    "node-fetch": "^2.6.1",
+    "ramda": "^0.27.2",
+    "sqlstring": "^2.3.3"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@cubejs-backend/linter": "^1.0.0",
+    "@types/jest": "^27",
+    "jest": "^27",
+    "should": "^13.2.3",
+    "testcontainers": "^10.10.4",
+    "typescript": "~5.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
 
 use regex::Regex;
 use sqlparser::{
@@ -23,8 +23,8 @@ impl Dialect for MySqlDialectWithBackTicks {
         // See https://dev.mysql.com/doc/refman/8.0/en/identifiers.html.
         // We don't yet support identifiers beginning with numbers, as that
         // makes it hard to distinguish numeric literals.
-        ('a'..='z').contains(&ch)
-            || ('A'..='Z').contains(&ch)
+        ch.is_ascii_lowercase()
+            || ch.is_ascii_uppercase()
             || ch == '_'
             || ch == '$'
             || ch == '@'
@@ -32,13 +32,13 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 
     fn is_identifier_part(&self, ch: char) -> bool {
-        self.is_identifier_start(ch) || ('0'..='9').contains(&ch)
+        self.is_identifier_start(ch) || ch.is_ascii_digit()
     }
 }
 
-lazy_static! {
-    static ref SIGMA_WORKAROUND: Regex = Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap();
-}
+static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap()
+});
 
 pub fn parse_sql_to_statements(
     query: &String,
@@ -60,7 +60,7 @@ pub fn parse_sql_to_statements(
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
-    // DBEver
+    // DBeaver
     let query = query.replace(
         "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
         "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
@@ -118,13 +118,18 @@ pub fn parse_sql_to_statements(
     // Sigma Computing WITH query workaround
     // TODO: remove workaround when subquery is supported in JOIN ON conditions
     let query = if SIGMA_WORKAROUND.is_match(&query) {
-        let relnamespace_re = Regex::new(r#"(?s)from\spg_catalog\.pg_class\s+where\s+relname\s=\s(?P<relname>'(?:[^']|'')+'|\$\d+)\s+and\s+relnamespace\s=\s\(select\soid\sfrom\snsp\)"#).unwrap();
-        let relnamespace_replaced = relnamespace_re.replace(
+        static RELNAMESPACE_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"(?s)from\spg_catalog\.pg_class\s+where\s+relname\s=\s(?P<relname>'(?:[^']|'')+'|\$\d+)\s+and\s+relnamespace\s=\s\(select\soid\sfrom\snsp\)"#).unwrap()
+        });
+        static ATTRELID_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"(?s)left\sjoin\spg_description\son\s+attrelid\s=\sobjoid\sand\s+attnum\s=\sobjsubid\s+where\s+attnum\s>\s0\s+and\s+attrelid\s=\s\(select\soid\sfrom\stbl\)"#).unwrap()
+        });
+
+        let relnamespace_replaced = RELNAMESPACE_RE.replace(
             &query,
             "from pg_catalog.pg_class join nsp on relnamespace = nsp.oid where relname = $relname",
         );
-        let attrelid_re = Regex::new(r#"(?s)left\sjoin\spg_description\son\s+attrelid\s=\sobjoid\sand\s+attnum\s=\sobjsubid\s+where\s+attnum\s>\s0\s+and\s+attrelid\s=\s\(select\soid\sfrom\stbl\)"#).unwrap();
-        let attrelid_replaced = attrelid_re.replace(&relnamespace_replaced, "left join pg_description on attrelid = objoid and attnum = objsubid join tbl on attrelid = tbl.oid where attnum > 0");
+        let attrelid_replaced = ATTRELID_RE.replace(&relnamespace_replaced, "left join pg_description on attrelid = objoid and attnum = objsubid join tbl on attrelid = tbl.oid where attnum > 0");
         attrelid_replaced.to_string()
     } else {
         query
@@ -207,6 +212,30 @@ pub fn parse_sql_to_statements(
         "p.proname AS PROCEDURE_NAME, NULL AS NULL, NULL AS NULL2, NULL AS NULL3, ",
     );
 
+    // Quicksight workarounds
+    // subquery must have an alias
+    let query = query.replace(
+        "ORDER BY nspname,c.relname,attnum  ) UNION ALL",
+        "ORDER BY nspname,c.relname,attnum  ) _internal_unaliased_1 UNION ALL",
+    );
+    // SELECT expression referencing column aliased above
+    let query = query.replace(
+        "AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN",
+        "AS IS_AUTOINCREMENT, 'NO' AS IS_GENERATEDCOLUMN",
+    );
+    // WHERE expressions referencing SELECT aliases
+    let query = {
+        static WHERE_TABLE_SCHEMA_NAME_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"\slbv_columns\s+WHERE\s+table_schema\sLIKE\s(?P<tableschema>[^\s]+)\s+AND\stable_name\sLIKE\s(?P<tablename>[^\s]+)\s*$"#).unwrap()
+        });
+        WHERE_TABLE_SCHEMA_NAME_RE
+            .replace(
+                &query,
+                " lbv_columns WHERE schemaname LIKE $tableschema AND tablename LIKE $tablename",
+            )
+            .to_string()
+    };
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }
@@ -264,11 +293,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -281,11 +308,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 
@@ -320,11 +345,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -337,11 +360,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 

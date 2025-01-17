@@ -480,9 +480,7 @@ trait Visitor<'ast, E: Error> {
                 ConnectionError::from(ErrorResponse::error(
                     ErrorCode::SyntaxError,
                     format!(
-                        "Unable to extract position for placeholder, actual: {}, err: {}",
-                        name,
-                        err.to_string()
+                        "Unable to extract position for placeholder, actual: {name}, err: {err}"
                     ),
                 ))
             })?;

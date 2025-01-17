@@ -1,0 +1,26 @@
+{
+  "schemaName": "scores",
+  "dimensionFieldSpecs": [
+    {
+      "name": "studentID",
+      "dataType": "INT"
+    },
+    {
+      "name": "subject",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "score",
+      "dataType": "DOUBLE"
+    }
+  ],
+  "dateTimeFieldSpecs": [{
+    "name": "score_date",
+    "dataType": "TIMESTAMP",
+    "format" : "1:MILLISECONDS:EPOCH",
+    "granularity": "1:MILLISECONDS"
+  }],
+  "primaryKeyColumns": ["studentID", "subject", "score_date"]
+}

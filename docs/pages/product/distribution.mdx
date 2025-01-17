@@ -1,0 +1,106 @@
+# Distribution
+
+This page explains the difference between [Cube Core and Cube Cloud](#cube-core-and-cube-cloud),
+provides links to ready-to-use [artifacts](#artifacts), and explains the
+[versioning model](#versions) and the release cycle, including the [long-term
+support](#long-term-support) (LTS). 
+
+## Cube Core and Cube Cloud
+
+_Cube Core_ is the universal semantic layer, developed by [Cube Dev][link-company]
+and the community in open source under a permissive [Apache License 2.0][link-license].
+You can find its [source code][link-repo] on GitHub.
+
+_Cube Cloud_ is the managed platform for Cube Core, developed by Cube Dev as a
+[commercial product][link-pricing]. It includes everything from Cube Core and
+provides additional semantic layer features, [managed infrastructure][ref-infrastructure]
+and [workspace tools][ref-workspace].
+
+_Cube_ can be used to refer to both products if the distinction is not important
+in a particular case.
+
+<SuccessBox>
+
+All Cube Cloud-specific features are marked with similar green boxes throughout
+this documentation.
+
+</SuccessBox>
+
+You are welcome to either [sign up for Cube Cloud][link-sign-up] or
+[self-host][ref-deployment] a Cube Core deployment.
+
+## Artifacts
+
+Cube Core is packaged and distributed as Docker images that you can run in a
+containerized environment. You can find images for [Cube][link-dockerhub-cube]
+and [Cube Store][link-dockerhub-cubestore] on Docker Hub.
+
+Note that Cube Store images support the `linux/amd64` architecture while Cube
+images support both `linux/amd64` and `linux/arm64`. The latter is convenient for
+Mac computers with [Apple silicon][link-apple-silicon] that you might use to run
+Cube locally.
+
+Notably, the following tags are used with Docker images:
+- `v1.1.0` and similar, one tag per each released version.
+- `latest`, always pointing to the latest release.
+- `dev`, always pointing to the bleeding-edge image built for the latest commit.
+
+## Versions
+
+Cube is actively developed, and new versions are released frequently.
+
+Versions mostly follow [SemVer][link-semver] principles, with the only exception
+that breaking changes can happen both in _major_ and _minor_ versions. Before
+upgrading, it is recommended that you check the [release notes][link-releases]
+on GitHub and read [changelog entries][link-changelog] in the blog.
+
+<WarningBox>
+
+You can find a list of currently [deprecated features][link-github-deprecation] on GitHub.
+Usually, there are also deprecation notices in the documentation that look similar to this one.
+
+</WarningBox>
+
+Additionally, Cube Cloud provides [update channels][ref-update-channels] where
+versions are marked as either <Btn>Stable</Btn> or <Btn>Latest</Btn>.
+
+### Long-term support
+
+To provide guarantees for the long-term support of Cube Core, some minor releases
+are designated as _long-term support (LTS) releases_.
+
+<InfoBox>
+
+Check the [long-term support announcement][link-lts-accouncement] in the blog.
+
+</InfoBox>
+
+For 12 months after being marked as LTS, these releases receive fixes for defects
+that significantly impact stability and functionality as well as the security
+fixes for critical vulnerabilities. It is recommended to use the latest patch
+version within an LTS release.
+
+List of LTS releases:
+
+| Version | Status | End-of-life date |
+| --- | --- | --- |
+| `v1.0.x` | Active | October 29, 2025 |
+
+
+[link-repo]: https://github.com/cube-js/cube
+[link-license]: https://github.com/cube-js/cube/blob/master/LICENSE
+[link-releases]: https://github.com/cube-js/cube/releases
+[link-company]: https://cube.dev/about
+[link-pricing]: https://cube.dev/pricing
+[link-sign-up]: https://cubecloud.dev/auth/signup
+[link-changelog]: https://cube.dev/blog/category/changelog
+[link-lts-accouncement]: https://cube.dev/blog/introducing-long-term-support-lts-for-cube-core
+[link-dockerhub-cube]: https://hub.docker.com/r/cubejs/cube/tags
+[link-dockerhub-cubestore]: https://hub.docker.com/r/cubejs/cubestore/tags
+[link-apple-silicon]: https://support.apple.com/en-us/116943
+[link-semver]: https://semver.org
+[link-github-deprecation]: https://github.com/cube-js/cube/blob/master/DEPRECATION.md
+[ref-infrastructure]: /product/deployment/cloud
+[ref-workspace]: /product/workspace
+[ref-deployment]: /product/deployment
+[ref-update-channels]: /product/deployment/cloud/deployments#update-channels

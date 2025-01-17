@@ -111,6 +111,7 @@
     ]
   },
   "skip": [
+    "---------------------------------------",
     "SKIPPED FOR MS SQL (total not supported)",
     "---------------------------------------",
     "querying Customers: dimensions + total",
@@ -124,7 +125,8 @@
     "querying ECommerce: dimensions + order + total + offset",
     "querying ECommerce: dimensions + order + limit + total + offset",
 
-    "SKIPPED FOR ALL",
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
@@ -133,6 +135,7 @@
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
 
+    "---------------------------------------",
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
     "SQL API: reuse params",
@@ -146,6 +149,8 @@
     "SQL API: Rollup over exprs",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
-    "SQL API: Extended nested Rollup over asterisk"
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: ungrouped pre-agg",
+    "SQL API: NULLS FIRST/LAST SQL push down"
   ]
 }

@@ -20,6 +20,10 @@ but not limited to the following ones:
 Often, the SQL API is used to enable internal or self-serve [business
 intelligence][cube-bi-use-case] use cases.
 
+See [SQL API reference][ref-ref-sql-api] for the list of supported SQL commands,
+functions, and operators. Also, check [query format][ref-sql-query-format] for
+details about supported queries.
+
 <InfoBox>
 
 Please use [this GitHub issue](https://github.com/cube-js/cube/issues/3906) to
@@ -77,10 +81,6 @@ WHERE table_schema = 'public';
 ```sql
 \d
 ```
-
-Check [query format][ref-sql-query-format] for details about supported queries.
-Also, check [SQL API reference][ref-ref-sql-api] for the list of supported SQL
-commands, functions, and operators.
 
 ## Fundamentals
 
@@ -181,8 +181,9 @@ an [example request](#example-request).
 
 ### Cube Cloud
 
-**SQL API is enabled by default.** You can find credentials for the SQL API on
-the <Btn>Overview</Btn> page by clicking <Btn>Connect to SQL API</Btn>.
+**SQL API is enabled by default.** To find your SQL API endpoint and credentials
+in Cube Cloud, go to the <Btn>Overview</Btn> page, click <Btn>API credentials</Btn>,
+and choose the <Btn>SQL API</Btn> tab.
 
 By default, the SQL API is enabled on port 5432, the user name is `cube`, and
 a random  string is generated for the password. You can customize these with
@@ -211,7 +212,7 @@ error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit rea
 Use the following environment variables to allocate more resources for query planning:
 `CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
 
-## Streaming
+### Streaming
 
 By default, query results are loaded in a single batch. However, a more effective
 *streaming mode* can be used for large result sets. To enable it, set the
@@ -223,6 +224,14 @@ When the streaming mode is enabled, the maximum [row limit][ref-queries-row-limi
 does not apply to SQL API queries. They can return an unlimited number of rows.
 
 </InfoBox>
+
+### Session limit
+
+Each concurrent connection to the SQL API consumes some resources and attempting
+to establish too many connections at once can lead to an out-of-memory crash.
+You can use the `CUBEJS_MAX_SESSIONS` environment variable to adjust the session
+limit.
+
 
 [ref-sql-api-auth]: /product/apis-integrations/sql-api/security
 [ref-config-checksqlauth]: /reference/configuration/config#checksqlauth

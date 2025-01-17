@@ -23,6 +23,7 @@ use chrono::Utc;
 use datafusion::arrow::array::ArrayBuilder;
 use datafusion::arrow::array::ArrayRef;
 use datafusion::cube_ext::ordfloat::OrdF64;
+use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use futures::future::join_all;
 use futures::stream::StreamExt;
 use futures::Stream;
@@ -57,6 +58,7 @@ pub struct StreamingServiceImpl {
     chunk_store: Arc<dyn ChunkDataStore>,
     ksql_client: Arc<dyn KsqlClient>,
     kafka_client: Arc<dyn KafkaClientService>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
 }
 
 crate::di_service!(StreamingServiceImpl, [StreamingService]);
@@ -68,6 +70,7 @@ impl StreamingServiceImpl {
         chunk_store: Arc<dyn ChunkDataStore>,
         ksql_client: Arc<dyn KsqlClient>,
         kafka_client: Arc<dyn KafkaClientService>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<Self> {
         Arc::new(Self {
             config_obj,
@@ -75,6 +78,7 @@ impl StreamingServiceImpl {
             chunk_store,
             ksql_client,
             kafka_client,
+            metadata_cache_factory,
         })
     }
 
@@ -165,6 +169,7 @@ impl StreamingServiceImpl {
                 self.kafka_client.clone(),
                 *use_ssl,
                 trace_obj,
+                self.metadata_cache_factory.clone(),
             )?)),
         }
     }
@@ -1705,6 +1710,24 @@ mod tests {
                             unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
                 .expect_err("Validation should fail");
+
+            service
+                .exec_query("CREATE TABLE test.events_by_type_6 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` timestamp, `TIMESTAMP_SECOND` timestamp) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                        ANONYMOUSID, MESSAGEID, FILTER_ID, TIMESTAMP, \
+                                        PARSE_TIMESTAMP(FORMAT_TIMESTAMP(CONVERT_TZ(TIMESTAMP, \\'UTC\\', \\'UTC\\'), \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.000\\'), \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', \\'UTC\\') `TIMESTAMP_SECOND` \
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            '\
+                            ) \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`, `TIMESTAMP_SECOND`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP_SECOND`,`TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
         })
             .await;
     }

@@ -1,7 +1,7 @@
 ARG DEV_BUILD_IMAGE=cubejs/cube:build
 
 FROM $DEV_BUILD_IMAGE as build
-FROM node:18.20.3-bullseye-slim
+FROM node:20.17.0-bookworm-slim
 
 ARG IMAGE_VERSION=dev
 
@@ -10,11 +10,11 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 python3 libpython3-dev \
+    # python3 package is necessary to install `python3` executable for node-gyp
+    && apt-get install -y --no-install-recommends libssl3 python3 python3.11 libpython3.11-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ENV TERM rxvt-unicode
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 WORKDIR /cube
 COPY . .
@@ -25,13 +25,13 @@ COPY --from=build /cubejs /cube-build
 RUN cd /cube-build && yarn run link:dev
 COPY package.json.local package.json
 
-RUN yarn policies set-version v1.22.19
+RUN yarn policies set-version v1.22.22
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
 RUN yarn config set network-timeout 120000 -g
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
-    && apt-get install -y python3 gcc g++ make cmake \
+    && apt-get install -y gcc g++ make cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH

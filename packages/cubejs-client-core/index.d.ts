@@ -252,9 +252,13 @@ declare module '@cubejs-client/core' {
      */
     y?: string[];
     /**
-     * If `true` missing dates on the time dimensions will be filled with `0` for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
+     * If `true` missing dates on the time dimensions will be filled with fillWithValue or `0` by default for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
      */
     fillMissingDates?: boolean | null;
+    /**
+     * Value to autofill all the missing date's measure.
+     */
+    fillWithValue?: string | number | null;
     /**
      * Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#result-set-chart-pivot)
      */
@@ -787,7 +791,9 @@ declare module '@cubejs-client/core' {
     | 'afterDate'
     | 'afterOrOnDate';
 
-  export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
+  export type TimeDimensionPredefinedGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
+
+  export type TimeDimensionGranularity = TimeDimensionPredefinedGranularity | string;
 
   export type DateRange = string | [string, string];
 
@@ -941,10 +947,22 @@ declare module '@cubejs-client/core' {
     format?: 'currency' | 'percent';
   };
 
-  export type TCubeDimension = BaseCubeMember & {
+  export type CubeTimeDimensionGranularity = {
+    name: string;
+    title: string;
+  }
+
+  export type BaseCubeDimension = BaseCubeMember & {
     primaryKey?: boolean;
     suggestFilterValues: boolean;
-  };
+  }
+
+  export type CubeTimeDimension = BaseCubeDimension &
+    { type: 'time'; granularities?: CubeTimeDimensionGranularity[] };
+
+  export type TCubeDimension =
+    (BaseCubeDimension & { type: Exclude<BaseCubeDimension['type'], 'time'> }) |
+    CubeTimeDimension;
 
   export type TCubeSegment = Omit<BaseCubeMember, 'type'>;
 
@@ -957,6 +975,18 @@ declare module '@cubejs-client/core' {
     : never;
 
   export type CubeMember = TCubeMeasure | TCubeDimension | TCubeSegment;
+
+  export type TCubeFolder = {
+    name: string;
+    members: string[];
+  };
+
+  export type TCubeHierarchy = {
+    name: string;
+    title?: string;
+    levels: string[];
+    public?: boolean;
+  };
 
   /**
    * @deprecated use DryRunResponse
@@ -984,6 +1014,8 @@ declare module '@cubejs-client/core' {
     measures: TCubeMeasure[];
     dimensions: TCubeDimension[];
     segments: TCubeSegment[];
+    folders: TCubeFolder[];
+    hierarchies: TCubeHierarchy[];
     connectedComponent?: number;
     type?: 'view' | 'cube';
     /**
@@ -1289,4 +1321,10 @@ declare module '@cubejs-client/core' {
     stage: string;
     timeElapsed: number;
   };
+
+  export function granularityFor(dateStr: string): string;
+
+  export function minGranularityForIntervals(i1: string, i2: string): string;
+
+  export function isPredefinedGranularity(granularity: TimeDimensionGranularity): boolean;
 }

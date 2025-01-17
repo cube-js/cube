@@ -1,13 +1,5 @@
 use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 
-use crate::transport::{
-    CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment, MetaContext,
-    TransportLoadRequestQuery, TransportLoadResponse,
-};
-use async_trait::async_trait;
-use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
-use uuid::Uuid;
-
 use super::{convert_sql_to_cube_query, CompilationResult, QueryPlan};
 use crate::{
     compile::{
@@ -16,24 +8,39 @@ use crate::{
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe, AuthContextRef,
-        AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
-        SqlAuthService,
+        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe,
+        pg_auth_service::PostgresAuthServiceDefaultImpl, AuthContextRef, AuthenticateResponse,
+        HttpAuthContext, ServerManager, Session, SessionManager, SqlAuthService,
     },
     transport::{
-        CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
-        TransportService,
+        CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
+        CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
+        SqlTemplates, TransportLoadRequestQuery, TransportLoadResponse, TransportService,
     },
     CubeError,
 };
+use async_trait::async_trait;
+use cubeclient::models::V1CubeMetaType;
+use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
+use uuid::Uuid;
 
 pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_bi_workarounds;
 #[cfg(test)]
+pub mod test_cube_join;
+#[cfg(test)]
+pub mod test_cube_join_grouped;
+#[cfg(test)]
+pub mod test_df_execution;
+#[cfg(test)]
 pub mod test_introspection;
 #[cfg(test)]
 pub mod test_udfs;
+#[cfg(test)]
+pub mod test_user_change;
+#[cfg(test)]
+pub mod test_wrapper;
 pub mod utils;
 pub use utils::*;
 
@@ -41,82 +48,90 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
     vec![
         CubeMeta {
             name: "KibanaSampleDataEcommerce".to_string(),
-            description: None,
+            description: Some("Sample data for tracking eCommerce orders from Kibana".to_string()),
             title: None,
+            r#type: V1CubeMetaType::Cube,
             dimensions: vec![
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    description: None,
-                    _type: "time".to_string(),
+                    r#type: "time".to_string(),
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.last_mod".to_string(),
-                    description: None,
-                    _type: "time".to_string(),
+                    r#type: "time".to_string(),
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    description: None,
-                    _type: "string".to_string(),
+                    description: Some("Customer gender".to_string()),
+                    r#type: "string".to_string(),
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.notes".to_string(),
-                    description: None,
-                    _type: "string".to_string(),
+                    r#type: "string".to_string(),
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.has_subscription".to_string(),
-                    description: None,
-                    _type: "boolean".to_string(),
+                    r#type: "boolean".to_string(),
+                    ..CubeMetaDimension::default()
                 },
             ],
             measures: vec![
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.count".to_string(),
                     title: None,
-                    description: None,
-                    _type: "number".to_string(),
+                    description: Some("Events count".to_string()),
+                    r#type: "number".to_string(),
                     agg_type: Some("count".to_string()),
+                    meta: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
                     title: None,
                     description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("max".to_string()),
+                    meta: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.sumPrice".to_string(),
                     title: None,
                     description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("sum".to_string()),
+                    meta: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.minPrice".to_string(),
                     title: None,
                     description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("min".to_string()),
+                    meta: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     title: None,
                     description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("avg".to_string()),
+                    meta: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
                     title: None,
                     description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("countDistinct".to_string()),
+                    meta: None,
                 },
             ],
             segments: vec![
@@ -125,38 +140,43 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     title: "Ecommerce Male".to_string(),
                     description: Some("Male users segment".to_string()),
                     short_title: "Male".to_string(),
+                    meta: None,
                 },
                 CubeMetaSegment {
                     name: "KibanaSampleDataEcommerce.is_female".to_string(),
                     title: "Ecommerce Female".to_string(),
                     description: None,
                     short_title: "Female".to_string(),
+                    meta: None,
                 },
             ],
             joins: Some(vec![CubeMetaJoin {
                 name: "Logs".to_string(),
                 relationship: "belongsTo".to_string(),
             }]),
+            folders: None,
+            meta: None,
         },
         CubeMeta {
             name: "Logs".to_string(),
             description: None,
             title: None,
+            r#type: V1CubeMetaType::Cube,
             dimensions: vec![
                 CubeMetaDimension {
                     name: "Logs.id".to_string(),
-                    description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "Logs.read".to_string(),
-                    description: None,
-                    _type: "boolean".to_string(),
+                    r#type: "boolean".to_string(),
+                    ..CubeMetaDimension::default()
                 },
                 CubeMetaDimension {
                     name: "Logs.content".to_string(),
-                    description: None,
-                    _type: "string".to_string(),
+                    r#type: "string".to_string(),
+                    ..CubeMetaDimension::default()
                 },
             ],
             measures: vec![
@@ -164,15 +184,17 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     name: "Logs.agentCount".to_string(),
                     title: None,
                     description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("countDistinct".to_string()),
+                    meta: None,
                 },
                 CubeMetaMeasure {
                     name: "Logs.agentCountApprox".to_string(),
                     title: None,
                     description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("countDistinctApprox".to_string()),
+                    meta: None,
                 },
             ],
             segments: vec![],
@@ -180,77 +202,90 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 name: "NumberCube".to_string(),
                 relationship: "belongsTo".to_string(),
             }]),
+            folders: None,
+            meta: None,
         },
         CubeMeta {
             name: "NumberCube".to_string(),
             description: None,
             title: None,
+            r#type: V1CubeMetaType::Cube,
             dimensions: vec![],
             measures: vec![CubeMetaMeasure {
                 name: "NumberCube.someNumber".to_string(),
                 title: None,
                 description: None,
-                _type: "number".to_string(),
+                r#type: "number".to_string(),
                 agg_type: Some("number".to_string()),
+                meta: None,
             }],
             segments: vec![],
             joins: None,
+            folders: None,
+            meta: None,
         },
         CubeMeta {
             name: "WideCube".to_string(),
             description: None,
             title: None,
+            r#type: V1CubeMetaType::Cube,
             dimensions: (0..100)
                 .map(|i| CubeMetaDimension {
                     name: format!("WideCube.dim{}", i),
-                    description: None,
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
+                    ..CubeMetaDimension::default()
                 })
                 .collect(),
             measures: (0..100)
                 .map(|i| CubeMetaMeasure {
                     name: format!("WideCube.measure{}", i),
-                    _type: "number".to_string(),
+                    r#type: "number".to_string(),
                     agg_type: Some("number".to_string()),
                     title: None,
                     description: None,
+                    meta: None,
                 })
                 .chain(
                     vec![
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.count".to_string(),
+                            name: "WideCube.count".to_string(),
                             title: None,
                             description: None,
-                            _type: "number".to_string(),
+                            r#type: "number".to_string(),
                             agg_type: Some("count".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                            name: "WideCube.maxPrice".to_string(),
                             title: None,
                             description: None,
-                            _type: "number".to_string(),
+                            r#type: "number".to_string(),
                             agg_type: Some("max".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                            name: "WideCube.minPrice".to_string(),
                             title: None,
                             description: None,
-                            _type: "number".to_string(),
+                            r#type: "number".to_string(),
                             agg_type: Some("min".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                            name: "WideCube.avgPrice".to_string(),
                             title: None,
                             description: None,
-                            _type: "number".to_string(),
+                            r#type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                            name: "WideCube.countDistinct".to_string(),
                             title: None,
                             description: None,
-                            _type: "number".to_string(),
+                            r#type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
+                            meta: None,
                         },
                     ]
                     .into_iter(),
@@ -258,28 +293,34 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 .collect(),
             segments: Vec::new(),
             joins: Some(Vec::new()),
+            folders: None,
+            meta: None,
         },
         CubeMeta {
             name: "MultiTypeCube".to_string(),
-            description: None,
+            description: Some("Test cube with a little bit of everything".to_string()),
             title: None,
+            r#type: V1CubeMetaType::Cube,
             dimensions: (0..10)
                 .flat_map(|i| {
                     [
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_num{}", i),
-                            description: None,
-                            _type: "number".to_string(),
+                            description: Some(format!("Test numeric dimention {i}")),
+                            r#type: "number".to_string(),
+                            ..CubeMetaDimension::default()
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_str{}", i),
-                            description: None,
-                            _type: "string".to_string(),
+                            description: Some(format!("Test string dimention {i}")),
+                            r#type: "string".to_string(),
+                            ..CubeMetaDimension::default()
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_date{}", i),
-                            description: None,
-                            _type: "time".to_string(),
+                            description: Some(format!("Test time dimention {i}")),
+                            r#type: "time".to_string(),
+                            ..CubeMetaDimension::default()
                         },
                     ]
                 })
@@ -289,24 +330,27 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     [
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_num{}", i),
-                            _type: "number".to_string(),
+                            r#type: "number".to_string(),
                             agg_type: Some("number".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test number measure {i}")),
+                            meta: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_str{}", i),
-                            _type: "string".to_string(),
+                            r#type: "string".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test max(string) measure {i}")),
+                            meta: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_date{}", i),
-                            _type: "time".to_string(),
+                            r#type: "time".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test max(time) measure {i}")),
+                            meta: None,
                         },
                     ]
                 })
@@ -315,37 +359,42 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                         CubeMetaMeasure {
                             name: "MultiTypeCube.count".to_string(),
                             title: None,
-                            description: None,
-                            _type: "number".to_string(),
+                            description: Some("Test count measure".to_string()),
+                            r#type: "number".to_string(),
                             agg_type: Some("count".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
                             title: None,
-                            description: None,
-                            _type: "number".to_string(),
+                            description: Some("Test maxPrice measure".to_string()),
+                            r#type: "number".to_string(),
                             agg_type: Some("max".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
                             title: None,
-                            description: None,
-                            _type: "number".to_string(),
+                            description: Some("Test minPrice measure".to_string()),
+                            r#type: "number".to_string(),
                             agg_type: Some("min".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
                             title: None,
-                            description: None,
-                            _type: "number".to_string(),
+                            description: Some("Test avgPrice measure".to_string()),
+                            r#type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
+                            meta: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
                             title: None,
-                            description: None,
-                            _type: "number".to_string(),
+                            description: Some("Test countDistinct measure".to_string()),
+                            r#type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
+                            meta: None,
                         },
                     ]
                     .into_iter(),
@@ -353,6 +402,8 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 .collect(),
             segments: Vec::new(),
             joins: Some(Vec::new()),
+            folders: None,
+            meta: None,
         },
     ]
 }
@@ -362,16 +413,20 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
         name: "StringCube".to_string(),
         description: None,
         title: None,
+        r#type: V1CubeMetaType::Cube,
         dimensions: vec![],
         measures: vec![CubeMetaMeasure {
             name: "StringCube.someString".to_string(),
             title: None,
             description: None,
-            _type: "string".to_string(),
+            r#type: "string".to_string(),
             agg_type: Some("string".to_string()),
+            meta: None,
         }],
         segments: vec![],
         joins: None,
+        folders: None,
+        meta: None,
     }]
 }
 
@@ -380,32 +435,38 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
         name: "SixteenChar".to_string(),
         description: None,
         title: None,
+        r#type: V1CubeMetaType::Cube,
         dimensions: vec![],
         measures: vec![
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar".to_string(),
                 title: None,
                 description: None,
-                _type: "number".to_string(),
+                r#type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
+                meta: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_foo".to_string(),
                 title: None,
                 description: None,
-                _type: "number".to_string(),
+                r#type: "number".to_string(),
                 agg_type: Some("avg".to_string()),
+                meta: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_bar".to_string(),
                 title: None,
                 description: None,
-                _type: "number".to_string(),
+                r#type: "number".to_string(),
                 agg_type: Some("count".to_string()),
+                meta: None,
             },
         ],
         segments: vec![],
         joins: None,
+        folders: None,
+        meta: None,
     }]
 }
 
@@ -444,6 +505,7 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
             ("Logs".to_string(), "default".to_string()),
             ("NumberCube".to_string(), "default".to_string()),
             ("WideCube".to_string(), "default".to_string()),
+            ("MultiTypeCube".to_string(), "default".to_string()),
         ]
         .into_iter()
         .collect(),
@@ -498,8 +560,8 @@ FROM (
 ) AS {{ from_alias }} {% endif %} {% if filter %}
 WHERE {{ filter }}{% endif %}{% if group_by %}
 GROUP BY {{ group_by }}{% endif %}{% if order_by %}
-ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
-LIMIT {{ limit }}{% endif %}{% if offset %}
+ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit is not none %}
+LIMIT {{ limit }}{% endif %}{% if offset is not none %}
 OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ),
                     (
@@ -528,6 +590,11 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/true".to_string(), "TRUE".to_string()),
                     ("expressions/false".to_string(), "FALSE".to_string()),
                     ("expressions/timestamp_literal".to_string(), "timestamptz '{{ value }}'".to_string()),
+                    ("expressions/like".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}".to_string()),
+                    ("expressions/ilike".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}".to_string()),
+                    ("expressions/like_escape".to_string(), "{{ like_expr }} ESCAPE {{ escape_char }}".to_string()),
+                    ("join_types/inner".to_string(), "INNER".to_string()),
+                    ("join_types/left".to_string(), "LEFT".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string()),
@@ -603,6 +670,7 @@ async fn get_test_session_with_config_and_transport(
     let server = Arc::new(ServerManager::new(
         get_test_auth(),
         test_transport.clone(),
+        Arc::new(PostgresAuthServiceDefaultImpl::new()),
         Arc::new(CompilerCacheImpl::new(config_obj.clone(), test_transport)),
         None,
         config_obj,
@@ -657,10 +725,19 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     Arc::new(TestSqlAuth {})
 }
 
+#[derive(Clone, Debug)]
+pub struct TestTransportLoadCall {
+    pub query: TransportLoadRequestQuery,
+    pub sql_query: Option<SqlQuery>,
+    pub ctx: AuthContextRef,
+    pub meta: LoadRequestMeta,
+}
+
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
     load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponse)>>,
+    load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
 }
 
 impl TestConnectionTransport {
@@ -668,7 +745,12 @@ impl TestConnectionTransport {
         Self {
             meta_context,
             load_mocks: tokio::sync::Mutex::new(vec![]),
+            load_calls: tokio::sync::Mutex::new(vec![]),
         }
+    }
+
+    pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
+        self.load_calls.lock().await.clone()
     }
 
     pub async fn add_cube_load_mock(
@@ -692,13 +774,21 @@ impl TransportService for TestConnectionTransport {
         _span_id: Option<Arc<SpanId>>,
         query: TransportLoadRequestQuery,
         _ctx: AuthContextRef,
-        _meta_fields: LoadRequestMeta,
-        _member_to_alias: Option<HashMap<String, String>>,
+        meta: LoadRequestMeta,
+        member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
+        let inputs = serde_json::json!({
+            "query": query,
+            "meta": meta,
+            "member_to_alias": member_to_alias,
+        });
         Ok(SqlResponse {
             sql: SqlQuery::new(
-                format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
+                format!(
+                    "SELECT * FROM {}",
+                    serde_json::to_string_pretty(&inputs).unwrap()
+                ),
                 expression_params.unwrap_or(Vec::new()),
             ),
         })
@@ -710,16 +800,30 @@ impl TransportService for TestConnectionTransport {
         _span_id: Option<Arc<SpanId>>,
         query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
-        _ctx: AuthContextRef,
-        _meta_fields: LoadRequestMeta,
+        ctx: AuthContextRef,
+        meta: LoadRequestMeta,
     ) -> Result<TransportLoadResponse, CubeError> {
-        if sql_query.is_some() {
-            unimplemented!("load with sql_query");
+        {
+            let mut calls = self.load_calls.lock().await;
+            calls.push(TestTransportLoadCall {
+                query: query.clone(),
+                sql_query: sql_query.clone(),
+                ctx: ctx.clone(),
+                meta: meta.clone(),
+            });
+        }
+
+        if let Some(sql_query) = sql_query {
+            return Err(CubeError::internal(format!(
+                "Test transport does not support load with SQL query: {sql_query:?}"
+            )));
         }
 
         let mocks = self.load_mocks.lock().await;
         let Some((_req, res)) = mocks.iter().find(|(req, _res)| req == &query) else {
-            panic!("Unexpected query: {:?}", query);
+            return Err(CubeError::internal(format!(
+                "Unexpected query in test transport: {query:?}"
+            )));
         };
         Ok(res.clone())
     }
@@ -860,6 +964,9 @@ impl TestContext {
             .or(Some(config_limit));
         self.transport.add_cube_load_mock(req, res).await
     }
+    pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
+        self.transport.load_calls().await
+    }
 
     pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {
         // TODO push to_string() deeper
@@ -886,19 +993,21 @@ impl TestContext {
                 .await
                 .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
             match query {
-                QueryPlan::DataFusionSelect(flags, plan, ctx) => {
+                QueryPlan::DataFusionSelect(plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
                     let batches = df.collect().await?;
                     let frame = batches_to_dataframe(&df.schema().into(), batches)?;
 
                     output.push(frame.print());
-                    output_flags = flags;
                 }
                 QueryPlan::MetaTabular(flags, frame) => {
                     output.push(frame.print());
                     output_flags = flags;
                 }
-                QueryPlan::MetaOk(flags, _) | QueryPlan::CreateTempTable(flags, _, _, _, _) => {
+                QueryPlan::CreateTempTable(_, _, _, _) => {
+                    // nothing to do
+                }
+                QueryPlan::MetaOk(flags, _) => {
                     output_flags = flags;
                 }
             }
@@ -915,14 +1024,10 @@ impl TestContext {
     }
 }
 
-lazy_static! {
-    pub static ref TEST_LOGGING_INITIALIZED: std::sync::RwLock<bool> =
-        std::sync::RwLock::new(false);
-}
+static TEST_LOGGING_INITIALIZED: std::sync::Once = std::sync::Once::new();
 
 pub fn init_testing_logger() {
-    let mut initialized = TEST_LOGGING_INITIALIZED.write().unwrap();
-    if !*initialized {
+    TEST_LOGGING_INITIALIZED.call_once(|| {
         let log_level = log::Level::Trace;
         let logger = simple_logger::SimpleLogger::new()
             .with_level(log::Level::Error.to_level_filter())
@@ -933,8 +1038,7 @@ pub fn init_testing_logger() {
 
         log::set_boxed_logger(Box::new(logger)).unwrap();
         log::set_max_level(log_level.to_level_filter());
-        *initialized = true;
-    }
+    });
 }
 
 pub async fn convert_select_to_query_plan_customized(

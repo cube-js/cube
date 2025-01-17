@@ -6,7 +6,10 @@ use crate::{
         injection::{DIService, Injector},
         processing_loop::{ProcessingLoop, ShutdownMode},
     },
-    sql::{PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService},
+    sql::{
+        pg_auth_service::{PostgresAuthService, PostgresAuthServiceDefaultImpl},
+        PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService,
+    },
     transport::{HttpTransport, TransportService},
     CubeError,
 };
@@ -112,6 +115,8 @@ pub trait ConfigObj: DIService + Debug {
     fn max_sessions(&self) -> usize;
 
     fn no_implicit_order(&self) -> bool;
+
+    fn top_down_extractor(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +137,7 @@ pub struct ConfigObjImpl {
     pub non_streaming_query_max_row_limit: i32,
     pub max_sessions: usize,
     pub no_implicit_order: bool,
+    pub top_down_extractor: bool,
 }
 
 impl ConfigObjImpl {
@@ -140,7 +146,7 @@ impl ConfigObjImpl {
             .ok()
             .map(|v| v.parse::<u64>().unwrap())
             .unwrap_or(120);
-        let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", false);
+        let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", true);
         Self {
             bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
                 env::var("CUBESQL_PORT")
@@ -168,7 +174,8 @@ impl ConfigObjImpl {
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
-            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", false),
+            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
+            top_down_extractor: env_parse("CUBESQL_TOP_DOWN_EXTRACTOR", true),
         }
     }
 }
@@ -235,11 +242,10 @@ impl ConfigObj for ConfigObjImpl {
     fn max_sessions(&self) -> usize {
         self.max_sessions
     }
-}
 
-lazy_static! {
-    pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
-        tokio::sync::RwLock::new(false);
+    fn top_down_extractor(&self) -> bool {
+        self.top_down_extractor
+    }
 }
 
 impl Config {
@@ -271,7 +277,8 @@ impl Config {
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
                 max_sessions: 1024,
-                no_implicit_order: false,
+                no_implicit_order: true,
+                top_down_extractor: true,
             }),
         }
     }
@@ -308,6 +315,12 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn PostgresAuthService, _, _, _>(|_| async move {
+                Arc::new(PostgresAuthServiceDefaultImpl::new())
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn CompilerCache, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(CompilerCacheImpl::new(
@@ -321,6 +334,7 @@ impl Config {
             .register_typed::<ServerManager, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(ServerManager::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

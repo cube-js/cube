@@ -1,10 +1,10 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
 import '@ant-design/compatible/assets/index.css';
 import { Alert, Layout } from 'antd';
-import { Component, useEffect } from 'react';
+import { Component, PropsWithChildren, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 import styled from 'styled-components';
-import { Root, tasty } from '@cube-dev/ui-kit';
+import { Root } from '@cube-dev/ui-kit';
 
 import { CubeLoader } from './atoms';
 import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
@@ -19,6 +19,8 @@ import {
   trackImpl,
 } from './events';
 import { useAppContext } from './hooks';
+import { QUERY_BUILDER_COLOR_TOKENS } from './QueryBuilderV2';
+
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
 `;
@@ -30,7 +32,14 @@ type AppState = {
   isAppContextSet: boolean;
 };
 
-class App extends Component<RouteComponentProps, AppState> {
+const ROOT_STYLES = {
+  height: 'min 100vh',
+  display: 'grid',
+  gridTemplateRows: 'min-content 1fr',
+  ...QUERY_BUILDER_COLOR_TOKENS,
+};
+
+class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
   static getDerivedStateFromError(error) {
     return { fatalError: error };
   }
@@ -103,24 +112,22 @@ class App extends Component<RouteComponentProps, AppState> {
       <LivePreviewContextProvider
         disabled={context!.livePreview == null || !context!.livePreview}
       >
-        <Root>
-          <Layout>
-            <GlobalStyles />
+        <Root styles={ROOT_STYLES}>
+          <GlobalStyles />
 
-            <Header selectedKeys={[location.pathname]} />
+          <Header selectedKeys={[location.pathname]} />
 
-            <StyledLayoutContent>
-              {fatalError ? (
-                <Alert
-                  message="Error occured while rendering"
-                  description={fatalError.stack || ''}
-                  type="error"
-                />
-              ) : (
-                children
-              )}
-            </StyledLayoutContent>
-          </Layout>
+          <StyledLayoutContent>
+            {fatalError ? (
+              <Alert
+                message="Error occured while rendering"
+                description={fatalError.stack || ''}
+                type="error"
+              />
+            ) : (
+              children
+            )}
+          </StyledLayoutContent>
         </Root>
       </LivePreviewContextProvider>
     );

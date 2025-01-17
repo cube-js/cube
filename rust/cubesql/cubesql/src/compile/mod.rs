@@ -40,7 +40,6 @@ mod tests {
             rewrite::rewriter::Rewriter,
             test::{get_sixteen_char_member_cube, get_string_cube_meta},
         },
-        config::ConfigObjImpl,
         CubeError,
     };
     use chrono::Datelike;
@@ -53,13 +52,12 @@ mod tests {
     use pretty_assertions::assert_eq;
     use regex::Regex;
     use serde_json::json;
-    use std::{env, sync::Arc};
+    use std::env;
 
     use crate::compile::test::{
         convert_select_to_query_plan, convert_select_to_query_plan_customized,
-        convert_select_to_query_plan_with_config, convert_select_to_query_plan_with_meta,
-        execute_queries_with_flags, execute_query, init_testing_logger, LogicalPlanTestUtils,
-        TestContext,
+        convert_select_to_query_plan_with_meta, execute_queries_with_flags, execute_query,
+        init_testing_logger, LogicalPlanTestUtils, TestContext,
     };
 
     #[tokio::test]
@@ -79,12 +77,8 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -123,12 +117,8 @@ mod tests {
                     "MultiTypeCube.dim_num1".to_string(),
                     "MultiTypeCube.dim_num2".to_string(),
                 ]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -162,12 +152,8 @@ mod tests {
                     "MultiTypeCube.dim_str0".to_string(),
                     "MultiTypeCube.dim_str1".to_string(),
                 ]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -185,12 +171,8 @@ mod tests {
                 measures: Some(vec!["NumberCube.someNumber".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -208,12 +190,8 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -236,12 +214,8 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -268,12 +242,8 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -286,68 +256,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![DataType::Float64, DataType::Float64, DataType::Float64]
         );
-    }
-
-    #[tokio::test]
-    async fn test_change_user_via_filter() {
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher'"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
-
-        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
-
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_change_user_via_in_filter() {
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user IN ('gopher')"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
-
-        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
-
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
-            }
-        )
     }
 
     #[tokio::test]
@@ -369,10 +277,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -380,7 +285,7 @@ mod tests {
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -404,10 +309,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("endsWith".to_string()),
@@ -415,7 +317,7 @@ mod tests {
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -434,11 +336,7 @@ mod tests {
         )
             .await.as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(sql.contains("LOWER("));
         assert!(sql.contains(" IN ("));
@@ -449,11 +347,7 @@ mod tests {
         )
             .await.as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(sql.contains("LOWER("));
         assert!(sql.contains(" IN ("));
@@ -472,99 +366,9 @@ mod tests {
             DatabaseProtocol::PostgreSQL,
         ).await.as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(sql.contains("LOWER("));
-    }
-
-    #[tokio::test]
-    async fn test_change_user_via_in_filter_thoughtspot() {
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE (LOWER("ta_1"."__user") IN ('gopher')) = TRUE"#.to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let expected_request = V1LoadRequestQuery {
-            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-            segments: Some(vec![]),
-            dimensions: Some(vec![]),
-            time_dimensions: None,
-            order: None,
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
-        };
-
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
-        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
-        assert_eq!(cube_scan.request, expected_request);
-
-        let query_plan = convert_select_to_query_plan(
-            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE ((LOWER("ta_1"."__user") IN ('gopher') = TRUE) = TRUE)"#.to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
-        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
-        assert_eq!(cube_scan.request, expected_request);
-    }
-
-    #[tokio::test]
-    async fn test_change_user_via_filter_and() {
-        let query_plan = convert_select_to_query_plan(
-            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' AND customer_gender = 'male'".to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
-
-        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
-
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["male".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_change_user_via_filter_or() {
-        // OR is not allowed for __user
-        let meta = get_test_tenant_ctx();
-        let query =
-            convert_sql_to_cube_query(
-                &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
-                meta.clone(),
-                get_test_session(DatabaseProtocol::PostgreSQL, meta).await
-            ).await;
-
-        // TODO: We need to propagate error to result, to assert message
-        query.unwrap_err();
     }
 
     #[tokio::test]
@@ -581,15 +385,11 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -611,15 +411,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             (
@@ -631,15 +428,11 @@ mod tests {
                         "KibanaSampleDataEcommerce.customer_gender".to_string(),
                         "KibanaSampleDataEcommerce.order_date".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.order_date".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             ),
             // test_order_indentifier_default
@@ -651,15 +444,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_compound_identifier_default
@@ -671,15 +461,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_indentifier_asc
@@ -691,15 +478,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_indentifier_desc
@@ -711,15 +495,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "desc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_identifer_alias_ident_no_escape
@@ -731,15 +512,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "desc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_identifer_alias_ident_escape
@@ -751,15 +529,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "desc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
         ];
@@ -804,10 +579,8 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "desc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -832,10 +605,7 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "desc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -910,12 +680,9 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -940,12 +707,9 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -998,12 +762,10 @@ mod tests {
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     "KibanaSampleDataEcommerce.has_subscription".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(0),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1056,12 +818,9 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1085,12 +844,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1114,12 +870,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1142,10 +895,7 @@ mod tests {
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -1153,7 +903,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1177,12 +927,8 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -1212,12 +958,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1247,12 +990,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1273,10 +1013,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec!["KibanaSampleDataEcommerce.is_female".to_string()]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("gt".to_string()),
@@ -1284,7 +1021,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -1300,10 +1037,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
@@ -1320,7 +1054,7 @@ mod tests {
                         and: None,
                     }
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1343,10 +1077,7 @@ mod tests {
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
                     operator: Some("set".to_string()),
@@ -1354,7 +1085,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1402,11 +1133,8 @@ mod tests {
                         "2022-04-01T00:00:00.000Z".to_string()
                     ]))
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -1447,10 +1175,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1491,8 +1216,6 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -1500,7 +1223,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1542,7 +1265,6 @@ ORDER BY \"COUNT(count)\" DESC LIMIT 10000"
                     "desc".to_string()
                 ]]),
                 limit: Some(10000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.notes".to_string()),
                     operator: Some("equals".to_string()),
@@ -1556,7 +1278,7 @@ ORDER BY \"COUNT(count)\" DESC LIMIT 10000"
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1601,8 +1323,6 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -1633,7 +1353,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None
                     }
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1654,15 +1374,12 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ],],),
                 limit: Some(1001),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1683,10 +1400,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -1728,7 +1442,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1770,10 +1484,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("gt".to_string()),
@@ -1781,7 +1492,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -1823,11 +1534,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("month".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -1848,12 +1556,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -1879,11 +1583,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("year".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -1904,11 +1605,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("year".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -1934,11 +1632,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("week".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -1959,10 +1654,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -1970,7 +1662,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1991,10 +1683,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -2002,7 +1691,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2023,10 +1712,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("gt".to_string()),
@@ -2034,7 +1720,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2069,12 +1755,8 @@ GROUP BY
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -2128,10 +1810,8 @@ GROUP BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -2139,7 +1819,7 @@ GROUP BY
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2189,11 +1869,8 @@ GROUP BY
                         date_range: None,
                     },
                 ]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -2243,11 +1920,9 @@ GROUP BY
                         "2022-06-12T23:59:59.999Z".to_string()
                     ])),
                 }]),
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2353,10 +2028,8 @@ limit
                 ]),
                 dimensions: Some(vec!["WideCube.dim1".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("WideCube.dim1".to_string()),
@@ -2402,7 +2075,7 @@ limit
                         and: None,
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2549,11 +2222,8 @@ limit
                         date_range: None,
                     }
                 ]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -2592,14 +2262,11 @@ from
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -2647,12 +2314,9 @@ from
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -2701,7 +2365,7 @@ from
     //                 dimensions: Some(vec![]),
     //                 segments: Some(vec![]),
     //                 time_dimensions: None,
-    //                 order: None,
+    //                 order: Some(vec![]),
     //                 limit: None,
     //                 offset: None,
     //                 filters: None,
@@ -2727,10 +2391,8 @@ from
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("set".to_string()),
@@ -2738,123 +2400,7 @@ from
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn powerbi_join() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT \
-            \n  \"_\".\"semijoin1.c30\" AS \"c30\", \"_\".\"a0\" AS \"a0\" FROM \
-            \n  (SELECT \"rows\".\"semijoin1.c30\" AS \"semijoin1.c30\", count(distinct \"rows\".\"basetable0.a0\") AS \"a0\" FROM (\
-            \n    SELECT \"$Outer\".\"basetable0.a0\", \"$Inner\".\"semijoin1.c30\" FROM (\
-            \n      SELECT \"__cubeJoinField\" AS \"basetable0.c22\", \"agentCount\" AS \"basetable0.a0\" FROM \"public\".\"Logs\" AS \"$Table\"\
-            \n    ) AS \"$Outer\" JOIN (\
-            \n    SELECT \"rows\".\"customer_gender\" AS \"semijoin1.c30\", \"rows\".\"__cubeJoinField\" AS \"semijoin1.c22\" FROM (\
-            \n      SELECT \"customer_gender\", \"__cubeJoinField\" FROM \"public\".\"KibanaSampleDataEcommerce\" AS \"$Table\"\
-            \n    ) AS \"rows\" GROUP BY \"customer_gender\", \"__cubeJoinField\"\
-            \n  ) AS \"$Inner\" ON (\
-            \n    \"$Outer\".\"basetable0.c22\" = \"$Inner\".\"semijoin1.c22\" OR \"$Outer\".\"basetable0.c22\" IS NULL AND \"$Inner\".\"semijoin1.c22\" IS NULL\
-            \n  )\
-            \n  ) AS \"rows\" GROUP BY \"semijoin1.c30\"\
-            \n  ) AS \"_\" WHERE NOT \"_\".\"a0\" IS NULL LIMIT 1000001".to_string(),
-            DatabaseProtocol::PostgreSQL,
-        ).await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["Logs.agentCount".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn powerbi_transitive_join() {
-        // FIXME: the test is currently broken and requires a revisit into joins
-        // See original query assertion below
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            r#"SELECT "_"."semijoin3.c98" AS "c98", "_"."a0" AS "a0" FROM (
-            SELECT "rows"."semijoin3.c98" AS "semijoin3.c98", sum(CAST("rows"."basetable2.a0" AS NUMERIC)) AS "a0" FROM
-            (
-                SELECT "$Outer"."basetable2.a0", "$Inner"."semijoin3.c98" FROM (
-                    SELECT "__cubeJoinField" AS "basetable2.c95", "count" AS "basetable2.a0" FROM "public"."KibanaSampleDataEcommerce" AS "$Table"
-                ) AS "$Outer" JOIN (
-                    SELECT "rows"."semijoin1.c98" AS "semijoin3.c98", "rows"."basetable0.c108" AS "semijoin3.c95" FROM (
-                        SELECT "$Outer"."basetable0.c108", "$Inner"."semijoin1.c98" FROM (
-                            SELECT "rows"."__cubeJoinField" AS "basetable0.c108" FROM (
-                                SELECT "__cubeJoinField" FROM "public"."NumberCube" AS "$Table"
-                            ) AS "rows" GROUP BY "__cubeJoinField"
-                        ) AS "$Outer" JOIN (
-                            SELECT "rows"."content" AS "semijoin1.c98", "rows"."__cubeJoinField" AS "semijoin1.c108" FROM (
-                                SELECT "content", "__cubeJoinField" FROM "public"."Logs" AS "$Table"
-                            ) AS "rows" GROUP BY "content", "__cubeJoinField"
-                        ) AS "$Inner" ON (
-                            "$Outer"."basetable0.c108" = "$Inner"."semijoin1.c108" OR "$Outer"."basetable0.c108" IS NULL AND "$Inner"."semijoin1.c108" IS NULL
-                        )) AS "rows" GROUP BY "semijoin1.c98", "basetable0.c108"
-                    ) AS "$Inner" ON (
-                    "$Outer"."basetable2.c95" = "$Inner"."semijoin3.c95" OR "$Outer"."basetable2.c95" IS NULL AND "$Inner"."semijoin3.c95" IS NULL
-                )
-            ) AS "rows" GROUP BY "semijoin3.c98") AS "_" WHERE NOT "_"."a0" IS NULL LIMIT 1000001
-            "#.to_string(),
-            DatabaseProtocol::PostgreSQL,
-        ).await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        // FIXME: original query assertion
-        // assert_eq!(
-        //     logical_plan.find_cube_scan().request,
-        //     V1LoadRequestQuery {
-        //         measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-        //         dimensions: Some(vec!["Logs.content".to_string()]),
-        //         segments: Some(vec![]),
-        //         time_dimensions: None,
-        //         order: None,
-        //         limit: Some(1000001),
-        //         offset: None,
-        //         filters: Some(vec![V1LoadRequestQueryFilterItem {
-        //             member: Some("KibanaSampleDataEcommerce.count".to_string()),
-        //             operator: Some("set".to_string()),
-        //             values: None,
-        //             or: None,
-        //             and: None,
-        //         }]),
-        //         ungrouped: None,
-        //     }
-        // );
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec!["Logs.content".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2922,9 +2468,8 @@ limit
                         "2024-01-01T00:00:00.000Z".to_string()
                     ])),
                 }]),
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
                     operator: Some("set".to_string()),
@@ -2932,7 +2477,7 @@ limit
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2989,12 +2534,9 @@ limit
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -3061,7 +2603,7 @@ limit
     //                         "2024-01-01T00:00:00.000Z".to_string()
     //                     ])),
     //                 }]),
-    //                 order: None,
+    //                 order: Some(vec![]),
     //                 limit: Some(1000001),
     //                 offset: None,
     //                 filters: Some(vec![V1LoadRequestQueryFilterItem {
@@ -3085,12 +2627,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 },
             ),
             (
@@ -3099,12 +2637,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 },
             ),
             (
@@ -3113,12 +2647,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 },
             ),
             (
@@ -3127,12 +2657,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 },
             ),
             (
@@ -3141,12 +2667,8 @@ limit
                     measures: Some(vec!["Logs.agentCount".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 },
             ),
             (
@@ -3155,12 +2677,8 @@ limit
                     measures: Some(vec!["Logs.agentCountApprox".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 },
             ),
             (
@@ -3169,12 +2687,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 },
             ),
         ];
@@ -3209,12 +2723,8 @@ limit
                 measures: Some(vec!["StringCube.someString".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -3247,28 +2757,23 @@ limit
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
         assert!(query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("sixteen_charchar_1"));
 
         assert!(query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("sixteen_charchar_2"));
     }
@@ -3357,11 +2862,8 @@ limit
                         granularity: Some(expected_granularity.to_string()),
                         date_range: None,
                     }]),
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 }
             );
 
@@ -3411,11 +2913,8 @@ limit
                     granularity: Some("quarter".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -4953,12 +4452,10 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
         assert_eq!(
@@ -4986,10 +4483,8 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -4998,6 +4493,7 @@ limit
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -5029,12 +4525,10 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -5060,12 +4554,10 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -5106,12 +4598,9 @@ limit
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -5175,12 +4664,8 @@ ORDER BY "ca_4" ASC
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["Logs.read".to_string()]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -5240,11 +4725,8 @@ ORDER BY
                     granularity: Some("month".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -5279,11 +4761,8 @@ ORDER BY
                     granularity: Some("quarter".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -5314,12 +4793,9 @@ ORDER BY
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -5364,11 +4840,8 @@ ORDER BY
                     granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -5405,11 +4878,8 @@ ORDER BY
                     granularity: Some("year".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -5451,12 +4921,9 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -5585,26 +5052,6 @@ ORDER BY
         insta::assert_snapshot!(
             "performance_schema_global_variables",
             execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_show_processlist() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "show_processlist",
-            execute_query("SHOW processlist".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_show_warnings() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "show_warnings",
-            execute_query("SHOW warnings".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         Ok(())
@@ -6770,12 +6217,9 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -6813,10 +6257,8 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -6882,11 +6324,8 @@ ORDER BY
                     granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -6923,12 +6362,9 @@ ORDER BY
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -6962,6 +6398,7 @@ ORDER BY
                 MIN(month_count) min_month_count
             FROM count_by_month
             GROUP BY quarter0
+            ORDER BY quarter0 ASC
         "#;
 
         let expected_cube_scan = V1LoadRequestQuery {
@@ -6973,11 +6410,8 @@ ORDER BY
                 granularity: Some("month".to_string()),
                 date_range: None,
             }]),
-            order: None,
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            order: Some(vec![]),
+            ..Default::default()
         };
 
         context
@@ -7082,11 +6516,8 @@ ORDER BY
                     granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -7316,9 +6747,7 @@ ORDER BY
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -7360,12 +6789,8 @@ ORDER BY
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -7479,10 +6904,7 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("equals".to_string()),
@@ -7491,6 +6913,7 @@ ORDER BY
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -7511,11 +6934,7 @@ ORDER BY
                 DatabaseProtocol::PostgreSQL
             ).await.as_logical_plan();
 
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
             assert!(
                 sql.contains(expected_search_expr),
                 "cast_expr is {}, expected_search_expr is {}",
@@ -7575,10 +6994,7 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
@@ -7596,6 +7012,7 @@ ORDER BY
                     }
                 ]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -7630,10 +7047,7 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("afterOrOnDate".to_string()),
@@ -7641,7 +7055,7 @@ ORDER BY
                     or: None,
                     and: None,
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -7691,9 +7105,8 @@ ORDER BY
                     "desc".to_string(),
                 ]]),
                 limit: Some(10000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -7714,10 +7127,8 @@ ORDER BY
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -7725,7 +7136,7 @@ ORDER BY
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -7748,12 +7159,10 @@ ORDER BY
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(0),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -7815,51 +7224,87 @@ ORDER BY
             displayable(physical_plan.as_ref()).indent()
         );
 
+        fn trivial_member_expr(cube: &str, member: &str, alias: &str) -> String {
+            json!({
+                "cube_name": cube,
+                "alias": alias,
+                "cube_params": [cube],
+                "expr": format!("${{{cube}.{member}}}"),
+                "grouping_set": null,
+            })
+            .to_string()
+        }
+
         assert_eq!(
-            query_plan.as_logical_plan().find_cube_scan().request,
+            query_plan
+                .as_logical_plan()
+                .find_cube_scan_wrapped_sql()
+                .request,
             V1LoadRequestQuery {
                 measures: Some(vec![
-                    "WideCube.measure1".to_string(),
-                    "WideCube.measure2".to_string(),
-                    "WideCube.measure3".to_string(),
-                    "WideCube.measure4".to_string(),
+                    json!({
+                        "cube_name": "WideCube",
+                        "alias": "max_source_measu",
+                        "cube_params": ["WideCube"],
+                        "expr": "${WideCube.measure1}",
+                        "grouping_set": null,
+                    })
+                    .to_string(),
+                    json!({
+                        "cube_name": "WideCube",
+                        "alias": "max_source_measu_1",
+                        "cube_params": ["WideCube"],
+                        "expr": "${WideCube.measure2}",
+                        "grouping_set": null,
+                    })
+                    .to_string(),
+                    json!({
+                        "cube_name": "WideCube",
+                        "alias": "sum_source_measu",
+                        "cube_params": ["WideCube"],
+                        "expr": "${WideCube.measure3}",
+                        "grouping_set": null,
+                    })
+                    .to_string(),
+                    json!({
+                        "cube_name": "WideCube",
+                        "alias": "max_source_measu_2",
+                        "cube_params": ["WideCube"],
+                        "expr": "${WideCube.measure4}",
+                        "grouping_set": null,
+                    })
+                    .to_string(),
                 ]),
                 dimensions: Some(vec![
-                    "WideCube.dim1".to_string(),
-                    "WideCube.dim2".to_string(),
-                    "WideCube.dim3".to_string(),
-                    "WideCube.dim4".to_string(),
+                    trivial_member_expr("WideCube", "dim2", "dim2"),
+                    trivial_member_expr("WideCube", "dim3", "dim3"),
+                    trivial_member_expr("WideCube", "dim4", "dim4"),
+                    json!({
+                        "cube_name": "WideCube",
+                        "alias": "pivot_grouping",
+                        "cube_params": ["WideCube"],
+                        "expr": "0",
+                        "grouping_set": null,
+                    })
+                    .to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![]),
-                limit: None,
-                offset: None,
+                order: Some(vec![
+                    vec!["dim2".to_string(), "asc".to_string(),],
+                    vec!["dim3".to_string(), "asc".to_string(),],
+                    vec!["dim4".to_string(), "asc".to_string(),],
+                    vec!["pivot_grouping".to_string(), "asc".to_string(),],
+                ]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("WideCube.dim1".to_string()),
                     operator: Some("equals".to_string()),
                     values: Some(vec!["foo".to_string()]),
                     or: None,
                     and: None,
-                }]),
-                ungrouped: Some(true),
+                },]),
+                ..Default::default()
             }
         );
-        assert!(!query_plan
-            .as_logical_plan()
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("ungrouped"));
-
-        assert!(query_plan
-            .as_logical_plan()
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("[\"dim2\",\"asc\"]"));
     }
 
     #[tokio::test]
@@ -7898,21 +7343,20 @@ ORDER BY "source"."str0" ASC
             query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec![
+                    "WideCube.dim1".to_string(),
+                    "WideCube.dim2".to_string(),
+                ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
         assert!(!query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("ungrouped"));
     }
@@ -7937,11 +7381,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("year".to_owned()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -8015,10 +7456,8 @@ ORDER BY "source"."str0" ASC
                         date_range: Some(json!(vec![from, to])),
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -8053,10 +7492,8 @@ ORDER BY "source"."str0" ASC
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -8115,10 +7552,8 @@ ORDER BY "source"."str0" ASC
                         date_range: Some(json!(vec![from, to])),
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -8153,10 +7588,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -8181,12 +7613,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -8215,10 +7643,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -8227,6 +7653,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 },]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -8247,10 +7674,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -8274,6 +7699,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 },]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -8302,10 +7728,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
@@ -8323,6 +7747,7 @@ ORDER BY "source"."str0" ASC
                     }
                 ]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -8343,10 +7768,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -8374,6 +7797,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 },]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -8405,11 +7829,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("week".to_string()),
                     date_range: None,
                 },]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -8502,11 +7923,8 @@ ORDER BY "source"."str0" ASC
                         granularity: Some(expected_granularity.to_string()),
                         date_range: None,
                     }]),
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 }
             )
         }
@@ -8542,12 +7960,9 @@ ORDER BY "source"."str0" ASC
                     measures: Some(vec![]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             )
         }
@@ -8589,11 +8004,8 @@ ORDER BY "source"."str0" ASC
                         "2022-07-11T19:00:00.000Z".to_string()
                     ])),
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -8629,9 +8041,7 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("second".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -8639,7 +8049,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -8684,11 +8094,8 @@ ORDER BY "source"."str0" ASC
                         granularity: Some(granularity.to_string()),
                         date_range: None,
                     }]),
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 }
             )
         }
@@ -8712,12 +8119,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -8747,12 +8151,10 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -8796,47 +8198,11 @@ ORDER BY "source"."str0" ASC
                     "Logs.content".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
-    }
-
-    #[tokio::test]
-    async fn test_user_with_join() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            "SELECT aliased.count as c, aliased.user_1 as u1, aliased.user_2 as u2 FROM (SELECT \"KibanaSampleDataEcommerce\".count as count, \"KibanaSampleDataEcommerce\".__user as user_1, Logs.__user as user_2 FROM \"KibanaSampleDataEcommerce\" CROSS JOIN Logs WHERE __user = 'foo') aliased".to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await
-            .as_logical_plan();
-
-        let cube_scan = logical_plan.find_cube_scan();
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec![]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: Some(true),
-            }
-        );
-
-        assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
     }
 
     #[tokio::test]
@@ -8988,12 +8354,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(50000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -9009,12 +8372,10 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(200),
                 offset: Some(200),
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -9078,11 +8439,8 @@ ORDER BY "source"."str0" ASC
                         granularity: Some(granularity.to_string()),
                         date_range: None
                     }]),
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 }
             );
         }
@@ -9123,12 +8481,8 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -9162,11 +8516,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("month".to_owned()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -9195,13 +8546,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
                 limit: Some(100000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("notContains".to_string()),
@@ -9209,7 +8558,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -9269,12 +8618,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }),
             true
         );
@@ -9288,12 +8633,8 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }),
             true
         );
@@ -9351,12 +8692,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }),
             true
         );
@@ -9374,11 +8711,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("quarter".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }),
             true
         );
@@ -9407,13 +8741,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
                 limit: Some(100000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("equals".to_string()),
@@ -9424,7 +8756,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -9487,9 +8819,7 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9574,9 +8904,7 @@ ORDER BY "source"."str0" ASC
                         "desc".to_string()
                     ]]),
                     limit: Some(2500),
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             )
         }
@@ -9608,10 +8936,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -9619,7 +8944,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9650,10 +8975,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("endsWith".to_string()),
@@ -9661,7 +8983,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9696,10 +9018,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -9707,7 +9026,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9743,10 +9062,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -9763,7 +9079,7 @@ ORDER BY "source"."str0" ASC
                         and: None,
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9797,10 +9113,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -9808,7 +9121,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9842,10 +9155,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("endsWith".to_string()),
@@ -9853,7 +9163,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9891,10 +9201,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("contains".to_string()),
@@ -9902,7 +9209,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9941,10 +9248,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
@@ -9961,7 +9265,7 @@ ORDER BY "source"."str0" ASC
                         and: None,
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9999,11 +9303,8 @@ ORDER BY "source"."str0" ASC
                         "2019-12-31".to_string(),
                     ])),
                 },]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -10049,9 +9350,7 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -10107,9 +9406,7 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -10140,12 +9437,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10174,12 +9468,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -10201,10 +9491,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -10212,7 +9499,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -10241,12 +9528,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -10314,12 +9597,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             },
         );
     }
@@ -10354,12 +9634,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10389,12 +9666,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10509,12 +9783,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10558,10 +9829,8 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10593,10 +9862,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10620,6 +9886,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10653,10 +9920,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10680,6 +9944,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10713,10 +9978,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10740,6 +10002,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10773,10 +10036,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10800,6 +10060,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10833,10 +10094,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10860,6 +10118,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10893,10 +10152,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10920,6 +10176,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10975,10 +10232,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -11023,6 +10277,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11057,10 +10312,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -11088,6 +10340,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11146,10 +10399,8 @@ ORDER BY "source"."str0" ASC
                             .collect::<Vec<_>>()
                     ),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             )
         }
@@ -11187,11 +10438,8 @@ ORDER BY "source"."str0" ASC
                             })
                             .collect::<Vec<_>>()
                     ),
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    order: Some(vec![]),
+                    ..Default::default()
                 }
             )
         }
@@ -11226,598 +10474,10 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_three_cubes() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT *
-            FROM KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            LEFT JOIN NumberCube ON (NumberCube.__cubeJoinField = Logs.__cubeJoinField)
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![
-                    "KibanaSampleDataEcommerce.count".to_string(),
-                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
-                    "KibanaSampleDataEcommerce.minPrice".to_string(),
-                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
-                    "Logs.agentCount".to_string(),
-                    "Logs.agentCountApprox".to_string(),
-                    "NumberCube.someNumber".to_string(),
-                ]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.order_date".to_string(),
-                    "KibanaSampleDataEcommerce.last_mod".to_string(),
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "KibanaSampleDataEcommerce.notes".to_string(),
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
-                    "Logs.id".to_string(),
-                    "Logs.read".to_string(),
-                    "Logs.content".to_string(),
-                ]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: Some(true),
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_three_cubes_split() {
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT count(KibanaSampleDataEcommerce.count), Logs.read, NumberCube.someNumber, extract(MONTH FROM KibanaSampleDataEcommerce.order_date)
-            FROM KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            LEFT JOIN NumberCube ON (NumberCube.__cubeJoinField = Logs.__cubeJoinField)
-            WHERE Logs.read
-            GROUP BY 2,3,4
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![
-                    "NumberCube.someNumber".to_string(),
-                    "KibanaSampleDataEcommerce.count".to_string(),
-                ]),
-                dimensions: Some(vec!["Logs.read".to_string(),]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
-                    granularity: Some("month".to_owned()),
-                    date_range: None
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("Logs.read".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["true".to_string()]),
-                    or: None,
-                    and: None
-                }]),
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_two_subqueries_with_filter_order_limit() {
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT count(KibanaSampleDataEcommerce.count), Logs.read
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            WHERE Logs.read
-            GROUP BY 2
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                dimensions: Some(vec!["Logs.read".to_string(),]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.read".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["true".to_string()]),
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT count(Ecommerce.count), Logs.r, extract(MONTH FROM Ecommerce.order_date)
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) Ecommerce
-            LEFT JOIN (SELECT read r, __cubeJoinField FROM Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
-            LEFT JOIN (SELECT someNumber, __cubeJoinField from NumberCube) NumberC ON (Logs.__cubeJoinField = NumberC.__cubeJoinField)
-            WHERE Logs.r
-            GROUP BY 2, 3
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                dimensions: Some(vec!["Logs.read".to_string(),]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
-                    granularity: Some("month".to_owned()),
-                    date_range: None
-                }]),
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.read".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["true".to_string()]),
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_subquery_and_table_with_filter_order_limit() {
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT count(KibanaSampleDataEcommerce.count), Logs.read
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            WHERE Logs.read
-            GROUP BY 2
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                dimensions: Some(vec!["Logs.read".to_string(),]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.read".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["true".to_string()]),
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() {
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT count(Ecommerce.count), Logs.read, extract(MONTH FROM Ecommerce.order_date)
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) Ecommerce
-            LEFT JOIN Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
-            LEFT JOIN (SELECT someNumber, __cubeJoinField from NumberCube) NumberC ON (Logs.__cubeJoinField = NumberC.__cubeJoinField)
-            WHERE Logs.read
-            GROUP BY 2, 3
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                dimensions: Some(vec!["Logs.read".to_string(),]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
-                    granularity: Some("month".to_owned()),
-                    date_range: None
-                }]),
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.read".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["true".to_string()]),
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_two_subqueries_filter_push_down() {
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT count(Ecommerce.count), Logs.r, Ecommerce.date
-            FROM (SELECT __cubeJoinField, count, order_date date FROM KibanaSampleDataEcommerce where customer_gender = 'female') Ecommerce
-            LEFT JOIN (select __cubeJoinField, read r from Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
-            WHERE (Logs.r IS NOT NULL) AND (Ecommerce.date BETWEEN timestamp with time zone '2022-06-13T12:30:00.000Z' AND timestamp with time zone '2022-06-29T12:30:00.000Z')
-            GROUP BY 2, 3
-            ORDER BY 1
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                dimensions: Some(vec![
-                    "Logs.read".to_string(),
-                    "KibanaSampleDataEcommerce.order_date".to_string(),
-                ]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        "2022-06-13T12:30:00.000Z".to_string(),
-                        "2022-06-29T12:30:00.000Z".to_string()
-                    ]))
-                }]),
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.count".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["female".to_string()]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.read".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_cubes_on_wrong_field_error() {
-        init_testing_logger();
-
-        let meta = get_test_tenant_ctx();
-        let query = convert_sql_to_cube_query(
-            &r#"
-            SELECT *
-            FROM KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read)
-            "#
-            .to_string(),
-            meta.clone(),
-            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
-        )
-        .await;
-
-        assert_eq!(
-            query.unwrap_err().message(),
-            "Error during rewrite: Use __cubeJoinField to join Cubes. Please check logs for additional information.".to_string()
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_cubes_filter_from_wrong_side_error() {
-        init_testing_logger();
-
-        let meta = get_test_tenant_ctx();
-        let query = convert_sql_to_cube_query(
-            &r#"
-            SELECT count(KibanaSampleDataEcommerce.count), Logs.read
-            FROM (SELECT * FROM KibanaSampleDataEcommerce) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs where read order by read limit 10) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            GROUP BY 2
-            "#
-            .to_string(),
-            meta.clone(),
-            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
-        )
-        .await;
-
-        assert_eq!(
-            query.unwrap_err().message(),
-            "Error during rewrite: Can not join Cubes. This is most likely due to one of the following reasons:\n\
-            • one of the cubes contains a group by\n\
-            • one of the cubes contains a measure\n\
-            • the cube on the right contains a filter, sorting or limits\n\
-            . Please check logs for additional information.".to_string()
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_cubes_with_aggr_error() {
-        init_testing_logger();
-
-        let meta = get_test_tenant_ctx();
-        let query = convert_sql_to_cube_query(
-            &r#"
-            SELECT *
-            FROM (SELECT count(count), __cubeJoinField FROM KibanaSampleDataEcommerce group by 2) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            "#
-            .to_string(),
-            meta.clone(),
-            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
-        )
-        .await;
-
-        assert_eq!(
-            query.unwrap_err().message(),
-            "Error during rewrite: Can not join Cubes. This is most likely due to one of the following reasons:\n\
-            • one of the cubes contains a group by\n\
-            • one of the cubes contains a measure\n\
-            • the cube on the right contains a filter, sorting or limits\n\
-            . Please check logs for additional information.".to_string()
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_cubes_with_postprocessing() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT *
-            FROM (SELECT count(count), __cubeJoinField, extract(MONTH from order_date) FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        let cube_scans = logical_plan
-            .find_cube_scans()
-            .iter()
-            .map(|cube| cube.request.clone())
-            .collect::<Vec<V1LoadRequestQuery>>();
-
-        assert_eq!(
-            cube_scans.contains(&V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec![]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("month".to_string()),
-                    date_range: None,
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
-            }),
-            true
-        );
-
-        assert_eq!(
-            cube_scans.contains(&V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["Logs.read".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: Some(true),
-            }),
-            true
-        )
-    }
-
-    #[tokio::test]
-    async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT *
-            FROM (SELECT count(count), extract(MONTH from order_date), taxful_total_price FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT id, read FROM Logs) Logs ON (KibanaSampleDataEcommerce.taxful_total_price = Logs.id)
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        let cube_scans = logical_plan
-            .find_cube_scans()
-            .iter()
-            .map(|cube| cube.request.clone())
-            .collect::<Vec<V1LoadRequestQuery>>();
-
-        assert_eq!(
-            cube_scans.contains(&V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                ]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("month".to_string()),
-                    date_range: None,
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
-            }),
-            true
-        );
-
-        assert_eq!(
-            cube_scans.contains(&V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["Logs.id".to_string(), "Logs.read".to_string(),]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: Some(true),
-            }),
-            true
         )
     }
 
@@ -11853,12 +10513,10 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10001),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11902,15 +10560,12 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11963,9 +10618,7 @@ ORDER BY "source"."str0" ASC
                         "2022-11-15T23:59:59.999Z".to_string(),
                     ]))
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("set".to_string()),
@@ -11973,7 +10626,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12020,10 +10673,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("set".to_string()),
@@ -12031,7 +10681,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12067,10 +10717,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(10001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("equals".to_string()),
@@ -12081,7 +10729,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12110,12 +10758,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12144,12 +10789,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12191,13 +10833,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -12205,7 +10845,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -12242,13 +10882,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("notStartsWith".to_string()),
@@ -12256,7 +10894,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -12293,13 +10931,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("notEndsWith".to_string()),
@@ -12307,7 +10943,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12336,11 +10972,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `LOWER(..) <> .. OR .. IS NULL`
         let re = Regex::new(r"LOWER ?\(.+\) != .+ OR .+ IS NULL").unwrap();
@@ -12373,11 +11005,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `NOT(LOWER(..) IN (..))`
         let re = Regex::new(r"NOT.+LOWER ?\(.+\).* IN ").unwrap();
@@ -12408,12 +11036,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12449,12 +11074,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12489,12 +11111,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12534,12 +11152,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12578,12 +11193,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12618,12 +11229,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12659,12 +11266,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12698,11 +11301,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `NOT(LOWER(..) IN (..)) OR NOT(.. IS NOT NULL)`
         let re = Regex::new(r"NOT.+LOWER ?\(.+\) IN .+\) OR NOT.+ IS NOT NULL").unwrap();
@@ -12736,10 +11335,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("lt".to_string()),
@@ -12747,7 +11343,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12783,12 +11379,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12820,12 +11413,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12858,11 +11447,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("day".to_string()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12902,11 +11488,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("month".to_string()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12946,11 +11529,8 @@ ORDER BY "source"."str0" ASC
                         date_range: None
                     },
                 ]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -12981,12 +11561,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -13015,12 +11591,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
 
@@ -13047,15 +11619,34 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-
-        assert!(sql.contains("LOWER("));
-        assert!(sql.contains("GROUP BY "));
-        assert!(sql.contains("ORDER BY "));
+        assert_eq!(
+            logical_plan
+                .find_cube_scan_wrapped_sql()
+                .request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "ta_1_order_date_",
+                        "cube_params": ["KibanaSampleDataEcommerce", "Logs"],
+                        "expr": "((${KibanaSampleDataEcommerce.order_date} = DATE('1994-05-01')) OR (${KibanaSampleDataEcommerce.order_date} = DATE('1996-05-03')))",
+                        "grouping_set": null,
+                    }).to_string(),
+                ]),
+                segments: Some(vec![
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "lower_ta_2_conte",
+                        "cube_params": ["KibanaSampleDataEcommerce", "Logs"],
+                        "expr": "(LOWER(${Logs.content}) = $0$)",
+                        "grouping_set": null,
+                    }).to_string(),
+                ]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        );
     }
 
     #[tokio::test]
@@ -13083,12 +11674,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13125,10 +11712,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "asc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -13160,10 +11744,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "asc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -13203,11 +11784,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("day".to_string()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13245,12 +11823,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -13280,12 +11855,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -13328,23 +11900,46 @@ ORDER BY "source"."str0" ASC
         );
 
         assert_eq!(
-            query_plan.as_logical_plan().find_cube_scan().request,
+            query_plan
+                .as_logical_plan()
+                .find_cube_scan_wrapped_sql()
+                .request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
-                segments: Some(vec![]),
-                time_dimensions: None,
+                dimensions: Some(vec![
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "customer_gender",
+                        "cube_params": ["KibanaSampleDataEcommerce"],
+                        "expr": "${KibanaSampleDataEcommerce.customer_gender}",
+                        "grouping_set": null,
+                    }).to_string(),
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "cast_dateadd_utf",
+                        "cube_params": ["KibanaSampleDataEcommerce"],
+                        "expr": "CAST(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') AS DATE)",
+                        "grouping_set": null,
+                    }).to_string(),
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "dateadd_utf8__se",
+                        "cube_params": ["KibanaSampleDataEcommerce"],
+                        "expr": "DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2000000 MILLISECOND')",
+                        "grouping_set": null,
+                    }).to_string(),
+                ]),
+                segments: Some(vec![
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "dateadd_utf8__da",
+                        "cube_params": ["KibanaSampleDataEcommerce"],
+                        "expr": "(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') < DATE('2014-06-02'))",
+                        "grouping_set": null,
+                    }).to_string(),
+                ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string(),),
-                    operator: Some("beforeDate".to_string(),),
-                    values: Some(vec!["2014-05-31T00:00:00.000Z".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
-                ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -13378,12 +11973,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -13423,11 +12015,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("week".to_string()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13468,12 +12057,8 @@ ORDER BY "source"."str0" ASC
                     "Logs.id".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13510,12 +12095,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -13551,11 +12133,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("quarter".to_owned()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13596,11 +12175,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("month".to_string()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13632,11 +12208,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `NOT(.. IS NULL OR LOWER(..) IN)`
         let re = Regex::new(r"NOT \(.+ IS NULL OR .*LOWER\(.+ IN ").unwrap();
@@ -13683,11 +12255,7 @@ ORDER BY "source"."str0" ASC
         let re = Regex::new(r"\(LOWER ?\(.+\) = .+ OR .+LOWER ?\(.+\) = .+\) IN \(TRUE, FALSE\)")
             .unwrap();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(re.is_match(&sql));
     }
@@ -13724,12 +12292,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13765,12 +12329,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13811,12 +12371,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -13896,10 +12453,7 @@ ORDER BY "source"."str0" ASC
                     measures: Some(vec![]),
                     dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
                     filters: Some(vec![V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some(filter_operator.to_string()),
@@ -13908,6 +12462,7 @@ ORDER BY "source"."str0" ASC
                         and: None
                     }]),
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -13944,11 +12499,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("month".to_string()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -13984,12 +12536,9 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -14027,10 +12576,8 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -14064,11 +12611,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("year".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -14134,11 +12678,9 @@ ORDER BY "source"."str0" ASC
             // Order and Limit and nearly pushed to CubeScan but the Projection
             // before TableScan is a post-processing projection.
             // Splitting such projections into two may be a good idea.
-            order: None,
-            limit: None,
-            offset: None,
-            filters: None,
+            order: Some(vec![]),
             ungrouped: Some(true),
+            ..Default::default()
         }))
     }
 
@@ -14173,55 +12715,40 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let end_date = chrono::Utc::now().date_naive() - chrono::Duration::days(1);
-        let start_date = end_date - chrono::Duration::days(29);
+        let end_date = chrono::Utc::now().date_naive();
+        let start_date = end_date - chrono::Duration::days(30);
         assert_eq!(
-            logical_plan.find_cube_scan().request,
+            logical_plan.find_cube_scan_wrapped_sql().request,
             V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec![]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: None,
-                    date_range: Some(json!(vec![
-                        format!("{}T00:00:00.000Z", start_date),
-                        format!("{}T23:59:59.999Z", end_date),
-                    ]))
-                }]),
+                measures: Some(vec![
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "avg_kibanasample",
+                        "cube_params": ["KibanaSampleDataEcommerce"],
+                        "expr": "${KibanaSampleDataEcommerce.avgPrice}",
+                        "grouping_set": null,
+                    }).to_string(),
+                ]),
+                dimensions: Some(vec![
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "cast_kibanasampl",
+                        "cube_params": ["KibanaSampleDataEcommerce"],
+                        "expr": "CAST(${KibanaSampleDataEcommerce.order_date} AS DATE)",
+                        "grouping_set": null,
+                    }).to_string(),
+                ]),
+                segments: Some(vec![
+                    json!({
+                        "cube_name": "KibanaSampleDataEcommerce",
+                        "alias": "kibanasampledata",
+                        "cube_params": ["KibanaSampleDataEcommerce"],
+                        "expr": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= DATE('{start_date}')) AND (${{KibanaSampleDataEcommerce.order_date}} < DATE('{end_date}'))) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))"),
+                        "grouping_set": null,
+                    }).to_string(),
+                ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["note1".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["note2".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["note3".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None
-                }]),
-                ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -14258,11 +12785,8 @@ ORDER BY "source"."str0" ASC
                         "2022-11-20T23:59:59.999Z".to_string(),
                     ]))
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -14310,961 +12834,10 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("LEFT"));
-    }
-
-    #[tokio::test]
-    async fn test_simple_wrapper() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT COALESCE(customer_gender, 'N/A', 'NN'), AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("COALESCE"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, ROLLUP(2)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("Rollup"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup_with_aliases() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender as \"customer_gender1\", notes as \"notes\", AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY ROLLUP(1, 2)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("Rollup"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup_nested() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, avg(mp) from (SELECT customer_gender, notes, avg(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2) b GROUP BY ROLLUP(1, 2)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("ROLLUP(1, 2)"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup_nested_from_asterisk() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, avg(avgPrice) from (SELECT * FROM KibanaSampleDataEcommerce) b GROUP BY ROLLUP(1, 2) ORDER BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("Rollup"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup_nested_with_aliases() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender as \"gender\", notes as \"notes\", avg(mp) from (SELECT customer_gender, notes, avg(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2) b GROUP BY ROLLUP(1, 2)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("ROLLUP(1, 2)"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup_nested_complex() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, order_date, last_mod, avg(mp) from \
-            (SELECT customer_gender, notes, order_date, last_mod, avg(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2, 3, 4) b \
-            GROUP BY ROLLUP(1), ROLLUP(2), 3, CUBE(4)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("ROLLUP(1), ROLLUP(2), 3, CUBE(4)"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup_placeholders() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY ROLLUP(1, 2)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("Rollup"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_cube() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY CUBE(customer_gender, notes)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("Cube"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_wrapper_group_by_rollup_complex() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, has_subscription, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY ROLLUP(customer_gender, notes), has_subscription"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("Rollup"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection_empty_source() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT (SELECT 'male' where 1  group by 'male' having 1 order by 'male' limit 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("(SELECT"));
-        assert!(sql.contains("utf8__male__"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-        //println!("phys plan {:?}", physical_plan);
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_filter_empty_source() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT avgPrice FROM KibanaSampleDataEcommerce a where customer_gender = (SELECT 'male' )"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("(SELECT"));
-        assert!(sql.contains("utf8__male__"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-        //println!("phys plan {:?}", physical_plan);
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection_aggregate_empty_source() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT (SELECT 'male'), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("(SELECT"));
-        assert!(sql.contains("utf8__male__"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_filter_in_empty_source() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select 'male')"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("IN (SELECT"));
-        assert!(sql.contains("utf8__male__"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_filter_and_projection_empty_source() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT (select 'male'), avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select 'female')"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("IN (SELECT"));
-        assert!(sql.contains("(SELECT"));
-        assert!(sql.contains("utf8__male__"));
-        assert!(sql.contains("utf8__female__"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce LIMIT 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("(SELECT"));
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("\\\\\\\"limit\\\\\\\":1"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection_aggregate() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = 'male' LIMIT 1), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("(SELECT"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_filter_equal() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, avgPrice FROM KibanaSampleDataEcommerce a where customer_gender = (select customer_gender from KibanaSampleDataEcommerce limit 1)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("(SELECT"));
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("\\\\\\\"limit\\\\\\\":1"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_filter_in() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select customer_gender from KibanaSampleDataEcommerce)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("IN (SELECT"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_filter_and_projection() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT (select customer_gender from KibanaSampleDataEcommerce limit 1), avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select customer_gender from KibanaSampleDataEcommerce)"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("IN (SELECT"));
-
-        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN COALESCE(customer_gender, 'N/A', 'NN') = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("CASE WHEN"));
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_distinct() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            r#"SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, COUNT(DISTINCT countDistinct) mp
-            FROM KibanaSampleDataEcommerce a
-            WHERE
-              (
-                (
-                  ( a.order_date ) >= '2024-01-01'
-                  AND ( a.order_date ) < '2024-02-01'
-                )
-              )
-            GROUP BY 1"#
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("CASE WHEN"));
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_alias_with_order() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END AS \"f822c516-3515-11c2-8464-5d4845a02f73\", AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END ORDER BY CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END NULLS FIRST LIMIT 500"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("ORDER BY \"case_when_a_cust\""));
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_ungrouped() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("CASE WHEN"));
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_non_strict_match() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let mut config = ConfigObjImpl::default();
-
-        config.disable_strict_agg_type_match = true;
-
-        let query_plan = convert_select_to_query_plan_with_config(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, SUM(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-            Arc::new(config)
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("CASE WHEN"));
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_ungrouped_sorted() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1 ORDER BY 1 DESC"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("ORDER BY"));
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_ungrouped_sorted_aliased() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT x FROM (SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END x, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1 ORDER BY 1 DESC) b"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            // TODO test without depend on column name
-            .contains("ORDER BY \"case_when"));
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_with_internal_limit() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1 LIMIT 1123"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("CASE WHEN"));
-
-        assert!(
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-                .contains("1123"),
-            "SQL contains 1123: {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        );
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_with_system_fields() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, __user, __cubeJoinField, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2, 3 LIMIT 1123"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-
-        assert!(
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-                .contains("\\\"cube_name\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"user\\\""),
-            r#"SQL contains `\"cube_name\":\"KibanaSampleDataEcommerce\",\"alias\":\"user\"` {}"#,
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        );
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_with_limit() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT * FROM (SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1) q LIMIT 1123"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("CASE WHEN"));
-
-        assert!(
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-                .contains("1123"),
-            "SQL contains 1123: {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        );
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_with_null() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN taxful_total_price IS NULL THEN NULL WHEN taxful_total_price < taxful_total_price * 2 THEN COALESCE(taxful_total_price, 0, 0) END, AVG(avgPrice) FROM KibanaSampleDataEcommerce GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("CASE WHEN"));
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_ungrouped_on_dimension() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN SUM(taxful_total_price) > 0 THEN SUM(taxful_total_price) ELSE 0 END FROM KibanaSampleDataEcommerce a"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-            .await;
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_case_wrapper_escaping() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan_customized(
-            "SELECT CASE WHEN customer_gender = '\\`' THEN COALESCE(customer_gender, 'N/A', 'NN') ELSE 'N/A' END as \"\\`\", AVG(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1".to_string(),
-            DatabaseProtocol::PostgreSQL,
-            vec![
-                ("expressions/binary".to_string(), "{{ left }} \\`{{ op }} {{ right }}".to_string())
-            ],
-        ).await;
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            // Expect 6 backslashes as output is JSON and it's escaped one more time
-            .contains("\\\\\\\\\\\\`"));
     }
 
     #[tokio::test]
@@ -15280,12 +12853,8 @@ ORDER BY "source"."str0" ASC
             measures: Some(vec![]),
             segments: Some(vec![]),
             dimensions: Some(vec!["MultiTypeCube.dim_date0".to_string()]),
-            time_dimensions: None,
-            order: None,
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            order: Some(vec![]),
+            ..Default::default()
         };
 
         context
@@ -15366,11 +12935,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some(expected_granularity.to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             };
 
             context
@@ -15415,11 +12981,8 @@ ORDER BY "source"."str0" ASC
             segments: Some(vec![]),
             dimensions: Some(vec!["MultiTypeCube.dim_date0".to_string()]),
             time_dimensions: None,
-            order: None,
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            order: Some(vec![]),
+            ..Default::default()
         };
 
         context
@@ -15499,11 +13062,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some(expected_granularity.to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             };
 
             context
@@ -15548,12 +13108,8 @@ ORDER BY "source"."str0" ASC
             measures: Some(vec![]),
             segments: Some(vec![]),
             dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
-            time_dimensions: None,
-            order: None,
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            order: Some(vec![]),
+            ..Default::default()
         };
 
         context
@@ -15628,9 +13184,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -15661,12 +13216,8 @@ ORDER BY "source"."str0" ASC
             measures: Some(vec![]),
             segments: Some(vec![]),
             dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
-            time_dimensions: None,
-            order: None,
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            order: Some(vec![]),
+            ..Default::default()
         };
 
         assert_eq!(
@@ -15712,9 +13263,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -15741,9 +13291,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -15770,9 +13319,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -15794,17 +13342,12 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         assert!(
             logical_plan
-                .find_cube_scan_wrapper()
+                .find_cube_scan_wrapped_sql()
                 .wrapped_sql
-                .unwrap()
                 .sql
                 .contains("OVER"),
             "SQL should contain 'OVER': {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
+            logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
         );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -15831,32 +13374,22 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         assert!(
             logical_plan
-                .find_cube_scan_wrapper()
+                .find_cube_scan_wrapped_sql()
                 .wrapped_sql
-                .unwrap()
                 .sql
                 .contains("long_l_1"),
             "SQL should contain long_l_1: {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
+            logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
         );
 
         assert!(
             logical_plan
-                .find_cube_scan_wrapper()
+                .find_cube_scan_wrapped_sql()
                 .wrapped_sql
-                .unwrap()
                 .sql
                 .contains("long_l_1"),
             "SQL should contain long_l_2: {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
+            logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
         );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -15882,9 +13415,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("CURRENT_DATE()"));
 
@@ -15938,11 +13470,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check if contains `CAST(EXTRACT(YEAR FROM ..) || .. || .. || ..)`
         let re = Regex::new(r"CAST.+EXTRACT.+YEAR FROM(.+ \|\|){3}").unwrap();
@@ -15990,11 +13518,9 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("quarter".to_string()),
                     date_range: None,
                 }]),
-                order: None,
+                order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16028,11 +13554,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("month".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -16069,11 +13592,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("month".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -16103,11 +13623,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
 
         if Rewriter::sql_push_down_enabled() {
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
             assert!(sql.contains("EXTRACT(YEAR"));
             assert!(sql.contains("EXTRACT(MONTH"));
 
@@ -16140,11 +13656,8 @@ ORDER BY "source"."str0" ASC
                         date_range: None,
                     }
                 ]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -16181,11 +13694,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -16217,12 +13727,12 @@ ORDER BY "source"."str0" ASC
         // TODO: split on complex expressions?
         // CAST(CAST(ta_1.order_date AS Date32) - CAST(CAST(Utf8("1970-01-01") AS Date32) AS Date32) + Int64(3) AS Decimal(38, 10))
         if Rewriter::sql_push_down_enabled() {
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
-            assert!(sql.contains("\"limit\":1000"));
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+            if Rewriter::top_down_extractor_enabled() {
+                assert!(sql.contains("LIMIT 1000"));
+            } else {
+                assert!(sql.contains("\"limit\": 1000"));
+            }
             assert!(sql.contains("% 7"));
 
             let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -16242,12 +13752,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -16284,10 +13790,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(25000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("afterOrOnDate".to_string()),
@@ -16295,7 +13799,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16340,11 +13844,9 @@ ORDER BY "source"."str0" ASC
                         "2020-01-01".to_string(),
                     ])),
                 }]),
-                order: None,
+                order: Some(vec![]),
                 limit: Some(25000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16381,10 +13883,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(25000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -16407,7 +13907,7 @@ ORDER BY "source"."str0" ASC
                     ]),
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16460,9 +13960,7 @@ ORDER BY "source"."str0" ASC
                     "asc".to_string(),
                 ]]),
                 limit: Some(25000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -16525,11 +14023,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -16604,11 +14099,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
 
         if Rewriter::sql_push_down_enabled() {
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
             assert!(sql.contains("LIMIT 101"));
             assert!(sql.contains("ORDER BY"));
 
@@ -16626,12 +14117,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -16722,9 +14209,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("NOT IN ("));
     }
@@ -16756,12 +14242,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -16793,9 +14275,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("NOT ("));
     }
@@ -16827,9 +14308,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("DATEDIFF(day,"));
 
@@ -16856,11 +14336,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("DATETIME_DIFF(CAST("));
         assert!(sql.contains("day)"));
 
@@ -16887,11 +14363,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("DATEDIFF(day,"));
         assert!(sql.contains("DATE_TRUNC('day',"));
 
@@ -16918,11 +14390,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("CASE WHEN LOWER('day')"));
         assert!(sql.contains("WHEN 'year' THEN 12 WHEN 'quarter' THEN 3 WHEN 'month' THEN 1 END"));
         assert!(sql.contains("EXTRACT(EPOCH FROM"));
@@ -16957,9 +14425,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("DATEADD(day, 7,"));
 
@@ -16986,11 +14453,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("DATETIME_ADD(CAST("));
         assert!(sql.contains("INTERVAL 7 day)"));
 
@@ -17018,11 +14481,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("+ '7 day'::interval"));
     }
 
@@ -17098,9 +14557,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("DATE("));
     }
@@ -17137,9 +14595,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT(MONTH FROM "));
     }
@@ -17180,11 +14637,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("order_date"));
         assert!(sql.contains("EXTRACT(DAY FROM"))
     }
@@ -17218,11 +14671,8 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("year".to_string()),
                     date_range: None,
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         );
     }
@@ -17288,8 +14738,8 @@ ORDER BY "source"."str0" ASC
                     r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }}
 FROM ({{ from }}) AS {{ from_alias }}
 {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}
-{% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if offset %}
-OFFSET {{ offset }}{% endif %}{% if limit %}
+{% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if offset is not none %}
+OFFSET {{ offset }}{% endif %}{% if limit is not none %}
 LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ),
             ]
@@ -17303,11 +14753,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("OFFSET 1\nLIMIT 2"));
     }
 
@@ -17417,10 +14863,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.notes".to_string()),
                     operator: Some("equals".to_string()),
@@ -17428,7 +14871,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -17519,10 +14962,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     },
                 ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -17559,9 +15000,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("SELECT DISTINCT "));
 
@@ -17601,15 +15041,11 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -17643,9 +15079,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"));
 
@@ -17675,10 +15110,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measures: Some(vec!["NumberCube.someNumber".into()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("NumberCube.someNumber".into()),
                     operator: Some("equals".into()),
@@ -17687,6 +15119,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     and: None
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -17723,9 +15156,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     granularity: Some("day".to_owned()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -17754,7 +15185,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ]),
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -17801,11 +15232,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         "2023-12-31 23:59:59.999".to_string()
                     ])),
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -17849,9 +15277,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     granularity: Some("quarter".to_string()),
                     date_range: None
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -17910,7 +15336,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ]),
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -18053,11 +15479,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         date_range: None
                     },
                 ]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -18107,11 +15530,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         "2024-12-31T23:59:59.999Z".to_string(),
                     ])),
                 },]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -18149,12 +15569,9 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.has_subscription".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
+                order: Some(vec![]),
                 limit: Some(500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -18187,9 +15604,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("LIMIT 250"));
 
@@ -18242,12 +15658,9 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -18285,12 +15698,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -18337,9 +15746,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         "2019-01-31T23:59:59.999Z".to_string()
                     ]))
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -18360,7 +15767,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         and: None
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -18400,7 +15807,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measure(count) AS cnt,
                 date_trunc('month', order_date) AS dt
             FROM KibanaSampleDataEcommerce
-            WHERE order_date IN (to_timestamp('2019-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US'))
+            WHERE date_trunc('month', order_date) IN (to_timestamp('2019-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US'))
             GROUP BY 2
             ;"#
             .to_string(),
@@ -18418,16 +15825,21 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
-                    date_range: Some(json!(vec![
-                        "2019-01-01T00:00:00.000Z".to_string(),
-                        "2019-01-01T00:00:00.000Z".to_string()
-                    ]))
+                    date_range: if Rewriter::top_down_extractor_enabled() {
+                        Some(json!(vec![
+                            "2019-01-01T00:00:00.000Z".to_string(),
+                            "2019-01-31T23:59:59.999Z".to_string()
+                        ]))
+                    } else {
+                        // Non-optimal variant with top down extractor disabled
+                        Some(json!(vec![
+                            "2019-01-01 00:00:00.000".to_string(),
+                            "2019-01-31 23:59:59.999".to_string()
+                        ]))
+                    }
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                order: Some(vec![]),
+                ..Default::default()
             }
         )
     }
@@ -18474,11 +15886,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(" AS STRING)"));
         assert!(sql.contains(" AS FLOAT)"));
         assert!(sql.contains(" AS DOUBLE)"));
@@ -18506,11 +15914,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(" AS STRING)"));
         assert!(sql.contains(" AS FLOAT64)"));
         assert!(sql.contains(" AS BIGDECIMAL(38,10))"));
@@ -18534,11 +15938,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(" AS TEXT)"));
         assert!(sql.contains(" AS REAL)"));
         assert!(sql.contains(" AS DOUBLE PRECISION)"));
@@ -18587,9 +15987,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         "2024-02-29".to_string()
                     ]))
                 }]),
-                order: None,
-                limit: None,
-                offset: None,
+                order: Some(vec![]),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
                     operator: Some("gte".to_string()),
@@ -18597,8 +15995,274 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_sql_implementation_info() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_sql_implementation_info",
+            execute_query(
+                r#"
+                SELECT character_value, version()
+                FROM INFORMATION_SCHEMA.SQL_IMPLEMENTATION_INFO
+                WHERE implementation_info_id IN ('17','18')
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_like_escape_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT CAST("customer_gender" AS TEXT) AS "customer_gender"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "customer_gender" LIKE (
+                    '%' || replace(
+                        replace(
+                            replace(
+                                'ale',
+                                '!',
+                                '!!'
+                            ),
+                            '%',
+                            '!%'
+                        ),
+                        '_',
+                        '!_'
+                    ) || '%'
+                ) ESCAPE '!'
+            GROUP BY 1
+            ORDER BY 1
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("LIKE "));
+        assert!(sql.contains("ESCAPE "));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_sql_sizing() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_sql_sizing",
+            execute_query(
+                r#"
+                SELECT supported_value
+                FROM INFORMATION_SCHEMA.SQL_SIZING
+                WHERE
+                    sizing_id = 34
+                    or sizing_id = 30
+                    or sizing_id = 31
+                    or sizing_id = 10005
+                    or sizing_id = 32
+                    or sizing_id = 35
+                    or sizing_id = 107
+                    or sizing_id = 97
+                    or sizing_id = 99
+                    or sizing_id = 100
+                    or sizing_id = 101
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_stv_slices() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_stv_slices",
+            execute_query(
+                r#"
+                with nodes as (
+                    select count(distinct node) as node_count
+                    from STV_SLICES
+                )
+                select
+                    case
+                        when diststyle = 'ALL' then size/cast(nodes.node_count as float)
+                        else size
+                    end as sizeMBs
+                from SVV_TABLE_INFO
+                join nodes on 1=1
+                where
+                    "table" = 'KibanaSampleDataEcommerce'
+                    and "schema" = 'public';
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_pg_external_schema() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_pg_external_schema",
+            execute_query(
+                r#"
+                select nspname
+                from pg_external_schema pe
+                join pg_namespace pn on pe.esoid = pn.oid
+                where
+                    nspowner != 1
+                    and nspname = 'public'
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_regexp_instr() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_regexp_instr",
+            execute_query(
+                r#"SELECT regexp_instr('abcdefg', 'd.f', 3)"#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_mysql_nulls_last() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT customer_gender AS s
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("expressions/sort".to_string(), "{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains(" IS NULL DESC, "));
+    }
+
+    #[tokio::test]
+    async fn test_values_literal_table() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "values_literal_table",
+            execute_query(
+                r#"SELECT a AS a, b AS b FROM (VALUES (1, 2), (3, 4), (5, 6)) AS t(a, b)"#
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_format_function() -> Result<(), CubeError> {
+        // Test: Basic usage with a single identifier
+        let result = execute_query(
+            "SELECT format('%I', 'column_name') AS formatted_identifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_identifier", result);
+
+        // Test: Using multiple identifiers
+        let result = execute_query(
+            "SELECT format('%I, %I', 'table_name', 'column_name') AS formatted_identifiers"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_identifiers", result);
+
+        // Test: Unsupported format specifier
+        let result = execute_query(
+            "SELECT format('%X', 'value') AS unsupported_specifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+        assert!(result.is_err());
+
+        // Test: Format string ending with %
+        let result = execute_query(
+            "SELECT format('%', 'value') AS invalid_format".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+        assert!(result.is_err());
+
+        // Test: Quoting necessary for special characters
+        let result = execute_query(
+            "SELECT format('%I', 'column-name') AS quoted_identifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("quoted_identifier", result);
+
+        // Test: Quoting necessary for reserved keywords
+        let result = execute_query(
+            "SELECT format('%I', 'select') AS quoted_keyword".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("quoted_keyword", result);
+
+        Ok(())
     }
 }

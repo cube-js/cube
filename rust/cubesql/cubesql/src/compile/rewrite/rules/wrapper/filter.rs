@@ -1,21 +1,24 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, filter, rules::wrapper::WrapperRules,
+        cube_scan_wrapper, filter,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
         wrapped_select_filter_expr, wrapped_select_filter_expr_empty_tail,
         wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
         wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrappedSelectUngrouped, WrappedSelectUngroupedScan,
-        WrapperPullupReplacerUngrouped,
+        LogicalPlanLanguage, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
+        WrapperPullupReplacerGroupedSubqueries, WrapperPullupReplacerPushToCube,
+        WrapperPushdownReplacerGroupedSubqueries, WrapperPushdownReplacerPushToCube,
     },
-    var, var_iter,
+    copy_flag, copy_value, var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst, Var};
+use egg::{Subst, Var};
 
 impl WrapperRules {
-    pub fn filter_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn filter_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO respect having filter for push down to wrapped select
         // rules.extend(vec![rewrite(
         //     "wrapper-push-down-filter-to-wrapped-select",
@@ -118,9 +121,10 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?cube_scan_input",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
@@ -131,60 +135,75 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         wrapped_select_projection_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_subqueries_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_group_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_aggr_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_window_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         "?cube_scan_input",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
-                    wrapped_select_joins_empty_tail(),
+                    wrapper_pullup_replacer(
+                        wrapped_select_joins_empty_tail(),
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                     wrapped_select_filter_expr(
                         wrapper_pushdown_replacer(
                             "?filter_expr",
                             "?alias_to_cube",
-                            "?ungrouped",
+                            "?pushdown_push_to_cube",
                             "?in_projection",
                             "?cube_members",
+                            "?pushdown_grouped_subqueries",
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_filter_expr_empty_tail(),
                             "?alias_to_cube",
-                            "?ungrouped",
+                            "?push_to_cube",
                             "?in_projection",
                             "?cube_members",
+                            "?grouped_subqueries",
                         ),
                     ),
                     wrapped_select_having_expr_empty_tail(),
@@ -193,18 +212,26 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         wrapped_select_order_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "WrappedSelectAlias:None",
                     "WrappedSelectDistinct:false",
-                    "?select_ungrouped",
+                    "?select_push_to_cube",
                     "?select_ungrouped_scan",
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_filter("?ungrouped", "?select_ungrouped", "?select_ungrouped_scan"),
+            self.transform_filter(
+                "?push_to_cube",
+                "?pushdown_push_to_cube",
+                "?select_push_to_cube",
+                "?select_ungrouped_scan",
+                "?grouped_subqueries",
+                "?pushdown_grouped_subqueries",
+            ),
         )]);
 
         Self::list_pushdown_pullup_rules(
@@ -215,10 +242,7 @@ impl WrapperRules {
         );
     }
 
-    pub fn filter_rules_subquery(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn filter_rules_subquery(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-filter-and-subquery-to-cube-scan",
             filter(
@@ -228,9 +252,10 @@ impl WrapperRules {
                         wrapper_pullup_replacer(
                             "?cube_scan_input",
                             "?alias_to_cube",
-                            "?ungrouped",
+                            "?push_to_cube",
                             "?in_projection",
                             "?cube_members",
+                            "?grouped_subqueries",
                         ),
                         "CubeScanWrapperFinalized:false",
                     ),
@@ -244,60 +269,75 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         wrapped_select_projection_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pushdown_replacer(
                         "?subqueries",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pushdown_push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?pushdown_grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_group_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_aggr_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_window_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     wrapper_pullup_replacer(
                         "?cube_scan_input",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
-                    wrapped_select_joins_empty_tail(),
+                    wrapper_pullup_replacer(
+                        wrapped_select_joins_empty_tail(),
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                     wrapped_select_filter_expr(
                         wrapper_pushdown_replacer(
                             "?filter_expr",
                             "?alias_to_cube",
-                            "?ungrouped",
+                            "?pushdown_push_to_cube",
                             "?in_projection",
                             "?cube_members",
+                            "?pushdown_grouped_subqueries",
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_filter_expr_empty_tail(),
                             "?alias_to_cube",
-                            "?ungrouped",
+                            "?push_to_cube",
                             "?in_projection",
                             "?cube_members",
+                            "?grouped_subqueries",
                         ),
                     ),
                     wrapped_select_having_expr_empty_tail(),
@@ -306,42 +346,55 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         wrapped_select_order_expr_empty_tail(),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
+                        "?grouped_subqueries",
                     ),
                     "WrappedSelectAlias:None",
                     "WrappedSelectDistinct:false",
-                    "?select_ungrouped",
+                    "?select_push_to_cube",
                     "?select_ungrouped_scan",
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
             self.transform_filter_subquery(
                 "?alias_to_cube",
-                "?ungrouped",
-                "?select_ungrouped",
+                "?push_to_cube",
+                "?pushdown_push_to_cube",
+                "?select_push_to_cube",
                 "?select_ungrouped_scan",
+                "?grouped_subqueries",
+                "?pushdown_grouped_subqueries",
             ),
         )]);
     }
 
     fn transform_filter(
         &self,
-        ungrouped_var: &'static str,
-        select_ungrouped_var: &'static str,
+        push_to_cube_var: &'static str,
+        pushdown_push_to_cube_var: &'static str,
+        select_push_to_cube_var: &'static str,
         select_ungrouped_scan_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let ungrouped_var = var!(ungrouped_var);
-        let select_ungrouped_var = var!(select_ungrouped_var);
+        grouped_subqueries_var: &'static str,
+        pushdown_grouped_subqueries_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pushdown_push_to_cube_var = var!(pushdown_push_to_cube_var);
+        let select_push_to_cube_var = var!(select_push_to_cube_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
+        let grouped_subqueries_var = var!(grouped_subqueries_var);
+        let pushdown_grouped_subqueries_var = var!(pushdown_grouped_subqueries_var);
         move |egraph, subst| {
             Self::transform_filter_impl(
                 egraph,
                 subst,
-                ungrouped_var,
-                select_ungrouped_var,
+                push_to_cube_var,
+                pushdown_push_to_cube_var,
+                select_push_to_cube_var,
                 select_ungrouped_scan_var,
+                grouped_subqueries_var,
+                pushdown_grouped_subqueries_var,
             )
         }
     }
@@ -349,14 +402,20 @@ impl WrapperRules {
     fn transform_filter_subquery(
         &self,
         alias_to_cube_var: &'static str,
-        ungrouped_var: &'static str,
-        select_ungrouped_var: &'static str,
+        push_to_cube_var: &'static str,
+        pushdown_push_to_cube_var: &'static str,
+        select_push_to_cube_var: &'static str,
         select_ungrouped_scan_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        grouped_subqueries_var: &'static str,
+        pushdown_grouped_subqueries_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let ungrouped_var = var!(ungrouped_var);
-        let select_ungrouped_var = var!(select_ungrouped_var);
+        let push_to_cube_var = var!(push_to_cube_var);
+        let pushdown_push_to_cube_var = var!(pushdown_push_to_cube_var);
+        let select_push_to_cube_var = var!(select_push_to_cube_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
+        let grouped_subqueries_var = var!(grouped_subqueries_var);
+        let pushdown_grouped_subqueries_var = var!(pushdown_grouped_subqueries_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             if Self::transform_check_subquery_allowed(
@@ -368,9 +427,12 @@ impl WrapperRules {
                 Self::transform_filter_impl(
                     egraph,
                     subst,
-                    ungrouped_var,
-                    select_ungrouped_var,
+                    push_to_cube_var,
+                    pushdown_push_to_cube_var,
+                    select_push_to_cube_var,
                     select_ungrouped_scan_var,
+                    grouped_subqueries_var,
+                    pushdown_grouped_subqueries_var,
                 )
             } else {
                 false
@@ -379,26 +441,55 @@ impl WrapperRules {
     }
 
     fn transform_filter_impl(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &mut Subst,
-        ungrouped_var: Var,
-        select_ungrouped_var: Var,
+        push_to_cube_var: Var,
+        pushdown_push_to_cube_var: Var,
+        select_push_to_cube_var: Var,
         select_ungrouped_scan_var: Var,
+        grouped_subqueries_var: Var,
+        pushdown_grouped_subqueries_var: Var,
     ) -> bool {
-        for ungrouped in
-            var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
+        if !copy_flag!(
+            egraph,
+            subst,
+            push_to_cube_var,
+            WrapperPullupReplacerPushToCube,
+            pushdown_push_to_cube_var,
+            WrapperPushdownReplacerPushToCube
+        ) {
+            return false;
+        }
+
+        if !copy_value!(
+            egraph,
+            subst,
+            Vec<String>,
+            grouped_subqueries_var,
+            WrapperPullupReplacerGroupedSubqueries,
+            pushdown_grouped_subqueries_var,
+            WrapperPushdownReplacerGroupedSubqueries
+        ) {
+            return false;
+        }
+
+        for push_to_cube in var_iter!(
+            egraph[subst[push_to_cube_var]],
+            WrapperPullupReplacerPushToCube
+        )
+        .cloned()
         {
             subst.insert(
-                select_ungrouped_var,
-                egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
-                    WrappedSelectUngrouped(ungrouped),
+                select_push_to_cube_var,
+                egraph.add(LogicalPlanLanguage::WrappedSelectPushToCube(
+                    WrappedSelectPushToCube(push_to_cube),
                 )),
             );
 
             subst.insert(
                 select_ungrouped_scan_var,
                 egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
-                    WrappedSelectUngroupedScan(ungrouped),
+                    WrappedSelectUngroupedScan(push_to_cube),
                 )),
             );
             return true;

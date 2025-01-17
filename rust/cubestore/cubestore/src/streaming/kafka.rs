@@ -11,6 +11,7 @@ use async_std::stream;
 use async_trait::async_trait;
 use datafusion::arrow::array::ArrayRef;
 use datafusion::cube_ext;
+use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use futures::Stream;
 use json::object::Object;
 use json::JsonValue;
@@ -59,6 +60,7 @@ impl KafkaStreamingSource {
         kafka_client: Arc<dyn KafkaClientService>,
         use_ssl: bool,
         trace_obj: Option<String>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Result<Self, CubeError> {
         let (post_processing_plan, columns, unique_key_columns, seq_column_index) =
             if let Some(select_statement) = select_statement {
@@ -69,7 +71,7 @@ impl KafkaStreamingSource {
                     columns.clone(),
                     source_columns,
                 );
-                let plan = planner.build(select_statement.clone())?;
+                let plan = planner.build(select_statement.clone(), metadata_cache_factory)?;
                 let columns = plan.source_columns().clone();
                 let seq_column_index = plan.source_seq_column_index();
                 let unique_columns = plan.source_unique_columns().clone();
@@ -304,6 +306,13 @@ impl StreamingSource for KafkaStreamingSource {
         let unique_key_columns = self.unique_key_columns.clone();
         let seq_column_index_to_move = self.seq_column_index;
         let traffic_sender = TrafficSender::new(self.trace_obj.clone());
+        let hosts = self
+            .host
+            .clone()
+            .split(",")
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
         let stream = self
             .kafka_client
             .create_message_stream(
@@ -319,7 +328,7 @@ impl StreamingSource for KafkaStreamingSource {
                         })
                         .unwrap_or(Offset::End),
                 ),
-                vec![self.host.clone()],
+                hosts,
                 &self.user,
                 &self.password,
                 self.use_ssl,

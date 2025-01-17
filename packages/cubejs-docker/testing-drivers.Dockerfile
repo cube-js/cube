@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:18.20.3-bullseye-slim AS base
+FROM node:20.17.0-bookworm-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -12,13 +12,12 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python3 gcc g++ make cmake openjdk-11-jdk-headless unzip mc \
+    && apt-get install -y --no-install-recommends libssl3 curl \
+       cmake python3 gcc g++ make cmake openjdk-17-jdk-headless unzip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
-ENV TERM rxvt-unicode
-ENV NODE_ENV development
+ENV NODE_ENV=development
 
 WORKDIR /cubejs
 
@@ -58,6 +57,7 @@ COPY packages/cubejs-questdb-driver/package.json packages/cubejs-questdb-driver/
 COPY packages/cubejs-materialize-driver/package.json packages/cubejs-materialize-driver/package.json
 COPY packages/cubejs-prestodb-driver/package.json packages/cubejs-prestodb-driver/package.json
 COPY packages/cubejs-trino-driver/package.json packages/cubejs-trino-driver/package.json
+COPY packages/cubejs-pinot-driver/package.json packages/cubejs-pinot-driver/package.json
 COPY packages/cubejs-query-orchestrator/package.json packages/cubejs-query-orchestrator/package.json
 COPY packages/cubejs-schema-compiler/package.json packages/cubejs-schema-compiler/package.json
 COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
@@ -78,33 +78,33 @@ COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/packag
 #COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 #COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-RUN yarn policies set-version v1.22.19
+RUN yarn policies set-version v1.22.22
 RUN yarn config set network-timeout 120000 -g
 
 ######################################################################
 # Databricks driver dependencies                                     #
 ######################################################################
-FROM base as prod_base_dependencies
+FROM base AS prod_base_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
-FROM prod_base_dependencies as prod_dependencies
+FROM prod_base_dependencies AS prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
 ######################################################################
 # Build dependencies                                                 #
 ######################################################################
-FROM base as build_dependencies
+FROM base AS build_dependencies
 
 RUN yarn install
 
 ######################################################################
 # Build layer                                                        #
 ######################################################################
-FROM build_dependencies as build
+FROM build_dependencies AS build
 
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
@@ -135,6 +135,7 @@ COPY packages/cubejs-questdb-driver/ packages/cubejs-questdb-driver/
 COPY packages/cubejs-materialize-driver/ packages/cubejs-materialize-driver/
 COPY packages/cubejs-prestodb-driver/ packages/cubejs-prestodb-driver/
 COPY packages/cubejs-trino-driver/ packages/cubejs-trino-driver/
+COPY packages/cubejs-pinot-driver/ packages/cubejs-pinot-driver/
 COPY packages/cubejs-query-orchestrator/ packages/cubejs-query-orchestrator/
 COPY packages/cubejs-schema-compiler/ packages/cubejs-schema-compiler/
 COPY packages/cubejs-server/ packages/cubejs-server/
@@ -167,7 +168,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates python3 libpython3-dev \
+    && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .
@@ -176,7 +177,7 @@ COPY --from=prod_dependencies /cubejs .
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
-ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 

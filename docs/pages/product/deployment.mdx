@@ -57,7 +57,7 @@ The [Cube Docker image][dh-cubejs] is used for API Instance.
 
 API instances can be configured via environment variables or the `cube.js`
 configuration file, and **must** have access to the data model files (as
-specified by [`schemaPath`][ref-conf-ref-schemapath].
+specified by [`schema_path`][ref-conf-ref-schemapath].
 
 ## Refresh Worker
 
@@ -244,21 +244,6 @@ services:
       - cubestore_router
 ```
 
-## Redis
-
-Earlier, [Redis][redis] was used in production deployments as storage for
-in-memory cache and query queue. Since version v0.32.0, Cube Store is used for
-that purpose. It is still possible to [configure][ref-config-redis] Cube to use
-Redis; however, it is strongly not recommended. Please check the [blog
-post][blog-details] for details.
-
-<WarningBox>
-
-Redis support is deprecated and will be removed from Cube in the future. Upgrade
-to v0.32.0 or later to use Cube Store instead of Redis. See the [migration
-guide][blog-migration-guide].
-
-</WarningBox>
 
 [dh-cubejs]: https://hub.docker.com/r/cubejs/cube
 [dh-cubestore]: https://hub.docker.com/r/cubejs/cubestore
@@ -271,11 +256,5 @@ guide][blog-migration-guide].
 [ref-deploy-docker]: /product/deployment/core
 [ref-config-env]: /reference/configuration/environment-variables
 [ref-config-js]: /reference/configuration/config
-[ref-conf-ref-schemapath]: /reference/configuration/config#schemapath
-[redis]: https://redis.io
-[ref-config-redis]:
-  /reference/configuration/environment-variables#cubejs_redis_password
-[blog-details]: https://cube.dev/blog/how-you-win-by-using-cube-store-part-1
-[blog-migration-guide]:
-  https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store
+[ref-conf-ref-schemapath]: /reference/configuration/config#schema_path
 [gh-pavel]: https://github.com/paveltiunov

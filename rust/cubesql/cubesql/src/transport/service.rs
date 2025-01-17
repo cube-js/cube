@@ -26,9 +26,12 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    compile::engine::df::{
-        scan::MemberField,
-        wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
+    compile::{
+        engine::df::{
+            scan::MemberField,
+            wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
+        },
+        rewrite::LikeType,
     },
     sql::{AuthContextRef, HttpAuthContext},
     transport::{
@@ -832,6 +835,39 @@ impl SqlTemplates {
         self.render_template("expressions/timestamp_literal", context! { value => value })
     }
 
+    pub fn like_expr(
+        &self,
+        like_type: LikeType,
+        expr: String,
+        negated: bool,
+        pattern: String,
+        escape_char: Option<String>,
+    ) -> Result<String, CubeError> {
+        let expression_name = match like_type {
+            LikeType::Like => "like",
+            LikeType::ILike => "ilike",
+            _ => {
+                return Err(CubeError::internal(format!(
+                    "Error rendering template: like type {} is not supported",
+                    like_type
+                )))
+            }
+        };
+
+        let rendered_like = self.render_template(
+            &format!("expressions/{}", expression_name),
+            context! { expr => expr, negated => negated, pattern => pattern },
+        )?;
+
+        let Some(escape_char) = escape_char else {
+            return Ok(rendered_like);
+        };
+        self.render_template(
+            "expressions/like_escape",
+            context! { like_expr => rendered_like, escape_char => escape_char },
+        )
+    }
+
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render_template("params/param", context! { param_index => param_index })
     }
@@ -869,5 +905,13 @@ impl SqlTemplates {
             }
         };
         self.render_template(&format!("types/{}", data_type), context! {})
+    }
+
+    pub fn left_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/left", context! {})
+    }
+
+    pub fn inner_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/inner", context! {})
     }
 }

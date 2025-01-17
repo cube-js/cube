@@ -5,9 +5,10 @@ pub mod language;
 pub mod rewriter;
 pub mod rules;
 
-use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, OriginalExpr},
-    CubeError,
+use self::analysis::{LogicalPlanData, MemberNameToExpr};
+use crate::compile::rewrite::{
+    analysis::{LogicalPlanAnalysis, OriginalExpr},
+    rewriter::{CubeEGraph, CubeRewrite},
 };
 use analysis::MemberNamesToExpr;
 use datafusion::{
@@ -23,8 +24,8 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{
-    rewrite, Applier, EGraph, Id, Language, Pattern, PatternAst, Rewrite, SearchMatches, Searcher,
-    Subst, Symbol, Var,
+    rewrite, Applier, Id, Language, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
+    Symbol, Var,
 };
 use itertools::Itertools;
 use std::{
@@ -33,9 +34,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-
-use self::analysis::{LogicalPlanData, MemberNameToExpr};
-
 // trace_macros!(true);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
@@ -105,6 +103,7 @@ crate::plan_to_language! {
             join_type: JoinType,
             join_constraint: JoinConstraint,
             schema: DFSchemaRef,
+            null_equals_null: bool,
         },
         CrossJoin {
             left: Arc<LogicalPlan>,
@@ -154,6 +153,9 @@ crate::plan_to_language! {
             name: String,
             location: String,
             has_header: bool,
+        },
+        Values {
+            values: Vec<Vec<Expr>>,
         },
         Extension {
             node: Arc<LogicalPlan>,
@@ -281,7 +283,7 @@ crate::plan_to_language! {
             order_expr: Vec<Expr>,
             alias: Option<String>,
             distinct: bool,
-            ungrouped: bool,
+            push_to_cube: bool,
             ungrouped_scan: bool,
         },
         WrappedSelectJoin {
@@ -455,16 +457,37 @@ crate::plan_to_language! {
         WrapperPushdownReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
-            ungrouped: bool,
+            // This means that result of this replacer would be used as member expression in load query to Cube.
+            // This flag should be passed from top, by the rule that starts wrapping new logical plan node.
+            // Important caveat: it means that result would be used for push to cube *and only there*.
+            // So it's more like "must push to Cube" than "can push to Cube"
+            // This part is important for rewrites like SUM(sumMeasure) => sumMeasure
+            // We can use sumMeasure instead of SUM(sumMeasure) ONLY in with push to Cube
+            // An vice versa, we can't use SUM(sumMeasure) in grouped query to Cube, so it can be allowed ONLY without push to grouped Cube query
+            push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+            // Known qualifiers of grouped subqueries
+            // Used to allow to rewrite columns from them even with push to Cube enabled
+            grouped_subqueries: Vec<String>,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
-            ungrouped: bool,
+            // When `member` is expression this means that result of this replacer should be used as member expression in load query to Cube.
+            // When `member` is logical plan node this means that logical plan inside allows to push to Cube
+            // This flag should make roundtrip from top to bottom and back.
+            // Important caveat: it means that result should be used for push to cube *and only there*.
+            // So it's more like "must push to Cube" than "can push to Cube"
+            // This part is important for rewrites like SUM(sumMeasure) => sumMeasure
+            // We can use sumMeasure instead of SUM(sumMeasure) ONLY in with push to Cube
+            // An vice versa, we can't use SUM(sumMeasure) in grouped query to Cube, so it can be allowed ONLY without push to grouped Cube query
+            push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+            // Known qualifiers of grouped subqueries
+            // Used to allow to rewrite columns from them even with push to Cube enabled
+            grouped_subqueries: Vec<String>,
         },
         FlattenPushdownReplacer {
             expr: Arc<Expr>,
@@ -498,7 +521,9 @@ crate::plan_to_language! {
 macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
-            LogicalPlanLanguage::$field_variant($field_variant(v)) => Some(v),
+            $crate::compile::rewrite::LogicalPlanLanguage::$field_variant($field_variant(v)) => {
+                Some(v)
+            }
             _ => None,
         })
     }};
@@ -508,7 +533,7 @@ macro_rules! var_iter {
 macro_rules! var_list_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
-            LogicalPlanLanguage::$field_variant(v) => Some(v),
+            $crate::compile::rewrite::LogicalPlanLanguage::$field_variant(v) => Some(v),
             _ => None,
         })
     }};
@@ -518,6 +543,44 @@ macro_rules! var_list_iter {
 macro_rules! var {
     ($var_str:expr) => {
         $var_str.parse().unwrap()
+    };
+}
+
+#[macro_export]
+macro_rules! copy_value {
+    ($egraph:expr, $subst:expr, $ty:ty, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {{
+        let mut found = false;
+        let mut found_value: Option<&$ty> = None;
+        for in_value in $crate::var_iter!($egraph[$subst[$in_var]], $in_kind) {
+            // Typechecking for $in_kind
+            let in_value: &$ty = in_value;
+            if found {
+                // Found many different unified representations of same kind for a single eclass, not safe to copy
+                found_value = None;
+            } else {
+                found = true;
+                found_value = Some(in_value);
+            }
+        }
+        if let Some(found_value) = found_value {
+            let out_value = found_value.clone();
+            $subst.insert(
+                $out_var,
+                $egraph.add($crate::compile::rewrite::LogicalPlanLanguage::$out_kind(
+                    $out_kind(out_value),
+                )),
+            );
+            true
+        } else {
+            false
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! copy_flag {
+    ($egraph:expr, $subst:expr, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {
+        $crate::copy_value!($egraph, $subst, bool, $in_var, $in_kind, $out_var, $out_kind)
     };
 }
 
@@ -583,6 +646,12 @@ pub fn column_name_to_member_vec(
 }
 
 impl LogicalPlanData {
+    // TODO use it instead of find_member_by_alias in more places
+    fn find_member_by_column(&mut self, column: &Column) -> Option<(&MemberNameToExpr, String)> {
+        let name = column.flat_name();
+        self.find_member_by_alias(&name)
+    }
+
     fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
         if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
             Self::do_find_member_by_alias(member_names_to_expr, name)
@@ -656,11 +725,7 @@ fn expr_column_name(expr: &Expr, cube: &Option<String>) -> String {
     }
 }
 
-pub fn rewrite(
-    name: &str,
-    searcher: String,
-    applier: String,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+pub fn rewrite(name: &str, searcher: String, applier: String) -> CubeRewrite {
     Rewrite::new(
         name.to_string(),
         searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
@@ -674,12 +739,9 @@ pub fn transforming_rewrite<T>(
     searcher: String,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -696,12 +758,9 @@ pub fn transforming_rewrite_with_root<T>(
     searcher: String,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -717,12 +776,9 @@ pub fn transforming_chain_rewrite<T>(
     chain: Vec<(&str, String)>,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -746,12 +802,9 @@ pub fn transforming_chain_rewrite_with_root<T>(
     chain: Vec<(&str, String)>,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -904,7 +957,7 @@ impl ListNodeSearcher {
 
     fn search_from_list_matches<'a>(
         &'a self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         limit: usize,
         list_subst: &Subst,
         output: &mut Vec<Subst>,
@@ -968,7 +1021,7 @@ impl ListNodeSearcher {
 impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
     fn search_eclass_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
@@ -989,7 +1042,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
 
     fn search_eclasses_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
@@ -1109,7 +1162,7 @@ impl ListNodeApplier {
 impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
     fn apply_one(
         &self,
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         mut eclass: Id,
         subst: &Subst,
         _searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
@@ -1169,7 +1222,7 @@ pub fn list_rewrite(
     list_type: ListType,
     searcher: ListPattern,
     applier: ListPattern,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,
@@ -1191,7 +1244,7 @@ pub fn list_rewrite_with_lists(
     searcher: ListPattern,
     applier_pattern: &str,
     lists: impl IntoIterator<Item = ListApplierListPattern>,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,
@@ -1208,7 +1261,7 @@ pub fn list_rewrite_with_vars(
     searcher: ListPattern,
     applier: ListPattern,
     top_level_elem_vars: &[&str],
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,
@@ -1232,7 +1285,7 @@ pub fn list_rewrite_with_lists_and_vars(
     applier_pattern: &str,
     lists: impl IntoIterator<Item = ListApplierListPattern>,
     top_level_elem_vars: &[&str],
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,
@@ -1398,7 +1451,7 @@ fn wrapped_select(
     order_expr: impl Display,
     alias: impl Display,
     distinct: impl Display,
-    ungrouped: impl Display,
+    push_to_cube: impl Display,
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
@@ -1418,7 +1471,7 @@ fn wrapped_select(
         order_expr,
         alias,
         distinct,
-        ungrouped,
+        push_to_cube,
         ungrouped_scan
     )
 }
@@ -1459,12 +1512,15 @@ fn wrapped_select_window_expr_empty_tail() -> String {
     wrapped_select_window_expr(Vec::<String>::new())
 }
 
+fn wrapped_select_join(input: impl Display, expr: impl Display, join_type: impl Display) -> String {
+    format!("(WrappedSelectJoin {} {} {})", input, expr, join_type)
+}
+
 #[allow(dead_code)]
 fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectJoins {} {})", left, right)
 }
 
-#[allow(dead_code)]
 fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
 }
@@ -1743,6 +1799,7 @@ fn join(
     right_on: impl Display,
     join_type: impl Display,
     join_constraint: impl Display,
+    null_equals_null: impl Display,
 ) -> String {
     let join_type_prefix = if join_type.to_string().starts_with("?") {
         ""
@@ -1755,7 +1812,7 @@ fn join(
         "JoinJoinConstraint:"
     };
     format!(
-        "(Join {} {} {} {} {}{} {}{})",
+        "(Join {} {} {} {} {}{} {}{} {})",
         left,
         right,
         left_on,
@@ -1764,6 +1821,7 @@ fn join(
         join_type,
         join_constraint_prefix,
         join_constraint,
+        null_equals_null,
     )
 }
 
@@ -1918,26 +1976,26 @@ fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> Str
 fn wrapper_pushdown_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
-    ungrouped: impl Display,
+    push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
+    grouped_subqueries: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {} {} {} {} {})",
-        members, alias_to_cube, ungrouped, in_projection, cube_members
+        "(WrapperPushdownReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
     )
 }
 
 fn wrapper_pullup_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
-    ungrouped: impl Display,
+    push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
+    grouped_subqueries: impl Display,
 ) -> String {
     format!(
-        "(WrapperPullupReplacer {} {} {} {} {})",
-        members, alias_to_cube, ungrouped, in_projection, cube_members
+        "(WrapperPullupReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
     )
 }
 
@@ -2075,7 +2133,7 @@ fn cube_scan(
     ungrouped: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {} {}))",
+        "(CubeScan {} {} {} {} {} {} {} {} {} {})",
         alias_to_cube,
         members,
         filters,
@@ -2097,10 +2155,7 @@ fn distinct(input: impl Display) -> String {
     format!("(Distinct {})", input)
 }
 
-pub fn original_expr_name(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    id: Id,
-) -> Option<String> {
+pub fn original_expr_name(egraph: &CubeEGraph, id: Id) -> Option<String> {
     egraph[id]
         .data
         .original_expr
@@ -2123,7 +2178,7 @@ pub struct ChainSearcher {
 impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
     fn search_eclasses_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
@@ -2141,7 +2196,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
 
     fn search_eclass_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
@@ -2164,7 +2219,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
 impl ChainSearcher {
     fn search_match_chained<'a>(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         mut cur_match: SearchMatches<'a, LogicalPlanLanguage>,
     ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
         let mut new_substs = vec![];
@@ -2195,7 +2250,7 @@ impl ChainSearcher {
 
 pub struct TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool,
 {
     pattern: Pattern<LogicalPlanLanguage>,
     vars_to_substitute: T,
@@ -2203,7 +2258,7 @@ where
 
 impl<T> TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool,
 {
     pub fn new(pattern: &str, vars_to_substitute: T) -> Self {
         Self {
@@ -2215,11 +2270,11 @@ where
 
 impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool,
 {
     fn apply_one(
         &self,
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         eclass: Id,
         subst: &Subst,
         searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
@@ -2237,13 +2292,13 @@ where
 
 pub fn transform_original_expr_to_alias(
     alias_expr_var: &'static str,
-) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool {
+) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
     let alias_expr_var = var!(alias_expr_var);
     move |egraph, root, subst| add_root_original_expr_alias(egraph, root, subst, alias_expr_var)
 }
 
 pub fn add_root_original_expr_alias(
-    egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    egraph: &mut CubeEGraph,
     root: Id,
     subst: &mut Subst,
     alias_expr_var: Var,

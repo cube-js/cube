@@ -15,6 +15,8 @@ const repo = "https://github.com/cube-js/cube";
 const branch = "master";
 const path = "/docs/";
 
+const isProduction = process.env.NODE_ENV !== 'development'
+
 const GoogleTagManager = () => (
   <>
     <script dangerouslySetInnerHTML={{ __html: `
@@ -46,7 +48,7 @@ const config: DocsThemeConfig = {
   head: (
     <>
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <GoogleTagManager />
+      {isProduction && <GoogleTagManager />}
     </>
   ),
   useNextSeoProps: () => {
@@ -104,6 +106,16 @@ const config: DocsThemeConfig = {
         >
           Try Cube for Free
         </BlogButton>
+      </div>
+    )
+  },
+  toc: {
+    extraContent: (
+      <div>
+        <br/>
+        <a target="_blank" href="https://cube.dev/blog/cube-cloud-named-fast-moving-leader-in-gigaoms-2024-sonar-report?utm_source=cube&utm_medium=docs">
+          <img src="https://ucarecdn.com/a16cd6ee-4310-4507-a528-3caeda0777c2/"/>
+        </a>
       </div>
     )
   }

@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis,
             converter::LanguageToLogicalPlanConverter,
-            cost::BestCubePlan,
+            cost::{BestCubePlan, CubePlanTopDownState, TopDownExtractor},
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
                 flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
@@ -15,7 +15,7 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
 };
@@ -23,7 +23,6 @@ use datafusion::{
     logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner, scalar::ScalarValue,
 };
 use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -32,124 +31,88 @@ use std::{
     time::Duration,
 };
 
+pub type CubeRewrite = Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>;
+pub type CubeEGraph = EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>;
+
 pub struct Rewriter {
-    graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    graph: CubeEGraph,
     cube_context: Arc<CubeContext>,
 }
 
 pub type CubeRunner = Runner<LogicalPlanLanguage, LogicalPlanAnalysis, IterInfo>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugNode {
-    id: String,
-    label: String,
-    #[serde(rename = "comboId")]
-    combo_id: String,
+#[derive(Clone, Serialize, Deserialize)]
+struct DebugENodeId(String);
+
+impl From<&LogicalPlanLanguage> for DebugENodeId {
+    fn from(value: &LogicalPlanLanguage) -> Self {
+        Self(format!("{value:?}"))
+    }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugEdge {
-    source: String,
-    target: String,
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EClassDebugData {
+    id: Id,
+    canon: Id,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugCombo {
-    id: String,
-    label: String,
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ENodeDebugData {
+    enode: DebugENodeId,
+    eclass: Id,
+    children: Vec<Id>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugData {
-    nodes: Vec<DebugNode>,
-    #[serde(rename = "removedNodes")]
-    removed_nodes: Vec<DebugNode>,
-    edges: Vec<DebugEdge>,
-    #[serde(rename = "removedEdges")]
-    removed_edges: Vec<DebugEdge>,
-    combos: Vec<DebugCombo>,
-    #[serde(rename = "removedCombos")]
-    removed_combos: Vec<DebugCombo>,
+/// Representation is optimised for storing in JSON, to transfer to UI
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EGraphDebugState {
+    eclasses: Vec<EClassDebugData>,
+    enodes: Vec<ENodeDebugData>,
+}
+
+impl EGraphDebugState {
+    pub fn new(graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>) -> Self {
+        let current_eclasses = graph.classes().map(|ec| ec.id);
+        let previous_debug_eclasses = graph
+            .analysis
+            .debug_states
+            .iter()
+            .flat_map(|state| state.eclasses.iter().map(|ecd| ecd.id));
+        let all_known_eclasses = current_eclasses.chain(previous_debug_eclasses);
+
+        let all_known_eclasses = all_known_eclasses.collect::<HashSet<_>>();
+
+        let eclasses = all_known_eclasses
+            .into_iter()
+            .map(|ec| EClassDebugData {
+                id: ec,
+                canon: graph.find(ec),
+            })
+            .collect::<Vec<_>>();
+
+        let enodes = graph
+            .classes()
+            .flat_map(|ec| ec.nodes.iter().map(move |node| (ec.id, node)))
+            .map(|(ec, node)| ENodeDebugData {
+                enode: node.into(),
+                eclass: ec,
+                children: node.children().to_vec(),
+            })
+            .collect();
+
+        EGraphDebugState { eclasses, enodes }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct DebugState {
+    egraph: EGraphDebugState,
     #[serde(rename = "appliedRules")]
-    applied_rules: Option<Vec<String>>,
-}
-
-#[derive(Debug)]
-pub struct IterDebugInfo {
-    debug_data: DebugData,
-}
-
-impl IterDebugInfo {
-    pub fn prepare_debug_data(
-        graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> DebugData {
-        DebugData {
-            applied_rules: None,
-            nodes: graph
-                .classes()
-                .flat_map(|class| {
-                    let mut result = class
-                        .nodes
-                        .iter()
-                        .map(|n| {
-                            let node_id = format!("{}-{:?}", class.id, n);
-                            DebugNode {
-                                id: node_id.to_string(),
-                                label: format!("{:?}", n),
-                                combo_id: format!("c{}", class.id),
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    result.push(DebugNode {
-                        id: class.id.to_string(),
-                        label: class.id.to_string(),
-                        combo_id: format!("c{}", class.id),
-                    });
-                    result
-                })
-                .collect(),
-            edges: graph
-                .classes()
-                .flat_map(|class| {
-                    class
-                        .nodes
-                        .iter()
-                        .map(|n| DebugEdge {
-                            source: class.id.to_string(),
-                            target: format!("{}-{:?}", class.id, n,),
-                        })
-                        .chain(class.nodes.iter().flat_map(|n| {
-                            n.children().iter().map(move |c| DebugEdge {
-                                source: format!("{}-{:?}", class.id, n),
-                                target: c.to_string(),
-                            })
-                        }))
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
-            combos: graph
-                .classes()
-                .map(|class| DebugCombo {
-                    id: format!("c{}", class.id),
-                    label: format!("#{}", class.id),
-                })
-                .collect(),
-            removed_nodes: Vec::new(),
-            removed_edges: Vec::new(),
-            removed_combos: Vec::new(),
-        }
-    }
-
-    fn make(runner: &CubeRunner) -> Self {
-        IterDebugInfo {
-            debug_data: Self::prepare_debug_data(&runner.egraph),
-        }
-    }
+    applied_rules: Vec<String>,
 }
 
 #[derive(Debug)]
 pub struct IterInfo {
-    debug_info: Option<IterDebugInfo>,
     debug_qtrace_eclasses: Option<Vec<QtraceEclass>>,
 }
 
@@ -164,11 +127,6 @@ impl IterInfo {
 impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
     fn make(runner: &CubeRunner) -> Self {
         IterInfo {
-            debug_info: if Self::egraph_debug_enabled() {
-                Some(IterDebugInfo::make(runner))
-            } else {
-                None
-            },
             debug_qtrace_eclasses: if Qtrace::is_enabled() {
                 Some(
                     runner
@@ -184,22 +142,65 @@ impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
     }
 }
 
+fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError> {
+    let dir = format!("egraph-debug-{}", stage);
+    let _ = fs::create_dir_all(dir.clone());
+    let _ = fs::create_dir_all(format!("{}/public", dir));
+    let _ = fs::create_dir_all(format!("{}/src", dir));
+    fs::copy(
+        "egraph-debug-template/public/index.html",
+        format!("{}/public/index.html", dir),
+    )?;
+    fs::copy(
+        "egraph-debug-template/package.json",
+        format!("{}/package.json", dir),
+    )?;
+    fs::copy(
+        "egraph-debug-template/tsconfig.json",
+        format!("{}/tsconfig.json", dir),
+    )?;
+    fs::copy(
+        "egraph-debug-template/src/index.tsx",
+        format!("{}/src/index.tsx", dir),
+    )?;
+
+    let debug_data = runner.egraph.analysis.debug_states.as_slice();
+    debug_assert_eq!(debug_data.len(), runner.iterations.len() + 1);
+
+    // debug_data[0] is initial state
+    // runner.iterations[0] is result of first iteration
+    let states_data = debug_data
+        .iter()
+        .skip(1)
+        .zip(runner.iterations.iter().map(|i| Some(&i.applied)));
+    let debug_data = std::iter::once((&debug_data[0], None))
+        .chain(states_data)
+        .map(|(egraph, applied_rules)| DebugState {
+            egraph: egraph.clone(),
+            applied_rules: applied_rules
+                .map(|applied| applied.iter().map(|s| format!("{:?}", s)).collect())
+                .unwrap_or(vec![]),
+        })
+        .collect::<Vec<_>>();
+
+    fs::write(
+        format!("{}/src/states.json", dir),
+        serde_json::to_string_pretty(&debug_data)?,
+    )?;
+
+    Ok(())
+}
+
 impl Rewriter {
-    pub fn new(
-        graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        cube_context: Arc<CubeContext>,
-    ) -> Self {
+    pub fn new(graph: CubeEGraph, cube_context: Arc<CubeContext>) -> Self {
         Self {
             graph,
             cube_context,
         }
     }
 
-    pub fn rewrite_runner(
-        cube_context: Arc<CubeContext>,
-        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> CubeRunner {
-        CubeRunner::new(LogicalPlanAnalysis::new(
+    pub fn rewrite_runner(cube_context: Arc<CubeContext>, egraph: CubeEGraph) -> CubeRunner {
+        let runner = CubeRunner::new(LogicalPlanAnalysis::new(
             cube_context,
             Arc::new(DefaultPhysicalPlanner::default()),
         ))
@@ -219,19 +220,36 @@ impl Rewriter {
                 .map(|v| v.parse::<u64>().unwrap())
                 .unwrap_or(30),
         ))
-        .with_scheduler(IncrementalScheduler::default())
-        .with_hook(|runner| {
-            runner.egraph.analysis.iteration_timestamp = runner.iterations.len() + 1;
-            Ok(())
-        })
-        .with_egraph(egraph)
+        .with_scheduler(IncrementalScheduler::default());
+
+        let runner = if IterInfo::egraph_debug_enabled() {
+            // We want more access than Iterations gives us
+            // Specifically, there's no way to store and access egraph state before first iteration
+            // This hook is not really order-dependent with iteration timestamp bump
+            // But just for clarity it should run before, so first captured state would be when iteration is zero, before first iteration started
+            runner.with_hook(|runner| {
+                LogicalPlanAnalysis::store_egraph_debug_state(&mut runner.egraph);
+                Ok(())
+            })
+        } else {
+            runner
+        };
+
+        let runner = runner
+            .with_hook(|runner| {
+                runner.egraph.analysis.iteration_timestamp = runner.iterations.len() + 1;
+                Ok(())
+            })
+            .with_egraph(egraph);
+
+        runner
     }
 
     pub async fn run_rewrite_to_completion(
         &mut self,
-        auth_context: AuthContextRef,
+        cache_entry: Arc<CompilerCacheEntry>,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+    ) -> Result<CubeEGraph, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
         if let Some(qtrace) = qtrace {
@@ -242,11 +260,7 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(
-                auth_context.clone(),
-                cube_context.session_state.protocol.clone(),
-                false,
-            )
+            .rewrite_rules(cache_entry, false)
             .await?;
 
         let (plan, qtrace_egraph_iterations) = tokio::task::spawn_blocking(move || {
@@ -311,9 +325,11 @@ impl Rewriter {
     pub async fn find_best_plan(
         &mut self,
         root: Id,
+        cache_entry: Arc<CompilerCacheEntry>,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
+        top_down_extractor: bool,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
@@ -325,11 +341,7 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(
-                auth_context.clone(),
-                cube_context.session_state.protocol.clone(),
-                true,
-            )
+            .rewrite_rules(cache_entry, true)
             .await?;
 
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
@@ -337,31 +349,40 @@ impl Rewriter {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
-                let extractor =
-                    Extractor::new(&runner.egraph, BestCubePlan::new(cube_context.meta.clone()));
-                let (best_cost, best) = extractor.find_best(root);
+                let best = if top_down_extractor {
+                    let mut extractor = TopDownExtractor::new(
+                        &runner.egraph,
+                        BestCubePlan::new(cube_context.meta.clone()),
+                        CubePlanTopDownState::new(),
+                    );
+                    let Some((best_cost, best)) = extractor.find_best(root) else {
+                        return Err(CubeError::internal("Unable to find best plan".to_string()));
+                    };
+                    log::debug!("Best cost: {:#?}", best_cost);
+                    best
+                } else {
+                    let extractor = Extractor::new(
+                        &runner.egraph,
+                        BestCubePlan::new(cube_context.meta.clone()),
+                    );
+                    let (best_cost, best) = extractor.find_best(root);
+                    log::debug!("Best cost: {:#?}", best_cost);
+                    best
+                };
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().iter().cloned().collect()
                 } else {
                     vec![]
                 };
                 let new_root = Id::from(best.as_ref().len() - 1);
-                log::debug!(
-                    "Best: {}",
-                    best.as_ref()
-                        .iter()
-                        .enumerate()
-                        .map(|(i, n)| format!("{}: {:?}", i, n))
-                        .join(", ")
-                );
-                log::debug!("Best cost: {:?}", best_cost);
+                log::debug!("Best: {}", best.pretty(120));
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
                     auth_context,
                     span_id.clone(),
                 );
-                Ok::<_, CubeError>((
+                Ok((
                     converter.to_logical_plan(new_root),
                     qtrace_egraph_iterations,
                     qtrace_best_graph,
@@ -379,12 +400,12 @@ impl Rewriter {
 
     fn run_rewrites(
         cube_context: &Arc<CubeContext>,
-        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        rules: Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
+        egraph: CubeEGraph,
+        rules: Arc<Vec<CubeRewrite>>,
         stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
         let runner = Self::rewrite_runner(cube_context.clone(), egraph);
-        let runner = runner.run(rules.iter());
+        let mut runner = runner.run(rules.iter());
         if !IterInfo::egraph_debug_enabled() {
             log::debug!("Iterations: {:?}", runner.iterations);
         }
@@ -402,70 +423,9 @@ impl Rewriter {
             }
         };
         if IterInfo::egraph_debug_enabled() {
-            let dir = format!("egraph-debug-{}", stage);
-            let _ = fs::create_dir_all(dir.clone());
-            let _ = fs::create_dir_all(format!("{}/public", dir));
-            let _ = fs::create_dir_all(format!("{}/src", dir));
-            fs::copy(
-                "egraph-debug-template/public/index.html",
-                format!("{}/public/index.html", dir),
-            )?;
-            fs::copy(
-                "egraph-debug-template/package.json",
-                format!("{}/package.json", dir),
-            )?;
-            fs::copy(
-                "egraph-debug-template/src/index.js",
-                format!("{}/src/index.js", dir),
-            )?;
-
-            let mut iterations = Vec::new();
-            let mut last_debug_data: Option<DebugData> = None;
-            for i in &runner.iterations {
-                let debug_data_clone = i.data.debug_info.as_ref().unwrap().debug_data.clone();
-                let mut debug_data = i.data.debug_info.as_ref().unwrap().debug_data.clone();
-                if let Some(last) = last_debug_data {
-                    debug_data
-                        .nodes
-                        .retain(|n| !last.nodes.iter().any(|ln| ln.id == n.id));
-                    debug_data.edges.retain(|n| {
-                        !last
-                            .edges
-                            .iter()
-                            .any(|ln| ln.source == n.source && ln.target == n.target)
-                    });
-                    debug_data
-                        .combos
-                        .retain(|n| !last.combos.iter().any(|ln| ln.id == n.id));
-
-                    debug_data.removed_nodes = last.nodes.clone();
-                    debug_data
-                        .removed_nodes
-                        .retain(|n| !debug_data_clone.nodes.iter().any(|ln| ln.id == n.id));
-                    debug_data.removed_edges = last.edges.clone();
-                    debug_data.removed_edges.retain(|n| {
-                        !debug_data_clone
-                            .edges
-                            .iter()
-                            .any(|ln| ln.source == n.source && ln.target == n.target)
-                    });
-                    debug_data.removed_combos = last.combos.clone();
-                    debug_data
-                        .removed_combos
-                        .retain(|n| !debug_data_clone.combos.iter().any(|ln| ln.id == n.id));
-                }
-                debug_data.applied_rules =
-                    Some(i.applied.iter().map(|s| format!("{:?}", s)).collect());
-                iterations.push(debug_data);
-                last_debug_data = Some(debug_data_clone);
-            }
-            fs::write(
-                format!("{}/src/iterations.js", dir),
-                &format!(
-                    "export const iterations = {};",
-                    serde_json::to_string_pretty(&iterations)?
-                ),
-            )?;
+            // Store final state after all rewrites
+            LogicalPlanAnalysis::store_egraph_debug_state(&mut runner.egraph);
+            write_debug_states(&runner, stage)?;
         }
         if let Some(stop_reason) = stop_reason {
             return Err(CubeError::user(format!(
@@ -498,14 +458,20 @@ impl Rewriter {
     pub fn sql_push_down_enabled() -> bool {
         env::var("CUBESQL_SQL_PUSH_DOWN")
             .map(|v| v.to_lowercase() == "true")
-            .unwrap_or(false)
+            .unwrap_or(true)
+    }
+
+    pub fn top_down_extractor_enabled() -> bool {
+        env::var("CUBESQL_TOP_DOWN_EXTRACTOR")
+            .map(|v| v.to_lowercase() != "false")
+            .unwrap_or(true)
     }
 
     pub fn rewrite_rules(
         meta_context: Arc<MetaContext>,
         config_obj: Arc<dyn ConfigObj>,
         eval_stable_functions: bool,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
             Box::new(MemberRules::new(
@@ -557,7 +523,7 @@ impl Rewriter {
 }
 
 pub trait RewriteRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>;
+    fn rewrite_rules(&self) -> Vec<CubeRewrite>;
 }
 
 struct IncrementalScheduler {
@@ -578,16 +544,18 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
     fn search_rewrite<'a>(
         &mut self,
         iteration: usize,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         rewrite: &'a Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>,
     ) -> Vec<egg::SearchMatches<'a, LogicalPlanLanguage>> {
         if iteration != self.current_iter {
             self.current_iter = iteration;
             self.current_eclasses.clear();
-            self.current_eclasses
-                .extend(egraph.classes().filter_map(|class| {
-                    (class.data.iteration_timestamp >= iteration).then(|| class.id)
-                }));
+            self.current_eclasses.extend(
+                egraph
+                    .classes()
+                    .filter(|class| (class.data.iteration_timestamp >= iteration))
+                    .map(|class| class.id),
+            );
         };
         assert_eq!(iteration, self.current_iter);
         rewrite.searcher.search_eclasses_with_limit(

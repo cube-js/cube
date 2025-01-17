@@ -1,0 +1,35 @@
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    measures:
+      - name: count
+        sql: id
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+    hierarchies:
+      - name: correct_hierarchy
+        levels:
+          - status
+          - city
+      - name: orders_hierarchy
+        levels:
+          - "{CUBE}.status"
+          - count
+
+views:
+  - name: test_view
+    cubes:
+      - join_path: orders
+        includes: "*"

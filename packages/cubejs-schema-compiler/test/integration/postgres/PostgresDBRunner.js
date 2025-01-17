@@ -4,7 +4,7 @@ import { PostgresQuery } from '../../../src';
 const pgPromise = require('pg-promise');
 // eslint-disable-next-line import/no-extraneous-dependencies
 const { GenericContainer, Wait } = require('testcontainers');
-const { BaseDbRunner } = require('./BaseDbRunner');
+const { BaseDbRunner } = require('../utils/BaseDbRunner');
 
 process.env.TZ = 'GMT';
 
@@ -125,7 +125,7 @@ export class PostgresDBRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    const version = process.env.TEST_PGSQL_VERSION || '9.6.8';
+    const version = process.env.TEST_PGSQL_VERSION || '12.22';
 
     return new GenericContainer(`postgres:${version}`)
       .withEnvironment({

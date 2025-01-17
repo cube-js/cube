@@ -30,7 +30,7 @@ use std::{
 
 use crate::{
     compile::{
-        engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
+        engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
         rewrite::WrappedSelectType,
         test::find_cube_scans_deep_search,
     },
@@ -162,7 +162,15 @@ pub struct WrappedSelectNode {
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
     pub distinct: bool,
-    pub ungrouped: bool,
+
+    /// States if this node actually a query to Cube or not.
+    /// When `false` this node will generate SQL on its own, using its fields and templates.
+    /// When `true` this node will generate SQL with load query to JS side of Cube.
+    /// It expects to be flattened: `from` is expected to be ungrouped CubeScan.
+    /// There's no point in doing this for grouped CubeScan, we can just use load query from that CubeScan and SQL API generation on top.
+    /// Load query generated for this case can be grouped when this node is an aggregation.
+    /// Most fields will be rendered as a member expressions in generated load query.
+    pub push_to_cube: bool,
 }
 
 impl WrappedSelectNode {
@@ -183,7 +191,7 @@ impl WrappedSelectNode {
         order_expr: Vec<Expr>,
         alias: Option<String>,
         distinct: bool,
-        ungrouped: bool,
+        push_to_cube: bool,
     ) -> Self {
         Self {
             schema,
@@ -202,7 +210,7 @@ impl WrappedSelectNode {
             order_expr,
             alias,
             distinct,
-            ungrouped,
+            push_to_cube,
         }
     }
 }
@@ -344,7 +352,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             order_expr,
             alias,
             self.distinct,
-            self.ungrouped,
+            self.push_to_cube,
         ))
     }
 }
@@ -386,35 +394,32 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     config_obj: self.config_obj.clone(),
                 }))
             } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                return Err(DataFusionError::Internal(format!(
+                    "CubeScanWrapperNode is not executable, SQL should be generated first with QueryEngine::evaluate_wrapped_sql: {:?}",
+                    wrapper_node
+                )));
+            } else if let Some(wrapped_sql_node) =
+                node.as_any().downcast_ref::<CubeScanWrappedSqlNode>()
+            {
                 // TODO
                 // assert_eq!(logical_inputs.len(), 0, "Inconsistent number of inputs");
                 // assert_eq!(physical_inputs.len(), 0, "Inconsistent number of inputs");
                 let scan_node =
-                    find_cube_scans_deep_search(wrapper_node.wrapped_plan.clone(), false)
+                    find_cube_scans_deep_search(wrapped_sql_node.wrapped_plan.clone(), false)
                         .into_iter()
                         .next()
                         .ok_or(DataFusionError::Internal(format!(
                             "No cube scans found in wrapper node: {:?}",
-                            wrapper_node
+                            wrapped_sql_node
                         )))?;
 
-                let schema = SchemaRef::new(wrapper_node.schema().as_ref().into());
+                let schema = SchemaRef::new(wrapped_sql_node.schema().as_ref().into());
                 Some(Arc::new(CubeScanExecutionPlan {
                     schema,
-                    member_fields: wrapper_node.member_fields.as_ref().ok_or_else(|| {
-                        DataFusionError::Internal(format!(
-                            "Member fields are not set for wrapper node. Optimization wasn't performed: {:?}",
-                            wrapper_node
-                        ))
-                    })?.clone(),
+                    member_fields: wrapped_sql_node.member_fields.clone(),
                     transport: self.transport.clone(),
-                    request: wrapper_node.request.clone().unwrap_or(scan_node.request.clone()),
-                    wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
-                        DataFusionError::Internal(format!(
-                            "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
-                            wrapper_node
-                        ))
-                    })?.clone()),
+                    request: wrapped_sql_node.request.clone(),
+                    wrapped_sql: Some(wrapped_sql_node.wrapped_sql.clone()),
                     auth_context: scan_node.auth_context.clone(),
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
@@ -746,11 +751,7 @@ impl CubeScanOneShotStream {
     }
 
     fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
-        if let Some(batch) = self.data.take() {
-            Some(Ok(batch))
-        } else {
-            None
-        }
+        self.data.take().map(Ok)
     }
 }
 
@@ -1127,10 +1128,16 @@ pub fn transform_response<V: ValueObject>(
                                     ))
                                 })?;
                             // TODO switch parsing to microseconds
-                            if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
+                            if timestamp.timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
+                            } else if let Some(nanos) = timestamp.timestamp_nanos_opt() {
+                                builder.append_value(nanos)?;
                             } else {
-                                builder.append_value(timestamp.timestamp_nanos_opt().unwrap())?;
+                                log::error!(
+                                    "Unable to cast timestamp value to nanoseconds: {}",
+                                    timestamp.to_string()
+                                );
+                                builder.append_null()?;
                             }
                         },
                     },
@@ -1505,13 +1512,7 @@ mod tests {
                     "KibanaSampleDataEcommerce.orderDate".to_string(),
                     "KibanaSampleDataEcommerce.city".to_string(),
                 ]),
-                segments: None,
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             },
             wrapped_sql: None,
             auth_context: Arc::new(HttpAuthContext {

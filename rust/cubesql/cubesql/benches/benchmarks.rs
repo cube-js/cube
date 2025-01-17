@@ -404,58 +404,58 @@ pub fn long_simple_in_str_expr_1k(c: &mut Criterion) {
 
 fn get_long_in_expr() -> String {
     r#"
-    SELECT 
-        "WideCube"."dim1" as "column1", 
-        "WideCube"."dim2" as "column2", 
-        "WideCube"."dim3" as "column3", 
-        "WideCube"."dim4" as "column4", 
-        "WideCube"."dim5" as "column5", 
-        "WideCube"."dim6" as "column6", 
-        "WideCube"."dim7" as "column7", 
-        "WideCube"."dim8" as "column8", 
-        "WideCube"."dim9" as "column9", 
-        "WideCube"."dim10" as "column10", 
-        "WideCube"."dim11" as "column11", 
-        "WideCube"."dim12" as "column12", 
-        "WideCube"."dim13" as "column13", 
-        "WideCube"."dim14" as "column14", 
-        "WideCube"."dim15" as "column15", 
-        SUM("WideCube"."dim16") as "some_sum" 
-    FROM 
-        "WideCube" 
-    WHERE 
-        "WideCube"."dim1" = 1 
-        AND "WideCube"."dim2" = 2 
-        AND "WideCube"."dim3" = 3 
-        AND "WideCube"."dim4" = 4 
-        AND "WideCube"."dim5" = 5 
-        AND "WideCube"."dim6" = 6 
-        AND "WideCube"."dim7" = 7 
-        AND "WideCube"."dim8" = 8 
-        AND "WideCube"."dim9" = 9 
-        AND "WideCube"."dim10" = 10 
-        AND ("WideCube"."dim11" = 42 OR "WideCube"."dim11" IS NULL) 
+    SELECT
+        "WideCube"."dim1" as "column1",
+        "WideCube"."dim2" as "column2",
+        "WideCube"."dim3" as "column3",
+        "WideCube"."dim4" as "column4",
+        "WideCube"."dim5" as "column5",
+        "WideCube"."dim6" as "column6",
+        "WideCube"."dim7" as "column7",
+        "WideCube"."dim8" as "column8",
+        "WideCube"."dim9" as "column9",
+        "WideCube"."dim10" as "column10",
+        "WideCube"."dim11" as "column11",
+        "WideCube"."dim12" as "column12",
+        "WideCube"."dim13" as "column13",
+        "WideCube"."dim14" as "column14",
+        "WideCube"."dim15" as "column15",
+        SUM("WideCube"."dim16") as "some_sum"
+    FROM
+        "WideCube"
+    WHERE
+        "WideCube"."dim1" = 1
+        AND "WideCube"."dim2" = 2
+        AND "WideCube"."dim3" = 3
+        AND "WideCube"."dim4" = 4
+        AND "WideCube"."dim5" = 5
+        AND "WideCube"."dim6" = 6
+        AND "WideCube"."dim7" = 7
+        AND "WideCube"."dim8" = 8
+        AND "WideCube"."dim9" = 9
+        AND "WideCube"."dim10" = 10
+        AND ("WideCube"."dim11" = 42 OR "WideCube"."dim11" IS NULL)
         AND (
             "WideCube"."dim12" IN (
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
                 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
             ) OR "WideCube"."dim12" IS NULL
-        ) AND "WideCube"."dim20" = 55 
-    GROUP BY 
-        "WideCube"."dim1", 
-        "WideCube"."dim2", 
-        "WideCube"."dim3", 
-        "WideCube"."dim4", 
-        "WideCube"."dim5", 
-        "WideCube"."dim6", 
-        "WideCube"."dim7", 
-        "WideCube"."dim8", 
-        "WideCube"."dim9", 
-        "WideCube"."dim10", 
-        "WideCube"."dim11", 
-        "WideCube"."dim12", 
-        "WideCube"."dim13", 
-        "WideCube"."dim14", 
+        ) AND "WideCube"."dim20" = 55
+    GROUP BY
+        "WideCube"."dim1",
+        "WideCube"."dim2",
+        "WideCube"."dim3",
+        "WideCube"."dim4",
+        "WideCube"."dim5",
+        "WideCube"."dim6",
+        "WideCube"."dim7",
+        "WideCube"."dim8",
+        "WideCube"."dim9",
+        "WideCube"."dim10",
+        "WideCube"."dim11",
+        "WideCube"."dim12",
+        "WideCube"."dim13",
+        "WideCube"."dim14",
         "WideCube"."dim15"
   "#.into()
 }
@@ -482,8 +482,8 @@ pub fn tableau_logical_17(c: &mut Criterion) {
 fn get_ts_last_day_redshift_query() -> String {
     r#"
     WITH "qt_0" AS (
-        SELECT 
-            DATE_TRUNC('month', "ta_1"."order_date") "ca_1", 
+        SELECT
+            DATE_TRUNC('month', "ta_1"."order_date") "ca_1",
             CASE
                 WHEN sum("ta_1"."sumPrice") IS NOT NULL THEN sum("ta_1"."sumPrice")
                 ELSE 0
@@ -495,8 +495,8 @@ fn get_ts_last_day_redshift_query() -> String {
         )
         GROUP BY "ca_1"
     )
-    SELECT 
-        min("ta_2"."ca_1") "ca_3", 
+    SELECT
+        min("ta_2"."ca_1") "ca_3",
         max("ta_2"."ca_1") "ca_4"
     FROM "qt_0" "ta_2"
     "#
@@ -743,4 +743,26 @@ criterion_group! {
     targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_number_expr_1k, long_simple_in_str_expr_50, long_simple_in_str_expr_1k, tableau_logical_17,
         tableau_bugs_b8888, ts_last_day_redshift, quicksight_1, quicksight_2
 }
-criterion_main!(benches);
+
+fn simple_rules_loading(c: &mut Criterion) {
+    let context = Arc::new(
+        futures::executor::block_on(create_test_postgresql_cube_context(get_test_tenant_ctx()))
+            .unwrap(),
+    );
+    // preload rules at least once
+    let _rules = rewrite_rules(context.clone());
+
+    c.bench_function("simple_rules_loading", |b| {
+        b.iter(|| {
+            rewrite_rules(context.clone());
+        })
+    });
+}
+
+criterion_group! {
+    name = rules_loading;
+    config = Criterion::default();
+    targets = simple_rules_loading
+}
+
+criterion_main!(benches, rules_loading);

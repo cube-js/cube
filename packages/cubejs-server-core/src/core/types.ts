@@ -1,7 +1,6 @@
 import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
-  CheckAuthMiddlewareFn,
   ExtendContextFn,
   JWTOptions,
   UserBackgroundContext,
@@ -10,7 +9,7 @@ import {
   CanSwitchSQLUserFn,
   ContextToApiScopesFn,
 } from '@cubejs-backend/api-gateway';
-import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 
 export interface QueueOptions {
@@ -45,7 +44,6 @@ export interface PreAggregationsOptions {
 
 export interface OrchestratorOptions {
   redisPrefix?: string;
-  redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
@@ -76,7 +74,6 @@ export interface OrchestratorInitedOptions {
   queryCacheOptions: QueryInitedOptions;
   preAggregationsOptions: AggsInitedOptions;
   redisPrefix?: string;
-  redisPoolOptions?: RedisPoolOptions;
   rollupOnlyMode?: boolean;
   testConnectionTimeout?: number;
 }
@@ -120,14 +117,26 @@ export type DatabaseType =
   | 'snowflake'
   | 'sqlite'
   | 'questdb'
-  | 'materialize';
+  | 'materialize'
+  | 'pinot';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
 export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
+
+export type ScheduledRefreshTimeZonesFn = (context: RequestContext) => string[] | Promise<string[]>;
+
+/**
+ * Function that should provide a logic of scheduled returning of
+ * the user background context. Used as a part of a main
+ * configuration object of the Gateway to provide extendability to
+ * this logic.
+ */
+export type ScheduledRefreshContextsFn = () => Promise<UserBackgroundContext[]>;
 
 // internal
 export type DriverOptions = {
@@ -179,10 +188,10 @@ export interface CreateOptions {
   externalDialectFactory?: ExternalDialectFactoryFn;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
+  contextToRoles?: ContextToRolesFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;
   canSwitchSqlUser?: CanSwitchSQLUserFn;
@@ -195,7 +204,7 @@ export interface CreateOptions {
   schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
-  scheduledRefreshTimeZones?: string[];
+  scheduledRefreshTimeZones?: string[] | ScheduledRefreshTimeZonesFn;
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
   scheduledRefreshBatchSize?: number;
