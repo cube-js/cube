@@ -1075,7 +1075,7 @@ impl CubeScanWrapperNode {
                                     alias: subq_alias.unwrap_or_else(|| alias.clone()),
                                     sql: subq_sql_string,
                                     condition: cond.clone(),
-                                    join_type: join_type.clone(),
+                                    join_type: join_type,
                                 });
                                 known_join_subqueries.insert(alias.clone());
                             }
@@ -1365,7 +1365,7 @@ impl CubeScanWrapperNode {
                                         load_request.order.clone()
                                     },
                                     ungrouped: if let WrappedSelectType::Projection = select_type {
-                                        load_request.ungrouped.clone()
+                                        load_request.ungrouped
                                     } else {
                                         None
                                     },
@@ -1373,13 +1373,13 @@ impl CubeScanWrapperNode {
                                     limit: if let Some(limit) = limit {
                                         Some(limit as i32)
                                     } else {
-                                        load_request.limit.clone()
+                                        load_request.limit
                                     },
                                     // TODO is it okay to just override offset?
                                     offset: if let Some(offset) = offset {
                                         Some(offset as i32)
                                     } else {
-                                        load_request.offset.clone()
+                                        load_request.offset
                                     },
 
                                     // Original scan node can already have consumed filters from Logical plan

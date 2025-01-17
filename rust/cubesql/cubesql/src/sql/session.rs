@@ -460,7 +460,7 @@ impl From<&Session> for SessionStatActivity {
             application_name,
             client_addr: session.state.client_ip.clone(),
             client_hostname: None,
-            client_port: session.state.client_port.clone(),
+            client_port: session.state.client_port,
             query,
         }
     }

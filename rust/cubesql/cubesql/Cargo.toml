@@ -93,7 +93,6 @@ harness = false
 # Feel free to remove any rule from here and fix all warnings with it
 # Or to write a comment why rule should stay disabled
 [lints.clippy]
-clone_on_copy = "allow"
 collapsible_if = "allow"
 collapsible_match = "allow"
 collapsible_else_if = "allow"

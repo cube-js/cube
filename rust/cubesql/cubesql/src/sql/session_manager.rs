@@ -59,7 +59,7 @@ impl SessionManager {
             server: self.server.clone(),
             state: Arc::new(SessionState::new(
                 connection_id,
-                extra_id.clone(),
+                extra_id,
                 client_addr,
                 client_port,
                 protocol,

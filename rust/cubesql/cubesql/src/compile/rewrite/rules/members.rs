@@ -587,38 +587,38 @@ impl MemberRules {
                 "member-pushdown-replacer-aggregate-group",
                 ListType::AggregateGroupExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_flat_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-aggr",
                 ListType::AggregateAggrExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_flat_push_down_node_substitute_rules(
                 "member-pushdown-replacer-projection",
                 ListType::ProjectionExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
         } else {
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-group",
                 "AggregateGroupExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-aggr",
                 "AggregateAggrExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-projection",
                 "ProjectionExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
         }
         rules.extend(find_matching_old_member("column", column_expr("?column")));
@@ -1442,7 +1442,7 @@ impl MemberRules {
                                         egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
                                             CubeScanAliasToCube(replaced_alias_to_cube.clone()),
                                         ));
-                                    subst.insert(new_alias_to_cube_var, new_alias_to_cube.clone());
+                                    subst.insert(new_alias_to_cube_var, new_alias_to_cube);
 
                                     let member_pushdown_replacer_alias_to_cube = egraph.add(
                                         LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
@@ -2722,11 +2722,11 @@ impl MemberRules {
                                 continue;
                             }
 
-                            let is_left_order_empty = Some(true)
-                                == egraph[subst[left_order_var]].data.is_empty_list.clone();
+                            let is_left_order_empty =
+                                Some(true) == egraph[subst[left_order_var]].data.is_empty_list;
 
-                            let is_right_order_empty = Some(true)
-                                == egraph[subst[right_order_var]].data.is_empty_list.clone();
+                            let is_right_order_empty =
+                                Some(true) == egraph[subst[right_order_var]].data.is_empty_list;
 
                             if !is_left_order_empty && !is_right_order_empty {
                                 continue;

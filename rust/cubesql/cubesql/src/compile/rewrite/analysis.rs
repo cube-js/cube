@@ -350,7 +350,7 @@ impl LogicalPlanAnalysis {
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
     ) -> Option<usize> {
-        let trivial_push_down = |id| egraph.index(id).data.trivial_push_down.clone();
+        let trivial_push_down = |id| egraph.index(id).data.trivial_push_down;
         match enode {
             LogicalPlanLanguage::ColumnExpr(_) => Some(0),
             LogicalPlanLanguage::LiteralExpr(_) => Some(0),
@@ -1244,7 +1244,7 @@ impl LogicalPlanAnalysis {
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
     ) -> Option<bool> {
-        let is_empty_list = |id| egraph.index(id).data.is_empty_list.clone();
+        let is_empty_list = |id| egraph.index(id).data.is_empty_list;
         match enode {
             LogicalPlanLanguage::FilterOpFilters(params)
             | LogicalPlanLanguage::CubeScanFilters(params)

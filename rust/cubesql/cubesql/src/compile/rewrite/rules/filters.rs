@@ -3221,7 +3221,6 @@ impl FilterRules {
             for year in years {
                 for aliases in aliases_es.iter() {
                     if let ScalarValue::Int64(Some(year)) = year {
-                        let year = year.clone();
                         if !(1000..=9999).contains(&year) {
                             continue;
                         }
@@ -4168,7 +4167,7 @@ impl FilterRules {
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let filter_ops_var = var!(filter_ops_var);
         move |egraph, subst| {
-            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list.clone() {
+            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list {
                 return true;
             }
 
@@ -4905,7 +4904,7 @@ impl FilterRules {
             return None;
         }
 
-        let new_dt = dt.clone();
+        let new_dt = dt;
         let new_dt = match granularity.as_str() {
             "year" => new_dt.checked_add_months(Months::new(12)),
             "quarter" | "qtr" => new_dt.checked_add_months(Months::new(3)),

@@ -1056,7 +1056,7 @@ impl AsyncPostgresShim {
             )
         })?;
 
-        let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
+        let format = body.result_formats.first().copied().unwrap_or(Format::Text);
         let portal = match source_statement {
             PreparedStatement::Empty { .. } => {
                 drop(statements_guard);

@@ -44,7 +44,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(left, right)| Expr::BinaryExpr {
                 left: Box::new(left),
-                op: op.clone(),
+                op: *op,
                 right: Box::new(right),
             })
         }
@@ -60,9 +60,9 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(left, right)| Expr::AnyExpr {
                 left: Box::new(left),
-                op: op.clone(),
+                op: *op,
                 right: Box::new(right),
-                all: all.clone(),
+                all: *all,
             })
         }
         Expr::Like(Like {
@@ -77,10 +77,10 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, pattern)| {
                 Expr::Like(Like {
-                    negated: negated.clone(),
+                    negated: *negated,
                     expr: Box::new(expr),
                     pattern: Box::new(pattern),
-                    escape_char: escape_char.clone(),
+                    escape_char: *escape_char,
                 })
             })
         }
@@ -96,10 +96,10 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, pattern)| {
                 Expr::ILike(Like {
-                    negated: negated.clone(),
+                    negated: *negated,
                     expr: Box::new(expr),
                     pattern: Box::new(pattern),
-                    escape_char: escape_char.clone(),
+                    escape_char: *escape_char,
                 })
             })
         }
@@ -115,10 +115,10 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, pattern)| {
                 Expr::SimilarTo(Like {
-                    negated: negated.clone(),
+                    negated: *negated,
                     expr: Box::new(expr),
                     pattern: Box::new(pattern),
-                    escape_char: escape_char.clone(),
+                    escape_char: *escape_char,
                 })
             })
         }
@@ -148,7 +148,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, low, high)| Expr::Between {
                 expr: Box::new(expr),
-                negated: negated.clone(),
+                negated: *negated,
                 low: Box::new(low),
                 high: Box::new(high),
             })
@@ -211,8 +211,8 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             nulls_first,
         } => rewrite(expr, map)?.map(|expr| Expr::Sort {
             expr: Box::new(expr),
-            asc: asc.clone(),
-            nulls_first: nulls_first.clone(),
+            asc: *asc,
+            nulls_first: *nulls_first,
         }),
         Expr::ScalarFunction { fun, args } => args
             .iter()
@@ -249,7 +249,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             .map(|args| Expr::AggregateFunction {
                 fun: fun.clone(),
                 args,
-                distinct: distinct.clone(),
+                distinct: *distinct,
             }),
         Expr::WindowFunction {
             fun,
@@ -283,7 +283,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
                     args,
                     partition_by,
                     order_by,
-                    window_frame: window_frame.clone(),
+                    window_frame: *window_frame,
                 })
         }
         Expr::AggregateUDF { fun, args } => args
@@ -310,7 +310,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
                 .map(|list| Expr::InList {
                     expr: Box::new(expr),
                     list,
-                    negated: negated.clone(),
+                    negated: *negated,
                 })
         }
         // As rewrites are used to push things down or up the plan, wildcards
@@ -329,7 +329,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             rewrites.map(|(expr, subquery)| Expr::InSubquery {
                 expr: Box::new(expr),
                 subquery: Box::new(subquery),
-                negated: negated.clone(),
+                negated: *negated,
             })
         }
     })
