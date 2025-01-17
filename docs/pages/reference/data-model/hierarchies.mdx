@@ -1,0 +1,305 @@
+# Hierarchies
+
+The `hierarchies` property contains a set of hierarchies. You can think about a
+hierarchy as a means to group [dimensions][ref-ref-dimensions] together and organize
+them into levels of granularity, allowing users to drill down or roll up for analysis.
+
+<InfoBox>
+
+Hierarchies display is subject to support in [visualization tools][ref-viz-tools].
+Check [APIs & Integrations][ref-apis-support] for details.
+You can also preview hierarchies in [Playground][ref-playground].
+
+</InfoBox>
+
+Any hierarchy should have the following parameters: [`name`](#name) and [`levels`](#levels).
+
+## Parameters
+
+### `name`
+
+The `name` parameter serves as the identifier of a hierarchy. It must be unique
+among all members within a cube and follow the [naming conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  // ...
+
+  hierarchies: {
+    location: {
+      title: `User Location`,
+      levels: [
+        state,
+        city
+      ]
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    # ...
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+```
+
+</CodeTabs>
+
+### `title`
+
+You can use the `title` parameter to set the human-readable name of a hierarchy:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  // ...
+
+  hierarchies: {
+    location: {
+      title: `User Location`,
+      levels: [
+        state,
+        city
+      ]
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    # ...
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+```
+
+</CodeTabs>
+
+### `levels`
+
+The `levels` parameter is used to define the levels of the hierarchy. You can do so
+by listing the dimensions included in the hierarchy, from less granular to more
+granular ones:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    state: {
+      sql: `state`,
+      type: `string`
+    },
+
+    city: {
+      sql: `city`,
+      type: `string`
+    }
+  },
+
+  hierarchies: {
+    location: {
+      title: `User Location`,
+      levels: [
+        state,
+        city
+      ]
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: state
+        sql: state
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+```
+
+</CodeTabs>
+
+You can include the same dimension in multiple hierarchies. It is also possible to
+include a dimension from a joined cube into a hierarchy: 
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  joins: {
+    orders: {
+      sql: `${CUBE.id} = ${orders.user_id}`,
+      relationship: `one_to_many`
+    }
+  },
+
+  dimensions: {
+    state: {
+      sql: `state`,
+      type: `string`
+    },
+
+    city: {
+      sql: `city`,
+      type: `string`
+    },
+
+    status: {
+      sql: `status`,
+      type: `string`
+    }
+  },
+
+  hierarchies: {
+    location: {
+      title: `User Location`,
+      levels: [
+        state,
+        city
+      ]
+    },
+
+    statuses: {
+      title: `User & Order Statuses`,
+      levels: [
+        status,
+        orders.status
+      ]
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    joins:
+      - name: orders
+        sql: "{CUBE.id} = {orders.user_id}"
+        relationship: one_to_many
+
+    dimensions:
+      - name: state
+        sql: state
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+      - name: status
+        sql: status
+        type: string
+
+    hierarchies:
+      - name: details
+        title: User Details
+        levels:
+          - status
+          - state
+          - city
+
+      - name: statuses
+        title: User & Order Statuses
+        levels:
+          - status
+          - orders.status
+```
+
+</CodeTabs>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a hierarchy. Valid
+values for `public` are `true` and `false`. When set to `false`, this hierarchy
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  // ...
+
+  hierarchies: {
+    location: {
+      title: `User Location`,
+      levels: [
+        state,
+        city
+      ],
+      public: false
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    # ...
+
+    hierarchies:
+      - name: location
+        title: User Location
+        levels:
+          - state
+          - city
+        public: false
+```
+
+</CodeTabs>
+
+
+[ref-ref-dimensions]: /reference/data-model/dimensions
+[ref-naming]: /product/data-modeling/syntax#naming
+[ref-apis-support]: /product/apis-integrations#support-for-data-modeling
+[ref-playground]: /product/workspace/playground#viewing-the-data-model
+[ref-viz-tools]: /product/configuration/visualization-tools

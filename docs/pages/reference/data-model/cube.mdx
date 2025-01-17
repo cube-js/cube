@@ -10,8 +10,9 @@ A `cube` represents a table of data in Cube.
 
 Cubes are typically declared in separate files with one cube per file.
 Within each cube are definitions of [measures][ref-ref-measures],
-[dimensions][ref-ref-dimensions], [segments][ref-ref-segments],
-[joins][ref-ref-joins] between cubes, and [pre-aggregations][ref-ref-pre-aggs].
+[dimensions][ref-ref-dimensions], [hierarchies][ref-ref-hierarchies],
+[segments][ref-ref-segments], [joins][ref-ref-joins] between cubes,
+and [pre-aggregations][ref-ref-pre-aggs].
 
 <CodeTabs>
 
@@ -277,13 +278,7 @@ cube(`extended_order_facts`, {
 
 ### `public`
 
-<InfoBox>
-
-Prior to v0.33, this property was called `shown`.
-
-</InfoBox>
-
-The `public` property is used to manage the visibility of a cube. Valid values
+The `public` parameter is used to manage the visibility of a cube. Valid values
 for `public` are `true` and `false`. When set to `false`, this cube **cannot**
 be queried through the API. Defaults to `true`.
 
@@ -599,6 +594,7 @@ cubes:
 [ref-apis]: /product/apis-integrations
 [ref-ref-measures]: /reference/data-model/measures
 [ref-ref-dimensions]: /reference/data-model/dimensions
+[ref-ref-hierarchies]: /reference/data-model/hierarchies
 [ref-ref-segments]: /reference/data-model/segments
 [ref-ref-joins]: /reference/data-model/joins
 [ref-ref-pre-aggs]: /reference/data-model/pre-aggregations

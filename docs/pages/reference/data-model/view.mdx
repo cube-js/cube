@@ -5,10 +5,12 @@ redirect_from:
 
 # Views
 
-Views sit on top of the data graph of cubes and create a facade of your whole
+Views sit on top of the data graph of [cubes][ref-ref-cubes] and create a facade of your whole
 data model with which data consumers can interact. They are useful for defining
 metrics, managing governance and data access, and controlling ambiguous join
 paths.
+
+Any view should have the following parameters: [`name`](#name) and [`cubes`](#cubes).
 
 ## Parameters
 
@@ -53,30 +55,6 @@ view(`active_users`, {
 views:
   - name: active_users
     description: 14 days rolling count of active users
-```
-
-</CodeTabs>
-
-### `meta`
-
-Custom metadata. Can be used to pass any information to the frontend.
-
-<CodeTabs>
-
-```javascript
-view(`active_users`, {
-  meta: {
-    any: `value`
-  }
-});
-```
-
-```yaml
-views:
-  - name: active_users
-    meta:
-      any: value
-
 ```
 
 </CodeTabs>
@@ -190,15 +168,99 @@ with the cube name, you can use the `prefix: true` parameter. It will prefix
 them with the cube name, e.g. `users_city`. You can use the `alias` parameter to
 specify a custom prefix.
 
-### `public`
+### `folders`
+
+The `folders` parameter is used to organize members of a view (e.g., dimensions,
+hierarchies, measures, etc.) into logical groups. Folders can contain non-overlapping
+subsets of members from a view.
 
 <InfoBox>
 
-Prior to v0.33, this parameter was called  `shown`.
+Folders display is subject to support in [visualization tools][ref-viz-tools].
+Check [APIs & Integrations][ref-apis-support] for details.
+You can also preview folders in [Playground][ref-playground].
 
 </InfoBox>
 
-The `public` property is used to manage the visibility of a view. Valid values
+Each folder should specify a human-readable name via the `name` parameter and list
+included members via the `includes` parameter:
+
+<CodeTabs>
+
+```javascript
+view(`customers`, {
+  cubes: [
+    {
+      join_path: `users`,
+      includes: `*`
+    },
+    {
+      join_path: `users.orders`,
+      prefix: true,
+      includes: [
+        `status`,
+        `price`,
+        `count`
+      ]
+    }
+  ],
+
+  folders: [
+    {
+      name: `Basic Details`,
+      includes: [
+        `created_at`,
+        `location`,
+        `orders_status`,
+        `orders_count`
+      ]
+    },
+
+    {
+      name: `Sensitive Details`,
+      includes: [
+        `name`,
+        `gender`
+      ]
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: customers
+
+    cubes:
+      - join_path: users
+        includes: "*"
+
+      - join_path: users.orders
+        prefix: true
+        includes:
+          - status
+          - price
+          - count
+
+    folders:
+      - name: Basic Details
+        includes:
+          - created_at
+          - location
+          - orders_status
+          - orders_count
+
+      - name: Sensitive Details
+        includes:
+          - name
+          - gender
+```
+
+</CodeTabs>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a view. Valid values
 for `public` are `true` and `false`. When set to `false`, this view **cannot**
 be queried through the API. Defaults to `true`.
 
@@ -254,6 +316,30 @@ To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
+### `meta`
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {
+  meta: {
+    any: `value`
+  }
+});
+```
+
+```yaml
+views:
+  - name: active_users
+    meta:
+      any: value
+
+```
+
+</CodeTabs>
+
 ### `includes` (deprecated)
 
 <WarningBox>
@@ -297,19 +383,14 @@ views:
 
 </CodeTabs>
 
-## Using views with pre-aggregations
-
-Pre-aggregations defined for original Cube members would still work when used in
-view queries. Please note that pre-aggregations use the same leaf members
-matching algorithm used for Cubes. As a consequence, all measures and dimensions
-included in pre-aggregation should be leaf members in order to be matched by
-view query.
-
 
 [ref-recipe-control-access-cubes-views]:
   /guides/recipes/access-control/controlling-access-to-cubes-and-views
 [ref-schema-joins-direction]:
   /product/data-modeling/concepts/working-with-joins#directions-of-joins
 [ref-naming]: /product/data-modeling/syntax#naming
-[ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
+[ref-ref-cubes]: /reference/data-model/cube
+[ref-apis-support]: /product/apis-integrations#support-for-data-modeling
+[ref-playground]: /product/workspace/playground#viewing-the-data-model
+[ref-viz-tools]: /product/configuration/visualization-tools

@@ -5,7 +5,7 @@ redirect_from:
 
 # Concepts
 
-Cube borrows a lot of terminology from data science and [OLAP
+Cube borrows a lot of terminology from [OLAP
 theory][wiki-olap], and this document is intended for both newcomers and regular
 users to refresh their understanding.
 
@@ -109,8 +109,10 @@ paths.
 
 <Diagram src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/" />
 
-Views can **not** have their own members. Instead, use the `cubes` or `includes`
-parameters to include measures and dimensions from other cubes into the view.
+Views can **not** have their own members. Instead, they use the `cubes`
+parameter to include members of cubes. Optionally, you can also group members of a view
+into [folders][ref-ref-folders].
+
 In the example below, we create the `orders` view which includes select members
 from `base_orders`, `products`, and `users` cubes:
 
@@ -178,7 +180,7 @@ views:
 </CodeTabs>
 
 Views do **not** define any [pre-aggregations](#pre-aggregations). Instead,
-they reuse pre-aggregations from underlying cubes.
+they [reuse][ref-matching-preaggs] pre-aggregations from underlying cubes.
 
 View may not only be defined statically; you can actually build
 [dynamic data models][ref-dynamic-data-models].
@@ -282,7 +284,9 @@ cubes:
 
 </CodeTabs>
 
-Also, [subquery dimensions][ref-subquery-dimensions] can be used to join cubes
+If needed, dimensions can be organized into [hierarchies][ref-ref-hierarchies].
+Also, [proxy dimensions][ref-proxy-dimensions] are helpful for code reusability
+and [subquery dimensions][ref-subquery-dimensions] can be used to join cubes
 implicitly.
 
 ### Dimension types
@@ -433,6 +437,9 @@ cubes:
 ```
 
 </CodeTabs>
+
+Also, [calculated measures][ref-calculated-measures] can be used to perform calculations
+on other measures.
 
 ### Measure types
 
@@ -719,6 +726,7 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-polymorphic-cubes]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-proxy-dimensions]: /product/data-modeling/concepts/calculated-members#proxy-dimensions
 [ref-subquery-dimensions]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [ref-working-with-joins]: /product/data-modeling/concepts/working-with-joins
 [self-dimensions]: #dimensions
@@ -736,3 +744,5 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-ref-primary-key]: /reference/data-model/dimensions#primary_key
 [ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
 [ref-proxy-granularity]: /product/data-modeling/concepts/calculated-members#time-dimension-granularity
+[ref-ref-hierarchies]: /reference/data-model/hierarchies
+[ref-ref-folders]: /reference/data-model/view#folders

@@ -9,7 +9,7 @@ redirect_from:
 The `measures` parameter contains a set of measures and each measure is an
 aggregation over a certain column in your database table.
 
-Any measure should have the following properties: `name`, `sql` and `type`.
+Any measure should have the following parameters: `name`, `sql` and `type`.
 
 ## Parameters
 
@@ -339,13 +339,7 @@ cubes:
 
 ### `public`
 
-<InfoBox>
-
-Prior to v0.33, this property was called `shown`.
-
-</InfoBox>
-
-The `public` property is used to manage the visibility of a measure. Valid
+The `public` parameter is used to manage the visibility of a measure. Valid
 values for `public` are `true` and `false`. When set to `false`, this measure
 **cannot** be queried through the API. Defaults to `true`.
 

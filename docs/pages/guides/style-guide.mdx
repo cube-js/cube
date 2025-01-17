@@ -73,6 +73,8 @@ cube_project
   - `pre_aggregations`
   - `joins`
   - `dimensions`
+  - `hierarchies`
+  - `segments`
   - `measures`
 
 ### Dimensions & measures
@@ -136,8 +138,9 @@ cubes:
 - Applicable [view parameters][ref-view-params] should be ordered as follows:
   - `name`
   - `description`
-  - `includes`
+  - `public`
   - `cubes`
+  - `folders`
 
 ### Example view
 
@@ -316,7 +319,7 @@ cube(`users`, {
 
 This style guide was inspired in part by:
 
-- [Brooklyn Data' SQL style guide](https://github.com/brooklyn-data/co/blob/main/sql_style_guide.md)
+- [Brooklyn Data Co. SQL style guide](https://github.com/brooklyn-data/co/blob/main/sql_style_guide.md)
 - [LAMS Style Guide](https://looker-open-source.github.io/look-at-me-sideways/rules.html)
 
 [cpn]: https://cube.dev/consulting/cube-partner-network
