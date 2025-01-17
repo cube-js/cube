@@ -751,11 +751,7 @@ impl CubeScanOneShotStream {
     }
 
     fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
-        if let Some(batch) = self.data.take() {
-            Some(Ok(batch))
-        } else {
-            None
-        }
+        self.data.take().map(Ok)
     }
 }
 

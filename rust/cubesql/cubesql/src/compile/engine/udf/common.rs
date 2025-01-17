@@ -1418,7 +1418,7 @@ fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<Naiv
     }
     debug_assert!(0 <= month);
     year += month / 12;
-    month = month % 12;
+    month %= 12;
 
     match change_ym(t, year, 1 + month as u32) {
         Some(t) => return Ok(t),
@@ -1442,13 +1442,13 @@ fn date_addsub_month_day_nano(
     let result = if month > 0 && is_add || month < 0 && !is_add {
         t.checked_add_months(Months::new(month as u32))
     } else {
-        t.checked_sub_months(Months::new(month.abs() as u32))
+        t.checked_sub_months(Months::new(month.unsigned_abs()))
     };
 
     let result = if day > 0 && is_add || day < 0 && !is_add {
         result.and_then(|t| t.checked_add_days(Days::new(day as u64)))
     } else {
-        result.and_then(|t| t.checked_sub_days(Days::new(day.abs() as u64)))
+        result.and_then(|t| t.checked_sub_days(Days::new(day.unsigned_abs() as u64)))
     };
 
     let result = result.and_then(|t| {
@@ -1472,7 +1472,7 @@ fn date_addsub_day_time(
     let result = if days > 0 && is_add || days < 0 && !is_add {
         t.checked_add_days(Days::new(days as u64))
     } else {
-        t.checked_sub_days(Days::new(days.abs() as u64))
+        t.checked_sub_days(Days::new(days.unsigned_abs() as u64))
     };
 
     let result = result.and_then(|t| {
@@ -1501,9 +1501,9 @@ fn last_day_of_month(y: i32, m: u32) -> u32 {
         return 31;
     }
     NaiveDate::from_ymd_opt(y, m + 1, 1)
-        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .unwrap_or_else(|| panic!("Invalid year month: {}-{}", y, m))
         .pred_opt()
-        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .unwrap_or_else(|| panic!("Invalid year month: {}-{}", y, m))
         .day()
 }
 
@@ -1564,10 +1564,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
 
             let res = NaiveDateTime::parse_from_str(timestamp, &format).map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Error evaluating str_to_date('{}', '{}'): {}",
-                    timestamp,
-                    format,
-                    e.to_string()
+                    "Error evaluating str_to_date('{timestamp}', '{format}'): {e}"
                 ))
             })?;
 
@@ -1671,7 +1668,7 @@ pub fn create_to_char_udf() -> ScalarUDF {
                     let secs = duration.num_seconds();
                     let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
                     let timestamp = NaiveDateTime::from_timestamp_opt(secs, nanosecs as u32)
-                        .expect(format!("Invalid secs {} nanosecs {}", secs, nanosecs).as_str());
+                        .unwrap_or_else(|| panic!("Invalid secs {} nanosecs {}", secs, nanosecs));
 
                     // chrono's strftime is missing quarter format, as such a workaround is required
                     let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
@@ -2237,10 +2234,7 @@ pub fn create_pg_get_constraintdef_udf() -> ScalarUDF {
         let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
         let result = oids_arr
             .iter()
-            .map(|oid| match oid {
-                Some(_oid) => Some("PRIMARY KEY (oid)".to_string()),
-                _ => None,
-            })
+            .map(|oid| oid.map(|_oid| "PRIMARY KEY (oid)".to_string()))
             .collect::<StringArray>();
 
         Ok(Arc::new(result))
@@ -3583,7 +3577,7 @@ pub fn create_array_to_string_udf() -> ScalarUDF {
             let join_str = join_strs.value(i);
             let strings = downcast_string_arg!(array, "str", i32);
             let joined_string =
-                itertools::Itertools::intersperse(strings.iter().filter_map(|s| s), join_str)
+                itertools::Itertools::intersperse(strings.iter().flatten(), join_str)
                     .collect::<String>();
             builder.append_value(joined_string)?;
         }
