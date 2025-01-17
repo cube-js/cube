@@ -1029,6 +1029,7 @@ pub fn create_date_udf() -> ScalarUDF {
                         builder.append_value(
                             NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
                                 .map_err(|e| DataFusionError::Execution(e.to_string()))?
+                                .and_utc()
                                 .timestamp_nanos_opt()
                                 .unwrap(),
                         )?;
@@ -1233,6 +1234,7 @@ macro_rules! date_math_udf {
                 let interval = intervals.value(i).into();
                 builder.append_value(
                     $FUN(timestamp, interval, $IS_ADD)?
+                        .and_utc()
                         .timestamp_nanos_opt()
                         .unwrap(),
                 )?;
@@ -1569,7 +1571,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
             })?;
 
             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                Some(res.timestamp_nanos_opt().unwrap()),
+                Some(res.and_utc().timestamp_nanos_opt().unwrap()),
                 None,
             )))
         });
@@ -2339,7 +2341,7 @@ macro_rules! generate_series_helper_timestamp {
             ))
         })?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
-        $CURRENT = res.timestamp_nanos_opt().unwrap() as $PRIMITIVE_TYPE;
+        $CURRENT = res.and_utc().timestamp_nanos_opt().unwrap() as $PRIMITIVE_TYPE;
     };
 }
 
@@ -3397,6 +3399,7 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
                             )?;
                             Ok(Some(
                                 NaiveDateTime::new(date, time)
+                                    .and_utc()
                                     .timestamp_nanos_opt()
                                     .unwrap(),
                             ))

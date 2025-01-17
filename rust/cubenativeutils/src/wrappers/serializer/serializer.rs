@@ -1,7 +1,8 @@
 use super::error::NativeObjSerializerError;
-use crate::wrappers::inner_types::InnerTypes;
-use crate::wrappers::NativeContextHolder;
-use crate::wrappers::{NativeArray, NativeObjectHandle, NativeString, NativeStruct, NativeType};
+use crate::wrappers::{
+    inner_types::InnerTypes, NativeArray, NativeContextHolder, NativeObjectHandle, NativeString,
+    NativeStruct, NativeType,
+};
 use serde::{ser, Serialize};
 
 pub struct NativeSerdeSerializer<IT: InnerTypes> {

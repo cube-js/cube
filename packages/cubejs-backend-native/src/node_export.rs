@@ -9,11 +9,6 @@ use futures::StreamExt;
 use serde_json::Map;
 use tokio::sync::Semaphore;
 
-use std::net::SocketAddr;
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::Arc;
-
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
@@ -31,6 +26,10 @@ use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use std::net::SocketAddr;
+use std::rc::Rc;
+use std::str::FromStr;
+use std::sync::Arc;
 
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
@@ -513,7 +512,11 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
+    //============ sql planner exports ===================
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
+
+    //========= sql orchestrator exports =================
+    crate::orchestrator::register_module(&mut cx)?;
 
     crate::template::template_register_module(&mut cx)?;
 

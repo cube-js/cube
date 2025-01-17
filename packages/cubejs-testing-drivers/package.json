@@ -39,6 +39,7 @@
     "postgres-driver": "yarn test-driver -i dist/test/postgres-driver.test.js",
     "postgres-core": "yarn test-driver -i dist/test/postgres-core.test.js",
     "postgres-full": "yarn test-driver -i dist/test/postgres-full.test.js",
+    "postgres-native-cubestore-response-full": "yarn test-driver -i dist/test/postgres-native-cubestore-response-full.test.js",
     "snowflake-driver": "yarn test-driver -i dist/test/snowflake-driver.test.js",
     "snowflake-core": "yarn test-driver -i dist/test/snowflake-core.test.js",
     "snowflake-full": "yarn test-driver -i dist/test/snowflake-full.test.js",

@@ -42,6 +42,9 @@ pub mod test_user_change;
 #[cfg(test)]
 pub mod test_wrapper;
 pub mod utils;
+use crate::compile::{
+    arrow::record_batch::RecordBatch, engine::df::scan::convert_transport_response,
+};
 pub use utils::*;
 
 pub fn get_test_meta() -> Vec<CubeMeta> {
@@ -802,7 +805,9 @@ impl TransportService for TestConnectionTransport {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<TransportLoadResponse, CubeError> {
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         {
             let mut calls = self.load_calls.lock().await;
             calls.push(TestTransportLoadCall {
@@ -820,12 +825,19 @@ impl TransportService for TestConnectionTransport {
         }
 
         let mocks = self.load_mocks.lock().await;
-        let Some((_req, res)) = mocks.iter().find(|(req, _res)| req == &query) else {
+        let Some(res) = mocks
+            .iter()
+            .find(|(req, _res)| req == &query)
+            .map(|(_req, res)| {
+                convert_transport_response(res.clone(), schema.clone(), member_fields)
+            })
+        else {
             return Err(CubeError::internal(format!(
                 "Unexpected query in test transport: {query:?}"
             )));
         };
-        Ok(res.clone())
+
+        res
     }
 
     async fn load_stream(

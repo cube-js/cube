@@ -6,6 +6,7 @@
  */
 
 import type { Request as ExpressRequest } from 'express';
+import type { DataResult } from '@cubejs-backend/native';
 import { RequestType, ApiType, ResultType } from './strings';
 import { Query } from './query';
 
@@ -105,7 +106,7 @@ type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
  */
 type ResponseResultFn =
   (
-    message: (Record<string, any> | Record<string, any>[]) | ErrorResponse,
+    message: (Record<string, any> | Record<string, any>[]) | DataResult | ErrorResponse,
     extra?: { status: number }
   ) => void;
 

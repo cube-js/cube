@@ -16,13 +16,15 @@ opt-level = 1
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-cubesqlplanner = { path = "../../rust/cubesqlplanner/cubesqlplanner/" }
+cubesqlplanner = { path = "../../rust/cubesqlplanner/cubesqlplanner" }
+cubeorchestrator = { path = "../../rust/cubeorchestrator" }
 cubenativeutils = { path = "../../rust/cubenativeutils" }
+cubesql = { path = "../../rust/cubesql/cubesql" }
+anyhow = "1.0"
 async-channel = { version = "2" }
 async-trait = "0.1.36"
 convert_case = "0.6.0"
 pin-project = "1.1.5"
-cubesql = { path = "../../rust/cubesql/cubesql" }
 findshlibs = "0.10.2"
 futures = "0.3.30"
 http-body-util = "0.1"
