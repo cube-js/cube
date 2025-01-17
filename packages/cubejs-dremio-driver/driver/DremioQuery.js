@@ -43,7 +43,6 @@ class DremioQuery extends BaseQuery {
    * @see https://docs.dremio.com/cloud/reference/sql/sql-functions/functions/CONVERT_TIMEZONE/
    */
   convertTz(field) {
-
     return `CONVERT_TIMEZONE('${this.timezone}', ${field})`;
   }
 
