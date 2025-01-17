@@ -663,6 +663,16 @@ The cluster name to use when connecting to [Materialize](/product/configuration/
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | A valid Materialize cluster name                          | N/A                    | N/A                   |
 
+## `CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES`
+
+This flag controls how timezones are passed to CONVERT_TZ. If it is set to TRUE - timezone names will be used.
+IF it is set to FALSE - numeric offsets will be passed instead. To use named timezones, MySQL Server needs
+to be [configured][mysql-server-tz-support] properly.
+
+| Possible Values                       | Default in Development | Default in Production |
+| ------------------------------------- | ---------------------- | --------------------- |
+| Whether to use named timezones or not | `false`                | `false`               |
+
 ## `CUBEJS_DB_SNOWFLAKE_ACCOUNT`
 
 The Snowflake account identifier to use when connecting to the database.
@@ -1612,3 +1622,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming
 [ref-row-limit]: /product/apis-integrations/queries#row-limit
+[mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
