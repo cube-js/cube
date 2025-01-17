@@ -22,13 +22,20 @@ const CONTEXT_SYMBOLS = {
 const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
 export class CubeSymbols {
-  constructor(evaluateViews) {
+  constructor(evaluateViews, skipCompilationIfNoAccessPolicies) {
     this.symbols = {};
     this.builtCubes = {};
     this.cubeDefinitions = {};
     this.funcArgumentsValues = {};
     this.cubeList = [];
     this.evaluateViews = evaluateViews || false;
+    // This flag controls whether the additional compilation pass for views will happen or not.
+    // Background:
+    // When implemmenting Data Access Policies we realized, that in order to properly resolve
+    // Cube references in views, we need to have an additional pass of .compile with the evaluateViews
+    // flag set to true. This pass comes with a significant performance penalty and we'd like to avoid
+    // it if no access policies are defined for views in the data model.
+    this.skipCompilationIfNoAccessPolicies = skipCompilationIfNoAccessPolicies || false;
   }
 
   compile(cubes, errorReporter) {
@@ -37,6 +44,11 @@ export class CubeSymbols {
       R.fromPairs
     )(cubes);
     this.cubeList = cubes.map(c => (c.name ? this.getCubeDefinition(c.name) : this.createCube(c)));
+
+    if (this.skipCompilationIfNoAccessPolicies && !this.viewsHaveAccessPolicies(cubes)) {
+      return;
+    }
+
     // TODO support actual dependency sorting to allow using views inside views
     const sortedByDependency = R.pipe(
       R.sortBy(c => !!c.isView),
@@ -50,6 +62,10 @@ export class CubeSymbols {
         this.symbols[viewName] = splitViews[viewName];
       }
     }
+  }
+
+  viewsHaveAccessPolicies(cubes) {
+    return cubes.some(c => c.isView && c.accessPolicy);
   }
 
   getCubeDefinition(cubeName) {
