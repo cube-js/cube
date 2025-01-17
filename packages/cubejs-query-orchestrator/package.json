@@ -36,7 +36,6 @@
     "es5-ext": "0.10.53",
     "generic-pool": "^3.7.1",
     "lru-cache": "^6.0.0",
-    "moment-timezone": "^0.5.33",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
