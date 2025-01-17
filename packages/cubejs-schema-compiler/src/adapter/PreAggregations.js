@@ -439,18 +439,34 @@ export class PreAggregations {
   static sortTimeDimensionsWithRollupGranularity(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => (d.isPredefinedGranularity() ?
-        [d.expressionPath(), d.rollupGranularity(), null] :
-        // For custom granularities we need to add its name to the list (for exact matches)
-        [d.expressionPath(), d.rollupGranularity(), d.granularity]
-      ))
+      timeDimensions.map(d => {
+        const res = [d.expressionPath(), d.rollupGranularity()];
+        if (d.isPredefinedGranularity()) {
+          res.push(null);
+        } else if (d.granularity && d.granularity !== res[1]) {
+          // For custom granularities we need to add its name to the list (for exact matches)
+          res.push(d.granularity);
+        }
+        return res;
+      })
     ) || [];
   }
 
   static timeDimensionsAsIs(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => [d.expressionPath(), d.granularity]),
+      timeDimensions.map(d => {
+        const res = [d.expressionPath()];
+        const resolvedGranularity = d.resolvedGranularity();
+        if (d.granularity && d.granularity !== resolvedGranularity) {
+          // For custom granularities we need to add its name to the list (for exact matches)
+          res.push(...[resolvedGranularity, d.granularity]);
+        } else {
+          // For query timeDimension without granularity we pass the resolved from dataRange as fallback
+          res.push(resolvedGranularity);
+        }
+        return res;
+      }),
     ) || [];
   }
 
@@ -628,13 +644,15 @@ export class PreAggregations {
      * @returns {Array<Array<string>>}
      */
     const expandTimeDimension = (timeDimension) => {
-      const [dimension, granularity, customGranularity] = timeDimension;
+      const [dimension, granularity, customOrResolvedGranularity] = timeDimension;
       const res = expandGranularity(granularity)
         .map((newGranularity) => [dimension, newGranularity]);
 
-      if (customGranularity) {
+      if (customOrResolvedGranularity) {
         // For custom granularities we add it upfront to the list (for exact matches)
-        res.unshift([dimension, customGranularity]);
+        // For queries with timeDimension but without granularity specified we use resolved
+        // granularity from date range
+        res.unshift([dimension, customOrResolvedGranularity]);
       }
 
       return res;

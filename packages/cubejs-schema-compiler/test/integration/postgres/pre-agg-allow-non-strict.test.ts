@@ -205,7 +205,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, false, false));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -266,7 +266,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(false, true, false));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -294,7 +294,7 @@ describe(
         expect(query.indexOf('cube__hourly_data')).toEqual(-1);
       });
 
-      it('hour query with the `week` granularity match `HourlyData`', async () => {
+      it('hour query with the `week` granularity match `DailyData`', async () => {
         await compiler.compile();
         const [,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
         const [query] = request.buildSqlAndParams();
@@ -327,7 +327,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(false, false, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -388,7 +388,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, true, false));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -449,7 +449,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, false, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -510,7 +510,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(false, true, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -571,7 +571,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, true, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);

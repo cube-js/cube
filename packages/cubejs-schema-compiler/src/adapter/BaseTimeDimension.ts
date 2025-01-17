@@ -39,7 +39,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   // TODO: find and fix all hidden references to granularity to rely on granularityObj instead?
-  public get granularity(): string | undefined {
+  public get granularity(): string | null | undefined {
     return this.granularityObj?.granularity;
   }
 
@@ -217,7 +217,7 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateToFormatted() : BUILD_RANGE_END_LOCAL));
   }
 
-  public dateRangeGranularity() {
+  public dateRangeGranularity(): string | null {
     if (!this.dateRange) {
       return null;
     }
@@ -262,7 +262,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public resolvedGranularity() {
-    return this.granularityObj?.resolvedGranularity();
+    return this.granularityObj ? this.granularityObj.resolvedGranularity() : this.dateRangeGranularity();
   }
 
   public isPredefinedGranularity(): boolean {

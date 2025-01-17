@@ -229,6 +229,7 @@ describe('PreAggregations', () => {
           dimensions: [sourceAndId, source],
           timeDimension: createdAt,
           granularity: 'hour',
+          allowNonStrictDateRangeMatch: true
         },
         visitorsMultiplied: {
           measures: [count],
@@ -542,6 +543,33 @@ describe('PreAggregations', () => {
             visitors__count: '2'
           }
         ]
+      );
+    });
+  }));
+
+  it('simple pre-aggregation (with no granularity in query)', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2017-01-01 00:00:00.000', '2017-01-29 22:59:59.999']
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(queryAndParams[0]).toMatch(/visitors_source_and_id_rollup/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [{
+          visitors__count: '5'
+        }]
       );
     });
   }));
