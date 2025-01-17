@@ -451,7 +451,7 @@ impl QueryProperties {
             let time_dimensions = self
                 .time_dimensions
                 .iter()
-                .map(|d| -> Rc<dyn BaseMember> { d.clone() });
+                .map(|d| -> Rc<dyn BaseMember> { d.base_dimension().clone() });
             dimensions
                 .chain(time_dimensions)
                 .chain(measures)

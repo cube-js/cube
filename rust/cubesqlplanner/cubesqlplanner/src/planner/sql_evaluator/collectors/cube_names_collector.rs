@@ -38,7 +38,7 @@ impl TraversalVisitor for CubeNamesCollector {
                     self.names.insert(name);
                 }
             }
-            MemberSymbol::TimeDimension(e) => self.apply(e.base_symbol(), &())?,
+            MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
                     self.names.insert(e.cube_name().clone());

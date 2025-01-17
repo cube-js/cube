@@ -36,7 +36,7 @@ impl TraversalVisitor for JoinHintsCollector {
                     self.hints.push(name);
                 }
             }
-            MemberSymbol::TimeDimension(e) => self.apply(e.base_symbol(), &())?,
+            MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
                     self.hints.push(e.cube_name().clone());
