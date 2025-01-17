@@ -6,9 +6,7 @@ redirect_from:
 # Development mode
 
 Development mode allows to test and debug the data model in an isolated
-environment before releasing any changes to production. When the development
-mode is enabled, you'll have access to your personal API endpoints that will track the branch you're on and will be updated automatically when you make changes to the data model.
-Read more about environments on the [Environments][ref-environments] page.
+[development environment][ref-environments-dev] before releasing any changes to production.
 
 <SuccessBox>
 
@@ -16,6 +14,10 @@ Development mode is available in Cube Cloud on
 [all product tiers](https://cube.dev/pricing).
 
 </SuccessBox>
+
+When you enter the development mode, you'll have access to your personal API endpoints
+that will track the branch you're on and will be updated automatically when you make
+changes to the data model.
 
 ## Development flow
 
@@ -87,7 +89,7 @@ They will be shown on the Overview page:
   />
 </div>
 
-Read more about the available endpoints on the [Environments][ref-environments] page.
+Read more about the available endpoints on the [Environments][ref-environments-endpoints] page.
 
 ## Limitations
 
@@ -106,10 +108,6 @@ Scheduled refresh is also disabled in the Development API. If you need to test
 scheduled refreshes, we recommend creating a separate deployment using a
 different Git branch of the same repository.
 
-### Cube version guarantees
 
-The version of Cube used in the Development API **is not** guaranteed to be the
-same each time. If this affects your development process, we recommend reaching
-out to our support team.
-
-[ref-environments]: /product/workspace/environments
+[ref-environments-dev]: /product/workspace/environments#development-environments
+[ref-environments-endpoints]: /product/workspace/environments#api-endpoints

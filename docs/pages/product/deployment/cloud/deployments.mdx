@@ -75,21 +75,19 @@ user-specific state of the deployment:
 
 ## Cube version
 
-Each deployment in Cube Cloud runs a specific version of Cube, depending on the
-branch of the source code and the selected [update channel](#update-channels).
+Each [environment][ref-environments] within a Cube Cloud deployment runs a specific
+version of Cube that depends on the environment type and the selected [update
+channel](#update-channels).
 
 ### Current version
 
-You can check the current version of Cube that your deployment runs by
+You can check the current version of Cube that your deployment (environment) runs by
 navigating to <Btn>Overview → Resources & Logs → Cube API</Btn>:
 
 <Screenshot
   src="https://ucarecdn.com/83a5010a-3c02-4ce1-8e4f-fdbb2efc6a90/"
   highlight="inset(42.5% 42.5% 32.5% 4% round 10px)"
 />
-
-Non-main branches and [development mode][ref-dev-mode] branches always run
-the most up-to-date version of Cube.
 
 ### Update channels
 
@@ -110,25 +108,12 @@ General → Cube version</Btn>:
 
 ## Resource consumption
 
-Each deployment allocates and consumes the following resources:
+Cube Cloud deployments only consume resources when they are needed to run workloads:
 
-* For the main branch of the source code, a set of resources in line with
-  the [deployment type][ref-deployment-types].
-* For any other branch of the source code, a [development
-  instance][ref-dev-instance].
-* For any user-specific [development mode][ref-dev-mode] branch, a
-  [development instance][ref-dev-instance].
-* If pre-aggregations are used, a minimum of two Cube Store workers.
-
-Cube Cloud only consumes resources when they are needed to run workloads:
-
-* For the main branch, resources are always consumed unless a deployment is
-  [auto-suspended][ref-auto-sus].
-* For any other branch or any user-specific development mode branch,
-  a development instance is allocated while there's some activity in the
-  branch, e.g., API endpoints are serving requests, a user is active in
-  Cube Cloud, etc. After a period of inactivity, the development instance
-  is deallocated.
+* For the [production environment][ref-environments-prod], resources are always consumed
+unless a deployment is [suspended][ref-auto-sus].
+* For any other [environment][ref-environments], a development instance is allocated
+while it's active. After a period of inactivity, the development instance is deallocated.
 * For pre-aggregations, Cube Store workers are allocated while there's some
   activity related to pre-aggregations, e.g., API endpoints are serving
   requests to pre-aggregations, pre-aggregations are being built, etc.
@@ -140,7 +125,6 @@ resource consumption in different scenarios.
 
 [cube-cloud-signup]: https://cubecloud.dev/auth/signup
 [ref-deployment-types]: /product/deployment/cloud/deployment-types
-[ref-dev-instance]: /product/deployment/cloud/deployment-types#development-instance
 [ref-dev-mode]: /product/workspace/dev-mode
 [ref-auto-sus]: /product/deployment/cloud/auto-suspension
 [ref-total-cost]: /product/deployment/cloud/pricing#total-cost-examples
@@ -151,3 +135,5 @@ resource consumption in different scenarios.
 [ref-config-options]: /product/configuration#configuration-options
 [ref-data-model]: /product/workspace/data-model
 [ref-playground]: /product/workspace/playground
+[ref-environments]: /product/workspace/environments
+[ref-environments-prod]: /product/workspace/environments#production-environment
