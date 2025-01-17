@@ -13,4 +13,3 @@ pub use measure_symbol::{MeasureSymbol, MeasureSymbolFactory};
 pub use member_symbol::MemberSymbol;
 pub use symbol_factory::SymbolFactory;
 pub use time_dimension_symbol::TimeDimensionSymbol;
-
