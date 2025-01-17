@@ -22,6 +22,7 @@ import {
   IndexesSQL,
   DownloadTableMemoryData,
   DriverCapabilities,
+  TableColumn,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -180,7 +181,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
   protected primaryKeysQuery(conditionString?: string): string | null {
     return `SELECT
-      TABLE_SCHEMA as ${this.quoteIdentifier('table_schema')}, 
+      TABLE_SCHEMA as ${this.quoteIdentifier('table_schema')},
       TABLE_NAME as ${this.quoteIdentifier('table_name')},
       COLUMN_NAME as ${this.quoteIdentifier('column_name')}
   FROM
@@ -260,6 +261,14 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       // eslint-disable-next-line no-underscore-dangle
       await (<any> this.pool)._factory.destroy(conn);
     }
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 64) {
+      throw new Error('MySQL can not work with table names longer than 64 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+    return super.createTable(quotedTableName, columns);
   }
 
   public async query(query: string, values: unknown[]) {
