@@ -20,6 +20,8 @@ $ yarn
 $ yarn test
 ```
 
+Note: Unit tests requires Java to be installed.
+
 ### License
 
 Cube.js Databricks Database Driver is [Apache 2.0 licensed](./LICENSE).

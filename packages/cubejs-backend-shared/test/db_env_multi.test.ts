@@ -956,6 +956,93 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("dbExportBucketAzureTenantId")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'wrong1';
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('dbExportBucketAzureTenantId', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'wrong2';
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('dbExportBucketAzureTenantId', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_TENANT_ID;
+    delete process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_TENANT_ID;
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('dbExportBucketAzureTenantId', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
+  test('getEnv("dbExportBucketAzureClientId")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'wrong1';
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('dbExportBucketAzureClientId', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'wrong2';
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('dbExportBucketAzureClientId', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_CLIENT_ID;
+    delete process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_CLIENT_ID;
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('dbExportBucketAzureClientId', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
+  test('getEnv("dbExportBucketAzureClientSecret")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'wrong1';
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('dbExportBucketAzureClientSecret', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'wrong2';
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('dbExportBucketAzureClientSecret', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET;
+    delete process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET;
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('dbExportBucketAzureClientSecret', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("dbExportIntegration")', () => {
     process.env.CUBEJS_DB_EXPORT_INTEGRATION = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_INTEGRATION = 'postgres1';
