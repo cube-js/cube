@@ -3,7 +3,7 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
 };
-use crate::cube_bridge::member_sql::{CustomMemberSql, MemberSql};
+use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;

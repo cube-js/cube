@@ -5,7 +5,6 @@ use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct GeoDimensionSqlNode {
