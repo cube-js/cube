@@ -32,7 +32,8 @@ impl CommonUtils {
             .static_data()
             .primary_keys
             .get(cube_name)
-            .unwrap();
+            .cloned()
+            .unwrap_or_else(|| vec![]);
 
         let dims = primary_keys
             .iter()

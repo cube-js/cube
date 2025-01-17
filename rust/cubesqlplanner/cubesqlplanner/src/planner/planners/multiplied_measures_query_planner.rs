@@ -7,11 +7,13 @@ use crate::plan::{
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
-    collect_sub_query_dimensions_from_members,
+    collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
-use crate::planner::{BaseMeasure, BaseMember, BaseMemberHelper, QueryProperties};
+use crate::planner::{
+    BaseMeasure, BaseMember, BaseMemberHelper, FullKeyAggregateMeasures, QueryProperties,
+};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -23,21 +25,24 @@ pub struct MultipliedMeasuresQueryPlanner {
     join_planner: JoinPlanner,
     common_utils: CommonUtils,
     context_factory: SqlNodesFactory,
+    full_key_aggregate_measures: FullKeyAggregateMeasures,
 }
 
 impl MultipliedMeasuresQueryPlanner {
-    pub fn new(
+    pub fn try_new(
         query_tools: Rc<QueryTools>,
         query_properties: Rc<QueryProperties>,
         context_factory: SqlNodesFactory,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CubeError> {
+        let full_key_aggregate_measures = query_properties.full_key_aggregate_measures()?;
+        Ok(Self {
             query_tools: query_tools.clone(),
             join_planner: JoinPlanner::new(query_tools.clone()),
             common_utils: CommonUtils::new(query_tools.clone()),
             query_properties,
             context_factory,
-        }
+            full_key_aggregate_measures,
+        })
     }
 
     pub fn plan_queries(&self) -> Result<Vec<Rc<Select>>, CubeError> {
@@ -47,14 +52,16 @@ impl MultipliedMeasuresQueryPlanner {
             )));
         }
 
-        let measures = self.query_properties.full_key_aggregate_measures()?;
+        let full_key_aggregate_measures = &self.full_key_aggregate_measures;
 
         let mut joins = Vec::new();
 
-        if !measures.regular_measures.is_empty() {
+        if !full_key_aggregate_measures.regular_measures.is_empty() {
             let join_multi_fact_groups = self
                 .query_properties
-                .compute_join_multi_fact_groups_with_measures(&measures.regular_measures)?;
+                .compute_join_multi_fact_groups_with_measures(
+                    &full_key_aggregate_measures.regular_measures,
+                )?;
             for (i, (join, measures)) in join_multi_fact_groups.iter().enumerate() {
                 let regular_subquery = self.regular_measures_subquery(
                     measures,
@@ -69,7 +76,7 @@ impl MultipliedMeasuresQueryPlanner {
             }
         }
 
-        for (cube_name, measures) in measures
+        for (cube_name, measures) in full_key_aggregate_measures
             .multiplied_measures
             .clone()
             .into_iter()
@@ -230,6 +237,11 @@ impl MultipliedMeasuresQueryPlanner {
         let mut context_factory = self.context_factory.clone();
         context_factory.set_render_references(render_references);
         context_factory.set_ungrouped_measure_references(ungrouped_measure_references);
+        context_factory.set_rendered_as_multiplied_measures(
+            self.full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
         Ok(Rc::new(select_builder.build(context_factory)))
     }
 
@@ -275,6 +287,13 @@ impl MultipliedMeasuresQueryPlanner {
         let mut context_factory = self.context_factory.clone();
         context_factory.set_ungrouped_measure(true);
         context_factory.set_render_references(dimension_subquery_planner.dimensions_refs().clone());
+
+        context_factory.set_rendered_as_multiplied_measures(
+            self.full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
+
         let mut select_builder = SelectBuilder::new(from);
         for dim in primary_keys_dimensions.iter() {
             select_builder.add_projection_member(dim, None);
@@ -291,8 +310,8 @@ impl MultipliedMeasuresQueryPlanner {
         join: Rc<dyn JoinDefinition>,
         alias_prefix: String,
     ) -> Result<Rc<Select>, CubeError> {
-        let subquery_dimensions = collect_sub_query_dimensions_from_members(
-            &self.query_properties.all_members(false),
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &self.query_properties.all_member_symbols(false),
             self.query_tools.clone(),
         )?;
 
@@ -323,6 +342,11 @@ impl MultipliedMeasuresQueryPlanner {
 
         let render_references = dimension_subquery_planner.dimensions_refs().clone();
         context_factory.set_render_references(render_references);
+        context_factory.set_rendered_as_multiplied_measures(
+            self.full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
 
         Ok(Rc::new(select_builder.build(context_factory)))
     }

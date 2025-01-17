@@ -2,6 +2,7 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{DimensionSymbol, MemberSymbol, TraversalVisitor};
 use crate::planner::{BaseDimension, BaseMember};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct SubQueryDimensionsCollector {
@@ -60,9 +61,17 @@ pub fn collect_sub_query_dimensions_from_members(
     members: &Vec<Rc<dyn BaseMember>>,
     query_tools: Rc<QueryTools>,
 ) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
+    let symbols = members.iter().map(|m| m.member_evaluator()).collect_vec();
+    collect_sub_query_dimensions_from_symbols(&symbols, query_tools)
+}
+
+pub fn collect_sub_query_dimensions_from_symbols(
+    members: &Vec<Rc<MemberSymbol>>,
+    query_tools: Rc<QueryTools>,
+) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
     let mut visitor = SubQueryDimensionsCollector::new();
     for member in members.iter() {
-        visitor.apply(&member.member_evaluator(), &())?;
+        visitor.apply(&member, &())?;
     }
     visitor
         .extract_result()

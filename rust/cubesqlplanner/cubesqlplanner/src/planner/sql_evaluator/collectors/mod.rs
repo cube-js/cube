@@ -16,4 +16,5 @@ pub use member_childs_collector::{member_childs, MemberChildsCollector};
 pub use multiplied_measures_collector::{collect_multiplied_measures, MultipliedMeasuresCollector};
 pub use sub_query_dimensions::{
     collect_sub_query_dimensions, collect_sub_query_dimensions_from_members,
+    collect_sub_query_dimensions_from_symbols,
 };

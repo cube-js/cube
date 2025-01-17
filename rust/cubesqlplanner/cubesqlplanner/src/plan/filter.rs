@@ -75,7 +75,7 @@ impl FilterItem {
                 }
             }
             FilterItem::Item(item) => {
-                let sql = item.to_sql(context.clone())?;
+                let sql = item.to_sql(context.clone(), templates)?;
                 format!("({})", sql)
             }
         };

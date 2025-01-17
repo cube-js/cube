@@ -1,6 +1,6 @@
 use super::{CommonUtils, DimensionSubqueryPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::member_sql::MemberSql;
 use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::SqlCall;

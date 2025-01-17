@@ -1,11 +1,11 @@
 use super::{
-    AutoPrefixSqlNode, EvaluateSqlNode, FinalMeasureSqlNode, MeasureFilterSqlNode,
-    MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode, RollingWindowNode,
-    RootSqlNode, SqlNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
+    AutoPrefixSqlNode, EvaluateSqlNode, FinalMeasureSqlNode, GeoDimensionSqlNode,
+    MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode,
+    RollingWindowNode, RootSqlNode, SqlNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
     UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -14,6 +14,7 @@ pub struct SqlNodesFactory {
     ungrouped: bool,
     ungrouped_measure: bool,
     render_references: HashMap<String, QualifiedColumnName>,
+    rendered_as_multiplied_measures: HashSet<String>,
     ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
     cube_name_references: HashMap<String, String>,
     multi_stage_rank: Option<Vec<String>>,   //partition_by
@@ -30,6 +31,7 @@ impl SqlNodesFactory {
             render_references: HashMap::new(),
             ungrouped_measure_references: HashMap::new(),
             cube_name_references: HashMap::new(),
+            rendered_as_multiplied_measures: HashSet::new(),
             multi_stage_rank: None,
             multi_stage_window: None,
             rolling_window: false,
@@ -54,6 +56,10 @@ impl SqlNodesFactory {
 
     pub fn render_references(&self) -> &HashMap<String, QualifiedColumnName> {
         &self.render_references
+    }
+
+    pub fn set_rendered_as_multiplied_measures(&mut self, value: HashSet<String>) {
+        self.rendered_as_multiplied_measures = value;
     }
 
     pub fn add_render_reference(&mut self, key: String, value: QualifiedColumnName) {
@@ -108,7 +114,7 @@ impl SqlNodesFactory {
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
 
         let root_node = RootSqlNode::new(
-            self.dimension_processor(auto_prefix_processor.clone()),
+            self.dimension_processor(evaluate_sql_processor.clone()),
             measure_processor.clone(),
             auto_prefix_processor.clone(),
             evaluate_sql_processor.clone(),
@@ -155,11 +161,16 @@ impl SqlNodesFactory {
         } else if self.rolling_window {
             RollingWindowNode::new(input)
         } else {
-            FinalMeasureSqlNode::new(input)
+            FinalMeasureSqlNode::new(input, self.rendered_as_multiplied_measures.clone())
         }
     }
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
+
+        let input: Rc<dyn SqlNode> =
+            AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
+
         let input = if !&self.time_shifts.is_empty() {
             TimeShiftSqlNode::new(self.time_shifts.clone(), input)
         } else {

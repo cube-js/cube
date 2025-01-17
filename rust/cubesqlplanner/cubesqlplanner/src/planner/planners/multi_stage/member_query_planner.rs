@@ -379,11 +379,11 @@ impl MultiStageMemberQueryPlanner {
             );
             planner.plan()?
         } else {
-            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::new(
+            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::try_new(
                 self.query_tools.clone(),
                 cte_query_properties.clone(),
                 node_factory.clone(),
-            );
+            )?;
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
                 cte_query_properties.clone(),
                 node_factory.clone(),

@@ -47,11 +47,11 @@ impl QueryPlanner {
             planner.plan()
         } else {
             let request = self.request.clone();
-            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::new(
+            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::try_new(
                 self.query_tools.clone(),
                 request.clone(),
                 nodes_factory.clone(),
-            );
+            )?;
             let multi_stage_query_planner =
                 MultiStageQueryPlanner::new(self.query_tools.clone(), request.clone());
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(

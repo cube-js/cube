@@ -180,7 +180,7 @@ impl JoinCondition {
     ) -> Result<String, CubeError> {
         match &self {
             JoinCondition::DimensionJoinCondition(cond) => cond.to_sql(templates, context),
-            JoinCondition::BaseJoinCondition(cond) => cond.to_sql(context),
+            JoinCondition::BaseJoinCondition(cond) => cond.to_sql(context, templates),
             JoinCondition::RollingWindowJoinCondition(cond) => cond.to_sql(templates, context),
         }
     }

@@ -1,4 +1,5 @@
-use super::memeber_sql::{MemberSql, NativeMemberSql};
+use super::geo_item::{GeoItem, NativeGeoItem};
+use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -25,6 +26,15 @@ pub struct DimenstionDefinitionStatic {
 
 #[nativebridge::native_bridge(DimenstionDefinitionStatic)]
 pub trait DimensionDefinition {
+    #[optional]
     #[field]
-    fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
+    fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+
+    #[optional]
+    #[field]
+    fn latitude(&self) -> Result<Option<Rc<dyn GeoItem>>, CubeError>;
+
+    #[optional]
+    #[field]
+    fn longitude(&self) -> Result<Option<Rc<dyn GeoItem>>, CubeError>;
 }

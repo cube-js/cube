@@ -4,6 +4,7 @@ use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext}
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
 };
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -84,8 +85,17 @@ impl Debug for BaseMeasure {
 }
 
 impl BaseMember for BaseMeasure {
-    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            templates,
+        )
     }
 
     fn alias_name(&self) -> String {
@@ -176,6 +186,22 @@ impl BaseMeasure {
             default_alias,
             time_shifts: vec![],
         })
+    }
+
+    pub fn can_used_as_addictive_in_multplied(&self) -> Result<bool, CubeError> {
+        let measure_type = self.measure_type();
+        let res = if measure_type == "countDistinct" {
+            true
+        } else if measure_type == "count" {
+            if let Some(definition) = &self.definition {
+                !definition.has_sql()?
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        Ok(res)
     }
 
     fn parse_time_shifts(

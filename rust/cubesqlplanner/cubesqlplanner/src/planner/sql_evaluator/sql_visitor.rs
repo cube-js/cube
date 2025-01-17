@@ -1,6 +1,7 @@
 use super::sql_nodes::SqlNode;
 use super::MemberSymbol;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -18,9 +19,15 @@ impl SqlEvaluatorVisitor {
         &self,
         node: &Rc<MemberSymbol>,
         node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let result =
-            node_processor.to_sql(self, node, self.query_tools.clone(), node_processor.clone())?;
+        let result = node_processor.to_sql(
+            self,
+            node,
+            self.query_tools.clone(),
+            node_processor.clone(),
+            templates,
+        )?;
         Ok(result)
     }
 }

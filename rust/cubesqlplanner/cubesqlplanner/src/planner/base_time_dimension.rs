@@ -2,6 +2,7 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::{MemberSymbol, TimeDimensionSymbol};
 use super::BaseDimension;
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,8 +17,17 @@ pub struct BaseTimeDimension {
 }
 
 impl BaseMember for BaseTimeDimension {
-    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            templates,
+        )
     }
 
     fn alias_name(&self) -> String {

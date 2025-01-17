@@ -1,7 +1,7 @@
 use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
 use super::measure_filter::{MeasureFiltersVec, NativeMeasureFiltersVec};
 use super::member_order_by::{MemberOrderByVec, NativeMemberOrderByVec};
-use super::memeber_sql::{MemberSql, NativeMemberSql};
+use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -59,6 +59,10 @@ pub trait MeasureDefinition {
     #[optional]
     #[field]
     fn filters(&self) -> Result<Option<Rc<dyn MeasureFiltersVec>>, CubeError>;
+
+    #[optional]
+    #[field]
+    fn drill_filters(&self) -> Result<Option<Rc<dyn MeasureFiltersVec>>, CubeError>;
 
     #[optional]
     #[field]

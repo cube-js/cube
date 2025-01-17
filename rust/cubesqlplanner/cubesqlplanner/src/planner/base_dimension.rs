@@ -2,6 +2,7 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::{MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,8 +17,17 @@ pub struct BaseDimension {
 }
 
 impl BaseMember for BaseDimension {
-    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            templates,
+        )
     }
 
     fn alias_name(&self) -> String {
@@ -88,7 +98,16 @@ impl BaseDimension {
 
     pub fn sql_call(&self) -> Result<Rc<SqlCall>, CubeError> {
         match self.member_evaluator.as_ref() {
-            MemberSymbol::Dimension(d) => Ok(d.member_sql().clone()),
+            MemberSymbol::Dimension(d) => {
+                if let Some(sql) = d.member_sql() {
+                    Ok(sql.clone())
+                } else {
+                    Err(CubeError::user(format!(
+                        "Dimension {} hasn't sql evaluator",
+                        self.full_name()
+                    )))
+                }
+            }
             _ => Err(CubeError::internal(format!(
                 "MemberSymbol::Dimension expected"
             ))),

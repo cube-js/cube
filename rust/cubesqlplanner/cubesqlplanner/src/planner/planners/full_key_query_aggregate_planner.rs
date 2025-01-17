@@ -151,7 +151,7 @@ impl FullKeyAggregateQueryPlanner {
         };
 
         select_builder.set_order_by(self.order_planner.default_order());
-        select_builder.set_having(having);
+        select_builder.set_filter(having);
         select_builder.set_limit(self.query_properties.row_limit());
         select_builder.set_offset(self.query_properties.offset());
         if !ctes.is_empty() {

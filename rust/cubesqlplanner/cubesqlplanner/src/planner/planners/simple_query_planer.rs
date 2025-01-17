@@ -1,7 +1,7 @@
 use super::{DimensionSubqueryPlanner, JoinPlanner, OrderPlanner};
 use crate::plan::{Filter, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions_from_members;
+use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions_from_symbols;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
@@ -30,8 +30,8 @@ impl SimpleQueryPlanner {
     }
 
     pub fn plan(&self) -> Result<Rc<Select>, CubeError> {
-        let subquery_dimensions = collect_sub_query_dimensions_from_members(
-            &self.query_properties.all_members(false),
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &self.query_properties.all_member_symbols(false),
             self.query_tools.clone(),
         )?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
