@@ -454,11 +454,10 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
-        WrapperPushdownReplacer {
-            member: Arc<LogicalPlan>,
+        WrapperReplacerContext {
             alias_to_cube: Vec<(String, String)>,
-            // This means that result of this replacer would be used as member expression in load query to Cube.
-            // This flag should be passed from top, by the rule that starts wrapping new logical plan node.
+            // When `member` is expression this means that result of this replacer should be used as member expression in load query to Cube.
+            // When `member` is logical plan node this means that logical plan inside allows to push to Cube
             // Important caveat: it means that result would be used for push to cube *and only there*.
             // So it's more like "must push to Cube" than "can push to Cube"
             // This part is important for rewrites like SUM(sumMeasure) => sumMeasure
@@ -471,23 +470,19 @@ crate::plan_to_language! {
             // Used to allow to rewrite columns from them even with push to Cube enabled
             grouped_subqueries: Vec<String>,
         },
+        WrapperPushdownReplacer {
+            member: Arc<LogicalPlan>,
+            // Only WrapperReplacerContext should be allowed here
+            // Context be passed from top, by the rule that starts wrapping new logical plan node,
+            // and should make roundtrip from top to bottom and back.
+            context: Arc<LogicalPlan>,
+        },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
-            alias_to_cube: Vec<(String, String)>,
-            // When `member` is expression this means that result of this replacer should be used as member expression in load query to Cube.
-            // When `member` is logical plan node this means that logical plan inside allows to push to Cube
-            // This flag should make roundtrip from top to bottom and back.
-            // Important caveat: it means that result should be used for push to cube *and only there*.
-            // So it's more like "must push to Cube" than "can push to Cube"
-            // This part is important for rewrites like SUM(sumMeasure) => sumMeasure
-            // We can use sumMeasure instead of SUM(sumMeasure) ONLY in with push to Cube
-            // An vice versa, we can't use SUM(sumMeasure) in grouped query to Cube, so it can be allowed ONLY without push to grouped Cube query
-            push_to_cube: bool,
-            in_projection: bool,
-            cube_members: Vec<LogicalPlan>,
-            // Known qualifiers of grouped subqueries
-            // Used to allow to rewrite columns from them even with push to Cube enabled
-            grouped_subqueries: Vec<String>,
+            // Only WrapperReplacerContext should be allowed here
+            // Context be passed from top, by the rule that starts wrapping new logical plan node,
+            // and should make roundtrip from top to bottom and back.
+            context: Arc<LogicalPlan>,
         },
         FlattenPushdownReplacer {
             expr: Arc<Expr>,
@@ -1973,8 +1968,7 @@ fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> Str
     format!("(CaseExprReplacer {} {})", members, alias_to_cube)
 }
 
-fn wrapper_pushdown_replacer(
-    members: impl Display,
+fn wrapper_replacer_context(
     alias_to_cube: impl Display,
     push_to_cube: impl Display,
     in_projection: impl Display,
@@ -1982,21 +1976,16 @@ fn wrapper_pushdown_replacer(
     grouped_subqueries: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
+        "(WrapperReplacerContext {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
     )
 }
 
-fn wrapper_pullup_replacer(
-    members: impl Display,
-    alias_to_cube: impl Display,
-    push_to_cube: impl Display,
-    in_projection: impl Display,
-    cube_members: impl Display,
-    grouped_subqueries: impl Display,
-) -> String {
-    format!(
-        "(WrapperPullupReplacer {members} {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
-    )
+fn wrapper_pushdown_replacer(members: impl Display, context: impl Display) -> String {
+    format!("(WrapperPushdownReplacer {members} {context})",)
+}
+
+fn wrapper_pullup_replacer(members: impl Display, context: impl Display) -> String {
+    format!("(WrapperPullupReplacer {members} {context})",)
 }
 
 fn flatten_pushdown_replacer(
