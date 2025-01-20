@@ -34,6 +34,8 @@ pub mod test_cube_join_grouped;
 #[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
+pub mod test_filters;
+#[cfg(test)]
 pub mod test_introspection;
 #[cfg(test)]
 pub mod test_udfs;

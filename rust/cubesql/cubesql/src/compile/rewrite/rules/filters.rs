@@ -4224,7 +4224,7 @@ impl FilterRules {
                             {
                                 swap_left_and_right = false;
                             } else if valid_left_filters.contains(date_range_end_op)
-                                || valid_right_filters.contains(date_range_start_op)
+                                && valid_right_filters.contains(date_range_start_op)
                             {
                                 swap_left_and_right = true;
                             } else {
