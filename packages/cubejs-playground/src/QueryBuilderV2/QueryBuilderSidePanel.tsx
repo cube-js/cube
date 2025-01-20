@@ -121,7 +121,7 @@ export function QueryBuilderSidePanel({
     if (isQueryEmpty) {
       setOpenCubes(cubesOrViews.length === 1 ? new Set([cubesOrViews[0].name]) : new Set());
     }
-  }, [meta, selectedType]);
+  }, [meta, cubesOrViews.length, selectedType]);
 
   const highlightedCubes = appliedFilterString ? usedCubes : [];
 
@@ -368,6 +368,7 @@ export function QueryBuilderSidePanel({
     [...openCubes.values()].join(),
     appliedFilterString,
     usedCubes.join(),
+    cubesOrViews.length,
     memberViewType,
     selectedType,
     isQueryEmpty,
