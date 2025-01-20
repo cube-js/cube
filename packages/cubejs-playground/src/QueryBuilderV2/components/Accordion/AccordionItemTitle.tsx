@@ -28,7 +28,7 @@ const StyledAccordionItemTitleWrap = tasty({
       subtitle: 'auto 1fr auto',
     },
     placeItems: 'center start',
-    gap: '1x',
+    gap: '0',
     width: '100%',
     borderRadius: { '': 0, focused: '0.5x' },
     outline: { '': '#purple-04.0', focused: '#purple-04' },

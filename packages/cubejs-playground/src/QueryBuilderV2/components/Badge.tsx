@@ -11,7 +11,7 @@ const MemberBadgeElement = tasty(Badge, {
     color: {
       '': '#dark',
       '![data-member]': '#danger-text',
-      special: '#white',
+      'special | missing': '#white',
     },
     fill: {
       '': '#danger-text.15',
@@ -25,6 +25,7 @@ const MemberBadgeElement = tasty(Badge, {
       '[data-member="timeDimension"] & special': '#time-dimension-text',
       '[data-member="segment"] & special': '#segment-text',
       '[data-member="filter"] & special': '#filter-text',
+      missing: '#danger',
     },
     preset: 't4m',
     width: 'max-content',
@@ -38,16 +39,18 @@ export const MemberBadge = memo(
   ({
     type,
     isSpecial,
+    isMissing,
     children,
   }: {
     type?: 'measure' | 'dimension' | 'segment' | 'filter' | 'timeDimension';
     isSpecial?: boolean;
+    isMissing?: boolean;
     children: ReactNode | number;
   }) => {
     return (
       <MemberBadgeElement
         data-member={type}
-        mods={{ special: isSpecial || !Number.isNaN(Number(children)) }}
+        mods={{ special: isSpecial || !Number.isNaN(Number(children)), missing: isMissing }}
         radius="1r"
       >
         {!type && <QuestionCircleOutlined style={{ fontSize: '13px' }} />}

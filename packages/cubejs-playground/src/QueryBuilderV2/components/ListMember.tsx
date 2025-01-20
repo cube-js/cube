@@ -1,44 +1,37 @@
-import { useRef } from 'react';
-import {
-  Menu,
-  MenuTrigger,
-  Space,
-  tasty,
-  Text,
-  CloseIcon,
-  TooltipProvider,
-} from '@cube-dev/ui-kit';
+import { useMemo, useRef } from 'react';
+import { Menu, MenuTrigger, Space, Text, CloseIcon, PlusIcon, CubeIcon } from '@cube-dev/ui-kit';
 import { TCubeMeasure, TCubeDimension, TCubeSegment, Cube, MemberType } from '@cubejs-client/core';
-import { PlusOutlined } from '@ant-design/icons';
 
-import { getTypeIcon, titleize } from '../utils';
+import { getTypeIcon } from '../utils';
 import { PrimaryKeyIcon } from '../icons/PrimaryKeyIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
 import { ItemInfoIcon } from '../icons/ItemInfoIcon';
-import { useHasOverflow } from '../hooks/has-overflow';
+import { MemberViewType } from '../types';
+import { useEvent, useShownMemberName } from '../hooks';
 
 import { ListMemberButton } from './ListMemberButton';
 import { FilterByMemberButton } from './FilterByMemberButton';
 import { FilteredLabel } from './FilteredLabel';
+import { InstanceTooltipProvider } from './InstanceTooltipProvider';
 
 interface ListMemberProps {
-  cube: Cube;
-  member: TCubeMeasure | TCubeDimension | TCubeSegment;
+  cube: Cube | { name: string };
+  member:
+    | TCubeMeasure
+    | TCubeDimension
+    | TCubeSegment
+    | { name: string; type?: 'string' | 'number' };
+  isMissing?: boolean;
   category: MemberType;
   filterString?: string;
   isSelected: boolean;
   isFiltered?: boolean;
+  isImported?: boolean;
+  memberViewType?: MemberViewType;
   onToggle?: (name: string) => void;
   onAddFilter?: (name: string) => void;
   onRemoveFilter?: (name: string) => void;
 }
-
-const ListMemberWrapper = tasty({
-  styles: {
-    display: 'grid',
-    position: 'relative',
-  },
-});
 
 export function ListMember(props: ListMemberProps) {
   const textRef = useRef<HTMLDivElement>(null);
@@ -47,100 +40,144 @@ export function ListMember(props: ListMemberProps) {
     filterString,
     category,
     member,
+    memberViewType,
+    isMissing,
     isSelected,
     isFiltered,
+    isImported,
     onAddFilter,
     onRemoveFilter,
     onToggle,
   } = props;
-  const type = 'type' in member ? member.type : 'string';
+  const type = 'type' in member ? member.type : undefined;
   const name = member.name.replace(`${cube.name}.`, '').trim();
-  const title = member.title;
+  const title = 'shortTitle' in member ? member.shortTitle : undefined;
   // @ts-ignore
   const description = member.description;
+  const { shownMemberName } = useShownMemberName({
+    cubeName: cube.name,
+    cubeTitle: 'title' in cube ? cube.title : undefined,
+    memberName: name,
+    memberTitle: title,
+    type: memberViewType,
+  });
 
-  const hasOverflow = useHasOverflow(textRef);
-  const isAutoTitle = titleize(member.name) === title;
+  const onFilterPress = useEvent(() =>
+    !isFiltered ? onAddFilter?.(member.name) : onRemoveFilter?.(member.name)
+  );
 
-  const button = (
-    <ListMemberWrapper>
+  const filterMenu = useMemo(() => {
+    const dangerProps = isFiltered
+      ? {
+          color: '#danger-text',
+        }
+      : {};
+
+    return (
+      <MenuTrigger>
+        <FilterByMemberButton
+          isAngular
+          type={category.replace(/s$/, '')}
+          isFiltered={true}
+          {...(isMissing ? { color: '#danger-text' } : {})}
+        />
+        <Menu
+          disabledKeys={isMissing ? ['add'] : []}
+          onAction={(key) => {
+            switch (key) {
+              case 'add':
+                onAddFilter?.(member.name);
+                break;
+              case 'remove':
+                onRemoveFilter?.(member.name);
+                break;
+              default:
+                return;
+            }
+          }}
+        >
+          <Menu.Item key="add" icon={<PlusIcon />}>
+            Filter by This Member
+          </Menu.Item>
+          <Menu.Item key="remove" icon={<CloseIcon {...dangerProps} />}>
+            <Text {...dangerProps}>Remove All</Text>
+          </Menu.Item>
+        </Menu>
+      </MenuTrigger>
+    );
+  }, [category, isMissing, member.name, onAddFilter, onRemoveFilter, isFiltered]);
+
+  return (
+    <InstanceTooltipProvider
+      name={name}
+      fullName={member.name}
+      type={category.replace(/s$/, '') as 'measure' | 'dimension' | 'segment'}
+      title={title}
+      overflowRef={textRef}
+    >
       <ListMemberButton
         qa="MemberButton"
         qaVal={member.name}
         icon={getTypeIcon(category === 'segments' ? 'filter' : type)}
         data-member={category.replace(/s$/, '')}
-        mods={{ selected: isSelected }}
-        onPress={() => onToggle?.(`${cube.name}.${member.name}`)}
+        mods={{ selected: isSelected, missing: isMissing }}
+        onPress={() => onToggle?.(member.name)}
       >
         <Text ref={textRef} ellipsis>
-          {filterString ? <FilteredLabel text={name} filter={filterString} /> : name}
+          {filterString ? (
+            <FilteredLabel text={shownMemberName} filter={filterString} />
+          ) : (
+            shownMemberName
+          )}
         </Text>
         <Space gap=".5x">
-          <Space gap="1x" color="#dark.6">
-            {description ? <ItemInfoIcon title={title} description={description} /> : undefined}
-            {/* @ts-ignore */}
-            {member.primaryKey ? <PrimaryKeyIcon color={'dark-02'} /> : undefined}
-            {/* @ts-ignore */}
-            {member.public === false ? <NonPublicIcon /> : undefined}
-          </Space>
-          {onAddFilter ? (
-            isFiltered ? (
-              <MenuTrigger>
-                <FilterByMemberButton type={category.replace(/s$/, '')} isFiltered={true} />
-                <Menu
-                  onAction={(key) => {
-                    switch (key) {
-                      case 'add':
-                        onAddFilter?.(member.name);
-                        break;
-                      case 'remove':
-                        onRemoveFilter?.(member.name);
-                        break;
-                      default:
-                        return;
-                    }
-                  }}
-                >
-                  <Menu.Item key="add" icon={<PlusOutlined style={{ fontSize: 16 }} />}>
-                    Add an additional filter with this member
-                  </Menu.Item>
-                  <Menu.Item key="remove" icon={<CloseIcon color="danger-text" />}>
-                    <Text color="#danger-text">Remove all filters associated with this member</Text>
-                  </Menu.Item>
-                </Menu>
-              </MenuTrigger>
+          {description ||
+          isImported ||
+          ('primaryKey' in member && member.primaryKey) ||
+          ('public' in member && member.public === false) ? (
+            <Space gap="1x" color="#dark.6">
+              {description || isImported ? (
+                <ItemInfoIcon
+                  description={
+                    isImported ? (
+                      <>
+                        {description ? (
+                          <>
+                            {description}
+                            <br />
+                            <br />
+                          </>
+                        ) : null}
+                        <Text preset="t4">This member is imported from another cube:</Text>
+                        <br />
+                        <CubeIcon /> <b>{member.name.split('.')[0]}</b>
+                      </>
+                    ) : (
+                      description
+                    )
+                  }
+                />
+              ) : undefined}
+              {'primaryKey' in member && member.primaryKey ? (
+                <PrimaryKeyIcon color={'dark-02'} />
+              ) : undefined}
+              {'public' in member && member.public === false ? <NonPublicIcon /> : undefined}
+            </Space>
+          ) : null}
+          {onAddFilter || onRemoveFilter ? (
+            isFiltered && !isMissing ? (
+              filterMenu
             ) : (
               <FilterByMemberButton
-                type={category.replace(/s$/, '')}
+                isAngular
                 isFiltered={isFiltered || false}
-                onPress={() =>
-                  !isFiltered ? onAddFilter?.(member.name) : onRemoveFilter?.(member.name)
-                }
+                type={category.replace(/s$/, '')}
+                onPress={onFilterPress}
               />
             )
           ) : undefined}
         </Space>
       </ListMemberButton>
-    </ListMemberWrapper>
-  );
-
-  return hasOverflow || !isAutoTitle ? (
-    <TooltipProvider
-      title={
-        <>
-          <Text preset="t4">
-            <b>{name}</b>
-          </Text>
-          <br />
-          <Text preset="t4">{title}</Text>
-        </>
-      }
-      delay={1000}
-      placement="right"
-    >
-      {button}
-    </TooltipProvider>
-  ) : (
-    button
+    </InstanceTooltipProvider>
   );
 }

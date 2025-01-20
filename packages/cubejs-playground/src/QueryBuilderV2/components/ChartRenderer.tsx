@@ -89,7 +89,6 @@ function CartesianChart({
   tooltipCursor = false,
   extra,
 }: any) {
-  const locale = 'en-US';
   const legendFormatter = useCallback(
     (value) => <LegendTextElement>{value}</LegendTextElement>,
     []

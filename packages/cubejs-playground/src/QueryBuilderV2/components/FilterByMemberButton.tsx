@@ -1,11 +1,13 @@
-import { tasty, TooltipProvider } from '@cube-dev/ui-kit';
+import { CubeButtonProps, tasty, TooltipProvider } from '@cube-dev/ui-kit';
 import { FilterFilled, FilterOutlined } from '@ant-design/icons';
+import { memo } from 'react';
 
 import { ListMemberButton } from './ListMemberButton';
 
 const OptionButtonElement = tasty(ListMemberButton, {
   'aria-label': 'Options',
   styles: {
+    width: '3.5x',
     color: {
       '': '#measure-text-color',
       'filtered & [data-member="timeDimension"]': '#time-dimension-text',
@@ -23,8 +25,16 @@ const OptionButtonElement = tasty(ListMemberButton, {
     },
     gridColumns: 'auto',
     placeContent: 'center',
-    radius: '1r right',
-    margin: '-.75x -1.5x -.75x 0',
+    placeItems: 'center',
+    radius: {
+      '': 0,
+      angular: '1r right',
+    },
+    margin: {
+      '': '-.75x 0 -.75x 0',
+      angular: '-.75x -.75x -.75x 0',
+    },
+    padding: 0,
 
     ButtonIcon: { fontSize: '16px' },
   },
@@ -32,21 +42,27 @@ const OptionButtonElement = tasty(ListMemberButton, {
 
 interface ListMemberOptionButtonProps {
   type: string;
+  isAngular?: boolean;
   isFiltered?: boolean;
+  color?: CubeButtonProps['color'];
   onPress?: () => void;
 }
 
-export function FilterByMemberButton(props: ListMemberOptionButtonProps) {
-  const { type, isFiltered, onPress } = props;
+export const FilterByMemberButton = memo((props: ListMemberOptionButtonProps) => {
+  const { type, isFiltered, isAngular, color, onPress } = props;
 
   return (
-    <TooltipProvider title="Add a filter for this member" delay={1000}>
+    <TooltipProvider
+      title={isFiltered ? 'There is a filter for this member' : 'Add a filter for this member'}
+      delay={1000}
+    >
       <OptionButtonElement
         icon={isFiltered ? <FilterFilled /> : <FilterOutlined />}
-        mods={{ filtered: isFiltered }}
+        color={color}
+        mods={{ filtered: isFiltered, angular: isAngular }}
         data-member={type}
         onPress={onPress}
       />
     </TooltipProvider>
   );
-}
+});

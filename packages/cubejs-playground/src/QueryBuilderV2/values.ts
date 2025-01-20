@@ -1,4 +1,4 @@
-import { BinaryOperator, UnaryOperator } from '@cubejs-client/core';
+import { BinaryOperator, UnaryOperator, TimeDimensionGranularity } from '@cubejs-client/core';
 
 type Operator = BinaryOperator | UnaryOperator;
 
@@ -36,6 +36,8 @@ export const TIME_OPERATORS: Operator[] = [
   'notInDateRange',
   'beforeDate',
   'afterDate',
+  'beforeOrOnDate',
+  'afterOrOnDate',
 ];
 
 export const BINARY_OPERATORS: Operator[] = [
@@ -53,11 +55,11 @@ export const OPERATOR_LABELS: Record<Operator, string> = {
   notEquals: 'not equals',
 
   contains: 'contains',
-  notContains: 'does not contain',
+  notContains: 'not contains',
   startsWith: 'starts with',
-  notStartsWith: 'does not start with',
+  notStartsWith: 'not starts with',
   endsWith: 'ends with',
-  notEndsWith: 'does not end with',
+  notEndsWith: 'not ends with',
 
   gt: '>',
   gte: '>=',
@@ -66,8 +68,8 @@ export const OPERATOR_LABELS: Record<Operator, string> = {
 
   inDateRange: 'in date range',
   notInDateRange: 'not in date range',
-  beforeDate: 'before',
-  afterDate: 'after',
+  beforeDate: 'before date',
+  afterDate: 'after date',
 
   beforeOrOnDate: 'before or on date',
   afterOrOnDate: 'after or on date',
@@ -89,8 +91,7 @@ export const OPERATORS_BY_TYPE = {
 
 export const OPERATORS: Operator[] = [...UNARY_OPERATORS, ...BINARY_OPERATORS];
 
-export const GRANULARITIES = [
-  'w/o grouping',
+export const PREDEFINED_GRANULARITIES: TimeDimensionGranularity[] = [
   'second',
   'minute',
   'hour',

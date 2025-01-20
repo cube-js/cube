@@ -14,19 +14,22 @@ import {
   BinaryFilter,
   BinaryOperator,
   Filter,
+  LogicalAndFilter,
+  LogicalOrFilter,
   TCubeMemberType,
   UnaryFilter,
   UnaryOperator,
 } from '@cubejs-client/core';
 
-import { useDeepMemo } from '../hooks';
+import { useDeepMemo, useEvent } from '../hooks';
 import { OPERATOR_LABELS, OPERATORS, OPERATORS_BY_TYPE, UNARY_OPERATORS } from '../values';
+import { MemberViewType } from '../types';
 
 import { ValuesInput } from './ValuesInput';
 import { TimeDateRangeSelector } from './TimeDateRangeSelector';
 import { TimeDateSelector } from './TimeDateSelector';
-import { DeleteFilterButton } from './DeleteFilterButton';
 import { FilterLabel } from './FilterLabel';
+import { FilterOptionsAction, FilterOptionsButton } from './FilterOptionsButton';
 
 interface OperatorSelectorProps {
   type: TCubeMemberType;
@@ -36,9 +39,18 @@ interface OperatorSelectorProps {
 }
 
 const MemberFilterElement = tasty(Space, {
+  qa: 'MemberFilter',
   styles: {
     gap: '1x',
     placeItems: 'start',
+    radius: true,
+    fill: {
+      '': '#clear',
+      ':has([data-qa="FilterOptionsButton"][data-is-hovered])': '#light',
+    },
+    margin: '-.5x',
+    padding: '.5x',
+    width: 'max-content',
 
     InnerContainer: {
       display: 'flex',
@@ -61,6 +73,7 @@ const ValueTag = tasty(Tag, {
   styles: {
     padding: '.625x .75x',
     preset: 't3',
+    fill: '#light',
   },
 });
 
@@ -72,7 +85,7 @@ function OperatorSelector(props: OperatorSelectorProps) {
       isDisabled={isDisabled}
       aria-label="Filter operator"
       size="small"
-      width="14x max-content max-content"
+      listBoxStyles={{ height: 'auto' }}
       selectedKey={value}
       onSelectionChange={(operator: Key) => onChange(operator as UnaryOperator | BinaryOperator)}
     >
@@ -87,11 +100,16 @@ function OperatorSelector(props: OperatorSelectorProps) {
   );
 }
 
-interface MemberFilterProps {
-  member: Filter;
+interface FilterMemberProps {
+  filter: BinaryFilter | UnaryFilter;
+  cubeName?: string;
+  cubeTitle?: string;
+  memberName?: string;
+  memberTitle?: string;
   memberType?: 'dimension' | 'measure';
+  memberViewType?: MemberViewType;
   type: TCubeMemberType;
-  // Extra compact where all items in the filter are streched to fit within the container.
+  // Extra compact where all items in the filter are stretched to fit within the container.
   isExtraCompact?: boolean;
   isCompact?: boolean;
   isMissing?: boolean;
@@ -99,62 +117,79 @@ interface MemberFilterProps {
   onRemove: () => void;
 }
 
-export function MemberFilter(props: MemberFilterProps) {
+export function FilterMember(props: FilterMemberProps) {
   const {
-    member,
+    filter,
     memberType,
     isCompact,
     isExtraCompact = false,
     isMissing,
     type,
+    cubeName,
+    cubeTitle,
+    memberName,
+    memberTitle,
+    memberViewType,
     onRemove,
+    onChange,
   } = props;
 
-  const onOperatorChange = useCallback(
-    (operator?: Key) => {
-      const updatedFilter = {
-        ...member,
-        operator: operator,
-        values: [],
-      } as Filter;
+  const onOperatorChange = useEvent((operator?: Key) => {
+    const updatedFilter = {
+      values: [],
+      ...filter,
+      operator: operator,
+    } as BinaryFilter | UnaryFilter;
 
-      if (['set', 'notSet'].includes(operator as string)) {
-        delete (updatedFilter as UnaryFilter | BinaryFilter).values;
-      }
+    if (type === 'time') {
+      updatedFilter.values = [];
+    }
 
-      if (['equals', 'notEquals'].includes(operator as string) && type === 'boolean') {
-        (updatedFilter as UnaryFilter | BinaryFilter).values = ['true'];
-      }
+    if (['set', 'notSet'].includes(operator as string)) {
+      delete updatedFilter.values;
+    }
 
-      props.onChange(updatedFilter);
-    },
-    [props.onChange]
-  );
+    if (['equals', 'notEquals'].includes(operator as string) && type === 'boolean') {
+      updatedFilter.values = ['true'];
+    }
 
-  const onValuesChange = useCallback(
-    (values?: string[]) => {
-      props.onChange({ ...member, values: values } as Filter);
-    },
-    [props.onChange]
-  );
+    onChange(updatedFilter);
+  });
+
+  const onValuesChange = useEvent((values?: string[]) => {
+    onChange({ ...filter, values: values } as Filter);
+  });
+
+  const wrapFilter = useEvent((type: 'and' | 'or') => {
+    onChange({ [type]: [filter] } as LogicalAndFilter | LogicalOrFilter);
+  });
 
   const inputs = useDeepMemo(() => {
+    const operator = filter.operator;
+
     if (
-      !('member' in member) ||
-      UNARY_OPERATORS.includes(member.operator) ||
-      !OPERATORS.includes(member.operator)
+      !('member' in filter) ||
+      UNARY_OPERATORS.includes(filter.operator) ||
+      !OPERATORS.includes(filter.operator)
     ) {
       return null;
     }
+
+    const allowSuggestions =
+      type === 'string' && (operator === 'equals' || operator === 'notEquals');
 
     switch (type) {
       case 'number':
       case 'string':
         return (
           <ValuesInput
+            key={operator}
+            memberName={'member' in filter ? filter.member : undefined}
+            memberType={memberType}
+            allowSuggestions={allowSuggestions}
             isCompact={isExtraCompact}
             type={type === 'number' ? 'number' : 'string'}
-            values={member.values || []}
+            values={filter.values || []}
             onChange={onValuesChange}
           />
         );
@@ -162,22 +197,24 @@ export function MemberFilter(props: MemberFilterProps) {
         return (
           <Switch
             margin=".5x top"
-            isSelected={member.values?.[0] === 'true'}
+            isSelected={filter.values?.[0] === 'true'}
             onChange={(value) => onValuesChange(value ? ['true'] : ['false'])}
           />
         );
       case 'time':
-        if (member.operator.includes('Range')) {
+        if (filter.operator.includes('Range')) {
           return (
             <TimeDateRangeSelector
-              value={(member.values as [string, string]) || []}
+              key={filter.operator}
+              value={(filter.values as [string, string]) || []}
               onChange={onValuesChange}
             />
           );
-        } else if (member.operator.includes('Date')) {
+        } else if (filter.operator.includes('Date')) {
           return (
             <TimeDateSelector
-              value={member.values?.[0]}
+              key={filter.operator}
+              value={filter.values?.[0]}
               onChange={(val) => {
                 onValuesChange([val]);
               }}
@@ -185,15 +222,24 @@ export function MemberFilter(props: MemberFilterProps) {
           );
         } else {
           return (
-            <ValuesInput type="string" values={member.values || []} onChange={onValuesChange} />
+            <ValuesInput
+              key={filter.operator}
+              memberName={'member' in filter ? filter.member : undefined}
+              memberType={memberType}
+              allowSuggestions={allowSuggestions}
+              placeholder="Date/time in ISO 8601"
+              type="string"
+              values={filter.values || []}
+              onChange={onValuesChange}
+            />
           );
         }
       default:
-        return member.values?.map((value: string, i: number) => {
+        return filter.values?.map((value: string, i: number) => {
           return <ValueTag key={i}>{value}</ValueTag>;
         });
     }
-  }, [member, type]);
+  }, [filter, type]);
 
   const ElementWrapper = useMemo(
     () => (isExtraCompact ? Fragment : MemberFilterElement),
@@ -222,19 +268,31 @@ export function MemberFilter(props: MemberFilterProps) {
     [isExtraCompact]
   );
 
+  const onAction = useEvent((key: FilterOptionsAction) => {
+    switch (key) {
+      case 'remove':
+        onRemove();
+        break;
+      case 'wrapWithAnd':
+        wrapFilter('and');
+        break;
+      case 'wrapWithOr':
+        wrapFilter('or');
+        break;
+    }
+  });
+
   return (
     <ElementWrapper>
-      <TooltipProvider title="Delete this filter">
-        <DeleteFilterButton onPress={onRemove} />
-      </TooltipProvider>
+      <FilterOptionsButton type="member" onAction={onAction} />
 
       <InnerContainer>
-        {'and' in member || 'or' in member ? (
+        {'and' in filter || 'or' in filter ? (
           <>
             <TooltipProvider
               activeWrap
               aria-label="UNSUPPORTED OPERATOR"
-              title={JSON.stringify(member)}
+              title={JSON.stringify(filter)}
             >
               <Badge type="disabled">UNSUPPORTED OPERATOR...</Badge>
             </TooltipProvider>
@@ -242,22 +300,27 @@ export function MemberFilter(props: MemberFilterProps) {
         ) : (
           <>
             <MemberContainer>
-              {'member' in member && member.member ? (
+              {'member' in filter && filter.member ? (
                 <FilterLabel
                   isCompact={isCompact}
                   isMissing={isMissing}
                   member={memberType}
+                  memberName={memberName}
+                  memberTitle={memberTitle}
+                  cubeName={cubeName}
+                  cubeTitle={cubeTitle}
+                  memberViewType={memberViewType}
                   type={type}
-                  name={member.member}
+                  name={filter.member}
                 />
               ) : null}
               {
                 <OperatorSelector
                   isDisabled={
-                    !type || ('operator' in member && !OPERATORS.includes(member.operator))
+                    !type || ('operator' in filter && !OPERATORS.includes(filter.operator))
                   }
                   type={type}
-                  value={'operator' in member ? member.operator : undefined}
+                  value={'operator' in filter ? filter.operator : undefined}
                   onChange={onOperatorChange}
                 />
               }

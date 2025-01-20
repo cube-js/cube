@@ -1,11 +1,12 @@
 import { DialogForm, LoadingIcon, Radio, Space, TextArea, useForm } from '@cube-dev/ui-kit';
-import { Meta, Query, validateQuery } from '@cubejs-client/core';
+import { Meta, Query } from '@cubejs-client/core';
 import { ValidationRule } from '@cube-dev/ui-kit/types/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { parse as BestEffortJsonParse } from 'best-effort-json-parser';
 
 import { useQueryBuilderContext } from '../context';
 import { useServerCoreVersionGte } from '../hooks';
-import { convertGraphQLToJsonQuery, convertJsonQueryToGraphQL } from '../utils';
+import { convertGraphQLToJsonQuery, convertJsonQueryToGraphQL, validateQuery } from '../utils';
 
 interface PasteQueryDialogFormProps {
   query?: Query;
@@ -15,9 +16,13 @@ interface PasteQueryDialogFormProps {
   onSubmit: (query: Query) => void;
 }
 
+const DEFAULT_GRAPHQL_QUERY = `query CubeQuery {
+  cube
+}`;
+
 function validateJsonQuery(json: string) {
   try {
-    return validateQuery(JSON.parse(json));
+    return validateQuery(BestEffortJsonParse(json));
   } catch (e: any) {
     throw 'Invalid query';
   }
@@ -46,10 +51,10 @@ function getJSONValidator(apiUrl: string, apiToken: string | null, meta?: Meta |
   return [
     {
       async validator(rule: ValidationRule, query: string) {
-        const originalQuery = JSON.stringify(JSON.parse(query));
+        const originalQuery = JSON.stringify(BestEffortJsonParse(query));
         const graphQLQuery = convertJsonQueryToGraphQL({
           meta,
-          query: JSON.parse(query),
+          query: BestEffortJsonParse(query),
         });
 
         return convertGraphQLToJsonQuery({
@@ -79,7 +84,7 @@ const QUERY_VALIDATOR = {
 const JSON_VALIDATOR = {
   async validator(rule: ValidationRule, value: string) {
     try {
-      JSON.parse(value);
+      BestEffortJsonParse(value);
     } catch (e: any) {
       throw ''; // do not show any error message
     }
@@ -113,7 +118,7 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
       );
     }
 
-    return validateQuery(JSON.parse(query) || {});
+    return validateQuery(BestEffortJsonParse(query) || {});
   }
 
   const onJsonBlur = useCallback(async () => {
@@ -127,29 +132,16 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
     }
 
     const jsonQuery = form.getFieldValue('jsonQuery');
-
+    let sanitizedQuery = {};
     try {
-      const query = validateQuery(JSON.parse(jsonQuery) || {});
-      const graphQLQuery = convertJsonQueryToGraphQL({ meta, query });
-      const ungrouped = query.ungrouped;
-
-      return convertGraphQLToJsonQuery({
-        apiUrl,
-        apiToken,
-        query: graphQLQuery,
-      }).then(
-        (jsonQuery) => {
-          const query = JSON.parse(jsonQuery);
-
-          form.setFieldValue('jsonQuery', JSON.stringify({ ...query, ungrouped }, null, 2));
-        },
-        () => {
-          throw '';
-        }
-      );
-    } catch (e: any) {
+      sanitizedQuery = validateQuery(BestEffortJsonParse(jsonQuery));
+    } catch (e) {
       // do nothing
     }
+
+    const query = sanitizedQuery;
+
+    form.setFieldValue('jsonQuery', JSON.stringify(query, null, 2));
   }, [meta]);
 
   const onGraphqlBlur = useCallback(async () => {
@@ -199,6 +191,14 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
               : '';
 
         form.setFieldValue(type === 'json' ? 'jsonQuery' : 'graphqlQuery', value);
+      })
+      .catch((e) => {
+        form.setFieldValue(
+          type === 'json' ? 'jsonQuery' : 'graphqlQuery',
+          type === 'json' ? '{}' : DEFAULT_GRAPHQL_QUERY
+        );
+
+        return 'Unable to convert query';
       })
       .finally(() => {
         setIsBlocked(false);
