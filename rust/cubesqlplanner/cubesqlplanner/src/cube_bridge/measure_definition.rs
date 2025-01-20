@@ -26,6 +26,9 @@ pub struct RollingWindow {
     pub trailing: Option<String>,
     pub leading: Option<String>,
     pub offset: Option<String>,
+    #[serde(rename = "type")]
+    pub rolling_type: Option<String>,
+    pub granularity: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

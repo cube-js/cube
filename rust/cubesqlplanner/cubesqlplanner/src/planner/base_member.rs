@@ -44,6 +44,10 @@ impl BaseMemberHelper {
         members.iter().map(|m| m.alias_name()).collect_vec()
     }
 
+    pub fn extract_symbols_from_members(members: &Vec<Rc<dyn BaseMember>>) -> Vec<Rc<MemberSymbol>> {
+        members.iter().map(|m| m.member_evaluator()).collect_vec()
+    }
+
     pub fn default_alias(
         cube_name: &String,
         member_name: &String,

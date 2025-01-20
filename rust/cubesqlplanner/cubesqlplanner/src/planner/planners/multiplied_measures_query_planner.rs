@@ -361,8 +361,25 @@ impl MultipliedMeasuresQueryPlanner {
             .query_properties
             .dimensions_for_select_append(dimensions);
 
-        let subquery_dimensions =
-            collect_sub_query_dimensions_from_members(&dimensions, self.query_tools.clone())?;
+        let mut symbols_for_subquery_dimensions =
+            BaseMemberHelper::extract_symbols_from_members(&dimensions);
+        for item in self.query_properties.dimensions_filters() {
+            item.find_all_member_evaluators(&mut symbols_for_subquery_dimensions);
+        }
+
+        for item in self.query_properties.measures_filters() {
+            item.find_all_member_evaluators(&mut symbols_for_subquery_dimensions);
+        }
+
+        let symbols_for_subquery_dimensions = symbols_for_subquery_dimensions
+            .into_iter()
+            .unique_by(|m| m.full_name())
+            .collect_vec();
+
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &symbols_for_subquery_dimensions,
+            self.query_tools.clone(),
+        )?;
 
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,

@@ -41,7 +41,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
-        let plan = query_planner.build_sql()?;
+        let plan = query_planner.plan()?;
 
         let sql = plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;

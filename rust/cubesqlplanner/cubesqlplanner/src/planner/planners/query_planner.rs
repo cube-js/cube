@@ -13,6 +13,7 @@ use std::rc::Rc;
 pub struct QueryPlanner {
     query_tools: Rc<QueryTools>,
     request: Rc<QueryProperties>,
+    context_factory: Option<SqlNodesFactory>,
 }
 
 impl QueryPlanner {
@@ -20,19 +21,33 @@ impl QueryPlanner {
         Self {
             request,
             query_tools,
+            context_factory: None,
         }
     }
 
-    pub fn build_sql(&self) -> Result<Rc<Select>, CubeError> {
-        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
-        self.build_sql_and_params_impl(templates)
+    pub fn new_with_context_factory(
+        request: Rc<QueryProperties>,
+        query_tools: Rc<QueryTools>,
+        context_factory: SqlNodesFactory,
+    ) -> Self {
+        Self {
+            request,
+            query_tools,
+            context_factory: Some(context_factory),
+        }
     }
 
-    fn build_sql_and_params_impl(
-        &self,
-        templates: PlanSqlTemplates,
-    ) -> Result<Rc<Select>, CubeError> {
-        let mut nodes_factory = SqlNodesFactory::new();
+    pub fn plan(&self) -> Result<Rc<Select>, CubeError> {
+        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+        self.build_sql_impl(templates)
+    }
+
+    fn build_sql_impl(&self, templates: PlanSqlTemplates) -> Result<Rc<Select>, CubeError> {
+        let mut nodes_factory = if let Some(context_factory) = &self.context_factory {
+            context_factory.clone()
+        } else {
+            SqlNodesFactory::new()
+        };
 
         if self.request.ungrouped() {
             nodes_factory.set_ungrouped(true)

@@ -461,11 +461,9 @@ impl QueryProperties {
         }
     }
     pub fn all_member_symbols(&self, exclude_time_dimensions: bool) -> Vec<Rc<MemberSymbol>> {
-        let mut members = self
-            .all_members(exclude_time_dimensions)
-            .into_iter()
-            .map(|m| m.member_evaluator())
-            .collect_vec();
+        let mut members = BaseMemberHelper::extract_symbols_from_members(
+            &self.all_members(exclude_time_dimensions),
+        );
         for filter_item in self.dimensions_filters.iter() {
             filter_item.find_all_member_evaluators(&mut members);
         }

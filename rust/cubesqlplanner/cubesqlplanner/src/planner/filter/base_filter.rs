@@ -114,7 +114,12 @@ impl BaseFilter {
                 FilterOperator::Equal => self.equals_where(&member_sql)?,
                 FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,
                 FilterOperator::InDateRange => self.in_date_range(&member_sql)?,
-                FilterOperator::InDateRangeExtended => self.in_date_range_extended(&member_sql)?,
+                FilterOperator::RegularRollingWindowDateRange => {
+                    self.regular_rolling_window_date_range(&member_sql)?
+                }
+                FilterOperator::ToDateRollingWindowDateRange => {
+                    self.to_date_rolling_window_date_range(&member_sql)?
+                }
                 FilterOperator::In => self.in_where(&member_sql)?,
                 FilterOperator::NotIn => self.not_in_where(&member_sql)?,
                 FilterOperator::Set => self.set_where(&member_sql)?,
@@ -211,7 +216,7 @@ impl BaseFilter {
     }
 
     fn in_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params()?;
+        let (from, to) = self.allocate_date_params(true)?;
         self.templates
             .time_range_filter(member_sql.to_string(), from, to)
     }
@@ -236,8 +241,9 @@ impl BaseFilter {
             Ok(date.to_string())
         }
     }
-    fn in_date_range_extended(&self, member_sql: &str) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params()?;
+
+    fn regular_rolling_window_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
+        let (from, to) = self.allocate_date_params(false)?;
 
         let from = if self.values.len() >= 3 {
             self.extend_date_range_bound(from, &self.values[2], true)?
@@ -251,8 +257,37 @@ impl BaseFilter {
             to
         };
 
-        self.templates
-            .time_range_filter(member_sql.to_string(), from, to)
+        let date_field = self
+            .query_tools
+            .base_tools()
+            .convert_tz(member_sql.to_string())?;
+        self.templates.time_range_filter(date_field, from, to)
+    }
+
+    fn to_date_rolling_window_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
+        let (from, to) = self.allocate_date_params(false)?;
+
+        let from = if self.values.len() >= 3 {
+            if let Some(granularity) = &self.values[2] {
+                self.query_tools
+                    .base_tools()
+                    .time_grouped_column(granularity.clone(), from)?
+            } else {
+                return Err(CubeError::user(format!(
+                    "Granularity required for to_date rolling window"
+                )));
+            }
+        } else {
+            return Err(CubeError::user(format!(
+                "Granularity required for to_date rolling window"
+            )));
+        };
+
+        let date_field = self
+            .query_tools
+            .base_tools()
+            .convert_tz(member_sql.to_string())?;
+        self.templates.time_range_filter(date_field, from, to)
     }
 
     fn in_where(&self, member_sql: &str) -> Result<String, CubeError> {
@@ -353,12 +388,16 @@ impl BaseFilter {
         ))
     }
 
-    fn allocate_date_params(&self) -> Result<(String, String), CubeError> {
+    fn allocate_date_params(&self, use_db_time_zone: bool) -> Result<(String, String), CubeError> {
         if self.values.len() >= 2 {
             let from = if let Some(from_str) = &self.values[0] {
-                self.query_tools
-                    .base_tools()
-                    .in_db_time_zone(self.format_from_date(&from_str)?)?
+                let from = self.format_from_date(&from_str)?;
+
+                if use_db_time_zone {
+                    self.query_tools.base_tools().in_db_time_zone(from)?
+                } else {
+                    from
+                }
             } else {
                 return Err(CubeError::user(format!(
                     "Arguments for date range is not valid"
@@ -366,9 +405,13 @@ impl BaseFilter {
             };
 
             let to = if let Some(to_str) = &self.values[1] {
-                self.query_tools
-                    .base_tools()
-                    .in_db_time_zone(self.format_to_date(&to_str)?)?
+                let to = self.format_to_date(&to_str)?;
+
+                if use_db_time_zone {
+                    self.query_tools.base_tools().in_db_time_zone(to)?
+                } else {
+                    to
+                }
             } else {
                 return Err(CubeError::user(format!(
                     "Arguments for date range is not valid"
@@ -411,11 +454,7 @@ impl BaseFilter {
                 "0".repeat(precision as usize)
             ));
         }
-        //FIXME chrono don't support parsing date without specified format
-        Err(CubeError::user(format!(
-            "Unsupported date format: {}",
-            date
-        )))
+        Ok(date.to_string())
     }
 
     fn format_to_date(&self, date: &str) -> Result<String, CubeError> {
@@ -447,11 +486,8 @@ impl BaseFilter {
                 "9".repeat(precision as usize)
             ));
         }
-        //FIXME chrono don't support parsing date without specified format
-        Err(CubeError::user(format!(
-            "Unsupported date format: {}",
-            date
-        )))
+
+        Ok(date.to_string())
     }
 
     fn allocate_param(&self, param: &str) -> String {

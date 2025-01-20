@@ -125,7 +125,7 @@ impl DimensionSubqueryPlanner {
             false,
         )?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
-        let sub_query = query_planner.build_sql()?;
+        let sub_query = query_planner.plan()?;
         let sub_query_alias = format!("{cube_name}_{dim_name}_subquery");
 
         let conditions = primary_keys_dimensions
