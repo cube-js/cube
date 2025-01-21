@@ -758,12 +758,11 @@ const baseSchema = {
 const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
-  hierarchies: Joi.array().items(Joi.object().keys({
-    name: identifier,
+  hierarchies: Joi.object().pattern(identifierRegex, Joi.object().keys({
     title: Joi.string(),
     public: Joi.boolean().strict(),
     levels: Joi.func()
-  })),
+  }))
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
