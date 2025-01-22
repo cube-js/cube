@@ -229,6 +229,16 @@ impl QueryTools {
         }
     }
 
+    pub fn alias_for_cube(&self, cube_name: &String) -> Result<String, CubeError> {
+        let cube_definition = self.cube_evaluator().cube_from_path(cube_name.clone())?;
+        let res = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
+            sql_alias.clone()
+        } else {
+            cube_name.clone()
+        };
+        Ok(res)
+    }
+
     pub fn escape_column_name(&self, column_name: &str) -> String {
         format!("\"{}\"", column_name)
     }

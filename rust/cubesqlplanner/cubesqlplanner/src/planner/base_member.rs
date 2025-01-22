@@ -54,14 +54,7 @@ impl BaseMemberHelper {
         member_suffix: &Option<String>,
         query_tools: Rc<QueryTools>,
     ) -> Result<String, CubeError> {
-        let cube_definition = query_tools
-            .cube_evaluator()
-            .cube_from_path(cube_name.clone())?;
-        let cube_alias = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
-            sql_alias
-        } else {
-            cube_name
-        };
+        let cube_alias = query_tools.alias_for_cube(cube_name)?;
         Ok(PlanSqlTemplates::memeber_alias_name(
             &cube_alias,
             &member_name,

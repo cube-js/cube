@@ -136,7 +136,7 @@ impl MultipliedMeasuresQueryPlanner {
 
         let pk_cube = self.common_utils.cube_from_path(key_cube_name.clone())?;
         let pk_cube_alias =
-            pk_cube.default_alias_with_prefix(&Some(format!("{key_cube_name}_key")));
+            pk_cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.default_alias())));
         let mut ungrouped_measure_references = HashMap::new();
         if should_build_join_for_measure_select {
             let subquery = self.aggregate_subquery_measure_join(
@@ -388,7 +388,10 @@ impl MultipliedMeasuresQueryPlanner {
         )?;
 
         let source = self.join_planner.make_join_node_impl(
-            &Some(format!("{}_key", key_cube_name)),
+            &Some(format!(
+                "{}_key",
+                self.query_tools.alias_for_cube(key_cube_name)?
+            )),
             key_join,
             &dimension_subquery_planner,
         )?;
