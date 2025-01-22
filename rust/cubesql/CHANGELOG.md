@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.16](https://github.com/cube-js/cube/compare/v1.1.15...v1.1.16) (2025-01-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Add forgotten Distinct in ast_size_outside_wrapper cost component ([#8882](https://github.com/cube-js/cube/issues/8882)) ([a64272e](https://github.com/cube-js/cube/commit/a64272e376d67431c7f1c057b56b04bf10c59967))
+* **cubesql:** Fix condition for joining two date range filters ([#9113](https://github.com/cube-js/cube/issues/9113)) ([39190e0](https://github.com/cube-js/cube/commit/39190e075671bf1adcf8334c513b70130c67cf64))
+* **cubesql:** Pass proper in_projection flag in non-trivial wrapper pull up rule ([#9097](https://github.com/cube-js/cube/issues/9097)) ([8f0758e](https://github.com/cube-js/cube/commit/8f0758e2b29a502a0048d6264ae30cf02d7340d7))
+* typo for DBeaver in comments change DBEver to DBeaver ([#9092](https://github.com/cube-js/cube/issues/9092)) ([aab9e8f](https://github.com/cube-js/cube/commit/aab9e8f844244247d21fac427ae36ee25aa24ae1))
+
+
+### Features
+
+* **cubesql:** Implement format and col_description ([#9072](https://github.com/cube-js/cube/issues/9072)) ([bde6eea](https://github.com/cube-js/cube/commit/bde6eea73f35a768f532c5a7dfd20c0533720238)), closes [#8947](https://github.com/cube-js/cube/issues/8947) [#8926](https://github.com/cube-js/cube/issues/8926)
+* Initial support for grouped join pushdown ([#9032](https://github.com/cube-js/cube/issues/9032)) ([2f11d20](https://github.com/cube-js/cube/commit/2f11d2050ab1e2fc7f0a37012d5d45592f01938e))
+
+
+### Performance Improvements
+
+* **cubesql:** Improve rules loading perf ([#9014](https://github.com/cube-js/cube/issues/9014)) ([4cef4f0](https://github.com/cube-js/cube/commit/4cef4f00337bd7d5c8921301ca1c18bc2e1a437d))
+
+
+
+
+
 ## [1.1.15](https://github.com/cube-js/cube/compare/v1.1.14...v1.1.15) (2025-01-13)
 
 

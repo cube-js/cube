@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.16](https://github.com/cube-js/cube/compare/v1.1.15...v1.1.16) (2025-01-22)
+
+
+### Bug Fixes
+
+* **schema-compiler:** hierarchies on extended cubes ([#9100](https://github.com/cube-js/cube/issues/9100)) ([c8f24f7](https://github.com/cube-js/cube/commit/c8f24f70131f0dc7138769837f8effa812998169))
+* **schema-compiler:** update hierarchies handling to use object pattern ([#9121](https://github.com/cube-js/cube/issues/9121)) ([42cbc8e](https://github.com/cube-js/cube/commit/42cbc8e51fd38b6ca7ade546d638408c06aeafb2))
+
+
+### Features
+
+* Initial support for grouped join pushdown ([#9032](https://github.com/cube-js/cube/issues/9032)) ([2f11d20](https://github.com/cube-js/cube/commit/2f11d2050ab1e2fc7f0a37012d5d45592f01938e))
+
+
+
+
+
 ## [1.1.15](https://github.com/cube-js/cube/compare/v1.1.14...v1.1.15) (2025-01-13)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

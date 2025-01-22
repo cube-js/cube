@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.16](https://github.com/cube-js/cube/compare/v1.1.15...v1.1.16) (2025-01-22)
+
+
+### Bug Fixes
+
+* **druid-driver:** Fix case sensitivity in like flow ([#8658](https://github.com/cube-js/cube/issues/8658)) ([6d75c60](https://github.com/cube-js/cube/commit/6d75c609cd9336b711e2539c255dba706442981c))
+
+
+
+
+
 ## [1.1.15](https://github.com/cube-js/cube/compare/v1.1.14...v1.1.15) (2025-01-13)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver

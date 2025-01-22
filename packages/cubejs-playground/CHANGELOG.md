@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.16](https://github.com/cube-js/cube/compare/v1.1.15...v1.1.16) (2025-01-22)
+
+
+### Features
+
+* **cubejs-playground:** update query builder ([#9118](https://github.com/cube-js/cube/issues/9118)) ([7ad8936](https://github.com/cube-js/cube/commit/7ad8936fbe6a174a13121b49f2f75fa0e56310ef))
+
+
+
+
+
 ## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
 
 **Note:** Version bump only for package @cubejs-client/playground

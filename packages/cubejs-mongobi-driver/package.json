@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mongobi-driver",
   "description": "Cube.js MongoBI driver",
   "author": "krunalsabnis@gmail.com",
-  "version": "1.1.12",
+  "version": "1.1.16",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -27,7 +27,7 @@
     "integration:mongobi": "jest dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.1.12",
+    "@cubejs-backend/base-driver": "1.1.16",
     "@cubejs-backend/shared": "1.1.12",
     "@types/node": "^18",
     "generic-pool": "^3.8.2",

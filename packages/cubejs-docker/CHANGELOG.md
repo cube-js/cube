@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.16](https://github.com/cube-js/cube/compare/v1.1.15...v1.1.16) (2025-01-22)
+
+
+### Bug Fixes
+
+* Install python3 executable for node-gyp ([#8998](https://github.com/cube-js/cube/issues/8998)) ([9700dc8](https://github.com/cube-js/cube/commit/9700dc83838479ed9453c9e10e6f1cec3ad4cdd6))
+
+
+
+
+
 ## [1.1.15](https://github.com/cube-js/cube/compare/v1.1.14...v1.1.15) (2025-01-13)
 
 **Note:** Version bump only for package @cubejs-backend/docker
