@@ -73,6 +73,7 @@ export function QueryBuilderSidePanel({
     setQuery,
     usedCubes,
     usedMembers,
+    queryStats,
     members,
     missingCubes,
     apiVersion,
@@ -109,19 +110,13 @@ export function QueryBuilderSidePanel({
       ? cubesOrViews.filter((cube) => usedCubes[0] === cube.name)
       : cubesOrViews.filter((cube) => joinableCubes.includes(cube));
 
-  const [openCubes, setOpenCubes] = useState<Set<string>>(
-    isQueryEmpty
-      ? cubesOrViews.length
-        ? new Set([cubesOrViews[0].name])
-        : new Set()
-      : new Set(usedCubes)
-  );
+  const [openCubes, setOpenCubes] = useState<Set<string>>(new Set());
 
   useLayoutEffect(() => {
     if (isQueryEmpty) {
       setOpenCubes(cubesOrViews.length === 1 ? new Set([cubesOrViews[0].name]) : new Set());
     }
-  }, [meta, cubesOrViews.length, selectedType]);
+  }, [cubesOrViews.length, selectedType]);
 
   const highlightedCubes = appliedFilterString ? usedCubes : [];
 
@@ -341,21 +336,29 @@ export function QueryBuilderSidePanel({
             />
           ))}
         {cubesOrViews
-          .filter((cube) => (appliedFilterString ? filteredCubes.includes(cube.name) : true))
-          .map((item) => (
+          .filter((cube) =>
+            appliedFilterString
+              ? // If filter is applied, show only filtered cubes
+                filteredCubes.includes(cube.name)
+              : viewMode === 'query'
+                ? // In query mode, show only used cubes
+                  usedCubes.includes(cube.name)
+                : true
+          )
+          .map((cube) => (
             <SidePanelCubeItem
-              key={item.name}
-              isNonJoinable={!allJoinableCubes.includes(item) && !usedCubes.includes(item.name)}
-              isOpen={openCubes.has(item.name)}
+              key={cube.name}
+              isNonJoinable={!allJoinableCubes.includes(cube) && !usedCubes.includes(cube.name)}
+              isOpen={openCubes.has(cube.name)}
               filterString={appliedFilterString}
-              cubeName={item.name}
+              cubeName={cube.name}
               mode={viewMode}
               rightIcon={isQueryEmpty ? 'arrow' : 'plus'}
               onToggle={(isOpen) => {
-                onCubeToggle(item.name, isOpen);
+                onCubeToggle(cube.name, isOpen);
               }}
               onMemberToggle={(name) => {
-                onMemberToggle(item.name, name);
+                onMemberToggle(cube.name, name);
               }}
               onHierarchyToggle={onHierarchyToggle}
             />
@@ -364,15 +367,11 @@ export function QueryBuilderSidePanel({
     );
   }, [
     viewMode,
-    meta,
+    queryStats,
     [...openCubes.values()].join(),
     appliedFilterString,
-    usedCubes.join(),
-    cubesOrViews.length,
     memberViewType,
     selectedType,
-    isQueryEmpty,
-    missingCubes.join(),
   ]);
 
   const onApplyQuery = useCallback(async (query) => {

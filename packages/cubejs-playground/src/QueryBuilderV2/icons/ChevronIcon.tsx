@@ -1,5 +1,12 @@
-import { CubeIconProps, UpIcon } from '@cube-dev/ui-kit';
-import { memo, useEffect, useRef, useState } from 'react';
+import { CubeIconProps, tasty, UpIcon } from '@cube-dev/ui-kit';
+import { memo, useEffect, useState } from 'react';
+
+const StyledUpIcon = tasty(UpIcon, {
+  styles: {
+    transformOrigin: 'center',
+    transition: 'rotate linear 120ms, scale linear 120ms',
+  },
+});
 
 export type ChevronIconProps = {
   /**
@@ -12,18 +19,15 @@ export type ChevronIconProps = {
 type Direction = 'left' | 'right' | 'top' | 'bottom';
 
 const rotationByDirection: Record<Direction, number> = {
-  bottom: -180,
-  left: -90,
   top: 0,
   right: 90,
+  bottom: 180,
+  left: 270,
 };
 
-const rotationByFlippedDirection: Record<Direction, number> = {
-  bottom: 0,
-  left: 90,
-  top: -180,
-  right: -90,
-};
+function flipRotation(rotation: number) {
+  return (rotation + 180) % 360;
+}
 
 export const ChevronIcon = memo(function ChevronIcon(props: ChevronIconProps) {
   const { direction = 'bottom', color, ...iconProps } = props;
@@ -31,40 +35,36 @@ export const ChevronIcon = memo(function ChevronIcon(props: ChevronIconProps) {
   const [flipScale, setFlipScale] = useState(1); // Tracks flipping: 1 (normal) or -1 (flipped)
 
   useEffect(() => {
-    let nextRotate =
-      flipScale === 1 ? rotationByDirection[direction] : rotationByFlippedDirection[direction];
+    let nextRotate = rotationByDirection[direction];
+
+    if (flipScale === -1) {
+      nextRotate = flipRotation(nextRotate);
+    }
 
     // Check if the change is to the opposite direction
-    const isOpposite = Math.abs(rotate - nextRotate) === 180;
+    const isOpposite = Math.abs((rotate - nextRotate) % 360) === 180;
 
     if (isOpposite) {
       // Toggle the flip state
       setFlipScale((prev) => -prev); // Alternates between 1 and -1
     } else {
-      if (flipScale === -1) {
-        nextRotate = rotationByFlippedDirection[direction];
+      while (rotate - nextRotate > 180) {
+        nextRotate += 360;
+      }
+      while (rotate - nextRotate < -180) {
+        nextRotate -= 360;
       }
 
-      // Calculate the shortest rotation path
-      let adjustedNextRotate = nextRotate;
-      while (rotate - adjustedNextRotate > 180) {
-        adjustedNextRotate += 360;
-      }
-      while (rotate - adjustedNextRotate < -180) {
-        adjustedNextRotate -= 360;
-      }
-
-      setRotate(adjustedNextRotate);
+      setRotate(nextRotate);
     }
   }, [direction]);
 
   return (
-    <UpIcon
+    <StyledUpIcon
       {...iconProps}
       style={{
-        transformOrigin: 'center',
-        transform: `rotate(${rotate}deg) scaleY(${flipScale})`,
-        transition: 'transform linear 120ms',
+        rotate: `${rotate}deg`,
+        scale: `1 ${flipScale}`,
       }}
     />
   );

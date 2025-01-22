@@ -57,8 +57,8 @@ export function QueryBuilderChartResults({
         <ChartContainer
           ref={containerRef}
           style={{
-            maxHeight: `${MAX_HEIGHT}px`,
-            height: `${MAX_HEIGHT}px`,
+            maxHeight: MAX_HEIGHT,
+            height: MAX_HEIGHT,
             overflow,
           }}
         >
