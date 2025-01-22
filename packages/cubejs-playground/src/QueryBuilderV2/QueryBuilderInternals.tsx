@@ -1,10 +1,9 @@
-import { Block, Flow, tasty } from '@cube-dev/ui-kit';
+import { Flex, Flow, Panel, tasty } from '@cube-dev/ui-kit';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import { QUERY_BUILDER_COLOR_TOKENS } from './color-tokens';
-import { useAutoSize, useEvent, useListMode, useLocalStorage } from './hooks';
+import { useAutoSize, useEvent, useLocalStorage } from './hooks';
 import { useQueryBuilderContext } from './context';
-import { Panel } from './components/Panel';
 import { Tabs, Tab } from './components/Tabs';
 import { QueryBuilderFilters } from './QueryBuilderFilters';
 import { QueryBuilderChart } from './QueryBuilderChart';
@@ -15,12 +14,11 @@ import { QueryBuilderSQL } from './QueryBuilderSQL';
 import { QueryBuilderRest } from './QueryBuilderRest';
 import { QueryBuilderGraphQL } from './QueryBuilderGraphQL';
 import { QueryBuilderSidePanel } from './QueryBuilderSidePanel';
-import { QueryBuilderDevSidePanel } from './QueryBuilderDevSidePanel';
 import { QueryBuilderExtras } from './QueryBuilderExtras';
 
 // The minimum size of the area below the top edge of the chart
 // when we can show both results and the chart at the same time.
-const CHART_THRESHOLD = 450;
+const CHART_THRESHOLD = 448;
 
 const Divider = tasty({
   styles: {
@@ -33,9 +31,9 @@ const Divider = tasty({
 type Tab = 'results' | 'generated-sql' | 'json' | 'graphql' | 'sql';
 
 const QueryBuilderPanel = tasty(Panel, {
+  isFlex: true,
   isStretched: true,
   qa: 'QueryBuilder',
-  gridColumns: '42x 1ow minmax(0, 1fr)',
   styles: {
     fill: '#white',
 
@@ -44,7 +42,6 @@ const QueryBuilderPanel = tasty(Panel, {
 });
 
 const QueryBuilderInternals = memo(function QueryBuilderInternals() {
-  const [listMode] = useListMode();
   const { error, resultSet, queryHash, dateRanges } = useQueryBuilderContext();
   const [isChartExpanded, setIsChartExpanded] = useLocalStorage(
     'QueryBuilder:Chart:expanded',
@@ -54,7 +51,7 @@ const QueryBuilderInternals = memo(function QueryBuilderInternals() {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
-  const [chartSize, updateChartSize] = useAutoSize(chartRef, -48);
+  const [chartSize, updateChartSize] = useAutoSize(chartRef, 0);
 
   const ResultsAndSQL = useMemo(() => {
     return (
@@ -96,14 +93,9 @@ const QueryBuilderInternals = memo(function QueryBuilderInternals() {
 
   return (
     <QueryBuilderPanel>
-      {useMemo(
-        () => (listMode === 'bi' ? <QueryBuilderSidePanel /> : <QueryBuilderDevSidePanel />),
-        [listMode]
-      )}
+      <QueryBuilderSidePanel />
 
-      <Block fill="#border" />
-
-      <Panel ref={ref} gridRows="min-content min-content minmax(0, 1fr)" border="right 1ow">
+      <Panel ref={ref} gridRows="min-content min-content minmax(0, 1fr)">
         {useMemo(
           () => (
             <>
@@ -137,9 +129,9 @@ const QueryBuilderInternals = memo(function QueryBuilderInternals() {
                 ) : (
                   <Flow>
                     <Divider />
-                    <Block padding=".5x">
+                    <Flex padding=".5x" placeContent="end">
                       <QueryBuilderExtras />
-                    </Block>
+                    </Flex>
                   </Flow>
                 )}
               </>

@@ -33,6 +33,7 @@
     "@apollo/client": "^3.11.4",
     "@graphiql/toolkit": "^0.4.3",
     "anser": "^2.1.1",
+    "best-effort-json-parser": "^1.1.2",
     "camel-case": "^4.1.2",
     "codesandbox-import-utils": "^2.1.1",
     "cron-validator": "^1.2.1",
@@ -66,7 +67,7 @@
   "devDependencies": {
     "@ant-design/compatible": "^1.0.1",
     "@ant-design/icons": "^5.3.5",
-    "@cube-dev/ui-kit": "0.38.0",
+    "@cube-dev/ui-kit": "0.52.3",
     "@cubejs-client/core": "1.1.12",
     "@cubejs-client/react": "1.1.12",
     "@types/flexsearch": "^0.7.3",
@@ -97,7 +98,7 @@
   },
   "peerDependencies": {
     "@ant-design/icons": ">=4.7.0",
-    "@cube-dev/ui-kit": ">=0.37.2",
+    "@cube-dev/ui-kit": ">=0.52.3",
     "@cubejs-client/core": ">=0.30.0",
     "@cubejs-client/react": ">=0.30.0",
     "antd": ">=4.16.13",

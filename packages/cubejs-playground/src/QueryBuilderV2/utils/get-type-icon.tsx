@@ -8,8 +8,12 @@ const ICON_MAP = {
   time: <TimeIcon />,
   boolean: <BooleanIcon />,
   filter: <FilterIcon />,
-};
+} as const;
 
-export function getTypeIcon(type: TCubeMemberType | 'filter') {
-  return ICON_MAP[type] || <QuestionCircleOutlined style={{ fontSize: 'var(--icon-size)' }} />;
+export function getTypeIcon(type: TCubeMemberType | 'filter' | undefined) {
+  return (
+    ICON_MAP[type as keyof typeof ICON_MAP] || (
+      <QuestionCircleOutlined style={{ fontSize: 'var(--icon-size)' }} />
+    )
+  );
 }
