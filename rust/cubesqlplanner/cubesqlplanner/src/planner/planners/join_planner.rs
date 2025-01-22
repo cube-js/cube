@@ -1,5 +1,6 @@
 use super::{CommonUtils, DimensionSubqueryPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::query_tools::QueryTools;
@@ -24,7 +25,7 @@ impl JoinPlanner {
     pub fn make_join_node_with_prefix_and_join_hints(
         &self,
         alias_prefix: &Option<String>, /*TODO dimensions for subqueries*/
-        join_hints: Vec<String>,
+        join_hints: Vec<JoinHintItem>,
         dimension_subquery_planner: &DimensionSubqueryPlanner,
     ) -> Result<Rc<From>, CubeError> {
         let join = self.query_tools.join_graph().build_join(join_hints)?;
@@ -39,7 +40,7 @@ impl JoinPlanner {
     ) -> Result<Rc<From>, CubeError> {
         let root = self.utils.cube_from_path(join.static_data().root.clone())?;
         let joins = join.joins()?;
-        if joins.items().is_empty() && dimension_subquery_planner.is_empty() {
+        if joins.is_empty() && dimension_subquery_planner.is_empty() {
             Ok(From::new_from_cube(root, None))
         } else {
             let mut join_builder = JoinBuilder::new_from_cube(
@@ -47,7 +48,7 @@ impl JoinPlanner {
                 Some(root.default_alias_with_prefix(alias_prefix)),
             );
             dimension_subquery_planner.add_joins_for_cube(&mut join_builder, root.name())?;
-            for join in joins.items().iter() {
+            for join in joins.iter() {
                 let definition = join.join()?;
                 let sql_call = self
                     .compile_join_condition(&join.static_data().original_from, definition.sql()?)?;

@@ -131,6 +131,26 @@ impl MeasureSymbol {
         deps
     }
 
+    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
+        let mut deps = vec![];
+        if let Some(member_sql) = &self.member_sql {
+            member_sql.extract_symbol_deps_with_path(&mut deps);
+        }
+        for pk in self.pk_sqls.iter() {
+            pk.extract_symbol_deps_with_path(&mut deps);
+        }
+        for filter in self.measure_filters.iter() {
+            filter.extract_symbol_deps_with_path(&mut deps);
+        }
+        for filter in self.measure_drill_filters.iter() {
+            filter.extract_symbol_deps_with_path(&mut deps);
+        }
+        for order in self.measure_order_by.iter() {
+            order.sql_call().extract_symbol_deps_with_path(&mut deps);
+        }
+        deps
+    }
+
     pub fn get_dependent_cubes(&self) -> Vec<String> {
         let mut cubes = vec![];
         if let Some(member_sql) = &self.member_sql {
@@ -296,7 +316,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         };
         let mut measure_filters = vec![];
         if let Some(filters) = definition.filters()? {
-            for filter in filters.items().iter() {
+            for filter in filters.iter() {
                 let node = compiler.compile_sql_call(&cube_name, filter.sql()?)?;
                 measure_filters.push(node);
             }
@@ -304,7 +324,7 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let mut measure_drill_filters = vec![];
         if let Some(filters) = definition.drill_filters()? {
-            for filter in filters.items().iter() {
+            for filter in filters.iter() {
                 let node = compiler.compile_sql_call(&cube_name, filter.sql()?)?;
                 measure_drill_filters.push(node);
             }
@@ -312,7 +332,7 @@ impl SymbolFactory for MeasureSymbolFactory {
 
         let mut measure_order_by = vec![];
         if let Some(group_by) = definition.order_by()? {
-            for item in group_by.items().iter() {
+            for item in group_by.iter() {
                 let node = compiler.compile_sql_call(&cube_name, item.sql()?)?;
                 measure_order_by.push(MeasureOrderBy::new(node, item.dir()?));
             }

@@ -38,6 +38,10 @@ impl BaseMember for BaseTimeDimension {
         self.member_evaluator.clone()
     }
 
+    fn full_name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
     fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember> {
         self.clone()
     }

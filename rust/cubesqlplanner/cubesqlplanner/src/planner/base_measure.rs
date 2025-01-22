@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{MemberSymbol, SqlCall};
+use super::sql_evaluator::{MemberExpressionSymbol, MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
@@ -68,6 +68,8 @@ pub struct BaseMeasure {
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
     definition: Option<Rc<dyn MeasureDefinition>>,
+    #[allow(dead_code)]
+    member_expression_definition: Option<String>,
     time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
     name: String,
@@ -142,6 +144,7 @@ impl BaseMeasure {
                     query_tools: query_tools.clone(),
                     member_evaluator: evaluation_node.clone(),
                     definition: Some(s.definition().clone()),
+                    member_expression_definition: None,
                     cube_name: s.cube_name().clone(),
                     name: s.name().clone(),
                     time_shifts,
@@ -170,22 +173,29 @@ impl BaseMeasure {
         expression: Rc<SqlCall>,
         cube_name: String,
         name: String,
+        member_expression_definition: Option<String>,
         query_tools: Rc<QueryTools>,
-    ) -> Result<Self, CubeError> {
-        let full_name = format!("{}.{}", cube_name, name);
-        let member_evaluator = Rc::new(MemberSymbol::SqlCall(expression));
-        let default_alias =
-            BaseMemberHelper::default_alias(&cube_name, &name, &None, query_tools.clone())?;
-        Ok(Self {
+    ) -> Result<Rc<Self>, CubeError> {
+        let member_expression_symbol = MemberExpressionSymbol::new(
+            cube_name.clone(),
+            name.clone(),
+            expression,
+            member_expression_definition.clone(),
+        );
+        let full_name = member_expression_symbol.full_name();
+        let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
+        let default_alias = PlanSqlTemplates::alias_name(&name);
+        Ok(Rc::new(Self {
             measure: full_name,
             query_tools,
             member_evaluator,
             definition: None,
             cube_name,
             name,
+            member_expression_definition,
             default_alias,
             time_shifts: vec![],
-        })
+        }))
     }
 
     pub fn can_used_as_addictive_in_multplied(&self) -> Result<bool, CubeError> {

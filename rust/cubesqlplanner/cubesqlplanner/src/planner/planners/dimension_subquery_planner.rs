@@ -94,6 +94,7 @@ impl DimensionSubqueryPlanner {
             expression,
             cube_name.clone(),
             dim_name.clone(),
+            None,
             self.query_tools.clone(),
         )?;
 
@@ -112,7 +113,7 @@ impl DimensionSubqueryPlanner {
 
         let sub_query_properties = QueryProperties::try_new_from_precompiled(
             self.query_tools.clone(),
-            vec![Rc::new(measure)], //measures,
+            vec![measure], //measures,
             primary_keys_dimensions.clone(),
             vec![],
             time_dimensions_filters,

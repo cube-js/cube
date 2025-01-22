@@ -1,9 +1,11 @@
 use super::filter::compiler::FilterCompiler;
 use super::query_tools::QueryTools;
+
 use super::sql_evaluator::MemberSymbol;
 use super::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::cube_bridge::options_member::OptionsMember;
 use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::sql_evaluator::collectors::{
     collect_multiplied_measures, has_cumulative_members, has_multi_stage_members,
@@ -76,12 +78,38 @@ impl QueryProperties {
         let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
-        let dimensions = if let Some(dimensions) = &options.static_data().dimensions {
+        let dimensions = if let Some(dimensions) = &options.dimensions()? {
             dimensions
                 .iter()
-                .map(|d| {
-                    let evaluator = evaluator_compiler.add_dimension_evaluator(d.clone())?;
-                    BaseDimension::try_new_required(evaluator, query_tools.clone())
+                .map(|d| match d {
+                    OptionsMember::MemberName(member_name) => {
+                        let evaluator =
+                            evaluator_compiler.add_dimension_evaluator(member_name.clone())?;
+                        BaseDimension::try_new_required(evaluator, query_tools.clone())
+                    }
+                    OptionsMember::MemberExpression(member_expression) => {
+                        let cube_name =
+                            if let Some(name) = &member_expression.static_data().cube_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let name =
+                            if let Some(name) = &member_expression.static_data().expression_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let expression_evaluator = evaluator_compiler
+                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        BaseDimension::try_new_from_expression(
+                            expression_evaluator,
+                            cube_name,
+                            name,
+                            member_expression.static_data().definition.clone(),
+                            query_tools.clone(),
+                        )
+                    }
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {

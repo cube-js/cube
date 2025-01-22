@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{MemberSymbol, SqlCall};
+use super::sql_evaluator::{MemberExpressionSymbol, MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -10,7 +10,9 @@ pub struct BaseDimension {
     dimension: String,
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<MemberSymbol>,
-    definition: Rc<dyn DimensionDefinition>,
+    definition: Option<Rc<dyn DimensionDefinition>>,
+    #[allow(dead_code)]
+    member_expression_definition: Option<String>,
     cube_name: String,
     name: String,
     default_alias: String,
@@ -28,6 +30,10 @@ impl BaseMember for BaseDimension {
             context,
             templates,
         )
+    }
+
+    fn full_name(&self) -> String {
+        self.member_evaluator.full_name()
     }
 
     fn alias_name(&self) -> String {
@@ -70,7 +76,8 @@ impl BaseDimension {
                     member_evaluator: evaluation_node.clone(),
                     cube_name: s.cube_name().clone(),
                     name: s.name().clone(),
-                    definition: s.definition().clone(),
+                    definition: Some(s.definition().clone()),
+                    member_expression_definition: None,
                     default_alias,
                 }))
             }
@@ -90,6 +97,35 @@ impl BaseDimension {
                 "DimensionSymbol expected as evaluation node for BaseDimension"
             )))
         }
+    }
+
+    pub fn try_new_from_expression(
+        expression: Rc<SqlCall>,
+        cube_name: String,
+        name: String,
+        member_expression_definition: Option<String>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let member_expression_symbol = MemberExpressionSymbol::new(
+            cube_name.clone(),
+            name.clone(),
+            expression,
+            member_expression_definition.clone(),
+        );
+        let full_name = member_expression_symbol.full_name();
+        let member_evaluator = Rc::new(MemberSymbol::MemberExpression(member_expression_symbol));
+        let default_alias = PlanSqlTemplates::alias_name(&name);
+
+        Ok(Rc::new(Self {
+            dimension: full_name,
+            query_tools,
+            member_evaluator,
+            definition: None,
+            cube_name,
+            name,
+            member_expression_definition,
+            default_alias,
+        }))
     }
 
     pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
@@ -119,13 +155,16 @@ impl BaseDimension {
     }
 
     pub fn is_sub_query(&self) -> bool {
-        self.definition.static_data().sub_query.unwrap_or(false)
+        self.definition
+            .as_ref()
+            .map_or(false, |def| def.static_data().sub_query.unwrap_or(false))
     }
 
     pub fn propagate_filters_to_sub_query(&self) -> bool {
-        self.definition
-            .static_data()
-            .propagate_filters_to_sub_query
-            .unwrap_or(false)
+        self.definition.as_ref().map_or(false, |def| {
+            def.static_data()
+                .propagate_filters_to_sub_query
+                .unwrap_or(false)
+        })
     }
 }

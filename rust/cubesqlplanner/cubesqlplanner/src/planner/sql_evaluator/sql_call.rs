@@ -46,12 +46,30 @@ impl SqlCall {
         deps
     }
 
+    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
+        let mut deps = Vec::new();
+        self.extract_symbol_deps_with_path(&mut deps);
+        deps
+    }
+
     pub fn extract_symbol_deps(&self, result: &mut Vec<Rc<MemberSymbol>>) {
         for dep in self.deps.iter() {
             match dep {
                 Dependency::SymbolDependency(dep) => result.push(dep.clone()),
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
+                }
+                Dependency::ContextDependency(_) => {}
+            }
+        }
+    }
+
+    pub fn extract_symbol_deps_with_path(&self, result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>) {
+        for dep in self.deps.iter() {
+            match dep {
+                Dependency::SymbolDependency(dep) => result.push((dep.clone(), vec![])),
+                Dependency::CubeDependency(cube_dep) => {
+                    self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, vec![], result)
                 }
                 Dependency::ContextDependency(_) => {}
             }
@@ -86,6 +104,29 @@ impl SqlCall {
                 CubeDepProperty::SymbolDependency(dep) => result.push(dep.clone()),
                 CubeDepProperty::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
+                }
+            };
+        }
+    }
+
+    fn extract_symbol_deps_with_path_from_cube_dep(
+        &self,
+        cube_dep: &CubeDependency,
+        mut path: Vec<String>,
+        result: &mut Vec<(Rc<MemberSymbol>, Vec<String>)>,
+    ) {
+        path.push(cube_dep.cube_symbol.cube_name());
+        if let Some(sql_fn) = &cube_dep.sql_fn {
+            result.push((sql_fn.clone(), path.clone()));
+        }
+        if let Some(to_string_fn) = &cube_dep.to_string_fn {
+            result.push((to_string_fn.clone(), path.clone()));
+        }
+        for (_, v) in cube_dep.properties.iter() {
+            match v {
+                CubeDepProperty::SymbolDependency(dep) => result.push((dep.clone(), path.clone())),
+                CubeDepProperty::CubeDependency(cube_dep) => {
+                    self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, path.clone(), result)
                 }
             };
         }

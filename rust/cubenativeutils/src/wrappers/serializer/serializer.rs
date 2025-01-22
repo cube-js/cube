@@ -185,14 +185,12 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
         _name: &'static str,
         _variant_index: u32,
         _variant: &'static str,
-        _value: &T,
+        value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
         T: ?Sized + Serialize,
     {
-        Err(NativeObjSerializerError::Message(
-            "serialize_newtype_variant is not implemented".to_string(),
-        ))
+        NativeSerdeSerializer::serialize(value, self.context.clone())
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {

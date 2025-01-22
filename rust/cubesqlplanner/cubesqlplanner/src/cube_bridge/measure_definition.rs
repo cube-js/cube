@@ -1,10 +1,11 @@
 use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
-use super::measure_filter::{MeasureFiltersVec, NativeMeasureFiltersVec};
-use super::member_order_by::{MemberOrderByVec, NativeMemberOrderByVec};
+use super::measure_filter::{MeasureFilter, NativeMeasureFilter};
+use super::member_order_by::{MemberOrderBy, NativeMemberOrderBy};
 use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -61,13 +62,16 @@ pub trait MeasureDefinition {
 
     #[optional]
     #[field]
-    fn filters(&self) -> Result<Option<Rc<dyn MeasureFiltersVec>>, CubeError>;
+    #[vec]
+    fn filters(&self) -> Result<Option<Vec<Rc<dyn MeasureFilter>>>, CubeError>;
 
     #[optional]
     #[field]
-    fn drill_filters(&self) -> Result<Option<Rc<dyn MeasureFiltersVec>>, CubeError>;
+    #[vec]
+    fn drill_filters(&self) -> Result<Option<Vec<Rc<dyn MeasureFilter>>>, CubeError>;
 
     #[optional]
     #[field]
-    fn order_by(&self) -> Result<Option<Rc<dyn MemberOrderByVec>>, CubeError>;
+    #[vec]
+    fn order_by(&self) -> Result<Option<Vec<Rc<dyn MemberOrderBy>>>, CubeError>;
 }

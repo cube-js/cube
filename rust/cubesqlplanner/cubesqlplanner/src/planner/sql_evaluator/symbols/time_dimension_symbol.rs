@@ -38,8 +38,8 @@ impl TimeDimensionSymbol {
         self.base_symbol.get_dependencies()
     }
 
-    pub fn get_dependent_cubes(&self) -> Vec<String> {
-        self.base_symbol.get_dependent_cubes()
+    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
+        self.base_symbol.get_dependencies_with_path()
     }
 
     pub fn cube_name(&self) -> String {

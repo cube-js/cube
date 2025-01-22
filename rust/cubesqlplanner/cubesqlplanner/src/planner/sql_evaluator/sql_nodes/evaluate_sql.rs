@@ -87,7 +87,7 @@ impl SqlNode for EvaluateSqlNode {
                 templates,
             ),
             MemberSymbol::CubeName(ev) => ev.evaluate_sql(),
-            MemberSymbol::SqlCall(s) => s.eval(
+            MemberSymbol::MemberExpression(e) => e.evaluate_sql(
                 visitor,
                 node_processor.clone(),
                 query_tools.clone(),

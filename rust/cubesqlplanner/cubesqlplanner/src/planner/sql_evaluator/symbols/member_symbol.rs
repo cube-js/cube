@@ -1,6 +1,7 @@
-use crate::planner::sql_evaluator::SqlCall;
-
-use super::{CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, TimeDimensionSymbol};
+use super::{
+    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
+    TimeDimensionSymbol,
+};
 use std::rc::Rc;
 
 pub enum MemberSymbol {
@@ -9,7 +10,7 @@ pub enum MemberSymbol {
     Measure(MeasureSymbol),
     CubeName(CubeNameSymbol),
     CubeTable(CubeTableSymbol),
-    SqlCall(Rc<SqlCall>), //FIXME for expressions only
+    MemberExpression(MemberExpressionSymbol),
 }
 
 impl MemberSymbol {
@@ -36,7 +37,7 @@ impl MemberSymbol {
             Self::Measure(m) => m.full_name(),
             Self::CubeName(c) => c.cube_name().clone(),
             Self::CubeTable(c) => c.cube_name().clone(),
-            Self::SqlCall(_) => format!(""),
+            Self::MemberExpression(e) => e.full_name().clone(),
         }
     }
     pub fn name(&self) -> String {
@@ -46,7 +47,7 @@ impl MemberSymbol {
             Self::Measure(m) => m.name().clone(),
             Self::CubeName(c) => c.cube_name().clone(),
             Self::CubeTable(c) => c.cube_name().clone(),
-            Self::SqlCall(_) => format!(""),
+            Self::MemberExpression(e) => e.name().clone(),
         }
     }
 
@@ -57,7 +58,7 @@ impl MemberSymbol {
             Self::Measure(m) => m.cube_name().clone(),
             Self::CubeName(c) => c.cube_name().clone(),
             Self::CubeTable(c) => c.cube_name().clone(),
-            Self::SqlCall(_) => format!(""),
+            Self::MemberExpression(e) => e.cube_name().clone(),
         }
     }
 
@@ -76,18 +77,18 @@ impl MemberSymbol {
             Self::Measure(m) => m.get_dependencies(),
             Self::CubeName(_) => vec![],
             Self::CubeTable(_) => vec![],
-            Self::SqlCall(s) => s.get_dependencies(),
+            Self::MemberExpression(e) => e.get_dependencies(),
         }
     }
 
-    pub fn get_dependent_cubes(&self) -> Vec<String> {
+    pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
         match self {
-            Self::Dimension(d) => d.get_dependent_cubes(),
-            Self::TimeDimension(d) => d.get_dependent_cubes(),
-            Self::Measure(m) => m.get_dependent_cubes(),
+            Self::Dimension(d) => d.get_dependencies_with_path(),
+            Self::TimeDimension(d) => d.get_dependencies_with_path(),
+            Self::Measure(m) => m.get_dependencies_with_path(),
             Self::CubeName(_) => vec![],
             Self::CubeTable(_) => vec![],
-            Self::SqlCall(s) => s.get_dependent_cubes(),
+            Self::MemberExpression(e) => e.get_dependencies_with_path(),
         }
     }
 

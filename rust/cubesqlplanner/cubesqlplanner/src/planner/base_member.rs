@@ -14,9 +14,7 @@ pub trait BaseMember {
     ) -> Result<String, CubeError>;
     fn alias_name(&self) -> String;
     fn member_evaluator(&self) -> Rc<MemberSymbol>;
-    fn full_name(&self) -> String {
-        self.member_evaluator().full_name()
-    }
+    fn full_name(&self) -> String;
     fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember>;
     fn cube_name(&self) -> &String;
     fn name(&self) -> &String;
@@ -44,7 +42,9 @@ impl BaseMemberHelper {
         members.iter().map(|m| m.alias_name()).collect_vec()
     }
 
-    pub fn extract_symbols_from_members(members: &Vec<Rc<dyn BaseMember>>) -> Vec<Rc<MemberSymbol>> {
+    pub fn extract_symbols_from_members(
+        members: &Vec<Rc<dyn BaseMember>>,
+    ) -> Vec<Rc<MemberSymbol>> {
         members.iter().map(|m| m.member_evaluator()).collect_vec()
     }
 
