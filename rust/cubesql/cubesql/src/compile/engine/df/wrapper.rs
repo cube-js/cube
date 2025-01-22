@@ -2948,11 +2948,12 @@ impl CubeScanWrapperNode {
         ungrouped_scan_node: &'scan CubeScanNode,
         column: &'col Column,
     ) -> Result<&'scan MemberField> {
-        let field_index = ungrouped_scan_node
+        let (_field, member) = ungrouped_scan_node
             .schema
             .fields()
             .iter()
-            .find_position(|f| {
+            .zip(ungrouped_scan_node.member_fields.iter())
+            .find(|(f, _mf)| {
                 f.name() == &column.name
                     && match column.relation.as_ref() {
                         Some(r) => Some(r) == f.qualifier(),
@@ -2961,16 +2962,7 @@ impl CubeScanWrapperNode {
             })
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "Can't find column {column} in ungrouped scan node",
-                ))
-            })?
-            .0;
-        let member = ungrouped_scan_node
-            .member_fields
-            .get(field_index)
-            .ok_or_else(|| {
-                DataFusionError::Internal(format!(
-                    "Can't find member for column {column} in ungrouped scan node",
+                    "Can't find member for column {column} in ungrouped scan node"
                 ))
             })?;
 
