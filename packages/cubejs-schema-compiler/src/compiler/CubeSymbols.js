@@ -515,6 +515,11 @@ export class CubeSymbols {
       cubeAliasFn: (cube) => cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [cube])),
       collectJoinHints: options.collectJoinHints,
     });
+
+    if (options.returnRaw) {
+      return arrayOrSingle;
+    }
+
     if (!Array.isArray(arrayOrSingle)) {
       return arrayOrSingle.toString();
     }

@@ -473,10 +473,13 @@ const RollUpSchema = condition(
       // Rollup with multiple time dimensions
       inherit(BasePreAggregation, {
         type: Joi.any().valid('rollup').required(),
-        timeDimensions: Joi.array().items(Joi.object().keys({
-          dimension: Joi.func(),
-          granularity: GranularitySchema,
-        })),
+        timeDimensions: Joi.alternatives().try(
+          Joi.array().items(Joi.object().keys({
+            dimension: Joi.func(),
+            granularity: GranularitySchema,
+          })),
+          Joi.func(),
+        ),
         allowNonStrictDateRangeMatch: Joi.bool(),
         measures: Joi.func(),
         dimensions: Joi.func(),

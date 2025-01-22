@@ -92,6 +92,168 @@ describe('pre-aggregations', () => {
     expect(cubeEvaluator.cubeFromPath('Orders').preAggregations.ordersRollupJoin.scheduledRefresh).toEqual(undefined);
   });
 
+  it('Rollup with pre-agg with hardcoded multiple time dimensions', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(
+      `
+        cube(\`Users\`, {
+          sql: \`SELECT * FROM public.users\`,
+
+          preAggregations: {
+            staticMultiple: {
+              dimensions: [CUBE.status],
+              measures: [CUBE.count],
+              timeDimensions: [
+                { dimension: CUBE.createdAt, granularity: \`day\` },
+                { dimension: CUBE.modifiedAt, granularity: \`day\` },
+              ]
+            }
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`string\`,
+              primaryKey: true,
+            },
+
+            name: {
+              sql: \`name\`,
+              type: \`string\`,
+            },
+
+            userId: {
+              sql: \`user_id\`,
+              type: \`number\`,
+            },
+            status: {
+              sql: \`status\`,
+              type: \`string\`,
+            },
+
+            createdAt: {
+              type: \`time\`,
+              sql: \`created_at\`
+            },
+
+            modifiedAt: {
+              type: \`time\`,
+              sql: \`modified_at\`
+            }
+          },
+        });
+      `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['Users.status'],
+      measures: ['Users.count'],
+      timeDimensions: [{
+        dimension: 'Users.createdAt',
+        dateRange: ['2023-01-20', '2024-01-20'],
+        granularity: 'day'
+      }]
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(queryAndParams[0].includes('undefined')).toBeFalsy();
+    expect(queryAndParams[0].includes('pre_aggregations')).toBeTruthy();
+
+    expect(preAggregationsDescription.length).toEqual(1);
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('Users.staticMultiple');
+  });
+
+  it('Rollup with pre-agg with dynamic multiple time dimensions', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(
+      `
+        cube(\`Users\`, {
+          sql: \`SELECT * FROM public.users\`,
+
+          preAggregations: {
+            dynamicMultiple: {
+              dimensions: [CUBE.status],
+              measures: [CUBE.count],
+              timeDimensions: (CUBE) => [
+                {dimension: CUBE.createdAt, granularity: 'day'},
+                {dimension: CUBE.modifiedAt, granularity: 'day'},
+              ]
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`string\`,
+              primaryKey: true,
+            },
+
+            name: {
+              sql: \`name\`,
+              type: \`string\`,
+            },
+
+            userId: {
+              sql: \`user_id\`,
+              type: \`number\`,
+            },
+            status: {
+              sql: \`status\`,
+              type: \`string\`,
+            },
+
+            createdAt: {
+              type: \`time\`,
+              sql: \`created_at\`
+            },
+
+            modifiedAt: {
+              type: \`time\`,
+              sql: \`modified_at\`
+            }
+          },
+        });
+      `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['Users.status'],
+      measures: ['Users.count'],
+      timeDimensions: [{
+        dimension: 'Users.createdAt',
+        dateRange: ['2023-01-20', '2024-01-20'],
+        granularity: 'day'
+      }]
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(queryAndParams[0].includes('undefined')).toBeFalsy();
+    expect(queryAndParams[0].includes('pre_aggregations')).toBeTruthy();
+
+    expect(preAggregationsDescription.length).toEqual(1);
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('Users.dynamicMultiple');
+  });
+
   it('query rollupLambda', async () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(
       `

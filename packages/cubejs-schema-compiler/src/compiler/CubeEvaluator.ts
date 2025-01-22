@@ -696,11 +696,19 @@ export class CubeEvaluator extends CubeSymbols {
         dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
         granularity: aggregation.granularity
       });
-    } else if (aggregation.timeDimensionReferences) {
+    } else if (Array.isArray(aggregation.timeDimensionReferences)) {
       // eslint-disable-next-line guard-for-in
       for (const timeDimensionReference of aggregation.timeDimensionReferences) {
         timeDimensions.push({
           dimension: this.evaluateReferences(cube, timeDimensionReference.dimension),
+          granularity: timeDimensionReference.granularity
+        });
+      }
+    } else if (aggregation.timeDimensionReferences) {
+      const evaluatedRefs: any[] = this.evaluateReferences(cube, aggregation.timeDimensionReferences, { returnRaw: true });
+      for (const timeDimensionReference of evaluatedRefs) {
+        timeDimensions.push({
+          dimension: timeDimensionReference.dimension.toString(),
           granularity: timeDimensionReference.granularity
         });
       }
