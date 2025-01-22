@@ -1171,6 +1171,7 @@ class ApiGateway {
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
       query = this.compareDateRangeTransformer(query);
+      query = this.fillMissingDateRangesForTimeDimensions(query);
       if (Array.isArray(query)) {
         queryType = QueryTypeEnum.COMPARE_DATE_RANGE_QUERY;
       }
@@ -2484,6 +2485,28 @@ class ApiGateway {
       next();
     }
   };
+
+  protected fillMissingDateRangesForTimeDimensions(query) {
+    if (!query.timeDimensions) {
+      return query;
+    }
+
+    const timeDimensionCount = query.timeDimensions.reduce((acc, item) => {
+      acc[item.dimension] = acc[item.dimension] || {};
+      if (!acc[item.dimension].dateRange && item.dateRange) {
+        acc[item.dimension].dateRange = item.dateRange;
+      }
+      return acc;
+    }, {});
+
+    query.timeDimensions.forEach(td => {
+      if (!td.dateRange && timeDimensionCount[td.dimension].dateRange) {
+        td.dateRange = timeDimensionCount[td.dimension].dateRange;
+      }
+    });
+
+    return query;
+  }
 
   protected compareDateRangeTransformer(query) {
     let queryCompareDateRange;
