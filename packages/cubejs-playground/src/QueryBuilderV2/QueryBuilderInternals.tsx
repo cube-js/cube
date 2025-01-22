@@ -95,7 +95,7 @@ const QueryBuilderInternals = memo(function QueryBuilderInternals() {
     <QueryBuilderPanel>
       <QueryBuilderSidePanel />
 
-      <Panel ref={ref} gridRows="min-content min-content minmax(0, 1fr)" border="right 1ow">
+      <Panel ref={ref} gridRows="min-content min-content minmax(0, 1fr)">
         {useMemo(
           () => (
             <>

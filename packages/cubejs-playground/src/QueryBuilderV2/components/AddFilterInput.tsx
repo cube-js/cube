@@ -208,7 +208,7 @@ export function AddFilterInput(props: AddFilterInputProps) {
   }, [onDateRangeAdd]);
 
   const disabledKeys = useMemo(() => {
-    const disabledKeys = [];
+    const disabledKeys: string[] = [];
 
     if (!dateRanges.length) {
       disabledKeys.push('dateRange');
