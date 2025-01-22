@@ -47,4 +47,9 @@ pub trait BaseTools {
     ) -> Result<Vec<Vec<String>>, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
+    //===== TODO Move to templates
+    fn hll_init(&self, sql: String) -> Result<String, CubeError>;
+    fn hll_merge(&self, sql: String) -> Result<String, CubeError>;
+    fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError>;
+    fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError>;
 }

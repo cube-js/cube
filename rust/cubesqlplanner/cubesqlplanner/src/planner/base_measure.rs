@@ -200,7 +200,7 @@ impl BaseMeasure {
 
     pub fn can_used_as_addictive_in_multplied(&self) -> Result<bool, CubeError> {
         let measure_type = self.measure_type();
-        let res = if measure_type == "countDistinct" {
+        let res = if measure_type == "countDistinct" || measure_type == "countDistinctApprox" {
             true
         } else if measure_type == "count" {
             if let Some(definition) = &self.definition {

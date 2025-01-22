@@ -12,16 +12,19 @@ use std::rc::Rc;
 pub struct FinalMeasureSqlNode {
     input: Rc<dyn SqlNode>,
     rendered_as_multiplied_measures: HashSet<String>,
+    count_approx_as_state: bool,
 }
 
 impl FinalMeasureSqlNode {
     pub fn new(
         input: Rc<dyn SqlNode>,
         rendered_as_multiplied_measures: HashSet<String>,
+        count_approx_as_state: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
             input,
             rendered_as_multiplied_measures,
+            count_approx_as_state,
         })
     }
 
@@ -60,6 +63,12 @@ impl SqlNode for FinalMeasureSqlNode {
 
                 if ev.is_calculated() {
                     input
+                } else if ev.measure_type() == "countDistinctApprox" {
+                    if self.count_approx_as_state {
+                        query_tools.base_tools().hll_init(input)?
+                    } else {
+                        query_tools.base_tools().count_distinct_approx(input)?
+                    }
                 } else if self.is_count_disttinct(ev) {
                     templates.count_distinct(&input)?
                 } else {

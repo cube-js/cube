@@ -13,6 +13,7 @@ pub struct SqlNodesFactory {
     time_shifts: HashMap<String, String>,
     ungrouped: bool,
     ungrouped_measure: bool,
+    count_approx_as_state: bool,
     render_references: HashMap<String, QualifiedColumnName>,
     rendered_as_multiplied_measures: HashSet<String>,
     ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
@@ -28,6 +29,7 @@ impl SqlNodesFactory {
             time_shifts: HashMap::new(),
             ungrouped: false,
             ungrouped_measure: false,
+            count_approx_as_state: false,
             render_references: HashMap::new(),
             ungrouped_measure_references: HashMap::new(),
             cube_name_references: HashMap::new(),
@@ -76,6 +78,10 @@ impl SqlNodesFactory {
 
     pub fn set_rolling_window(&mut self, value: bool) {
         self.rolling_window = value;
+    }
+
+    pub fn set_count_approx_as_state(&mut self, value: bool) {
+        self.count_approx_as_state = value;
     }
 
     pub fn set_ungrouped_measure_references(
@@ -161,7 +167,11 @@ impl SqlNodesFactory {
         } else if self.rolling_window {
             RollingWindowNode::new(input)
         } else {
-            FinalMeasureSqlNode::new(input, self.rendered_as_multiplied_measures.clone())
+            FinalMeasureSqlNode::new(
+                input,
+                self.rendered_as_multiplied_measures.clone(),
+                self.count_approx_as_state,
+            )
         }
     }
 

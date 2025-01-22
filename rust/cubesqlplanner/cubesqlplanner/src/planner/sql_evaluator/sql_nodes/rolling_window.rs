@@ -39,16 +39,20 @@ impl SqlNode for RollingWindowNode {
                     templates,
                 )?;
                 if m.is_cumulative() {
-                    let aggregate_function = if m.measure_type() == "sum"
-                        || m.measure_type() == "count"
-                        || m.measure_type() == "runningTotal"
-                    {
-                        "sum"
+                    if m.measure_type() == "countDistinctApprox" {
+                        query_tools.base_tools().hll_cardinality_merge(input)?
                     } else {
-                        m.measure_type()
-                    };
+                        let aggregate_function = if m.measure_type() == "sum"
+                            || m.measure_type() == "count"
+                            || m.measure_type() == "runningTotal"
+                        {
+                            "sum"
+                        } else {
+                            m.measure_type()
+                        };
 
-                    format!("{}({})", aggregate_function, input)
+                        format!("{}({})", aggregate_function, input)
+                    }
                 } else {
                     input
                 }

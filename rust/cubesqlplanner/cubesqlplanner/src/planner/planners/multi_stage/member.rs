@@ -186,6 +186,7 @@ pub struct MultiStageMember {
     member_type: MultiStageMemberType,
     evaluation_node: Rc<MemberSymbol>,
     is_ungrupped: bool,
+    has_aggregates_on_top: bool,
 }
 
 impl MultiStageMember {
@@ -193,11 +194,13 @@ impl MultiStageMember {
         member_type: MultiStageMemberType,
         evaluation_node: Rc<MemberSymbol>,
         is_ungrupped: bool,
+        has_aggregates_on_top: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
             member_type,
             evaluation_node,
             is_ungrupped,
+            has_aggregates_on_top,
         })
     }
 
@@ -215,5 +218,9 @@ impl MultiStageMember {
 
     pub fn is_ungrupped(&self) -> bool {
         self.is_ungrupped
+    }
+
+    pub fn has_aggregates_on_top(&self) -> bool {
+        self.has_aggregates_on_top
     }
 }

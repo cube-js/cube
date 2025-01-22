@@ -384,6 +384,9 @@ impl MultiStageMemberQueryPlanner {
 
         let mut node_factory = SqlNodesFactory::new();
         node_factory.set_time_shifts(self.description.state().time_shifts().clone());
+        if self.description.member().has_aggregates_on_top() {
+            node_factory.set_count_approx_as_state(true);
+        }
 
         if cte_query_properties
             .full_key_aggregate_measures()?
