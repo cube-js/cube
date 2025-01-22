@@ -654,7 +654,17 @@ export class BaseQuery {
       ungrouped: this.options.ungrouped
 
     };
-    const res = nativeBuildSqlAndParams(queryParams);
+    const buildResult = nativeBuildSqlAndParams(queryParams);
+
+    if (buildResult.error) {
+      if (buildResult.error.cause && buildResult.error.cause === 'User') {
+        throw new UserError(buildResult.error.message);
+      } else {
+        throw new Error(buildResult.error.message);
+      }
+    }
+
+    const res = buildResult.result;
     // FIXME
     res[1] = [...res[1]];
     return res;

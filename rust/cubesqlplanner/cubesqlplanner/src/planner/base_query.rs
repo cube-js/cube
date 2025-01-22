@@ -7,8 +7,8 @@ use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::NativeType;
-use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
-use cubenativeutils::CubeError;
+use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle, NativeStruct};
+use cubenativeutils::{CubeError, CubeErrorCauseType};
 use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
@@ -38,7 +38,41 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         })
     }
 
-    pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
+    pub fn build_sql_and_params(&self) -> NativeObjectHandle<IT> {
+        let build_result = self.build_sql_and_params_impl();
+        let result = self.context.empty_struct();
+        match build_result {
+            Ok(res) => {
+                result.set_field("result", res).unwrap();
+            }
+            Err(e) => {
+                let error_descr = self.context.empty_struct();
+                let error_cause = match &e.cause {
+                    CubeErrorCauseType::User(_) => "User",
+                    CubeErrorCauseType::Internal(_) => "Internal",
+                };
+                error_descr
+                    .set_field(
+                        "message",
+                        e.message.to_native(self.context.clone()).unwrap(),
+                    )
+                    .unwrap();
+                error_descr
+                    .set_field(
+                        "cause",
+                        error_cause.to_native(self.context.clone()).unwrap(),
+                    )
+                    .unwrap();
+                result
+                    .set_field("error", NativeObjectHandle::new(error_descr.into_object()))
+                    .unwrap();
+            }
+        }
+
+        NativeObjectHandle::new(result.into_object())
+    }
+
+    fn build_sql_and_params_impl(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let plan = query_planner.plan()?;
