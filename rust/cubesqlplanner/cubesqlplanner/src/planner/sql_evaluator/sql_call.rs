@@ -223,6 +223,9 @@ impl SqlCall {
             ContextSymbolDep::FilterGroup => MemberSqlArg::ContextSymbol(
                 ContextSymbolArg::FilterGroup(query_tools.base_tools().filter_group_function()?),
             ),
+            ContextSymbolDep::SqlUtils => MemberSqlArg::ContextSymbol(ContextSymbolArg::SqlUtils(
+                query_tools.base_tools().sql_utils_for_rust()?,
+            )),
         };
         Ok(res)
     }

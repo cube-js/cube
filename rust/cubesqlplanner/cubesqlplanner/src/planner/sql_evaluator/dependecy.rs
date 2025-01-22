@@ -41,6 +41,7 @@ pub enum ContextSymbolDep {
     SecurityContext,
     FilterParams,
     FilterGroup,
+    SqlUtils,
 }
 
 #[derive(Clone)]
@@ -168,6 +169,7 @@ impl<'a> DependenciesBuilder<'a> {
                 ContextSymbolDep::FilterParams,
             )),
             "FILTER_GROUP" => Some(Dependency::ContextDependency(ContextSymbolDep::FilterGroup)),
+            "SQL_UTILS" => Some(Dependency::ContextDependency(ContextSymbolDep::SqlUtils)),
             _ => None,
         }
     }

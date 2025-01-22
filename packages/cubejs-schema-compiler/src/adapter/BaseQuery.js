@@ -3805,6 +3805,12 @@ export class BaseQuery {
     return this.contextSymbolsProxy(this.contextSymbols.securityContext);
   }
 
+  sqlUtilsForRust() {
+    return {
+      convertTz: this.convertTz.bind(this)
+    };
+  }
+
   contextSymbolsProxy(symbols) {
     return BaseQuery.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
   }

@@ -2,6 +2,7 @@ use super::{
     filter_group::{FilterGroup, NativeFilterGroup},
     filter_params::{FilterParams, NativeFilterParams},
     security_context::{NativeSecurityContext, SecurityContext},
+    sql_utils::{NativeSqlUtils, SqlUtils},
 };
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
@@ -24,6 +25,7 @@ pub struct MemberSqlStruct {
 
 pub enum ContextSymbolArg {
     SecurityContext(Rc<dyn SecurityContext>),
+    SqlUtils(Rc<dyn SqlUtils>),
     FilterParams(Rc<dyn FilterParams>),
     FilterGroup(Rc<dyn FilterGroup>),
 }
@@ -113,6 +115,12 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlArg {
                     .clone()
                     .as_any()
                     .downcast::<NativeSecurityContext<IT>>()
+                    .unwrap()
+                    .to_native(context_holder.clone()),
+                ContextSymbolArg::SqlUtils(context) => context
+                    .clone()
+                    .as_any()
+                    .downcast::<NativeSqlUtils<IT>>()
                     .unwrap()
                     .to_native(context_holder.clone()),
                 ContextSymbolArg::FilterParams(params) => params
