@@ -1778,33 +1778,8 @@ impl CubeScanWrapperNode {
                             }
                         }
 
-                        let field_index = ungrouped_scan_node
-                            .schema
-                            .fields()
-                            .iter()
-                            .find_position(|f| {
-                                f.name() == &c.name
-                                    && match c.relation.as_ref() {
-                                        Some(r) => Some(r) == f.qualifier(),
-                                        None => true,
-                                    }
-                            })
-                            .ok_or_else(|| {
-                                DataFusionError::Internal(format!(
-                                    "Can't find column {} in ungrouped scan node",
-                                    c
-                                ))
-                            })?
-                            .0;
-                        let member = ungrouped_scan_node
-                            .member_fields
-                            .get(field_index)
-                            .ok_or_else(|| {
-                                DataFusionError::Internal(format!(
-                                    "Can't find member for column {} in ungrouped scan node",
-                                    c
-                                ))
-                            })?;
+                        let member = Self::find_member_in_ungrouped_scan(ungrouped_scan_node, c)?;
+
                         match member {
                             MemberField::Member(member) => {
                                 if let Some(used_members) = used_members {
@@ -2967,6 +2942,39 @@ impl CubeScanWrapperNode {
                 }
             }
         })
+    }
+
+    fn find_member_in_ungrouped_scan<'scan, 'col>(
+        ungrouped_scan_node: &'scan CubeScanNode,
+        column: &'col Column,
+    ) -> Result<&'scan MemberField> {
+        let field_index = ungrouped_scan_node
+            .schema
+            .fields()
+            .iter()
+            .find_position(|f| {
+                f.name() == &column.name
+                    && match column.relation.as_ref() {
+                        Some(r) => Some(r) == f.qualifier(),
+                        None => true,
+                    }
+            })
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "Can't find column {column} in ungrouped scan node",
+                ))
+            })?
+            .0;
+        let member = ungrouped_scan_node
+            .member_fields
+            .get(field_index)
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "Can't find member for column {column} in ungrouped scan node",
+                ))
+            })?;
+
+        Ok(member)
     }
 
     fn escape_interpolation_quotes(s: String, ungrouped: bool) -> String {
