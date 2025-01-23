@@ -173,7 +173,7 @@ interface SnowflakeDriverOptions {
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
-  caseSensitiveIdentifiers?: boolean,
+  identIgnoreCase?: boolean,
   application: string,
   readOnly?: boolean,
 
@@ -281,7 +281,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(dataSource),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
-      ignoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource }),
+      identIgnoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource }),
       exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
       application: 'CubeDev_Cube',
       ...config
@@ -453,10 +453,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
       await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
-      
+
       // We only want to ignore the case if someone sets the value to false explicitly since the default assumption
       // is that casing matters
-      if (!this.ignoreCase) {
+      if (!this.config.identIgnoreCase) {
         await this.execute(connection, 'ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = FALSE', [], false);
       }
       return connection;
