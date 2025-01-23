@@ -1823,15 +1823,17 @@ impl LanguageToLogicalPlanConverter {
                                 let values =
                                     match_data_node!(node_by_id, params[2], FilterMemberValues);
                                 if !is_in_or && op == "inDateRange" {
-                                    let existing_time_dimensions: Vec<_> =
-                                        query_time_dimensions.iter_mut().filter_map(|td| {
+                                    let existing_time_dimensions: Vec<_> = query_time_dimensions
+                                        .iter_mut()
+                                        .filter_map(|td| {
                                             if td.dimension == member && td.date_range.is_none() {
                                                 td.date_range = Some(json!(values));
                                                 Some(td)
                                             } else {
                                                 None
                                             }
-                                        }).collect();
+                                        })
+                                        .collect();
                                     if existing_time_dimensions.len() == 0 {
                                         let dimension = V1LoadRequestQueryTimeDimension {
                                             dimension: member.to_string(),
