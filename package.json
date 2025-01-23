@@ -22,14 +22,13 @@
     "lint:fix": "lerna run lint:fix",
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
-    "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
-    "postinstall": "lerna link"
+    "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.34.0",
-    "lerna": "^4.0.0"
+    "lerna": "^8.1.9"
   },
   "files": [
     "src",
