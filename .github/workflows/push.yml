@@ -333,6 +333,13 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-07-15
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -362,6 +369,9 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build cubejs-backend-native (without Python)
+        run: yarn run native:build-release
+        working-directory: ./packages/cubejs-backend-native
       - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
         uses: actions/download-artifact@v4
         with:
