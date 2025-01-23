@@ -85,6 +85,11 @@ jobs:
         with:
           crate: cargo-llvm-cov
           version: "0.6.10"
+      - name: Install cargo-insta@1.42.0
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-insta
+          version: "1.42.0"
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -95,6 +100,17 @@ jobs:
         run: |
           cd rust/cubesql
           cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      - name: Check unreferenced insta snapshots in tests (Rewrite Engine)
+        env:
+          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
+          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
+          CUBESQL_SQL_PUSH_DOWN: true
+          CUBESQL_TOP_DOWN_EXTRACTOR: ${{ matrix.top-down-extractor }}
+          CUBESQL_REWRITE_CACHE: true
+          CUBESQL_REWRITE_TIMEOUT: 60
+        run: |
+          cd rust/cubesql
+          cargo insta test --all-features --workspace --unreferenced reject
       - name: Upload code coverage
         uses: codecov/codecov-action@v5
         with:
