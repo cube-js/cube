@@ -1480,6 +1480,10 @@ export class BaseQuery {
       return baseQueryFn(cumulativeMeasures, filters, false);
     }
 
+    if (this.timeDimensions.filter(d => !d.dateRange && d.granularity).length > 0) {
+      throw new UserError('Time series queries without dateRange aren\'t supported');
+    }
+
     // We can't do meaningful query if few time dimensions with different ranges passed,
     // it won't be possible to join them together without loosing some rows.
     const rangedTimeDimensions = this.timeDimensions.filter(d => d.dateRange && d.granularity);
