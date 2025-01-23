@@ -20,6 +20,7 @@ pub use malloc_trim_loop::spawn_malloc_trim_loop;
 use crate::CubeError;
 use log::error;
 use std::future::Future;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -172,6 +173,22 @@ impl IntervalLoop {
     pub fn stop(&self) {
         self.stopped_token.cancel()
     }
+}
+
+pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    std::fs::create_dir_all(&dst)?;
+
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
