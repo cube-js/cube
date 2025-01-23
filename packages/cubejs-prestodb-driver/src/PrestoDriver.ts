@@ -102,15 +102,18 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     this.client = new presto.Client(this.config);
   }
 
-  public testConnection() {
-    const query = SqlString.format('show catalogs like ?', [`%${this.catalog}%`]);
-
-    return (<Promise<any[]>> this.queryPromised(query, false))
-      .then(catalogs => {
-        if (catalogs.length === 0) {
-          throw new Error(`Catalog not found '${this.catalog}'`);
+  public async testConnection(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Get node list of presto cluster and return it.
+      // @see https://prestodb.io/docs/current/rest/node.html
+      this.client.nodes(null, (error: any, _result: any[]) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
         }
       });
+    });
   }
 
   public query(query: string, values: unknown[]): Promise<any[]> {
@@ -230,7 +233,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
-    
+
     if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
@@ -240,7 +243,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     const types = options.query
       ? await this.unloadWithSql(tableName, options.query.sql, options.query.params)
       : await this.unloadWithTable(tableName);
-      
+
     const csvFile = await this.getCsvFiles(tableName);
 
     return {
@@ -287,7 +290,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
     const { bucketType, exportBucket } = this.config;
     const types = await this.queryColumnTypes(params.typeSql, params.typeParams);
-    
+
     const { schema, tableName } = this.splitTableFullName(params.tableFullName);
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
     const protocol = bucketType === 'gcs' ? 'gs' : bucketType;
