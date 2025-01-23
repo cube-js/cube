@@ -82,7 +82,7 @@ context("Playground: Explore Page", () => {
       cy.intercept("get", "/playground/context", (req) => {
         delete req.headers["if-none-match"];
 
-        req.reply((res) => {
+        req.continue((res) => {
           res.body = {
             ...res.body,
             livePreview: undefined,
