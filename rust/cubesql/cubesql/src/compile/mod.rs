@@ -8206,6 +8206,42 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_select_distinct_dimensions() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT DISTINCT customer_gender FROM \"KibanaSampleDataEcommerce\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        println!("logical_plan: {:?}", logical_plan);
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    // "KibanaSampleDataEcommerce.order_date".to_string(),
+                    // "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    // "KibanaSampleDataEcommerce.notes".to_string(),
+                    // "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    // "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ungrouped: Some(false),
+                ..Default::default()
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_sort_relations() -> Result<(), CubeError> {
         init_testing_logger();
 
