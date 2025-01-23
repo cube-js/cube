@@ -1392,6 +1392,7 @@ fn extract_data<'a>(
             builder.append_value(val_int.unwrap());
         }
         ColumnType::Int96 => {
+            // TODO: Probably some duplicate code between Int96, Decimal, and Decimal96 now.
             let builder = builder
                 .as_any_mut()
                 .downcast_mut::<Decimal128Builder>()
@@ -1664,7 +1665,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::cluster::MockCluster;
-    use crate::config::{Config, FileStoreProvider};
+    use crate::config::{Config, CubeServices, FileStoreProvider};
     use crate::import::MockImportService;
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStore, RowKey, TableId};
     use crate::queryplanner::query_executor::MockQueryExecutor;
@@ -2152,33 +2153,36 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(16061000)), TableValue::Float(5.892.into())]));
+            // For this test's purposes there is no a priori reason to expect (precision, scale) =
+            // (32, 6) -- DF decided that on its own initiative.
+            const EXPECTED_SCALE: i8 = 6;
+            assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(16061000)), TableValue::Decimal(Decimal::new(5892 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
 
             let result = service
                 .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < 10")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Float(0.45.into())]));
+            assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Decimal(Decimal::new(450 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
 
             let result = service
-                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < '10'")
+                .exec_query("SELECT sum(dec_value), sum(dec_value_1) / 10 from foo.values where dec_value_1 < decimal '10'")
                 .await
                 .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Float(0.45.into())]));
+            assert_eq!(result.get_schema().field(1).data_type(), &datafusion::arrow::datatypes::DataType::Decimal128(32, EXPECTED_SCALE));
+            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal(Decimal::new(-13299000)), TableValue::Decimal(Decimal::new(450 * 10i128.pow((EXPECTED_SCALE - 3) as u32)))]));
         })
             .await;
     }
 
-    #[tokio::test]
-    async fn int96() {
-        Config::test("int96").update_config(|mut c| {
-            c.partition_split_threshold = 2;
-            c
-        }).start_test(async move |services| {
-            let service = services.sql_service;
+    /// Runs int96 test with write operations, or runs read-only on an existing store.
+    async fn int96_helper(services: CubeServices, perform_writes: bool) {
+        let service = services.sql_service;
 
+        if perform_writes {
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             let _ = service
@@ -2190,59 +2194,157 @@ mod tests {
                 .exec_query("INSERT INTO foo.values (id, value) VALUES (1, 10000000000000000000000), (2, 20000000000000000000000), (3, 10000000000000220000000), (4, 12000000000000000000024), (5, 123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Int96(Int96::new(10000000000000000000000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Int96(Int96::new(20000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Int96(Int96::new(10000000000000220000000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Int96(Int96::new(12000000000000000000024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Int96(Int96::new(123))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000000024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT sum(value) from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT sum(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(52000000000000220000147))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![TableValue::Decimal(Decimal::new(
+                52000000000000220000147
+            ))])
+        );
 
-            let result = service
-                .exec_query("SELECT max(value), min(value) from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT max(value), min(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(20000000000000000000000)), TableValue::Int96(Int96::new(123))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(20000000000000000000000)),
+                TableValue::Decimal(Decimal::new(123))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT value + 103, value + value, value = 12000000000000000000024 from foo.values where value = 12000000000000000000024")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value + 103, value + value, value = CAST('12000000000000000000024' AS DECIMAL(38, 0)) from foo.values where value = CAST('12000000000000000000024' AS DECIMAL(38, 0))")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(12000000000000000000127)),
-            TableValue::Int96(Int96::new(2 * 12000000000000000000024)), TableValue::Boolean(true)]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(12000000000000000000127)),
+                TableValue::Decimal(Decimal::new(2 * 12000000000000000000024)),
+                TableValue::Boolean(true)
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT value / 2, value * 2 from foo.values where value > 12000000000000000000024")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query(
+                "SELECT value / 2, value * 2 from foo.values where value > 12000000000000000000024",
+            )
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(10000000000000000000000)),
-            TableValue::Int96(Int96::new(40000000000000000000000))]));
+        // This value 4 just describes DataFusion behavior with Decimal.
+        const EXPECTED_SCALE: i8 = 4;
+        assert!(matches!(
+            result.get_schema().field(0).data_type(),
+            datafusion::arrow::datatypes::DataType::Decimal128(38, EXPECTED_SCALE)
+        ));
+        assert!(matches!(
+            result.get_schema().field(1).data_type(),
+            datafusion::arrow::datatypes::DataType::Decimal128(38, 0)
+        ));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(
+                    10000000000000000000000 * 10i128.pow(EXPECTED_SCALE as u32)
+                )),
+                TableValue::Decimal(Decimal::new(40000000000000000000000))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT * from foo.values order by value")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values order by value")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5), TableValue::Int96(Int96::new(123))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(1), TableValue::Int96(Int96::new(10000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Int96(Int96::new(10000000000000220000000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Int96(Int96::new(12000000000000000000024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(2), TableValue::Int96(Int96::new(20000000000000000000000))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000000024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000))
+            ])
+        );
 
+        if perform_writes {
             let _ = service
                 .exec_query("CREATE TABLE foo.values2 (id int, value int96)")
                 .await
@@ -2252,16 +2354,36 @@ mod tests {
                 .exec_query("INSERT INTO foo.values2 (id, value) VALUES (1, 10000000000000000000000), (2, 20000000000000000000000), (3, 10000000000000000000000), (4, 20000000000000000000000), (5, 123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int96(Int96::new(123)), TableValue::Int(1)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int96(Int96::new(10000000000000000000000)), TableValue::Int(2)]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int96(Int96::new(20000000000000000000000)), TableValue::Int(2)]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(123)),
+                TableValue::Int(1)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(10000000000000000000000)),
+                TableValue::Int(2)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(20000000000000000000000)),
+                TableValue::Int(2)
+            ])
+        );
 
+        if perform_writes {
             let _ = service
                 .exec_query("CREATE TABLE foo.values3 (id int, value int96)")
                 .await
@@ -2271,30 +2393,90 @@ mod tests {
                 .exec_query("INSERT INTO foo.values3 (id, value) VALUES (1, -10000000000000000000000), (2, -20000000000000000000000), (3, -10000000000000220000000), (4, -12000000000000000000024), (5, -123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values3")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values3")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Int96(Int96::new(-10000000000000000000000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Int96(Int96::new(-20000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Int96(Int96::new(-10000000000000220000000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Int96(Int96::new(-12000000000000000000024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Int96(Int96::new(-123))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(-10000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(-20000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(-10000000000000220000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(-12000000000000000000024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(-123))
+            ])
+        );
+    }
 
-        })
+    #[tokio::test]
+    async fn int96() {
+        Config::test("int96")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_test(async move |services| int96_helper(services, true).await)
             .await;
     }
 
     #[tokio::test]
-    async fn decimal96() {
-        Config::test("decimal96").update_config(|mut c| {
-            c.partition_split_threshold = 2;
-            c
-        }).start_test(async move |services| {
-            let service = services.sql_service;
+    async fn int96_read() {
+        // Copy pre-DF store.
+        let fixtures_path = env::current_dir()
+            .unwrap()
+            .join("testing-fixtures")
+            .join("int96_read");
+        crate::util::copy_dir_all(&fixtures_path, ".").unwrap();
+        let remote_dir = "./int96_read-upstream";
 
+        Config::test("int96_read")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_test_worker(async move |services| {
+                // ^^ start_test_worker for clean_remote set to false
+
+                int96_helper(services, false).await
+            })
+            .await;
+
+        std::fs::remove_dir_all(remote_dir).unwrap();
+    }
+
+    async fn decimal96_helper(services: CubeServices, perform_writes: bool) {
+        let service: Arc<dyn SqlService> = services.sql_service;
+
+        if perform_writes {
             let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
             let _ = service
@@ -2306,62 +2488,169 @@ mod tests {
                 .exec_query("INSERT INTO foo.values (id, value) VALUES (1, 100000000000000000000.10), (2, 200000000000000000000), (3, 100000000000002200000.01), (4, 120000000000000000.10024), (5, 1.23)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Decimal96(Decimal96::new(10000000000000000000010000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Decimal96(Decimal96::new(20000000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Decimal96(Decimal96::new(10000000000000220000001000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Decimal96(Decimal96::new(12000000000000000010024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Decimal96(Decimal96::new(123000))]));
+        assert_eq!(
+            result.get_schema().field(1).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(27, 5)
+        );
 
-            let result = service
-                .exec_query("SELECT sum(value) from foo.values")
-                .await
-                .unwrap();
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000010000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000001000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000010024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123000))
+            ])
+        );
 
+        let result = service
+            .exec_query("SELECT sum(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(40012000000000220000144024))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![TableValue::Decimal(Decimal::new(
+                40012000000000220000144024
+            ))])
+        );
 
-            let result = service
-                .exec_query("SELECT max(value), min(value) from foo.values")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT max(value), min(value) from foo.values")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(20000000000000000000000000)), TableValue::Decimal96(Decimal96::new(123000))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(20000000000000000000000000)),
+                TableValue::Decimal(Decimal::new(123000))
+            ])
+        );
 
-            let result = service
-                .exec_query("SELECT value + 10.103, value + value from foo.values where id = 4")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value + CAST('10.103' AS DECIMAL(27, 5)), value + value from foo.values where id = 4")
+            .await
+            .unwrap();
 
+        // 27, 5 comes from Cube's convert_columns_type.  Precision = 28 here comes from DataFusion behavior.
+        assert_eq!(
+            result.get_schema().field(0).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(28, 5)
+        );
+        assert_eq!(
+            result.get_schema().field(1).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(28, 5)
+        );
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(12000000000000001020324)),
+                TableValue::Decimal(Decimal::new(2 * 12000000000000000010024))
+            ])
+        );
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(12000000000000001020324)),
-            TableValue::Decimal96(Decimal96::new(2 * 12000000000000000010024))]));
+        let result = service
+            .exec_query(
+                "SELECT value / 2, value * 2 from foo.values where value > 100000000000002200000",
+            )
+            .await
+            .unwrap();
 
-           let result = service
-                .exec_query("SELECT value / 2, value * 2 from foo.values where value > 100000000000002200000")
-                .await
-                .unwrap();
+        // 31, 9, and 38, 5 simply describes the DF behavior we see (starting from value being a
+        // decimal(27, 5)).  Prior to DF upgrade, this returned a Float.
+        assert_eq!(
+            result.get_schema().field(0).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(31, 9)
+        );
+        assert_eq!(
+            result.get_schema().field(1).data_type(),
+            &datafusion::arrow::datatypes::DataType::Decimal128(38, 5)
+        );
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(100000000000000000000000000000)),
+                TableValue::Decimal(Decimal::new(40000000000000000000000000))
+            ])
+        );
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Float(1.0000000000000002e20.into()),
-            TableValue::Float(4.0000000000000007e20.into())]));
+        let result = service
+            .exec_query("SELECT * from foo.values order by value")
+            .await
+            .unwrap();
 
-           let result = service
-                .exec_query("SELECT * from foo.values order by value")
-                .await
-                .unwrap();
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(123000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(12000000000000000010024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(10000000000000000000010000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(10000000000000220000001000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(20000000000000000000000000))
+            ])
+        );
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(5), TableValue::Decimal96(Decimal96::new(123000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(4), TableValue::Decimal96(Decimal96::new(12000000000000000010024))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(1), TableValue::Decimal96(Decimal96::new(10000000000000000000010000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(3), TableValue::Decimal96(Decimal96::new(10000000000000220000001000))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(2), TableValue::Decimal96(Decimal96::new(20000000000000000000000000))]));
-
-              let _ = service
+        if perform_writes {
+            let _ = service
                 .exec_query("CREATE TABLE foo.values2 (id int, value decimal(27, 2))")
                 .await
                 .unwrap();
@@ -2370,17 +2659,36 @@ mod tests {
                 .exec_query("INSERT INTO foo.values2 (id, value) VALUES (1, 100000000000000000000.10), (2, 20000000000000000000000.1), (3, 100000000000000000000.10), (4, 20000000000000000000000.1), (5, 123)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT value, count(*) from foo.values2 group by value order by value")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Decimal96(Decimal96::new(12300)), TableValue::Int(1)]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Decimal96(Decimal96::new(10000000000000000000010)), TableValue::Int(2)]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Decimal96(Decimal96::new(2000000000000000000000010)), TableValue::Int(2)]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(12300)),
+                TableValue::Int(1)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(10000000000000000000010)),
+                TableValue::Int(2)
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Decimal(Decimal::new(2000000000000000000000010)),
+                TableValue::Int(2)
+            ])
+        );
 
-
+        if perform_writes {
             let _ = service
                 .exec_query("CREATE TABLE foo.values3 (id int, value decimal96)")
                 .await
@@ -2390,20 +2698,84 @@ mod tests {
                 .exec_query("INSERT INTO foo.values3 (id, value) VALUES (1, -100000000000000000000.10), (2, -200000000000000000000), (3, -100000000000002200000.01), (4, -120000000000000000.10024), (5, -1.23)")
                 .await
                 .unwrap();
+        }
 
-            let result = service
-                .exec_query("SELECT * from foo.values3")
-                .await
-                .unwrap();
+        let result = service
+            .exec_query("SELECT * from foo.values3")
+            .await
+            .unwrap();
 
-            assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(1), TableValue::Decimal96(Decimal96::new(-10000000000000000000010000))]));
-            assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Int(2), TableValue::Decimal96(Decimal96::new(-20000000000000000000000000))]));
-            assert_eq!(result.get_rows()[2], Row::new(vec![TableValue::Int(3), TableValue::Decimal96(Decimal96::new(-10000000000000220000001000))]));
-            assert_eq!(result.get_rows()[3], Row::new(vec![TableValue::Int(4), TableValue::Decimal96(Decimal96::new(-12000000000000000010024))]));
-            assert_eq!(result.get_rows()[4], Row::new(vec![TableValue::Int(5), TableValue::Decimal96(Decimal96::new(-123000))]));
+        assert_eq!(
+            result.get_rows()[0],
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::Decimal(Decimal::new(-10000000000000000000010000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[1],
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Decimal(Decimal::new(-20000000000000000000000000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[2],
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Decimal(Decimal::new(-10000000000000220000001000))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[3],
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::Decimal(Decimal::new(-12000000000000000010024))
+            ])
+        );
+        assert_eq!(
+            result.get_rows()[4],
+            Row::new(vec![
+                TableValue::Int(5),
+                TableValue::Decimal(Decimal::new(-123000))
+            ])
+        );
+    }
 
-        })
+    #[tokio::test]
+    async fn decimal96() {
+        Config::test("decimal96")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_test(async move |services| decimal96_helper(services, true).await)
             .await;
+    }
+
+    #[tokio::test]
+    async fn decimal96_read() {
+        // Copy pre-DF store.
+        let fixtures_path = env::current_dir()
+            .unwrap()
+            .join("testing-fixtures")
+            .join("decimal96_read");
+        crate::util::copy_dir_all(&fixtures_path, ".").unwrap();
+        let remote_dir = "./decimal96_read-upstream";
+
+        Config::test("decimal96_read")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2;
+                c
+            })
+            .start_test_worker(async move |services| {
+                // ^^ start_test_worker for clean_remote set to false
+
+                decimal96_helper(services, false).await
+            })
+            .await;
+
+        std::fs::remove_dir_all(remote_dir).unwrap();
     }
 
     #[tokio::test]
@@ -2818,8 +3190,9 @@ mod tests {
                 assert!(
                     // TODO 2 because partition pruning doesn't respect half open intervals yet
                     matches < 3 && matches > 0,
-                    "{}\nshould have 2 and less partition scan nodes",
-                    worker_plan
+                    "{}\nshould have 2 and less partition scan nodes, matches = {}",
+                    worker_plan,
+                    matches,
                 );
             })
             .await;
