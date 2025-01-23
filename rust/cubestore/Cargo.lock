@@ -178,7 +178,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 [[package]]
 name = "arrow"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-arith",
  "arrow-array",
@@ -198,7 +198,7 @@ dependencies = [
 [[package]]
 name = "arrow-arith"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -212,7 +212,7 @@ dependencies = [
 [[package]]
 name = "arrow-array"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "ahash 0.8.11",
  "arrow-buffer",
@@ -228,7 +228,7 @@ dependencies = [
 [[package]]
 name = "arrow-buffer"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "bytes 1.6.0",
  "half 2.4.1",
@@ -238,7 +238,7 @@ dependencies = [
 [[package]]
 name = "arrow-cast"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -258,7 +258,7 @@ dependencies = [
 [[package]]
 name = "arrow-csv"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -276,7 +276,7 @@ dependencies = [
 [[package]]
 name = "arrow-data"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-buffer",
  "arrow-schema",
@@ -287,7 +287,7 @@ dependencies = [
 [[package]]
 name = "arrow-ipc"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -301,7 +301,7 @@ dependencies = [
 [[package]]
 name = "arrow-json"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -320,7 +320,7 @@ dependencies = [
 [[package]]
 name = "arrow-ord"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -334,7 +334,7 @@ dependencies = [
 [[package]]
 name = "arrow-row"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "ahash 0.8.11",
  "arrow-array",
@@ -347,7 +347,7 @@ dependencies = [
 [[package]]
 name = "arrow-schema"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "serde",
 ]
@@ -355,7 +355,7 @@ dependencies = [
 [[package]]
 name = "arrow-select"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "ahash 0.8.11",
  "arrow-array",
@@ -368,7 +368,7 @@ dependencies = [
 [[package]]
 name = "arrow-string"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -4165,7 +4165,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "53.2.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#5459af5771652a6dc5b35e9e891f958376fd2d02"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube-42.2.0#ffa76183205425807fa1f79f7eed2c3d02f0f4c2"
 dependencies = [
  "ahash 0.8.11",
  "arrow-array",
@@ -6288,7 +6288,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if 0.1.10",
- "rand 0.7.3",
+ "rand 0.6.5",
  "static_assertions",
 ]
 

@@ -420,23 +420,7 @@ impl RocksCacheStore {
             .join("testing-fixtures")
             .join(remote_fixtures);
 
-        fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
-            std::fs::create_dir_all(&dst)?;
-
-            for entry in std::fs::read_dir(src)? {
-                let entry = entry?;
-                let ty = entry.file_type()?;
-                if ty.is_dir() {
-                    copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
-                } else {
-                    std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
-                }
-            }
-
-            Ok(())
-        }
-
-        copy_dir_all(&fixtures_path, store_path.join("cachestore")).unwrap();
+        crate::util::copy_dir_all(&fixtures_path, store_path.join("cachestore")).unwrap();
 
         Self::prepare_test_cachestore_impl(test_name, store_path, config)
     }
