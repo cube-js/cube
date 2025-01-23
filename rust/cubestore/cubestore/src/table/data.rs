@@ -162,6 +162,9 @@ pub fn create_array_builder(t: &ColumnType) -> Box<dyn ArrayBuilder> {
         ($type: tt, Decimal128Builder, Decimal, $scale: expr, $precision: expr) => {
             Box::new(Decimal128Builder::new().with_data_type(datafusion::arrow::datatypes::DataType::Decimal128(*$precision as u8, *$scale as i8)))
         };
+        ($type: tt, Decimal128Builder, Int96) => {
+            Box::new(Decimal128Builder::new().with_data_type(datafusion::arrow::datatypes::DataType::Decimal128(38, 0)))
+        };
         ($type: tt, $builder: tt $(,$arg: tt)*) => {
             Box::new($builder::new())
         };
