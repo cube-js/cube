@@ -39,6 +39,9 @@ on:
       - 'rollup.config.js'
       - 'yarn.lock'
 
+env:
+  CUBEJS_TESSERACT_ORCHESTRATOR: true
+
 jobs:
   unit:
     runs-on: ubuntu-20.04

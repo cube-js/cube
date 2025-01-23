@@ -56,6 +56,9 @@ on:
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
 
+env:
+  CUBEJS_TESSERACT_ORCHESTRATOR: true
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-20.04
