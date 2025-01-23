@@ -110,7 +110,7 @@ class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
 
     return (
       <LivePreviewContextProvider
-        disabled={context?.livePreview == null ?? false}
+        disabled={!context?.livePreview}
       >
         <Root styles={ROOT_STYLES}>
           <GlobalStyles />
