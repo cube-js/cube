@@ -414,8 +414,7 @@ impl Builder<'_> {
         }
         match t {
             t if Self::is_signed_int(t) => Self::extract_signed_int(v),
-            // TODO upgrade DF
-            // DataType::Int64Decimal(scale) => Self::extract_decimal(v, *scale),
+            DataType::Decimal128(_precision, scale) => Self::extract_decimal(v, *scale),
             DataType::Boolean => Self::extract_bool(v),
             DataType::Utf8 => Self::extract_string(v),
             _ => None,
@@ -457,12 +456,14 @@ impl Builder<'_> {
         Some(TableValue::String(s.unwrap()))
     }
 
-    fn extract_decimal(v: &ScalarValue, scale: usize) -> Option<TableValue> {
+    fn extract_decimal(v: &ScalarValue, scale: i8) -> Option<TableValue> {
         let decimal_value = match v {
-            // TODO upgrade DF
-            // ScalarValue::Int64Decimal(v, input_scale) => {
-            //     Builder::int_to_decimal_value(v.unwrap(), scale as i64 - (*input_scale as i64))
-            // }
+            ScalarValue::Decimal128(v, _input_precision, input_scale) => {
+                Builder::int_to_decimal_value(
+                    v.unwrap() as i128,
+                    scale as i64 - (*input_scale as i64),
+                )
+            }
             ScalarValue::Int16(v) => {
                 Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64)
             }

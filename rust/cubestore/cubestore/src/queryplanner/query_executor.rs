@@ -1785,9 +1785,6 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                 DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
-                // DataType::Int96 => {
-                //     convert_array!(array, num_rows, rows, Int96Array, Int96, (Int96))
-                // }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
@@ -1799,114 +1796,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         });
                     }
                 }
-                // TODO upgrade DF
                 DataType::Decimal128(_, _) => {
                     convert_array!(array, num_rows, rows, Decimal128Array, Decimal, (Decimal))
                 }
-                // DataType::Int64Decimal(1) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int64Decimal1Array,
-                //     Decimal,
-                //     (Decimal)
-                // ),
-                // DataType::Int64Decimal(2) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int64Decimal2Array,
-                //     Decimal,
-                //     (Decimal)
-                // ),
-                // DataType::Int64Decimal(3) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int64Decimal3Array,
-                //     Decimal,
-                //     (Decimal)
-                // ),
-                // DataType::Int64Decimal(4) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int64Decimal4Array,
-                //     Decimal,
-                //     (Decimal)
-                // ),
-                // DataType::Int64Decimal(5) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int64Decimal5Array,
-                //     Decimal,
-                //     (Decimal)
-                // ),
-                // DataType::Int64Decimal(10) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int64Decimal10Array,
-                //     Decimal,
-                //     (Decimal)
-                // ),
-                // DataType::Int96Decimal(0) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int96Decimal0Array,
-                //     Decimal96,
-                //     (Decimal96)
-                // ),
-                // DataType::Int96Decimal(1) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int96Decimal1Array,
-                //     Decimal96,
-                //     (Decimal96)
-                // ),
-                // DataType::Int96Decimal(2) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int96Decimal2Array,
-                //     Decimal96,
-                //     (Decimal96)
-                // ),
-                // DataType::Int96Decimal(3) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int96Decimal3Array,
-                //     Decimal96,
-                //     (Decimal96)
-                // ),
-                // DataType::Int96Decimal(4) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int96Decimal4Array,
-                //     Decimal96,
-                //     (Decimal96)
-                // ),
-                // DataType::Int96Decimal(5) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int96Decimal5Array,
-                //     Decimal96,
-                //     (Decimal96)
-                // ),
-                // DataType::Int96Decimal(10) => convert_array!(
-                //     array,
-                //     num_rows,
-                //     rows,
-                //     Int96Decimal10Array,
-                //     Decimal96,
-                //     (Decimal96)
-                // ),
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
                         .as_any()
