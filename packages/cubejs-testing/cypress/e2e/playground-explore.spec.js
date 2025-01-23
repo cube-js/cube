@@ -92,6 +92,7 @@ context("Playground: Explore Page", () => {
 
       cy.setQuery(ordersCountQuery);
       cy.wait(["@context"]);
+      cy.wait(500);
       cy.getByTestId("live-preview-btn").should("not.exist");
     });
   });
