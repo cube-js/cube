@@ -31,9 +31,8 @@ import { DriverType, startBirdBoxFromContainer } from '../../src';
       // @todo tput: No value for $TERM and no -T specified
       // headless: true,
       config: {
-        env: {
-          baseUrl: birdbox.configuration.playgroundUrl,
-        },
+        // @ts-ignore
+        baseUrl: birdbox.configuration.playgroundUrl,
         video: true,
         // default 4000
         defaultCommandTimeout: 15 * 1000,
