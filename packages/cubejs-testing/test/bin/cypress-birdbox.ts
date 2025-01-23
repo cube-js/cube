@@ -31,7 +31,9 @@ import { DriverType, startBirdBoxFromContainer } from '../../src';
       // @todo tput: No value for $TERM and no -T specified
       // headless: true,
       config: {
-        baseUrl: birdbox.configuration.playgroundUrl,
+        env: {
+          baseUrl: birdbox.configuration.playgroundUrl,
+        },
         video: true,
         // default 4000
         defaultCommandTimeout: 15 * 1000,
@@ -70,11 +72,11 @@ import { DriverType, startBirdBoxFromContainer } from '../../src';
     } else {
       const results = await cypress.run(options);
 
-      if (results.status === 'failed') {
+      if ('status' in results && results.status === 'failed') {
         throw new Error('Cypress failed');
       }
 
-      if (results.status === 'finished' && results.totalFailed > 0) {
+      if ('totalFailed' in results && results.totalFailed > 0) {
         throw new Error('Cypress failed');
       }
     }
