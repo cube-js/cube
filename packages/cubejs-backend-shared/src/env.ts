@@ -796,6 +796,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+    * Client Secret for the Azure based export bucket storage.
+    */
+  dbExportBucketAzureClientSecret: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET', dataSource)
+    ]
+  ),
+
+  /**
    * Azure Federated Token File Path for the Azure based export bucket storage.
    */
   dbExportBucketAzureTokenFilePAth: ({
