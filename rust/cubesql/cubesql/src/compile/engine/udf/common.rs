@@ -3281,6 +3281,42 @@ pub fn create_format_udf() -> ScalarUDF {
                         // %% is escaped to single %
                         result.push('%');
                     }
+                    Some('s') => {
+                        // Handle %s - regular string
+                        if arg_index >= args.len() {
+                            return Err(DataFusionError::Execution(
+                                "Not enough arguments for format string".to_string(),
+                            ));
+                        }
+
+                        let arg = &args[arg_index];
+                        let value = match arg.data_type() {
+                            DataType::Utf8 => {
+                                let str_arr = downcast_string_arg!(arg, "arg", i32);
+                                if str_arr.is_null(i) {
+                                    // A null value is treated as an empty string
+                                    String::new()
+                                } else {
+                                    str_arr.value(i).to_string()
+                                }
+                            }
+                            _ => {
+                                // For other types, try to convert to string
+                                let str_arr = cast(&arg, &DataType::Utf8)?;
+                                let str_arr =
+                                    str_arr.as_any().downcast_ref::<StringArray>().unwrap();
+                                if str_arr.is_null(i) {
+                                    // A null value is treated as an empty string
+                                    String::new()
+                                } else {
+                                    str_arr.value(i).to_string()
+                                }
+                            }
+                        };
+
+                        result.push_str(&value);
+                        arg_index += 1;
+                    }
                     Some(c) => {
                         return Err(DataFusionError::Execution(format!(
                             "Unsupported format specifier %{}",

@@ -16214,6 +16214,30 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
     #[tokio::test]
     async fn test_format_function() -> Result<(), CubeError> {
+        // Test: Basic usage with a single string
+        let result = execute_query(
+            "SELECT format('%s', 'foo') AS formatted_string".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_string", result);
+
+        // Test: Basic usage with a single null string
+        let result = execute_query(
+            "SELECT format('%s', NULL) = '' AS formatted_null_string_is_empty".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_null_string_is_empty", result);
+
+        // Test: Basic usage with a multiple strings
+        let result = execute_query(
+            "SELECT format('%s.%s', 'foo', 'bar') AS formatted_strings".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_strings", result);
+
         // Test: Basic usage with a single identifier
         let result = execute_query(
             "SELECT format('%I', 'column_name') AS formatted_identifier".to_string(),
