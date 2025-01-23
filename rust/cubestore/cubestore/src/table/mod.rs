@@ -83,91 +83,12 @@ impl TableValue {
                     .value(row)
                     .to_vec(),
             ),
-            // TODO upgrade DF
             DataType::Decimal128(_, _) => TableValue::Decimal(Decimal::new(
                 a.as_any()
                     .downcast_ref::<Decimal128Array>()
                     .unwrap()
                     .value(row),
             )),
-            // DataType::Int64Decimal(1) => TableValue::Decimal(Decimal::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int64Decimal1Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int64Decimal(2) => TableValue::Decimal(Decimal::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int64Decimal2Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int64Decimal(3) => TableValue::Decimal(Decimal::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int64Decimal3Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int64Decimal(4) => TableValue::Decimal(Decimal::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int64Decimal4Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int64Decimal(5) => TableValue::Decimal(Decimal::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int64Decimal5Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int64Decimal(10) => TableValue::Decimal(Decimal::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int64Decimal10Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int96Decimal(0) => TableValue::Decimal96(Decimal96::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int96Decimal0Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int96Decimal(1) => TableValue::Decimal96(Decimal96::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int96Decimal1Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int96Decimal(2) => TableValue::Decimal96(Decimal96::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int96Decimal2Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int96Decimal(3) => TableValue::Decimal96(Decimal96::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int96Decimal3Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int96Decimal(4) => TableValue::Decimal96(Decimal96::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int96Decimal4Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int96Decimal(5) => TableValue::Decimal96(Decimal96::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int96Decimal5Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
-            // DataType::Int96Decimal(10) => TableValue::Decimal96(Decimal96::new(
-            //     a.as_any()
-            //         .downcast_ref::<Int96Decimal10Array>()
-            //         .unwrap()
-            //         .value(row),
-            // )),
             DataType::Float64 => TableValue::Float(
                 a.as_any()
                     .downcast_ref::<Float64Array>()
