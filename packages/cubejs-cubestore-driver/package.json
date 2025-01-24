@@ -29,6 +29,7 @@
     "@cubejs-backend/base-driver": "1.1.16",
     "@cubejs-backend/cubestore": "1.1.12",
     "@cubejs-backend/shared": "1.1.12",
+    "@cubejs-backend/native": "1.1.16",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "23.3.3",
     "fs-extra": "^9.1.0",

@@ -193,6 +193,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('1')
     .asInt(),
   nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').asBool(),
+  nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *
