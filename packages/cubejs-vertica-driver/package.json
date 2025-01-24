@@ -22,7 +22,6 @@
     "@cubejs-backend/base-driver": "1.1.16",
     "@cubejs-backend/query-orchestrator": "1.1.16",
     "@cubejs-backend/schema-compiler": "1.1.16",
-    "moment-timezone": "^0.5.45",
     "vertica-nodejs": "^1.0.3"
   },
   "license": "Apache-2.0",

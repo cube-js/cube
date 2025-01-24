@@ -867,6 +867,44 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /** ****************************************************************
+   * MySQL Driver                                                    *
+   ***************************************************************** */
+
+  /**
+   * Use timezone names for date/time conversions.
+   * Defaults to FALSE, meaning that numeric offsets for timezone will be used.
+   * @see https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_convert-tz
+   * @see https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
+   */
+  mysqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
+        dataSource,
+      )
+    ];
+
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
+  },
+
+  /** ****************************************************************
    * Databricks Driver                                               *
    ***************************************************************** */
 

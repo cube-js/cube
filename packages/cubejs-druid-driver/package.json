@@ -31,8 +31,7 @@
     "@cubejs-backend/base-driver": "1.1.16",
     "@cubejs-backend/schema-compiler": "1.1.16",
     "@cubejs-backend/shared": "1.1.12",
-    "axios": "^0.21.1",
-    "moment-timezone": "^0.5.31"
+    "axios": "^0.21.1"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^1.0.0",
