@@ -125,7 +125,7 @@ export class ClickHouseQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  public getFieldAlias(id) {
+  public getField(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
@@ -136,16 +136,30 @@ export class ClickHouseQuery extends BaseQuery {
       d => equalIgnoreCase(d.dimension, id),
     );
 
+    if (!field) {
+      field = this.measures.find(
+        d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
+      );
+    }
+
+    return field;
+  }
+
+  public getFieldAlias(id) {
+    const field = this.getField(id);
+
     if (field) {
       return field.aliasName();
     }
 
-    field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
+    return null;
+  }
+
+  public getFieldType(id) {
+    const field = this.getField(id);
 
     if (field) {
-      return field.aliasName();
+      return field.definition().type;
     }
 
     return null;
@@ -179,7 +193,13 @@ export class ClickHouseQuery extends BaseQuery {
     }
 
     const orderByString = R.pipe(
-      R.map((order) => `${this.orderHashToString(order)} COLLATE 'en'`),
+      R.map((order) => {
+        let orderString = this.orderHashToString(order);
+        if (this.getFieldType(order) === 'string') {
+          orderString = `${orderString} COLLATE 'en'`;
+        }
+        return orderString;
+      }),
       R.reject(R.isNil),
       R.join(', ')
     )(this.order);

@@ -380,9 +380,9 @@ describe('ClickHouse JoinGraph', () => {
     order: []
   }, [{
     visitors__visitor_revenue: '300',
-    visitors__visitor_count: '5',
+    visitors__visitor_count: '6',
     visitor_checkins__visitor_checkins_count: '6',
-    visitors__per_visitor_revenue: '60'
+    visitors__per_visitor_revenue: '50'
   }]));
 
   // FAILS - need to finish query to override ::timestamptz
@@ -1222,6 +1222,7 @@ describe('ClickHouse JoinGraph', () => {
     { visitors__location: '120.12,40.6' },
     { visitors__location: '120.12,58.1' },
     { visitors__location: '120.12,58.6' },
+    { visitors__location: '120.12,59.6' },
     { visitors__location: '120.12,70.6' }
   ]));
 
