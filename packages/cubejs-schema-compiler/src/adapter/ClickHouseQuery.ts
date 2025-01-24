@@ -20,7 +20,7 @@ class ClickHouseFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `lowerUTF8(${column}) ${not ? 'NOT' : ''} LIKE lowerUTF8(${p}${this.allocateParam(param)}${s})`;
+    return `lowerUTF8(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lowerUTF8(${this.allocateParam(param)}), '${s}')`;
   }
 
   public castParameter() {
