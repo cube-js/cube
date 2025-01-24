@@ -644,6 +644,8 @@ macro_rules! variant_field_struct {
                     } else if let Some(value) = typed_str.strip_prefix("f:") {
                         let n: f64 = value.parse().map_err(|err| Self::Err::InvalidFloatValue(err))?;
                         Ok([<$variant $var_field:camel>](ScalarValue::Float64(Some(n))))
+                    } else if typed_str == "null" {
+                        Ok([<$variant $var_field:camel>](ScalarValue::Null))
                     } else {
                         Err(Self::Err::InvalidScalarType)
                     }
