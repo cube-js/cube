@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+use crate::orchestrator::ResultWrapper;
 use crate::transport::MapCubeErrExt;
+use crate::utils::bind_method;
 use async_trait::async_trait;
 use cubesql::transport::{SqlGenerator, SqlTemplates};
 use cubesql::CubeError;
@@ -12,8 +14,6 @@ use cubesql::CubeError;
 use log::trace;
 use neon::prelude::*;
 use tokio::sync::oneshot;
-
-use crate::utils::bind_method;
 
 type JsAsyncStringChannelCallback =
     Box<dyn FnOnce(Result<String, CubeError>) -> Result<(), CubeError> + Send>;
@@ -192,6 +192,12 @@ where
         })?;
 
     rx.await?
+}
+
+#[derive(Debug)]
+pub enum ValueFromJs {
+    String(String),
+    ResultWrapper(Vec<ResultWrapper>),
 }
 
 #[allow(clippy::type_complexity)]

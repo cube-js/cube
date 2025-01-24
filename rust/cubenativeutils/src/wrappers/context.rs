@@ -1,5 +1,4 @@
-use super::inner_types::InnerTypes;
-use super::object_handle::NativeObjectHandle;
+use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
 
 pub trait NativeContext<IT: InnerTypes>: Clone {
     fn boolean(&self, v: bool) -> IT::Boolean;
