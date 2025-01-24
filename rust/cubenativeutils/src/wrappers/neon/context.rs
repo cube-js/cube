@@ -64,10 +64,6 @@ impl<'cx, C: Context<'cx> + 'cx> ContextHolder<'cx, C> {
         context.with_context(f)
     }
 
-    /* pub fn as_native_context_holder(&self) -> NativeContextHolder {
-        NativeContextHolder::new(Box::new(self.clone()))
-    } */
-
     pub fn weak(&self) -> WeakContextHolder<'cx, C> {
         WeakContextHolder {
             context: Rc::downgrade(&self.context),

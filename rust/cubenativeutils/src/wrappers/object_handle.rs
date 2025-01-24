@@ -61,7 +61,6 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     pub fn is_undefined(&self) -> bool {
         self.object.is_undefined()
     }
-
     pub fn get_context(&self) -> IT::Context {
         self.object.get_context()
     }

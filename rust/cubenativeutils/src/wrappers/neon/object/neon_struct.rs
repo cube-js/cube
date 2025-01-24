@@ -1,4 +1,4 @@
-use super::NeonObject;
+use super::{NeonObject, NeonTypeHandle};
 use crate::wrappers::{
     neon::inner_types::NeonInnerTypes,
     object::{NativeStruct, NativeType},
@@ -9,18 +9,18 @@ use neon::prelude::*;
 
 #[derive(Clone)]
 pub struct NeonStruct<'cx: 'static, C: Context<'cx>> {
-    object: NeonObject<'cx, C>,
+    object: NeonTypeHandle<'cx, C, JsObject>,
 }
 
 impl<'cx, C: Context<'cx> + 'cx> NeonStruct<'cx, C> {
-    pub fn new(object: NeonObject<'cx, C>) -> Self {
+    pub fn new(object: NeonTypeHandle<'cx, C, JsObject>) -> Self {
         Self { object }
     }
 }
 
 impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonStruct<'cx, C> {
     fn into_object(self) -> NeonObject<'cx, C> {
-        self.object
+        self.object.upcast()
     }
 }
 
@@ -30,10 +30,8 @@ impl<'cx, C: Context<'cx> + 'cx> NativeStruct<NeonInnerTypes<'cx, C>> for NeonSt
         field_name: &str,
     ) -> Result<NativeObjectHandle<NeonInnerTypes<'cx, C>>, CubeError> {
         let neon_result = self.object.map_neon_object(|cx, neon_object| {
-            let this = neon_object
-                .downcast::<JsObject, _>(cx)
-                .map_err(|_| CubeError::internal(format!("Neon object is not JsObject")))?;
-            this.get::<JsValue, _, _>(cx, field_name)
+            neon_object
+                .get::<JsValue, _, _>(cx, field_name)
                 .map_err(|_| CubeError::internal(format!("Field `{}` not found", field_name)))
         })?;
         Ok(NativeObjectHandle::new(NeonObject::new(
@@ -46,10 +44,7 @@ impl<'cx, C: Context<'cx> + 'cx> NativeStruct<NeonInnerTypes<'cx, C>> for NeonSt
         let result = self
             .object
             .map_neon_object(|cx, neon_object| -> Result<bool, CubeError> {
-                let this = neon_object
-                    .downcast::<JsObject, _>(cx)
-                    .map_err(|_| CubeError::internal(format!("Neon object is not JsObject")))?;
-                let res = this
+                let res = neon_object
                     .get_opt::<JsValue, _, _>(cx, field_name)
                     .map_err(|_| {
                         CubeError::internal(format!(
@@ -69,21 +64,17 @@ impl<'cx, C: Context<'cx> + 'cx> NativeStruct<NeonInnerTypes<'cx, C>> for NeonSt
         value: NativeObjectHandle<NeonInnerTypes<'cx, C>>,
     ) -> Result<bool, CubeError> {
         let value = value.into_object().into_object();
-        self.object
-            .map_downcast_neon_object::<JsObject, _, _>(|cx, object| {
-                object
-                    .set(cx, field_name, value)
-                    .map_err(|_| CubeError::internal(format!("Error setting field {}", field_name)))
-            })
+        self.object.map_neon_object::<_, _>(|cx, object| {
+            object
+                .set(cx, field_name, value)
+                .map_err(|_| CubeError::internal(format!("Error setting field {}", field_name)))
+        })
     }
     fn get_own_property_names(
         &self,
     ) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<'cx, C>>>, CubeError> {
         let neon_array = self.object.map_neon_object(|cx, neon_object| {
-            let this = neon_object
-                .downcast::<JsObject, _>(cx)
-                .map_err(|_| CubeError::internal(format!("Neon object is not JsObject")))?;
-            let neon_array = this
+            let neon_array = neon_object
                 .get_own_property_names(cx)
                 .map_err(|_| CubeError::internal(format!("Cannot get own properties not found")))?;
 
@@ -107,18 +98,17 @@ impl<'cx, C: Context<'cx> + 'cx> NativeStruct<NeonInnerTypes<'cx, C>> for NeonSt
             .collect::<Result<Vec<_>, _>>()?;
 
         let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            let this = neon_object
-                .downcast::<JsObject, _>(cx)
-                .map_err(|_| CubeError::internal(format!("Neon object is not JsObject")))?;
-            let neon_method = this
+            let neon_method = neon_object
                 .get::<JsFunction, _, _>(cx, method)
                 .map_err(|_| CubeError::internal(format!("Method `{}` not found", method)))?;
-            neon_method.call(cx, this, neon_args).map_err(|err| {
-                CubeError::internal(format!(
-                    "Failed to call method `{} {} {:?}",
-                    method, err, err
-                ))
-            })
+            neon_method
+                .call(cx, neon_object.clone(), neon_args)
+                .map_err(|err| {
+                    CubeError::internal(format!(
+                        "Failed to call method `{} {} {:?}",
+                        method, err, err
+                    ))
+                })
         })?;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),

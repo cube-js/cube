@@ -1,4 +1,4 @@
-use super::NeonObject;
+use super::{NeonObject, NeonTypeHandle};
 use crate::wrappers::{
     neon::inner_types::NeonInnerTypes,
     object::{NativeFunction, NativeType},
@@ -11,18 +11,18 @@ use regex::Regex;
 
 #[derive(Clone)]
 pub struct NeonFunction<'cx: 'static, C: Context<'cx>> {
-    object: NeonObject<'cx, C>,
+    object: NeonTypeHandle<'cx, C, JsFunction>,
 }
 
 impl<'cx, C: Context<'cx> + 'cx> NeonFunction<'cx, C> {
-    pub fn new(object: NeonObject<'cx, C>) -> Self {
+    pub fn new(object: NeonTypeHandle<'cx, C, JsFunction>) -> Self {
         Self { object }
     }
 }
 
 impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonFunction<'cx, C> {
     fn into_object(self) -> NeonObject<'cx, C> {
-        self.object
+        self.object.upcast()
     }
 }
 
@@ -36,11 +36,9 @@ impl<'cx, C: Context<'cx> + 'cx> NativeFunction<NeonInnerTypes<'cx, C>> for Neon
             .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
             .collect::<Result<Vec<_>, _>>()?;
         let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            let this = neon_object
-                .downcast::<JsFunction, _>(cx)
-                .map_err(|_| CubeError::internal(format!("Neon object is not JsFunction")))?;
             let null = cx.null();
-            this.call(cx, null, neon_args)
+            neon_object
+                .call(cx, null, neon_args)
                 .map_err(|_| CubeError::internal(format!("Failed to call function ")))
         })?;
         Ok(NativeObjectHandle::new(NeonObject::new(
@@ -53,10 +51,7 @@ impl<'cx, C: Context<'cx> + 'cx> NativeFunction<NeonInnerTypes<'cx, C>> for Neon
         let result =
             self.object
                 .map_neon_object(|cx, neon_object| -> Result<String, CubeError> {
-                    let this = neon_object.downcast::<JsFunction, _>(cx).map_err(|_| {
-                        CubeError::internal(format!("Neon object is not JsFunction"))
-                    })?;
-                    let res = this
+                    let res = neon_object
                         .to_string(cx)
                         .map_err(|_| {
                             CubeError::internal(format!("Can't convert function to string"))
