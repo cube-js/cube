@@ -261,8 +261,12 @@ macro_rules! variant_field_struct {
 
             impl FromStr for [<$variant $var_field:camel>] {
                 type Err = $crate::compile::rewrite::language::LanguageParseError;
-                fn from_str(_s: &str) -> Result<Self, Self::Err> {
-                    Err(Self::Err::NotSupported)
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    const PREFIX: &'static str = concat!(std::stringify!([<$variant $var_field:camel>]), ":");
+                    if let Some(suffix) =  s.strip_prefix(PREFIX) {
+                        return Ok([<$variant $var_field:camel>](suffix.to_string()));
+                    }
+                    Err(Self::Err::ShouldStartWith(PREFIX))
                 }
             }
 
