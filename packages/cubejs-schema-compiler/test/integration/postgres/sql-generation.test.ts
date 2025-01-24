@@ -64,7 +64,7 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
-        revenueRolling3day: {
+        revenueRollingThreeDay: {
           type: 'sum',
           sql: 'amount',
           rollingWindow: {
@@ -296,6 +296,7 @@ describe('SQL Generation', () => {
       \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')} AND
       \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("(created_at - INTERVAL '3 DAY')"), FILTER_PARAMS.visitor_checkins.source.filter('source'))}
       \`,
+      sql_alias: \`vc\`,
 
       rewriteQueries: true,
 
@@ -406,7 +407,7 @@ describe('SQL Generation', () => {
 
     cube('visitor_checkins_sources', {
       sql: \`
-      select id, source from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins_sources.source.filter('source')}
+      select id, visitor_id, source from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins_sources.source.filter('source')}
       \`,
 
       rewriteQueries: true,
@@ -418,11 +419,21 @@ describe('SQL Generation', () => {
         }
       },
 
+      measures: {
+        count: {
+          type: 'count'
+        }
+      },
+
       dimensions: {
         id: {
           type: 'number',
           sql: 'id',
           primaryKey: true
+        },
+        visitor_id: {
+          type: 'number',
+          sql: 'visitor_id'
         },
         source: {
           type: 'string',
@@ -568,28 +579,28 @@ describe('SQL Generation', () => {
             visitors__created_at_day: '2017-01-02T00:00:00.000Z',
             visitors__visitor_revenue: '100',
             visitors__visitor_count: '1',
-            visitor_checkins__visitor_checkins_count: '3',
+            vc__visitor_checkins_count: '3',
             visitors__per_visitor_revenue: '100'
           },
           {
             visitors__created_at_day: '2017-01-04T00:00:00.000Z',
             visitors__visitor_revenue: '200',
             visitors__visitor_count: '1',
-            visitor_checkins__visitor_checkins_count: '2',
+            vc__visitor_checkins_count: '2',
             visitors__per_visitor_revenue: '200'
           },
           {
             visitors__created_at_day: '2017-01-05T00:00:00.000Z',
             visitors__visitor_revenue: null,
             visitors__visitor_count: '1',
-            visitor_checkins__visitor_checkins_count: '1',
+            vc__visitor_checkins_count: '1',
             visitors__per_visitor_revenue: null
           },
           {
             visitors__created_at_day: '2017-01-06T00:00:00.000Z',
             visitors__visitor_revenue: null,
             visitors__visitor_count: '2',
-            visitor_checkins__visitor_checkins_count: '0',
+            vc__visitor_checkins_count: '0',
             visitors__per_visitor_revenue: null
           }
         ]
@@ -627,7 +638,7 @@ describe('SQL Generation', () => {
   }, [{
     visitors__visitor_revenue: '300',
     visitors__visitor_count: '5',
-    visitor_checkins__visitor_checkins_count: '6',
+    vc__visitor_checkins_count: '6',
     visitors__per_visitor_revenue: '60'
   }]));
 
@@ -748,28 +759,28 @@ describe('SQL Generation', () => {
     {
       visitors__created_at_day: '2017-01-02T00:00:00.000Z',
       visitors__revenue_rolling: null,
-      visitor_checkins__visitor_checkins_count: '3'
+      vc__visitor_checkins_count: '3'
     },
     {
       visitors__created_at_day: '2017-01-04T00:00:00.000Z',
       visitors__revenue_rolling: '100',
-      visitor_checkins__visitor_checkins_count: '2'
+      vc__visitor_checkins_count: '2'
     },
     {
       visitors__created_at_day: '2017-01-05T00:00:00.000Z',
       visitors__revenue_rolling: '200',
-      visitor_checkins__visitor_checkins_count: '1'
+      vc__visitor_checkins_count: '1'
     },
     {
       visitors__created_at_day: '2017-01-06T00:00:00.000Z',
       visitors__revenue_rolling: '500',
-      visitor_checkins__visitor_checkins_count: '0'
+      vc__visitor_checkins_count: '0'
     }
   ]));
 
   it('rolling month', async () => runQueryTest({
     measures: [
-      'visitors.revenueRolling3day'
+      'visitors.revenueRollingThreeDay'
     ],
     timeDimensions: [{
       dimension: 'visitors.created_at',
@@ -781,7 +792,7 @@ describe('SQL Generation', () => {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling3day: '900' }
+    { visitors__created_at_week: '2017-01-09T00:00:00.000Z', visitors__revenue_rolling_three_day: '900' }
   ]));
 
   it('rolling count', async () => runQueryTest({
@@ -979,7 +990,7 @@ describe('SQL Generation', () => {
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
-        [{ visitor_checkins__revenue_per_checkin: '50' }]
+        [{ vc__revenue_per_checkin: '50' }]
       );
     });
   });
@@ -1000,7 +1011,7 @@ describe('SQL Generation', () => {
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
-        [{ visitor_checkins__google_sourced_checkins: '1' }]
+        [{ vc__google_sourced_checkins: '1' }]
       );
     });
   });
@@ -1024,7 +1035,7 @@ describe('SQL Generation', () => {
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
-        [{ visitor_checkins__google_sourced_checkins: '1' }]
+        [{ vc__google_sourced_checkins: '1' }]
       );
     });
   });
@@ -1435,18 +1446,77 @@ describe('SQL Generation', () => {
     }]
   }, [
     {
-      visitor_checkins__cards_count: '0',
+      vc__cards_count: '0',
       visitors__visitor_revenue: '300'
     },
     {
-      visitor_checkins__cards_count: '1',
+      vc__cards_count: '1',
       visitors__visitor_revenue: '100'
     },
     {
-      visitor_checkins__cards_count: null,
+      vc__cards_count: null,
       visitors__visitor_revenue: null
     }
   ]));
+
+  it('ungrouped cumulative query', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitor_checkins.visitor_checkins_count',
+        'visitor_checkins.visitorCheckinsRolling',
+      ],
+      dimensions: [
+        'visitor_checkins.id'
+      ],
+      timeDimensions: [{
+        dimension: 'visitor_checkins.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: [{
+        id: 'visitor_checkins.id'
+      }],
+      ungrouped: true
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            vc__id: 3,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 4,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 5,
+            vc__created_at_day: '2017-01-04T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          },
+          {
+            vc__id: 6,
+            vc__created_at_day: '2017-01-05T00:00:00.000Z',
+            vc__visitor_checkins_count: 1,
+            vc__visitor_checkins_rolling: 1
+          }
+        ]
+      );
+    });
+  });
 
   it('join rollup pre-aggregation', async () => {
     await compiler.compile();
@@ -1490,7 +1560,7 @@ describe('SQL Generation', () => {
       expect(res).toEqual(
         [
           {
-            visitor_checkins__source: 'google',
+            vc__source: 'google',
             visitors__created_at_day: '2017-01-02T00:00:00.000Z',
             visitors__per_visitor_revenue: '100'
           }
@@ -1537,7 +1607,7 @@ describe('SQL Generation', () => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [{
-          visitor_checkins__source: 'google',
+          vc__source: 'google',
           visitors__created_at_day: '2017-01-02T00:00:00.000Z',
           visitors__visitor_revenue: '100'
         }]
@@ -1564,7 +1634,7 @@ describe('SQL Generation', () => {
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
-        [{ visitor_checkins__revenue_per_checkin: '60' }]
+        [{ vc__revenue_per_checkin: '60' }]
       );
     });
   });
@@ -1590,7 +1660,7 @@ describe('SQL Generation', () => {
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
-        [{ visitor_checkins__revenue_per_checkin: '50' }]
+        [{ vc__revenue_per_checkin: '50' }]
       );
     });
   });
@@ -1635,12 +1705,12 @@ describe('SQL Generation', () => {
     ungrouped: true,
     allowUngroupedWithoutPrimaryKey: true,
   }, [
-    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__google_sourced_checkins: 1 },
+    { vc__created_at_day: '2017-01-02T00:00:00.000Z', vc__google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-03T00:00:00.000Z', vc__google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-05T00:00:00.000Z', vc__google_sourced_checkins: 1 },
   ]));
 
   it('ungrouped filtered distinct count', () => runQueryTest({
@@ -1659,12 +1729,12 @@ describe('SQL Generation', () => {
     ungrouped: true,
     allowUngroupedWithoutPrimaryKey: true,
   }, [
-    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: 1 },
+    { vc__created_at_day: '2017-01-02T00:00:00.000Z', vc__unique_google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-03T00:00:00.000Z', vc__unique_google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__unique_google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__unique_google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__unique_google_sourced_checkins: null },
+    { vc__created_at_day: '2017-01-05T00:00:00.000Z', vc__unique_google_sourced_checkins: 1 },
   ]));
 
   it('ungrouped ratio measure', () => runQueryTest({
@@ -1683,12 +1753,12 @@ describe('SQL Generation', () => {
     ungrouped: true,
     allowUngroupedWithoutPrimaryKey: true,
   }, [
-    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
-    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { vc__created_at_day: '2017-01-02T00:00:00.000Z', vc__unique_sources_per_checking: 1 },
+    { vc__created_at_day: '2017-01-03T00:00:00.000Z', vc__unique_sources_per_checking: 1 },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__unique_sources_per_checking: 1 },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__unique_sources_per_checking: 1 },
+    { vc__created_at_day: '2017-01-04T00:00:00.000Z', vc__unique_sources_per_checking: 1 },
+    { vc__created_at_day: '2017-01-05T00:00:00.000Z', vc__unique_sources_per_checking: 1 },
   ]));
 
   it('builds geo dimension', () => runQueryTest({
@@ -1721,7 +1791,7 @@ describe('SQL Generation', () => {
   ]));
 
   it(
-    'contains filter',
+    'contains filter 1',
     () => runQueryTest({
       measures: [],
       dimensions: [
@@ -1834,6 +1904,171 @@ describe('SQL Generation', () => {
     }, [
       { visitors__source: 'some' },
       { visitors__source: null },
+    ])
+  );
+
+  it(
+    'equals NULL filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'equals',
+        values: [null]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'notSet(IS NULL) filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'notSet',
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'notEquals NULL filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'notEquals',
+        values: [null]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'set(IS NOT NULL) filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins_sources.source',
+        operator: 'set',
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '1'
+      }
+    ])
+  );
+
+  it(
+    'source is notSet(IS NULL) "or" source is google filter',
+    () => runQueryTest({
+      measures: [
+        'visitor_checkins_sources.count'
+      ],
+      dimensions: [
+        'visitor_checkins_sources.visitor_id'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [
+          {
+            dimension: 'visitor_checkins_sources.source',
+            operator: 'notSet',
+          },
+          {
+            dimension: 'visitor_checkins_sources.source',
+            operator: 'equals',
+            values: ['google']
+          }
+        ]
+      }],
+      order: [{
+        id: 'visitor_checkins_sources.visitor_id'
+      }]
+    }, [
+      {
+        visitor_checkins_sources__visitor_id: 1,
+        visitor_checkins_sources__count: '3'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 2,
+        visitor_checkins_sources__count: '2'
+      },
+      {
+        visitor_checkins_sources__visitor_id: 3,
+        visitor_checkins_sources__count: '1'
+      }
     ])
   );
 
@@ -2116,7 +2351,7 @@ describe('SQL Generation', () => {
       }],
       order: []
     }, [
-      { visitor_checkins__visitor_checkins_count: '4' }
+      { vc__visitor_checkins_count: '4' }
     ])
   );
 
@@ -2150,7 +2385,7 @@ describe('SQL Generation', () => {
       }],
       order: []
     }, [
-      { visitor_checkins__visitor_checkins_count: '4' }
+      { vc__visitor_checkins_count: '4' }
     ])
   );
 
@@ -2168,7 +2403,7 @@ describe('SQL Generation', () => {
       }],
       order: []
     }, [
-      { visitor_checkins__visitor_checkins_count: '4' }
+      { vc__visitor_checkins_count: '4' }
     ])
   );
 
@@ -2204,7 +2439,7 @@ describe('SQL Generation', () => {
       }],
       order: []
     }, [
-      { visitor_checkins__visitor_checkins_count: '1' }
+      { vc__visitor_checkins_count: '1' }
     ])
   );
 
@@ -2244,7 +2479,7 @@ describe('SQL Generation', () => {
       }],
       order: []
     }, [
-      { visitor_checkins__visitor_checkins_count: '1' }
+      { vc__visitor_checkins_count: '1' }
     ])
   );
 
@@ -2348,7 +2583,7 @@ describe('SQL Generation', () => {
     ]
   ));
 
-  it('rank measure', async () => runQueryTest(
+  it('rank measure 1', async () => runQueryTest(
     {
       measures: ['visitors.revenue_rank'],
     },
@@ -2711,11 +2946,11 @@ describe('SQL Generation', () => {
     [{
       visitors__percentage_of_total: 9,
       visitors__revenue: '100',
-      visitor_checkins__source: 'google'
+      vc__source: 'google'
     }, {
       visitors__percentage_of_total: 91,
       visitors__revenue: '1000',
-      visitor_checkins__source: null
+      vc__source: null
     }]
   ));
 
@@ -2737,6 +2972,63 @@ describe('SQL Generation', () => {
       visitors_visitors_checkins_view__revenue: '2000',
       visitors_visitors_checkins_view__id_sum: '21'
     }]
+  ));
+
+  // Subquery aggregation for multiplied measure (and any `keysSelect` for that matter)
+  // should pick up all dimensions, even through member expressions
+  it('multiplied sum with dimension member expressions', async () => runQueryTest(
+    {
+      measures: [
+        'visitors_visitors_checkins_view.revenue',
+        'visitors_visitors_checkins_view.visitor_checkins_count',
+      ],
+      dimensions: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitors_visitors_checkins_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `LOWER(${visitors_visitors_checkins_view.source})`'
+          ),
+          expressionName: 'lower_source',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'LOWER(${visitors_visitors_checkins_view.source})',
+          cubeName: 'visitors_visitors_checkins_view',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitors_visitors_checkins_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `UPPER(${visitors_visitors_checkins_view.source})`'
+          ),
+          expressionName: 'upper_source',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'UPPER(${visitors_visitors_checkins_view.source})',
+          cubeName: 'visitors_visitors_checkins_view',
+        },
+      ],
+    },
+    [
+      {
+        lower_source: null,
+        upper_source: null,
+        visitors_visitors_checkins_view__revenue: '1400',
+        visitors_visitors_checkins_view__visitor_checkins_count: '0',
+      },
+      {
+        lower_source: 'google',
+        upper_source: 'GOOGLE',
+        visitors_visitors_checkins_view__revenue: '300',
+        visitors_visitors_checkins_view__visitor_checkins_count: '1',
+      },
+      {
+        lower_source: 'some',
+        upper_source: 'SOME',
+        visitors_visitors_checkins_view__revenue: '300',
+        visitors_visitors_checkins_view__visitor_checkins_count: '5',
+      },
+    ]
   ));
 
   // TODO not implemented

@@ -3,7 +3,7 @@ use crate::compile::{
     StatusFlags,
 };
 use sqlparser::ast;
-use std::{collections::HashMap, sync::Arc, time::SystemTime};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     compile::{
@@ -61,50 +61,8 @@ impl QueryRouter {
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
-        let planning_start = SystemTime::now();
-        if let Some(span_id) = span_id.as_ref() {
-            if let Some(auth_context) = self.state.auth_context() {
-                self.session_manager
-                    .server
-                    .transport
-                    .log_load_state(
-                        Some(span_id.clone()),
-                        auth_context,
-                        self.state.get_load_request_meta(),
-                        "SQL API Query Planning".to_string(),
-                        serde_json::json!({
-                            "query": span_id.query_key.clone(),
-                        }),
-                    )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
-            }
-        }
-        let result = self
-            .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-            .await?;
-
-        if let Some(span_id) = span_id.as_ref() {
-            if let Some(auth_context) = self.state.auth_context() {
-                self.session_manager
-                    .server
-                    .transport
-                    .log_load_state(
-                        Some(span_id.clone()),
-                        auth_context,
-                        self.state.get_load_request_meta(),
-                        "SQL API Query Planning Success".to_string(),
-                        serde_json::json!({
-                            "query": span_id.query_key.clone(),
-                            "duration": planning_start.elapsed().unwrap().as_millis() as u64,
-                        }),
-                    )
-                    .await
-                    .map_err(|e| CompilationError::internal(e.to_string()))?;
-            }
-        }
-
-        return Ok(result);
+        self.create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
+            .await
     }
 
     pub async fn plan(
@@ -210,8 +168,7 @@ impl QueryRouter {
                 DatabaseProtocol::PostgreSQL,
             ) if object_type == &ast::ObjectType::Table => self.drop_table_to_plan(names).await,
             _ => Err(CompilationError::unsupported(format!(
-                "Unsupported query type: {}",
-                stmt.to_string()
+                "Unsupported query type: {stmt}"
             ))),
         };
 
@@ -390,7 +347,7 @@ impl QueryRouter {
             }
             DatabaseProtocol::MySQL => {
                 for key_value in key_values.iter() {
-                    if key_value.key.value.to_lowercase() == "autocommit".to_string() {
+                    if key_value.key.value.to_lowercase() == "autocommit" {
                         flags |= StatusFlags::AUTOCOMMIT;
 
                         break;
@@ -555,7 +512,7 @@ impl QueryRouter {
     async fn select_into_to_plan(
         &self,
         into: &ast::SelectInto,
-        query: &Box<ast::Query>,
+        query: &ast::Query,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -573,7 +530,7 @@ impl QueryRouter {
                 "query is unexpectedly not SELECT".to_string(),
             ));
         }
-        let new_stmt = ast::Statement::Query(new_query);
+        let new_stmt = ast::Statement::Query(Box::new(new_query));
         self.create_table_to_plan(&into.name, &new_stmt, qtrace, span_id)
             .await
     }

@@ -15,6 +15,7 @@ import {
   QueryTablesResult,
   StreamOptions,
   StreamTableDataWithTypes,
+  TableColumn,
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
@@ -103,7 +104,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   /**
    * @override
    */
-  protected informationSchemaQuery() {
+  protected override informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
@@ -119,7 +120,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    * so it needs to be queried separately.
    * @override
    */
-  public async tablesSchema(): Promise<DatabaseStructure> {
+  public override async tablesSchema(): Promise<DatabaseStructure> {
     const query = this.informationSchemaQuery();
     const tablesSchema = await this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
 
@@ -155,7 +156,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   /**
    * @override
    */
-  protected getSchemasQuery() {
+  protected override getSchemasQuery() {
     return `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')}
       FROM information_schema.tables
@@ -170,7 +171,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    * It returns regular schemas (queryable from information_schema) and external ones.
    * @override
    */
-  public async getSchemas(): Promise<QuerySchemasResult[]> {
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
     const schemas = await this.query<QuerySchemasResult>(`SHOW SCHEMAS FROM DATABASE ${this.dbName}`, []);
 
     return schemas
@@ -178,7 +179,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       .map(s => ({ schema_name: s.schema_name }));
   }
 
-  public async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     const tables = await super.getTablesForSpecificSchemas(schemas);
 
     // We might request the external schemas and tables, their descriptions won't be returned
@@ -195,7 +196,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     return tables;
   }
 
-  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     const columns = await super.getColumnsForSpecificTables(tables);
 
     // We might request the external tables, their descriptions won't be returned
@@ -240,12 +241,27 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     }
   }
 
+  public override async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 127) {
+      throw new Error('Redshift can not work with table names longer than 127 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+
+    // we can not call super.createTable(quotedTableName, columns)
+    // because Postgres has 63 length check. So pasting the code from the base driver
+    const createTableSql = this.createTableSql(quotedTableName, columns);
+    await this.query(createTableSql, []).catch(e => {
+      e.message = `Error during create table: ${createTableSql}: ${e.message}`;
+      throw e;
+    });
+  }
+
   /**
    * AWS Redshift doesn't have any special connection check.
    * And querying even system tables is billed.
    * @override
    */
-  public async testConnection() {
+  public override async testConnection() {
     const conn = await this.pool.connect();
     conn.release();
   }

@@ -142,6 +142,20 @@ describe('PostgresDriver', () => {
     }
   });
 
+  test('table name check', async () => {
+    const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
+    try {
+      await driver.createTable(tblName, [{ name: 'id', type: 'bigint' }]);
+
+      throw new Error('createTable must throw an exception');
+    } catch (e: any) {
+      expect(e.message).toEqual(
+        'PostgreSQL can not work with table names longer than 63 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${tblName}.`
+      );
+    }
+  });
+
   // Note: This test MUST be the last in the list.
   test('release', async () => {
     expect(async () => {

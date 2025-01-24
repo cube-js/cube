@@ -7,7 +7,7 @@ redirect_from:
 
 [Apache Pinot][link-pinot] is a real-time distributed OLAP datastore purpose-built
 for low-latency, high-throughput analytics, and perfect for user-facing analytical
-workloads.
+workloads. [StarTree][link-startree] is a fully-managed platform for Pinot.
 
 ## Prerequisites
 
@@ -44,6 +44,8 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_PORT`     | The port for the database connection       | A valid port number |    ✅    |
 | `CUBEJS_DB_USER`     | The username used to connect to the broker | A valid username    |    ❌    |
 | `CUBEJS_DB_PASS`     | The password used to connect to the broker | A valid password    |    ❌    |
+| `CUBEJS_DB_NAME`     | The database name for StarTree             | A valid name        |    ❌    |
+| `CUBEJS_DB_PINOT_AUTH_TOKEN` | The authentication token for StarTree | A valid token    |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -96,3 +98,4 @@ Cube does not require any additional configuration to enable SSL as Pinot connec
 [ref-recipe-enable-ssl]:
   /guides/recipes/data-sources/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[link-startree]: https://startree.ai

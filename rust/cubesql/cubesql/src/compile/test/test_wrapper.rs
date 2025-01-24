@@ -1,10 +1,13 @@
-use datafusion::physical_plan::displayable;
+use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use datafusion::{physical_plan::displayable, scalar::ScalarValue};
 use pretty_assertions::assert_eq;
+use regex::Regex;
 use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
     compile::{
+        engine::df::scan::MemberField,
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
@@ -32,9 +35,8 @@ async fn test_simple_wrapper() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("COALESCE"));
 
@@ -56,11 +58,7 @@ async fn test_wrapper_group_by_rollup() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -81,11 +79,7 @@ async fn test_wrapper_group_by_rollup_with_aliases() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -106,11 +100,7 @@ async fn test_wrapper_group_by_rollup_nested() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("ROLLUP(1, 2)"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -131,11 +121,7 @@ async fn test_wrapper_group_by_rollup_nested_from_asterisk() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -156,11 +142,7 @@ async fn test_wrapper_group_by_rollup_nested_with_aliases() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("ROLLUP(1, 2)"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -183,11 +165,7 @@ async fn test_wrapper_group_by_rollup_nested_complex() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("ROLLUP(1), ROLLUP(2), 3, CUBE(4)"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -208,11 +186,7 @@ async fn test_wrapper_group_by_rollup_placeholders() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -233,11 +207,7 @@ async fn test_wrapper_group_by_cube() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Cube"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -258,11 +228,7 @@ async fn test_wrapper_group_by_rollup_complex() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -283,11 +249,7 @@ async fn test_simple_subquery_wrapper_projection_empty_source() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -310,11 +272,7 @@ async fn test_simple_subquery_wrapper_filter_empty_source() {
     .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -337,11 +295,7 @@ async fn test_simple_subquery_wrapper_projection_aggregate_empty_source() {
     .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -363,11 +317,7 @@ async fn test_simple_subquery_wrapper_filter_in_empty_source() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("IN (SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -390,11 +340,7 @@ async fn test_simple_subquery_wrapper_filter_and_projection_empty_source() {
 
     let logical_plan = query_plan.as_logical_plan();
 
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("IN (SELECT"));
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
@@ -419,15 +365,13 @@ async fn test_simple_subquery_wrapper_projection() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("(SELECT"));
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("\\\\\\\"limit\\\\\\\": 1"));
 
@@ -450,9 +394,8 @@ async fn test_simple_subquery_wrapper_projection_aggregate() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("(SELECT"));
 
@@ -475,15 +418,13 @@ async fn test_simple_subquery_wrapper_filter_equal() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("(SELECT"));
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("\\\\\\\"limit\\\\\\\": 1"));
 
@@ -506,9 +447,8 @@ async fn test_simple_subquery_wrapper_filter_in() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("IN (SELECT"));
 
@@ -532,9 +472,8 @@ async fn test_simple_subquery_wrapper_filter_and_projection() {
     let logical_plan = query_plan.as_logical_plan();
 
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("IN (SELECT"));
 
@@ -580,9 +519,8 @@ GROUP BY
 
     assert!(query_plan
         .as_logical_plan()
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains(
             "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
@@ -626,9 +564,8 @@ WHERE
 
     assert!(query_plan
         .as_logical_plan()
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains(
             "${KibanaSampleDataEcommerce.order_date} >= timestamptz '2024-02-03T04:05:06.000Z'"
@@ -671,9 +608,8 @@ GROUP BY
 
     assert!(query_plan
         .as_logical_plan()
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
 }
@@ -712,9 +648,8 @@ WHERE
 
     assert!(query_plan
         .as_logical_plan()
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
 }
@@ -735,9 +670,8 @@ async fn test_case_wrapper() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -773,9 +707,8 @@ async fn test_case_wrapper_distinct() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -802,11 +735,10 @@ async fn test_case_wrapper_alias_with_order() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
-        .contains("ORDER BY \"case_when_a_cust\""));
+        .contains("ORDER BY \"a\".\"case_when_a_cust\""));
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
     println!(
@@ -831,9 +763,8 @@ async fn test_case_wrapper_ungrouped() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -865,9 +796,8 @@ async fn test_case_wrapper_non_strict_match() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -900,9 +830,8 @@ async fn test_case_wrapper_ungrouped_sorted() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("ORDER BY"));
 }
@@ -929,12 +858,11 @@ async fn test_case_wrapper_ungrouped_sorted_aliased() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         // TODO test without depend on column name
-        .contains("ORDER BY \"case_when"));
+        .contains("ORDER BY \"a\".\"case_when"));
 }
 
 #[tokio::test]
@@ -953,25 +881,19 @@ async fn test_case_wrapper_with_internal_limit() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
     assert!(
         logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("1123"),
         "SQL contains 1123: {}",
-        logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
+        logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -999,19 +921,14 @@ async fn test_case_wrapper_with_system_fields() {
 
     assert!(
         logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains(
                 "\\\"cube_name\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"user\\\""
             ),
         r#"SQL contains `\"cube_name\":\"KibanaSampleDataEcommerce\",\"alias\":\"user\"` {}"#,
-        logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
+        logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -1037,25 +954,19 @@ async fn test_case_wrapper_with_limit() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
     assert!(
         logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("1123"),
         "SQL contains 1123: {}",
-        logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
+        logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -1081,9 +992,8 @@ async fn test_case_wrapper_with_null() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -1138,12 +1048,139 @@ async fn test_case_wrapper_escaping() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         // Expect 6 backslashes as output is JSON and it's escaped one more time
         .contains("\\\\\\\\\\\\`"));
+}
+
+/// Test aliases for grouped CubeScan in wrapper
+/// qualifiers from join should get remapped to single from alias
+/// long generated aliases from Datafusion should get shortened
+#[tokio::test]
+async fn test_join_wrapper_cubescan_aliasing() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+WITH
+-- This subquery should be represented as CubeScan(ungrouped=false) inside CubeScanWrapper
+cube_scan_subq AS (
+    SELECT
+        logs_alias.content logs_content,
+        DATE_TRUNC('month', kibana_alias.last_mod) last_mod_month,
+        kibana_alias.__user AS cube_user,
+        1 AS literal,
+        -- Columns without aliases should also work
+        DATE_TRUNC('month', kibana_alias.order_date),
+        kibana_alias.__cubeJoinField,
+        2,
+        CASE
+            WHEN sum(kibana_alias."sumPrice") IS NOT NULL
+                THEN sum(kibana_alias."sumPrice")
+            ELSE 0
+            END sum_price
+    FROM KibanaSampleDataEcommerce kibana_alias
+    JOIN Logs logs_alias
+    ON kibana_alias.__cubeJoinField = logs_alias.__cubeJoinField
+    GROUP BY 1,2,3,4,5,6,7
+),
+filter_subq AS (
+    SELECT
+        Logs.content logs_content_filter
+    FROM Logs
+    GROUP BY
+        logs_content_filter
+)
+SELECT
+    -- Should use SELECT * here to reference columns without aliases.
+    -- But it's broken ATM in DF, initial plan contains `Projection: ... #__subquery-0.logs_content_filter` on top, but it should not be there
+    -- TODO fix it
+    logs_content,
+    cube_user,
+    literal
+FROM cube_scan_subq
+WHERE
+    -- This subquery filter should trigger wrapping of whole query
+    logs_content IN (
+        SELECT
+            logs_content_filter
+        FROM filter_subq
+    )
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+            dimensions: Some(vec!["Logs.content".to_string(),]),
+            time_dimensions: Some(vec![
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                },
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                },
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+
+    assert_eq!(
+        logical_plan.find_cube_scan().member_fields,
+        vec![
+            MemberField::Member("Logs.content".to_string()),
+            MemberField::Member("KibanaSampleDataEcommerce.last_mod.month".to_string()),
+            MemberField::Literal(ScalarValue::Utf8(None)),
+            MemberField::Literal(ScalarValue::Int64(Some(1))),
+            MemberField::Member("KibanaSampleDataEcommerce.order_date.month".to_string()),
+            MemberField::Literal(ScalarValue::Utf8(None)),
+            MemberField::Literal(ScalarValue::Int64(Some(2))),
+            MemberField::Member("KibanaSampleDataEcommerce.sumPrice".to_string()),
+        ],
+    );
+
+    // Check that all aliases from different tables have same qualifier, and that names are simple and short
+    // logs_content => logs_alias.content
+    // last_mod_month => DATE_TRUNC('month', kibana_alias.last_mod),
+    // sum_price => CASE WHEN sum(kibana_alias."sumPrice") ... END
+    let content_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "logs_content""#).unwrap();
+    assert!(content_re.is_match(&sql));
+    let last_mod_month_re =
+        Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "last_mod_month""#).unwrap();
+    assert!(last_mod_month_re.is_match(&sql));
+    let sum_price_re = Regex::new(r#"CASE WHEN "logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
+        .unwrap();
+    assert!(sum_price_re.is_match(&sql));
+    let cube_user_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "cube_user""#).unwrap();
+    assert!(cube_user_re.is_match(&sql));
+    let literal_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "literal""#).unwrap();
+    assert!(literal_re.is_match(&sql));
 }
 
 /// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
@@ -1174,9 +1211,8 @@ async fn test_wrapper_limit_zero() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("LIMIT 0"));
 
@@ -1219,9 +1255,8 @@ async fn test_wrapper_filter_flatten() {
     assert_eq!(
         query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
-            .request
-            .unwrap(),
+            .find_cube_scan_wrapped_sql()
+            .request,
         TransportLoadRequestQuery {
             measures: Some(vec![json!({
                 "cube_name": "KibanaSampleDataEcommerce",
@@ -1252,9 +1287,133 @@ async fn test_wrapper_filter_flatten() {
             time_dimensions: None,
             order: Some(vec![]),
             limit: Some(50000),
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     );
+}
+
+/// Regular aggregation over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+/// and inner ungrouped CubeScan should have both proper members and limit
+#[tokio::test]
+async fn wrapper_agg_over_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender
+        FROM (
+            SELECT
+                customer_gender
+            FROM
+                KibanaSampleDataEcommerce
+            LIMIT 5
+        ) scan
+        GROUP BY
+            1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: Some(5),
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    assert!(logical_plan
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains("\"limit\": 5"));
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains("\"ungrouped\": true"));
+}
+
+/// Aggregation(dimension) over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+/// and inner ungrouped CubeScan should have both proper members and limit
+#[tokio::test]
+async fn wrapper_agg_dimension_over_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            MAX(customer_gender)
+        FROM (
+            SELECT
+                customer_gender
+            FROM
+                KibanaSampleDataEcommerce
+            LIMIT 5
+        ) scan
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: Some(5),
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    assert!(logical_plan
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains("\"limit\": 5"));
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains("\"ungrouped\": true"));
 }

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/dx",
-  "version": "1.0.0",
+  "version": "1.1.12",
   "engines": {},
   "repository": {
     "type": "git",
@@ -37,7 +37,11 @@
     "jest": "^27"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "verbose": true,
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    }
   },
   "publishConfig": {
     "access": "public"

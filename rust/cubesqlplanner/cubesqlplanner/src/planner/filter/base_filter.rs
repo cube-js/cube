@@ -1,13 +1,12 @@
 use super::filter_operator::FilterOperator;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::EvaluationNode;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::filter::FilterTemplates;
 use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::rc::Rc;
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FilterType {
@@ -17,12 +16,20 @@ pub enum FilterType {
 
 pub struct BaseFilter {
     query_tools: Rc<QueryTools>,
-    member_evaluator: Rc<EvaluationNode>,
+    member_evaluator: Rc<MemberSymbol>,
     #[allow(dead_code)]
     filter_type: FilterType,
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,
     templates: FilterTemplates,
+}
+
+impl PartialEq for BaseFilter {
+    fn eq(&self, other: &Self) -> bool {
+        self.filter_type == other.filter_type
+            && self.filter_operator == other.filter_operator
+            && self.values == other.values
+    }
 }
 
 lazy_static! {
@@ -36,9 +43,9 @@ lazy_static! {
 impl BaseFilter {
     pub fn try_new(
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<EvaluationNode>,
+        member_evaluator: Rc<MemberSymbol>,
         filter_type: FilterType,
-        filter_operator: String,
+        filter_operator: FilterOperator,
         values: Option<Vec<Option<String>>>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates = FilterTemplates::new(query_tools.templates_render());
@@ -51,10 +58,37 @@ impl BaseFilter {
             query_tools,
             member_evaluator,
             filter_type,
-            filter_operator: FilterOperator::from_str(&filter_operator)?,
+            filter_operator,
             values,
             templates,
         }))
+    }
+
+    pub fn change_operator(
+        &self,
+        filter_operator: FilterOperator,
+        values: Vec<Option<String>>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            query_tools: self.query_tools.clone(),
+            member_evaluator: self.member_evaluator.clone(),
+            filter_type: self.filter_type.clone(),
+            filter_operator,
+            values,
+            templates: self.templates.clone(),
+        })
+    }
+
+    pub fn member_evaluator(&self) -> &Rc<MemberSymbol> {
+        &self.member_evaluator
+    }
+
+    pub fn values(&self) -> &Vec<Option<String>> {
+        &self.values
+    }
+
+    pub fn filter_operator(&self) -> &FilterOperator {
+        &self.filter_operator
     }
 
     pub fn member_name(&self) -> String {
@@ -68,6 +102,7 @@ impl BaseFilter {
             FilterOperator::Equal => self.equals_where(&member_sql)?,
             FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,
             FilterOperator::InDateRange => self.in_date_range(&member_sql)?,
+            FilterOperator::InDateRangeExtended => self.in_date_range_extended(&member_sql)?,
             FilterOperator::In => self.in_where(&member_sql)?,
             FilterOperator::NotIn => self.not_in_where(&member_sql)?,
             FilterOperator::Set => self.set_where(&member_sql)?,
@@ -76,6 +111,12 @@ impl BaseFilter {
             FilterOperator::Gte => self.gte_where(&member_sql)?,
             FilterOperator::Lt => self.lt_where(&member_sql)?,
             FilterOperator::Lte => self.lte_where(&member_sql)?,
+            FilterOperator::Contains => self.contains_where(&member_sql)?,
+            FilterOperator::NotContains => self.not_contains_where(&member_sql)?,
+            FilterOperator::StartsWith => self.starts_with_where(&member_sql)?,
+            FilterOperator::NotStartsWith => self.not_starts_with_where(&member_sql)?,
+            FilterOperator::EndsWith => self.ends_with_where(&member_sql)?,
+            FilterOperator::NotEndsWith => self.not_ends_with_where(&member_sql)?,
         };
         Ok(res)
     }
@@ -114,6 +155,45 @@ impl BaseFilter {
 
     fn in_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
         let (from, to) = self.allocate_date_params()?;
+        self.templates
+            .time_range_filter(member_sql.to_string(), from, to)
+    }
+
+    fn extend_date_range_bound(
+        &self,
+        date: String,
+        interval: &Option<String>,
+        is_sub: bool,
+    ) -> Result<String, CubeError> {
+        if let Some(interval) = interval {
+            if interval != "unbounded" {
+                if is_sub {
+                    self.templates.sub_interval(date, interval.clone())
+                } else {
+                    self.templates.add_interval(date, interval.clone())
+                }
+            } else {
+                Ok(date.to_string())
+            }
+        } else {
+            Ok(date.to_string())
+        }
+    }
+    fn in_date_range_extended(&self, member_sql: &str) -> Result<String, CubeError> {
+        let (from, to) = self.allocate_date_params()?;
+
+        let from = if self.values.len() >= 3 {
+            self.extend_date_range_bound(from, &self.values[2], true)?
+        } else {
+            from
+        };
+
+        let to = if self.values.len() >= 4 {
+            self.extend_date_range_bound(to, &self.values[3], false)?
+        } else {
+            to
+        };
+
         self.templates
             .time_range_filter(member_sql.to_string(), from, to)
     }
@@ -162,6 +242,58 @@ impl BaseFilter {
     fn lte_where(&self, member_sql: &str) -> Result<String, CubeError> {
         self.templates
             .lte(member_sql.to_string(), self.first_param()?)
+    }
+
+    fn contains_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, false, true, true)
+    }
+
+    fn not_contains_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, true, true, true)
+    }
+
+    fn starts_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, false, false, true)
+    }
+
+    fn not_starts_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, true, false, true)
+    }
+
+    fn ends_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, false, true, false)
+    }
+
+    fn not_ends_with_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.like_or_where(member_sql, true, true, false)
+    }
+
+    fn like_or_where(
+        &self,
+        member_sql: &str,
+        not: bool,
+        start_wild: bool,
+        end_wild: bool,
+    ) -> Result<String, CubeError> {
+        let values = self.filter_and_allocate_values();
+        let like_parts = values
+            .into_iter()
+            .map(|v| {
+                self.templates
+                    .ilike(member_sql, &v, start_wild, end_wild, not)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let logical_symbol = if not { " AND " } else { " OR " };
+        let null_check = if self.is_need_null_chek(not) {
+            self.templates.or_is_null_check(member_sql.to_string())?
+        } else {
+            "".to_string()
+        };
+        Ok(format!(
+            "({}){}",
+            like_parts.join(logical_symbol),
+            null_check
+        ))
     }
 
     fn allocate_date_params(&self) -> Result<(String, String), CubeError> {
@@ -266,13 +398,12 @@ impl BaseFilter {
     }
 
     fn allocate_param(&self, param: &str) -> String {
-        let index = self.query_tools.allocaate_param(param);
-        format!("${}$", index)
+        self.query_tools.allocate_param(param)
     }
 
     fn allocate_timestamp_param(&self, param: &str) -> String {
-        let index = self.query_tools.allocaate_param(param);
-        format!("${}$::timestamptz", index)
+        let placeholder = self.query_tools.allocate_param(param);
+        format!("{}::timestamptz", placeholder)
     }
 
     fn first_param(&self) -> Result<String, CubeError> {

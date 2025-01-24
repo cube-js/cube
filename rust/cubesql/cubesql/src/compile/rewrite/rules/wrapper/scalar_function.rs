@@ -4,11 +4,10 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         scalar_fun_expr_args_empty_tail, scalar_fun_expr_args_legacy, transforming_rewrite,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListPattern, ListType,
-        ScalarFunctionExprFun, WrapperPullupReplacerAliasToCube, WrapperPullupReplacerPushToCube,
-        WrapperPushdownReplacerPushToCube,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context, ListPattern,
+        ListType, ScalarFunctionExprFun, WrapperReplacerContextAliasToCube,
     },
-    copy_flag, var, var_iter,
+    var, var_iter,
 };
 use egg::Subst;
 
@@ -17,23 +16,8 @@ impl WrapperRules {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-function",
-                wrapper_pushdown_replacer(
-                    fun_expr_var_arg("?fun", "?args"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                fun_expr_var_arg(
-                    "?fun",
-                    wrapper_pushdown_replacer(
-                        "?args",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
-                ),
+                wrapper_pushdown_replacer(fun_expr_var_arg("?fun", "?args"), "?context"),
+                fun_expr_var_arg("?fun", wrapper_pushdown_replacer("?args", "?context")),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-function",
@@ -41,38 +25,31 @@ impl WrapperRules {
                     "?fun",
                     wrapper_pullup_replacer(
                         "?args",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                        ),
                     ),
                 ),
                 wrapper_pullup_replacer(
                     fun_expr_var_arg("?fun", "?args"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                    ),
                 ),
                 self.transform_fun_expr("?fun", "?alias_to_cube"),
             ),
-            transforming_rewrite(
+            rewrite(
                 "wrapper-push-down-scalar-function-empty-tail",
-                wrapper_pushdown_replacer(
-                    scalar_fun_expr_args_empty_tail(),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                wrapper_pullup_replacer(
-                    scalar_fun_expr_args_empty_tail(),
-                    "?alias_to_cube",
-                    "?pullup_push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                self.transform_scalar_function_empty_tail("?push_to_cube", "?pullup_push_to_cube"),
+                wrapper_pushdown_replacer(scalar_fun_expr_args_empty_tail(), "?context"),
+                wrapper_pullup_replacer(scalar_fun_expr_args_empty_tail(), "?context"),
             ),
         ]);
 
@@ -82,26 +59,14 @@ impl WrapperRules {
                     "wrapper-push-down-scalar-function-args",
                     ListType::ScalarFunctionExprArgs,
                     ListPattern {
-                        pattern: wrapper_pushdown_replacer(
-                            "?args",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
+                        pattern: wrapper_pushdown_replacer("?args", "?context"),
                         list_var: "?args".to_string(),
                         elem: "?arg".to_string(),
                     },
                     ListPattern {
                         pattern: "?new_args".to_string(),
                         list_var: "?new_args".to_string(),
-                        elem: wrapper_pushdown_replacer(
-                            "?arg",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
+                        elem: wrapper_pushdown_replacer("?arg", "?context"),
                     },
                 ),
                 list_rewrite_with_vars(
@@ -110,31 +75,14 @@ impl WrapperRules {
                     ListPattern {
                         pattern: "?args".to_string(),
                         list_var: "?args".to_string(),
-                        elem: wrapper_pullup_replacer(
-                            "?arg",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
+                        elem: wrapper_pullup_replacer("?arg", "?context"),
                     },
                     ListPattern {
-                        pattern: wrapper_pullup_replacer(
-                            "?new_args",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
+                        pattern: wrapper_pullup_replacer("?new_args", "?context"),
                         list_var: "?new_args".to_string(),
                         elem: "?arg".to_string(),
                     },
-                    &[
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                    ],
+                    &["?context"],
                 ),
             ]);
         } else {
@@ -143,78 +91,25 @@ impl WrapperRules {
                     "wrapper-push-down-scalar-function-args",
                     wrapper_pushdown_replacer(
                         scalar_fun_expr_args_legacy("?left", "?right"),
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
+                        "?context",
                     ),
                     scalar_fun_expr_args_legacy(
-                        wrapper_pushdown_replacer(
-                            "?left",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
-                        wrapper_pushdown_replacer(
-                            "?right",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
+                        wrapper_pushdown_replacer("?left", "?context"),
+                        wrapper_pushdown_replacer("?right", "?context"),
                     ),
                 ),
                 rewrite(
                     "wrapper-pull-up-scalar-function-args",
                     scalar_fun_expr_args_legacy(
-                        wrapper_pullup_replacer(
-                            "?left",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
-                        wrapper_pullup_replacer(
-                            "?right",
-                            "?alias_to_cube",
-                            "?push_to_cube",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
+                        wrapper_pullup_replacer("?left", "?context"),
+                        wrapper_pullup_replacer("?right", "?context"),
                     ),
                     wrapper_pullup_replacer(
                         scalar_fun_expr_args_legacy("?left", "?right"),
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
+                        "?context",
                     ),
                 ),
             ]);
-        }
-    }
-
-    fn transform_scalar_function_empty_tail(
-        &self,
-        push_to_cube_var: &'static str,
-        pullup_push_to_cube_var: &'static str,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
-        move |egraph, subst| {
-            if !copy_flag!(
-                egraph,
-                subst,
-                push_to_cube_var,
-                WrapperPushdownReplacerPushToCube,
-                pullup_push_to_cube_var,
-                WrapperPullupReplacerPushToCube
-            ) {
-                return false;
-            }
-
-            true
         }
     }
 
@@ -229,7 +124,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

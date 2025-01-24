@@ -119,7 +119,7 @@ describe('SQL API', () => {
             expect(JSON.parse(chunk.toString()).schema).toEqual([
               {
                 name: 'orderDate',
-                column_type: 'String',
+                column_type: 'Timestamp',
               },
             ]);
           } else {
@@ -404,6 +404,137 @@ describe('SQL API', () => {
       expect(res.rows).toEqual([{ max: null }]);
     });
 
+    test('select __user and literal grouped', async () => {
+      const query = `
+        SELECT
+          status AS my_status,
+          date_trunc('month', createdAt) AS my_created_at,
+          __user AS my_user,
+          1 AS my_literal,
+          -- Columns without aliases should also work
+          id,
+          date_trunc('day', createdAt),
+          __cubeJoinField,
+          2
+        FROM
+          Orders
+        GROUP BY 1,2,3,4,5,6,7,8
+        ORDER BY 1,2,3,4,5,6,7,8
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('select __user and literal');
+    });
+
+    test('select __user and literal grouped under wrapper', async () => {
+      const query = `
+        WITH
+-- This subquery should be represented as CubeScan(ungrouped=false) inside CubeScanWrapper
+cube_scan_subq AS (
+  SELECT
+    status AS my_status,
+    date_trunc('month', createdAt) AS my_created_at,
+    __user AS my_user,
+    1 AS my_literal,
+    -- Columns without aliases should also work
+    id,
+    date_trunc('day', createdAt),
+    __cubeJoinField,
+    2
+  FROM Orders
+  GROUP BY 1,2,3,4,5,6,7,8
+),
+filter_subq AS (
+  SELECT
+    status status_filter
+  FROM Orders
+  GROUP BY
+    status_filter
+)
+        SELECT
+          -- Should use SELECT * here to reference columns without aliases.
+          -- But it's broken ATM in DF, initial plan contains \`Projection: ... #__subquery-0.logs_content_filter\` on top, but it should not be there
+          -- TODO fix it
+          my_created_at,
+          my_status,
+          my_user,
+          my_literal
+        FROM cube_scan_subq
+        WHERE
+          -- This subquery filter should trigger wrapping of whole query
+          my_status IN (
+            SELECT
+              status_filter
+            FROM filter_subq
+          )
+        GROUP BY 1,2,3,4
+        ORDER BY 1,2,3,4
+        ;
+        `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('select __user and literal in wrapper');
+    });
+
+    test('join with grouped query', async () => {
+      const query = `
+        SELECT
+          "Orders".status AS status,
+          COUNT(*) AS count
+        FROM
+          "Orders"
+          INNER JOIN
+          (
+            SELECT
+              status,
+              SUM(totalAmount)
+            FROM
+              "Orders"
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 2
+          ) top_orders
+        ON
+          "Orders".status = top_orders.status
+        GROUP BY 1
+        ORDER BY 1
+        `;
+
+      const res = await connection.query(query);
+      // Expect only top statuses 2 by total amount: processed and shipped
+      expect(res.rows).toMatchSnapshot('join grouped');
+    });
+
+    test('join with filtered grouped query', async () => {
+      const query = `
+        SELECT
+          "Orders".status AS status,
+          COUNT(*) AS count
+        FROM
+          "Orders"
+          INNER JOIN
+          (
+            SELECT
+              status,
+              SUM(totalAmount)
+            FROM
+              "Orders"
+            WHERE
+              status NOT IN ('shipped')
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 2
+          ) top_orders
+        ON
+          "Orders".status = top_orders.status
+        GROUP BY 1
+        `;
+
+      const res = await connection.query(query);
+      // Expect only top statuses 2 by total amount, with shipped filtered out: processed and new
+      expect(res.rows).toMatchSnapshot('join grouped with filter');
+    });
+
     test('where segment is false', async () => {
       const query =
         'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
@@ -470,6 +601,34 @@ describe('SQL API', () => {
 
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('timestamps');
+    });
+
+    test('query views with deep joins', async () => {
+      const query = `
+      SELECT
+        CAST(
+          DATE_TRUNC(
+            'MONTH',
+            CAST(
+              CAST("OrdersItemsPrefixView"."Orders_createdAt" AS DATE) AS TIMESTAMP
+            )
+          ) AS DATE
+        ) AS "Calculation_1055547778125863",
+        SUM("OrdersItemsPrefixView"."Orders_arpu") AS "Orders_arpu",
+        SUM("OrdersItemsPrefixView"."Orders_refundRate") AS "Orders_refundRate",
+        SUM("OrdersItemsPrefixView"."Orders_netCollectionCompleted") AS "Orders_netCollectionCompleted"
+      FROM
+        OrdersItemsPrefixView
+      WHERE
+        OrdersItemsPrefixView.Orders_createdAt >= '2024-01-01T00:00:00.000'
+        AND OrdersItemsPrefixView.Orders_createdAt <= '2024-12-31T23:59:59.999'
+        AND (OrdersItemsPrefixView.Orders_status IN ('shipped', 'processed'))
+        AND (OrdersItemsPrefixView.OrderItems_type IN ('Electronics', 'Home'))
+      GROUP BY 1
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('query-view-deep-joins');
     });
   });
 });

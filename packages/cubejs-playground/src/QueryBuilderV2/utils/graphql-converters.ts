@@ -56,13 +56,9 @@ export function convertJsonQueryToGraphQL({ meta, query }: { meta?: Meta | null;
     return '';
   }
 
-  try {
-    const converter = new CubeGraphQLConverter(query, types);
+  const converter = new CubeGraphQLConverter(query, types);
 
-    return converter.convert();
-  } catch (error: any) {
-    return `# ${error}\n`;
-  }
+  return converter.convert();
 }
 
 const singleValueOperators = ['gt', 'gte', 'lt', 'lte'];
@@ -244,9 +240,9 @@ export class CubeGraphQLConverter {
 
   private objectValue(
     fields: t.ObjectFieldNode | t.ObjectFieldNode[],
-    filedName?: string
+    fieldName?: string
   ): t.ObjectValueNode {
-    if (filedName) {
+    if (fieldName) {
       return {
         kind: t.Kind.OBJECT,
         fields: [
@@ -254,7 +250,7 @@ export class CubeGraphQLConverter {
             kind: t.Kind.OBJECT_FIELD,
             name: {
               kind: t.Kind.NAME,
-              value: filedName,
+              value: fieldName,
             },
             value: {
               kind: t.Kind.OBJECT,
@@ -343,8 +339,10 @@ export class CubeGraphQLConverter {
                       // value: operatorsMap[f.operator] || f.operator,
                       value:
                         f.operator === 'equals' && (f.values || []).length <= 1
-                          ? f.operator in OPERATORS_MAP
-                          : OPERATORS_MAP[f.operator as keyof typeof OPERATORS_MAP] || f.operator,
+                          ? 'equals'
+                          : f.operator in OPERATORS_MAP
+                            ? OPERATORS_MAP[f.operator as keyof typeof OPERATORS_MAP]
+                            : f.operator,
                     },
                     value: value(f),
                   },

@@ -921,10 +921,16 @@ cubes:
 
 </CodeTabs>
 
-For possible `every` parameter values please refer to
+To have a pre-aggregation rebuild at a specific time of day, you can use a CRON string with some limitations. For more details about values that can be used with the `every` parameter, please refer to the
 [`refreshKey`][ref-cube-refreshkey] documentation.
 
 You can also use `every` with `sql`:
+
+<WarningBox>
+
+Using CRON strings and `sql` is not supported and will result in a compilation error.
+
+</WarningBox>
 
 <CodeTabs>
 
@@ -1634,6 +1640,13 @@ cubes:
 ```
 
 </CodeTabs>
+
+<ReferenceBox>
+
+In some cases, indexes would not work with `original_sql` pre-aggregations.
+Please [track this issue](https://github.com/cube-js/cube/issues/7420).
+
+</ReferenceBox>
 
 #### `type`
 

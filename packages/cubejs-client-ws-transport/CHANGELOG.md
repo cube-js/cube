@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.16](https://github.com/cube-js/cube/compare/v1.1.15...v1.1.16) (2025-01-22)
+
+
+### Bug Fixes
+
+* **client-ws-transport:** Flush send queue in close() to avoid race ([#9101](https://github.com/cube-js/cube/issues/9101)) ([d9bc147](https://github.com/cube-js/cube/commit/d9bc147a6ae1deb5e554d76c23a8ad0c3f0225a5))
+
+
+
+
+
+## [1.1.12](https://github.com/cube-js/cube/compare/v1.1.11...v1.1.12) (2025-01-09)
+
+**Note:** Version bump only for package @cubejs-client/ws-transport
+
+
+
+
+
 # [1.0.0](https://github.com/cube-js/cube/compare/v0.36.11...v1.0.0) (2024-10-15)
 
 **Note:** Version bump only for package @cubejs-client/ws-transport

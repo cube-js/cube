@@ -27,6 +27,7 @@ import {
 } from '@azure/storage-blob';
 import {
   DefaultAzureCredential,
+  ClientSecretCredential,
 } from '@azure/identity';
 
 import { cancelCombinator } from './utils';
@@ -73,6 +74,15 @@ export type AzureStorageClientConfig = {
    * the Azure library will try to use the AZURE_TENANT_ID env
    */
   tenantId?: string,
+  /**
+   * Azure service principal client secret.
+   * Enables authentication to Microsoft Entra ID using a client secret that was generated
+   * for an App Registration. More information on how to configure a client secret can be found here:
+   * https://learn.microsoft.com/entra/identity-platform/quickstart-configure-app-access-web-apis#add-credentials-to-your-web-application
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_CLIENT_SECRET env
+   */
+  clientSecret?: string,
   /**
    * The path to a file containing a Kubernetes service account token that authenticates the identity.
    * In case of DefaultAzureCredential flow if it is omitted
@@ -470,12 +480,12 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  public getSchemas() {
+  public getSchemas(): Promise<QuerySchemasResult[]> {
     const query = this.getSchemasQuery();
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]) {
+  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
     const schemaNames = schemas.map(s => s.schema_name);
 
@@ -483,7 +493,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public async getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     const groupedBySchema: Record<string, string[]> = {};
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {
@@ -760,7 +770,7 @@ export abstract class BaseDriver implements DriverInterface {
     const parts = bucketName.split(splitter);
     const account = parts[0];
     const container = parts[1].split('/')[0];
-    let credential: StorageSharedKeyCredential | DefaultAzureCredential;
+    let credential: StorageSharedKeyCredential | ClientSecretCredential | DefaultAzureCredential;
     let blobServiceClient: BlobServiceClient;
     let getSas;
 
@@ -778,6 +788,28 @@ export abstract class BaseDriver implements DriverInterface {
         },
         credential as StorageSharedKeyCredential
       ).toString();
+    } else if (azureConfig.clientSecret && azureConfig.tenantId && azureConfig.clientId) {
+      credential = new ClientSecretCredential(
+        azureConfig.tenantId,
+        azureConfig.clientId,
+        azureConfig.clientSecret,
+      );
+      getSas = async (name: string, startsOn: Date, expiresOn: Date) => {
+        const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
+        return generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn,
+            expiresOn,
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          userDelegationKey,
+          account
+        ).toString();
+      };
     } else {
       const opts = {
         tenantId: azureConfig.tenantId,

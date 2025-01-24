@@ -1,7 +1,5 @@
 import moment from 'moment-timezone';
-
-import { parseSqlInterval } from '@cubejs-backend/shared';
-
+import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -26,39 +24,50 @@ class MysqlFilter extends BaseFilter {
 }
 
 export class MysqlQuery extends BaseQuery {
+  private readonly useNamedTimezones: boolean;
+
+  public constructor(compilers: any, options: any) {
+    super(compilers, options);
+
+    this.useNamedTimezones = getEnv('mysqlUseNamedTimezones', { dataSource: this.dataSource });
+  }
+
   public newFilter(filter) {
     return new MysqlFilter(this, filter);
   }
 
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as CHAR)`;
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
+    if (this.useNamedTimezones) {
+      return `CONVERT_TZ(${field}, @@session.time_zone, '${this.timezone}')`;
+    }
     return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `TIMESTAMP(convert_tz(${value}, '+00:00', @@session.time_zone))`;
   }
 
   public timestampFormat() {
-    return moment.HTML5_FMT.DATETIME_LOCAL_MS;
+    return 'YYYY-MM-DDTHH:mm:ss.SSS';
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `TIMESTAMP(${value})`;
   }
 
-  public subtractInterval(date, interval) {
+  public subtractInterval(date: string, interval: string) {
     return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
-  public addInterval(date, interval) {
+  public addInterval(date: string, interval: string) {
     return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension) {
     return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
   }
 
@@ -72,10 +81,10 @@ export class MysqlQuery extends BaseQuery {
 
     return `TIMESTAMPADD(${timeUnit},
         FLOOR(
-          TIMESTAMPDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          TIMESTAMPDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
           TIMESTAMPDIFF(${timeUnit}, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${intervalFormatted})
         ) * TIMESTAMPDIFF(${timeUnit}, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${intervalFormatted}),
-        ${this.timeStampCast(`'${origin}'`)}
+        ${this.dateTimeCast(`'${origin}'`)}
     )`;
   }
 

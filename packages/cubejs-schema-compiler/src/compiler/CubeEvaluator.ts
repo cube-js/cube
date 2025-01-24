@@ -112,7 +112,8 @@ export class CubeEvaluator extends CubeSymbols {
     this.evaluateMultiStageReferences(cube.name, cube.measures);
     this.evaluateMultiStageReferences(cube.name, cube.dimensions);
 
-    this.prepareHierarchies(cube);
+    this.prepareHierarchies(cube, errorReporter);
+    this.prepareFolders(cube, errorReporter);
 
     this.prepareAccessPolicy(cube, errorReporter);
 
@@ -179,40 +180,98 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  private prepareHierarchies(cube: any) {
-    if (Array.isArray(cube.hierarchies)) {
-      cube.hierarchies = cube.hierarchies.map(hierarchy => ({
-        ...hierarchy,
-        levels: this.evaluateReferences(
-          cube.name, hierarchy.levels, { originalSorting: true }
-        )
-      }));
+  private prepareFolders(cube: any, errorReporter: ErrorReporter) {
+    if (Array.isArray(cube.folders)) {
+      cube.folders = cube.folders.map(it => {
+        const includedMembers = this.allMembersOrList(cube, it.includes);
+        const includes = includedMembers.map(memberName => {
+          if (memberName.includes('.')) {
+            errorReporter.error(
+              `Paths aren't allowed in the 'folders' but '${memberName}' has been provided for ${cube.name}`
+            );
+          }
+
+          const member = cube.includedMembers.find(m => m.name === memberName);
+          if (!member) {
+            errorReporter.error(
+              `Member '${memberName}' included in folder '${it.name}' not found`
+            );
+            return null;
+          }
+
+          return member;
+        })
+          .filter(Boolean);
+
+        return ({
+          ...it,
+          includes
+        });
+      });
+    }
+
+    return [];
+  }
+
+  private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
+    const uniqueHierarchyNames = new Set();
+    if (Object.keys(cube.hierarchies).length) {
+      cube.evaluatedHierarchies = Object.entries(cube.hierarchies).map(([name, hierarchy]) => {
+        if (uniqueHierarchyNames.has(name)) {
+          errorReporter.error(`Duplicate hierarchy name '${name}' in cube '${cube.name}'`);
+        }
+        uniqueHierarchyNames.add(name);
+
+        return ({
+          name,
+          ...(typeof hierarchy === 'object' ? hierarchy : {}),
+          levels: this.evaluateReferences(
+            cube.name,
+            // @ts-ignore
+            hierarchy.levels,
+            { originalSorting: true }
+          )
+        });
+      });
     }
 
     if (cube.isView && (cube.includedMembers || []).length) {
-      const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath.split('.')[0]));
       const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
+      const includedCubeNames: string[] = R.uniq(includedMemberPaths.map(it => it.split('.')[0]));
+      const includedHierarchyNames = cube.includedMembers.filter(it => it.type === 'hierarchies').map(it => it.memberPath.split('.')[1]);
 
-      if (!cube.hierarchies) {
-        for (const cubeName of includedCubeNames) {
-          const { hierarchies } = this.evaluatedCubes[cubeName] || {};
+      for (const cubeName of includedCubeNames) {
+        // As views come after cubes in the list, we can safely assume that cube is already evaluated
+        const { evaluatedHierarchies: hierarchies } = this.evaluatedCubes[cubeName] || {};
 
-          if (Array.isArray(hierarchies) && hierarchies.length) {
-            const filteredHierarchies = hierarchies.map(it => {
-              const levels = it.levels.filter(level => includedMemberPaths.includes(level));
+        if (Array.isArray(hierarchies) && hierarchies.length) {
+          const filteredHierarchies = hierarchies
+            .filter(it => includedHierarchyNames.includes(it.name))
+            .map(it => {
+              const levels = it.levels.filter(level => {
+                const member = cube.includedMembers.find(m => m.memberPath === level);
+                if (member && member.type !== 'dimensions') {
+                  const memberName = level.split('.')[1] || level;
+                  errorReporter.error(`Only dimensions can be part of a hierarchy. Please remove the '${memberName}' member from the '${it.name}' hierarchy.`);
+                } else if (member) {
+                  return includedMemberPaths.includes(level);
+                }
+
+                return null;
+              }).filter(Boolean);
 
               return {
                 ...it,
                 levels
               };
-            }).filter(it => it.levels.length);
+            })
+            .filter(it => it.levels.length);
 
-            cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
-          }
+          cube.evaluatedHierarchies = [...(cube.evaluatedHierarchies || []), ...filteredHierarchies];
         }
       }
 
-      cube.hierarchies = (cube.hierarchies || []).map((hierarchy) => ({
+      cube.evaluatedHierarchies = (cube.evaluatedHierarchies || []).map((hierarchy) => ({
         ...hierarchy,
         levels: hierarchy.levels.map((level) => {
           const member = cube.includedMembers.find(m => m.memberPath === level);
@@ -225,8 +284,6 @@ export class CubeEvaluator extends CubeSymbols {
         }).filter(Boolean)
       }));
     }
-
-    return [];
   }
 
   private evaluateMultiStageReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {

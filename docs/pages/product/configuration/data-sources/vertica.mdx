@@ -1,0 +1,46 @@
+# Vertica
+
+## Prerequisites
+
+- The hostname for the [Vertica][vertica] database server
+- The username/password for the [Vertica][vertica] database server
+- The name of the database to use within the [Vertica][vertica] database server
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=vertica
+CUBEJS_DB_HOST=my.vertica.host
+CUBEJS_DB_USER=vertica_user
+CUBEJS_DB_PASS=**********
+CUBEJS_DB_SCHEMA=my_vertica_schema
+```
+
+## Environment Variables
+
+| Environment Variable       | Description                                                                         | Possible Values                               | Required |
+| -------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- | :------: |
+| `CUBEJS_DB_HOST`           | The host URL for a database                                                         | A valid database host URL                     |    ✅    |
+| `CUBEJS_DB_PORT`           | The port for the database connection                                                | A valid port number                           |    ❌    |
+| `CUBEJS_DB_USER`           | The username used to connect to the database                                        | A valid database username                     |    ✅    |
+| `CUBEJS_DB_PASS`           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
+| `CUBEJS_DB_SCHEMA`         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
+| `CUBEJS_DB_SSL`            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
+| `CUBEJS_CONCURRENCY`       | The number of concurrent connections each queue has to the database. Default is `2` | A valid number                                |    ❌    |
+| `CUBEJS_DB_MAX_POOL`       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
+
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and Verica, set the
+`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+[vertica]: https://www.vertica.com/documentation/vertica/all/
+[ref-recipe-enable-ssl]:/guides/recipes/data-sources/using-ssl-connections-to-data-source
+  

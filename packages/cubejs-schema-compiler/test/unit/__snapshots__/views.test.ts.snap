@@ -40,6 +40,7 @@ Object {
       "type": "number",
     },
   ],
+  "folders": Array [],
   "hierarchies": Array [],
   "isVisible": true,
   "measures": Array [
@@ -118,6 +119,7 @@ Object {
       "type": "number",
     },
   ],
+  "folders": Array [],
   "hierarchies": Array [],
   "isVisible": true,
   "measures": Array [
@@ -230,6 +232,7 @@ Object {
       "type": "number",
     },
   ],
+  "folders": Array [],
   "hierarchies": Array [],
   "isVisible": true,
   "measures": Array [
@@ -308,6 +311,7 @@ Object {
       "type": "number",
     },
   ],
+  "folders": Array [],
   "hierarchies": Array [],
   "isVisible": true,
   "measures": Array [

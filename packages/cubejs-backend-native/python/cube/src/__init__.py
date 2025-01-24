@@ -44,7 +44,7 @@ class Configuration:
     allow_js_duplicate_props_in_schema: bool
     jwt: Dict
     scheduled_refresh_timer: Any
-    scheduled_refresh_timezones: list[str]
+    scheduled_refresh_time_zones: Union[Callable[[RequestContext], list[str]], list[str]]
     scheduled_refresh_concurrency: int
     scheduled_refresh_batch_size: int
     compiler_cache_size: int
@@ -93,7 +93,6 @@ class Configuration:
         self.process_subscriptions_interval = None
         self.jwt = None
         self.scheduled_refresh_timer = None
-        self.scheduled_refresh_timezones = None
         self.scheduled_refresh_concurrency = None
         self.scheduled_refresh_batch_size = None
         self.compiler_cache_size = None
@@ -118,6 +117,7 @@ class Configuration:
         self.query_rewrite = None
         self.extend_context = None
         self.scheduled_refresh_contexts = None
+        self.scheduled_refresh_time_zones = None
         self.context_to_api_scopes = None
         self.repository_factory = None
         self.schema_version = None

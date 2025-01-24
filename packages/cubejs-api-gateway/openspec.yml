@@ -125,6 +125,8 @@ components:
       properties:
         name:
           type: "string"
+        title:
+          type: "string"
         description:
           type: "string"
         type:
@@ -156,6 +158,18 @@ components:
           type: "string"
         meta:
           type: "object"
+    V1CubeMetaFolder:
+      type: "object"
+      required:
+        - name
+        - members
+      properties:
+        name:
+          type: "string"
+        members:
+          type: array
+          items:
+            type: "string"
     V1CubeMeta:
       type: "object"
       required:
@@ -191,6 +205,10 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1CubeMetaJoin"
+        folders:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1CubeMetaFolder"
     V1CubeMetaType:
       type: "string"
       description: Type of cube
@@ -311,6 +329,24 @@ components:
         - $ref: "#/components/schemas/V1LoadRequestQueryFilterBase"
         - $ref: "#/components/schemas/V1LoadRequestQueryFilterLogicalOr"
         - $ref: "#/components/schemas/V1LoadRequestQueryFilterLogicalAnd"
+    V1LoadRequestQueryJoinSubquery:
+      type: "object"
+      properties:
+        sql:
+          type: "string"
+        # TODO This is _always_ a member expression, maybe pass as parsed, without intermediate string?
+        "on":
+          type: "string"
+        # TODO why string? it's enum
+        joinType:
+          type: "string"
+        alias:
+          type: "string"
+      required:
+        - sql
+        - "on"
+        - joinType
+        - alias
     V1LoadRequestQuery:
       type: "object"
       properties:
@@ -348,6 +384,12 @@ components:
             $ref: "#/components/schemas/V1LoadRequestQueryFilterItem"
         ungrouped:
           type: "boolean"
+        # vector of (subquery sql: string, join condition: member expression, join type: enum)
+        # they will be added to end of joinQuery in BaseQuery, in same order as here
+        subqueryJoins:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1LoadRequestQueryJoinSubquery"
     V1LoadRequest:
       type: "object"
       properties:

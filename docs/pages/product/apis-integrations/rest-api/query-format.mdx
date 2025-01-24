@@ -156,6 +156,13 @@ Use it when you need an exact match. It supports multiple values.
 }
 ```
 
+<InfoBox>
+
+If you would like to check if a value is `NULL`, use the [`notSet`](#notset)
+operator instead.
+
+</InfoBox>
+
 ### `notEquals`
 
 The opposite operator of `equals`. It supports multiple values.
@@ -170,6 +177,13 @@ The opposite operator of `equals`. It supports multiple values.
   "values": ["France"]
 }
 ```
+
+<InfoBox>
+
+If you would like to check if a value is not `NULL`, use the [`set`](#set)
+operator instead.
+
+</InfoBox>
 
 ### `contains`
 
@@ -506,8 +520,11 @@ only one of the following properties:
 }
 ```
 
-> **Note:** You can not put dimensions and measures filters in the same logical
-> operator.
+**You can not put dimensions and measures filters in the same logical operator.**
+When Cube generates a SQL query to the data source, dimension and measure filters
+are translated to expressions in `WHERE` and `HAVING` clauses, respectively.  
+In other words, dimension filters apply to raw (unaggregated) data and measure filters
+apply to aggregated data, so it's not possible to express such filters in SQL semantics.
 
 ## Time Dimensions Format
 

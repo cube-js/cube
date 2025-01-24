@@ -82,7 +82,7 @@ Example of a Cube project with models that fail validation:
 
 ```bash{outputLines: 2-16}
 npx cubejs-cli validate
-❌ Cube Schema validation failed
+❌ Cube Data Model validation failed
 
 Cube Error ---------------------------------------
 
@@ -137,14 +137,15 @@ run this command from the Cube app directory.
 ### Usage
 
 ```bash
-npx cubejs-cli deploy --upload-env --directory PATH --token TOKEN
+npx cubejs-cli deploy --replace-env --directory PATH --token TOKEN
 ```
 
-| Parameter            | Description                                    |
-| -------------------- | ---------------------------------------------- |
-| `--upload-env`       | Optional. Upload the `.env` file to Cube Cloud |
-| `--token <token>`    | Authentication token for Cube Cloud            |
-| `--directory <path>` | Path to the Cube application directory         |
+| Parameter            | Required | Description                                    |
+| -------------------- | -------- | ---------------------------------------------- |
+| `--token <token>`    | ✅ Yes   | Authentication token for Cube Cloud            |
+| `--directory <path>` | ✅ Yes   | Path to the Cube application directory         |
+| `--upload-env`       | ❌ No    | Use `.env` file to populate environment variables in Cube Cloud. Only set them once during the very _first_ upload for this deployment |
+| `--replace-env`      | ❌ No    | Use `.env` file to populate environment variables in Cube Cloud. Replace them with new ones during _every_ upload for this deployment |
 
 ### Example
 

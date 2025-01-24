@@ -10,8 +10,9 @@ RUN yarn config set network-timeout 120000 -g
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
+    # python3 package is necessary to install `python3` executable for node-gyp
     # libpython3-dev is needed to trigger post-installer to download native with python
-    && apt-get install -y python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
+    && apt-get install -y python3 python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH

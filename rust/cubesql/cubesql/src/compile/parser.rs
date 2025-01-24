@@ -23,8 +23,8 @@ impl Dialect for MySqlDialectWithBackTicks {
         // See https://dev.mysql.com/doc/refman/8.0/en/identifiers.html.
         // We don't yet support identifiers beginning with numbers, as that
         // makes it hard to distinguish numeric literals.
-        ('a'..='z').contains(&ch)
-            || ('A'..='Z').contains(&ch)
+        ch.is_ascii_lowercase()
+            || ch.is_ascii_uppercase()
             || ch == '_'
             || ch == '$'
             || ch == '@'
@@ -32,7 +32,7 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 
     fn is_identifier_part(&self, ch: char) -> bool {
-        self.is_identifier_start(ch) || ('0'..='9').contains(&ch)
+        self.is_identifier_start(ch) || ch.is_ascii_digit()
     }
 }
 
@@ -60,7 +60,7 @@ pub fn parse_sql_to_statements(
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
-    // DBEver
+    // DBeaver
     let query = query.replace(
         "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
         "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
@@ -293,11 +293,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -310,11 +308,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 
@@ -349,11 +345,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -366,11 +360,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 

@@ -8,21 +8,9 @@ impl WrapperRules {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-sort-expr",
-                wrapper_pushdown_replacer(
-                    sort_expr("?expr", "?asc", "?nulls_first"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                wrapper_pushdown_replacer(sort_expr("?expr", "?asc", "?nulls_first"), "?context"),
                 sort_expr(
-                    wrapper_pushdown_replacer(
-                        "?expr",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?expr", "?context"),
                     "?asc",
                     "?nulls_first",
                 ),
@@ -30,23 +18,11 @@ impl WrapperRules {
             rewrite(
                 "wrapper-pull-up-sort-expr",
                 sort_expr(
-                    wrapper_pullup_replacer(
-                        "?expr",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    wrapper_pullup_replacer("?expr", "?context"),
                     "?asc",
                     "?nulls_first",
                 ),
-                wrapper_pullup_replacer(
-                    sort_expr("?expr", "?asc", "?nulls_first"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                wrapper_pullup_replacer(sort_expr("?expr", "?asc", "?nulls_first"), "?context"),
             ),
         ]);
     }

@@ -456,7 +456,7 @@ class ApiGateway {
 
       app.get('/cubejs-system/v1/pre-aggregations/timezones', systemMiddlewares, systemAsyncHandler(async (req, res) => {
         this.resToResultFn(res)({
-          timezones: this.scheduledRefreshTimeZones || []
+          timezones: this.scheduledRefreshTimeZones ? this.scheduledRefreshTimeZones(req.context) : []
         });
       }));
 
@@ -625,12 +625,13 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const preAggregations = await compilerApi.preAggregations();
 
+      const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
           context,
           normalizeQueryPreAggregations(
             {
-              timezones: this.scheduledRefreshTimeZones,
+              timezones: refreshTimezones.length > 0 ? refreshTimezones : undefined,
               preAggregations: preAggregations.map(p => ({
                 id: p.id,
                 cacheOnly,
@@ -652,9 +653,10 @@ class ApiGateway {
   ) {
     const requestStarted = new Date();
     try {
+      const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
       query = normalizeQueryPreAggregations(
         this.parseQueryParam(query),
-        { timezones: this.scheduledRefreshTimeZones }
+        { timezones: refreshTimezones.length > 0 ? refreshTimezones : undefined }
       );
       const orchestratorApi = await this.getAdapterApi(context);
       const compilerApi = await this.getCompilerApi(context);
@@ -1159,7 +1161,7 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
     memberExpressions: boolean = false,
-  ): Promise<[QueryType, NormalizedQuery[]]> {
+  ): Promise<[QueryType, NormalizedQuery[], NormalizedQuery[]]> {
     let query = this.parseQueryParam(inputQuery);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
@@ -1182,39 +1184,58 @@ class ApiGateway {
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
 
+    const queryNormalizationResult: Array<{
+      normalizedQuery: NormalizedQuery,
+      hasExpressionsInQuery: boolean
+    }> = queries.map((currentQuery) => {
+      const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+
+      if (hasExpressionsInQuery) {
+        if (!memberExpressions) {
+          throw new Error('Expressions are not allowed in this context');
+        }
+
+        currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+      }
+
+      return {
+        normalizedQuery: (normalizeQuery(currentQuery, persistent)),
+        hasExpressionsInQuery
+      };
+    });
+
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
-      queries.map(
-        async (currentQuery) => {
-          const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+      queryNormalizationResult.map(
+        async ({ normalizedQuery, hasExpressionsInQuery }) => {
+          let evaluatedQuery: Query | NormalizedQuery = normalizedQuery;
 
           if (hasExpressionsInQuery) {
-            if (!memberExpressions) {
-              throw new Error('Expressions are not allowed in this context');
-            }
-
-            currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+            // We need to parse/eval all member expressions early as applyRowLevelSecurity
+            // needs to access the full SQL query in order to evaluate rules
+            evaluatedQuery = this.evalMemberExpressionsInQuery(normalizedQuery);
           }
 
-          const normalizedQuery = normalizeQuery(currentQuery, persistent);
           // First apply cube/view level security policies
-          const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
+          const { query: queryWithRlsFilters, denied } = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
+            evaluatedQuery,
             context
           );
           // Then apply user-supplied queryRewrite
-          let rewrittenQuery = await this.queryRewrite(
+          let rewrittenQuery = !denied ? await this.queryRewrite(
             queryWithRlsFilters,
-            context,
-          );
+            context
+          ) : queryWithRlsFilters;
 
-          if (hasExpressionsInQuery) {
+          // applyRowLevelSecurity may add new filters which may contain raw member expressions
+          // if that's the case, we should run an extra pass of parsing here to make sure
+          // nothing breaks down the road
+          if (hasExpressionsInQuery || this.hasExpressionsInQuery(rewrittenQuery)) {
+            rewrittenQuery = this.parseMemberExpressionsInQuery(rewrittenQuery);
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(
-            rewrittenQuery,
-            persistent,
-          );
+          return normalizeQuery(rewrittenQuery, persistent);
         }
       )
     );
@@ -1243,7 +1264,7 @@ class ApiGateway {
       }
     }
 
-    return [queryType, normalizedQueries];
+    return [queryType, normalizedQueries, queryNormalizationResult.map((it) => remapToQueryAdapterFormat(it.normalizedQuery))];
   }
 
   public async sql({
@@ -1291,7 +1312,12 @@ class ApiGateway {
   }
 
   private hasExpressionsInQuery(query: Query): boolean {
-    const arraysToCheck = [query.measures, query.dimensions, query.segments];
+    const arraysToCheck = [
+      query.measures,
+      query.dimensions,
+      query.segments,
+      (query.subqueryJoins ?? []).map(join => join.on),
+    ];
 
     return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
   }
@@ -1302,6 +1328,10 @@ class ApiGateway {
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
       dimensions: (query.dimensions || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
       segments: (query.segments || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
+      subqueryJoins: (query.subqueryJoins ?? []).map(join => (typeof join.on === 'string' ? {
+        ...join,
+        on: this.parseMemberExpression(join.on),
+      } : join)),
     };
   }
 
@@ -1340,6 +1370,10 @@ class ApiGateway {
       measures: (query.measures || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
       dimensions: (query.dimensions || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
       segments: (query.segments || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
+      subqueryJoins: (query.subqueryJoins ?? []).map(join => (typeof join.on !== 'string' ? {
+        ...join,
+        on: this.evalMemberExpression(join.on as ParsedMemberExpression)
+      } : join)),
     };
   }
 
@@ -1440,7 +1474,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('data', context.securityContext);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, _, normalizedQueries] = await this.getNormalizedQueries(query, context, undefined, undefined);
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
@@ -2310,8 +2344,10 @@ class ApiGateway {
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
-    if (typeof req.headers.authorization === 'string') {
-      const parts = req.headers.authorization.split(' ', 2);
+    const authHeader = req.headers?.['x-cube-authorization'] || req.headers?.authorization;
+
+    if (typeof authHeader === 'string') {
+      const parts = authHeader.split(' ', 2);
       if (parts.length === 1) {
         return parts[0];
       }

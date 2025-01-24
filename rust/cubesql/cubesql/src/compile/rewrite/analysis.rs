@@ -3,7 +3,7 @@ use crate::{
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
             expr_column_name,
-            rewriter::{CubeEGraph, DebugData},
+            rewriter::{CubeEGraph, EGraphDebugState},
             AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
             ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
@@ -235,8 +235,6 @@ impl Member {
     }
 }
 
-type EgraphDebugState = DebugData;
-
 #[derive(Clone)]
 pub struct LogicalPlanAnalysis {
     /* This is 0, when creating the EGraph.  It's set to 1 before iteration 0,
@@ -244,7 +242,7 @@ pub struct LogicalPlanAnalysis {
     pub iteration_timestamp: usize,
     /// Debug info, used with egraph-debug
     /// Will be filled by special hook in Runner
-    pub debug_states: Vec<EgraphDebugState>,
+    pub debug_states: Vec<EGraphDebugState>,
     cube_context: Arc<CubeContext>,
     planner: Arc<DefaultPhysicalPlanner>,
 }
@@ -283,16 +281,12 @@ impl LogicalPlanAnalysis {
         }
     }
 
-    fn prepare_egraph_debug_state(egraph: &CubeEGraph) -> EgraphDebugState {
-        DebugData::prepare(egraph)
-    }
-
     pub fn store_egraph_debug_state(egraph: &mut CubeEGraph) {
         debug_assert_eq!(
             egraph.analysis.iteration_timestamp,
             egraph.analysis.debug_states.len()
         );
-        let state = Self::prepare_egraph_debug_state(egraph);
+        let state = EGraphDebugState::new(egraph);
         egraph.analysis.debug_states.push(state);
     }
 
@@ -557,7 +551,7 @@ impl LogicalPlanAnalysis {
                         .unwrap();
                     let expr = original_expr(params[2])?;
                     map.push((
-                        Some(format!("{}.{}", cube, field_name.to_string())),
+                        Some(format!("{cube}.{field_name}")),
                         Member::VirtualField {
                             name: field_name.to_string(),
                             cube: cube.to_string(),
@@ -1242,7 +1236,6 @@ impl LogicalPlanAnalysis {
                 Some(c.to_string())
             }
             LogicalPlanLanguage::CubeScan(params) => cube_reference(params[0]),
-            LogicalPlanLanguage::Extension(params) => cube_reference(params[0]),
             _ => None,
         }
     }

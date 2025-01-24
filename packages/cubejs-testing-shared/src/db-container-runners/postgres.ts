@@ -5,7 +5,7 @@ import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract
 
 export class PostgresDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
-    const version = process.env.TEST_PGSQL_VERSION || options.version || '9.6.8';
+    const version = process.env.TEST_PGSQL_VERSION || options.version || '12.22';
 
     const container = new GenericContainer(`postgres:${version}`)
       .withEnvironment({

@@ -12,6 +12,7 @@ use crate::{
         CommandCompletion, CompilationError, DatabaseProtocol, QueryPlan, StatusFlags,
     },
     sql::{
+        compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalBatch, PortalFrom},
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
@@ -240,6 +241,15 @@ impl AsyncPostgresShim {
         return Ok(());
     }
 
+    async fn get_cache_entry(&self) -> Result<Arc<CompilerCacheEntry>, CubeError> {
+        self.session
+            .session_manager
+            .server
+            .compiler_cache
+            .get_cache_entry(self.auth_context()?, self.session.state.protocol.clone())
+            .await
+    }
+
     pub async fn run_on(
         fast_shutdown_interruptor: CancellationToken,
         semifast_shutdown_interruptor: CancellationToken,
@@ -301,7 +311,7 @@ impl AsyncPostgresShim {
     fn is_semifast_shutdownable(&self) -> bool {
         return self.cursors.is_empty()
             && self.portals.is_empty()
-            && Self::session_state_is_semifast_shutdownable(&*self.session.state);
+            && Self::session_state_is_semifast_shutdownable(&self.session.state);
     }
 
     fn admin_shutdown_error() -> ConnectionError {
@@ -1058,12 +1068,8 @@ impl AsyncPostgresShim {
                     source_statement.bind(body.to_bind_values(&parameters)?)?;
                 drop(statements_guard);
 
-                let meta = self
-                    .session
-                    .server
-                    .compiler_cache
-                    .meta(self.auth_context()?, self.session.state.protocol.clone())
-                    .await?;
+                let cache_entry = self.get_cache_entry().await?;
+                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
                 let plan = convert_statement_to_cube_query(
                     prepared_statement,
@@ -1171,12 +1177,8 @@ impl AsyncPostgresShim {
                     .map(|param| param.coltype.to_pg_tid())
                     .collect();
 
-                let meta = self
-                    .session
-                    .server
-                    .compiler_cache
-                    .meta(self.auth_context()?, self.session.state.protocol.clone())
-                    .await?;
+                let cache_entry = self.get_cache_entry().await?;
+                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
                 let stmt_replacer = StatementPlaceholderReplacer::new();
                 let hacked_query = stmt_replacer.replace(query.clone())?;
@@ -1334,7 +1336,7 @@ impl AsyncPostgresShim {
                 .await?;
             }
             Statement::Rollback { .. } => {
-                if self.end_transaction()? == false {
+                if !self.end_transaction()? {
                     // PostgreSQL returns command completion anyway
                     self.write(protocol::NoticeResponse::warning(
                         ErrorCode::NoActiveSqlTransaction,
@@ -1353,7 +1355,7 @@ impl AsyncPostgresShim {
                 .await?;
             }
             Statement::Commit { .. } => {
-                if self.end_transaction()? == false {
+                if !self.end_transaction()? {
                     // PostgreSQL returns command completion anyway
                     self.write(protocol::NoticeResponse::warning(
                         ErrorCode::NoActiveSqlTransaction,
@@ -1643,17 +1645,10 @@ impl AsyncPostgresShim {
             Statement::Close { cursor } => {
                 let plan = match cursor {
                     CloseCursor::All => {
-                        let mut portals_to_remove = Vec::new();
-
-                        for (key, _) in &self.cursors {
-                            portals_to_remove.push(key.clone());
+                        for key in self.cursors.keys() {
+                            self.portals.remove(key);
                         }
-
-                        self.cursors = HashMap::new();
-
-                        for key in portals_to_remove {
-                            self.portals.remove(&key);
-                        }
+                        self.cursors.clear();
 
                         Ok(QueryPlan::MetaOk(
                             StatusFlags::empty(),
@@ -1794,12 +1789,8 @@ impl AsyncPostgresShim {
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<(), ConnectionError> {
-        let meta = self
-            .session
-            .server
-            .compiler_cache
-            .meta(self.auth_context()?, self.session.state.protocol.clone())
-            .await?;
+        let cache_entry = self.get_cache_entry().await?;
+        let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
         let statements =
             parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL, qtrace)?;

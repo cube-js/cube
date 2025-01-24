@@ -76,7 +76,7 @@ describe('OptsHandler class', () => {
     }
   );
 
-  test('must handle vanila CreateOptions', async () => {
+  test('must handle vanilla CreateOptions', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
     // Case 1
@@ -432,7 +432,7 @@ describe('OptsHandler class', () => {
     testDriverConnectionSpy.mockRestore();
   });
 
-  test('must determine correcct driver type by the query context', async () => {
+  test('must determine correct driver type by the query context', async () => {
     class Driver1 extends OriginalBaseDriver {
       public async testConnection() {
         //

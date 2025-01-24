@@ -301,7 +301,11 @@ export class SQLServer {
   protected createDefaultCanSwitchSqlUserFn(options: SQLServerOptions): CanSwitchSQLUserFn {
     const superUser = options.sqlSuperUser || getEnv('sqlSuperUser');
 
-    return async (current: string | null, _user: string) => {
+    return async (current: string | null, newUser: string) => {
+      if (current === newUser) {
+        return true;
+      }
+
       if (superUser) {
         return current === superUser;
       }
