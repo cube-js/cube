@@ -40,13 +40,13 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
     pub fn build_sql_and_params(&self) -> NativeObjectHandle<IT> {
         let build_result = self.build_sql_and_params_impl();
-        let result = self.context.empty_struct();
+        let result = self.context.empty_struct().unwrap();
         match build_result {
             Ok(res) => {
                 result.set_field("result", res).unwrap();
             }
             Err(e) => {
-                let error_descr = self.context.empty_struct();
+                let error_descr = self.context.empty_struct().unwrap();
                 let error_cause = match &e.cause {
                     CubeErrorCauseType::User(_) => "User",
                     CubeErrorCauseType::Internal(_) => "Internal",
@@ -80,7 +80,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let sql = plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
 
-        let res = self.context.empty_array();
+        let res = self.context.empty_array()?;
         res.set(0, result_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
         let result = NativeObjectHandle::new(res.into_object());

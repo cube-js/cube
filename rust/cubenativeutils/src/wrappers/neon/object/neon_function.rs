@@ -10,27 +10,27 @@ use neon::prelude::*;
 use regex::Regex;
 
 #[derive(Clone)]
-pub struct NeonFunction<'cx: 'static, C: Context<'cx>> {
-    object: NeonTypeHandle<'cx, C, JsFunction>,
+pub struct NeonFunction<C: Context<'static>> {
+    object: NeonTypeHandle<C, JsFunction>,
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NeonFunction<'cx, C> {
-    pub fn new(object: NeonTypeHandle<'cx, C, JsFunction>) -> Self {
+impl<C: Context<'static> + 'static> NeonFunction<C> {
+    pub fn new(object: NeonTypeHandle<C, JsFunction>) -> Self {
         Self { object }
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonFunction<'cx, C> {
-    fn into_object(self) -> NeonObject<'cx, C> {
+impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonFunction<C> {
+    fn into_object(self) -> NeonObject<C> {
         self.object.upcast()
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeFunction<NeonInnerTypes<'cx, C>> for NeonFunction<'cx, C> {
+impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFunction<C> {
     fn call(
         &self,
-        args: Vec<NativeObjectHandle<NeonInnerTypes<'cx, C>>>,
-    ) -> Result<NativeObjectHandle<NeonInnerTypes<'cx, C>>, CubeError> {
+        args: Vec<NativeObjectHandle<NeonInnerTypes<C>>>,
+    ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
         let neon_args = args
             .into_iter()
             .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
@@ -40,7 +40,7 @@ impl<'cx, C: Context<'cx> + 'cx> NativeFunction<NeonInnerTypes<'cx, C>> for Neon
             neon_object
                 .call(cx, null, neon_args)
                 .map_err(|_| CubeError::internal(format!("Failed to call function ")))
-        })?;
+        })??;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
             neon_reuslt,
@@ -58,7 +58,7 @@ impl<'cx, C: Context<'cx> + 'cx> NativeFunction<NeonInnerTypes<'cx, C>> for Neon
                         })?
                         .value(cx);
                     Ok(res)
-                })?;
+                })??;
         Ok(result)
     }
 

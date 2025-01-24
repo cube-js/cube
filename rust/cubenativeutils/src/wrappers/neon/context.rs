@@ -12,21 +12,30 @@ use crate::wrappers::{
 use cubesql::CubeError;
 use neon::prelude::*;
 use std::{
-    cell::{RefCell, RefMut},
-    marker::PhantomData,
+    cell::RefCell,
+    panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
     rc::{Rc, Weak},
 };
-pub struct ContextWrapper<'cx, C: Context<'cx>> {
-    cx: C,
-    lifetime: PhantomData<&'cx ()>,
+
+pub trait NoenContextLifetimeExpand<'cx> {
+    type ExpandedResult: Context<'static>;
+    fn expand_lifetime(self) -> Self::ExpandedResult;
 }
 
-impl<'cx, C: Context<'cx>> ContextWrapper<'cx, C> {
+impl<'cx> NoenContextLifetimeExpand<'cx> for FunctionContext<'cx> {
+    type ExpandedResult = FunctionContext<'static>;
+    fn expand_lifetime(self) -> Self::ExpandedResult {
+        unsafe { std::mem::transmute::<FunctionContext<'cx>, FunctionContext<'static>>(self) }
+    }
+}
+
+pub struct ContextWrapper<C: Context<'static>> {
+    cx: C,
+}
+
+impl<C: Context<'static>> ContextWrapper<C> {
     pub fn new(cx: C) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self {
-            cx,
-            lifetime: Default::default(),
-        }))
+        Rc::new(RefCell::new(Self { cx }))
     }
 
     pub fn with_context<T, F>(&mut self, f: F) -> T
@@ -41,110 +50,34 @@ impl<'cx, C: Context<'cx>> ContextWrapper<'cx, C> {
     }
 }
 
-pub struct ContextHolder<'cx, C: Context<'cx>> {
-    context: Rc<RefCell<ContextWrapper<'cx, C>>>,
-}
+pub fn neon_run_with_guarded_lifetime<'cx, C, T, F>(cx: C, func: F) -> T
+where
+    C: Context<'cx> + NoenContextLifetimeExpand<'cx>,
+    F: FnOnce(ContextHolder<C::ExpandedResult>) -> T,
+{
+    let context = ContextWrapper::new(cx.expand_lifetime());
+    let context_holder = ContextHolder::new(Rc::downgrade(&context));
+    let res = catch_unwind(AssertUnwindSafe(|| func(context_holder)));
+    match Rc::try_unwrap(context) {
+        Ok(_) => {}
+        Err(_) => panic!("Guarded context have more then one reference"),
+    };
 
-impl<'cx, C: Context<'cx> + 'cx> ContextHolder<'cx, C> {
-    pub fn new(cx: C) -> Self {
-        Self {
-            context: ContextWrapper::new(cx),
-        }
-    }
-
-    pub fn borrow_mut(&self) -> RefMut<ContextWrapper<'cx, C>> {
-        self.context.borrow_mut()
-    }
-
-    pub fn with_context<T, F>(&self, f: F) -> T
-    where
-        F: FnOnce(&mut C) -> T,
-    {
-        let mut context = self.context.borrow_mut();
-        context.with_context(f)
-    }
-
-    pub fn weak(&self) -> WeakContextHolder<'cx, C> {
-        WeakContextHolder {
-            context: Rc::downgrade(&self.context),
-        }
+    match res {
+        Ok(res) => res,
+        Err(e) => resume_unwind(e),
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeContext<NeonInnerTypes<'cx, C>> for ContextHolder<'cx, C> {
-    fn boolean(&self, v: bool) -> NeonBoolean<'cx, C> {
-        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.boolean(v).upcast()));
-        obj.into_boolean().unwrap()
-    }
-
-    fn string(&self, v: String) -> NeonString<'cx, C> {
-        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.string(v).upcast()));
-        obj.into_string().unwrap()
-    }
-
-    fn number(&self, v: f64) -> NeonNumber<'cx, C> {
-        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.number(v).upcast()));
-        obj.into_number().unwrap()
-    }
-
-    fn undefined(&self) -> NativeObjectHandle<NeonInnerTypes<'cx, C>> {
-        NativeObjectHandle::new(NeonObject::new(
-            self.clone(),
-            self.with_context(|cx| cx.undefined().upcast()),
-        ))
-    }
-
-    fn empty_array(&self) -> NeonArray<'cx, C> {
-        let obj = NeonObject::new(
-            self.clone(),
-            self.with_context(|cx| cx.empty_array().upcast()),
-        );
-        obj.into_array().unwrap()
-    }
-
-    fn empty_struct(&self) -> NeonStruct<'cx, C> {
-        let obj = NeonObject::new(
-            self.clone(),
-            self.with_context(|cx| cx.empty_object().upcast()),
-        );
-        obj.into_struct().unwrap()
-    }
-    fn to_string_fn(&self, result: String) -> NeonFunction<'cx, C> {
-        let obj = NeonObject::new(
-            self.clone(),
-            self.with_context(|cx| {
-                JsFunction::new(cx, move |mut c| Ok(c.string(result.clone())))
-                    .unwrap()
-                    .upcast()
-            }),
-        );
-        obj.into_function().unwrap()
-    }
+pub struct ContextHolder<C: Context<'static>> {
+    context: Weak<RefCell<ContextWrapper<C>>>,
 }
 
-impl<'cx, C: Context<'cx>> Clone for ContextHolder<'cx, C> {
-    fn clone(&self) -> Self {
-        Self {
-            context: self.context.clone(),
-        }
+impl<C: Context<'static>> ContextHolder<C> {
+    fn new(context: Weak<RefCell<ContextWrapper<C>>>) -> Self {
+        Self { context }
     }
-}
 
-pub struct WeakContextHolder<'cx, C: Context<'cx>> {
-    context: Weak<RefCell<ContextWrapper<'cx, C>>>,
-}
-
-impl<'cx, C: Context<'cx>> WeakContextHolder<'cx, C> {
-    pub fn try_upgrade<'a>(&'a self) -> Result<ContextHolder<'a, C>, CubeError>
-    where
-        'a: 'cx,
-    {
-        if let Some(context) = self.context.upgrade() {
-            Ok(ContextHolder { context })
-        } else {
-            Err(CubeError::internal(format!("Neon context is not alive")))
-        }
-    }
     pub fn with_context<T, F>(&self, f: F) -> Result<T, CubeError>
     where
         F: FnOnce(&mut C) -> T,
@@ -154,12 +87,68 @@ impl<'cx, C: Context<'cx>> WeakContextHolder<'cx, C> {
             let res = cx.with_context(f);
             Ok(res)
         } else {
-            Err(CubeError::internal(format!("Neon context is not alive")))
+            Err(CubeError::internal(format!(
+                "Call to neon context outside of its lifetime"
+            )))
         }
     }
 }
 
-impl<'cx, C: Context<'cx>> Clone for WeakContextHolder<'cx, C> {
+impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for ContextHolder<C> {
+    fn boolean(&self, v: bool) -> Result<NeonBoolean<C>, CubeError> {
+        let obj = NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| cx.boolean(v).upcast())?,
+        );
+        obj.into_boolean()
+    }
+
+    fn string(&self, v: String) -> Result<NeonString<C>, CubeError> {
+        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.string(v).upcast())?);
+        obj.into_string()
+    }
+
+    fn number(&self, v: f64) -> Result<NeonNumber<C>, CubeError> {
+        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.number(v).upcast())?);
+        obj.into_number()
+    }
+
+    fn undefined(&self) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
+        Ok(NativeObjectHandle::new(NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| cx.undefined().upcast())?,
+        )))
+    }
+
+    fn empty_array(&self) -> Result<NeonArray<C>, CubeError> {
+        let obj = NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| cx.empty_array().upcast())?,
+        );
+        obj.into_array()
+    }
+
+    fn empty_struct(&self) -> Result<NeonStruct<C>, CubeError> {
+        let obj = NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| cx.empty_object().upcast())?,
+        );
+        obj.into_struct()
+    }
+    fn to_string_fn(&self, result: String) -> Result<NeonFunction<C>, CubeError> {
+        let obj = NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| {
+                JsFunction::new(cx, move |mut c| Ok(c.string(result.clone())))
+                    .unwrap()
+                    .upcast()
+            })?,
+        );
+        obj.into_function()
+    }
+}
+
+impl<C: Context<'static>> Clone for ContextHolder<C> {
     fn clone(&self) -> Self {
         Self {
             context: self.context.clone(),

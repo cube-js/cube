@@ -82,20 +82,20 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlStruct {
         &self,
         context: NativeContextHolder<IT>,
     ) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let res = context.empty_struct();
+        let res = context.empty_struct()?;
         for (k, v) in self.properties.iter() {
             res.set_field(k, v.to_native(context.clone())?)?;
         }
         if let Some(to_string_fn) = &self.to_string_fn {
             res.set_field(
                 "toString",
-                NativeObjectHandle::new(context.to_string_fn(to_string_fn.clone()).into_object()),
+                NativeObjectHandle::new(context.to_string_fn(to_string_fn.clone())?.into_object()),
             )?;
         }
         if let Some(sql_fn) = &self.sql_fn {
             res.set_field(
                 "sql",
-                NativeObjectHandle::new(context.to_string_fn(sql_fn.clone()).into_object()),
+                NativeObjectHandle::new(context.to_string_fn(sql_fn.clone())?.into_object()),
             )?;
         }
         Ok(NativeObjectHandle::new(res.into_object()))
