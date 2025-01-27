@@ -8235,7 +8235,6 @@ ORDER BY "source"."str0" ASC
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                ungrouped: Some(false),
                 ..Default::default()
             }
         )
@@ -15702,7 +15701,6 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                ungrouped: Some(true),
                 ..Default::default()
             }
         )
