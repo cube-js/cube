@@ -269,8 +269,8 @@ impl RewriteRules for MemberRules {
                     "?members",
                     "?filters",
                     "?orders",
-                    "?limit",
-                    "?offset",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
                     "?split",
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
@@ -281,14 +281,14 @@ impl RewriteRules for MemberRules {
                     "?members",
                     "?filters",
                     "?orders",
-                    "?limit",
-                    "?offset",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
                     "?split",
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
                     "CubeScanUngrouped:false",
                 ),
-                self.select_distinct_dimensions(/*"?members",*/ "?limit"),
+                self.select_distinct_dimensions(/*"?members"*/),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -1509,20 +1509,10 @@ impl MemberRules {
     fn select_distinct_dimensions(
         &self,
         // members_var: &'static str,
-        limit_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         // let members_var = var!(members_var);
-        let limit_var = var!(limit_var);
 
-        move |egraph, subst| {
-            let cube_limit = var_iter!(egraph[subst[limit_var]], CubeScanLimit)
-                .next()
-                .unwrap();
-
-            if cube_limit.is_some() {
-                return false;
-            }
-
+        move |_egraph, _subst| {
             // for members in var_list_iter!(egraph[subst[members_var]], CubeScanMembers) {
             //     // TODO: check if all members in request are dimensions
             //     // If no - return false
