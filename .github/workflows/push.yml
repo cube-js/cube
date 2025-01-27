@@ -106,8 +106,6 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - name: Build native (no python)
-        run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Build client
         run: yarn build
       - name: Build cubejs-backend-native (with Python)
@@ -446,6 +444,9 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build cubejs-backend-native (without Python)
+        run: yarn run native:build-release
+        working-directory: ./packages/cubejs-backend-native
       - name: Run Integration tests for ${{ matrix.db }} matrix
         uses: nick-fields/retry@v3
         with:
@@ -682,8 +683,9 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - name: Build native (no python)
-        run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Build cubejs-backend-native (without Python)
+        run: yarn run native:build-release
+        working-directory: ./packages/cubejs-backend-native
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       # current .dockerignore prevents use of native build
