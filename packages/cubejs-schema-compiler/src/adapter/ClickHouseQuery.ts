@@ -1,6 +1,6 @@
 import R from 'ramda';
 
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -192,11 +192,13 @@ export class ClickHouseQuery extends BaseQuery {
       return '';
     }
 
+    const collation = getEnv('clickhouseSortCollation') || 'en';
+
     const orderByString = R.pipe(
       R.map((order) => {
         let orderString = this.orderHashToString(order);
         if (this.getFieldType(order) === 'string') {
-          orderString = `${orderString} COLLATE 'en'`;
+          orderString = `${orderString} COLLATE '${collation}'`;
         }
         return orderString;
       }),
