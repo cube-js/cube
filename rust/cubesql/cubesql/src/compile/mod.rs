@@ -8213,7 +8213,7 @@ ORDER BY "source"."str0" ASC
         init_testing_logger();
 
         let logical_plan = convert_select_to_query_plan(
-            "SELECT DISTINCT customer_gender FROM \"KibanaSampleDataEcommerce\"".to_string(),
+            "SELECT DISTINCT customer_gender FROM KibanaSampleDataEcommerce".to_string(),
             DatabaseProtocol::PostgreSQL,
         )
         .await
@@ -8226,12 +8226,120 @@ ORDER BY "source"."str0" ASC
             V1LoadRequestQuery {
                 measures: Some(vec![]),
                 dimensions: Some(vec![
-                    // "KibanaSampleDataEcommerce.order_date".to_string(),
-                    // "KibanaSampleDataEcommerce.last_mod".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    // "KibanaSampleDataEcommerce.notes".to_string(),
-                    // "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    // "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT DISTINCT customer_gender FROM KibanaSampleDataEcommerce LIMIT 100".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        println!("logical_plan: {:?}", logical_plan);
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                limit: Some(100),
+                ..Default::default()
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT DISTINCT * FROM (SELECT customer_gender FROM KibanaSampleDataEcommerce LIMIT 100) q_0".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        println!("logical_plan: {:?}", logical_plan);
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                limit: Some(100),
+                ungrouped: Some(true),
+                ..Default::default()
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT DISTINCT customer_gender, order_date FROM KibanaSampleDataEcommerce"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        println!("logical_plan: {:?}", logical_plan);
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT DISTINCT MAX(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        println!("logical_plan: {:?}", logical_plan);
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ..Default::default()
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT DISTINCT * FROM (SELECT customer_gender, MAX(maxPrice) FROM KibanaSampleDataEcommerce GROUP BY 1) q_0".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        println!("logical_plan: {:?}", logical_plan);
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string(),]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
