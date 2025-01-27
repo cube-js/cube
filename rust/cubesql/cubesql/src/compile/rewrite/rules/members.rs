@@ -288,7 +288,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanWrapped:false",
                     "CubeScanUngrouped:false",
                 ),
-                self.select_distinct_dimensions(/*"?members"*/),
+                self.select_distinct_dimensions("?members"),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -1508,20 +1508,26 @@ impl MemberRules {
 
     fn select_distinct_dimensions(
         &self,
-        // members_var: &'static str,
+        members_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        // let members_var = var!(members_var);
+        let members_var = var!(members_var);
+        let meta_context = self.meta_context.clone();
 
-        move |_egraph, _subst| {
-            // for members in var_list_iter!(egraph[subst[members_var]], CubeScanMembers) {
-            //     // TODO: check if all members in request are dimensions
-            //     // If no - return false
-            //     for member in members.iter() {
-            //         println!("member: {:?}", egraph[*member]);
-            //     }
-            // }
-
-            true
+        move |egraph, subst| {
+            egraph
+                .index(subst[members_var])
+                .data
+                .member_name_to_expr
+                .as_ref()
+                .map_or(true, |member_names_to_expr| {
+                    !member_names_to_expr.list.iter().any(|(_, member, _)| {
+                        // we should allow transform only for queries with dimensions only,
+                        // as it doesn't make sense for measures
+                        meta_context
+                            .find_measure_with_name(member.name().unwrap().to_string())
+                            .is_some()
+                    })
+                })
         }
     }
 
