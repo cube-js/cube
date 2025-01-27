@@ -1524,7 +1524,12 @@ impl MemberRules {
                         // we should allow transform only for queries with dimensions only,
                         // as it doesn't make sense for measures
                         meta_context
-                            .find_measure_with_name(member.name().unwrap().to_string())
+                            .find_measure_with_name(
+                                member
+                                    .name()
+                                    .expect("Measure should have a name")
+                                    .to_string(),
+                            )
                             .is_some()
                     })
                 })
