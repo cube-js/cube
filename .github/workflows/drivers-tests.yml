@@ -23,6 +23,7 @@ on:
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
@@ -49,6 +50,7 @@ on:
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
