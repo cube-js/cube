@@ -15700,7 +15700,10 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                order: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string()
+                ],]),
                 ..Default::default()
             }
         )
