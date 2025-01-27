@@ -59,11 +59,27 @@ class DremioQuery extends BaseQuery {
   }
 
   subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL ${interval})`;
+    const intervalParts = interval.trim().split(' ');
+    const intervalNumber = parseInt(intervalParts[0]);
+    const intervalName = intervalParts[1].toLowerCase();
+    if (intervalName == 'quarter') {
+      intervalParts[0] = intervalNumber * 3;
+      intervalParts[1] = 'month';
+    }
+
+    return `DATE_SUB(${date}, CAST(${intervalParts[0]} as INTERVAL ${intervalParts[1]}))`;
   }
 
   addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL ${interval})`;
+    const intervalParts = interval.trim().split(' ');
+    const intervalNumber = parseInt(intervalParts[0]);
+    const intervalName = intervalParts[1].toLowerCase();
+    if (intervalName == 'quarter') {
+      intervalParts[0] = intervalNumber * 3;
+      intervalParts[1] = 'month';
+    }
+
+    return `DATE_ADD(${date}, CAST(${intervalParts[0]} as INTERVAL ${intervalParts[1]}))`;
   }
 
   timeGroupedColumn(granularity, dimension) {
