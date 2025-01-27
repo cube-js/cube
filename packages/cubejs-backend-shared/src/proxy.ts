@@ -1,5 +1,5 @@
 import { exec } from 'child_process';
-import HttpsProxyAgent from 'http-proxy-agent';
+import { ProxyAgent } from 'proxy-agent';
 
 function getCommandOutput(command: string) {
   return new Promise<string>((resolve, reject) => {
@@ -14,6 +14,7 @@ function getCommandOutput(command: string) {
   });
 }
 
+// deprecated, use ProxyAgent instead
 export async function getProxySettings() {
   const [proxy] = (
     await Promise.all([getCommandOutput('npm config -g get https-proxy'), getCommandOutput('npm config -g get proxy')])
@@ -25,7 +26,5 @@ export async function getProxySettings() {
 }
 
 export async function getHttpAgentForProxySettings() {
-  const proxy = await getProxySettings();
-
-  return proxy ? HttpsProxyAgent(proxy) : undefined;
+  return new ProxyAgent();
 }
