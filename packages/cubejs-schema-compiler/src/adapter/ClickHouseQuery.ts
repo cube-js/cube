@@ -20,7 +20,7 @@ class ClickHouseFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `lowerUTF8(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lowerUTF8(${this.allocateParam(param)}), '${s}')`;
+    return `lowerUTF8(toValidUTF8(${column})) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lowerUTF8(toValidUTF8(${this.allocateParam(param)})), '${s}')`;
   }
 
   public castParameter() {
@@ -184,7 +184,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
-  public orderBy() {
+  public override orderBy() {
     //
     // ClickHouse orders string by bytes, so we need to use COLLATE 'en' to order by string
     //

@@ -300,7 +300,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
         expect(res).toEqual(
           [
             { visitors__enabled_source: 'google', visitors__visitor_count: '1' },
-            { visitors__enabled_source: 'Google', visitors__visitor_count: '1' },
+            { visitors__enabled_source: 'Gork', visitors__visitor_count: '1' },
             { visitors__enabled_source: 'some', visitors__visitor_count: '2' },
             { visitors__enabled_source: null, visitors__visitor_count: '3' },
           ]
@@ -416,7 +416,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
     const sql = sqlAndParams[0];
     expect(sql).toMatch('ORDER BY `visitors__source` COLLATE \'en\'');
 
-    expect(res).toEqual([{ visitors__source: 'google' }, { visitors__source: 'Google' }, { visitors__source: 'some' }]);
+    expect(res).toEqual([{ visitors__source: 'google' }, { visitors__source: 'Gork' }, { visitors__source: 'some' }]);
   });
 
   it('export import', () => {
