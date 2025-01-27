@@ -15,6 +15,7 @@ import {
   QueryTablesResult,
   StreamOptions,
   StreamTableDataWithTypes,
+  TableColumn,
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
@@ -238,6 +239,21 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     if (length >= 32768) {
       throw new Error(`Redshift server does not support more than 32767 parameters, but ${length} passed`);
     }
+  }
+
+  public override async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 127) {
+      throw new Error('Redshift can not work with table names longer than 127 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+
+    // we can not call super.createTable(quotedTableName, columns)
+    // because Postgres has 63 length check. So pasting the code from the base driver
+    const createTableSql = this.createTableSql(quotedTableName, columns);
+    await this.query(createTableSql, []).catch(e => {
+      e.message = `Error during create table: ${createTableSql}: ${e.message}`;
+      throw e;
+    });
   }
 
   /**

@@ -28,6 +28,8 @@ pub mod v1_load_request_query_filter_logical_and;
 pub use self::v1_load_request_query_filter_logical_and::V1LoadRequestQueryFilterLogicalAnd;
 pub mod v1_load_request_query_filter_logical_or;
 pub use self::v1_load_request_query_filter_logical_or::V1LoadRequestQueryFilterLogicalOr;
+pub mod v1_load_request_query_join_subquery;
+pub use self::v1_load_request_query_join_subquery::V1LoadRequestQueryJoinSubquery;
 pub mod v1_load_request_query_time_dimension;
 pub use self::v1_load_request_query_time_dimension::V1LoadRequestQueryTimeDimension;
 pub mod v1_load_response;

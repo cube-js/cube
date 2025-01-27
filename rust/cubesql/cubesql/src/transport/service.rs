@@ -28,15 +28,13 @@ use uuid::Uuid;
 use crate::{
     compile::{
         engine::df::{
-            scan::MemberField,
+            scan::{convert_transport_response, MemberField},
             wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
         },
         rewrite::LikeType,
     },
     sql::{AuthContextRef, HttpAuthContext},
-    transport::{
-        MetaContext, TransportLoadRequest, TransportLoadRequestQuery, TransportLoadResponse,
-    },
+    transport::{MetaContext, TransportLoadRequest, TransportLoadRequestQuery},
     CubeError, RWLockAsync,
 };
 
@@ -142,7 +140,9 @@ pub trait TransportService: Send + Sync + Debug {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
-    ) -> Result<TransportLoadResponse, CubeError>;
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+    ) -> Result<Vec<RecordBatch>, CubeError>;
 
     async fn load_stream(
         &self,
@@ -280,7 +280,9 @@ impl TransportService for HttpTransport {
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<TransportLoadResponse, CubeError> {
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
                 "Changing security context (__user) is not supported in the standalone mode"
@@ -296,7 +298,7 @@ impl TransportService for HttpTransport {
         let response =
             cube_api::load_v1(&self.get_client_config_for_ctx(ctx), Some(request)).await?;
 
-        Ok(response)
+        convert_transport_response(response, schema, member_fields)
     }
 
     async fn load_stream(
@@ -905,5 +907,13 @@ impl SqlTemplates {
             }
         };
         self.render_template(&format!("types/{}", data_type), context! {})
+    }
+
+    pub fn left_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/left", context! {})
+    }
+
+    pub fn inner_join(&self) -> Result<String, CubeError> {
+        self.render_template("join_types/inner", context! {})
     }
 }

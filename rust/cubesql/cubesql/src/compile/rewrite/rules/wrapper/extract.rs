@@ -3,7 +3,8 @@ use crate::{
         literal_expr,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, WrapperPullupReplacerAliasToCube,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_replacer_context,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -18,17 +19,23 @@ impl WrapperRules {
                 vec![
                     wrapper_pullup_replacer(
                         literal_expr("?date_part"),
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?date",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                        ),
                     ),
                 ],
             ),
@@ -37,10 +44,13 @@ impl WrapperRules {
                     "DatePart",
                     vec![literal_expr("?date_part"), "?date".to_string()],
                 ),
-                "?alias_to_cube",
-                "?push_to_cube",
-                "?in_projection",
-                "?cube_members",
+                wrapper_replacer_context(
+                    "?alias_to_cube",
+                    "?push_to_cube",
+                    "?in_projection",
+                    "?cube_members",
+                    "?grouped_subqueries",
+                ),
             ),
             self.transform_date_part_expr("?alias_to_cube"),
         )]);
@@ -55,7 +65,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

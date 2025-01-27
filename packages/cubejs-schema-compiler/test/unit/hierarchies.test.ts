@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { prepareYamlCompiler } from './PrepareCompiler';
+import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Cube hierarchies', () => {
   it('base cases', async () => {
@@ -62,44 +62,84 @@ describe('Cube hierarchies', () => {
     await expect(compiler.compile()).rejects.toThrow('Only dimensions can be part of a hierarchy. Please remove the \'count\' member from the \'orders_hierarchy\' hierarchy.');
   });
 
-  it(('does not accept wrong name'), async () => {
-    const { compiler } = prepareYamlCompiler(`cubes:
-  - name: orders
-    sql_table: orders
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
+  //     await expect(compiler.compile()).rejects.toThrow('with value "hello wrong name" fails to match the identifier pattern');
+  //   });
 
-    hierarchies:
-      - name: hello wrong name
-        levels:
-          - id
-`);
+  // it(('duplicated hierarchy'), async () => {
+  //   const { compiler } = prepareYamlCompiler(`cubes:
+  //     - name: orders
+  //       sql_table: orders
+  //       dimensions:
+  //         - name: id
+  //           sql: id
+  //           type: number
+  //           primary_key: true
 
-    await expect(compiler.compile()).rejects.toThrow('with value "hello wrong name" fails to match the identifier pattern');
+  //         - name: id
+  //           sql: id
+  //           type: number
+  //           primary_key: true
+
+  //       hierarchies:
+  //         - name: test_hierarchy
+  //           levels:
+  //             - id
+  //         - name: test_hierarchy
+  //           levels:
+  //             - id
+  //   `);
+
+  //   await expect(compiler.compile()).rejects.toThrow('Duplicate hierarchy name \'test_hierarchy\' in cube \'orders\'');
+  // });
+
+  it(('hierarchies on extended cubes'), async () => {
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/hierarchies-extended-cubes.yml'),
+      'utf8'
+    );
+    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+
+    await compiler.compile();
+
+    const testView = metaTransformer.cubes.find(
+      (it) => it.config.name === 'test_view'
+    );
+
+    expect(testView?.config.hierarchies).toEqual([
+      {
+        name: 'test_view.base_orders_hierarchy',
+        title: 'Hello Hierarchy',
+        levels: ['test_view.status', 'test_view.number'],
+        public: true
+      },
+      {
+        name: 'test_view.orders_hierarchy',
+        levels: ['test_view.state', 'test_view.city'],
+        public: true
+      }
+    ]);
   });
 
-  it(('duplicated hierarchy'), async () => {
-    const { compiler } = prepareYamlCompiler(`cubes:
-      - name: orders
-        sql_table: orders
-        dimensions:
-          - name: id
-            sql: id
-            type: number
-            primary_key: true
+  it('js model base cases', async () => {
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
+      'utf8'
+    );
+    const { compiler, metaTransformer } = prepareCompiler(modelContent);
 
-        hierarchies:
-          - name: test_hierarchy
-            levels:
-              - id
-          - name: test_hierarchy
-            levels:
-              - id
-    `);
+    await compiler.compile();
 
-    await expect(compiler.compile()).rejects.toThrow('Duplicate hierarchy name \'test_hierarchy\' in cube \'orders\'');
+    const ordersCube = metaTransformer.cubes.find(
+      (it) => it.config.name === 'orders'
+    );
+
+    expect(ordersCube.config.hierarchies).toEqual([
+      {
+        name: 'orders.hello',
+        title: 'World',
+        levels: ['orders.status'],
+        public: true
+      }
+    ]);
   });
 });

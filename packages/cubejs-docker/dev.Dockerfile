@@ -8,8 +8,9 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
+    # python3 package is necessary to install `python3` executable for node-gyp
     && apt-get install -y --no-install-recommends libssl3 curl \
-       cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
+       cmake python3 python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup

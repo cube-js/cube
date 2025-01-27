@@ -57,6 +57,32 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) join with filtered grouped query: join grouped with filter 1`] = `
+Array [
+  Object {
+    "count": "2",
+    "status": "processed",
+  },
+  Object {
+    "count": "2",
+    "status": "new",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) join with grouped query: join grouped 1`] = `
+Array [
+  Object {
+    "count": "2",
+    "status": "processed",
+  },
+  Object {
+    "count": "1",
+    "status": "shipped",
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) metabase max number: metabase max number 1`] = `
 Array [
   Object {

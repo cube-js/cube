@@ -457,6 +457,66 @@ with a data source][ref-config-multiple-ds-decorating-env].
 | -------------------------------------- | ---------------------- | --------------------- |
 | [A valid AWS region][aws-docs-regions] | N/A                    | N/A                   |
 
+## `CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY`
+
+The Azure Access Key to use for the export bucket.
+
+<InfoBox>
+
+When using multiple data sources, this environment variable can be [decorated
+with a data source][ref-config-multiple-ds-decorating-env].
+
+</InfoBox>
+
+| Possible Values          | Default in Development | Default in Production |
+| ------------------------ | ---------------------- | --------------------- |
+| A valid Azure Access Key | N/A                    | N/A                   |
+
+## `CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID`
+
+The Azure tenant ID to use for the export bucket.
+
+<InfoBox>
+
+When using multiple data sources, this environment variable can be [decorated
+with a data source][ref-config-multiple-ds-decorating-env].
+
+</InfoBox>
+
+| Possible Values         | Default in Development | Default in Production |
+| ----------------------- | ---------------------- | --------------------- |
+| A valid Azure Tenant ID | N/A                    | N/A                   |
+
+## `CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID`
+
+The Azure client ID to use for the export bucket.
+
+<InfoBox>
+
+When using multiple data sources, this environment variable can be [decorated
+with a data source][ref-config-multiple-ds-decorating-env].
+
+</InfoBox>
+
+| Possible Values         | Default in Development | Default in Production |
+| ----------------------- | ---------------------- | --------------------- |
+| A valid Azure Client ID | N/A                    | N/A                   |
+
+## `CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET`
+
+The Azure client secret to use for the export bucket.
+
+<InfoBox>
+
+When using multiple data sources, this environment variable can be [decorated
+with a data source][ref-config-multiple-ds-decorating-env].
+
+</InfoBox>
+
+| Possible Values             | Default in Development | Default in Production |
+| --------------------------- | ---------------------- | --------------------- |
+| A valid Azure Client Secret | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`
 
 The mount path to use for a [Databricks DBFS mount][databricks-docs-dbfs].
@@ -602,6 +662,17 @@ The cluster name to use when connecting to [Materialize](/product/configuration/
 | Possible Values                                           | Default in Development | Default in Production |
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | A valid Materialize cluster name                          | N/A                    | N/A                   |
+
+## `CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES`
+
+This flag controls how time zones conversion is done in the generated SQL for MySQL:
+- If it is set to `true`, time zone names are used. In this case, your MySQL server needs
+to be [configured][mysql-server-tz-support] properly.
+- If it is set to `false`, numeric offsets are used instead.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
 
 ## `CUBEJS_DB_SNOWFLAKE_ACCOUNT`
 
@@ -1552,3 +1623,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming
 [ref-row-limit]: /product/apis-integrations/queries#row-limit
+[mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html

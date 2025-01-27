@@ -193,6 +193,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('1')
     .asInt(),
   nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').asBool(),
+  nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -796,6 +799,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+    * Client Secret for the Azure based export bucket storage.
+    */
+  dbExportBucketAzureClientSecret: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET', dataSource)
+    ]
+  ),
+
+  /**
    * Azure Federated Token File Path for the Azure based export bucket storage.
    */
   dbExportBucketAzureTokenFilePAth: ({
@@ -851,6 +867,44 @@ const variables: Record<string, (...args: any) => any> = {
       );
     }
     return undefined;
+  },
+
+  /** ****************************************************************
+   * MySQL Driver                                                    *
+   ***************************************************************** */
+
+  /**
+   * Use timezone names for date/time conversions.
+   * Defaults to FALSE, meaning that numeric offsets for timezone will be used.
+   * @see https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_convert-tz
+   * @see https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
+   */
+  mysqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
+        dataSource,
+      )
+    ];
+
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
   },
 
   /** ****************************************************************
@@ -1478,6 +1532,39 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Snowflake case sensitivity for identifiers (like database columns).
+   */
+  snowflakeQuotedIdentIgnoreCase: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
+        dataSource,
+      )
+    ];
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
+  },
   /** ****************************************************************
    * Presto Driver                                                   *
    ***************************************************************** */

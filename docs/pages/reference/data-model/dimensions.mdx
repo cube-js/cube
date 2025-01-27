@@ -10,7 +10,9 @@ The `dimensions` property contains a set of dimensions. You can think about a
 dimension as an attribute related to a measure, e.g. the measure `user_count`
 can have dimensions like `country`, `age`, `occupation`, etc.
 
-Any dimension should have the following properties: `name`, `sql` and `type`.
+Any dimension should have the following parameters: `name`, `sql` and `type`.
+
+Dimensions can be also organized into [hierarchies][ref-ref-hierarchies].
 
 ## Parameters
 
@@ -425,13 +427,7 @@ cubes:
 
 ### `public`
 
-<InfoBox>
-
-Prior to v0.33, this property was called `shown`.
-
-</InfoBox>
-
-The `public` property is used to manage the visibility of a dimension. Valid
+The `public` parameter is used to manage the visibility of a dimension. Valid
 values for `public` are `true` and `false`. When set to `false`, this dimension
 **cannot** be queried through the API. Defaults to `true`.
 
@@ -716,3 +712,4 @@ cube(`orders`, {
 [ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
 [link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
 [ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
+[ref-ref-hierarchies]: /reference/data-model/hierarchies

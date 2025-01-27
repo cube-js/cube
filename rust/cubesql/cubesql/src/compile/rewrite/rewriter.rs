@@ -23,7 +23,6 @@ use datafusion::{
     logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner, scalar::ScalarValue,
 };
 use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -359,7 +358,7 @@ impl Rewriter {
                     let Some((best_cost, best)) = extractor.find_best(root) else {
                         return Err(CubeError::internal("Unable to find best plan".to_string()));
                     };
-                    log::debug!("Best cost: {:?}", best_cost);
+                    log::debug!("Best cost: {:#?}", best_cost);
                     best
                 } else {
                     let extractor = Extractor::new(
@@ -367,7 +366,7 @@ impl Rewriter {
                         BestCubePlan::new(cube_context.meta.clone()),
                     );
                     let (best_cost, best) = extractor.find_best(root);
-                    log::debug!("Best cost: {:?}", best_cost);
+                    log::debug!("Best cost: {:#?}", best_cost);
                     best
                 };
                 let qtrace_best_graph = if Qtrace::is_enabled() {
@@ -376,14 +375,7 @@ impl Rewriter {
                     vec![]
                 };
                 let new_root = Id::from(best.as_ref().len() - 1);
-                log::debug!(
-                    "Best: {}",
-                    best.as_ref()
-                        .iter()
-                        .enumerate()
-                        .map(|(i, n)| format!("{}: {:?}", i, n))
-                        .join(", ")
-                );
+                log::debug!("Best: {}", best.pretty(120));
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
@@ -558,10 +550,12 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
         if iteration != self.current_iter {
             self.current_iter = iteration;
             self.current_eclasses.clear();
-            self.current_eclasses
-                .extend(egraph.classes().filter_map(|class| {
-                    (class.data.iteration_timestamp >= iteration).then(|| class.id)
-                }));
+            self.current_eclasses.extend(
+                egraph
+                    .classes()
+                    .filter(|class| (class.data.iteration_timestamp >= iteration))
+                    .map(|class| class.id),
+            );
         };
         assert_eq!(iteration, self.current_iter);
         rewrite.searcher.search_eclasses_with_limit(

@@ -25,6 +25,9 @@ on:
       - 'package.json'
       - 'yarn.lock'
 
+env:
+  CUBEJS_TESSERACT_ORCHESTRATOR: true
+
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-20.04
@@ -59,11 +62,20 @@ jobs:
       matrix:
         node-version: [ 20.x ]
         db: [ 'athena', 'bigquery', 'snowflake' ]
+        target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-07-15
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
+          target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -82,17 +94,37 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.22
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
-      - name: Build client
+        uses: nick-fields/retry@v3
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+      - name: Build Core Client libraries
         run: yarn build
+      - name: Build other packages
+        run: yarn lerna run --concurrency 1 build
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build cubejs-backend-native (without Python)
+        run: yarn run native:build-release
+        working-directory: ./packages/cubejs-backend-native
       - name: Run Integration tests for ${{ matrix.db }} matrix
-        timeout-minutes: 30
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 30
+          command: ./.github/actions/integration/${{ matrix.db }}.sh
         env:
           CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
           CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
           CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
           CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
-        run: ./.github/actions/integration/${{ matrix.db }}.sh

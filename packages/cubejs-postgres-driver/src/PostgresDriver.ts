@@ -16,7 +16,7 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
@@ -118,7 +118,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+
     this.pool = new Pool({
       idleTimeoutMillis: 30000,
       max:
@@ -146,9 +146,9 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected primaryKeysQuery(conditionString?: string): string | null {
-    return `SELECT 
+    return `SELECT
       columns.table_schema as ${this.quoteIdentifier('table_schema')},
-      columns.table_name as ${this.quoteIdentifier('table_name')}, 
+      columns.table_name as ${this.quoteIdentifier('table_name')},
       columns.column_name as ${this.quoteIdentifier('column_name')}
     FROM information_schema.table_constraints tc
     JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
@@ -358,6 +358,14 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     } finally {
       await conn.release();
     }
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 63) {
+      throw new Error('PostgreSQL can not work with table names longer than 63 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+    return super.createTable(quotedTableName, columns);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

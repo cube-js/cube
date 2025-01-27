@@ -106,7 +106,7 @@ export class CubeToMetaTransformer {
           })),
           R.toPairs
         )(cube.segments || {}),
-        hierarchies: (cube.hierarchies || []).map((it) => ({
+        hierarchies: (cube.evaluatedHierarchies || []).map((it) => ({
           ...it,
           public: it.public ?? true,
           name: `${cube.name}.${it.name}`,

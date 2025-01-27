@@ -8,7 +8,7 @@ const {
   getEnv,
   assertDataSource,
 } = require('@cubejs-backend/shared');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { BaseDriver, TableColumn } = require('@cubejs-backend/base-driver');
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 
@@ -95,13 +95,13 @@ class OracleDriver extends BaseDriver {
           , tc.data_type      "data_type"
           , c.constraint_type "key_type"
       from all_tab_columns tc
-      left join all_cons_columns cc 
-        on (tc.owner, tc.table_name, tc.column_name) 
+      left join all_cons_columns cc
+        on (tc.owner, tc.table_name, tc.column_name)
         in ((cc.owner, cc.table_name, cc.column_name))
-      left join all_constraints c 
-        on (tc.owner, tc.table_name, cc.constraint_name) 
-        in ((c.owner, c.table_name, c.constraint_name)) 
-        and c.constraint_type 
+      left join all_constraints c
+        on (tc.owner, tc.table_name, cc.constraint_name)
+        in ((c.owner, c.table_name, c.constraint_name))
+        and c.constraint_type
         in ('P','U')
       where tc.owner = user
     `);
@@ -119,6 +119,14 @@ class OracleDriver extends BaseDriver {
 
   async testConnection() {
     await this.query('SELECT 1 FROM DUAL', {});
+  }
+
+  async createTable(quotedTableName, columns) {
+    if (quotedTableName.length > 128) {
+      throw new Error('Oracle can not work with table names longer than 128 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+    return super.createTable(quotedTableName, columns);
   }
 
   async query(query, values) {

@@ -19,7 +19,7 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
   typeof message === 'string' ? message : JSON.stringify(message)
 );
 
-export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
+export type WebSocketSendMessageFn = (connectionId: string, message: any) => Promise<void>;
 
 export class SubscriptionServer {
   public constructor(
@@ -31,7 +31,7 @@ export class SubscriptionServer {
   }
 
   public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
-    return (message, { status } = { status: 200 }) => {
+    return async (message, { status } = { status: 200 }) => {
       this.apiGateway.log({
         type: 'Outgoing network usage',
         service: 'api-ws',

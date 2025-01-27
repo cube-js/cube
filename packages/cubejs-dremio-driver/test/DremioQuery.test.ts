@@ -63,7 +63,7 @@ cube(\`sales\`, {
     const queryAndParams = query.buildSqlAndParams();
 
     expect(queryAndParams[0]).toContain(
-      'DATE_TRUNC(\'day\', CONVERT_TIMEZONE(\'-08:00\', "sales".sales_datetime))'
+      'DATE_TRUNC(\'day\', CONVERT_TIMEZONE(\'America/Los_Angeles\', "sales".sales_datetime))'
     );
   }));
 
