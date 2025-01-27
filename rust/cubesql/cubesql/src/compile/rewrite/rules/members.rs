@@ -288,7 +288,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanWrapped:false",
                     "CubeScanUngrouped:false",
                 ),
-                self.select_distinct_dimensions("?members", "?limit"),
+                self.select_distinct_dimensions(/*"?members",*/ "?limit"),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -1508,10 +1508,10 @@ impl MemberRules {
 
     fn select_distinct_dimensions(
         &self,
-        members_var: &'static str,
+        // members_var: &'static str,
         limit_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let members_var = var!(members_var);
+        // let members_var = var!(members_var);
         let limit_var = var!(limit_var);
 
         move |egraph, subst| {
@@ -1523,7 +1523,13 @@ impl MemberRules {
                 return false;
             }
 
-            for members in var_list_iter!(egraph[subst[members_var]], CubeScanMembers) {}
+            // for members in var_list_iter!(egraph[subst[members_var]], CubeScanMembers) {
+            //     // TODO: check if all members in request are dimensions
+            //     // If no - return false
+            //     for member in members.iter() {
+            //         println!("member: {:?}", egraph[*member]);
+            //     }
+            // }
 
             true
         }
