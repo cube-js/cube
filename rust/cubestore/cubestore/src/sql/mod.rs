@@ -982,36 +982,37 @@ impl SqlService for SqlServiceImpl {
             //         .await?;
             //     Ok(Arc::new(DataFrame::from(vec![res])))
             // }
-            // CubeStoreStatement::Statement(Statement::Drop {
-            //     object_type, names, ..
-            // }) => {
-            //     let command = match object_type {
-            //         ObjectType::Schema => {
-            //             self.db.delete_schema(names[0].to_string()).await?;
-            //             &"drop_schema"
-            //         }
-            //         ObjectType::Table => {
-            //             let table = self
-            //                 .db
-            //                 .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
-            //                 .await?;
-            //             self.db.drop_table(table.get_id()).await?;
-            //             &"drop_table"
-            //         }
-            //         ObjectType::PartitionedIndex => {
-            //             let schema = names[0].0[0].value.clone();
-            //             let name = names[0].0[1].value.clone();
-            //             self.db.drop_partitioned_index(schema, name).await?;
-            //             &"drop_partitioned_index"
-            //         }
-            //         _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
-            //     };
-            //
-            //     app_metrics::DATA_QUERIES
-            //         .add_with_tags(1, Some(&vec![metrics::format_tag("command", command)]));
-            //
-            //     Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            // }
+            CubeStoreStatement::Statement(Statement::Drop {
+                object_type, names, ..
+            }) => {
+                let command = match object_type {
+                    ObjectType::Schema => {
+                        self.db.delete_schema(names[0].to_string()).await?;
+                        &"drop_schema"
+                    }
+                    ObjectType::Table => {
+                        let table = self
+                            .db
+                            .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
+                            .await?;
+                        self.db.drop_table(table.get_id()).await?;
+                        &"drop_table"
+                    }
+                    // TODO upgrade DF
+                    // ObjectType::PartitionedIndex => {
+                    //     let schema = names[0].0[0].value.clone();
+                    //     let name = names[0].0[1].value.clone();
+                    //     self.db.drop_partitioned_index(schema, name).await?;
+                    //     &"drop_partitioned_index"
+                    // }
+                    _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
+                };
+
+                app_metrics::DATA_QUERIES
+                    .add_with_tags(1, Some(&vec![metrics::format_tag("command", command)]));
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
             CubeStoreStatement::Statement(Statement::Insert(Insert {
                 table_name,
                 columns,
@@ -4456,7 +4457,7 @@ mod tests {
                 .unwrap();
 
             let _ = service
-                .exec_query("CREATE TABLE test.events_by_type_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .exec_query("CREATE TABLE test.events_by_type_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= ''2022-01-01'' AND time < ''2022-02-01''') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .unwrap();
 
@@ -4500,7 +4501,7 @@ mod tests {
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
-                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                select_statement = 'SELECT a as a, b + c as b FROM `EVENTS_BY_TYPE` WHERE c > 10',\
                 source_table = 'CREATE TABLE events1 (a int, b int, c int)'
                             ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
                 .await

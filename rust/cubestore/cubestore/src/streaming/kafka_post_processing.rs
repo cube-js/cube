@@ -1,4 +1,5 @@
 use crate::metastore::Column;
+use crate::queryplanner::{QueryPlan, QueryPlannerImpl};
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
@@ -8,9 +9,11 @@ use datafusion::arrow::datatypes::{Field, Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common;
 use datafusion::common::{DFSchema, DFSchemaRef};
+use datafusion::config::ConfigOptions;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::expr::{Alias, ScalarFunction};
 use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection};
+use datafusion::optimizer::AnalyzerRule;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
@@ -140,7 +143,16 @@ impl KafkaPostProcessPlanner {
                 .map(|c| c.clone().into())
                 .collect::<Vec<Field>>(),
         ));
-        let logical_plan = self.make_logical_plan(&select_statement)?;
+        let logical_plan: LogicalPlan = self.make_logical_plan(&select_statement)?;
+        // Here we want to expand wildcards for extract_source_unique_columns.  Also, we run the
+        // entire Analyzer pass, because make_projection_and_filter_physical_plans specifically
+        // skips the Analyzer pass and LogicalPlan optimization steps performed by
+        // SessionState::create_physical_plan.
+        let logical_plan: LogicalPlan = datafusion::optimizer::Analyzer::new().execute_and_check(
+            logical_plan,
+            &ConfigOptions::default(),
+            |_, _| {},
+        )?;
         let source_unique_columns = self.extract_source_unique_columns(&logical_plan)?;
 
         let (projection_plan, filter_plan) = self
@@ -422,19 +434,20 @@ impl KafkaPostProcessPlanner {
                             schema.clone(),
                             projection_input.clone(),
                         )?;
-                        // TODO upgrade DF: SessionContext::new_...
-                        let plan_ctx =
-                            Arc::new(SessionContext::new_with_config(SessionConfig::new()));
 
-                        let projection_phys_plan = plan_ctx
-                            .state()
-                            .create_physical_plan(&projection_plan)
-                            .await?
+                        let plan_ctx = QueryPlannerImpl::make_execution_context();
+                        let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
+
+                        let projection_phys_plan_without_new_children = state
+                            .query_planner()
+                            .create_physical_plan(&projection_plan, &state)
+                            .await?;
+                        let projection_phys_plan = projection_phys_plan_without_new_children
                             .with_new_children(vec![empty_exec.clone()])?;
 
-                        let filter_phys_plan = plan_ctx
-                            .state()
-                            .create_physical_plan(&filter_plan)
+                        let filter_phys_plan = state
+                            .query_planner()
+                            .create_physical_plan(&filter_plan, &state)
                             .await?
                             .with_new_children(vec![empty_exec.clone()])?;
 
@@ -448,11 +461,13 @@ impl KafkaPostProcessPlanner {
                 LogicalPlan::TableScan { .. } => {
                     let projection_plan =
                         self.make_projection_plan(expr, schema.clone(), projection_input.clone())?;
-                    // TODO upgrade DF: SessionContext::new_...
-                    let plan_ctx = Arc::new(SessionContext::new_with_config(SessionConfig::new()));
-                    let projection_phys_plan = plan_ctx
-                        .state()
-                        .create_physical_plan(&projection_plan)
+
+                    let plan_ctx = QueryPlannerImpl::make_execution_context();
+                    let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
+
+                    let projection_phys_plan = state
+                        .query_planner()
+                        .create_physical_plan(&projection_plan, &state)
                         .await?
                         .with_new_children(vec![empty_exec.clone()])?;
                     Ok((projection_phys_plan, None))
@@ -515,9 +530,10 @@ impl KafkaPostProcessPlanner {
         match expr {
             Expr::Column(c) => Ok(c.name.clone()),
             Expr::Alias(Alias { name, .. }) => Ok(name.clone()),
-            _ => Err(CubeError::user(
-                "All expressions must have aliases in kafka streaming queries".to_string(),
-            )),
+            _ => Err(CubeError::user(format!(
+                "All expressions must have aliases in kafka streaming queries, expression is {:?}",
+                expr
+            ))),
         }
     }
 
