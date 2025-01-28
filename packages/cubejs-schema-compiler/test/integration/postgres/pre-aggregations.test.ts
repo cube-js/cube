@@ -547,14 +547,15 @@ describe('PreAggregations', () => {
     });
   }));
 
-  it('simple pre-aggregation (with no granularity in query)', () => compiler.compile().then(() => {
+  it('simple pre-aggregation (allowNonStrictDateRangeMatch: true)', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
       ],
       timeDimensions: [{
         dimension: 'visitors.createdAt',
-        dateRange: ['2017-01-01 00:00:00.000', '2017-01-29 22:59:59.999']
+        dateRange: ['2017-01-01 00:10:00.000', '2017-01-29 22:59:59.999'],
+        granularity: 'hour',
       }],
       timezone: 'America/Los_Angeles',
       preAggregationsSchema: ''
@@ -567,9 +568,24 @@ describe('PreAggregations', () => {
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
-        [{
-          visitors__count: '5'
-        }]
+        [
+          {
+            visitors__count: '1',
+            visitors__created_at_hour: '2017-01-02T16:00:00.000Z',
+          },
+          {
+            visitors__count: '1',
+            visitors__created_at_hour: '2017-01-04T16:00:00.000Z',
+          },
+          {
+            visitors__count: '1',
+            visitors__created_at_hour: '2017-01-05T16:00:00.000Z',
+          },
+          {
+            visitors__count: '2',
+            visitors__created_at_hour: '2017-01-06T16:00:00.000Z',
+          },
+        ]
       );
     });
   }));
