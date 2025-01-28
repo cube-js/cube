@@ -1,6 +1,6 @@
 pub mod kafka;
 mod kafka_post_processing;
-mod topic_table_provider;
+pub(crate) mod topic_table_provider;
 mod traffic_sender;
 
 mod buffered_stream;
@@ -1169,7 +1169,7 @@ mod tests {
             let listener = services.cluster.job_result_listener();
 
             let _ = service
-                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'', stream_offset = 'earliest') unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://ksql/EVENTS_BY_TYPE/0', 'stream://ksql/EVENTS_BY_TYPE/1'")
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= ''2022-01-01'' AND time < ''2022-02-01''', stream_offset = 'earliest') unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://ksql/EVENTS_BY_TYPE/0', 'stream://ksql/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap();
 
@@ -1464,7 +1464,7 @@ mod tests {
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int) \
-                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE FILTER_ID >= 1000 and FILTER_ID < 1400') \
+                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM `EVENTS_BY_TYPE` WHERE `FILTER_ID` >= 1000 and `FILTER_ID` < 1400') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`) INDEX by_anonymous(`ANONYMOUSID`, `FILTER_ID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap();
@@ -1482,13 +1482,13 @@ mod tests {
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(800)])]);
 
             let result = service
-                .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
+                .exec_query("SELECT min(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1000)])]);
 
             let result = service
-                .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
+                .exec_query("SELECT max(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1399)])]);
@@ -1528,10 +1528,10 @@ mod tests {
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` timestamp) \
-                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE \
-                            WHERE  TIMESTAMP >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM `EVENTS_BY_TYPE` \
+                            WHERE  `TIMESTAMP` >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            TIMESTAMP < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            `TIMESTAMP` < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             ') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
@@ -1550,13 +1550,13 @@ mod tests {
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(20 * 60)])]);
 
             let result = service
-                .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
+                .exec_query("SELECT min(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600)])]);
 
             let result = service
-                .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
+                .exec_query("SELECT max(`FILTER_ID`) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
@@ -1598,10 +1598,10 @@ mod tests {
                                   stream_offset = 'earliest',
                                   select_statement = 'SELECT \
                                   *
-                                   FROM EVENTS_BY_TYPE \
-                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                                   FROM `EVENTS_BY_TYPE` \
+                            WHERE  PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             \
                             '\
                             ) \
@@ -1614,11 +1614,11 @@ mod tests {
                             WITH (\
                                   stream_offset = 'earliest',
                                   select_statement = 'SELECT \
-                                  ANONYMOUSID as ANONYMOUSID, MESSAGEID as MESSAGEID, FILTER_ID + 5 as FILTER_ID, TIMESTAMP as TIMESTAMP
-                                   FROM EVENTS_BY_TYPE \
-                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                                  `ANONYMOUSID` as `ANONYMOUSID`, `MESSAGEID` as `MESSAGEID`, `FILTER_ID` + 5 as `FILTER_ID`, `TIMESTAMP` as `TIMESTAMP`
+                                   FROM `EVENTS_BY_TYPE` \
+                            WHERE  PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             \
                             '\
                             ) \
@@ -1631,11 +1631,11 @@ mod tests {
                             WITH (\
                                   stream_offset = 'earliest',
                                   select_statement = 'SELECT \
-                                  ANONYMOUSID as ANONYMOUSID, MESSAGEID + 3 as MESSAGEID, FILTER_ID + 5 as FILTER_ID
-                                   FROM EVENTS_BY_TYPE \
-                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                                  `ANONYMOUSID` as `ANONYMOUSID`, `MESSAGEID` + 3 as `MESSAGEID`, `FILTER_ID` + 5 as `FILTER_ID`
+                                   FROM `EVENTS_BY_TYPE` \
+                            WHERE  PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             \
                             '\
                             ) \
@@ -1648,28 +1648,28 @@ mod tests {
                             WITH (\
                                   stream_offset = 'earliest',
                                   select_statement = 'SELECT \
-                                  ANONYMOUSID an_id,
-                                  MESSAGEID message_id,
-                                  FILTER_ID filter_id,
+                                  `ANONYMOUSID` an_id,
+                                  `MESSAGEID` message_id,
+                                  `FILTER_ID` filter_id,
                                   PARSE_TIMESTAMP(\
                                     FORMAT_TIMESTAMP(\
                                         CONVERT_TZ(\
-                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'),
-                                            \\'UTC\\',
-                                            \\'UTC\\'
+                                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX''),
+                                            ''UTC'',
+                                            ''UTC''
                                         ),
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\'
+                                        ''yyyy-MM-dd''''T''''HH:mm:00.000''
                                         ),
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\',
-                                        \\'UTC\\'
+                                        ''yyyy-MM-dd''''T''''HH:mm:ss.SSS'',
+                                        ''UTC''
                                     ) minute_timestamp
-                                   FROM EVENTS_BY_TYPE \
-                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                                   FROM `EVENTS_BY_TYPE` \
+                            WHERE  PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             \
                             ',\
-                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            source_table='CREATE TABLE `EVENTS_BY_TYPE` (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
                             ) \
                             unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
@@ -1680,28 +1680,28 @@ mod tests {
                             WITH (\
                                   stream_offset = 'earliest',
                                   select_statement = 'SELECT \
-                                  ANONYMOUSID an_id,
-                                  MESSAGEID message_id,
-                                  FILTER_ID filter_id,
+                                  `ANONYMOUSID` an_id,
+                                  `MESSAGEID` message_id,
+                                  `FILTER_ID` filter_id,
                                   PARSE_TIMESTAMP(\
                                     FORMAT_TIMESTAMP(\
                                         CONVERT_TZ(\
-                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'),
-                                            \\'UTC\\',
-                                            \\'UTC\\'
+                                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX''),
+                                            ''UTC'',
+                                            ''UTC''
                                         ),
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\'
+                                        ''yyyy-MM-dd''''T''''HH:mm:00.000''
                                         ),
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\',
-                                        \\'UTC\\'
+                                        ''yyyy-MM-dd''''T''''HH:mm:ss.SSS'',
+                                        ''UTC''
                                     ) minute_timestamp
-                                   FROM EVENTS_BY_TYPE \
-                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                                   FROM `EVENTS_BY_TYPE` \
+                            WHERE  PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             \
                             ',\
-                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            source_table='CREATE TABLE `EVENTS_BY_TYPE` (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
                             ) \
                             unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
@@ -1712,12 +1712,12 @@ mod tests {
                             WITH (\
                                   stream_offset = 'earliest',
                                   select_statement = 'SELECT \
-                                        ANONYMOUSID, MESSAGEID, FILTER_ID, TIMESTAMP, \
-                                        PARSE_TIMESTAMP(FORMAT_TIMESTAMP(CONVERT_TZ(TIMESTAMP, \\'UTC\\', \\'UTC\\'), \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.000\\'), \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', \\'UTC\\') `TIMESTAMP_SECOND` \
-                                   FROM EVENTS_BY_TYPE \
-                            WHERE PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                                        `ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`, \
+                                        PARSE_TIMESTAMP(FORMAT_TIMESTAMP(CONVERT_TZ(`TIMESTAMP`, ''UTC'', ''UTC''), ''yyyy-MM-dd''''T''''HH:mm:ss.000''), ''yyyy-MM-dd''''T''''HH:mm:ss.SSS'', ''UTC'') `TIMESTAMP_SECOND` \
+                                   FROM `EVENTS_BY_TYPE` \
+                            WHERE PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             \
                             '\
                             ) \
@@ -1762,25 +1762,25 @@ mod tests {
                             WITH (\
                                   stream_offset = 'earliest',
                                   select_statement = 'SELECT \
-                                  ANONYMOUSID an_id,
-                                  MESSAGEID message_id,
-                                  FILTER_ID filter_id,
+                                  `ANONYMOUSID` an_id,
+                                  `MESSAGEID` message_id,
+                                  `FILTER_ID` filter_id,
                                   PARSE_TIMESTAMP(\
                                     FORMAT_TIMESTAMP(\
                                         CONVERT_TZ(\
-                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'),
-                                            \\'UTC\\',
-                                            \\'UTC\\'
+                                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX''),
+                                            ''UTC'',
+                                            ''UTC''
                                         ),
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\'
+                                        ''yyyy-MM-dd''''T''''HH:mm:00.000''
                                         ),
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\',
-                                        \\'UTC\\'
+                                        ''yyyy-MM-dd''''T''''HH:mm:ss.SSS'',
+                                        ''UTC''
                                     ) minute_timestamp
-                                   FROM EVENTS_BY_TYPE \
-                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                                   FROM `EVENTS_BY_TYPE` \
+                            WHERE  PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') >= PARSE_TIMESTAMP(''1970-01-01T01:00:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             AND
-                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            PARSE_TIMESTAMP(`TIMESTAMP`, ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') < PARSE_TIMESTAMP(''1970-01-01T01:10:00.000Z'', ''yyyy-MM-dd''''T''''HH:mm:ss.SSSX'', ''UTC'') \
                             \
                             ',\
                             source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\

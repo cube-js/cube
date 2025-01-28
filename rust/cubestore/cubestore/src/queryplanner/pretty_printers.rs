@@ -31,6 +31,7 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::SortColumn;
 use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
+use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::joins::{HashJoinExec, SortMergeJoinExec};
@@ -320,6 +321,8 @@ fn pp_source(t: Arc<dyn TableProvider>) -> String {
         .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
     {
         "InfoSchemaQueryCacheTableProvider".to_string()
+    } else if let Some(_) = t.as_any().downcast_ref::<TopicTableProvider>() {
+        "TopicTableProvider".to_string()
     } else {
         panic!("unknown table provider");
     }
