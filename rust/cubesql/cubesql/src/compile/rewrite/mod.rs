@@ -469,6 +469,13 @@ crate::plan_to_language! {
             // Known qualifiers of grouped subqueries
             // Used to allow to rewrite columns from them even with push to Cube enabled
             grouped_subqueries: Vec<String>,
+            // When `member` is logical plan this means it is actually ungrouped, even when push_to_cube is disabled.
+            // When `member` is expression it just acts as a pull-through from pushdown.
+            // It will be filled by every wrapper replacer producer rule, essentially same way as
+            // ungrouped_scan flag in wrapped_select is filled:
+            // fixed false for aggregation, copy inner value for projection.
+            // This flag should make roundtrip from top to bottom and back.
+            ungrouped_scan: bool,
         },
         WrapperPushdownReplacer {
             member: Arc<LogicalPlan>,
@@ -1974,9 +1981,10 @@ fn wrapper_replacer_context(
     in_projection: impl Display,
     cube_members: impl Display,
     grouped_subqueries: impl Display,
+    ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrapperReplacerContext {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries})",
+        "(WrapperReplacerContext {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries} {ungrouped_scan})",
     )
 }
 
