@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing-drivers",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "description": "Cube.js drivers test suite",
   "author": "Cube Dev, Inc.",
   "license": "MIT",
@@ -68,7 +68,7 @@
     "@cubejs-backend/mysql-driver": "1.1.17",
     "@cubejs-backend/postgres-driver": "1.1.17",
     "@cubejs-backend/query-orchestrator": "1.1.17",
-    "@cubejs-backend/server-core": "1.1.17",
+    "@cubejs-backend/server-core": "1.1.18",
     "@cubejs-backend/shared": "1.1.17",
     "@cubejs-backend/snowflake-driver": "1.1.17",
     "@cubejs-backend/testing-shared": "1.1.17",

@@ -24,6 +24,8 @@ Monitoring integrations suspend their work when a deployment goes to [auto-suspe
 
 </WarningBox>
 
+Monitoring integrations are only available for [production environments][ref-prod-env].
+
 Under the hood, Cube Cloud uses [Vector][vector], an open-source tool for
 collecting and delivering monitoring data. It supports a [wide range of
 destinations][vector-docs-sinks], also known as _sinks_.
@@ -295,3 +297,4 @@ setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 [prometheus]: https://prometheus.io
 [mimir]: https://grafana.com/oss/mimir/
 [grafana-cloud]: https://grafana.com/products/cloud/
+[ref-prod-env]: /product/workspace/environments#production-environment

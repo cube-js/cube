@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.18](https://github.com/cube-js/cube/compare/v1.1.17...v1.1.18) (2025-01-27)
+
+### Bug Fixes
+
+- **api-gateway:** Fix graphql query result processing via native results ([#9146](https://github.com/cube-js/cube/issues/9146)) ([7974eac](https://github.com/cube-js/cube/commit/7974eac4f32d5c81fea6266224821424f67b5ead))
+
 ## [1.1.17](https://github.com/cube-js/cube/compare/v1.1.16...v1.1.17) (2025-01-27)
 
 ### Features
