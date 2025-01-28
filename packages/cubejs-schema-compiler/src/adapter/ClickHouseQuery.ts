@@ -192,12 +192,12 @@ export class ClickHouseQuery extends BaseQuery {
       return '';
     }
 
-    const collation = getEnv('clickhouseSortCollation') || 'en';
+    const collation = getEnv('clickhouseSortCollation');
 
     const orderByString = R.pipe(
       R.map((order) => {
         let orderString = this.orderHashToString(order);
-        if (this.getFieldType(order) === 'string') {
+        if (this.getFieldType(order) === 'string') && collation !== '' {
           orderString = `${orderString} COLLATE '${collation}'`;
         }
         return orderString;
