@@ -28,7 +28,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
             Field::new("id", DataType::UInt64, false),
             Field::new("file_name", DataType::Utf8, false),
             Field::new("partition_id", DataType::UInt64, false),
-            Field::new("replay_handle_id", DataType::UInt64, false),
+            Field::new("replay_handle_id", DataType::UInt64, true),
             Field::new("row_count", DataType::UInt64, true),
             Field::new("uploaded", DataType::Boolean, true),
             Field::new("active", DataType::Boolean, true),
@@ -46,7 +46,7 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
             Field::new(
                 "deactivated_at",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new("file_size", DataType::UInt64, true),
             Field::new("min_row", DataType::Utf8, true),
