@@ -1,8 +1,12 @@
 import moment from 'moment-timezone';
 import {
   addInterval,
-  isPredefinedGranularity, parseSqlInterval,
-  QueryDateRange, timeSeries,
+  alignToOrigin,
+  isPredefinedGranularity,
+  parsedSqlIntervalToDuration,
+  parseSqlInterval,
+  QueryDateRange,
+  timeSeries,
   timeSeriesFromCustomInterval,
   TimeSeriesOptions
 } from '@cubejs-backend/shared';
@@ -157,6 +161,25 @@ export class Granularity {
     } else /* if (intervalParsed.year) */ {
       return 'year';
     }
+  }
+
+  public isAlignedWithDateRange([startStr, endStr]: QueryDateRange): boolean {
+    const intervalParsed = parseSqlInterval(this.granularityInterval);
+    const grIntervalDuration = parsedSqlIntervalToDuration(intervalParsed);
+    const msFrom = moment.tz(startStr, this.queryTimezone);
+    const msTo = moment.tz(endStr, this.queryTimezone).add(1, 'ms');
+    const dateRangeDuration = moment.duration(msTo.diff(msFrom));
+
+    if (dateRangeDuration.asMilliseconds() % grIntervalDuration.asMilliseconds() !== 0) {
+      return false;
+    }
+
+    const closestDate = alignToOrigin(msFrom, intervalParsed, this.origin);
+    if (!msFrom.isSame(closestDate)) {
+      return false;
+    }
+
+    return true;
   }
 
   public isNaturalAligned(): boolean {
