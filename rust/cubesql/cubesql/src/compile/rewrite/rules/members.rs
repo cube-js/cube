@@ -1520,17 +1520,17 @@ impl MemberRules {
                 .member_name_to_expr
                 .as_ref()
                 .map_or(true, |member_names_to_expr| {
-                    !member_names_to_expr.list.iter().any(|(_, member, _)| {
-                        // we should allow transform only for queries with dimensions only,
+                    !member_names_to_expr.list.iter().all(|(_, member, _)| {
+                        // we should allow transform for queries with dimensions only,
                         // as it doesn't make sense for measures
-                        meta_context
-                            .find_measure_with_name(
-                                member
-                                    .name()
-                                    .expect("Measure should have a name")
-                                    .to_string(),
-                            )
-                            .is_some()
+                        if let Some(name) = member.name() {
+                            meta_context
+                                .find_dimension_with_name(name.to_string())
+                                .is_some()
+                                || meta_context.is_synthetic_field(name.to_string())
+                        } else {
+                            true
+                        }
                     })
                 })
         }
