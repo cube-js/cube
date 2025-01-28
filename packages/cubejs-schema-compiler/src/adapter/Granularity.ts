@@ -109,6 +109,14 @@ export class Granularity {
     return timeSeriesFromCustomInterval(this.granularityInterval, dateRange, moment(this.originLocalFormatted()), options);
   }
 
+  public resolvedGranularity(): string {
+    if (this.predefinedGranularity) {
+      return this.granularity;
+    }
+
+    return this.granularityFromInterval();
+  }
+
   /**
    * Returns the smallest granularity for the granularityInterval
    */

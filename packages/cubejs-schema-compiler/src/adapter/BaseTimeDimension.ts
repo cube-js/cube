@@ -241,7 +241,14 @@ export class BaseTimeDimension extends BaseFilter {
               return this.dateRangeGranularity();
             }
 
-            return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
+            // If we have granularity and date range, we need to check
+            // that the interval and the granularity offset are stacked/fits with date range
+            if (this.granularityObj.isPredefined() ||
+              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()])) {
+              return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
+            }
+
+            return this.granularityObj.granularity;
           }
         );
     }
@@ -263,10 +270,6 @@ export class BaseTimeDimension extends BaseFilter {
 
   public resolvedGranularity() {
     return this.granularityObj ? this.granularityObj.resolvedGranularity() : this.dateRangeGranularity();
-  }
-
-  public isPredefinedGranularity(): boolean {
-    return this.granularityObj?.isPredefined() || false;
   }
 
   public wildcardRange() {
