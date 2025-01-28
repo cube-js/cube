@@ -247,7 +247,10 @@ mod tests {
                 None,
                 Some(5),
             ])),
-            Arc::new(Decimal128Array::from(vec![Some(9), Some(7), Some(8), None])),
+            Arc::new(
+                Decimal128Array::from(vec![Some(9), Some(7), Some(8), None])
+                    .with_data_type(datafusion::arrow::datatypes::DataType::Decimal128(5, 4)),
+            ),
             Arc::new(Float64Array::from(vec![
                 Some(3.3),
                 None,
