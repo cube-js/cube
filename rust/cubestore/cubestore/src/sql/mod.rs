@@ -3204,25 +3204,32 @@ mod tests {
 
                 println!("All partitions: {:#?}", partitions);
 
-                // TODO API to wait for all jobs to be completed and all events processed
-                Delay::new(Duration::from_millis(500)).await;
+                // Semi-busy-wait for, or, seemingly, induce, compaction for 2000 ms.
+                let num_attempts = 100;
+                for i in 0..num_attempts {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
 
-                let plans = service
-                    .plan_query("SELECT sum(num) from foo.numbers where num = 50")
-                    .await
-                    .unwrap();
+                    let plans = service
+                        .plan_query("SELECT sum(num) from foo.numbers where num = 50")
+                        .await
+                        .unwrap();
 
-                let worker_plan = pp_phys_plan(plans.worker.as_ref());
-                println!("Worker Plan: {}", worker_plan);
-                let parquet_regex = Regex::new(r"\d+-[a-z0-9]+.parquet").unwrap();
-                let matches = parquet_regex.captures_iter(&worker_plan).count();
-                assert!(
-                    // TODO 2 because partition pruning doesn't respect half open intervals yet
-                    matches < 3 && matches > 0,
-                    "{}\nshould have 2 and less partition scan nodes, matches = {}",
-                    worker_plan,
-                    matches,
-                );
+                    let worker_plan = pp_phys_plan(plans.worker.as_ref());
+                    let parquet_regex = Regex::new(r"\d+-[a-z0-9]+\.parquet").unwrap();
+                    let matches = parquet_regex.captures_iter(&worker_plan).count();
+                    let chunk_parquet_regex = Regex::new(r"\d+-[a-z0-9]+\.chunk\.parquet").unwrap();
+                    let chunk_matches = chunk_parquet_regex.captures_iter(&worker_plan).count();
+                    if matches < 3 && matches > 0 && chunk_matches == 0 {
+                        break;
+                    } else if i == num_attempts - 1 {
+                        panic!(
+                            "{}\nshould have 2 and less partition scan nodes, matches = {}, chunk_matches = {}",
+                            worker_plan,
+                            matches,
+                            chunk_matches,
+                        );
+                    }
+                }
             })
             .await;
     }
