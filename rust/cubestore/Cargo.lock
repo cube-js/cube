@@ -1650,7 +1650,7 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 [[package]]
 name = "datafusion"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1706,7 +1706,7 @@ dependencies = [
 [[package]]
 name = "datafusion-catalog"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow-schema",
  "async-trait",
@@ -1720,7 +1720,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1743,7 +1743,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common-runtime"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "log",
  "tokio",
@@ -1752,7 +1752,7 @@ dependencies = [
 [[package]]
 name = "datafusion-execution"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "chrono",
@@ -1772,7 +1772,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1793,7 +1793,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr-common"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "datafusion-common",
@@ -1803,7 +1803,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "arrow-buffer",
@@ -1829,7 +1829,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1849,7 +1849,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-aggregate-common"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1862,7 +1862,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-nested"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -1884,7 +1884,7 @@ dependencies = [
 [[package]]
 name = "datafusion-functions-window"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "datafusion-common",
  "datafusion-expr",
@@ -1895,7 +1895,7 @@ dependencies = [
 [[package]]
 name = "datafusion-optimizer"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "async-trait",
@@ -1914,7 +1914,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1945,7 +1945,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr-common"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -1958,7 +1958,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-optimizer"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow-schema",
  "datafusion-common",
@@ -1971,7 +1971,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-plan"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "ahash 0.8.11",
  "arrow",
@@ -2008,7 +2008,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "chrono",
@@ -2023,7 +2023,7 @@ dependencies = [
 [[package]]
 name = "datafusion-proto-common"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "chrono",
@@ -2035,7 +2035,7 @@ dependencies = [
 [[package]]
 name = "datafusion-sql"
 version = "42.2.0"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#a6c2008d6e090865a0c8ad55aa05a869755620b2"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube-42.2.0#93a9a78c847089668faa7380a8813e09b786ddc7"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -4535,7 +4535,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.10.1",
  "proc-macro2",
  "quote",
  "syn 2.0.87",
