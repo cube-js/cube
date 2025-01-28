@@ -501,26 +501,6 @@ export class PreAggregations {
     );
   }
 
-  canUsePreAggregationAndCheckIfRefValid(query) {
-    const transformedQuery = PreAggregations.transformQueryToCanUseForm(query);
-    return (refs) => PreAggregations.canUsePreAggregationForTransformedQueryFn(
-      transformedQuery, refs
-    );
-  }
-
-  checkAutoRollupPreAggregationValid(refs) {
-    try {
-      this.autoRollupPreAggregationQuery(null, refs); // TODO null
-      return true;
-    } catch (e) {
-      if (e instanceof UserError || e.toString().indexOf('ReferenceError') !== -1) {
-        return false;
-      } else {
-        throw e;
-      }
-    }
-  }
-
   /**
    * Returns function to determine whether pre-aggregation can be used or not
    * for specified query, or its value for `refs` if specified.

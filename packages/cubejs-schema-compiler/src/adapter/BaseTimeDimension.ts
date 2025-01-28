@@ -229,9 +229,9 @@ export class BaseTimeDimension extends BaseFilter {
     );
   }
 
-  protected rollupGranularityValue: any | null = null;
+  protected rollupGranularityValue: string | null = null;
 
-  public rollupGranularity() {
+  public rollupGranularity(): string | null {
     if (!this.rollupGranularityValue) {
       this.rollupGranularityValue =
         this.query.cacheValue(
