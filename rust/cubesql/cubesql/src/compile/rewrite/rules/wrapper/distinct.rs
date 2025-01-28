@@ -51,7 +51,7 @@ impl WrapperRules {
                         "?select_alias",
                         "WrappedSelectDistinct:true",
                         "WrappedSelectPushToCube:false",
-                        "?select_ungrouped_scan",
+                        "WrappedSelectUngroupedScan:false",
                     ),
                     "?context",
                 ),

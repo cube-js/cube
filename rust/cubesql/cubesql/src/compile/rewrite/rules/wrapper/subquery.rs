@@ -48,6 +48,7 @@ impl WrapperRules {
                             "WrapperReplacerContextInProjection:true",
                             "CubeScanMembers",
                             "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
                         ),
                     ),
                     "CubeScanWrapperFinalized:false",
