@@ -13,7 +13,7 @@ module.exports = {
   "performance": "Performance Insights",
   "monitoring": "Monitoring Integrations",
   "access-control": "Access Control",
-  "sso": "Single Sign-on",
+  "sso": "Authentication & SSO",
   "audit-log": "Audit Log",
   "encryption-keys": "Encryption keys",
   "budgets": "Budgets",
