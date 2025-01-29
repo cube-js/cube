@@ -1,4 +1,4 @@
-# Publicity of data model entities
+# Member-level security
 
 The data model serves as a facade of your data and enables running
 [queries][ref-queries] via a [rich set of APIs][ref-apis] by referencing data
@@ -10,7 +10,7 @@ By default, all cubes, views, measures, dimensions, and segments are *public*,
 meaning that they can be used in API queries and they are visible during data
 model introspection.
 
-## Managing publicity
+## Managing member-level access
 
 You can explicitly make a data model entity public or private by setting its
 `public` parameter to `true` or `false`. This parameter is available for

@@ -1,0 +1,174 @@
+# Data access policies
+
+You can use the `access_policy` parameter within [cubes][ref-ref-cubes] and [views][ref-ref-views]
+to configure [data access policies][ref-dap] for them.
+
+## Parameters
+
+The `access_policy` parameter should define a list of access policies. Each policy
+can be configured using the following parameters:
+
+- [`role`](#role) defines which [data access role][ref-dap-roles] a policy applies
+to.
+- [`conditions`](#conditions) can be optionally used to specify when a policy
+takes effect.
+- [`member_level`](#member-level) and [`row_level`](#row-level) are used to
+configure [member-level][ref-dap-mls] and [row-level][ref-dap-rls] access.
+
+### `role`
+
+The `role` parameter defines which [data access role][ref-dap-roles], as defined
+by the [`context_to_roles`][ref-context-to-roles] configuration parameter, a
+policy applies to. To define a policy that applies to all users regardless of
+their roles, use the _any role_ shorthand: `role: "*"`.
+
+In the following example, three access policies are defined, with the first one
+applying to all users and two other applying to users with `marketing` or
+`finance` roles, respectively.
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - role: "*"
+        # ...
+
+      - role: marketing
+        # ...
+
+      - role: finance
+        # ...
+```
+
+### `conditions`
+
+The optional `conditions` parameter, when present, defines a list of conditions
+that should all be `true` in order for a policy to take effect. Each condition is
+configured with an `if` parameter that is expected to reference the security
+context via an [inline expression][ref-python-inline-expressions].
+
+TODO: JavaScript??? Maybe it should be in Syntax, not in Python.
+
+In the following example, a permissive policy for all roles will only apply to
+EMEA-based users, as determined by the `is_EMEA_based` attribute in the security
+context:
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - role: "*"
+        conditions:
+          - if: "{ securityContext.is_EMEA_based }"
+        member_level:
+          includes: "*"
+```
+You can use the `conditions` parameter to define multiple policies for the same
+role.
+
+In the following example, the first policy provides access to a _subset of members_
+to managers who are full-time employees while the other one provides access to
+_all members_ to managers who are full-time employees and have also completed a
+data privacy training:
+
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+    access_policy:
+      - role: manager
+        conditions:
+          - if: "{ securityContext.is_full_time_employee }"
+        member_level:
+          includes:
+            - status
+            - count
+      - role: manager
+        conditions:
+          - if: "{ securityContext.is_full_time_employee }"
+          - if: "{ securityContext.has_completed_privacy_training }"
+        member_level:
+          includes: "*"
+```
+
+### `member_level`
+
+The optional `member_level` parameter, when present, configures [member-level
+access][ref-dap-mls] for a policy. You can provide the lists of allowed and
+disallowed members with `includes` and `excludes` parameters, respectively.
+You can also use the _all members_ shorthand with both of these paramaters:
+`includes: "*"`, `excludes: "*"`.
+
+In the following example, member-level access is configured this way:
+
+| Users | Accessible members |
+| --- | --- |
+| Users with the `admin` role | All members except for `count` |
+| Users with the `manager` role | All members except for `count` |
+| Users with the `observer` role | All members except for `count` and `count_7d` |
+| Users with the `guest` role | Only the `count_30d` measure |
+| All other users | No access to this cube at all |
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+    measures:
+      - name: count
+        type: count
+        public: false
+      - name: count_7d
+        type: count
+        rolling_window:
+          trailing: 7 days
+      - name: count_30d
+        type: count
+        rolling_window:
+          trailing: 30 days
+    access_policy:
+      - role: "*"
+        member_level:
+          includes: []
+      
+      - role: admin
+      
+      - role: manager
+        member_level:
+          includes: "*"
+      
+      - role: observer
+        member_level:
+          excludes:
+            - count_7d
+      
+      - role: guest
+        member_level:
+          includes:
+            - count_30d
+```
+
+Note that access policies respect [member-level security][ref-mls] restrictions
+configured via `public` parameters. See [member-level access][ref-dap-mls] to
+learn more about policy evaluation.
+
+### `row_level`
+
+TODO: `filters`, `or`
+
+
+
+
+[ref-ref-cubes]: /reference/data-model/cube
+[ref-ref-views]: /reference/data-model/view
+[ref-dap]: /product/auth/data-access-policies
+[ref-dap-roles]: /product/auth/data-access-policies#data-access-roles
+[ref-dap-mls]: /product/auth/data-access-policies#member-level-access
+[ref-dap-rls]: /product/auth/data-access-policies#row-level-access
+[ref-context-to-roles]: /reference/configuration/config#context_to_roles
+[ref-python-inline-expressions]: /product/data-modeling/dynamic/jinja#inline-expressions
+[ref-mls]: /product/auth/member-level-security
