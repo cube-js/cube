@@ -168,9 +168,13 @@ export class Granularity {
     const grIntervalDuration = parsedSqlIntervalToDuration(intervalParsed);
     const msFrom = moment.tz(startStr, this.queryTimezone);
     const msTo = moment.tz(endStr, this.queryTimezone).add(1, 'ms');
-    const dateRangeDuration = moment.duration(msTo.diff(msFrom));
 
-    if (dateRangeDuration.asMilliseconds() % grIntervalDuration.asMilliseconds() !== 0) {
+    // We can't simply compare interval milliseconds because of DSTs.
+    const testDate = msFrom.clone();
+    while (testDate.isBefore(msTo)) {
+      testDate.add(grIntervalDuration);
+    }
+    if (!testDate.isSame(msTo)) {
       return false;
     }
 
