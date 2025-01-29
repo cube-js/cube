@@ -1521,3 +1521,41 @@ LIMIT 1
         .sql
         .contains(r#""foo" "bar""#));
 }
+
+/// Simple wrapper with cast should have explicit members, not zero
+#[tokio::test]
+async fn wrapper_cast_limit_explicit_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            CAST(dim_date0 AS DATE) AS "dim_date0"
+        FROM
+            MultiTypeCube
+        LIMIT 10
+        ;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    // Query should mention just a single member
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures.unwrap().len(), 1);
+    assert_eq!(request.dimensions.unwrap().len(), 0);
+}
