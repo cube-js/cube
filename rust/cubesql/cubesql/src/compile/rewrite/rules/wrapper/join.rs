@@ -53,6 +53,7 @@ impl WrapperRules {
                                 // RHS of join is grouped, so it shouldn't have any cubes or members
                                 "?left_cube_members",
                                 "?left_grouped_subqueries",
+                                "?left_ungrouped_scan",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -63,12 +64,12 @@ impl WrapperRules {
                             wrapper_replacer_context(
                                 // Going to ignore this
                                 "?right_alias_to_cube",
-                                // TODO depend on proper "ungrouped scan" flag (that is not a push-to-cube)
-                                "WrapperReplacerContextPushToCube:false",
+                                "?right_push_to_cube",
                                 "?in_projection",
                                 // Going to ignore this
                                 "?right_cube_members",
                                 "?right_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:false",
                             ),
                         ),
                         "CubeScanWrapperFinalized:false",
@@ -90,6 +91,9 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                // Can use it, because we've checked that left input allows push-to-Cube,
+                                // so it must be ungrouped, making this whole plan ungrouped
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -100,6 +104,7 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -110,6 +115,7 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -120,6 +126,7 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -130,6 +137,7 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         wrapper_pullup_replacer(
@@ -142,6 +150,7 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
@@ -155,6 +164,7 @@ impl WrapperRules {
                                         "?in_projection",
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
+                                        "WrapperReplacerContextUngroupedScan:true",
                                     ),
                                 ),
                                 wrapper_pushdown_replacer(
@@ -168,6 +178,7 @@ impl WrapperRules {
                                         "?in_projection",
                                         "?left_cube_members",
                                         "?out_grouped_subqueries",
+                                        "WrapperReplacerContextUngroupedScan:true",
                                     ),
                                 ),
                                 "?out_join_type",
@@ -181,6 +192,7 @@ impl WrapperRules {
                                     "?in_projection",
                                     "?left_cube_members",
                                     "?out_grouped_subqueries",
+                                    "WrapperReplacerContextUngroupedScan:true",
                                 ),
                             ),
                         ),
@@ -192,6 +204,7 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
@@ -205,6 +218,7 @@ impl WrapperRules {
                                 "?in_projection",
                                 "?left_cube_members",
                                 "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
                             ),
                         ),
                         "WrappedSelectAlias:None",
