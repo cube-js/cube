@@ -99,16 +99,16 @@ class DremioQuery extends BaseQuery {
   wrapSegmentForDimensionSelect(sql) {
     return `IF(${sql}, 1, 0)`;
   }
-  
+
   /**
    * The input interval with (possible) plural units, like "1 hour 2 minutes", "2 year", "3 months", "4 weeks", "5 days", "3 months 24 days 15 minutes", ...
    * will be converted to Dremio dialect.
    * @see https://docs.dremio.com/24.3.x/reference/sql/sql-functions/functions/DATE_ADD/
    * @see https://docs.dremio.com/24.3.x/reference/sql/sql-functions/functions/DATE_SUB/
    * It returns a tuple of (formatted interval, timeUnit to use in date functions)
-   * This function only supports the following scenarios for now: 
-   *   ie. n year[s] or n month[3] or n day[s] 
-   */  
+   * This function only supports the following scenarios for now:
+   *   ie. n year[s] or n month[3] or n day[s]
+   */
   formatInterval(interval) {
     const intervalParsed = parseSqlInterval(interval);
     const intKeys = Object.keys(intervalParsed).length;
@@ -122,11 +122,10 @@ class DremioQuery extends BaseQuery {
       return [`${intervalParsed.month}`, 'MONTH'];
     } else if (intervalParsed.month && intKeys === 1) {
       return [`${intervalParsed.day}`, 'DAY'];
-    } 
+    }
 
     throw new Error(`Cannot transform interval expression "${interval}" to Dremio dialect`);
   }
-
 }
 
 module.exports = DremioQuery;
