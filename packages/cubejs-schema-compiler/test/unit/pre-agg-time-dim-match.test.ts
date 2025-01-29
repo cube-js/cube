@@ -107,7 +107,7 @@ describe('Pre Aggregation by filter match tests', () => {
     ['count'],
     'one_week_by_sunday',
     'one_week_by_sunday',
-    'UTC',
+    'America/Los_Angeles',
     ['2024-02-25', '2024-03-30'], // DST Switch happens here, but still must work!
   ));
 
