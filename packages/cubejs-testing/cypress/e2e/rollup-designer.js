@@ -2,18 +2,6 @@
 import { ordersCountQuery } from "../queries";
 
 context("Playground: Rollup Designer", () => {
-  beforeEach(() => {
-    cy.wait(500);
-    cy.restoreLocalStorage();
-    cy.wait(500);
-  });
-
-  afterEach(() => {
-    cy.wait(500);
-    cy.saveLocalStorage();
-    cy.wait(500);
-  });
-
   describe("Opens the Rollup Designer modal", () => {
     it("opens the Rollup Designer without running a query", () => {
       cy.setQuery(ordersCountQuery);
