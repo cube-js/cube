@@ -20,6 +20,6 @@ export default defineConfig({
     specPattern: 'cypress/e2e/**/*.{js,jsx,ts,tsx}',
   },
   // set optimal values for the number of tests kept in memory
-  numTestsKeptInMemory: 10,
+  numTestsKeptInMemory: 5,
   experimentalMemoryManagement: true,
 });
