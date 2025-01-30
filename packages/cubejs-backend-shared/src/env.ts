@@ -170,6 +170,29 @@ const variables: Record<string, (...args: any) => any> = {
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
+  scheduledRefreshQueriesPerAppId: () => {
+    const refreshQueries = get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive();
+
+    if (refreshQueries) {
+      return refreshQueries;
+    }
+
+    console.warn(
+      'The CUBEJS_SCHEDULED_REFRESH_CONCURRENCY is deprecated. Please, use the CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID instead.'
+    );
+    return get('CUBEJS_SCHEDULED_REFRESH_CONCURRENCY').asIntPositive();
+  },
+  refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
+    .default(5)
+    .asIntPositive(),
+  // eslint-disable-next-line consistent-return
+  scheduledRefreshTimezones: () => {
+    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES').asString();
+
+    if (timezones) {
+      return timezones.split(',').map(t => t.trim());
+    }
+  },
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
