@@ -4,8 +4,8 @@ use crate::{
         analysis::{ConstantFolding, LogicalPlanData, MemberNamesToExpr, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
-        cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join, like_expr,
-        limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
+        cube_scan_order_empty_tail, dimension_expr, distinct, expr_column_name, fun_expr, join,
+        like_expr, limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
         literal_member, measure_expr, member_pushdown_replacer, member_replacer,
         merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
@@ -261,6 +261,34 @@ impl RewriteRules for MemberRules {
                     "?ungrouped",
                 ),
                 self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
+            ),
+            transforming_rewrite(
+                "select-distinct-dimensions",
+                distinct(cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?orders",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
+                    "?split",
+                    "?can_pushdown_join",
+                    "CubeScanWrapped:false",
+                    "?old_ungrouped",
+                )),
+                cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?orders",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
+                    "?split",
+                    "?can_pushdown_join",
+                    "CubeScanWrapped:false",
+                    "CubeScanUngrouped:false",
+                ),
+                self.select_distinct_dimensions("?members"),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -1476,6 +1504,36 @@ impl MemberRules {
                     })
                     .collect::<Vec<_>>(),
             )
+    }
+
+    fn select_distinct_dimensions(
+        &self,
+        members_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let members_var = var!(members_var);
+        let meta_context = self.meta_context.clone();
+
+        move |egraph, subst| {
+            egraph
+                .index(subst[members_var])
+                .data
+                .member_name_to_expr
+                .as_ref()
+                .map_or(true, |member_names_to_expr| {
+                    !member_names_to_expr.list.iter().all(|(_, member, _)| {
+                        // we should allow transform for queries with dimensions only,
+                        // as it doesn't make sense for measures
+                        if let Some(name) = member.name() {
+                            meta_context
+                                .find_dimension_with_name(name.to_string())
+                                .is_some()
+                                || meta_context.is_synthetic_field(name.to_string())
+                        } else {
+                            true
+                        }
+                    })
+                })
+        }
     }
 
     fn push_down_non_empty_aggregate(
