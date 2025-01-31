@@ -15946,6 +15946,57 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_extract_epoch_pushdown() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query = "
+            SELECT LOWER(customer_gender),
+                   MAX(CAST(FLOOR(EXTRACT(EPOCH FROM order_date) / 31536000) AS bigint)) AS max_years
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ";
+
+        // Generic
+        let query_plan =
+            convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL).await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("EXTRACT(EPOCH"));
+
+        // Databricks
+        let query_plan = convert_select_to_query_plan_customized(
+            query.to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("expressions/timestamp_literal".to_string(), "from_utc_timestamp('{{ value }}', 'UTC')".to_string()),
+                ("expressions/extract".to_string(), "{% if date_part|lower == \"epoch\" %}unix_timestamp({{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}".to_string()),
+            ],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(!sql.contains("EXTRACT(EPOCH"));
+        assert!(sql.contains("unix_timestamp"));
+    }
+
+    #[tokio::test]
     async fn test_push_down_to_grouped_query_with_filters() {
         if !Rewriter::sql_push_down_enabled() {
             return;
