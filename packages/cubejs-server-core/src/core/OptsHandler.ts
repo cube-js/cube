@@ -458,7 +458,9 @@ export class OptsHandler {
       basePath: '/cubejs-api',
       dashboardAppPath: 'dashboard-app',
       dashboardAppPort: 3000,
-      scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
+      scheduledRefreshConcurrency: getEnv('refreshWorkerMode')
+        ? getEnv('refreshWorkerConcurrency')
+        : getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
