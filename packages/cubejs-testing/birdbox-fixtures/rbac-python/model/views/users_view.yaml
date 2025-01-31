@@ -1,0 +1,13 @@
+views:
+  - name: users_view
+    cubes:
+      - join_path: users
+        includes: "*"
+
+    access_policy:
+      - role: '*'
+        row_level:
+          filters:
+            - member: id
+              operator: gt
+              values: [10]
