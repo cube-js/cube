@@ -119,7 +119,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 5;
+    return 10;
   }
 
   // ClickHouseClient has internal pool of several sockets, no need for generic-pool

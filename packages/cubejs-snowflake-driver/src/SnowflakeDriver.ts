@@ -195,7 +195,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 5;
+    return 8;
   }
 
   public static driverEnvVariables() {

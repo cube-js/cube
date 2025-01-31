@@ -147,7 +147,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 10;
   }
 
   /**

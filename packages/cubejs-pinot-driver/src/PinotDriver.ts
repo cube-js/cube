@@ -74,7 +74,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency() {
-    return 2;
+    return 10;
   }
 
   private config: PinotDriverConfiguration;

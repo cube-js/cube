@@ -46,7 +46,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 5;
+    return 10;
   }
 
   private config: FireboltDriverConfiguration;
