@@ -215,17 +215,19 @@ export class CubeEvaluator extends CubeSymbols {
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
     const uniqueHierarchyNames = new Set();
-    if (Array.isArray(cube.hierarchies)) {
-      cube.evaluatedHierarchies = cube.hierarchies.map(hierarchy => {
-        if (uniqueHierarchyNames.has(hierarchy.name)) {
-          errorReporter.error(`Duplicate hierarchy name '${hierarchy.name}' in cube '${cube.name}'`);
+    if (Object.keys(cube.hierarchies).length) {
+      cube.evaluatedHierarchies = Object.entries(cube.hierarchies).map(([name, hierarchy]) => {
+        if (uniqueHierarchyNames.has(name)) {
+          errorReporter.error(`Duplicate hierarchy name '${name}' in cube '${cube.name}'`);
         }
-        uniqueHierarchyNames.add(hierarchy.name);
+        uniqueHierarchyNames.add(name);
 
         return ({
-          ...hierarchy,
+          name,
+          ...(typeof hierarchy === 'object' ? hierarchy : {}),
           levels: this.evaluateReferences(
             cube.name,
+            // @ts-ignore
             hierarchy.levels,
             { originalSorting: true }
           )

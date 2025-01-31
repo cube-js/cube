@@ -15946,6 +15946,57 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_extract_epoch_pushdown() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query = "
+            SELECT LOWER(customer_gender),
+                   MAX(CAST(FLOOR(EXTRACT(EPOCH FROM order_date) / 31536000) AS bigint)) AS max_years
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ";
+
+        // Generic
+        let query_plan =
+            convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL).await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("EXTRACT(EPOCH"));
+
+        // Databricks
+        let query_plan = convert_select_to_query_plan_customized(
+            query.to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("expressions/timestamp_literal".to_string(), "from_utc_timestamp('{{ value }}', 'UTC')".to_string()),
+                ("expressions/extract".to_string(), "{% if date_part|lower == \"epoch\" %}unix_timestamp({{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}".to_string()),
+            ],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(!sql.contains("EXTRACT(EPOCH"));
+        assert!(sql.contains("unix_timestamp"));
+    }
+
+    #[tokio::test]
     async fn test_push_down_to_grouped_query_with_filters() {
         if !Rewriter::sql_push_down_enabled() {
             return;
@@ -16208,6 +16259,84 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             )
             .await?
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_format_function() -> Result<(), CubeError> {
+        // Test: Basic usage with a single string
+        let result = execute_query(
+            "SELECT format('%s', 'foo') AS formatted_string".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_string", result);
+
+        // Test: Basic usage with a single null string
+        let result = execute_query(
+            "SELECT format('%s', NULL) = '' AS formatted_null_string_is_empty".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_null_string_is_empty", result);
+
+        // Test: Basic usage with a multiple strings
+        let result = execute_query(
+            "SELECT format('%s.%s', 'foo', 'bar') AS formatted_strings".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_strings", result);
+
+        // Test: Basic usage with a single identifier
+        let result = execute_query(
+            "SELECT format('%I', 'column_name') AS formatted_identifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_identifier", result);
+
+        // Test: Using multiple identifiers
+        let result = execute_query(
+            "SELECT format('%I, %I', 'table_name', 'column_name') AS formatted_identifiers"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("formatted_identifiers", result);
+
+        // Test: Unsupported format specifier
+        let result = execute_query(
+            "SELECT format('%X', 'value') AS unsupported_specifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+        assert!(result.is_err());
+
+        // Test: Format string ending with %
+        let result = execute_query(
+            "SELECT format('%', 'value') AS invalid_format".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+        assert!(result.is_err());
+
+        // Test: Quoting necessary for special characters
+        let result = execute_query(
+            "SELECT format('%I', 'column-name') AS quoted_identifier".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("quoted_identifier", result);
+
+        // Test: Quoting necessary for reserved keywords
+        let result = execute_query(
+            "SELECT format('%I', 'select') AS quoted_keyword".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        insta::assert_snapshot!("quoted_keyword", result);
 
         Ok(())
     }

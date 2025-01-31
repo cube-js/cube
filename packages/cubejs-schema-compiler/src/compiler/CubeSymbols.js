@@ -68,22 +68,12 @@ export class CubeSymbols {
     let hierarchies;
 
     const cubeObject = Object.assign({
-      allDefinitions(type, asArray = false) {
+      allDefinitions(type) {
         if (cubeDefinition.extends) {
-          if (asArray) {
-            return [
-              ...super.allDefinitions(type, asArray),
-              ...(cubeDefinition[type] || [])
-            ];
-          }
-
           return {
-            ...super.allDefinitions(type, asArray),
+            ...super.allDefinitions(type),
             ...cubeDefinition[type]
           };
-        } else if (asArray) {
-          return [...(cubeDefinition[type] || [])];
-          // TODO We probably do not need this shallow copy
         } else {
           return { ...cubeDefinition[type] };
         }
@@ -120,7 +110,7 @@ export class CubeSymbols {
 
       get hierarchies() {
         if (!hierarchies) {
-          hierarchies = this.allDefinitions('hierarchies', true);
+          hierarchies = this.allDefinitions('hierarchies');
         }
         return hierarchies;
       },
@@ -152,7 +142,8 @@ export class CubeSymbols {
       R.unnest,
       R.map(R.toPairs),
       R.filter(v => !!v)
-    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations]);
+    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
+
     if (duplicateNames.length > 0) {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }

@@ -1,13 +1,16 @@
 import {
   BinaryFilter,
   BinaryOperator,
+  Filter,
   Query,
   UnaryFilter,
   UnaryOperator,
   MetaResponse,
+  LogicalAndFilter,
+  LogicalOrFilter,
 } from '@cubejs-client/core';
 
-export function getMembersList(query: Query): string[] {
+export function getMembersList(query: NormalizedQuery): string[] {
   const list: string[] = [
     ...(query.dimensions || []),
     ...(query.measures || []),
@@ -18,9 +21,7 @@ export function getMembersList(query: Query): string[] {
     list.push(td.dimension);
   });
 
-  if ((query.order || []).length) {
-    // `Query` is normalized, so we can safely access `id` property
-    // @ts-ignore
+  if (query.order && (query.order || []).length) {
     query.order.forEach(({ id }) => list.push(id));
   }
 
@@ -33,6 +34,14 @@ function isBinaryOperator(operator: string): operator is BinaryOperator {
 
 function isBinaryFilter(filter: any): filter is BinaryFilter {
   return !['set', 'notSet'].includes(filter.operator);
+}
+
+function isLogicalAndFilter(filter: any): filter is LogicalAndFilter {
+  return filter.and != null;
+}
+
+function isLogicalOrFilter(filter: any): filter is LogicalOrFilter {
+  return filter.or != null;
 }
 
 enum MemberKind {
@@ -65,14 +74,14 @@ type ConverterMember = {
   granularity?: string;
 };
 
-type NormalizedQuery = Query & {
-  order: Array<{ id: string; desc: boolean }>;
+export type NormalizedQuery = Omit<Query, 'order'> & {
+  order?: Array<{ id: string; desc: boolean }>;
 };
 
 export class CubeSQLConverter {
   protected members: ConverterMember[] = [];
 
-  protected filters: Array<BinaryFilter | UnaryFilter> = [];
+  protected filters: Array<Filter> = [];
 
   protected tables: string[] = [];
 
@@ -147,8 +156,7 @@ export class CubeSQLConverter {
     );
 
     this.query.filters?.forEach((filter) => {
-      // todo: boolean filters
-      this.filters.push(filter as any);
+      this.filters.push(filter);
     });
 
     const pathsList = getMembersList(this.query);
@@ -185,38 +193,65 @@ export class CubeSQLConverter {
 
     query.push(this.makeJoins());
 
-    const having: string[] = [];
+    let having: string = '';
 
-    if (this.filters?.length || this.query.segments?.length) {
+    const flattenFilter = (filter: Filter, isMeasureFilter: boolean): string => {
+      if (isLogicalAndFilter(filter)) {
+        const value = filter.and.map((it) => flattenFilter(it, isMeasureFilter)).join(' AND ');
+
+        return `(${value})`;
+      }
+
+      if (isLogicalOrFilter(filter)) {
+        const value = filter.or.map((it) => flattenFilter(it, isMeasureFilter)).join(' OR ');
+
+        return `(${value})`;
+      }
+
+      return this.makeFilter({
+        ...filter,
+        member: isMeasureFilter ? this.makeMeasure(filter.member!) : filter.member,
+      });
+    };
+
+    const allPathsFromFilter = (filter: Filter): string[] => {
+      if (isLogicalAndFilter(filter)) {
+        return filter.and.flatMap((it) => allPathsFromFilter(it));
+      }
+
+      if (isLogicalOrFilter(filter)) {
+        return filter.or.flatMap((it) => allPathsFromFilter(it));
+      }
+
+      return [filter.member!];
+    };
+
+    if (this.filters.length || this.query.segments?.length) {
       const measureFilters = this.filters.filter((filter) => {
-        return this.getPathKind(filter.member) === MemberKind.Measure;
+        const paths = allPathsFromFilter(filter);
+
+        return paths.every((path) => this.getPathKind(path) === MemberKind.Measure);
       });
 
       const dimensionFilters = this.filters.filter((filter) => {
-        return [MemberKind.Dimension, MemberKind.TimeDimension].includes(
-          this.getPathKind(filter.member)
-        );
+        const paths = allPathsFromFilter(filter);
+
+        return paths.every((path) => this.getPathKind(path) === MemberKind.Dimension);
       });
 
-      const filters = dimensionFilters
-        .map((filter) => this.makeFilter(filter))
-        .concat(this.query.segments || []);
+      const filters = flattenFilter(
+        {
+          and: dimensionFilters,
+        },
+        false
+      );
 
-      if (filters.length) {
-        query.push(`WHERE ${filters.join(' AND ')}`);
+      if (filters) {
+        query.push(`WHERE ${[filters, ...(this.query.segments || [])].join(' AND ')}`);
       }
 
       if (measureFilters.length) {
-        having.push(
-          measureFilters
-            .map((filter) =>
-              this.makeFilter({
-                ...filter,
-                member: `MEASURE(${filter.member})`,
-              })
-            ) //
-            .join(' AND ')
-        );
+        having = flattenFilter({ and: measureFilters }, true);
       }
     }
 
@@ -224,11 +259,11 @@ export class CubeSQLConverter {
       query.push(`GROUP BY ${groupBy.join(', ')}`);
     }
 
-    if (having.length) {
-      query.push(`HAVING ${having.join(' AND ')}`);
+    if (having) {
+      query.push(`HAVING ${having}`);
     }
 
-    if ((this.query.order || []).length > 0) {
+    if (this.query.order && (this.query.order || []).length > 0) {
       query.push(this.makeOrderBy(this.query.order));
     }
 
@@ -236,7 +271,7 @@ export class CubeSQLConverter {
       query.push(`LIMIT ${this.query.limit}`);
     }
 
-    return `${query.join('\n')};`;
+    return `${query.filter(Boolean).join('\n')};`;
   }
 
   protected makeJoins() {
@@ -257,7 +292,6 @@ export class CubeSQLConverter {
     return `MEASURE(${name})`;
   }
 
-  // todo: support boolean filters
   protected makeFilter(filter: BinaryFilter | UnaryFilter): string {
     if (
       isBinaryFilter(filter) &&
@@ -320,7 +354,8 @@ export class CubeSQLConverter {
 
       const string = [filter.member, operator[filter.operator], value, nullValue].join(' ').trim();
 
-      return `(${string})`;
+      // return `(${string})`;
+      return string;
     }
 
     const repeatFilter = (template: string, values: string[], negated: boolean) => {

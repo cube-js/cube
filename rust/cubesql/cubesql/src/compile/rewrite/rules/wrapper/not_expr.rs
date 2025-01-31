@@ -4,7 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -15,40 +15,32 @@ impl WrapperRules {
         rules.extend(vec![
             rewrite(
                 "wrapper-not-push-down",
-                wrapper_pushdown_replacer(
-                    not_expr("?expr"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                ),
-                not_expr(wrapper_pushdown_replacer(
-                    "?expr",
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )),
+                wrapper_pushdown_replacer(not_expr("?expr"), "?context"),
+                not_expr(wrapper_pushdown_replacer("?expr", "?context")),
             ),
             transforming_rewrite(
                 "wrapper-not-pull-up",
                 not_expr(wrapper_pullup_replacer(
                     "?expr",
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 )),
                 wrapper_pullup_replacer(
                     not_expr("?expr"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_not_expr("?alias_to_cube"),
             ),
@@ -64,7 +56,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

@@ -1,7 +1,9 @@
 use super::NeonObject;
-use crate::wrappers::neon::inner_types::NeonInnerTypes;
-use crate::wrappers::object::{NativeStruct, NativeType};
-use crate::wrappers::object_handle::NativeObjectHandle;
+use crate::wrappers::{
+    neon::inner_types::NeonInnerTypes,
+    object::{NativeStruct, NativeType},
+    object_handle::NativeObjectHandle,
+};
 use cubesql::CubeError;
 use neon::prelude::*;
 

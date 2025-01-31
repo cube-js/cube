@@ -3,11 +3,12 @@ use crate::{
         cube_scan, cube_scan_wrapper, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, CubeScanAliasToCube, CubeScanLimit,
-        CubeScanOffset, CubeScanUngrouped, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
-        WrapperPullupReplacerGroupedSubqueries, WrapperPullupReplacerPushToCube,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_replacer_context,
+        CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, LogicalPlanLanguage,
+        WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
+        WrapperReplacerContextPushToCube, WrapperReplacerContextUngroupedScan,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::Subst;
 
@@ -42,11 +43,14 @@ impl WrapperRules {
                             "CubeScanWrapped:true",
                             "?ungrouped",
                         ),
-                        "?alias_to_cube_out",
-                        "?push_to_cube_out",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?members",
-                        "?grouped_subqueries_out",
+                        wrapper_replacer_context(
+                            "?alias_to_cube_out",
+                            "?push_to_cube_out",
+                            "WrapperReplacerContextInProjection:false",
+                            "?members",
+                            "?grouped_subqueries_out",
+                            "?ungrouped_scan_out",
+                        ),
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
@@ -59,19 +63,13 @@ impl WrapperRules {
                     "?alias_to_cube_out",
                     "?push_to_cube_out",
                     "?grouped_subqueries_out",
+                    "?ungrouped_scan_out",
                 ),
             ),
             rewrite(
                 "wrapper-finalize-pull-up-replacer",
                 cube_scan_wrapper(
-                    wrapper_pullup_replacer(
-                        "?cube_scan_input",
-                        "?alias_to_cube",
-                        "?push_to_cube",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                    ),
+                    wrapper_pullup_replacer("?cube_scan_input", "?context"),
                     "CubeScanWrapperFinalized:false",
                 ),
                 cube_scan_wrapper("?cube_scan_input", "CubeScanWrapperFinalized:true"),
@@ -89,6 +87,7 @@ impl WrapperRules {
         alias_to_cube_var_out: &'static str,
         push_to_cube_out_var: &'static str,
         grouped_subqueries_out_var: &'static str,
+        ungrouped_scan_out_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let members_var = var!(members_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -98,6 +97,7 @@ impl WrapperRules {
         let alias_to_cube_var_out = var!(alias_to_cube_var_out);
         let push_to_cube_out_var = var!(push_to_cube_out_var);
         let grouped_subqueries_out_var = var!(grouped_subqueries_out_var);
+        let ungrouped_scan_out_var = var!(ungrouped_scan_out_var);
         move |egraph, subst| {
             let mut has_no_limit_or_offset = true;
             for limit in var_iter!(egraph[subst[limit_var]], CubeScanLimit).cloned() {
@@ -105,6 +105,17 @@ impl WrapperRules {
             }
             for offset in var_iter!(egraph[subst[offset_var]], CubeScanOffset).cloned() {
                 has_no_limit_or_offset &= offset.is_none();
+            }
+
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_cube_var,
+                CubeScanUngrouped,
+                ungrouped_scan_out_var,
+                WrapperReplacerContextUngroupedScan
+            ) {
+                return false;
             }
 
             if let Some(_) = egraph[subst[members_var]].data.member_name_to_expr {
@@ -121,21 +132,21 @@ impl WrapperRules {
                         let push_to_cube_out = ungrouped && has_no_limit_or_offset;
                         subst.insert(
                             push_to_cube_out_var,
-                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerPushToCube(
-                                WrapperPullupReplacerPushToCube(push_to_cube_out),
+                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextPushToCube(
+                                WrapperReplacerContextPushToCube(push_to_cube_out),
                             )),
                         );
                         subst.insert(
                             alias_to_cube_var_out,
-                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
-                                WrapperPullupReplacerAliasToCube(alias_to_cube),
+                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
+                                WrapperReplacerContextAliasToCube(alias_to_cube),
                             )),
                         );
                         subst.insert(
                             grouped_subqueries_out_var,
                             egraph.add(
-                                LogicalPlanLanguage::WrapperPullupReplacerGroupedSubqueries(
-                                    WrapperPullupReplacerGroupedSubqueries(vec![]),
+                                LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                                    WrapperReplacerContextGroupedSubqueries(vec![]),
                                 ),
                             ),
                         );

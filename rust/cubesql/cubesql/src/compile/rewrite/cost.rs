@@ -255,8 +255,8 @@ pub struct CubePlanCost {
     non_pushed_down_limit_sort: i64,
     joins: usize,
     wrapper_nodes: i64,
-    wrapped_select_ungrouped_scan: usize,
     ast_size_outside_wrapper: usize,
+    wrapped_select_ungrouped_scan: usize,
     filters: i64,
     structure_points: i64,
     filter_members: i64,
@@ -495,6 +495,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::Union(_) => 1,
             LogicalPlanLanguage::Window(_) => 1,
             LogicalPlanLanguage::Subquery(_) => 1,
+            LogicalPlanLanguage::Distinct(_) => 1,
             _ => 0,
         };
 

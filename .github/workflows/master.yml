@@ -16,6 +16,8 @@ on:
       - 'rust/cubesql/**'
     branches:
       - master
+env:
+  CUBEJS_TESSERACT_ORCHESTRATOR: true
 jobs:
   latest-tag-sha:
     runs-on: ubuntu-20.04
@@ -45,7 +47,7 @@ jobs:
     timeout-minutes: 60
     name: Build Linux Native backend for Dev image
     container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024-python-3.9
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024-python-3.11
 
     steps:
       - name: Checkout
@@ -77,14 +79,14 @@ jobs:
         run: npm install -g cargo-cp-artifact@0.1
       - name: Build native (with Python)
         env:
-          PYO3_PYTHON: python3.9
+          PYO3_PYTHON: python3.11
           CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
         working-directory: ./packages/cubejs-backend-native
         run: yarn run native:build-debug-python
       - name: Store build artifact for dev image
         uses: actions/upload-artifact@v4
         with:
-          name: "native-linux-x64-glibc-3.9.node"    # this name is referenced below in docker-image-dev
+          name: "native-linux-x64-glibc-3.11.node"    # this name is referenced below in docker-image-dev
           path: ./packages/cubejs-backend-native/index.node
           overwrite: true
 
@@ -99,7 +101,7 @@ jobs:
       - name: Download backend-native artifact
         uses: actions/download-artifact@v4
         with:
-          name: "native-linux-x64-glibc-3.9.node"    # this name is referenced in above in native_linux
+          name: "native-linux-x64-glibc-3.11.node"    # this name is referenced in above in native_linux
           path: ./packages/cubejs-backend-native/
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -108,6 +110,11 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+      # current .dockerignore prevents use of native build
+      - name: Unignore native from .dockerignore
+        run: |
+          grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
+          mv .dockerignore.tmp .dockerignore
       - name: Push to Docker Hub
         uses: docker/build-push-action@v6
         with:

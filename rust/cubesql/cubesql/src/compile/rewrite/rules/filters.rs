@@ -2780,12 +2780,13 @@ impl FilterRules {
                                                     value.to_string()
                                                 }
                                             } else if op == "endsWith" || op == "notEndsWith" {
-                                                if value.starts_with("%") {
-                                                    let without_wildcard = value[1..].to_string();
+                                                if let Some(without_wildcard) =
+                                                    value.strip_prefix("%")
+                                                {
                                                     if without_wildcard.contains("%") {
                                                         continue;
                                                     }
-                                                    without_wildcard
+                                                    without_wildcard.to_string()
                                                 } else {
                                                     value.to_string()
                                                 }
@@ -4117,8 +4118,8 @@ impl FilterRules {
             };
 
             let (Some(start_date), Some(end_date)) = (
-                start_date.timestamp_nanos_opt(),
-                end_date.timestamp_nanos_opt(),
+                start_date.and_utc().timestamp_nanos_opt(),
+                end_date.and_utc().timestamp_nanos_opt(),
             ) else {
                 return false;
             };
@@ -4223,7 +4224,7 @@ impl FilterRules {
                             {
                                 swap_left_and_right = false;
                             } else if valid_left_filters.contains(date_range_end_op)
-                                || valid_right_filters.contains(date_range_start_op)
+                                && valid_right_filters.contains(date_range_start_op)
                             {
                                 swap_left_and_right = true;
                             } else {

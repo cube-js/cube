@@ -1,71 +1,128 @@
-import { useMemo, useRef, useState } from 'react';
-import { Flex, Space, Text, TimeIcon, TooltipProvider } from '@cube-dev/ui-kit';
+import { useMemo, useRef } from 'react';
+import {
+  CloseIcon,
+  Flex,
+  Menu,
+  MenuTrigger,
+  PlusIcon,
+  Space,
+  tasty,
+  Text,
+  TimeIcon,
+} from '@cube-dev/ui-kit';
 import { Cube, TCubeDimension, TimeDimensionGranularity } from '@cubejs-client/core';
 
-import { ArrowIcon } from '../icons/ArrowIcon';
+import { ChevronIcon } from '../icons/ChevronIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
 import { ItemInfoIcon } from '../icons/ItemInfoIcon';
-import { useHasOverflow } from '../hooks/has-overflow';
 import { titleize } from '../utils/index';
+import { PREDEFINED_GRANULARITIES } from '../values';
+import { useEvent, useShownMemberName } from '../hooks';
+import { MemberViewType } from '../types';
 
 import { GranularityListMember } from './GranularityListMember';
 import { ListMemberButton } from './ListMemberButton';
 import { FilterByMemberButton } from './FilterByMemberButton';
 import { FilteredLabel } from './FilteredLabel';
+import { InstanceTooltipProvider } from './InstanceTooltipProvider';
 
-interface ListMemberProps {
-  cube: Cube;
-  member: TCubeDimension;
+const GranularitiesWrapper = tasty(Flex, {
+  styles: {
+    position: 'relative',
+    flow: 'column',
+    gap: '1bw',
+    margin: '4x left',
+
+    TimeListLine: {
+      position: 'absolute',
+      inset: '0 auto 0 (1bw - 2x)',
+      fill: '#dimension-active',
+      width: '.25x',
+      radius: true,
+    },
+  },
+});
+
+interface TimeListMemberProps {
+  cube: Cube | { name: string };
+  isOpen?: boolean;
+  member: TCubeDimension | { name: string; type: 'time' };
   filterString?: string;
   isCompact?: boolean;
   isSelected: (granularity?: TimeDimensionGranularity) => boolean;
   isFiltered: boolean;
+  isDateRangeFiltered: boolean;
+  isMissing?: boolean;
+  selectedGranularities?: string[];
+  memberViewType?: MemberViewType;
   onDimensionToggle: (component: string) => void;
   onGranularityToggle: (name: string, granularity: TimeDimensionGranularity) => void;
-  onToggleDataRange?: (name: string) => void;
+  onAddDataRange?: (name: string) => void;
+  onRemoveDataRange?: (name: string) => void;
+  onToggle: (isOpen: boolean, name: string) => void;
+  onAddFilter?: (name: string) => void;
+  onRemoveFilter?: (name: string) => void;
 }
 
-const PREDEFINED_GRANULARITIES: TimeDimensionGranularity[] = [
-  'second',
-  'minute',
-  'hour',
-  'day',
-  'week',
-  'month',
-  'quarter',
-  'year',
-];
-
-export function TimeListMember(props: ListMemberProps) {
+export function TimeListMember(props: TimeListMemberProps) {
   const textRef = useRef<HTMLDivElement>(null);
 
-  let [open, setOpen] = useState(false);
-
   const {
+    isOpen,
     cube,
     member,
     filterString,
-    isCompact,
     isSelected,
     isFiltered,
+    isDateRangeFiltered,
+    isMissing,
+    selectedGranularities = [],
+    memberViewType,
     onDimensionToggle,
     onGranularityToggle,
-    onToggleDataRange,
+    onAddDataRange,
+    onRemoveDataRange,
+    onAddFilter,
+    onRemoveFilter,
+    onToggle,
   } = props;
 
-  // const title = member.title.replace(cube.title, '').trim();
   const name = member.name.replace(`${cube.name}.`, '').trim();
-  const title = member.title;
+  const title = 'shortTitle' in member ? member.shortTitle : undefined;
   // @ts-ignore
   const description = member.description;
   const isTimestampSelected = isSelected();
+  const definedGranularities =
+    (member.type === 'time' ? ('granularities' in member ? member?.granularities : []) : []) ?? [];
+  const definedGranularityNames = definedGranularities.map((g) => g.name);
+  const nonPredefinedGranularityNames = [...definedGranularityNames];
+  const { shownMemberName } = useShownMemberName({
+    cubeName: cube.name,
+    cubeTitle: 'title' in cube ? cube.title : undefined,
+    memberName: name,
+    memberTitle: title,
+    type: memberViewType,
+  });
 
-  const customGranularities =
-    member.type === 'time' && member.granularities ? member.granularities.map((g) => g.name) : [];
-  const customGranularitiesTitleMap = useMemo(() => {
+  selectedGranularities.forEach((granularity) => {
+    if (
+      !nonPredefinedGranularityNames.includes(granularity) &&
+      !PREDEFINED_GRANULARITIES.includes(granularity)
+    ) {
+      nonPredefinedGranularityNames.push(granularity);
+    }
+  });
+
+  const missingGranularities = selectedGranularities.filter(
+    (granularity) =>
+      !definedGranularityNames.includes(granularity) &&
+      !PREDEFINED_GRANULARITIES.includes(granularity)
+  );
+
+  const definedGranularitiesTitleMap = useMemo(() => {
     return (
       member.type === 'time' &&
-      member.granularities?.reduce(
+      definedGranularities?.reduce(
         (map, granularity) => {
           map[granularity.name] = granularity.title;
 
@@ -74,69 +131,25 @@ export function TimeListMember(props: ListMemberProps) {
         {} as Record<string, string>
       )
     );
-  }, [member.type === 'time' ? member.granularities : null]);
-  const memberGranularities = customGranularities.concat(PREDEFINED_GRANULARITIES);
+  }, [member.type === 'time' ? definedGranularities : null]);
+
+  const allGranularityNames = nonPredefinedGranularityNames.concat(PREDEFINED_GRANULARITIES);
   const isGranularitySelectedMap: Record<string, boolean> = {};
-  memberGranularities.forEach((granularity) => {
+
+  allGranularityNames.forEach((granularity) => {
     isGranularitySelectedMap[granularity] = isSelected(granularity);
   });
-  const selectedGranularity = memberGranularities.find((granularity) => isSelected(granularity));
 
-  open = isCompact ? false : open;
-
-  const hasOverflow = useHasOverflow(textRef);
-  const isAutoTitle = titleize(member.name) === title;
-
-  const button = (
-    <ListMemberButton
-      icon={
-        isCompact ? (
-          <TimeIcon />
-        ) : (
-          <ArrowIcon direction={open ? 'top' : 'right'} color="var(--dimension-text-color)" />
-        )
-      }
-      data-member="dimension"
-      isSelected={isTimestampSelected && (isCompact || !open)}
-      onPress={() => {
-        if (!isCompact) {
-          setOpen(!open);
-        } else {
-          if (isTimestampSelected) {
-            onDimensionToggle(member.name);
-          } else if (selectedGranularity) {
-            onGranularityToggle(member.name, selectedGranularity);
-          }
-        }
-      }}
-    >
-      <Text ref={textRef} ellipsis>
-        {filterString ? <FilteredLabel text={name} filter={filterString} /> : name}
-      </Text>
-
-      <Space gap=".5x">
-        <Space gap="1x">
-          {description ? <ItemInfoIcon title={title} description={description} /> : undefined}
-          {/* @ts-ignore */}
-          {member.public === false ? <NonPublicIcon /> : undefined}
-        </Space>
-        <FilterByMemberButton
-          type="timeDimension"
-          isFiltered={isFiltered || false}
-          onPress={() => onToggleDataRange?.(member.name)}
-        />
-      </Space>
-    </ListMemberButton>
-  );
+  const selectedGranularity = allGranularityNames.find((granularity) => isSelected(granularity));
 
   const granularityItems = (items: string[], isCustom?: boolean) => {
     return items.map((granularity: string) => {
-      if ((!open || isCompact) && !isGranularitySelectedMap[granularity]) {
+      if (!isOpen && !isGranularitySelectedMap[granularity]) {
         return null;
       }
 
-      const title = customGranularitiesTitleMap
-        ? customGranularitiesTitleMap[granularity]
+      const title = definedGranularitiesTitleMap
+        ? definedGranularitiesTitleMap[granularity]
         : titleize(granularity);
 
       return (
@@ -144,52 +157,148 @@ export function TimeListMember(props: ListMemberProps) {
           key={`${name}.${granularity}`}
           name={granularity}
           title={title}
+          memberViewType={memberViewType}
+          isMissing={missingGranularities.includes(granularity)}
           isCustom={isCustom}
           isSelected={isGranularitySelectedMap[granularity]}
           onToggle={() => {
             onGranularityToggle(member.name, granularity);
-            setOpen(false);
           }}
         />
       );
     });
   };
 
+  const onPress = useEvent(() => {
+    onToggle(!isOpen, member.name);
+  });
+
+  const filterMenu = useMemo(() => {
+    const dangerProps = isFiltered
+      ? {
+          color: '#danger-text',
+        }
+      : {};
+    const disabledMenuKeys: string[] = [];
+
+    if (!isFiltered) {
+      disabledMenuKeys.push('remove');
+    }
+
+    if (isDateRangeFiltered) {
+      disabledMenuKeys.push('add-date-range');
+    }
+
+    return (
+      <MenuTrigger>
+        <FilterByMemberButton
+          isAngular
+          type="timeDimension"
+          isFiltered={isFiltered || false}
+          {...(isMissing ? { color: '#danger-text' } : {})}
+        />
+        <Menu
+          disabledKeys={disabledMenuKeys}
+          onAction={(key) => {
+            switch (key) {
+              case 'add-date-range':
+                onAddDataRange?.(member.name);
+                break;
+              case 'add-filter':
+                onAddFilter?.(member.name);
+                break;
+              case 'remove':
+                onRemoveFilter?.(member.name);
+                onRemoveDataRange?.(member.name);
+                break;
+              default:
+                return;
+            }
+          }}
+        >
+          <Menu.Item key="add-date-range" icon={<PlusIcon />}>
+            Filter by Date Range
+          </Menu.Item>
+          <Menu.Item key="add-filter" icon={<PlusIcon />}>
+            Filter by This Member
+          </Menu.Item>
+          <Menu.Item key="remove" icon={<CloseIcon {...dangerProps} />}>
+            <Text {...dangerProps}>Remove all</Text>
+          </Menu.Item>
+        </Menu>
+      </MenuTrigger>
+    );
+  }, [
+    member?.name,
+    isDateRangeFiltered,
+    isFiltered,
+    isMissing,
+    onAddDataRange,
+    onRemoveDataRange,
+    onAddFilter,
+    onRemoveFilter,
+  ]);
+
   return (
     <>
-      {hasOverflow || !isAutoTitle ? (
-        <TooltipProvider
-          title={
-            <>
-              <b>{name}</b>
-            </>
-          }
-          delay={1000}
-          placement="right"
+      <InstanceTooltipProvider
+        name={name}
+        fullName={member.name}
+        type="dimension"
+        title={title}
+        overflowRef={textRef}
+      >
+        <ListMemberButton
+          icon={<TimeIcon />}
+          data-member="dimension"
+          isSelected={isTimestampSelected && !isOpen}
+          mods={{ missing: isMissing }}
+          gridColumns="auto minmax(0, 1fr) auto"
+          onPress={onPress}
         >
-          {button}
-        </TooltipProvider>
-      ) : (
-        button
-      )}
-      {open || isCompact || selectedGranularity ? (
-        <Flex flow="column" gap="1bw" padding="4.5x left">
-          {open && !isCompact ? (
+          <Space gap=".75x">
+            <Text ref={textRef} ellipsis>
+              {filterString ? (
+                <FilteredLabel text={shownMemberName} filter={filterString} />
+              ) : (
+                shownMemberName
+              )}
+            </Text>
+            <ChevronIcon
+              direction={isOpen ? 'top' : 'bottom'}
+              color="var(--dimension-text-color)"
+            />
+          </Space>
+
+          <Space gap=".5x">
+            {('public' in member && member.public === false) || description ? (
+              <Space gap="1x">
+                {description ? <ItemInfoIcon description={description} /> : undefined}
+                {'public' in member && member.public === false ? <NonPublicIcon /> : undefined}
+              </Space>
+            ) : null}
+            {member && filterMenu}
+          </Space>
+        </ListMemberButton>
+      </InstanceTooltipProvider>
+      {isOpen || selectedGranularity ? (
+        <GranularitiesWrapper>
+          {isOpen ? (
             <ListMemberButton
               icon={<TimeIcon />}
               data-member="dimension"
               isSelected={isTimestampSelected}
               onPress={() => {
                 onDimensionToggle(member.name);
-                setOpen(false);
               }}
             >
               <Text ellipsis>value</Text>
             </ListMemberButton>
           ) : null}
-          {granularityItems(customGranularities, true)}
+          {granularityItems(nonPredefinedGranularityNames, true)}
           {granularityItems(PREDEFINED_GRANULARITIES)}
-        </Flex>
+          <div data-element="TimeListLine" />
+        </GranularitiesWrapper>
       ) : null}
     </>
   );

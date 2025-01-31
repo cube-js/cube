@@ -7,9 +7,9 @@ use crate::{
         wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        BinaryExprOp, ColumnExprColumn, CubeEGraph, JoinLeftOn, JoinRightOn, LogicalPlanLanguage,
-        WrappedSelectJoinJoinType, WrapperPullupReplacerGroupedSubqueries,
-        WrapperPushdownReplacerGroupedSubqueries,
+        wrapper_replacer_context, BinaryExprOp, ColumnExprColumn, CubeEGraph, JoinLeftOn,
+        JoinRightOn, LogicalPlanLanguage, WrappedSelectJoinJoinType,
+        WrapperReplacerContextGroupedSubqueries,
     },
     var, var_iter, var_list_iter,
 };
@@ -24,31 +24,13 @@ impl WrapperRules {
             rewrite(
                 "wrapper-pull-up-single-select-join",
                 wrapped_select_join(
-                    wrapper_pullup_replacer(
-                        "?input",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                    ),
-                    wrapper_pullup_replacer(
-                        "?join_expr",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                        "?grouped_subqueries",
-                    ),
+                    wrapper_pullup_replacer("?input", "?context"),
+                    wrapper_pullup_replacer("?join_expr", "?context"),
                     "?out_join_type",
                 ),
                 wrapper_pullup_replacer(
                     wrapped_select_join("?input", "?join_expr", "?out_join_type"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    "?context",
                 ),
             ),
             // TODO handle CrossJoin and Filter(CrossJoin) as well
@@ -58,32 +40,37 @@ impl WrapperRules {
                     cube_scan_wrapper(
                         wrapper_pullup_replacer(
                             "?left_cube_scan_input",
-                            // Going to use this in RHS of rule
-                            // RHS of join is grouped, so it shouldn't have any cubes or members
-                            "?left_alias_to_cube",
-                            // This check is important
-                            // Rule would place ?left_cube_scan_input to `from` position of WrappedSelect(WrappedSelectPushToCube:true)
-                            // So it need to support push-to-Cube
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            // Going to use this in RHS of rule
-                            // RHS of join is grouped, so it shouldn't have any cubes or members
-                            "?left_cube_members",
-                            "?left_grouped_subqueries",
+                            wrapper_replacer_context(
+                                // Going to use this in RHS of rule
+                                // RHS of join is grouped, so it shouldn't have any cubes or members
+                                "?left_alias_to_cube",
+                                // This check is important
+                                // Rule would place ?left_cube_scan_input to `from` position of WrappedSelect(WrappedSelectPushToCube:true)
+                                // So it need to support push-to-Cube
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                // Going to use this in RHS of rule
+                                // RHS of join is grouped, so it shouldn't have any cubes or members
+                                "?left_cube_members",
+                                "?left_grouped_subqueries",
+                                "?left_ungrouped_scan",
+                            ),
                         ),
                         "CubeScanWrapperFinalized:false",
                     ),
                     cube_scan_wrapper(
                         wrapper_pullup_replacer(
                             "?right_input",
-                            // Going to ignore this
-                            "?right_alias_to_cube",
-                            // TODO depend on proper "ungrouped scan" flag (that is not a push-to-cube)
-                            "WrapperPullupReplacerPushToCube:false",
-                            "?in_projection",
-                            // Going to ignore this
-                            "?right_cube_members",
-                            "?right_grouped_subqueries",
+                            wrapper_replacer_context(
+                                // Going to ignore this
+                                "?right_alias_to_cube",
+                                "?right_push_to_cube",
+                                "?in_projection",
+                                // Going to ignore this
+                                "?right_cube_members",
+                                "?right_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:false",
+                            ),
                         ),
                         "CubeScanWrapperFinalized:false",
                     ),
@@ -98,116 +85,149 @@ impl WrapperRules {
                         "WrappedSelectSelectType:Projection",
                         wrapper_pullup_replacer(
                             wrapped_select_projection_expr_empty_tail(),
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                // Can use it, because we've checked that left input allows push-to-Cube,
+                                // so it must be ungrouped, making this whole plan ungrouped
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_subqueries_empty_tail(),
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_group_expr_empty_tail(),
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_aggr_expr_empty_tail(),
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_window_expr_empty_tail(),
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         wrapper_pullup_replacer(
                             // Can move left_cube_scan_input here without checking if it's actually CubeScan
-                            // Check for WrapperPullupReplacerPushToCube:true should be enough
+                            // Check for WrapperReplacerContextPushToCube:true should be enough
                             "?left_cube_scan_input",
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
                         wrapped_select_joins(
                             wrapped_select_join(
                                 wrapper_pullup_replacer(
                                     "?right_input",
-                                    "?left_alias_to_cube",
-                                    "WrapperPullupReplacerPushToCube:true",
-                                    "?in_projection",
-                                    "?left_cube_members",
-                                    "?out_pullup_grouped_subqueries",
+                                    wrapper_replacer_context(
+                                        "?left_alias_to_cube",
+                                        "WrapperReplacerContextPushToCube:true",
+                                        "?in_projection",
+                                        "?left_cube_members",
+                                        "?out_grouped_subqueries",
+                                        "WrapperReplacerContextUngroupedScan:true",
+                                    ),
                                 ),
                                 wrapper_pushdown_replacer(
                                     "?out_join_expr",
-                                    // TODO pullup field in pushdown replacer
-                                    "?left_alias_to_cube",
-                                    // On one hand, this should be PushToCube:true, so we would only join on dimensions
-                                    // On other: RHS is grouped, so any column is just a column
-                                    // Right now, it is relying on grouped_subqueries + PushToCube:true, to allow both dimensions and grouped columns
-                                    "WrapperPushdownReplacerPushToCube:true",
-                                    // TODO pullup flag in pushdown replacer
-                                    "?in_projection",
-                                    "?left_cube_members",
-                                    "?out_pushdown_grouped_subqueries",
+                                    wrapper_replacer_context(
+                                        "?left_alias_to_cube",
+                                        // On one hand, this should be PushToCube:true, so we would only join on dimensions
+                                        // On other: RHS is grouped, so any column is just a column
+                                        // Right now, it is relying on grouped_subqueries + PushToCube:true, to allow both dimensions and grouped columns
+                                        "WrapperReplacerContextPushToCube:true",
+                                        "?in_projection",
+                                        "?left_cube_members",
+                                        "?out_grouped_subqueries",
+                                        "WrapperReplacerContextUngroupedScan:true",
+                                    ),
                                 ),
                                 "?out_join_type",
                             ),
                             // pullup(tail) just so it could be easily picked up by pullup rules
                             wrapper_pullup_replacer(
                                 wrapped_select_joins_empty_tail(),
-                                "?left_alias_to_cube",
-                                "WrapperPullupReplacerPushToCube:true",
-                                "?in_projection",
-                                "?left_cube_members",
-                                "?out_pullup_grouped_subqueries",
+                                wrapper_replacer_context(
+                                    "?left_alias_to_cube",
+                                    "WrapperReplacerContextPushToCube:true",
+                                    "?in_projection",
+                                    "?left_cube_members",
+                                    "?out_grouped_subqueries",
+                                    "WrapperReplacerContextUngroupedScan:true",
+                                ),
                             ),
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_filter_expr_empty_tail(),
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         wrapped_select_having_expr_empty_tail(),
                         "WrappedSelectLimit:None",
                         "WrappedSelectOffset:None",
                         wrapper_pullup_replacer(
                             wrapped_select_order_expr_empty_tail(),
-                            "?left_alias_to_cube",
-                            "WrapperPullupReplacerPushToCube:true",
-                            "?in_projection",
-                            "?left_cube_members",
-                            "?out_pullup_grouped_subqueries",
+                            wrapper_replacer_context(
+                                "?left_alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "?in_projection",
+                                "?left_cube_members",
+                                "?out_grouped_subqueries",
+                                "WrapperReplacerContextUngroupedScan:true",
+                            ),
                         ),
                         "WrappedSelectAlias:None",
                         "WrappedSelectDistinct:false",
-                        // left input has WrapperPullupReplacerPushToCube:true
+                        // left input has WrapperReplacerContextPushToCube:true
                         // Meaning that left input itself is ungrouped CubeScan
                         // Keep it in result, rely on pull-up rules to drop it, and on flattening rules to pick it up
                         "WrappedSelectPushToCube:true",
-                        // left input is WrapperPullupReplacerPushToCube:true, so result must be ungrouped
+                        // left input is WrapperReplacerContextPushToCube:true, so result must be ungrouped
                         "WrappedSelectUngroupedScan:true",
                     ),
                     "CubeScanWrapperFinalized:false",
@@ -219,8 +239,7 @@ impl WrapperRules {
                     "?in_join_type",
                     "?out_join_expr",
                     "?out_join_type",
-                    "?out_pullup_grouped_subqueries",
-                    "?out_pushdown_grouped_subqueries",
+                    "?out_grouped_subqueries",
                 ),
             ),
         ]);
@@ -314,8 +333,7 @@ impl WrapperRules {
         in_join_type_var: &'static str,
         out_join_expr_var: &'static str,
         out_join_type_var: &'static str,
-        out_pullup_grouped_subqueries_var: &'static str,
-        out_pushdown_grouped_subqueries_var: &'static str,
+        out_grouped_subqueries_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_members_var = var!(left_members_var);
         let left_on_var = var!(left_on_var);
@@ -326,8 +344,7 @@ impl WrapperRules {
 
         let out_join_expr_var = var!(out_join_expr_var);
         let out_join_type_var = var!(out_join_type_var);
-        let out_pullup_grouped_subqueries_var = var!(out_pullup_grouped_subqueries_var);
-        let out_pushdown_grouped_subqueries_var = var!(out_pushdown_grouped_subqueries_var);
+        let out_grouped_subqueries_var = var!(out_grouped_subqueries_var);
 
         // Only left is allowed to be ungrouped query, so right would be a subquery join for left ungrouped CubeScan
         // It means we don't care about just a "single cube" in LHS, and there's essentially no cubes by this moment in RHS
@@ -382,22 +399,10 @@ impl WrapperRules {
                             )),
                         );
                         subst.insert(
-                            out_pullup_grouped_subqueries_var,
+                            out_grouped_subqueries_var,
                             egraph.add(
-                                LogicalPlanLanguage::WrapperPullupReplacerGroupedSubqueries(
-                                    WrapperPullupReplacerGroupedSubqueries(
-                                        out_grouped_subqueries.clone(),
-                                    ),
-                                ),
-                            ),
-                        );
-                        subst.insert(
-                            out_pushdown_grouped_subqueries_var,
-                            egraph.add(
-                                LogicalPlanLanguage::WrapperPushdownReplacerGroupedSubqueries(
-                                    WrapperPushdownReplacerGroupedSubqueries(
-                                        out_grouped_subqueries,
-                                    ),
+                                LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                                    WrapperReplacerContextGroupedSubqueries(out_grouped_subqueries),
                                 ),
                             ),
                         );

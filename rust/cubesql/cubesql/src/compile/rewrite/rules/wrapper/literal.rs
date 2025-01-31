@@ -2,16 +2,15 @@ use crate::{
     compile::rewrite::{
         literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerGroupedSubqueries,
-        WrapperPullupReplacerPushToCube, WrapperPushdownReplacerGroupedSubqueries,
-        WrapperPushdownReplacerPushToCube,
+        WrapperReplacerContextAliasToCube,
     },
-    copy_flag, copy_value, var, var_iter,
+    var, var_iter,
 };
 
 use crate::compile::rewrite::{
     rewriter::{CubeEGraph, CubeRewrite},
     rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
+    wrapper_replacer_context,
 };
 use datafusion::scalar::ScalarValue;
 use egg::Subst;
@@ -23,56 +22,53 @@ impl WrapperRules {
                 "wrapper-push-down-literal",
                 wrapper_pushdown_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 wrapper_pullup_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?pullup_push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?pullup_grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
-                self.transform_literal(
-                    "?alias_to_cube",
-                    "?value",
-                    "?push_to_cube",
-                    "?pullup_push_to_cube",
-                    "?grouped_subqueries",
-                    "?pullup_grouped_subqueries",
-                ),
+                self.transform_literal("?alias_to_cube", "?value"),
             ),
             transforming_rewrite(
                 "wrapper-push-down-interval-literal",
                 wrapper_pushdown_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 wrapper_pullup_replacer(
                     "?new_value",
-                    "?alias_to_cube",
-                    "?pullup_push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?pullup_grouped_subqueries",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
-                self.transform_interval_literal(
-                    "?alias_to_cube",
-                    "?value",
-                    "?new_value",
-                    "?push_to_cube",
-                    "?pullup_push_to_cube",
-                    "?grouped_subqueries",
-                    "?pullup_grouped_subqueries",
-                ),
+                self.transform_interval_literal("?alias_to_cube", "?value", "?new_value"),
             ),
         ]);
     }
@@ -81,44 +77,14 @@ impl WrapperRules {
         &self,
         alias_to_cube_var: &str,
         value_var: &str,
-        push_to_cube_var: &str,
-        pullup_push_to_cube_var: &str,
-        grouped_subqueries_var: &str,
-        pullup_grouped_subqueries_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
-        let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
-        let grouped_subqueries_var = var!(grouped_subqueries_var);
-        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            if !copy_flag!(
-                egraph,
-                subst,
-                push_to_cube_var,
-                WrapperPushdownReplacerPushToCube,
-                pullup_push_to_cube_var,
-                WrapperPullupReplacerPushToCube
-            ) {
-                return false;
-            }
-            if !copy_value!(
-                egraph,
-                subst,
-                Vec<String>,
-                grouped_subqueries_var,
-                WrapperPushdownReplacerGroupedSubqueries,
-                pullup_grouped_subqueries_var,
-                WrapperPullupReplacerGroupedSubqueries
-            ) {
-                return false;
-            }
-
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
                     for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
@@ -151,45 +117,15 @@ impl WrapperRules {
         alias_to_cube_var: &str,
         value_var: &str,
         new_value_var: &str,
-        push_to_cube_var: &str,
-        pullup_push_to_cube_var: &str,
-        grouped_subqueries_var: &str,
-        pullup_grouped_subqueries_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let new_value_var = var!(new_value_var);
-        let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
-        let grouped_subqueries_var = var!(grouped_subqueries_var);
-        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            if !copy_flag!(
-                egraph,
-                subst,
-                push_to_cube_var,
-                WrapperPushdownReplacerPushToCube,
-                pullup_push_to_cube_var,
-                WrapperPullupReplacerPushToCube
-            ) {
-                return false;
-            }
-            if !copy_value!(
-                egraph,
-                subst,
-                Vec<String>,
-                grouped_subqueries_var,
-                WrapperPushdownReplacerGroupedSubqueries,
-                pullup_grouped_subqueries_var,
-                WrapperPullupReplacerGroupedSubqueries
-            ) {
-                return false;
-            }
-
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
                     let contains_template =

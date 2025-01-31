@@ -30,22 +30,17 @@ mod wrapper_pull_up;
 
 use crate::{
     compile::rewrite::{
-        fun_expr,
-        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
+        fun_expr, rewrite,
+        rewriter::{CubeRewrite, RewriteRules},
         rules::{
             replacer_flat_pull_up_node, replacer_flat_push_down_node, replacer_pull_up_node,
             replacer_push_down_node,
         },
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
-        WrapperPullupReplacerGroupedSubqueries, WrapperPullupReplacerPushToCube,
-        WrapperPushdownReplacerGroupedSubqueries, WrapperPushdownReplacerPushToCube,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
     },
     config::ConfigObj,
-    copy_flag, copy_value,
     transport::MetaContext,
-    var,
 };
-use egg::Subst;
 use std::{fmt::Display, sync::Arc};
 
 pub struct WrapperRules {
@@ -68,6 +63,7 @@ impl RewriteRules for WrapperRules {
         self.limit_rules(&mut rules);
         self.filter_rules(&mut rules);
         self.filter_rules_subquery(&mut rules);
+        self.filter_merge_rules(&mut rules);
         self.subquery_rules(&mut rules);
         self.order_rules(&mut rules);
         self.window_rules(&mut rules);
@@ -116,16 +112,7 @@ impl WrapperRules {
         rules.extend(replacer_push_down_node(
             rule_name,
             list_node,
-            |node| {
-                wrapper_pushdown_replacer(
-                    node,
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )
-            },
+            |node| wrapper_pushdown_replacer(node, "?context"),
             false,
         ));
 
@@ -133,79 +120,14 @@ impl WrapperRules {
             rule_name,
             list_node,
             substitute_list_node,
-            |node| {
-                wrapper_pullup_replacer(
-                    node,
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )
-            },
+            |node| wrapper_pullup_replacer(node, "?context"),
         ));
 
-        rules.extend(vec![transforming_rewrite(
+        rules.extend(vec![rewrite(
             &format!("{}-tail", rule_name),
-            wrapper_pushdown_replacer(
-                list_node,
-                "?alias_to_cube",
-                "?push_to_cube",
-                "?in_projection",
-                "?cube_members",
-                "?grouped_subqueries",
-            ),
-            wrapper_pullup_replacer(
-                substitute_list_node,
-                "?alias_to_cube",
-                "?pullup_push_to_cube",
-                "?in_projection",
-                "?cube_members",
-                "?pullup_grouped_subqueries",
-            ),
-            Self::transform_list_tail(
-                "?push_to_cube",
-                "?pullup_push_to_cube",
-                "?grouped_subqueries",
-                "?pullup_grouped_subqueries",
-            ),
+            wrapper_pushdown_replacer(list_node, "?context"),
+            wrapper_pullup_replacer(substitute_list_node, "?context"),
         )]);
-    }
-
-    fn transform_list_tail(
-        push_to_cube_var: &str,
-        pullup_push_to_cube_var: &str,
-        grouped_subqueries_var: &str,
-        pullup_grouped_subqueries_var: &str,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
-        let grouped_subqueries_var = var!(grouped_subqueries_var);
-        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
-        move |egraph, subst| {
-            if !copy_flag!(
-                egraph,
-                subst,
-                push_to_cube_var,
-                WrapperPushdownReplacerPushToCube,
-                pullup_push_to_cube_var,
-                WrapperPullupReplacerPushToCube
-            ) {
-                return false;
-            }
-            if !copy_value!(
-                egraph,
-                subst,
-                Vec<String>,
-                grouped_subqueries_var,
-                WrapperPushdownReplacerGroupedSubqueries,
-                pullup_grouped_subqueries_var,
-                WrapperPullupReplacerGroupedSubqueries
-            ) {
-                return false;
-            }
-            true
-        }
     }
 
     fn flat_list_pushdown_pullup_rules(
@@ -217,16 +139,7 @@ impl WrapperRules {
         rules.extend(replacer_flat_push_down_node(
             rule_name,
             list_type.clone(),
-            |node| {
-                wrapper_pushdown_replacer(
-                    node,
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )
-            },
+            |node| wrapper_pushdown_replacer(node, "?context"),
             false,
         ));
 
@@ -234,86 +147,15 @@ impl WrapperRules {
             rule_name,
             list_type.clone(),
             substitute_list_type.clone(),
-            |node| {
-                wrapper_pullup_replacer(
-                    node,
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )
-            },
-            &[
-                "?alias_to_cube",
-                "?push_to_cube",
-                "?in_projection",
-                "?cube_members",
-                "?grouped_subqueries",
-            ],
+            |node| wrapper_pullup_replacer(node, "?context"),
+            &["?context"],
         ));
 
-        rules.extend(vec![transforming_rewrite(
+        rules.extend(vec![rewrite(
             &format!("{}-tail", rule_name),
-            wrapper_pushdown_replacer(
-                list_type.empty_list(),
-                "?alias_to_cube",
-                "?push_to_cube",
-                "?in_projection",
-                "?cube_members",
-                "?grouped_subqueries",
-            ),
-            wrapper_pullup_replacer(
-                substitute_list_type.empty_list(),
-                "?alias_to_cube",
-                "?pullup_push_to_cube",
-                "?in_projection",
-                "?cube_members",
-                "?pullup_grouped_subqueries",
-            ),
-            Self::transform_flat_list_tail(
-                "?push_to_cube",
-                "?pullup_push_to_cube",
-                "?grouped_subqueries",
-                "?pullup_grouped_subqueries",
-            ),
+            wrapper_pushdown_replacer(list_type.empty_list(), "?context"),
+            wrapper_pullup_replacer(substitute_list_type.empty_list(), "?context"),
         )]);
-    }
-
-    fn transform_flat_list_tail(
-        push_to_cube_var: &str,
-        pullup_push_to_cube_var: &str,
-        grouped_subqueries_var: &str,
-        pullup_grouped_subqueries_var: &str,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
-        let grouped_subqueries_var = var!(grouped_subqueries_var);
-        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
-        move |egraph, subst| {
-            if !copy_flag!(
-                egraph,
-                subst,
-                push_to_cube_var,
-                WrapperPushdownReplacerPushToCube,
-                pullup_push_to_cube_var,
-                WrapperPullupReplacerPushToCube
-            ) {
-                return false;
-            }
-            if !copy_value!(
-                egraph,
-                subst,
-                Vec<String>,
-                grouped_subqueries_var,
-                WrapperPushdownReplacerGroupedSubqueries,
-                pullup_grouped_subqueries_var,
-                WrapperPullupReplacerGroupedSubqueries
-            ) {
-                return false;
-            }
-            true
-        }
     }
 
     fn expr_list_pushdown_pullup_rules(
@@ -324,16 +166,7 @@ impl WrapperRules {
         rules.extend(replacer_push_down_node(
             rule_name,
             list_node,
-            |node| {
-                wrapper_pushdown_replacer(
-                    node,
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )
-            },
+            |node| wrapper_pushdown_replacer(node, "?context"),
             false,
         ));
 
@@ -341,78 +174,13 @@ impl WrapperRules {
             rule_name,
             list_node,
             list_node,
-            |node| {
-                wrapper_pullup_replacer(
-                    node,
-                    "?alias_to_cube",
-                    "?push_to_cube",
-                    "?in_projection",
-                    "?cube_members",
-                    "?grouped_subqueries",
-                )
-            },
+            |node| wrapper_pullup_replacer(node, "?context"),
         ));
 
-        rules.extend(vec![transforming_rewrite(
+        rules.extend(vec![rewrite(
             rule_name,
-            wrapper_pushdown_replacer(
-                list_node,
-                "?alias_to_cube",
-                "?push_to_cube",
-                "?in_projection",
-                "?cube_members",
-                "?grouped_subqueries",
-            ),
-            wrapper_pullup_replacer(
-                list_node,
-                "?alias_to_cube",
-                "?pullup_push_to_cube",
-                "?in_projection",
-                "?cube_members",
-                "?pullup_grouped_subqueries",
-            ),
-            Self::transform_expr_list_tail(
-                "?push_to_cube",
-                "?pullup_push_to_cube",
-                "?grouped_subqueries",
-                "?pullup_grouped_subqueries",
-            ),
+            wrapper_pushdown_replacer(list_node, "?context"),
+            wrapper_pullup_replacer(list_node, "?context"),
         )]);
-    }
-
-    fn transform_expr_list_tail(
-        push_to_cube_var: &str,
-        pullup_push_to_cube_var: &str,
-        grouped_subqueries_var: &str,
-        pullup_grouped_subqueries_var: &str,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
-        let grouped_subqueries_var = var!(grouped_subqueries_var);
-        let pullup_grouped_subqueries_var = var!(pullup_grouped_subqueries_var);
-        move |egraph, subst| {
-            if !copy_flag!(
-                egraph,
-                subst,
-                push_to_cube_var,
-                WrapperPushdownReplacerPushToCube,
-                pullup_push_to_cube_var,
-                WrapperPullupReplacerPushToCube
-            ) {
-                return false;
-            }
-            if !copy_value!(
-                egraph,
-                subst,
-                Vec<String>,
-                grouped_subqueries_var,
-                WrapperPushdownReplacerGroupedSubqueries,
-                pullup_grouped_subqueries_var,
-                WrapperPullupReplacerGroupedSubqueries
-            ) {
-                return false;
-            }
-            true
-        }
     }
 }

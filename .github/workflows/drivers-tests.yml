@@ -23,6 +23,7 @@ on:
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
@@ -49,12 +50,16 @@ on:
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-redshift-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
       - 'packages/cubejs-vertica-driver/**'
 
       # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
+
+env:
+  CUBEJS_TESSERACT_ORCHESTRATOR: true
 
 jobs:
   latest-tag-sha:
@@ -117,8 +122,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./packages/cubejs-backend-native
-          key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
-          shared-key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
+          key: native-${{ runner.OS }}-${{ matrix.target }}
+          shared-key: native-${{ runner.OS }}-${{ matrix.target }}
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         env:
@@ -165,7 +170,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-native
-          path: packages/cubejs-backend-native/
+          path: packages/cubejs-backend-native
+      # current .dockerignore prevents use of native build
+      - name: Unignore native from .dockerignore
+        run: |
+          grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
+          mv .dockerignore.tmp .dockerignore
       - name: Build and push
         uses: docker/build-push-action@v6
         with:

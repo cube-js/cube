@@ -48,6 +48,16 @@ for an unofficial, community-maintained [client library for Python](https://gith
 
 </ReferenceBox>
 
+### Support for data modeling
+
+Support for data modeling features differ across APIs, integrations, and [visualization
+tools][ref-viz-tools]. Some of the features with partial support are listed below:
+
+| Feature | Supported in | Not supported in |
+| --- | --- | --- |
+| [Hierarchies][ref-hierarchies] | ✅ [Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>✅ Cube Cloud for Excel<br/>✅ [Cube Cloud for Sheets][ref-cube-cloud-for-sheets] | ❌ All other tools |
+| [Folders][ref-folders] | ✅ [Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>✅ Cube Cloud for Excel<br/>✅ [Cube Cloud for Sheets][ref-cube-cloud-for-sheets] | ❌ All other tools |
+
 ## Management APIs
 
 In case you'd like Cube to work with data orchestration tools and let them push
@@ -70,3 +80,7 @@ API][ref-orchestration-api].
 [ref-json-syntax]: /product/apis-integrations/rest-api/query-format
 [ref-graphql-syntax]: /product/apis-integrations/graphql-api#getting-started
 [ref-cube-cloud-for-sheets]: /product/apis-integrations/google-sheets
+[ref-viz-tools]: /product/configuration/visualization-tools
+[ref-hierarchies]: /reference/data-model/hierarchies
+[ref-folders]: /reference/data-model/view#folders
+[ref-tableau]: /product/configuration/visualization-tools/tableau

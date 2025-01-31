@@ -552,7 +552,7 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v6
         with:
-          context: ./rust/cubestore/
+          context: ./rust/
           file: ./rust/cubestore/Dockerfile
           platforms: ${{ matrix.platforms }}
           build-args: ${{ matrix.build-args }}

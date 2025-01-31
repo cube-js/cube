@@ -1,18 +1,21 @@
 //use super::object::NeonObject;
-use super::inner_types::NeonInnerTypes;
-use super::object::base_types::*;
-use super::object::neon_array::NeonArray;
-use super::object::neon_function::NeonFunction;
-use super::object::neon_struct::NeonStruct;
-use super::object::NeonObject;
-use crate::wrappers::context::NativeContext;
-use crate::wrappers::object::NativeObject;
-use crate::wrappers::object_handle::NativeObjectHandle;
+use super::{
+    inner_types::NeonInnerTypes,
+    object::{
+        base_types::*, neon_array::NeonArray, neon_function::NeonFunction, neon_struct::NeonStruct,
+        NeonObject,
+    },
+};
+use crate::wrappers::{
+    context::NativeContext, object::NativeObject, object_handle::NativeObjectHandle,
+};
 use cubesql::CubeError;
 use neon::prelude::*;
-use std::cell::{RefCell, RefMut};
-use std::marker::PhantomData;
-use std::rc::{Rc, Weak};
+use std::{
+    cell::{RefCell, RefMut},
+    marker::PhantomData,
+    rc::{Rc, Weak},
+};
 pub struct ContextWrapper<'cx, C: Context<'cx>> {
     cx: C,
     lifetime: PhantomData<&'cx ()>,

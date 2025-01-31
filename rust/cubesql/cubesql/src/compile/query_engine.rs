@@ -467,7 +467,9 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_current_timestamp_udf("localtimestamp"));
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
+        ctx.register_udf(create_format_udf());
         ctx.register_udf(create_format_type_udf());
+        ctx.register_udf(create_col_description_udf());
         ctx.register_udf(create_pg_datetime_precision_udf());
         ctx.register_udf(create_pg_numeric_precision_udf());
         ctx.register_udf(create_pg_numeric_scale_udf());
