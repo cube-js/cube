@@ -39,7 +39,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   // TODO: find and fix all hidden references to granularity to rely on granularityObj instead?
-  public get granularity(): string | undefined {
+  public get granularity(): string | null | undefined {
     return this.granularityObj?.granularity;
   }
 
@@ -217,7 +217,7 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateToFormatted() : BUILD_RANGE_END_LOCAL));
   }
 
-  public dateRangeGranularity() {
+  public dateRangeGranularity(): string | null {
     if (!this.dateRange) {
       return null;
     }
@@ -229,9 +229,9 @@ export class BaseTimeDimension extends BaseFilter {
     );
   }
 
-  protected rollupGranularityValue: any | null = null;
+  protected rollupGranularityValue: string | null = null;
 
-  public rollupGranularity() {
+  public rollupGranularity(): string | null {
     if (!this.rollupGranularityValue) {
       this.rollupGranularityValue =
         this.query.cacheValue(
@@ -241,7 +241,18 @@ export class BaseTimeDimension extends BaseFilter {
               return this.dateRangeGranularity();
             }
 
-            return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
+            if (!this.dateRange) {
+              return this.granularityObj.minGranularity();
+            }
+
+            // If we have granularity and date range, we need to check
+            // that the interval and the granularity offset are stacked/fits with date range
+            if (this.granularityObj.isPredefined() ||
+              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()])) {
+              return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
+            }
+
+            return this.granularityObj.granularity;
           }
         );
     }
@@ -262,11 +273,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public resolvedGranularity() {
-    return this.granularityObj?.resolvedGranularity();
-  }
-
-  public isPredefinedGranularity(): boolean {
-    return this.granularityObj?.isPredefined() || false;
+    return this.granularityObj ? this.granularityObj.resolvedGranularity() : this.dateRangeGranularity();
   }
 
   public wildcardRange() {

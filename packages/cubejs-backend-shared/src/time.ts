@@ -76,7 +76,7 @@ export function subtractInterval(date: moment.Moment, interval: ParsedInterval):
 /**
  * Returns the closest date prior to date parameter aligned with the origin point
  */
-function alignToOrigin(startDate: moment.Moment, interval: ParsedInterval, origin: moment.Moment): moment.Moment {
+export const alignToOrigin = (startDate: moment.Moment, interval: ParsedInterval, origin: moment.Moment): moment.Moment => {
   let alignedDate = startDate.clone();
   let intervalOp;
   let isIntervalNegative = false;
@@ -111,9 +111,9 @@ function alignToOrigin(startDate: moment.Moment, interval: ParsedInterval, origi
   }
 
   return alignedDate;
-}
+};
 
-function parsedSqlIntervalToDuration(parsedInterval: ParsedInterval): moment.Duration {
+export const parsedSqlIntervalToDuration = (parsedInterval: ParsedInterval): moment.Duration => {
   const duration = moment.duration();
 
   Object.entries(parsedInterval).forEach(([key, value]) => {
@@ -121,7 +121,7 @@ function parsedSqlIntervalToDuration(parsedInterval: ParsedInterval): moment.Dur
   });
 
   return duration;
-}
+};
 
 function checkSeriesForDateRange(intervalStr: string, [startStr, endStr]: QueryDateRange): void {
   const intervalParsed = parseSqlInterval(intervalStr);

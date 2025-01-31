@@ -448,8 +448,8 @@ export class CubeEvaluator extends CubeSymbols {
 
   public timeDimensionPathsForCube(cube: any) {
     return R.compose(
-      R.map(nameToDefinition => `${cube}.${nameToDefinition[0]}`),
-      R.toPairs,
+      R.map(dimName => `${cube}.${dimName}`),
+      R.keys,
       // @ts-ignore
       R.filter((d: any) => d.type === 'time')
       // @ts-ignore
@@ -460,12 +460,19 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(cube).measures || {};
   }
 
+  public timeDimensionsForCube(cube) {
+    return R.filter(
+      (d: any) => d.type === 'time',
+      this.cubeFromPath(cube).dimensions || {}
+    );
+  }
+
   public preAggregationsForCube(path: string) {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
   /**
-   * Returns pre-aggregations filtered by the spcified selector.
+   * Returns pre-aggregations filtered by the specified selector.
    * @param {{
    *  scheduled: boolean,
    *  dataSource: Array<string>,
