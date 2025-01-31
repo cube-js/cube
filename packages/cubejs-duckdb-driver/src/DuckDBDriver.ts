@@ -55,10 +55,36 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     return super.toGenericType(columnType.toLowerCase());
   }
 
+  private async installAndLoadExtensions(extensions: string[], execAsync: (sql: string, ...params: any[]) => Promise<void>, repository: string = '',): Promise<void> {
+    // repository for official extensions is empty.
+    repository = repository ? ` FROM ${repository}` : '';
+    for (const extension of extensions) {
+      try {
+        await execAsync(`INSTALL ${extension}${repository}`);
+      } catch (e) {
+        if (this.logger) {
+          console.error(`DuckDB - error on installing ${extension}`, { e });
+        }
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
+      }
+
+      try {
+        await execAsync(`LOAD ${extension}`);
+      } catch (e) {
+        if (this.logger) {
+          console.error(`DuckDB - error on loading ${extension}`, { e });
+        }
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
+      }
+    }
+  }
+
   protected async init(): Promise<InitPromise> {
     const token = getEnv('duckdbMotherDuckToken', this.config);
     const dbPath = getEnv('duckdbDatabasePath', this.config);
-    
+
     // Determine the database URL based on the provided db_path or token
     let dbUrl: string;
     if (dbPath) {
@@ -119,7 +145,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         value: getEnv('duckdbS3SessionToken', this.config),
       }
     ];
-    
+
     for (const { key, value } of configuration) {
       if (value) {
         try {
@@ -135,34 +161,10 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     }
 
     // Install & load extensions if configured in env variable.
-    const extensions = getEnv('duckdbExtensions', this.config);
-    for (const extension of extensions) {
-      try {
-        await execAsync(`INSTALL ${extension}`);
-      } catch (e) {
-        if (this.logger) {
-          console.error(`DuckDB - error on installing ${extension}`, {
-            e
-          });
-        }
-
-        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-        throw e;
-      }
-
-      try {
-        await execAsync(`LOAD ${extension}`);
-      } catch (e) {
-        if (this.logger) {
-          console.error(`DuckDB - error on loading ${extension}`, {
-            e
-          });
-        }
-
-        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-        throw e;
-      }
-    }
+    const officialExtensions = getEnv('duckdbExtensions', this.config);
+    await this.installAndLoadExtensions(officialExtensions, execAsync);
+    const communityExtensions = getEnv('duckdbCommunityExtensions', this.config);
+    await this.installAndLoadExtensions(communityExtensions, execAsync, 'community');
 
     if (this.config.initSql) {
       try {
@@ -175,7 +177,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-    
+
     return {
       defaultConnection,
       db
