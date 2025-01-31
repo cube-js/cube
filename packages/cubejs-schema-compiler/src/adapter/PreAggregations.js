@@ -439,14 +439,14 @@ export class PreAggregations {
   static sortTimeDimensionsWithRollupGranularity(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => [d.expressionPath(), d.rollupGranularity(), d.granularityObj?.minGranularity()])
+      timeDimensions.map(d => [d.expressionPath(), d.rollupGranularity()])
     ) || [];
   }
 
   static timeDimensionsAsIs(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => [d.expressionPath(), d.resolvedGranularity(), d.granularityObj?.minGranularity()]),
+      timeDimensions.map(d => [d.expressionPath(), d.resolvedGranularity()]),
     ) || [];
   }
 
@@ -536,9 +536,7 @@ export class PreAggregations {
         backAlias(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
       const qryTimeDimensions = references.allowNonStrictDateRangeMatch
         ? transformedQuery.timeDimensions
-        : transformedQuery.sortedTimeDimensions.map(t => t.slice(0, 2));
-      // slices above/below are used to exclude granularity on 3rd position returned from sortTimeDimensionsWithRollupGranularity()
-      const qryDimensions = transformedQuery.timeDimensions.map(t => t.slice(0, 2));
+        : transformedQuery.sortedTimeDimensions;
       const backAliasMeasures = backAlias(references.measures);
       const backAliasSortedDimensions = backAlias(references.sortedDimensions || references.dimensions);
       const backAliasDimensions = backAlias(references.dimensions);
@@ -550,7 +548,7 @@ export class PreAggregations {
         R.equals(qryTimeDimensions, refTimeDimensions)
       ) && (
         transformedQuery.isAdditive ||
-        R.equals(qryDimensions, refTimeDimensions)
+        R.equals(transformedQuery.timeDimensions, refTimeDimensions)
       ) && (
         filterDimensionsSingleValueEqual &&
         references.dimensions.length === filterDimensionsSingleValueEqual.size &&
@@ -566,28 +564,14 @@ export class PreAggregations {
 
     /**
      * Expand granularity into array of granularity hierarchy.
-     * resolvedGranularity might be a custom granularity name, in this case
-     * we insert it into all expanded hierarchies using its minimal granularity passed
-     * as minGranularity param
-     * @param {string} resolvedGranularity
-     * @param {string} minGranularity
+     * @param {string} dimension Dimension in the form of `cube.timeDimension`
+     * @param {string} granularity Granularity
      * @returns {Array<string>}
      */
-    const expandGranularity = (resolvedGranularity, minGranularity) => {
-      if (!resolvedGranularity) {
-        return [];
-      }
-
-      let predefinedHierarchy = transformedQuery.granularityHierarchies[resolvedGranularity];
-
-      if (predefinedHierarchy) {
-        return predefinedHierarchy;
-      }
-
-      predefinedHierarchy = transformedQuery.granularityHierarchies[minGranularity];
-      // Custom granularity should be the first in list for exact match hit
-      return [resolvedGranularity, ...predefinedHierarchy];
-    };
+    const expandGranularity = (dimension, granularity) => (
+      transformedQuery.granularityHierarchies[`${dimension}.${granularity}`] ||
+      [granularity]
+    );
 
     /**
      * Determine whether time dimensions match to the window granularity or not.
@@ -602,15 +586,15 @@ export class PreAggregations {
         references.sortedTimeDimensions ||
         sortTimeDimensions(references.timeDimensions);
 
-      return expandGranularity(transformedQuery.windowGranularity)
-        .map(
-          windowGranularity => R.all(
-            td => td[1] === windowGranularity,
-            sortedTimeDimensions,
+      return sortedTimeDimensions
+        .map(td => expandGranularity(td[0], transformedQuery.windowGranularity))
+        .some(
+          expandedGranularities => expandedGranularities.some(
+            windowGranularity => sortedTimeDimensions.every(
+              td => td[1] === windowGranularity
+            )
           )
-        )
-        .filter(x => !!x)
-        .length > 0;
+        );
     };
 
     /**
@@ -619,8 +603,8 @@ export class PreAggregations {
      * @returns {Array<Array<string>>}
      */
     const expandTimeDimension = (timeDimension) => {
-      const [dimension, resolvedGranularity, minGranularity] = timeDimension;
-      return expandGranularity(resolvedGranularity, minGranularity)
+      const [dimension, resolvedGranularity] = timeDimension;
+      return expandGranularity(dimension, resolvedGranularity)
         .map((newGranularity) => [dimension, newGranularity]);
     };
 
