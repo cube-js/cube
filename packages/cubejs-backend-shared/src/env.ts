@@ -1132,6 +1132,19 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * ClickHouse sort collation.
+   */
+  clickhouseSortCollation: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_CLICKHOUSE_SORT_COLLATION', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * ElasticSearch Driver                                            *
    ***************************************************************** */

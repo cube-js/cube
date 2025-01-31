@@ -1,4 +1,6 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import R from 'ramda';
+
+import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -18,7 +20,7 @@ class ClickHouseFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lower(${this.allocateParam(param)}), '${s}')`;
+    return `lowerUTF8(toValidUTF8(${column})) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lowerUTF8(toValidUTF8(${this.allocateParam(param)})), '${s}')`;
   }
 
   public castParameter() {
@@ -123,7 +125,7 @@ export class ClickHouseQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  public getFieldAlias(id) {
+  public getField(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
@@ -134,16 +136,30 @@ export class ClickHouseQuery extends BaseQuery {
       d => equalIgnoreCase(d.dimension, id),
     );
 
+    if (!field) {
+      field = this.measures.find(
+        d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
+      );
+    }
+
+    return field;
+  }
+
+  public getFieldAlias(id) {
+    const field = this.getField(id);
+
     if (field) {
       return field.aliasName();
     }
 
-    field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
+    return null;
+  }
+
+  public getFieldType(id) {
+    const field = this.getField(id);
 
     if (field) {
-      return field.aliasName();
+      return field.definition().type;
     }
 
     return null;
@@ -166,6 +182,35 @@ export class ClickHouseQuery extends BaseQuery {
 
     const direction = hash.desc ? 'DESC' : 'ASC';
     return `${fieldAlias} ${direction}`;
+  }
+
+  public override orderBy() {
+    //
+    // ClickHouse orders string by bytes, so we need to use COLLATE 'en' to order by string
+    //
+    if (R.isEmpty(this.order)) {
+      return '';
+    }
+
+    const collation = getEnv('clickhouseSortCollation');
+
+    const orderByString = R.pipe(
+      R.map((order) => {
+        let orderString = this.orderHashToString(order);
+        if (this.getFieldType(order) === 'string') && collation !== '' {
+          orderString = `${orderString} COLLATE '${collation}'`;
+        }
+        return orderString;
+      }),
+      R.reject(R.isNil),
+      R.join(', ')
+    )(this.order);
+
+    if (!orderByString) {
+      return '';
+    }
+
+    return ` ORDER BY ${orderByString}`;
   }
 
   public groupByClause() {

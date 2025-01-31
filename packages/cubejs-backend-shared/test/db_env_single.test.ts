@@ -975,6 +975,23 @@ describe('Single datasources', () => {
     expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("clickhouseSortCollation")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION = 'default1';
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION = 'default2';
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION;
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("elasticApiId")', () => {
     process.env.CUBEJS_DB_ELASTIC_APIKEY_ID = 'default1';
     expect(getEnv('elasticApiId', { dataSource: 'default' })).toEqual('default1');

@@ -1539,6 +1539,35 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("clickhouseSortCollation")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION = 'wrong1';
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION = 'wrong2';
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION;
+    delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION;
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("elasticApiId")', () => {
     process.env.CUBEJS_DB_ELASTIC_APIKEY_ID = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_ELASTIC_APIKEY_ID = 'postgres1';
