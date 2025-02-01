@@ -58,7 +58,7 @@ features:
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
 | Deprecated | [`SECURITY_CONTEXT`](#security_context)                                                                                           | v0.33.0    |           |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
-| Deprecated | [Top-level `includes` parameter in views](#top-level-includes-parameter-in-views)                                                 | v0.34.34   |           |
+| Removed    | [Top-level `includes` parameter in views](#top-level-includes-parameter-in-views)                                                 | v0.34.34   | v1.2.0    |
 | Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
@@ -349,9 +349,9 @@ to calculate running totals instead.
 
 ### Top-level `includes` parameter in views
 
-**Deprecated in Release: v0.34.34**
+**Removed in release: v1.2.0**
 
-The top-level `includes` parameter is now deprecated. Please always use the
+The top-level `includes` parameter has been removed. Instead, always use the
 `includes` parameter within [`cubes` and `join_path`
 parameters](https://cube.dev/docs/reference/data-model/view#cubes) so you can
 explicitly control the join path.
