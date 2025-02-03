@@ -144,8 +144,10 @@ export function ValuesInput(props: ValuesInputProps) {
   }, [isOpen]);
 
   useEffect(() => {
-    focusOnInput();
-  }, [suggestions]);
+    if (!isSuggestionLoading) {
+      focusOnInput();
+    }
+  }, [isSuggestionLoading]);
 
   // Add current value to the value list and clear the input value
   const addValue = useEvent(() => {
@@ -219,7 +221,7 @@ export function ValuesInput(props: ValuesInputProps) {
 
   const input =
     type === 'string' ? (
-      memberType === 'dimension' && allowSuggestions && showSuggestions && suggestions.length ? (
+      memberType === 'dimension' && allowSuggestions && showSuggestions ? (
         <ComboBox
           allowsCustomValue
           aria-label="Text value input"
@@ -227,9 +229,9 @@ export function ValuesInput(props: ValuesInputProps) {
           size="small"
           inputValue={textValue}
           placeholder={
-            isSuggestionLoading && !suggestions.length
+            isSuggestionLoading
               ? 'Loading values...'
-              : (placeholder ?? 'Type value to add...')
+              : (placeholder ?? `Type ${suggestions.length ? 'or select ' : ''}value to add...`)
           }
           validationState={hasError ? 'invalid' : undefined}
           suffix={
@@ -243,6 +245,7 @@ export function ValuesInput(props: ValuesInputProps) {
           width="30x"
           menuTrigger="focus"
           isLoading={isSuggestionLoading && !suggestions.length}
+          disabledKeys={suggestions.length ? undefined : ['no-suggestions']}
           onSelectionChange={(key: Key | null) => {
             key && onTextChange(key as string);
             addValueLazy();
@@ -253,11 +256,15 @@ export function ValuesInput(props: ValuesInputProps) {
           onKeyDown={onKeyDown}
           onFocus={onFocus}
         >
-          {suggestions.map((suggestion) => (
-            <ComboBox.Item key={suggestion} textValue={suggestion}>
-              {suggestion}
-            </ComboBox.Item>
-          ))}
+          {suggestions.length ? (
+            suggestions.map((suggestion) => (
+              <ComboBox.Item key={suggestion} textValue={suggestion}>
+                {suggestion}
+              </ComboBox.Item>
+            ))
+          ) : (
+            <ComboBox.Item key="no-suggestions">No values loaded</ComboBox.Item>
+          )}
         </ComboBox>
       ) : (
         <TextInput
@@ -265,7 +272,7 @@ export function ValuesInput(props: ValuesInputProps) {
           inputRef={inputRef}
           size="small"
           value={textValue}
-          placeholder={placeholder || 'Type value to add...'}
+          placeholder={placeholder || `Type ${allowSuggestions ? 'or select ' : ''}value to add...`}
           validationState={hasError ? 'invalid' : undefined}
           isLoading={isSuggestionLoading}
           suffix={
