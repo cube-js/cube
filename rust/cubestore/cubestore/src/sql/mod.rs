@@ -1827,7 +1827,7 @@ mod tests {
                 )),
                 BasicProcessRateLimiter::new(),
             );
-            let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+            let i = service.exec_query("CREATE SCHEMA `Foo`").await.unwrap();
             assert_eq!(
                 i.get_rows()[0],
                 Row::new(vec![
@@ -1835,12 +1835,12 @@ mod tests {
                     TableValue::String("Foo".to_string())
                 ])
             );
-            let query = "CREATE TABLE Foo.Persons (
-                                PersonID int,
-                                LastName varchar(255),
-                                FirstName varchar(255),
-                                Address varchar(255),
-                                City varchar(255)
+            let query = "CREATE TABLE `Foo`.`Persons` (
+                                `PersonID` int,
+                                `LastName` varchar(255),
+                                `FirstName` varchar(255),
+                                `Address` varchar(255),
+                                `City` varchar(255)
                               );";
             let i = service.exec_query(&query.to_string()).await.unwrap();
             assert_eq!(i.get_rows()[0], Row::new(vec![
@@ -1937,7 +1937,7 @@ mod tests {
                 )),
                 BasicProcessRateLimiter::new(),
             );
-            let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+            let i = service.exec_query("CREATE SCHEMA `Foo`").await.unwrap();
             assert_eq!(
                 i.get_rows()[0],
                 Row::new(vec![
@@ -1945,13 +1945,13 @@ mod tests {
                     TableValue::String("Foo".to_string())
                 ])
             );
-            let query = "CREATE TABLE Foo.Persons (
-                                PersonID int,
-                                LastName varchar(255),
-                                FirstName varchar(255),
-                                Address varchar(255),
-                                City varchar(255)
-                              ) WITH (seal_at='2022-10-05T01:00:00.000Z', select_statement='SELECT * FROM test WHERE created_at > \\'2022-05-01 00:00:00\\'');";
+            let query = "CREATE TABLE `Foo`.`Persons` (
+                                `PersonID` int,
+                                `LastName` varchar(255),
+                                `FirstName` varchar(255),
+                                `Address` varchar(255),
+                                `City` varchar(255)
+                              ) WITH (seal_at='2022-10-05T01:00:00.000Z', select_statement='SELECT * FROM test WHERE created_at > ''2022-05-01 00:00:00''');";
             let i = service.exec_query(&query.to_string()).await.unwrap();
             assert_eq!(i.get_rows()[0], Row::new(vec![
                 TableValue::Int(1),
