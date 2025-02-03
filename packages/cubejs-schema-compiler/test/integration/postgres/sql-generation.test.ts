@@ -3753,4 +3753,48 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     ungrouped_measure_with_filter__view__count: 1,
     ungrouped_measure_with_filter__view__sum_filter: 1
   }]));
+
+  it('patched measure expression', async () => {
+    await runQueryTest(
+      {
+        measures: [
+          'visitors.revenue',
+          'visitors.visitor_revenue',
+          {
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'visitors.revenue',
+              replaceAggregationType: 'max',
+              addFilters: [],
+            },
+            cubeName: 'visitors',
+            name: 'max_revenue',
+            definition: 'PatchMeasure(visitors.revenue, max, [])',
+          },
+          {
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'visitors.revenue',
+              replaceAggregationType: null,
+              addFilters: [
+                {
+                  sql: (visitors) => `${visitors.source} IN ('google', 'some')`,
+                },
+              ],
+            },
+            cubeName: 'visitors',
+            name: 'google_revenue',
+            // eslint-disable-next-line no-template-curly-in-string
+            definition: 'PatchMeasure(visitors.revenue, min, [${visitors.source} IN (\'google\', \'some\')])',
+          },
+        ],
+      },
+      [{
+        visitors__revenue: '2000',
+        visitors__visitor_revenue: '300',
+        visitors__max_revenue: 500,
+        visitors__google_revenue: '600',
+      }]
+    );
+  });
 });
