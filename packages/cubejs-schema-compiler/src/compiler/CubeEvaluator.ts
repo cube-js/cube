@@ -56,6 +56,7 @@ export type MeasureDefinition = {
   reduceByReferences?: string[],
   addGroupByReferences?: string[],
   timeShiftReferences?: TimeShiftDefinitionReference[],
+  patchedFrom?: { cubeName: string, name: string },
 };
 
 export type PreAggregationFilters = {
