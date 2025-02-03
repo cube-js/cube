@@ -3,3 +3,4 @@ export * from './CubePropContextTranspiler';
 export * from './CubeCheckDuplicatePropTranspiler';
 export * from './ValidationTranspiler';
 export * from './transpiler.interface';
+export * from './patternMatcher';

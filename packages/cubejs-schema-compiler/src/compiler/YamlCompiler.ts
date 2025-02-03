@@ -8,7 +8,11 @@ import { JinjaEngine, NativeInstance, PythonCtx } from '@cubejs-backend/native';
 import type { FileContent } from '@cubejs-backend/shared';
 
 import { getEnv } from '@cubejs-backend/shared';
-import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
+import {
+  CubePropContextTranspiler,
+  transpiledFieldMatch,
+  transpiledFields,
+} from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
@@ -137,35 +141,30 @@ export class YamlCompiler {
   }
 
   private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
-    if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
-      for (const p of transpiledFieldsPatterns) {
-        const fullPath = propertyPath.join('.');
-        if (fullPath.match(p)) {
-          if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
-            return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
-          } else if (typeof obj === 'string') {
-            return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
-          } else if (Array.isArray(obj)) {
-            const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
-              let ast: t.Program | t.NullLiteral | t.BooleanLiteral | t.NumericLiteral | null = null;
-              // Special case for accessPolicy.rowLevel.filter.values and other values-like fields
-              if (propertyPath[propertyPath.length - 1] === 'values') {
-                if (typeof code === 'string') {
-                  ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code)}"`, errorsReport);
-                } else if (typeof code === 'boolean') {
-                  ast = t.booleanLiteral(code);
-                } else if (typeof code === 'number') {
-                  ast = t.numericLiteral(code);
-                }
-              }
-              if (ast === null) {
-                ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-              }
-              return this.extractProgramBodyIfNeeded(ast);
-            }).filter(ast => !!ast)))]);
-            return this.astIntoArrowFunction(resultAst, '', cubeName);
+    if (transpiledFields.has(propertyPath[propertyPath.length - 1]) && transpiledFieldMatch(propertyPath)) {
+      if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
+        return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
+      } else if (typeof obj === 'string') {
+        return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
+      } else if (Array.isArray(obj)) {
+        const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
+          let ast: t.Program | t.NullLiteral | t.BooleanLiteral | t.NumericLiteral | null = null;
+          // Special case for accessPolicy.rowLevel.filter.values and other values-like fields
+          if (propertyPath[propertyPath.length - 1] === 'values') {
+            if (typeof code === 'string') {
+              ast = this.parsePythonAndTranspileToJs(`f"${this.escapeDoubleQuotes(code)}"`, errorsReport);
+            } else if (typeof code === 'boolean') {
+              ast = t.booleanLiteral(code);
+            } else if (typeof code === 'number') {
+              ast = t.numericLiteral(code);
+            }
           }
-        }
+          if (ast === null) {
+            ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+          }
+          return this.extractProgramBodyIfNeeded(ast);
+        }).filter(ast => !!ast)))]);
+        return this.astIntoArrowFunction(resultAst, '', cubeName);
       }
     }
 
