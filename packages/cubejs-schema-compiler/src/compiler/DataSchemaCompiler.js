@@ -15,7 +15,7 @@ const NATIVE_IS_SUPPORTED = isNativeSupported();
 
 const moduleFileCache = {};
 
-const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
+const JINJA_SYNTAX = /{%|%}|{{|}}/;
 
 export class DataSchemaCompiler {
   constructor(repository, options = {}) {
@@ -114,10 +114,10 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
-    if (R.endsWith('.jinja', file.fileName) ||
-      (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName))
+    if (file.fileName.endsWith('.jinja') ||
+      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       // TODO do Jinja syntax check with jinja compiler
-      && file.content.match(JINJA_SYNTAX)
+      && JINJA_SYNTAX.test(file.content)
     ) {
       if (NATIVE_IS_SUPPORTED !== true) {
         throw new Error(
@@ -129,9 +129,9 @@ export class DataSchemaCompiler {
       this.yamlCompiler.getJinjaEngine().loadTemplate(file.fileName, file.content);
 
       return file;
-    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       return file;
-    } else if (R.endsWith('.js', file.fileName)) {
+    } else if (file.fileName.endsWith('.js')) {
       return this.transpileJsFile(file, errorsReport);
     } else {
       return file;
@@ -221,13 +221,12 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
-    if (R.endsWith('.js', file.fileName)) {
+    if (file.fileName.endsWith('.js')) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
-    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName) ||
-      (
-        R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)
-        // TODO do Jinja syntax check with jinja compiler
-      ) && file.content.match(JINJA_SYNTAX)
+    } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
+      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
+      // TODO do Jinja syntax check with jinja compiler
+      && JINJA_SYNTAX.test(file.content)
     ) {
       asyncModules.push(() => this.yamlCompiler.compileYamlWithJinjaFile(
         file,
@@ -241,7 +240,7 @@ export class DataSchemaCompiler {
         this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
         this.pythonContext
       ));
-    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }
   }
