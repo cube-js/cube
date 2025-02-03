@@ -52,10 +52,6 @@ describe('SQL Generation', () => {
           }]
         },
         per_visitor_revenue: perVisitorRevenueMeasure,
-        revenueRunning: {
-          type: 'runningTotal',
-          sql: 'amount'
-        },
         revenueRolling: {
           type: 'sum',
           sql: 'amount',
@@ -109,14 +105,6 @@ describe('SQL Generation', () => {
             trailing: '2 day',
             offset: 'start'
           }
-        },
-        runningCount: {
-          type: 'runningTotal',
-          sql: '1'
-        },
-        runningRevenuePerCount: {
-          type: 'number',
-          sql: \`round(\${revenueRunning} / \${runningCount})\`
         },
         averageCheckins: {
           type: 'avg',
@@ -656,65 +644,6 @@ describe('SQL Generation', () => {
     visitors__str_case: 'More than 1'
   }]));
 
-  it('running total', async () => {
-    await compiler.compile();
-
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [
-        'visitors.revenueRunning'
-      ],
-      timeDimensions: [{
-        dimension: 'visitors.created_at',
-        granularity: 'day',
-        dateRange: ['2017-01-01', '2017-01-10']
-      }],
-      order: [{
-        id: 'visitors.created_at'
-      }],
-      timezone: 'America/Los_Angeles'
-    });
-
-    console.log(query.buildSqlAndParams());
-
-    // TODO ordering doesn't work for running total
-    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [{
-          visitors__created_at_day: '2017-01-01T00:00:00.000Z',
-          visitors__revenue_running: null
-        }, {
-          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-          visitors__revenue_running: '100'
-        }, {
-          visitors__created_at_day: '2017-01-03T00:00:00.000Z',
-          visitors__revenue_running: '100'
-        }, {
-          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-          visitors__revenue_running: '300'
-        }, {
-          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-          visitors__revenue_running: '600'
-        }, {
-          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-07T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-08T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-09T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }, {
-          visitors__created_at_day: '2017-01-10T00:00:00.000Z',
-          visitors__revenue_running: '1500'
-        }]
-      );
-    });
-  });
-
   it('rolling', async () => runQueryTest({
     measures: [
       'visitors.revenueRolling'
@@ -881,50 +810,6 @@ describe('SQL Generation', () => {
     { visitors__created_at_sql_utils_day: '2017-01-04T00:00:00.000Z', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-05T00:00:00.000Z', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000Z', visitors__visitor_count: '2' }
-  ]));
-
-  it('running total total', async () => runQueryTest({
-    measures: [
-      'visitors.revenueRunning'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    {
-      visitors__revenue_running: '1500'
-    }
-  ]));
-
-  it('running total ratio', async () => runQueryTest({
-    measures: [
-      'visitors.runningRevenuePerCount'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      granularity: 'day',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__running_revenue_per_count: null },
-    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__running_revenue_per_count: '150' },
-    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__running_revenue_per_count: '200' },
-    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__running_revenue_per_count: '300' }
   ]));
 
   it('hll rolling (BigQuery)', async () => {

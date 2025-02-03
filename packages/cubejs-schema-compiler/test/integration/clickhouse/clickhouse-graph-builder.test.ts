@@ -50,10 +50,6 @@ describe('ClickHouse JoinGraph', () => {
           }]
         },
         per_visitor_revenue: perVisitorRevenueMeasure,
-        revenueRunning: {
-          type: 'runningTotal',
-          sql: 'amount'
-        },
         revenueRolling: {
           type: 'sum',
           sql: 'amount',
@@ -84,14 +80,6 @@ describe('ClickHouse JoinGraph', () => {
             trailing: '2 day',
             offset: 'start'
           }
-        },
-        runningCount: {
-          type: 'runningTotal',
-          sql: '1'
-        },
-        runningRevenuePerCount: {
-          type: 'number',
-          sql: \`round(\${revenueRunning} / \${runningCount})\`
         },
         averageCheckins: {
           type: 'avg',
@@ -386,68 +374,6 @@ describe('ClickHouse JoinGraph', () => {
   }]));
 
   // FAILS - need to finish query to override ::timestamptz
-  it.skip('running total', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
-        measures: [
-          'visitors.revenueRunning'
-        ],
-        timeDimensions: [{
-          dimension: 'visitors.created_at',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-10']
-        }],
-        order: [{
-          id: 'visitors.created_at'
-        }],
-        timezone: 'America/Los_Angeles'
-      });
-
-      logSqlAndParams(query);
-
-      // TODO ordering doesn't work for running total
-      return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
-        debugLog(JSON.stringify(res));
-        expect(res).toEqual(
-          [{
-            visitors__created_at_day: '2017-01-01T00:00:00.000Z',
-            visitors__revenue_running: null
-          }, {
-            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-            visitors__revenue_running: '100'
-          }, {
-            visitors__created_at_day: '2017-01-03T00:00:00.000Z',
-            visitors__revenue_running: '100'
-          }, {
-            visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-            visitors__revenue_running: '300'
-          }, {
-            visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-            visitors__revenue_running: '600'
-          }, {
-            visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-07T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-08T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-09T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }, {
-            visitors__created_at_day: '2017-01-10T00:00:00.000Z',
-            visitors__revenue_running: '1500'
-          }]
-        );
-      });
-    });
-
-    return result;
-  });
-
-  // FAILS - need to finish query to override ::timestamptz
   it.skip('rolling', () => runQueryTest({
     measures: [
       'visitors.revenueRolling'
@@ -575,51 +501,6 @@ describe('ClickHouse JoinGraph', () => {
     { visitors__created_at_sql_utils_day: '2017-01-04T00:00:00.000', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-05T00:00:00.000', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000', visitors__visitor_count: '2' }
-  ]));
-
-  it('running total total', () => runQueryTest({
-    measures: [
-      'visitors.revenueRunning'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    {
-      visitors__revenue_running: '1500'
-    }
-  ]));
-
-  // FAILS Unmatched parentheses
-  it.skip('running total ratio', () => runQueryTest({
-    measures: [
-      'visitors.runningRevenuePerCount'
-    ],
-    timeDimensions: [{
-      dimension: 'visitors.created_at',
-      granularity: 'day',
-      dateRange: ['2017-01-01', '2017-01-10']
-    }],
-    order: [{
-      id: 'visitors.created_at'
-    }],
-    timezone: 'America/Los_Angeles'
-  }, [
-    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__running_revenue_per_count: null },
-    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__running_revenue_per_count: '100' },
-    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__running_revenue_per_count: '150' },
-    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__running_revenue_per_count: '200' },
-    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__running_revenue_per_count: '300' },
-    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__running_revenue_per_count: '300' }
   ]));
 
   // FAILS ClickHouse supports multiple approximate aggregators:

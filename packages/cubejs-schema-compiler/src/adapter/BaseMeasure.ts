@@ -126,13 +126,10 @@ export class BaseMeasure {
   }
 
   public static isCumulative(definition) {
-    return definition.type === 'runningTotal' || !!definition.rollingWindow;
+    return !!definition.rollingWindow;
   }
 
   public rollingWindowDefinition() {
-    if (this.measureDefinition().type === 'runningTotal') {
-      throw new UserError('runningTotal rollups aren\'t supported. Please consider replacing runningTotal measure with rollingWindow.');
-    }
     const { type } = this.measureDefinition().rollingWindow;
     if (type && type !== 'fixed') {
       throw new UserError(`Only fixed rolling windows are supported by Cube Store but got '${type}' rolling window`);
@@ -142,9 +139,6 @@ export class BaseMeasure {
 
   public dateJoinCondition() {
     const definition = this.measureDefinition();
-    if (definition.type === 'runningTotal') {
-      return this.query.runningTotalDateJoinCondition();
-    }
     const { rollingWindow } = definition;
     if (rollingWindow.type === 'to_date') {
       return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity);
