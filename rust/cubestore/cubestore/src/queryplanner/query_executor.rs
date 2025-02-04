@@ -719,7 +719,7 @@ impl CubeTable {
                     Arc::new(
                         MemoryExec::try_new(
                             &[record_batches.clone()],
-                            index_projection_schema.clone(),
+                            index_schema.clone(),
                             index_projection_or_none_on_schema_match.clone(),
                         )?
                         .with_sort_information(vec![
