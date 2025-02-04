@@ -12,15 +12,21 @@
         "build": {
           "builder": "@angular-devkit/build-angular:ng-packagr",
           "options": {
-            "tsConfig": "tsconfig.json",
-            "project": "ng-package.json",
-            "aot": true
-          }
+            "project": "ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "tsconfig.prod.json"
+            },
+            "development": {
+              "tsConfig": "tsconfig.json"
+            }
+          },
+          "defaultConfiguration": "production"
         }
       }
     }
   },
-  "defaultProject": "cubejs-client-ngx",
   "cli": {
     "analytics": "24ffae35-fafc-41e6-b395-db5f2f6f12d4"
   }

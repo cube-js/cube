@@ -19,7 +19,4 @@ export default defineConfig({
     baseUrl: 'http://localhost:3080',
     specPattern: 'cypress/e2e/**/*.{js,jsx,ts,tsx}',
   },
-  // set optimal values for the number of tests kept in memory
-  numTestsKeptInMemory: 10,
-  experimentalMemoryManagement: true,
 });

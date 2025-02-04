@@ -63,6 +63,7 @@ impl RewriteRules for WrapperRules {
         self.limit_rules(&mut rules);
         self.filter_rules(&mut rules);
         self.filter_rules_subquery(&mut rules);
+        self.filter_merge_rules(&mut rules);
         self.subquery_rules(&mut rules);
         self.order_rules(&mut rules);
         self.window_rules(&mut rules);

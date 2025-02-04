@@ -205,7 +205,7 @@ export function AddFilterInput(props: AddFilterInputProps) {
     items.push({ value: 'and', label: 'AND Branch' }, { value: 'or', label: 'OR Branch' });
 
     return items;
-  }, [onDateRangeAdd]);
+  }, [onDateRangeAdd, onSegmentAdd]);
 
   const disabledKeys = useMemo(() => {
     const disabledKeys: string[] = [];

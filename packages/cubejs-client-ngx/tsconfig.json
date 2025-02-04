@@ -2,17 +2,22 @@
   "compilerOptions": {
     "baseUrl": "./",
     "outDir": "../../out-tsc/lib",
-    "target": "es2015",
-    "module": "es2015",
     "moduleResolution": "node",
     "declaration": true,
+    "declarationMap": true,
     "sourceMap": true,
     "inlineSources": true,
     "experimentalDecorators": true,
     "importHelpers": true,
     "allowSyntheticDefaultImports": true,
+    "strict": false,
     "types": [],
-    "lib": ["dom", "es2018"],
+    "target": "es2017",
+    "module": "es2020",
+    "lib": [
+      "es2020",
+      "dom"
+    ],
     "paths": {
       "@angular/*": ["./node_modules/@angular/*"],
       "@cubejs-client/core": ["../cubejs-client-core"]
@@ -25,8 +30,7 @@
     "fullTemplateTypeCheck": true,
     "strictInjectionParameters": true,
     "enableResourceInlining": true,
-    "enableIvy": true,
-    "preserveSymlinks": true
+    "preserveSymlinks": true,
   },
   "exclude": ["src/test.ts", "**/*.spec.ts"],
   "include": ["index.ts", "src/*"]
