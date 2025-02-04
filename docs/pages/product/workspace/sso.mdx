@@ -125,11 +125,11 @@ Additionally, the user always assumes the role specified under <Btn>Default Clou
 
 <Screenshot src="https://ucarecdn.com/e467faa1-bf40-4f29-998a-5ea5244610af/"/>
 
-All roles will be available under `cloud.roles` array in the [security context][ref-security-context]:
+All roles will be available under `cubeCloud.roles` array in the [security context][ref-security-context]:
 
 ```json
 {
-  "cloud": {
+  "cubeCloud": {
     "roles": [
       "Everyone",
       "manager"
@@ -143,12 +143,12 @@ All roles will be available under `cloud.roles` array in the [security context][
 You can also bring more user data from an LDAP catalog to use with [data access policies][ref-dap].
 Mapping is performed using the rules under <Btn>Attribute mapping</Btn>.
 
-All mapped attributes and their values will be available under `cloud.userAttributes`
+All mapped attributes and their values will be available under `cubeCloud.userAttributes`
 dictionary in the [security context][ref-security-context]:
 
 ```json
 {
-  "cloud": {
+  "cubeCloud": {
     "userAttributes": {
       "fullName": "John Doe",
       "department": "Finance",

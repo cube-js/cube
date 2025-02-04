@@ -1,18 +1,25 @@
 # Access control
 
-Cube authenticates requests to [APIs & integrations][ref-apis] via a number
-of API-specific mechanisms. Most APIs use the following mechanisms:
+Cube supports a few methods to authenticates requests to [APIs & integrations][ref-apis].
+Usually, an API supports authentication via [one of these methods][ref-apis-methods]:
 
-* [User name and password](#user-name-and-password) authentication (e.g., used by the [SQL API][ref-sql-api]).
-* [JSON Web Tokens](#json-web-tokens) (JWT) (e.g., used by the [REST API][ref-rest-api]).
+* [User name and password](#user-name-and-password) (e.g., used by the [SQL API][ref-sql-api]).
+* [Identity provider](#identity-provider) (e.g., used by the [Cube Cloud for Sheets][ref-cube-cloud-sheets]).
+* [Access token](#access-token) (e.g., used by the [REST API][ref-rest-api]).
 
-Once the authentication is completed, the API request is associated with a
-[security context][ref-sec-ctx]. It is then used to configure [member-level security][ref-mls]
+Regardless of the method, the authentication flow includes the following steps:
+
+* User identity information (e.g., password or access token) is passed to Cube.
+* Cube validates the identity information or trusts the identity provider.
+* User identity information is optionally enriched with additional attributes,
+such the user's role, via [authentication integration](#authentication-integration).
+* Finally, the API request is associated with a [security context][ref-sec-ctx].
+It is then used to configure [member-level security][ref-mls]
 and [row-level security][ref-rls] as well as set [data access policies][ref-dap].
 
 ## User name and password
 
-With this mechanism, user name and password are checked.
+Some visualization tools (e.g., BI tools) can pass user name and, sometimes, password to Cube.
 
 ### Configuration
 
@@ -20,30 +27,28 @@ Relevant configuration options: [`check_sql_auth`][ref-config-check-sql-auth] an
 
 Relevant environment variables: `CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, `CUBEJS_SQL_SUPER_USER`.
 
-### Authentication integration
+## Identity provider
 
-When using Cube Cloud, you can also validate user name and password pairs via
-the Cube Cloud [authentication mechanism][ref-auth-sso], including its [LDAP integration][ref-ldap-integration].
+Some visualization tools (e.g., [Cube Cloud for Sheets][ref-cube-cloud-sheets]) implement
+an OAuth 2.0 flow to authenticate users.
 
 <SuccessBox>
 
-Authentication integration is available in Cube Cloud on the [Enterprise and above](https://cube.dev/pricing) product tiers.
+OAuth 2.0 flow is available in Cube Cloud on [Premium and above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
 
-You can enable the authentication integration by navigating to the <Btn>Settings → Configuration</Btn>
-of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</Btn> toggle.
+During this flow, users are redirected to a login page of an identity provider (e.g., Google)
+where they enter their credentials. Then, the identity provider passes the user identity
+information to Cube Cloud.
 
-## JSON Web Tokens
+This method does not require any configuration.
 
-With this mechanism, a JSON Web Token (JWT) is checked.
+## Access token
 
-### Configuration
-
-Relevant configuration options: [`check_auth`][ref-config-check-auth] and [`jwt`][ref-config-jwt].
-
-Relevant environment variables: `CUBEJS_API_SECRET`, `CUBEJS_JWT_KEY`, `CUBEJS_JWK_URL`,
-`CUBEJS_JWT_AUDIENCE`, `CUBEJS_JWT_ISSUER`, `CUBEJS_JWT_SUBJECT`, `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+Some visualization tools (e.g., custom front-end applications) can pass access tokens based
+on the [JSON Web Token][wiki-jwt] (JWT) standard to Cube. These tokens can be either generated
+by these applications or obtained from an identity provider. Cube then validates these tokens.
 
 The diagram below shows how it works during the request processing in Cube:
 
@@ -55,9 +60,16 @@ The diagram below shows how it works during the request processing in Cube:
   />
 </div>
 
+### Configuration
+
+Relevant configuration options: [`check_auth`][ref-config-check-auth] and [`jwt`][ref-config-jwt].
+
+Relevant environment variables: `CUBEJS_API_SECRET`, `CUBEJS_JWT_KEY`, `CUBEJS_JWK_URL`,
+`CUBEJS_JWT_AUDIENCE`, `CUBEJS_JWT_ISSUER`, `CUBEJS_JWT_SUBJECT`, `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+
 ### Custom authentication
 
-Cube also allows you to provide your own JWT verification logic. You can use the
+Cube allows you to provide your own JWT verification logic. You can use the
 [`check_auth`][ref-config-check-auth] configuration option to verify a JWT and set the security context.
 
 For example, if you needed to retrieve user information from an LDAP server,
@@ -270,9 +282,24 @@ module.exports = {
 };
 ```
 
+## Authentication integration
 
-[link-jwt-docs]:
-  https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
+When using Cube Cloud, you can enrich the security context with information about
+an authenticated user, obtained during their authentication or loaded via an
+[LDAP integration][ref-ldap-integration].
+
+<SuccessBox>
+
+Authentication integration is available in Cube Cloud on [all product tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+You can enable the authentication integration by navigating to the <Btn>Settings → Configuration</Btn>
+of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</Btn> toggle.
+
+
+[wiki-jwt]: https://en.wikipedia.org/wiki/JSON_Web_Token
+[link-jwt-docs]: https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
 [ref-config-check-auth]: /reference/configuration/config#check_auth
@@ -285,6 +312,7 @@ module.exports = {
 [ref-recipe-cognito]: /guides/recipes/auth/aws-cognito
 [ref-sec-ctx]: /product/auth/context
 [ref-apis]: /product/apis-integrations
+[ref-apis-methods]: /product/apis-integrations#authentication-methods
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-dap]: /product/auth/data-access-policies
@@ -292,3 +320,4 @@ module.exports = {
 [ref-rls]: /product/auth/row-level-security
 [ref-auth-sso]: /product/workspace/sso
 [ref-ldap-integration]: /product/workspace/sso#ldap-integration
+[ref-cube-cloud-sheets]: /product/apis-integrations/google-sheets

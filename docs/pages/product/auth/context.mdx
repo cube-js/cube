@@ -31,6 +31,30 @@ inside:
 - the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
   support [multi-tenant deployments][link-multitenancy].
 
+## Contents
+
+By convention, the contents of the security context should be an object (dictionary)
+with nested structure:
+
+```json
+{
+  "sub": "1234567890",
+  "iat": 1516239022,
+  "user_name": "John Doe",
+  "user_id": 42,
+  "location": {
+    "city": "San Francisco",
+    "state": "CA"
+  }
+}
+```
+
+### Reserved elements
+
+Some features of Cube Cloud (e.g., [authentication integration][ref-auth-integration]
+and [LDAP integration][ref-ldap-integration]) use the `cloud` element in the security context.
+This element is reserved and should not be used for other purposes.
+
 ## Using query_rewrite
 
 You can use [`query_rewrite`][ref-config-queryrewrite] to amend incoming queries
@@ -223,7 +247,6 @@ def masked(sql, security_context):
     return "'--- masked ---'"
 ```
 
-
 ### Usage with pre-aggregations
 
 To generate pre-aggregations that rely on `COMPILE_CONTEXT`, [configure
@@ -248,3 +271,5 @@ build one from a JSON object.
 [ref-cubes-compile-ctx]: /reference/data-model/context-variables#compile_context
 [ref-devtools-playground]:
   /product/workspace/playground#editing-the-security-context
+[ref-auth-integration]: /product/auth#authentication-integration
+[ref-ldap-integration]: /product/workspace/sso#ldap-integration
