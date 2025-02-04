@@ -640,15 +640,14 @@ impl CubeTable {
         };
 
         let predicate = combine_filters(filters);
-        let physical_predicate =
-            if let Some(pred) = &predicate {
-                Some(state.create_physical_expr(
-                    pred.clone(),
-                    &index_schema.as_ref().clone().to_dfschema()?,
-                )?)
-            } else {
-                None
-            };
+        let physical_predicate = if let Some(pred) = &predicate {
+            Some(state.create_physical_expr(
+                pred.clone(),
+                &index_schema.as_ref().clone().to_dfschema()?,
+            )?)
+        } else {
+            None
+        };
         for partition_snapshot in partition_snapshots {
             let partition = partition_snapshot.partition();
             let filter = self
@@ -720,7 +719,7 @@ impl CubeTable {
                     Arc::new(
                         MemoryExec::try_new(
                             &[record_batches.clone()],
-                            index_projection_schema.clone(),
+                            index_schema.clone(),
                             index_projection_or_none_on_schema_match.clone(),
                         )?
                         .with_sort_information(vec![
