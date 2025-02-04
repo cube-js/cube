@@ -514,6 +514,19 @@ crate::plan_to_language! {
         QueryParam {
             index: usize,
         },
+        JoinCheckStage {
+            expr: Arc<Expr>,
+        },
+        JoinCheckPushDown {
+            expr: Arc<Expr>,
+            left_input: Arc<LogicalPlan>,
+            right_input: Arc<LogicalPlan>,
+        },
+        JoinCheckPullUp {
+            expr: Arc<Expr>,
+            left_input: Arc<LogicalPlan>,
+            right_input: Arc<LogicalPlan>,
+        },
     }
 }
 
@@ -2150,6 +2163,18 @@ fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
 
 fn distinct(input: impl Display) -> String {
     format!("(Distinct {})", input)
+}
+
+fn join_check_stage(expr: impl Display) -> String {
+    format!("(JoinCheckStage {expr})")
+}
+
+fn join_check_push_down(expr: impl Display, left: impl Display, right: impl Display) -> String {
+    format!("(JoinCheckPushDown {expr} {left} {right})")
+}
+
+fn join_check_pull_up(expr: impl Display, left: impl Display, right: impl Display) -> String {
+    format!("(JoinCheckPullUp {expr} {left} {right})")
 }
 
 pub fn original_expr_name(egraph: &CubeEGraph, id: Id) -> Option<String> {

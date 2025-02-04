@@ -12188,7 +12188,7 @@ ORDER BY "source"."str0" ASC
         }
         init_testing_logger();
 
-        let logical_plan = convert_select_to_query_plan(
+        let query_plan = convert_select_to_query_plan(
             r#"
             WITH "qt_0" AS (
                 SELECT "ta_1"."customer_gender" "ca_1"
@@ -12205,13 +12205,20 @@ ORDER BY "source"."str0" ASC
             .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-        .await
-        .as_logical_plan();
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
 
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
-        // check wrapping for `NOT(.. IS NULL OR LOWER(..) IN)`
-        let re = Regex::new(r"NOT \(.+ IS NULL OR .*LOWER\(.+ IN ").unwrap();
+        // check wrapping for `NOT((.. IS NULL) OR LOWER(..) IN)`
+        let re = Regex::new(r"NOT \(\(.+ IS NULL\) OR .*LOWER\(.+ IN ").unwrap();
         assert!(re.is_match(&sql));
     }
 

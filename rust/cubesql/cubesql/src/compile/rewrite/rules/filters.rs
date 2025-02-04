@@ -2807,7 +2807,7 @@ impl FilterRules {
                                         ScalarValue::TimestampNanosecond(_, _)
                                         | ScalarValue::Date32(_)
                                         | ScalarValue::Date64(_) => {
-                                            if let Some(timestamp) =
+                                            if let Ok(Some(timestamp)) =
                                                 Self::scalar_to_native_datetime(&literal)
                                             {
                                                 let value = format_iso_timestamp(timestamp);
@@ -2842,7 +2842,10 @@ impl FilterRules {
                                                 continue;
                                             }
                                         }
-                                        x => panic!("Unsupported filter scalar: {:?}", x),
+                                        x => {
+                                            log::trace!("Unsupported filter scalar: {x:?}");
+                                            continue;
+                                        }
                                     };
 
                                     subst.insert(
@@ -3442,6 +3445,7 @@ impl FilterRules {
     }
 
     // Transform ?expr IN (?literal) to ?expr = ?literal
+    // TODO it's incorrect: inner expr can be null, or can be non-literal (and domain in not clear)
     fn transform_filter_in_to_equal(
         &self,
         negated_var: &'static str,
@@ -3501,7 +3505,10 @@ impl FilterRules {
                     let values = list
                         .into_iter()
                         .map(|literal| FilterRules::scalar_to_value(literal))
-                        .collect::<Vec<_>>();
+                        .collect::<Result<Vec<_>, _>>();
+                    let Ok(values) = values else {
+                        return false;
+                    };
 
                     if let Some((member_name, cube)) = Self::filter_member_name(
                         egraph,
@@ -3552,8 +3559,8 @@ impl FilterRules {
         }
     }
 
-    fn scalar_to_value(literal: &ScalarValue) -> String {
-        match literal {
+    fn scalar_to_value(literal: &ScalarValue) -> Result<String, &'static str> {
+        Ok(match literal {
             ScalarValue::Utf8(Some(value)) => value.to_string(),
             ScalarValue::Int64(Some(value)) => value.to_string(),
             ScalarValue::Boolean(Some(value)) => value.to_string(),
@@ -3564,18 +3571,24 @@ impl FilterRules {
             ScalarValue::TimestampNanosecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
-                if let Some(timestamp) = Self::scalar_to_native_datetime(literal) {
-                    return format_iso_timestamp(timestamp);
+                if let Some(timestamp) = Self::scalar_to_native_datetime(literal)? {
+                    format_iso_timestamp(timestamp)
+                } else {
+                    log::trace!("Unsupported filter scalar: {literal:?}");
+                    return Err("Unsupported filter scalar");
                 }
-
-                panic!("Unsupported filter scalar: {:?}", literal);
             }
-            x => panic!("Unsupported filter scalar: {:?}", x),
-        }
+            x => {
+                log::trace!("Unsupported filter scalar: {x:?}");
+                return Err("Unsupported filter scalar");
+            }
+        })
     }
 
-    fn scalar_to_native_datetime(literal: &ScalarValue) -> Option<NaiveDateTime> {
-        match literal {
+    fn scalar_to_native_datetime(
+        literal: &ScalarValue,
+    ) -> Result<Option<NaiveDateTime>, &'static str> {
+        Ok(match literal {
             ScalarValue::TimestampNanosecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
@@ -3589,13 +3602,17 @@ impl FilterRules {
                 } else if let Some(array) = array.as_any().downcast_ref::<Date64Array>() {
                     array.value_as_datetime(0)
                 } else {
-                    panic!("Unexpected array type: {:?}", array.data_type())
+                    log::trace!("Unexpected array type: {:?}", array.data_type());
+                    return Err("Unexpected array type");
                 };
 
                 timestamp
             }
-            _ => panic!("Unsupported filter scalar: {:?}", literal),
-        }
+            x => {
+                log::trace!("Unsupported filter scalar: {x:?}");
+                return Err("Unsupported filter scalar");
+            }
+        })
     }
 
     fn transform_is_null(
@@ -3865,10 +3882,15 @@ impl FilterRules {
                                         Some(MemberType::Time) => (),
                                         _ => continue,
                                     }
-                                    let values = vec![
-                                        FilterRules::scalar_to_value(&low),
-                                        FilterRules::scalar_to_value(&high),
-                                    ];
+
+                                    let Ok(low) = FilterRules::scalar_to_value(&low) else {
+                                        return false;
+                                    };
+                                    let Ok(high) = FilterRules::scalar_to_value(&high) else {
+                                        return false;
+                                    };
+
+                                    let values = vec![low, high];
 
                                     subst.insert(
                                         filter_member_var,

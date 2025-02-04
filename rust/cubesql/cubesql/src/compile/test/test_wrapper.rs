@@ -1174,7 +1174,7 @@ WHERE
     let last_mod_month_re =
         Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "last_mod_month""#).unwrap();
     assert!(last_mod_month_re.is_match(&sql));
-    let sum_price_re = Regex::new(r#"CASE WHEN "logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
+    let sum_price_re = Regex::new(r#"CASE WHEN \("logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL\) THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
         .unwrap();
     assert!(sum_price_re.is_match(&sql));
     let cube_user_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "cube_user""#).unwrap();
