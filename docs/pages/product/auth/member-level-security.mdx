@@ -1,21 +1,25 @@
-# Publicity of data model entities
+# Member-level security
 
-The data model serves as a facade of your data and enables running
-[queries][ref-queries] via a [rich set of APIs][ref-apis] by referencing data
-model [entities][ref-data-modeling-concepts]: cubes, views, and their members.
-Controlling whether they are public or not helps manage data access and expose
-a coherent representation of the data model to end users.
+The data model serves as a facade of your data. With member-level security,
+you can define whether [data model entities][ref-data-modeling-concepts] (cubes, views,
+and their members) are exposed to end users and can be queried via [APIs &
+integrations][ref-apis].
 
-By default, all cubes, views, measures, dimensions, and segments are *public*,
-meaning that they can be used in API queries and they are visible during data
-model introspection.
+Member-level security in Cube is similar to column-level security in SQL databases.
+Defining whether users have access to [cubes][ref-cubes] and [views][ref-views] is
+similar to defining access to database tables; defining whether they have access
+to dimensions and measures — to columns.
 
-## Managing publicity
+__By default, all cubes, views, and their members are *public*,__ meaning that they
+can be accessed by any users and they are also visible during data model introspection.
+
+## Managing member-level access
 
 You can explicitly make a data model entity public or private by setting its
 `public` parameter to `true` or `false`. This parameter is available for
 [cubes][ref-cubes-public], [views][ref-views-public], [measures][ref-measures-public],
-[dimensions][ref-dimensions-public], and [segments][ref-segments-public].
+[dimensions][ref-dimensions-public], [hierarchies][ref-hierarchies-public], and
+[segments][ref-segments-public].
 
 <InfoBox>
 
@@ -55,6 +59,16 @@ If you'd like to keep a data model entity public but prevent access to it
 anyway, you can use the [`query_rewrite` configuration option][ref-query-rewrite] for that.
 
 ## Best practices
+
+### Data access policies
+
+You can use [data access policies][ref-dap] to manage both member-level and
+[row-level][ref-rls] security for different roles. With them, you can keep
+access control rules in one place instead of spreading them across a number of
+`public` parameters in a cube or a view.
+
+__It is recommended to use data access policies by default.__ You can also combine
+them with setting some `public` parameters manually for specific cases.
 
 ### Cubes and views
 
@@ -116,11 +130,11 @@ cube(`users`, {
 
 [ref-data-modeling-concepts]: /product/data-modeling/concepts
 [ref-apis]: /product/apis-integrations
-[ref-queries]: /product/apis-integrations/queries
 [ref-cubes-public]: /reference/data-model/cube#public
 [ref-views-public]: /reference/data-model/view#public
 [ref-measures-public]: /reference/data-model/measures#public
 [ref-dimensions-public]: /reference/data-model/dimensions#public
+[ref-hierarchies-public]: /reference/data-model/hierarchies#public
 [ref-segments-public]: /reference/data-model/segments#public
 [ref-cubes]: /product/data-modeling/concepts#cubes
 [ref-views]: /product/data-modeling/concepts#views
@@ -130,3 +144,5 @@ cube(`users`, {
 [ref-query-rewrite]: /reference/configuration/config#query_rewrite
 [ref-dev-mode]: /product/configuration#development-mode
 [ref-playground]: /product/workspace/playground
+[ref-dap]: /product/auth/data-access-policies
+[ref-rls]: /product/auth/row-level-security
