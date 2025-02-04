@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use chrono::{Datelike, NaiveDateTime, Timelike};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use datafusion::{
     arrow::datatypes::{ArrowPrimitiveType, IntervalDayTimeType, IntervalMonthDayNanoType},
     error::DataFusionError,
@@ -457,9 +457,9 @@ pub fn is_literal_date_trunced(ns: i64, granularity: &str) -> Option<bool> {
         return Some(false);
     }
     let seconds = ns / ns_in_seconds;
-    let dt = NaiveDateTime::from_timestamp_opt(seconds, 0)?;
+    let dt = DateTime::from_timestamp(seconds, 0)?;
 
-    let is_minute_trunced = |dt: NaiveDateTime| dt.second() == 0;
+    let is_minute_trunced = |dt: DateTime<Utc>| dt.second() == 0;
     let is_hour_trunced = |dt| is_minute_trunced(dt) && dt.minute() == 0;
     let is_day_trunced = |dt| is_hour_trunced(dt) && dt.hour() == 0;
     let is_week_trunced = |dt| is_day_trunced(dt) && dt.weekday().num_days_from_monday() == 0;
