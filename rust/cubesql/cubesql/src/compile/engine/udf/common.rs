@@ -1669,7 +1669,8 @@ pub fn create_to_char_udf() -> ScalarUDF {
 
                     let secs = duration.num_seconds();
                     let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
-                    let timestamp = NaiveDateTime::from_timestamp_opt(secs, nanosecs as u32)
+                    let timestamp = ::chrono::DateTime::from_timestamp(secs, nanosecs as u32)
+                        .map(|dt| dt.naive_utc())
                         .unwrap_or_else(|| panic!("Invalid secs {} nanosecs {}", secs, nanosecs));
 
                     // chrono's strftime is missing quarter format, as such a workaround is required
@@ -2316,7 +2317,8 @@ macro_rules! generate_series_udtf {
 
 macro_rules! generate_series_helper_date32 {
     ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
-        let current_dt = NaiveDateTime::from_timestamp_opt(($CURRENT as i64) * 86400, 0)
+        let current_dt = ::chrono::DateTime::from_timestamp(($CURRENT as i64) * 86400, 0)
+            .map(|dt| dt.naive_utc())
             .ok_or_else(|| {
                 DataFusionError::Execution(format!(
                     "Cannot convert date to NaiveDateTime: {}",
@@ -2324,16 +2326,17 @@ macro_rules! generate_series_helper_date32 {
                 ))
             })?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
-        $CURRENT = (res.timestamp() / 86400) as $PRIMITIVE_TYPE;
+        $CURRENT = (res.and_utc().timestamp() / 86400) as $PRIMITIVE_TYPE;
     };
 }
 
 macro_rules! generate_series_helper_timestamp {
     ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
-        let current_dt = NaiveDateTime::from_timestamp_opt(
+        let current_dt = ::chrono::DateTime::from_timestamp(
             ($CURRENT as i64) / 1_000_000_000,
             ($CURRENT % 1_000_000_000) as u32,
         )
+        .map(|dt| dt.naive_utc())
         .ok_or_else(|| {
             DataFusionError::Execution(format!(
                 "Cannot convert timestamp to NaiveDateTime: {}",

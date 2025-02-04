@@ -1129,7 +1129,7 @@ pub fn transform_response<V: ValueObject>(
                             // TODO switch parsing to microseconds
                             if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
-                            } else if let Some(nanos) = timestamp.timestamp_nanos_opt() {
+                            } else if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
                                 builder.append_value(nanos)?;
                             } else {
                                 log::error!(
