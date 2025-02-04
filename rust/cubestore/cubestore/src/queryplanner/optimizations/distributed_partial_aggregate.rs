@@ -21,36 +21,70 @@ use std::sync::Arc;
 ///
 /// The latter gives results in more parallelism and less network.
 pub fn push_aggregate_to_workers(
-    p: Arc<dyn ExecutionPlan>,
+    p_final: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-    let agg;
-    if let Some(a) = p.as_any().downcast_ref::<AggregateExec>() {
-        agg = a;
+    let p_final_agg: &AggregateExec;
+    let p_partial: &Arc<dyn ExecutionPlan>;
+    if let Some(a) = p_final.as_any().downcast_ref::<AggregateExec>() {
+        if matches!(
+            a.mode(),
+            AggregateMode::Final | AggregateMode::FinalPartitioned
+        ) {
+            p_final_agg = a;
+            p_partial = a.input();
+        } else {
+            return Ok(p_final);
+        }
     } else {
-        return Ok(p);
-    }
-    if *agg.mode() != AggregateMode::Partial {
-        return Ok(p);
+        return Ok(p_final);
     }
 
-    if let Some(cs) = agg.input().as_any().downcast_ref::<ClusterSendExec>() {
-        // Router plan, replace partial aggregate with cluster send.
-        Ok(Arc::new(
-            cs.with_changed_schema(
-                p.clone()
-                    .with_new_children(vec![cs.input_for_optimizations.clone()])?,
-            ),
-        ))
-    } else if let Some(w) = agg.input().as_any().downcast_ref::<WorkerExec>() {
-        // Worker plan, execute partial aggregate inside the worker.
-        Ok(Arc::new(WorkerExec {
-            input: p.clone().with_new_children(vec![w.input.clone()])?,
-            max_batch_rows: w.max_batch_rows,
-            limit_and_reverse: w.limit_and_reverse.clone(),
-        }))
+    let agg;
+    if let Some(a) = p_partial.as_any().downcast_ref::<AggregateExec>() {
+        agg = a;
     } else {
-        Ok(p)
+        return Ok(p_final);
     }
+    if *agg.mode() != AggregateMode::Partial {
+        return Ok(p_final);
+    }
+
+    let p_final_input: Arc<dyn ExecutionPlan> =
+        if let Some(cs) = agg.input().as_any().downcast_ref::<ClusterSendExec>() {
+            let clustersend_input = p_partial
+                .clone()
+                .with_new_children(vec![cs.input_for_optimizations.clone()])?;
+
+            // Router plan, replace partial aggregate with cluster send.
+            Arc::new(cs.with_changed_schema(clustersend_input))
+        } else if let Some(w) = agg.input().as_any().downcast_ref::<WorkerExec>() {
+            let worker_input = p_partial.clone().with_new_children(vec![w.input.clone()])?;
+
+            // Worker plan, execute partial aggregate inside the worker.
+            Arc::new(WorkerExec {
+                input: worker_input,
+                max_batch_rows: w.max_batch_rows,
+                limit_and_reverse: w.limit_and_reverse.clone(),
+            })
+        } else {
+            return Ok(p_final);
+        };
+
+    // We change AggregateMode::FinalPartitioned to AggregateMode::Final, because the ClusterSend
+    // node ends up creating an incompatible partitioning for FinalPartitioned.  Some other ideas,
+    // like adding a RepartitionExec node, would just be redundant with the behavior of
+    // AggregateExec::Final, and also, tricky to set up with the ideal number of partitions in the
+    // middle of optimization passes.  Having ClusterSend be able to pass through hash partitions in
+    // some form is another option.
+    let p_final_input_schema = p_final_input.schema();
+    Ok(Arc::new(AggregateExec::try_new(
+        AggregateMode::Final,
+        p_final_agg.group_expr().clone(),
+        p_final_agg.aggr_expr().to_vec(),
+        p_final_agg.filter_expr().to_vec(),
+        p_final_input,
+        p_final_input_schema,
+    )?))
 }
 
 // TODO upgrade DF: this one was handled by something else but most likely only in sorted scenario
