@@ -945,8 +945,6 @@ describe('SQL Generation', () => {
       timezone: 'America/Los_Angeles'
     });
 
-    console.log(query.buildSqlAndParams());
-
     expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.MERGE/);
     expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.INIT/);
   });
@@ -971,7 +969,7 @@ describe('SQL Generation', () => {
 
     console.log(query.buildSqlAndParams());
 
-    expect(query.buildSqlAndParams()[0]).toMatch(/OFFSET (\d) LIMIT (\d)/);
+    expect(query.buildSqlAndParams()[0]).toMatch(/OFFSET (\d)\s+LIMIT (\d)/);
   });
 
   it('calculated join', async () => {
@@ -2534,6 +2532,9 @@ describe('SQL Generation', () => {
       });
 
       const sqlBuild = query.buildSqlAndParams();
+
+      console.log(sqlBuild[0]);
+      console.log(sqlBuild[1]);
 
       expect(sqlBuild[0].includes('America/Los_Angeles')).toEqual(true);
       expect(sqlBuild[1][0]).toEqual(granularityTest.from);

@@ -1,22 +1,20 @@
----
-redirect_from:
-  - /workspace/sso/
----
+# Authentication & SSO
 
-# Single Sign-on
+As an account administrator, you can manage how your team and users access Cube Cloud.
 
-As an account administrator, you can manage how your team accesses Cube Cloud.
-There are options to log in using email and password, a GitHub account, or a
-Google account.
-
+You can authenticate using email and password, a GitHub account, or a Google account.
 Cube Cloud also provides single sign-on (SSO) via identity providers supporting
-industry-proven [SAML 2.0 protocol][wiki-saml], e.g., Okta, Google Workspace,
-Azure AD, etc.
+[SAML 2.0](#saml-20), e.g., Okta, Google Workspace, Azure AD, etc.
+
+Finally, Cube Cloud provides the [LDAP integration](#ldap-integration), enabling
+users of [APIs & integrations][ref-apis] to authenticate via an LDAP catalog
+and assume roles that work with [data access policies][ref-dap] once [authentication
+integration][ref-auth-integration] is enabled.
 
 <SuccessBox>
 
-Single sign-on is available in Cube Cloud on
-[Enterprise and above](https://cube.dev/pricing) product tiers.
+Authentication is available in Cube Cloud on [all product tiers](https://cube.dev/pricing).<br/>
+[SAML 2.0](#saml-20) and [LDAP integration](#ldap-integration) are available on [Enterprise and above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
 
@@ -25,10 +23,23 @@ Single sign-on is available in Cube Cloud on
   style="border: 0;"
 />
 
-## Guides
+## Configuration
 
-Single sign-on works with various identity providers. Check the following guides
-to get tool-specific instructions:
+To manage authentication settings, navigate to <Btn>Team & Security</Btn> settings
+of your Cube Cloud account, and switch to the <Btn>Authentication & SSO</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/5665f017-07ff-4734-bae5-8d4984470dd7/"/>
+
+Use the toggles in <Btn>Password</Btn>, <Btn>Google</Btn>, and <Btn>GitHub</Btn>
+sections to enable or disable these authentication options.
+
+### SAML 2.0
+
+Use the toggle in the <Btn>SAML 2.0</Btn> section to enable or disable the authentication
+via an identity provider supporting the [SAML 2.0 protocol][wiki-saml].
+Once it's enabled, you'll see the <Btn>SAML 2.0 Settings</Btn> section directly below.
+
+Check the following guides to get tool-specific instructions on configuration:
 
 <Grid imageSize={[56, 56]}>
   <GridItem
@@ -48,15 +59,108 @@ to get tool-specific instructions:
   />
 </Grid>
 
-## Configuration
+### LDAP integration
 
-To manage sign-in and single sign-on settings, click your user name from the
-top-right corner, navigate to <Btn>Team & Security</Btn>, and switch to
-the <Btn>Authentication & SSO</Btn> tab:
+Use the toggle in the <Btn>LDAP Integration</Btn> section to enable or disable the
+integration with an [LDAP catalog][wiki-ldap].
+Once it's enabled, you'll see the <Btn>LDAP Settings</Btn> section directly below.
 
-<Screenshot
-  alt="Cube Cloud Team Authentication and SSO tab"
-  src="https://ucarecdn.com/72248967-9b77-4a7e-970c-162b96861e4a/"
-/>
+<InfoBox>
+
+Cube Cloud will be accessing your LDAP server from the IP addresses shown under
+<Btn>LDAP Settings</Btn>. If needed, add these IP addresses to an allowlist.
+
+</InfoBox>
+
+You can configure [connection settings](#connection-settings) and use the
+<Btn>Test Connection</Btn> button to validate them. You can also configure
+[user properties](#user-properties-mapping) mapping, [user roles](#user-roles-mapping) mapping,
+and [user attributes](#user-attributes-mapping) mapping.
+
+#### Connection settings
+
+You have to configure the following connection settings:
+
+| Option | Description |
+| --- | --- |
+| <Btn>LDAP Server URL</Btn>       | Address of your LDAP server |
+| <Btn>Use Secure LDAP</Btn>       | Use an encrypted connection (LDAPS) |
+| <Btn>Don't Verify CA</Btn>       | Disable certificate authority verification |
+| <Btn>Certificate</Btn>           | Certificate for LDAPS in the PEM format |
+| <Btn>Certificate Authority</Btn> | Certificate for the private CA in the PEM format |
+| <Btn>Key</Btn>                   | Key for mutual TLS (mTLS) in the PEM format |
+| <Btn>Bind DN</Btn>               | User name for LDAP authentication |
+| <Btn>Bind Credentials</Btn>      | Password for LDAP authentication |
+| <Btn>Search Base</Btn>           | Base DN for searching users |
+| <Btn>User Object Class</Btn>     | Object class for user entries |
+
+Use the tooltips in Cube Cloud to get more information about each setting.
+
+#### User properties mapping
+
+You have to configure how user data in an LDAP catalog maps to user properties in Cube Cloud.
+The following properties are required:
+
+| Property | Description |
+| --- | --- |
+| <Btn>Login Attribute</Btn> | Login name |
+| <Btn>Id Attribute</Btn> | Unique identifier |
+| <Btn>Email Attribute</Btn> | Email address |
+| <Btn>Name Attribute</Btn> | Full name |
+
+Use the tooltips in Cube Cloud to get more information about each setting.
+
+#### User roles mapping
+
+You can configure how user data in an LDAP catalog maps to roles in Cube Cloud.
+You can also use mapped roles with [data access policies][ref-dap] once [authentication
+integration][ref-auth-integration] is enabled.
+
+Mapping is performed as follows:
+* <Btn>Roles Attribute</Btn> is retrieved from an LDAP catalog.
+* Retrieved value is transformed using rules under <Btn>Role mapping</Btn>.
+* If the value matches an existing role in Cube Cloud, then the user assumes this role.
+
+Additionally, the user always assumes the role specified under <Btn>Default Cloud role</Btn>.
+
+<Screenshot src="https://ucarecdn.com/e467faa1-bf40-4f29-998a-5ea5244610af/"/>
+
+All roles will be available under `cubeCloud.roles` array in the [security context][ref-security-context]:
+
+```json
+{
+  "cubeCloud": {
+    "roles": [
+      "Everyone",
+      "manager"
+    ]
+  }
+}
+```
+
+#### User attributes mapping
+
+You can also bring more user data from an LDAP catalog to use with [data access policies][ref-dap].
+Mapping is performed using the rules under <Btn>Attribute mapping</Btn>.
+
+All mapped attributes and their values will be available under `cubeCloud.userAttributes`
+dictionary in the [security context][ref-security-context]:
+
+```json
+{
+  "cubeCloud": {
+    "userAttributes": {
+      "fullName": "John Doe",
+      "department": "Finance",
+      "location": "San Mateo"
+    }
+  }
+}
+```
 
 [wiki-saml]: https://en.wikipedia.org/wiki/SAML_2.0
+[wiki-ldap]: https://en.wikipedia.org/wiki/Lightweight_Directory_Access_Protocol
+[ref-apis]: /product/apis-integrations
+[ref-dap]: /product/auth/data-access-policies
+[ref-security-context]: /product/auth/context
+[ref-auth-integration]: /product/auth#authentication-integration

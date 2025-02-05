@@ -1,4 +1,5 @@
 use super::join_definition::{JoinDefinition, NativeJoinDefinition};
+use super::join_hints::JoinHintItem;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -10,5 +11,8 @@ use std::rc::Rc;
 
 #[nativebridge::native_bridge]
 pub trait JoinGraph {
-    fn build_join(&self, cubes_to_join: Vec<String>) -> Result<Rc<dyn JoinDefinition>, CubeError>;
+    fn build_join(
+        &self,
+        cubes_to_join: Vec<JoinHintItem>,
+    ) -> Result<Rc<dyn JoinDefinition>, CubeError>;
 }

@@ -6,13 +6,10 @@ use crate::plan::{
     Cte, Expr, From, JoinBuilder, JoinCondition, MemberExpression, OrderBy, QualifiedColumnName,
     QueryPlan, Schema, SelectBuilder, TimeSeries,
 };
-use crate::planner::planners::{
-    FullKeyAggregateQueryPlanner, MultipliedMeasuresQueryPlanner, OrderPlanner, SimpleQueryPlanner,
-};
+use crate::planner::planners::{multi_stage::RollingWindowType, OrderPlanner, QueryPlanner};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
-use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
 use cubenativeutils::CubeError;
@@ -105,16 +102,31 @@ impl MultiStageMemberQueryPlanner {
         let rolling_base_cte_schema = cte_schemas.get(input).unwrap().clone();
         let time_dimension_alias =
             rolling_base_cte_schema.resolve_member_alias(&rolling_window_desc.time_dimension);
-        let on = JoinCondition::new_rolling_join(
-            root_alias.clone(),
-            rolling_window_desc.trailing.clone(),
-            rolling_window_desc.leading.clone(),
-            rolling_window_desc.offset.clone(),
-            Expr::Reference(QualifiedColumnName::new(
-                Some(alias.clone()),
-                time_dimension_alias,
-            )),
-        );
+        let on = match &rolling_window_desc.rolling_window {
+            RollingWindowType::Regular(regular_rolling_window) => {
+                JoinCondition::new_regular_rolling_join(
+                    root_alias.clone(),
+                    regular_rolling_window.trailing.clone(),
+                    regular_rolling_window.leading.clone(),
+                    regular_rolling_window.offset.clone(),
+                    Expr::Reference(QualifiedColumnName::new(
+                        Some(alias.clone()),
+                        time_dimension_alias,
+                    )),
+                )
+            }
+            RollingWindowType::ToDate(to_date_rolling_window) => {
+                JoinCondition::new_to_date_rolling_join(
+                    root_alias.clone(),
+                    to_date_rolling_window.granularity.clone(),
+                    Expr::Reference(QualifiedColumnName::new(
+                        Some(alias.clone()),
+                        time_dimension_alias,
+                    )),
+                    self.query_tools.clone(),
+                )
+            }
+        };
         join_builder.left_join_table_reference(
             input.clone(),
             rolling_base_cte_schema.clone(),
@@ -124,13 +136,21 @@ impl MultiStageMemberQueryPlanner {
 
         let from = From::new_from_join(join_builder.build());
 
-        let group_by = dimensions
-            .iter()
-            .map(|dim| Expr::Member(MemberExpression::new(dim.clone())))
-            .collect_vec();
+        let group_by = if self.description.member().is_ungrupped() {
+            vec![]
+        } else {
+            dimensions
+                .iter()
+                .map(|dim| Expr::Member(MemberExpression::new(dim.clone())))
+                .collect_vec()
+        };
 
         let mut context_factory = SqlNodesFactory::new();
         context_factory.set_rolling_window(true);
+
+        if self.description.member().is_ungrupped() {
+            context_factory.set_ungrouped(true);
+        }
 
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut render_references = HashMap::new();
@@ -186,7 +206,7 @@ impl MultiStageMemberQueryPlanner {
             format!("{}_join", self.description.alias()),
         );
 
-        let group_by = if multi_stage_member.is_ungrupped() {
+        let group_by = if self.description.member().is_ungrupped() {
             vec![]
         } else {
             dimensions
@@ -195,7 +215,7 @@ impl MultiStageMemberQueryPlanner {
                 .collect_vec()
         };
 
-        let order_by = if multi_stage_member.is_ungrupped() {
+        let order_by = if self.description.member().is_ungrupped() {
             vec![]
         } else {
             self.query_order()?
@@ -243,6 +263,9 @@ impl MultiStageMemberQueryPlanner {
         select_builder.set_group_by(group_by);
         select_builder.set_order_by(order_by);
         context_factory.set_render_references(render_references);
+        if self.description.member().is_ungrupped() {
+            context_factory.set_ungrouped(true);
+        }
         let select = select_builder.build(context_factory);
 
         Ok(Rc::new(Cte::new_from_select(
@@ -356,44 +379,31 @@ impl MultiStageMemberQueryPlanner {
             None,
             None,
             true,
-            false,
+            self.description.member().is_ungrupped(),
         )?;
 
         let mut node_factory = SqlNodesFactory::new();
         node_factory.set_time_shifts(self.description.state().time_shifts().clone());
+        if self.description.member().has_aggregates_on_top() {
+            node_factory.set_count_approx_as_state(true);
+        }
 
-        /* if cte_query_properties
+        if cte_query_properties
             .full_key_aggregate_measures()?
             .has_multi_stage_measures()
         {
             return Err(CubeError::internal(format!(
                 "Leaf multi stage query cannot contain multi stage member"
             )));
-        } */
+        }
 
-        let cte_select = if cte_query_properties.is_simple_query()? {
-            let planner = SimpleQueryPlanner::new(
-                self.query_tools.clone(),
-                cte_query_properties.clone(),
-                node_factory.clone(),
-            );
-            planner.plan()?
-        } else {
-            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::new(
-                self.query_tools.clone(),
-                cte_query_properties.clone(),
-                node_factory.clone(),
-            );
-            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
-                cte_query_properties.clone(),
-                node_factory.clone(),
-                PlanSqlTemplates::new(self.query_tools.templates_render()),
-            );
-            let subqueries = multiplied_measures_query_planner.plan_queries()?;
-            let result = full_key_aggregate_planner.plan(subqueries, vec![])?;
-            result
-        };
-        let result = Cte::new_from_select(Rc::new(cte_select), self.description.alias().clone());
+        let query_planner = QueryPlanner::new_with_context_factory(
+            cte_query_properties.clone(),
+            self.query_tools.clone(),
+            node_factory,
+        );
+        let cte_select = query_planner.plan()?;
+        let result = Cte::new_from_select(cte_select, self.description.alias().clone());
         Ok(Rc::new(result))
     }
 

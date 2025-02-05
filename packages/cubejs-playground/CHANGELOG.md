@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
+
+### Bug Fixes
+
+- **@cubejs-client/ngx:** Update APF configuration and build settings for Angular 12+ compatibility ([#9152](https://github.com/cube-js/cube/issues/9152)) Thanks to @HaidarZ! ([57bcbc4](https://github.com/cube-js/cube/commit/57bcbc482002aaa025ba5eab8960ecc5784faa55))
+- **cubejs-playground:** update query builder ([#9175](https://github.com/cube-js/cube/issues/9175)) ([4e9ed0e](https://github.com/cube-js/cube/commit/4e9ed0eae46c4abb1b84e6423bbc94ad93da37c3))
+- **cubejs-playground:** update query builder ([#9184](https://github.com/cube-js/cube/issues/9184)) ([247ac0c](https://github.com/cube-js/cube/commit/247ac0c4028aef5295e88cd501323b94c5a4eaab))
+
 ## [1.1.17](https://github.com/cube-js/cube/compare/v1.1.16...v1.1.17) (2025-01-27)
 
 **Note:** Version bump only for package @cubejs-client/playground

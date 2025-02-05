@@ -2,6 +2,7 @@ use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -27,6 +28,7 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
         node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
@@ -35,6 +37,7 @@ impl SqlNode for UngroupedQueryFinalMeasureSqlNode {
                     node,
                     query_tools.clone(),
                     node_processor.clone(),
+                    templates,
                 )?;
 
                 if input == "*" {

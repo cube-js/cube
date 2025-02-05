@@ -152,7 +152,7 @@ above for `base_orders`.
 The other required parameter inside the `cubes` block is `includes`. Use it
 to list measures, dimensions, or segments you'd like to include into the view. 
 
-To include all members from a cube, use the "includes all" form: `includes: "*"`.
+To include all members from a cube, use the _includes all_ shorthand: `includes: "*"`.
 In that case, you can also use the `excludes` parameter to list members that
 you'd like to exclude. 
 
@@ -292,8 +292,20 @@ view(`arr`, {
   description: `Annual Recurring Revenue`,
   public: COMPILE_CONTEXT.security_context.is_finance,
 
-  includes: [revenue.arr, revenue.date, customers.plan],
-});
+  cubes: [
+    {
+      join_path: revenue,
+      includes: [
+        `arr`,
+        `date`
+      ]
+    },
+    {
+      join_path: revenue.customers,
+      includes: `plan`
+    }
+  ]
+})
 ```
 
 ```yaml
@@ -302,12 +314,15 @@ views:
     description: Annual Recurring Revenue
     public: COMPILE_CONTEXT.security_context.is_finance
 
-    includes:
-      # Measures
-      - revenue.arr
-      # Dimensions
-      - revenue.date
-      - customers.plan
+    cubes:
+      - join_path: revenue
+        includes:
+          - arr
+          - date
+
+      - join_path: revenue.customers
+        includes:
+          - plan
 ```
 
 </CodeTabs>
@@ -340,49 +355,9 @@ views:
 
 </CodeTabs>
 
-### `includes` (deprecated)
+### `access_policy`
 
-<WarningBox>
-
-The top-level `includes` parameter is deprecated and might be removed in
-the future. Please always use the `includes` parameter with `cubes` and
-`join_path` parameters so you can explicitly control the join path.
-
-</WarningBox>
-
-The top-level `includes` parameter is used to bulk add measures or dimensions
-to a view.
-
-<CodeTabs>
-
-```javascript
-view(`active_users`, {
-  includes: [
-    // Measures
-    users.rolling_count,
-
-    // Dimensions
-    users.city,
-    users.created_at,
-  ],
-});
-```
-
-```yaml
-views:
-  - name: active_users
-
-    includes:
-      # Measures
-      - users.rolling_count
-
-      # Dimensions
-      - users.city
-      - users.created_at
-```
-
-</CodeTabs>
-
+The `access_policy` parameter is used to configure [data access policies][ref-ref-dap].
 
 [ref-recipe-control-access-cubes-views]:
   /guides/recipes/access-control/controlling-access-to-cubes-and-views
@@ -391,6 +366,7 @@ views:
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-apis]: /product/apis-integrations
 [ref-ref-cubes]: /reference/data-model/cube
-[ref-apis-support]: /product/apis-integrations#support-for-data-modeling
+[ref-ref-dap]: /reference/data-model/data-access-policies
+[ref-apis-support]: /product/apis-integrations#data-modeling
 [ref-playground]: /product/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /product/configuration/visualization-tools

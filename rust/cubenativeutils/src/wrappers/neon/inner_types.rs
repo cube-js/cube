@@ -9,25 +9,25 @@ use crate::wrappers::inner_types::InnerTypes;
 use neon::prelude::*;
 use std::marker::PhantomData;
 
-pub struct NeonInnerTypes<'cx: 'static, C: Context<'cx>> {
-    lifetime: PhantomData<&'cx ContextHolder<'cx, C>>,
+pub struct NeonInnerTypes<C: Context<'static>> {
+    marker: PhantomData<ContextHolder<C>>,
 }
 
-impl<'cx, C: Context<'cx>> Clone for NeonInnerTypes<'cx, C> {
+impl<C: Context<'static>> Clone for NeonInnerTypes<C> {
     fn clone(&self) -> Self {
         Self {
-            lifetime: Default::default(),
+            marker: Default::default(),
         }
     }
 }
 
-impl<'cx: 'static, C: Context<'cx>> InnerTypes for NeonInnerTypes<'cx, C> {
-    type Object = NeonObject<'cx, C>;
-    type Context = ContextHolder<'cx, C>;
-    type Array = NeonArray<'cx, C>;
-    type Struct = NeonStruct<'cx, C>;
-    type String = NeonString<'cx, C>;
-    type Boolean = NeonBoolean<'cx, C>;
-    type Function = NeonFunction<'cx, C>;
-    type Number = NeonNumber<'cx, C>;
+impl<C: Context<'static> + 'static> InnerTypes for NeonInnerTypes<C> {
+    type Object = NeonObject<C>;
+    type Context = ContextHolder<C>;
+    type Array = NeonArray<C>;
+    type Struct = NeonStruct<C>;
+    type String = NeonString<C>;
+    type Boolean = NeonBoolean<C>;
+    type Function = NeonFunction<C>;
+    type Number = NeonNumber<C>;
 }

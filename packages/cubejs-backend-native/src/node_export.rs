@@ -18,7 +18,7 @@ use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::batch_to_rows;
-use cubenativeutils::wrappers::neon::context::ContextHolder;
+use cubenativeutils::wrappers::neon::context::neon_run_with_guarded_lifetime;
 use cubenativeutils::wrappers::neon::inner_types::NeonInnerTypes;
 use cubenativeutils::wrappers::neon::object::NeonObject;
 use cubenativeutils::wrappers::object_handle::NativeObjectHandle;
@@ -462,37 +462,29 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 //============ sql planner ===================
 
 fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
-    //IMPORTANT It seems to be safe here, because context lifetime is bound to function, but this
-    //context should be used only inside function
-    let mut cx = extend_function_context_lifetime(cx);
-    let options = cx.argument::<JsValue>(0)?;
+    neon_run_with_guarded_lifetime(cx, |neon_context_holder| {
+        let options =
+            NativeObjectHandle::<NeonInnerTypes<FunctionContext<'static>>>::new(NeonObject::new(
+                neon_context_holder.clone(),
+                neon_context_holder
+                    .with_context(|cx| cx.argument::<JsValue>(0))
+                    .unwrap()?,
+            ));
 
-    let neon_context_holder = ContextHolder::new(cx);
-
-    let options = NativeObjectHandle::<NeonInnerTypes<'static, FunctionContext<'static>>>::new(
-        NeonObject::new(neon_context_holder.clone(), options),
-    );
-
-    let context_holder =
-        NativeContextHolder::<NeonInnerTypes<'static, FunctionContext<'static>>>::new(
+        let context_holder = NativeContextHolder::<NeonInnerTypes<FunctionContext<'static>>>::new(
             neon_context_holder,
         );
 
-    let base_query_options = Rc::new(NativeBaseQueryOptions::from_native(options).unwrap());
+        let base_query_options = Rc::new(NativeBaseQueryOptions::from_native(options).unwrap());
 
-    let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
+        let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
 
-    //arg_clrep.into_js(&mut cx)
-    let res = base_query.build_sql_and_params().unwrap();
+        let res = base_query.build_sql_and_params();
 
-    let result: NeonObject<'static, FunctionContext<'static>> = res.into_object();
-    let result = result.into_object();
-
-    Ok(result)
-}
-
-fn extend_function_context_lifetime<'a>(cx: FunctionContext<'a>) -> FunctionContext<'static> {
-    unsafe { std::mem::transmute::<FunctionContext<'a>, FunctionContext<'static>>(cx) }
+        let result: NeonObject<FunctionContext<'static>> = res.into_object();
+        let result = result.into_object();
+        Ok(result)
+    })
 }
 
 fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {

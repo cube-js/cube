@@ -34,7 +34,7 @@ We'll use a sample e-commerce database with two tables, `orders` and
 
 ## Cubes
 
-A [cube][ref-cubes] represents a dataset in Cube, and is conceptually similar to a [view in
+_Cubes_ represent datasets in Cube and are conceptually similar to [views in
 SQL][wiki-view-sql]. Cubes are usually declared in separate files with one
 cube per file. Typically, a cube points to a single table in
 your database using the [`sql_table` property][ref-schema-ref-sql-table]:
@@ -82,15 +82,18 @@ cubes:
 
 </CodeTabs>
 
-Within each cube are definitions of [dimensions][self-dimensions],
-[measures][self-measures], and [segments](#segments). [Joins](#joins) are used
-to define relations between cubes; [pre-aggregations](#pre-aggregations) are
-designed to accelerate queries to cubes.
+Each cube contains the definitions of its _members_: [dimensions](#dimensions),
+[measures](#measures), and [segments](#segments). You can control the access to
+cubes and their members by configuring the [member-level security][ref-mls].
+
+[Joins](#joins) are used to define relations between cubes.
+[Pre-aggregations](#pre-aggregations) are used to accelerate queries to cubes.
+Cubes and their members can be further referenced by [views](#views).
 
 Note that cubes support [extension][ref-extending-cubes],
 [polymorphism][ref-polymorphic-cubes], and [data blending][ref-data-blending].
-Also, cubes should not necessarily be defined statically; you can actually build
-[dynamic data models][ref-dynamic-data-models].
+Cubes can be defined statically and you can also build [dynamic data
+models][ref-dynamic-data-models].
 
 <InfoBox>
 
@@ -100,18 +103,24 @@ For massive [multi-tenancy][ref-multitenancy] configurations, e.g., with more th
 
 </InfoBox>
 
+<ReferenceBox>
+
+See the reference documentaton for the full list of cube [parameters][ref-cubes].
+
+</ReferenceBox>
+
 ## Views
 
-Views sit on top of the data graph of cubes and create a facade of your whole
+_Views_ sit on top of the data graph of cubes and create a facade of your whole
 data model with which data consumers can interact. They are useful for defining
 metrics, managing governance and data access, and controlling ambiguous join
 paths.
 
 <Diagram src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/" />
 
-Views can **not** have their own members. Instead, they use the `cubes`
-parameter to include members of cubes. Optionally, you can also group members of a view
-into [folders][ref-ref-folders].
+Views do **not** define their own members. Instead, they reference cubes by
+specific join paths and include their members. Optionally, you can also group
+members of a view into [folders][ref-ref-folders].
 
 In the example below, we create the `orders` view which includes select members
 from `base_orders`, `products`, and `users` cubes:
@@ -182,12 +191,18 @@ views:
 Views do **not** define any [pre-aggregations](#pre-aggregations). Instead,
 they [reuse][ref-matching-preaggs] pre-aggregations from underlying cubes.
 
-View may not only be defined statically; you can actually build
-[dynamic data models][ref-dynamic-data-models].
+View can be defined statically and you can also build [dynamic data
+models][ref-dynamic-data-models].
+
+<ReferenceBox>
+
+See the reference documentaton for the full list of view [parameters][ref-views].
+
+</ReferenceBox>
 
 ## Dimensions
 
-Dimensions represent the properties of a **single** data point in the cube.
+_Dimensions_ represent the properties of a **single** data point in the cube.
 [The `orders` table](#top) contains only dimensions, so representing them in the
 `orders` cube is straightforward:
 
@@ -289,10 +304,29 @@ Also, [proxy dimensions][ref-proxy-dimensions] are helpful for code reusability
 and [subquery dimensions][ref-subquery-dimensions] can be used to join cubes
 implicitly.
 
+<ReferenceBox>
+
+See the reference documentaton for the full list of [dimension parameters][ref-dimensions].
+
+</ReferenceBox>
+
 ### Dimension types
 
-Dimensions can be of different types. See the [dimension type
-reference][ref-schema-dimension-types] for details.
+Dimensions can be of different types, e.g., `string`, `number`, or `time`. Often,
+data types in SQL are mapped to dimension types in the following way:
+
+| Data type in SQL | Dimension type in Cube |
+| --- | --- |
+| `timestamp`, `date`, `time` | [`time`](/reference/data-model/types-and-formats#time-1) |
+| `text`, `varchar` | [`string`](/reference/data-model/types-and-formats#string-1) |
+| `integer`, `bigint`, `decimal` | [`number`](/reference/data-model/types-and-formats#number-1) |
+| `boolean` | [`boolean`](/reference/data-model/types-and-formats#boolean-1) |
+
+<ReferenceBox>
+
+See the [dimension type reference][ref-ref-dimension-types] for details.
+
+</ReferenceBox>
 
 ### Time dimensions
 
@@ -377,7 +411,7 @@ Time dimensions are essential to enabling performance boosts such as
 
 ## Measures
 
-Measures represent the properties of a **set of data points** in the cube. To
+_Measures_ represent the properties of a **set of data points** in the cube. To
 add a measure called `count` to our `orders` cube, for example, we can do the
 following:
 
@@ -438,15 +472,19 @@ cubes:
 
 </CodeTabs>
 
-Also, [calculated measures][ref-calculated-measures] can be used to perform calculations
-on other measures.
+[Calculated measures][ref-calculated-measures] and [subquery dimensions][ref-subquery-dimensions]
+can be used for measure composition.
+
+<ReferenceBox>
+
+See the reference documentaton for the full list of measure [parameters][ref-measures].
+
+</ReferenceBox>
 
 ### Measure types
 
-Measures can be of different types. See the [measure type
-reference][ref-schema-measure-types] for details.
-
-Often, aggregate functions in SQL are mapped to measure types in the following way:
+Measures can be of different types, e.g., `count`, `sum`, or `number`. Often,
+aggregate functions in SQL are mapped to measure types in the following way:
 
 | Aggregate function in SQL | Measure type in Cube |
 | --- | --- |
@@ -461,6 +499,12 @@ Often, aggregate functions in SQL are mapped to measure types in the following w
 | `STRING_AGG`, `LISTAGG` | [`string`](/reference/data-model/types-and-formats#string) |
 | `SUM` | [`sum`](/reference/data-model/types-and-formats#sum) |
 | Any function returning a timestamp, e.g., `MAX(time)` | [`time`](/reference/data-model/types-and-formats#time) |
+
+<ReferenceBox>
+
+See the [measure type reference][ref-ref-measure-types] for details.
+
+</ReferenceBox>
 
 ### Measure additivity
 
@@ -578,7 +622,7 @@ an impact on [pre-aggregation matching][ref-matching-preaggs].
 
 ## Joins
 
-Joins define the relationships between cubes, which then allows accessing and
+_Joins_ define the relationships between cubes, which then allows accessing and
 comparing properties from two or more cubes at the same time. In Cube, all joins
 are `LEFT JOIN`s.
 
@@ -624,15 +668,22 @@ cubes:
 
 </CodeTabs>
 
-There are three [types of join relationships][ref-schema-ref-joins-types]
+There are three [types of join relationships][ref-ref-join-types]
 (`one_to_one`, `one_to_many`, and `many_to_one`) and a few [other 
-concepts][ref-working-with-joins].
+concepts][ref-working-with-joins] such as the direction of joins and trasitive
+joins pitfalls.
+
+<ReferenceBox>
+
+See the reference documentaton for the full list of join [parameters][ref-joins].
+
+</ReferenceBox>
 
 ## Segments
 
-Segments are filters that are predefined in the data model instead of [a Cube
-query][ref-backend-query-filters]. They allow simplifying Cube queries and make
-it easy to re-use common filters across a variety of queries.
+_Segments_ are pre-defined filters that are kept within the data model instead of
+[a Cube query][ref-backend-query-filters]. They help to simplify queries and make
+it easy to reuse common filters across a variety of queries.
 
 To add a segment which limits results to completed orders, we can do the
 following:
@@ -663,11 +714,17 @@ cubes:
 
 </CodeTabs>
 
+<ReferenceBox>
+
+See the reference documentaton for the full list of segment [parameters][ref-segments].
+
+</ReferenceBox>
+
 ## Pre-aggregations
 
-Pre-aggregations are a powerful way of caching frequently-used, expensive
-queries and keeping the cache up-to-date on a periodic basis. Within a data
-model, they are defined under the `pre_aggregations` property:
+_Pre-aggregations_ provide a powerful way to accelerate frequently used queries
+and keep the cache up-to-date. Within a data model, they are defined using the
+`pre_aggregations` property:
 
 <CodeTabs>
 
@@ -706,31 +763,41 @@ cubes:
 A more thorough introduction can be found in [Getting Started with
 Pre-Aggregations][ref-caching-preaggs-intro].
 
+<ReferenceBox>
+
+See the reference documentaton for the full list of pre-aggregation
+[parameters][ref-preaggs].
+
+</ReferenceBox>
+
+
 [ref-backend-query-filters]:
   /product/apis-integrations/rest-api/query-format#filters-format
 [ref-caching-preaggs-intro]: /product/caching/getting-started-pre-aggregations
 [ref-caching-use-preaggs-partition-time]:
   /product/caching/using-pre-aggregations#partitioning
-[ref-schema-dimension-types]:
-  /reference/data-model/types-and-formats#dimension-types
-[ref-schema-measure-types]:
-  /reference/data-model/types-and-formats#measure-types
-[ref-schema-ref-joins-types]:
-  /reference/data-model/joins#relationship
+[ref-ref-dimension-types]: /reference/data-model/types-and-formats#dimension-types
+[ref-ref-measure-types]: /reference/data-model/types-and-formats#measure-types
+[ref-ref-join-types]: /reference/data-model/joins#relationship
 [ref-schema-ref-sql]: /reference/data-model/cube#sql
 [ref-schema-ref-sql-table]: /reference/data-model/cube#sql_table
 [ref-tutorial-incremental-preagg]:
   /reference/data-model/pre-aggregations#incremental
 [ref-cubes]: /reference/data-model/cube
+[ref-views]: /reference/data-model/view
+[ref-dimensions]: /reference/data-model/dimensions
+[ref-measures]: /reference/data-model/measures
+[ref-joins]: /reference/data-model/joins
+[ref-segments]: /reference/data-model/segments
+[ref-preaggs]: /reference/data-model/pre-aggregations
 [ref-extending-cubes]: /product/data-modeling/concepts/code-reusability-extending-cubes
 [ref-polymorphic-cubes]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-proxy-dimensions]: /product/data-modeling/concepts/calculated-members#proxy-dimensions
 [ref-subquery-dimensions]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
+[ref-calculated-measures]: /product/data-modeling/concepts/calculated-members#calculated-measures
 [ref-working-with-joins]: /product/data-modeling/concepts/working-with-joins
-[self-dimensions]: #dimensions
-[self-measures]: #measures
 [wiki-olap]: https://en.wikipedia.org/wiki/Online_analytical_processing
 [wiki-view-sql]: https://en.wikipedia.org/wiki/View_(SQL)
 [ref-matching-preaggs]: /product/caching/matching-pre-aggregations
@@ -744,5 +811,6 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-ref-primary-key]: /reference/data-model/dimensions#primary_key
 [ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
 [ref-proxy-granularity]: /product/data-modeling/concepts/calculated-members#time-dimension-granularity
+[ref-mls]: /product/auth/member-level-security
 [ref-ref-hierarchies]: /reference/data-model/hierarchies
 [ref-ref-folders]: /reference/data-model/view#folders

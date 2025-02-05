@@ -4,6 +4,7 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
+use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::FilterItem;
@@ -20,8 +21,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct QueryToolsCachedData {
-    join_hints: HashMap<String, Rc<Vec<String>>>,
-    join_hints_to_join_key: HashMap<Vec<Rc<Vec<String>>>, Rc<JoinKey>>,
+    join_hints: HashMap<String, Rc<Vec<JoinHintItem>>>,
+    join_hints_to_join_key: HashMap<Vec<Rc<Vec<JoinHintItem>>>, Rc<JoinKey>>,
     join_key_to_join: HashMap<Rc<JoinKey>, Rc<dyn JoinDefinition>>,
 }
 
@@ -43,7 +44,7 @@ impl QueryToolsCachedData {
     pub fn join_hints_for_member(
         &mut self,
         node: &Rc<MemberSymbol>,
-    ) -> Result<Rc<Vec<String>>, CubeError> {
+    ) -> Result<Rc<Vec<JoinHintItem>>, CubeError> {
         let full_name = node.full_name();
         if let Some(val) = self.join_hints.get(&full_name) {
             Ok(val.clone())
@@ -57,7 +58,7 @@ impl QueryToolsCachedData {
     pub fn join_hints_for_base_member_vec<T: BaseMember>(
         &mut self,
         vec: &Vec<Rc<T>>,
-    ) -> Result<Vec<Rc<Vec<String>>>, CubeError> {
+    ) -> Result<Vec<Rc<Vec<JoinHintItem>>>, CubeError> {
         vec.iter()
             .map(|b| self.join_hints_for_member(&b.member_evaluator()))
             .collect::<Result<Vec<_>, _>>()
@@ -66,7 +67,7 @@ impl QueryToolsCachedData {
     pub fn join_hints_for_member_symbol_vec(
         &mut self,
         vec: &Vec<Rc<MemberSymbol>>,
-    ) -> Result<Vec<Rc<Vec<String>>>, CubeError> {
+    ) -> Result<Vec<Rc<Vec<JoinHintItem>>>, CubeError> {
         vec.iter()
             .map(|b| self.join_hints_for_member(b))
             .collect::<Result<Vec<_>, _>>()
@@ -75,7 +76,7 @@ impl QueryToolsCachedData {
     pub fn join_hints_for_filter_item_vec(
         &mut self,
         vec: &Vec<FilterItem>,
-    ) -> Result<Vec<Rc<Vec<String>>>, CubeError> {
+    ) -> Result<Vec<Rc<Vec<JoinHintItem>>>, CubeError> {
         let mut member_symbols = Vec::new();
         for i in vec.iter() {
             i.find_all_member_evaluators(&mut member_symbols);
@@ -88,8 +89,8 @@ impl QueryToolsCachedData {
 
     pub fn join_by_hints(
         &mut self,
-        hints: Vec<Rc<Vec<String>>>,
-        join_fn: impl FnOnce(Vec<String>) -> Result<Rc<dyn JoinDefinition>, CubeError>,
+        hints: Vec<Rc<Vec<JoinHintItem>>>,
+        join_fn: impl FnOnce(Vec<JoinHintItem>) -> Result<Rc<dyn JoinDefinition>, CubeError>,
     ) -> Result<(Rc<JoinKey>, Rc<dyn JoinDefinition>), CubeError> {
         if let Some(key) = self.join_hints_to_join_key.get(&hints) {
             Ok((key.clone(), self.join_key_to_join.get(key).unwrap().clone()))
@@ -104,7 +105,6 @@ impl QueryToolsCachedData {
                 root: join.static_data().root.to_string(),
                 joins: join
                     .joins()?
-                    .items()
                     .iter()
                     .map(|i| i.static_data().clone())
                     .collect(),
@@ -227,6 +227,16 @@ impl QueryTools {
         } else {
             sql.to_string()
         }
+    }
+
+    pub fn alias_for_cube(&self, cube_name: &String) -> Result<String, CubeError> {
+        let cube_definition = self.cube_evaluator().cube_from_path(cube_name.clone())?;
+        let res = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
+            sql_alias.clone()
+        } else {
+            cube_name.clone()
+        };
+        Ok(res)
     }
 
     pub fn escape_column_name(&self, column_name: &str) -> String {
