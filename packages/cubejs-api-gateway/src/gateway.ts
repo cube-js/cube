@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
+import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
@@ -1395,8 +1396,17 @@ class ApiGateway {
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
     if (memberExpression.startsWith('{')) {
       const obj = parseInputMemberExpression(JSON.parse(memberExpression));
-      const args = obj.cubeParams;
-      args.push(`return \`${obj.expr}\``);
+      let expression: ParsedMemberExpression['expression'];
+      switch (obj.expr.type) {
+        case 'SqlFunction':
+          expression = [
+            ...obj.expr.cubeParams,
+            `return \`${obj.expr.sql}\``,
+          ];
+          break;
+        default:
+          assertNever(obj.expr.type);
+      }
 
       const groupingSet = obj.groupingSet ? {
         groupType: obj.groupingSet.groupType,
@@ -1408,7 +1418,7 @@ class ApiGateway {
         cubeName: obj.cubeName,
         name: obj.alias,
         expressionName: obj.alias,
-        expression: args,
+        expression,
         definition: memberExpression,
         groupingSet,
       };
