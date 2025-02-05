@@ -97,7 +97,7 @@ async fn test_filter_dim_in_null() {
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${MultiTypeCube.dim_str1} IN (NULL)\""#));
+        .contains(r#"\"sql\":\"${MultiTypeCube.dim_str1} IN (NULL)\""#));
 }
 
 #[tokio::test]
@@ -131,5 +131,5 @@ SELECT dim_str0 FROM MultiTypeCube WHERE (dim_str1 IS NULL OR dim_str1 IN (NULL)
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"((${MultiTypeCube.dim_str1} IS NULL) OR (${MultiTypeCube.dim_str1} IN (NULL) AND FALSE))\""#));
+        .contains(r#"\"sql\":\"((${MultiTypeCube.dim_str1} IS NULL) OR (${MultiTypeCube.dim_str1} IN (NULL) AND FALSE))\""#));
 }

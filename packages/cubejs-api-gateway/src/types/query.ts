@@ -59,12 +59,17 @@ type MemberExpression = Omit<ParsedMemberExpression, 'expression'> & {
   expression: Function;
 };
 
+export type InputMemberExpressionSqlFunction = {
+  type: 'SqlFunction'
+  cubeParams: Array<string>,
+  sql: string,
+};
+
 // This should be aligned with cubesql side
 export type InputMemberExpression = {
   cubeName: string,
   alias: string,
-  cubeParams: Array<string>,
-  expr: string,
+  expr: InputMemberExpressionSqlFunction,
   groupingSet: GroupingSet | null,
 };
 

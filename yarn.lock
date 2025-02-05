@@ -11678,6 +11678,11 @@ asn1@^0.2.6, asn1@~0.2.3:
   dependencies:
     safer-buffer "~2.1.0"
 
+assert-never@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/assert-never/-/assert-never-1.4.0.tgz#b0d4988628c87f35eb94716cc54422a63927e175"
+  integrity sha512-5oJg84os6NMQNl27T9LnZkvvqzvAnHu03ShCnoj6bsJwS7L8AO4lf+C/XjK/nvzEqQB744moC6V128RucQd1jA==
+
 assert-options@0.7.0:
   version "0.7.0"
   resolved "https://registry.yarnpkg.com/assert-options/-/assert-options-0.7.0.tgz#82c27618d9c0baa5e9da8ef607ee261a44ed6e5e"

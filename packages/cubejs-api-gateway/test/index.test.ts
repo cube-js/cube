@@ -774,13 +774,13 @@ describe('API Gateway', () => {
     const query = {
       measures: [
         // eslint-disable-next-line no-template-curly-in-string
-        '{"cubeName":"sales","alias":"sum_sales_line_i","cubeParams":["sales"],"expr":"SUM(${sales.line_items_price})","groupingSet":null}'
+        '{"cubeName":"sales","alias":"sum_sales_line_i","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"SUM(${sales.line_items_price})"},"groupingSet":null}'
       ],
       dimensions: [
         // eslint-disable-next-line no-template-curly-in-string
-        '{"cubeName":"sales","alias":"users_age","cubeParams":["sales"],"expr":"${sales.users_age}","groupingSet":null}',
+        '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
         // eslint-disable-next-line no-template-curly-in-string
-        '{"cubeName":"sales","alias":"cast_sales_users","cubeParams":["sales"],"expr":"CAST(${sales.users_first_name} AS TEXT)","groupingSet":null}'
+        '{"cubeName":"sales","alias":"cast_sales_users","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"CAST(${sales.users_first_name} AS TEXT)"},"groupingSet":null}'
       ],
       segments: [],
       order: []
