@@ -58,7 +58,7 @@ jobs:
       fail-fast: false
 
     env:
-      CUBEJS_WORKER_THREADS_TRANSPILATION: ${{ matrix.transpile-worker-threads }}
+      CUBEJS_TRANSPILATION_WORKER_THREADS: ${{ matrix.transpile-worker-threads }}
     steps:
       - id: get-tag-out
         run: echo "$OUT"
