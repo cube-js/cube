@@ -52,9 +52,15 @@ cubes:
 views:
   - name: total_revenue_per_customer
     public: {{ COMPILE_CONTEXT['securityContext']['isFinance'] }}
-    includes:
-      - orders.total_revenue
-      - users.company
+
+    cubes:
+      - join_path: orders
+        includes:
+          - total_revenue
+
+      - join_path: orders.users
+        includes:
+          - company
 ```
 
 ```javascript
@@ -75,12 +81,25 @@ cube(`users`, {
 });
 
 // total_revenue_per_customer.js
-view("total_revenue_per_customer", {
+view(`total_revenue_per_customer`, {
   description: `Total revenue per customer`,
   public: COMPILE_CONTEXT.securityContext.isFinance,
 
-  includes: [orders.total_revenue, users.company],
-});
+  cubes: [
+    {
+      join_path: orders,
+      includes: [
+        `total_revenue`
+      ]
+    },
+    {
+      join_path: orders.users,
+      includes: [
+        `company`
+      ]
+    }
+  ]
+})
 ```
 
 </CodeTabs>
