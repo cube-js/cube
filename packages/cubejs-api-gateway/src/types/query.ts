@@ -38,8 +38,10 @@ type LogicalOrFilter = {
   or: (QueryFilter | LogicalAndFilter)[]
 };
 
+export type GroupingSetType = 'Rollup' | 'Cube';
+
 type GroupingSet = {
-    groupType: string,
+    groupType: GroupingSetType,
     id: number,
     subId?: null | number
 };
@@ -55,6 +57,26 @@ type ParsedMemberExpression = {
 
 type MemberExpression = Omit<ParsedMemberExpression, 'expression'> & {
   expression: Function;
+};
+
+export type InputGroupingSetDesc = {
+  // eslint-disable-next-line camelcase
+  group_type: GroupingSetType,
+  id: number,
+  // eslint-disable-next-line camelcase
+  sub_id: number | null,
+};
+
+// This should be aligned with cubesql side
+export type InputMemberExpression = {
+  // eslint-disable-next-line camelcase
+  cube_name: string,
+  alias: string,
+  // eslint-disable-next-line camelcase
+  cube_params: Array<string>,
+  expr: string,
+  // eslint-disable-next-line camelcase
+  grouping_set: InputGroupingSetDesc | null,
 };
 
 /**
