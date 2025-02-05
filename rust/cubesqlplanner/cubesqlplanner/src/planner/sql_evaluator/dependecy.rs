@@ -1,7 +1,12 @@
 use super::symbols::MemberSymbol;
 use super::Compiler;
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
-use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::member_sql::{ContextSymbolArg, MemberSql, MemberSqlArgForResolve};
+use crate::cube_bridge::proxy::{
+    CubeDepsCollector, CubeDepsCollectorProp, CubeDepsCollectorProxyHandler,
+};
+use cubenativeutils::wrappers::NativeContextHolderRef;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -54,13 +59,22 @@ pub enum Dependency {
 pub struct DependenciesBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
+    context_holder_ref: Rc<dyn NativeContextHolderRef>,
 }
 
 impl<'a> DependenciesBuilder<'a> {
-    pub fn new(compiler: &'a mut Compiler, cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(
+        compiler: &'a mut Compiler,
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
+        context_holder_ref: Rc<dyn NativeContextHolderRef>,
+    ) -> Self {
         DependenciesBuilder {
             compiler,
             cube_evaluator,
+            base_tools,
+            context_holder_ref,
         }
     }
 
@@ -71,12 +85,81 @@ impl<'a> DependenciesBuilder<'a> {
     ) -> Result<Vec<Dependency>, CubeError> {
         let call_deps = if member_sql.need_deps_resolve() {
             self.cube_evaluator
-                .resolve_symbols_call_deps(cube_name.clone(), member_sql)?
+                .resolve_symbols_call_deps(cube_name.clone(), member_sql.clone())?
         } else {
             vec![]
         };
 
-        let mut childs = Vec::new();
+        let arg_names = member_sql.args_names();
+        let mut deps_to_resolve = Vec::new();
+        for arg_name in arg_names {
+            if let Some(context_arg) = self.build_context_resolve_arg_tmp(arg_name)? {
+                deps_to_resolve.push(MemberSqlArgForResolve::ContextSymbol(context_arg));
+            } else if self
+                .cube_evaluator
+                .is_name_of_symbol_in_cube(cube_name.clone(), arg_name.clone())?
+            {
+                deps_to_resolve.push(MemberSqlArgForResolve::String("".to_string()));
+            } else if self.is_current_cube(&arg_name)
+                || self.cube_evaluator.is_name_of_cube(arg_name.clone())?
+            {
+                let new_cube_name = if self.is_current_cube(&arg_name) {
+                    cube_name.clone()
+                } else {
+                    arg_name.clone()
+                };
+                let collector = CubeDepsCollector::try_new(
+                    new_cube_name,
+                    self.cube_evaluator.clone(),
+                    self.base_tools.clone(),
+                    self.context_holder_ref.clone(),
+                )?;
+                let proxy = CubeDepsCollectorProxyHandler::new(collector, self.base_tools.clone());
+                deps_to_resolve.push(MemberSqlArgForResolve::CubeProxy(proxy));
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Undefinded dependency {}",
+                    arg_name
+                )));
+            }
+        }
+        member_sql.deps_resolve(deps_to_resolve.clone())?;
+
+        let mut result = Vec::new();
+
+        for (dep, arg_name) in deps_to_resolve.into_iter().zip(arg_names.iter()) {
+            match dep {
+                MemberSqlArgForResolve::String(_) => {
+                    result.push(Dependency::SymbolDependency(
+                        self.build_evaluator(&cube_name, &arg_name)?,
+                    ));
+                }
+                MemberSqlArgForResolve::CubeProxy(proxy_handler) => {
+                    result.push(Dependency::CubeDependency(
+                        self.build_cube_dependency(proxy_handler.clone())?,
+                    ));
+                }
+                MemberSqlArgForResolve::ContextSymbol(context_symbol_arg) => {
+                    let dep = match context_symbol_arg {
+                        ContextSymbolArg::SecurityContext(_rc) => {
+                            Dependency::ContextDependency(ContextSymbolDep::SecurityContext)
+                        }
+                        ContextSymbolArg::SqlUtils(_rc) => {
+                            Dependency::ContextDependency(ContextSymbolDep::SqlUtils)
+                        }
+                        ContextSymbolArg::FilterParams(_rc) => {
+                            Dependency::ContextDependency(ContextSymbolDep::FilterParams)
+                        }
+                        ContextSymbolArg::FilterGroup(_rc) => {
+                            Dependency::ContextDependency(ContextSymbolDep::FilterGroup)
+                        }
+                    };
+                    result.push(dep);
+                }
+            };
+        }
+
+        /* let mut childs = Vec::new();
         for (i, dep) in call_deps.iter().enumerate() {
             childs.push(vec![]);
             if let Some(parent) = dep.parent {
@@ -102,19 +185,55 @@ impl<'a> DependenciesBuilder<'a> {
                 let dep = self.build_cube_dependency(&cube_name, i, &call_deps, &childs)?;
                 result.push(Dependency::CubeDependency(dep));
             }
-        }
+        } */
 
         Ok(result)
     }
 
     fn build_cube_dependency(
         &mut self,
-        cube_name: &String,
-        dep_index: usize,
-        call_deps: &Vec<CallDep>,
-        call_childs: &Vec<Vec<usize>>,
+        proxy_handler: Rc<CubeDepsCollectorProxyHandler>,
     ) -> Result<CubeDependency, CubeError> {
-        let dep = &call_deps[dep_index];
+        let collector = proxy_handler.get_collector();
+        let cube_symbol = self
+            .compiler
+            .add_cube_table_evaluator(collector.cube_name().clone())?;
+        let sql_fn = if collector.has_sql_fn() {
+            Some(
+                self.compiler
+                    .add_cube_table_evaluator(collector.cube_name().clone())?,
+            )
+        } else {
+            None
+        };
+
+        let to_string_fn = if collector.has_to_string_fn() {
+            Some(
+                self.compiler
+                    .add_cube_name_evaluator(collector.cube_name().clone())?,
+            )
+        } else {
+            None
+        };
+
+        let mut properties = HashMap::new();
+        for dep in collector.deps().iter() {
+            match dep {
+                CubeDepsCollectorProp::Symbol(name) => {
+                    let prop = CubeDepProperty::SymbolDependency(
+                        self.build_evaluator(collector.cube_name(), name)?,
+                    );
+                    properties.insert(name.clone(), prop);
+                }
+                CubeDepsCollectorProp::Cube(rc) => {
+                    let prop =
+                        CubeDepProperty::CubeDependency(self.build_cube_dependency(rc.clone())?);
+                    let prop_name = rc.get_collector().cube_name().clone();
+                    properties.insert(prop_name, prop);
+                }
+            };
+        }
+        /* let dep = &call_deps[dep_index];
         let new_cube_name = if self.is_current_cube(&dep.name) {
             cube_name.clone()
         } else {
@@ -151,7 +270,7 @@ impl<'a> DependenciesBuilder<'a> {
                 };
                 properties.insert(name.clone(), child_dep);
             }
-        }
+        } */
         Ok(CubeDependency::new(
             cube_symbol,
             sql_fn,
@@ -172,6 +291,28 @@ impl<'a> DependenciesBuilder<'a> {
             "SQL_UTILS" => Some(Dependency::ContextDependency(ContextSymbolDep::SqlUtils)),
             _ => None,
         }
+    }
+
+    fn build_context_resolve_arg_tmp(
+        &self,
+        name: &str,
+    ) -> Result<Option<ContextSymbolArg>, CubeError> {
+        let res = match name {
+            "USER_CONTEXT" | "SECURITY_CONTEXT" => Some(ContextSymbolArg::SecurityContext(
+                self.base_tools.security_context_for_rust()?,
+            )),
+            "FILTER_PARAMS" => Some(ContextSymbolArg::FilterParams(
+                self.base_tools.filters_proxy()?,
+            )),
+            "FILTER_GROUP" => Some(ContextSymbolArg::FilterGroup(
+                self.base_tools.filter_group_function()?,
+            )),
+            "SQL_UTILS" => Some(ContextSymbolArg::SqlUtils(
+                self.base_tools.sql_utils_for_rust()?,
+            )),
+            _ => None,
+        };
+        Ok(res)
     }
 
     //FIXME may be should be moved to BaseTools

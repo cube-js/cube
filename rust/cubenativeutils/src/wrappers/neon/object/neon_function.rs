@@ -1,4 +1,4 @@
-use super::{NeonObject, NeonTypeHandle};
+use super::{NeonObject, NeonStruct, NeonTypeHandle};
 use crate::wrappers::{
     neon::inner_types::NeonInnerTypes,
     object::{NativeFunction, NativeType},
@@ -27,6 +27,23 @@ impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonFuncti
 }
 
 impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFunction<C> {
+    fn call_as_construct(
+        &self,
+        args: Vec<NativeObjectHandle<NeonInnerTypes<C>>>,
+    ) -> Result<NeonStruct<C>, CubeError> {
+        let neon_args = args
+            .into_iter()
+            .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
+            .collect::<Result<Vec<_>, _>>()?;
+        let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
+            neon_object
+                .construct(cx, neon_args)
+                .map_err(|_| CubeError::internal(format!("Failed to call function as construct")))
+        })??;
+        let obj = NeonTypeHandle::new(self.object.context.clone(), neon_reuslt);
+        Ok(NeonStruct::new(obj))
+    }
+
     fn call(
         &self,
         args: Vec<NativeObjectHandle<NeonInnerTypes<C>>>,
@@ -35,12 +52,12 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
             .into_iter()
             .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
             .collect::<Result<Vec<_>, _>>()?;
-        let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            let null = cx.null();
-            neon_object
-                .call(cx, null, neon_args)
-                .map_err(|_| CubeError::internal(format!("Failed to call function ")))
-        })??;
+        let neon_reuslt =
+            self.object
+                .map_neon_object_with_safe_call_fn(|cx, neon_object, safe_call_fn| {
+                    let null = cx.null();
+                    safe_call_fn.safe_call(cx, neon_object, null, neon_args)
+                })??;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
             neon_reuslt,

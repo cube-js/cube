@@ -1,6 +1,10 @@
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::proxy::{
+    NativeProxy, NativeProxyHandler, NativeProxyHandlerFunction, Proxy, ProxyHandler,
+    ProxyHandlerFunction,
+};
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use super::sql_utils::{NativeSqlUtils, SqlUtils};
@@ -47,6 +51,11 @@ pub trait BaseTools {
     ) -> Result<Vec<Vec<String>>, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
+    fn native_proxy(
+        &self,
+        handler: Rc<dyn ProxyHandler>,
+        resolve_funcion: Rc<dyn ProxyHandlerFunction>,
+    ) -> Result<Rc<dyn Proxy>, CubeError>;
     //===== TODO Move to templates
     fn hll_init(&self, sql: String) -> Result<String, CubeError>;
     fn hll_merge(&self, sql: String) -> Result<String, CubeError>;

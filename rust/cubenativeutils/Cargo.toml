@@ -22,4 +22,4 @@ convert_case = "0.6.0"
 [dependencies.neon]
 version = "=1"
 default-features = false
-features = ["napi-1", "napi-4", "napi-6", "futures"]
+features = ["napi-1", "napi-4", "napi-5", "napi-6", "futures"]

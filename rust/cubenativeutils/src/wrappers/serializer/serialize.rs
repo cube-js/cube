@@ -4,18 +4,19 @@ use crate::{
     CubeError,
 };
 use serde::Serialize;
+use std::rc::Rc;
 
 pub trait NativeSerialize<IT: InnerTypes> {
     fn to_native(
         &self,
-        context: NativeContextHolder<IT>,
+        context: Rc<NativeContextHolder<IT>>,
     ) -> Result<NativeObjectHandle<IT>, CubeError>;
 }
 
 impl<IT: InnerTypes, T: Serialize> NativeSerialize<IT> for T {
     fn to_native(
         &self,
-        context: NativeContextHolder<IT>,
+        context: Rc<NativeContextHolder<IT>>,
     ) -> Result<NativeObjectHandle<IT>, CubeError> {
         NativeSerdeSerializer::serialize(self, context)
             .map_err(|e| CubeError::internal(format!("Serialize error: {}", e)))
@@ -25,7 +26,7 @@ impl<IT: InnerTypes, T: Serialize> NativeSerialize<IT> for T {
 impl<IT: InnerTypes> NativeSerialize<IT> for NativeObjectHandle<IT> {
     fn to_native(
         &self,
-        _context: NativeContextHolder<IT>,
+        _context: Rc<NativeContextHolder<IT>>,
     ) -> Result<NativeObjectHandle<IT>, CubeError> {
         Ok(self.clone())
     }

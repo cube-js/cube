@@ -12,17 +12,18 @@ use cubenativeutils::{CubeError, CubeErrorCauseType};
 use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
-    context: NativeContextHolder<IT>,
+    context: Rc<NativeContextHolder<IT>>,
     query_tools: Rc<QueryTools>,
     request: Rc<QueryProperties>,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn try_new(
-        context: NativeContextHolder<IT>,
+        context: Rc<NativeContextHolder<IT>>,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
         let query_tools = QueryTools::try_new(
+            context.as_context_ref(),
             options.cube_evaluator()?,
             options.base_tools()?,
             options.join_graph()?,

@@ -1,4 +1,8 @@
-use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
+use super::{
+    context::{NativeContext, NativeFinalize},
+    inner_types::InnerTypes,
+    object_handle::NativeObjectHandle,
+};
 use cubesql::CubeError;
 
 pub trait NativeObject<IT: InnerTypes>: Clone {
@@ -10,6 +14,8 @@ pub trait NativeObject<IT: InnerTypes>: Clone {
     fn into_number(self) -> Result<IT::Number, CubeError>;
     fn into_boolean(self) -> Result<IT::Boolean, CubeError>;
     fn into_function(self) -> Result<IT::Function, CubeError>;
+    fn into_root(self) -> Result<IT::Root, CubeError>;
+    fn into_boxed<T: 'static + NativeFinalize>(self) -> Result<impl NativeBox<IT, T>, CubeError>;
     fn is_null(&self) -> Result<bool, CubeError>;
     fn is_undefined(&self) -> Result<bool, CubeError>;
 }
@@ -40,6 +46,8 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
 }
 
 pub trait NativeFunction<IT: InnerTypes>: NativeType<IT> {
+    fn call_as_construct(&self, args: Vec<NativeObjectHandle<IT>>)
+        -> Result<IT::Struct, CubeError>;
     fn call(&self, args: Vec<NativeObjectHandle<IT>>) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn definition(&self) -> Result<String, CubeError>;
     fn args_names(&self) -> Result<Vec<String>, CubeError>;
@@ -59,4 +67,9 @@ pub trait NativeBoolean<IT: InnerTypes>: NativeType<IT> {
 
 pub trait NativeBox<IT: InnerTypes, T: 'static>: NativeType<IT> {
     fn deref_value(&self) -> &T;
+}
+
+pub trait NativeRoot<IT: InnerTypes> {
+    fn to_inner(&self, cx: &IT::Context) -> Result<NativeObjectHandle<IT>, CubeError>; //FIXME we allow to get use root only in the same context type in which it was created. It can lead to problems if we will try to use it in different type of context (In neon case if we crate it in FunctionContext but tryed to use in TaskContext)
+    fn drop_root(&self, cx: &IT::Context) -> Result<(), CubeError>;
 }

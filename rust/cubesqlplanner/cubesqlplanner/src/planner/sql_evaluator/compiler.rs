@@ -5,22 +5,32 @@ use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, MeasureSymbolFactory,
     SqlCall, SymbolFactory, TraversalVisitor,
 };
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
+use cubenativeutils::wrappers::NativeContextHolderRef;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
+    context_holder_ref: Rc<dyn NativeContextHolderRef>,
     /* (type, name) */
     members: HashMap<(String, String), Rc<MemberSymbol>>,
 }
 
 impl Compiler {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
+        context_holder_ref: Rc<dyn NativeContextHolderRef>,
+    ) -> Self {
         Self {
+            base_tools,
             cube_evaluator,
+            context_holder_ref,
             members: HashMap::new(),
         }
     }
@@ -94,7 +104,12 @@ impl Compiler {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
+        let dep_builder = DependenciesBuilder::new(
+            self,
+            self.cube_evaluator.clone(),
+            self.base_tools.clone(),
+            self.context_holder_ref.clone(),
+        );
         let deps = dep_builder.build(cube_name.clone(), member_sql.clone())?;
         let sql_call = SqlCall::new(member_sql, deps);
         Ok(Rc::new(sql_call))

@@ -12,6 +12,7 @@ use crate::planner::sql_evaluator::collectors::collect_join_hints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use convert_case::{Case, Casing};
+use cubenativeutils::wrappers::NativeContextHolderRef;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -117,6 +118,7 @@ impl QueryToolsCachedData {
 }
 
 pub struct QueryTools {
+    context_holder_ref: Rc<dyn NativeContextHolderRef>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
     join_graph: Rc<dyn JoinGraph>,
@@ -129,13 +131,18 @@ pub struct QueryTools {
 
 impl QueryTools {
     pub fn try_new(
+        context_holder_ref: Rc<dyn NativeContextHolderRef>,
         cube_evaluator: Rc<dyn CubeEvaluator>,
         base_tools: Rc<dyn BaseTools>,
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
-        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(cube_evaluator.clone())));
+        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
+            cube_evaluator.clone(),
+            base_tools.clone(),
+            context_holder_ref.clone(),
+        )));
         let timezone = if let Some(timezone) = timezone_name {
             Some(
                 timezone
@@ -147,6 +154,7 @@ impl QueryTools {
         };
         let sql_templates = PlanSqlTemplates::new(templates_render.clone());
         Ok(Rc::new(Self {
+            context_holder_ref,
             cube_evaluator,
             base_tools,
             join_graph,

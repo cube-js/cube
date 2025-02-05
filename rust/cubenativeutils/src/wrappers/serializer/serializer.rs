@@ -4,35 +4,36 @@ use crate::wrappers::{
     NativeStruct, NativeType,
 };
 use serde::{ser, Serialize};
+use std::rc::Rc;
 
 pub struct NativeSerdeSerializer<IT: InnerTypes> {
-    context: NativeContextHolder<IT>,
+    context: Rc<NativeContextHolder<IT>>,
 }
 
 pub struct NativeSeqSerializer<IT: InnerTypes> {
-    context: NativeContextHolder<IT>,
+    context: Rc<NativeContextHolder<IT>>,
     last_id: u32,
     seq: IT::Array,
 }
 
 pub struct NativeMapSerializer<IT: InnerTypes> {
-    context: NativeContextHolder<IT>,
+    context: Rc<NativeContextHolder<IT>>,
     obj: IT::Struct,
 }
 
 pub struct NativeTupleSerializer<IT: InnerTypes> {
-    _context: NativeContextHolder<IT>,
+    _context: Rc<NativeContextHolder<IT>>,
     tuple: IT::Array,
 }
 
 impl<IT: InnerTypes> NativeSerdeSerializer<IT> {
-    pub fn new(context: NativeContextHolder<IT>) -> Self {
+    pub fn new(context: Rc<NativeContextHolder<IT>>) -> Self {
         Self { context }
     }
 
     pub fn serialize<T: ?Sized>(
         value: &T,
-        context: NativeContextHolder<IT>,
+        context: Rc<NativeContextHolder<IT>>,
     ) -> Result<NativeObjectHandle<IT>, NativeObjSerializerError>
     where
         T: Serialize,

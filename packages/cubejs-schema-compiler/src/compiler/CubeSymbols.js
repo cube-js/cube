@@ -645,6 +645,25 @@ export class CubeSymbols {
     });
   }
 
+  isNameOfCube(name) {
+    if (this.symbols[name]) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  isNameOfSymbolInCube(cubeName, name) {
+    const cube = this.symbols[cubeName];
+    if (!cube) {
+      return false;
+    }
+    if (cube[name]) {
+      return true;
+    }
+    return false;
+  }
+
   filterGroupFunctionDep() {
     return (...filterParamArgs) => '';
   }
