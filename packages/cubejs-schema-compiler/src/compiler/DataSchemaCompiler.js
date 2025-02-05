@@ -3,9 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import { Worker } from 'worker_threads';
 import syntaxCheck from 'syntax-error';
+import { parse } from '@babel/parser';
+import babelGenerator from '@babel/generator';
+import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 
-import { isNativeSupported } from '@cubejs-backend/shared';
+import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
 
@@ -89,20 +92,31 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
-    // TODO: required in order to get pre transpile compilation work
-    // const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
     const transpile = async () => {
-      const cubeNames = Object.keys(this.cubeDictionary.byId);
-      const cubeSymbolsNames = Object.fromEntries(
-        Object.entries(this.cubeSymbols.symbols)
-          .map(
-            ([key, value]) => [key, Object.fromEntries(
-              Object.keys(value).map((k) => [k, true])
-            )]
-          )
-      );
-      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
-      return results.filter(f => !!f);
+      let cubeNames;
+      let cubeSymbolsNames;
+
+      if (getEnv('workerThreadsTranspilation')) {
+        cubeNames = Object.keys(this.cubeDictionary.byId);
+        cubeSymbolsNames = Object.fromEntries(
+          Object.entries(this.cubeSymbols.symbols)
+            .map(
+              ([key, value]) => [key, Object.fromEntries(
+                Object.keys(value).map((k) => [k, true]),
+              )],
+            ),
+        );
+      }
+      // const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
+      const results = [];
+      for (const f of toCompile) {
+        const result = await this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames });
+        if (result) {
+          results.push(result);
+        }
+      }
+      // return results.filter(f => !!f);
+      return results;
     };
 
     const compilePhase = async (compilers) => this.compileCubeFiles(compilers, await transpile(), errorsReport);
@@ -158,32 +172,55 @@ export class DataSchemaCompiler {
 
   async transpileJsFile(file, errorsReport, options) {
     try {
-      const res = await new Promise((resolve, reject) => {
-        const { cubeNames, cubeSymbolsNames } = options;
-        const worker = new Worker(
-          path.join(__dirname, 'transpilers/transpiler_worker'),
-          { workerData: { cubeNames, cubeSymbolsNames } },
-        );
-        const data = {
-          fileName: file.fileName,
-          content: file.content,
-          transpilers: this.transpilers.map(t => t.constructor.name)
-        };
-        worker.postMessage(data);
+      if (getEnv('workerThreadsTranspilation')) {
+        const res = await new Promise((resolve, reject) => {
+          const { cubeNames, cubeSymbolsNames } = options;
 
-        worker.on('message', resolve);
-        worker.on('error', reject);
-        worker.on('exit', (code) => {
-          if (code !== 0) {
-            reject(new Error(`Worker thread exited with code ${code}`));
-          }
+          const worker = new Worker(
+            path.join(__dirname, 'transpilers/transpiler_worker'),
+            { workerData: { cubeNames, cubeSymbolsNames } },
+          );
+
+          const data = {
+            fileName: file.fileName,
+            content: file.content,
+            transpilers: this.transpilers.map(t => t.constructor.name),
+          };
+
+          worker.postMessage(data);
+
+          worker.on('message', resolve);
+          worker.on('error', reject);
+          worker.on('exit', (code) => {
+            if (code !== 0) {
+              reject(new Error(`Worker thread exited with code ${code}`));
+            }
+          });
         });
-      });
 
-      errorsReport.addErrors(res.errors);
-      errorsReport.addWarnings(res.warnings);
+        errorsReport.addErrors(res.errors);
+        errorsReport.addWarnings(res.warnings);
 
-      return Object.assign({}, file, { content: res.content });
+        return Object.assign({}, file, { content: res.content });
+      } else {
+        const ast = parse(
+          file.content,
+          {
+            sourceFilename: file.fileName,
+            sourceType: 'module',
+            plugins: ['objectRestSpread'],
+          },
+        );
+
+        this.transpilers.forEach((t) => {
+          errorsReport.inFile(file);
+          babelTraverse(ast, t.traverseObject(errorsReport));
+          errorsReport.exitFile();
+        });
+
+        const content = babelGenerator(ast, {}, file.content).code;
+        return Object.assign({}, file, { content });
+      }
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
         const line = file.content.split('\n')[e.loc.line - 1];
