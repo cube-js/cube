@@ -1404,8 +1404,19 @@ class ApiGateway {
             `return \`${obj.expr.sql}\``,
           ];
           break;
+        case 'PatchMeasure':
+          expression = {
+            type: 'PatchMeasure',
+            sourceMeasure: obj.expr.sourceMeasure,
+            replaceAggregationType: obj.expr.replaceAggregationType,
+            addFilters: obj.expr.addFilters.map(filter => [
+              ...filter.cubeParams,
+              `return \`${filter.sql}\``,
+            ]),
+          };
+          break;
         default:
-          assertNever(obj.expr.type);
+          assertNever(obj.expr);
       }
 
       const groupingSet = obj.groupingSet ? {
@@ -1440,14 +1451,31 @@ class ApiGateway {
     };
   }
 
-  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): string | MemberExpression {
-    const expression = Array.isArray(memberExpression.expression) ?
-      Function.constructor.apply(null, memberExpression.expression) : memberExpression.expression;
+  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): MemberExpression | ParsedMemberExpression {
+    if (typeof memberExpression.expression === 'function') {
+      return memberExpression;
+    }
 
-    return {
-      ...memberExpression,
-      expression,
-    };
+    if (Array.isArray(memberExpression.expression)) {
+      return {
+        ...memberExpression,
+        expression: Function.constructor.apply(null, memberExpression.expression),
+      };
+    }
+
+    if (memberExpression.expression.type === 'PatchMeasure') {
+      return {
+        ...memberExpression,
+        expression: {
+          ...memberExpression.expression,
+          addFilters: memberExpression.expression.addFilters.map(filter => ({
+            sql: Function.constructor.apply(null, filter),
+          })),
+        }
+      };
+    }
+
+    throw new Error(`Unexpected member expression to evaluate: ${memberExpression}`);
   }
 
   public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
