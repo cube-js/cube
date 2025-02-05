@@ -59,24 +59,13 @@ type MemberExpression = Omit<ParsedMemberExpression, 'expression'> & {
   expression: Function;
 };
 
-export type InputGroupingSetDesc = {
-  // eslint-disable-next-line camelcase
-  group_type: GroupingSetType,
-  id: number,
-  // eslint-disable-next-line camelcase
-  sub_id: number | null,
-};
-
 // This should be aligned with cubesql side
 export type InputMemberExpression = {
-  // eslint-disable-next-line camelcase
-  cube_name: string,
+  cubeName: string,
   alias: string,
-  // eslint-disable-next-line camelcase
-  cube_params: Array<string>,
+  cubeParams: Array<string>,
   expr: string,
-  // eslint-disable-next-line camelcase
-  grouping_set: InputGroupingSetDesc | null,
+  groupingSet: GroupingSet | null,
 };
 
 /**
