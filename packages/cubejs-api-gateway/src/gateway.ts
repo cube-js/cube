@@ -1395,17 +1395,17 @@ class ApiGateway {
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
     if (memberExpression.startsWith('{')) {
       const obj = parseInputMemberExpression(JSON.parse(memberExpression));
-      const args = obj.cube_params;
+      const args = obj.cubeParams;
       args.push(`return \`${obj.expr}\``);
 
-      const groupingSet = obj.grouping_set ? {
-        groupType: obj.grouping_set.group_type,
-        id: obj.grouping_set.id,
-        subId: obj.grouping_set.sub_id ? obj.grouping_set.sub_id : undefined
+      const groupingSet = obj.groupingSet ? {
+        groupType: obj.groupingSet.groupType,
+        id: obj.groupingSet.id,
+        subId: obj.groupingSet.subId ? obj.groupingSet.subId : undefined
       } : undefined;
 
       return {
-        cubeName: obj.cube_name,
+        cubeName: obj.cubeName,
         name: obj.alias,
         expressionName: obj.alias,
         expression: args,
