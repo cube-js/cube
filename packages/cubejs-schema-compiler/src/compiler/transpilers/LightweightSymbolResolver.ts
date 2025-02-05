@@ -1,8 +1,14 @@
 import { TranspilerSymbolResolver } from './transpiler.interface';
 import { CONTEXT_SYMBOLS, CURRENT_CUBE_CONSTANTS } from '../CubeSymbols';
 
+type CubeSymbols = Record<string, Record<string, boolean>>;
+
 export class LightweightSymbolResolver implements TranspilerSymbolResolver {
-  public constructor(private readonly symbols: any) {
+  public constructor(private symbols: CubeSymbols = {}) {
+  }
+
+  public setSymbols(symbols: CubeSymbols) {
+    this.symbols = symbols;
   }
 
   public isCurrentCube(name): boolean {

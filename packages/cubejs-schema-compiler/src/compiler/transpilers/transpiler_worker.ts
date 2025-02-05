@@ -1,5 +1,4 @@
-import { parentPort, workerData } from 'worker_threads';
-
+import workerpool from 'workerpool';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
@@ -12,14 +11,16 @@ import { ErrorReporter } from '../ErrorReporter';
 import { LightweightSymbolResolver } from './LightweightSymbolResolver';
 import { LightweightNodeCubeDictionary } from './LightweightNodeCubeDictionary';
 
-type FileContent = {
+type TransferContent = {
   fileName: string;
   content: string;
   transpilers: string[];
+  cubeNames: string[];
+  cubeSymbolsNames: Record<string, Record<string, boolean>>;
 };
 
-const cubeDictionary = new LightweightNodeCubeDictionary(workerData.cubeNames);
-const cubeSymbols = new LightweightSymbolResolver(workerData.cubeSymbolsNames);
+const cubeDictionary = new LightweightNodeCubeDictionary();
+const cubeSymbols = new LightweightSymbolResolver();
 const errorsReport = new ErrorReporter(null, []);
 
 const transpilers = {
@@ -29,34 +30,38 @@ const transpilers = {
   CubePropContextTranspiler: new CubePropContextTranspiler(cubeSymbols, cubeDictionary, cubeSymbols),
 };
 
-if (parentPort) {
-  parentPort.on('message', (file: FileContent) => {
-    const ast = parse(
-      file.content,
-      {
-        sourceFilename: file.fileName,
-        sourceType: 'module',
-        plugins: ['objectRestSpread']
-      },
-    );
+const transpile = (data: TransferContent) => {
+  cubeDictionary.setCubeNames(data.cubeNames);
+  cubeSymbols.setSymbols(data.cubeSymbolsNames);
 
-    file.transpilers.forEach(transpilerName => {
-      if (transpilers[transpilerName]) {
-        errorsReport.inFile(file);
-        babelTraverse(ast, transpilers[transpilerName].traverseObject(errorsReport));
-        errorsReport.exitFile();
-      } else {
-        throw new Error(`Transpiler ${transpilerName} not supported`);
-      }
-    });
+  const ast = parse(
+    data.content,
+    {
+      sourceFilename: data.fileName,
+      sourceType: 'module',
+      plugins: ['objectRestSpread']
+    },
+  );
 
-    const content = babelGenerator(ast, {}, file.content).code;
-
-    // @ts-ignore
-    parentPort.postMessage({
-      content,
-      errors: errorsReport.getErrors(),
-      warnings: errorsReport.getWarnings()
-    });
+  data.transpilers.forEach(transpilerName => {
+    if (transpilers[transpilerName]) {
+      errorsReport.inFile(data);
+      babelTraverse(ast, transpilers[transpilerName].traverseObject(errorsReport));
+      errorsReport.exitFile();
+    } else {
+      throw new Error(`Transpiler ${transpilerName} not supported`);
+    }
   });
-}
+
+  const content = babelGenerator(ast, {}, data.content).code;
+
+  return {
+    content,
+    errors: errorsReport.getErrors(),
+    warnings: errorsReport.getWarnings()
+  };
+};
+
+workerpool.worker({
+  transpile,
+});
