@@ -94,15 +94,19 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
-    if (getEnv('workerThreadsTranspilation')) {
-      this.workerPool = workerpool.pool(path.join(__dirname, 'transpilers/transpiler_worker'));
+    if (getEnv('transpilationWorkerThreads')) {
+      const wc = getEnv('transpilationWorkerThreadsCount');
+      this.workerPool = workerpool.pool(
+        path.join(__dirname, 'transpilers/transpiler_worker'),
+        wc > 0 ? { maxWorkers: wc } : undefined,
+      );
     }
 
     const transpile = async () => {
       let cubeNames;
       let cubeSymbolsNames;
 
-      if (getEnv('workerThreadsTranspilation')) {
+      if (getEnv('transpilationWorkerThreads')) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
         // We need only cubes and all its member names for transpiling.
         // Cubes doesn't change during transpiling, but are changed during compilation phase,
@@ -119,16 +123,8 @@ export class DataSchemaCompiler {
             ),
         );
       }
-      // const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
-      const results = [];
-      for (const f of toCompile) {
-        const result = await this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames });
-        if (result) {
-          results.push(result);
-        }
-      }
-      // return results.filter(f => !!f);
-      return results;
+      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
+      return results.filter(f => !!f);
     };
 
     const compilePhase = async (compilers) => this.compileCubeFiles(compilers, await transpile(), errorsReport);
@@ -189,7 +185,7 @@ export class DataSchemaCompiler {
 
   async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbolsNames }) {
     try {
-      if (getEnv('workerThreadsTranspilation')) {
+      if (getEnv('transpilationWorkerThreads')) {
         const data = {
           fileName: file.fileName,
           content: file.content,

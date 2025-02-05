@@ -196,9 +196,12 @@ const variables: Record<string, (...args: any) => any> = {
   nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
     .default('false')
     .asBoolStrict(),
-  workerThreadsTranspilation: () => get('CUBEJS_WORKER_THREADS_TRANSPILATION')
+  transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
     .default('false')
     .asBoolStrict(),
+  transpilationWorkerThreadsCount: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
+    .default('0')
+    .asInt(),
 
   /** ****************************************************************
    * Common db options                                               *
