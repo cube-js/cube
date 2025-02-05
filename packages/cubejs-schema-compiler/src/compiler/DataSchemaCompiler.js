@@ -1,10 +1,8 @@
 import vm from 'vm';
 import fs from 'fs';
 import path from 'path';
+import { Worker } from 'worker_threads';
 import syntaxCheck from 'syntax-error';
-import { parse } from '@babel/parser';
-import babelGenerator from '@babel/generator';
-import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 
 import { isNativeSupported } from '@cubejs-backend/shared';
@@ -28,6 +26,8 @@ export class DataSchemaCompiler {
     this.viewCompilationGate = options.viewCompilationGate;
     this.cubeNameCompilers = options.cubeNameCompilers || [];
     this.extensions = options.extensions || {};
+    this.cubeDictionary = options.cubeDictionary;
+    this.cubeSymbols = options.cubeSymbols;
     this.cubeFactory = options.cubeFactory;
     this.filesToCompile = options.filesToCompile;
     this.omitErrors = options.omitErrors;
@@ -90,9 +90,22 @@ export class DataSchemaCompiler {
     this.errorsReport = errorsReport;
 
     // TODO: required in order to get pre transpile compilation work
-    const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
+    // const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
+    const transpile = async () => {
+      const cubeNames = Object.keys(this.cubeDictionary.byId);
+      const cubeSymbolsNames = Object.fromEntries(
+        Object.entries(this.cubeSymbols.symbols)
+          .map(
+            ([key, value]) => [key, Object.fromEntries(
+              Object.keys(value).map((k) => [k, true])
+            )]
+          )
+      );
+      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
+      return results.filter(f => !!f);
+    };
 
-    const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
+    const compilePhase = async (compilers) => this.compileCubeFiles(compilers, await transpile(), errorsReport);
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers })
       .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }))
@@ -118,7 +131,7 @@ export class DataSchemaCompiler {
     return this.compilePromise;
   }
 
-  transpileFile(file, errorsReport) {
+  async transpileFile(file, errorsReport, options) {
     if (R.endsWith('.jinja', file.fileName) ||
       (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName))
       // TODO do Jinja syntax check with jinja compiler
@@ -137,31 +150,40 @@ export class DataSchemaCompiler {
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       return file;
     } else if (R.endsWith('.js', file.fileName)) {
-      return this.transpileJsFile(file, errorsReport);
+      return this.transpileJsFile(file, errorsReport, options);
     } else {
       return file;
     }
   }
 
-  transpileJsFile(file, errorsReport) {
+  async transpileJsFile(file, errorsReport, options) {
     try {
-      const ast = parse(
-        file.content,
-        {
-          sourceFilename: file.fileName,
-          sourceType: 'module',
-          plugins: ['objectRestSpread']
-        },
-      );
+      const res = await new Promise((resolve, reject) => {
+        const { cubeNames, cubeSymbolsNames } = options;
+        const worker = new Worker(
+          path.join(__dirname, 'transpilers/transpiler_worker'),
+          { workerData: { cubeNames, cubeSymbolsNames } },
+        );
+        const data = {
+          fileName: file.fileName,
+          content: file.content,
+          transpilers: this.transpilers.map(t => t.constructor.name)
+        };
+        worker.postMessage(data);
 
-      this.transpilers.forEach((t) => {
-        errorsReport.inFile(file);
-        babelTraverse(ast, t.traverseObject(errorsReport));
-        errorsReport.exitFile();
+        worker.on('message', resolve);
+        worker.on('error', reject);
+        worker.on('exit', (code) => {
+          if (code !== 0) {
+            reject(new Error(`Worker thread exited with code ${code}`));
+          }
+        });
       });
 
-      const content = babelGenerator(ast, {}, file.content).code;
-      return Object.assign({}, file, { content });
+      errorsReport.addErrors(res.errors);
+      errorsReport.addWarnings(res.warnings);
+
+      return Object.assign({}, file, { content: res.content });
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
         const line = file.content.split('\n')[e.loc.line - 1];
