@@ -160,6 +160,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 relationship: "belongsTo".to_string(),
             }]),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -208,6 +209,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 relationship: "belongsTo".to_string(),
             }]),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -227,6 +229,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             segments: vec![],
             joins: None,
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -299,6 +302,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             segments: Vec::new(),
             joins: Some(Vec::new()),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -408,6 +412,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             segments: Vec::new(),
             joins: Some(Vec::new()),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
     ]
@@ -431,6 +436,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
         segments: vec![],
         joins: None,
         folders: None,
+        hierarchies: None,
         meta: None,
     }]
 }
@@ -471,6 +477,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
         segments: vec![],
         joins: None,
         folders: None,
+        hierarchies: None,
         meta: None,
     }]
 }
