@@ -9,9 +9,16 @@
     "directory": "packages/cubejs-client-ngx"
   },
   "description": "Cube.js client for Angular",
-  "files": [
-    "dist"
-  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "lerna": {
+    "command": {
+      "publish": {
+        "directory": "dist"
+      }
+    }
+  },
   "license": "MIT",
   "scripts": {
     "build": "ng build",
