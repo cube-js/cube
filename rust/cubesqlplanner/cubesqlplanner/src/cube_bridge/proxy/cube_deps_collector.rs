@@ -145,7 +145,6 @@ impl ProxyCollector for CubeDepsCollector {
             self.has_sql_fn = true;
             return Ok(Some(CubeDepsProxyRes::ToStringFn(format!(""))));
         }
-        println!("!!!! cbbbb {}.{}", self.cube_name, property_name);
         if evaluator.is_name_of_symbol_in_cube(self.cube_name.clone(), property_name.clone())? {
             self.deps
                 .push(CubeDepsCollectorProp::Symbol(property_name.clone()));

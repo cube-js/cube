@@ -8,7 +8,7 @@ pub mod serializer;
 
 pub use context::{NativeContextHolder, NativeContextHolderRef};
 pub use object::{
-    NativeArray, NativeBoolean, NativeFunction, NativeNumber, NativeRoot, NativeString,
+    NativeArray, NativeBoolean, NativeBox, NativeFunction, NativeNumber, NativeRoot, NativeString,
     NativeStruct, NativeType,
 };
 pub use object_handle::NativeObjectHandle;

@@ -1,7 +1,6 @@
-use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle};
+use super::{inner_types::InnerTypes, object_handle::NativeObjectHandle, NativeBox};
 use cubesql::CubeError;
-use std::any::Any;
-use std::rc::Rc;
+use std::{any::Any, rc::Rc};
 
 pub trait NativeContext<IT: InnerTypes>: Clone {
     fn boolean(&self, v: bool) -> Result<IT::Boolean, CubeError>;
