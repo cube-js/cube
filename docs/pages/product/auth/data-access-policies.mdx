@@ -62,7 +62,7 @@ cubes:
         row_level:
           filters:
             - member: country
-              operator: eq
+              operator: equals
               values: [ "{ securityContext.country }" ]
 ```
 
@@ -117,6 +117,10 @@ For more details on available parameters, check out the [data access policies re
 When processing a request, Cube will evaluate the data access policies and combine them
 with relevant custom security rules, e.g., [`public` parameters][ref-mls-public] for member-level security
 and [`query_rewrite` filters][ref-rls-queryrewrite] for row-level security.
+
+If multiple access policies apply to a request, they are _combined together_
+using the _OR_ semantics. For example, if a user has two roles with different
+policies, the user will get the union of the permissions in these policies.
 
 ### Member-level access
 
