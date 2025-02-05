@@ -1,8 +1,11 @@
 use super::filter::compiler::FilterCompiler;
 use super::query_tools::QueryTools;
+
+use super::sql_evaluator::MemberSymbol;
 use super::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::cube_bridge::options_member::OptionsMember;
 use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::sql_evaluator::collectors::{
     collect_multiplied_measures, has_cumulative_members, has_multi_stage_members,
@@ -37,6 +40,7 @@ pub struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<BaseMeasure>>,
     pub regular_measures: Vec<Rc<BaseMeasure>>,
     pub multi_stage_measures: Vec<Rc<BaseMeasure>>,
+    pub rendered_as_multiplied_measures: HashSet<String>,
 }
 
 impl FullKeyAggregateMeasures {
@@ -74,12 +78,38 @@ impl QueryProperties {
         let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
-        let dimensions = if let Some(dimensions) = &options.static_data().dimensions {
+        let dimensions = if let Some(dimensions) = &options.dimensions()? {
             dimensions
                 .iter()
-                .map(|d| {
-                    let evaluator = evaluator_compiler.add_dimension_evaluator(d.clone())?;
-                    BaseDimension::try_new_required(evaluator, query_tools.clone())
+                .map(|d| match d {
+                    OptionsMember::MemberName(member_name) => {
+                        let evaluator =
+                            evaluator_compiler.add_dimension_evaluator(member_name.clone())?;
+                        BaseDimension::try_new_required(evaluator, query_tools.clone())
+                    }
+                    OptionsMember::MemberExpression(member_expression) => {
+                        let cube_name =
+                            if let Some(name) = &member_expression.static_data().cube_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let name =
+                            if let Some(name) = &member_expression.static_data().expression_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let expression_evaluator = evaluator_compiler
+                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        BaseDimension::try_new_from_expression(
+                            expression_evaluator,
+                            cube_name,
+                            name,
+                            member_expression.static_data().definition.clone(),
+                            query_tools.clone(),
+                        )
+                    }
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {
@@ -451,12 +481,27 @@ impl QueryProperties {
             let time_dimensions = self
                 .time_dimensions
                 .iter()
-                .map(|d| -> Rc<dyn BaseMember> { d.clone() });
+                .map(|d| -> Rc<dyn BaseMember> { d.base_dimension().clone() });
             dimensions
                 .chain(time_dimensions)
                 .chain(measures)
                 .collect_vec()
         }
+    }
+    pub fn all_member_symbols(&self, exclude_time_dimensions: bool) -> Vec<Rc<MemberSymbol>> {
+        let mut members = BaseMemberHelper::extract_symbols_from_members(
+            &self.all_members(exclude_time_dimensions),
+        );
+        for filter_item in self.dimensions_filters.iter() {
+            filter_item.find_all_member_evaluators(&mut members);
+        }
+        for filter_item in self.measures_filters.iter() {
+            filter_item.find_all_member_evaluators(&mut members);
+        }
+        members
+            .into_iter()
+            .unique_by(|m| m.full_name())
+            .collect_vec()
     }
 
     pub fn group_by(&self) -> Vec<Expr> {
@@ -541,7 +586,7 @@ impl QueryProperties {
 
     pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
-        let measures = self.measures();
+        let measures = self.all_used_measures()?;
         for m in measures.iter() {
             if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
                 result.multi_stage_measures.push(m.clone())
@@ -559,6 +604,11 @@ impl QueryProperties {
                     join,
                 )? {
                     if item.multiplied {
+                        result
+                            .rendered_as_multiplied_measures
+                            .insert(item.measure.full_name());
+                    }
+                    if item.multiplied && !item.measure.can_used_as_addictive_in_multplied()? {
                         result.multiplied_measures.push(item.measure.clone());
                     } else {
                         result.regular_measures.push(item.measure.clone());
@@ -568,5 +618,41 @@ impl QueryProperties {
         }
 
         Ok(result)
+    }
+
+    fn all_used_measures(&self) -> Result<Vec<Rc<BaseMeasure>>, CubeError> {
+        let mut measures = self.measures.clone();
+        for item in self.measures_filters.iter() {
+            self.fill_missed_measures_from_filter(item, &mut measures)?;
+        }
+        Ok(measures)
+    }
+
+    fn fill_missed_measures_from_filter(
+        &self,
+        item: &FilterItem,
+        measures: &mut Vec<Rc<BaseMeasure>>,
+    ) -> Result<(), CubeError> {
+        match item {
+            FilterItem::Group(group) => {
+                for item in group.items.iter() {
+                    self.fill_missed_measures_from_filter(item, measures)?
+                }
+            }
+            FilterItem::Item(item) => {
+                let item_member_name = item.member_name();
+                if measures
+                    .iter()
+                    .find(|m| m.full_name() == item_member_name)
+                    .is_none()
+                {
+                    measures.push(BaseMeasure::try_new_required(
+                        item.member_evaluator().clone(),
+                        self.query_tools.clone(),
+                    )?);
+                }
+            }
+        }
+        Ok(())
     }
 }

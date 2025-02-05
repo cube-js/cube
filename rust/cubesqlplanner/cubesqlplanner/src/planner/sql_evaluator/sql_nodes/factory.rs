@@ -1,12 +1,11 @@
-use super::leaf_time_dimension::LeafTimeDimensionNode;
 use super::{
-    AutoPrefixSqlNode, EvaluateSqlNode, FinalMeasureSqlNode, MeasureFilterSqlNode,
-    MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode, RollingWindowNode,
-    RootSqlNode, SqlNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
+    AutoPrefixSqlNode, EvaluateSqlNode, FinalMeasureSqlNode, GeoDimensionSqlNode,
+    MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode,
+    RollingWindowNode, RootSqlNode, SqlNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
     UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -14,9 +13,10 @@ pub struct SqlNodesFactory {
     time_shifts: HashMap<String, String>,
     ungrouped: bool,
     ungrouped_measure: bool,
+    count_approx_as_state: bool,
     render_references: HashMap<String, QualifiedColumnName>,
+    rendered_as_multiplied_measures: HashSet<String>,
     ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
-    leaf_time_dimensions: HashMap<String, String>,
     cube_name_references: HashMap<String, String>,
     multi_stage_rank: Option<Vec<String>>,   //partition_by
     multi_stage_window: Option<Vec<String>>, //partition_by
@@ -29,10 +29,11 @@ impl SqlNodesFactory {
             time_shifts: HashMap::new(),
             ungrouped: false,
             ungrouped_measure: false,
+            count_approx_as_state: false,
             render_references: HashMap::new(),
             ungrouped_measure_references: HashMap::new(),
             cube_name_references: HashMap::new(),
-            leaf_time_dimensions: HashMap::new(),
+            rendered_as_multiplied_measures: HashSet::new(),
             multi_stage_rank: None,
             multi_stage_window: None,
             rolling_window: false,
@@ -59,6 +60,10 @@ impl SqlNodesFactory {
         &self.render_references
     }
 
+    pub fn set_rendered_as_multiplied_measures(&mut self, value: HashSet<String>) {
+        self.rendered_as_multiplied_measures = value;
+    }
+
     pub fn add_render_reference(&mut self, key: String, value: QualifiedColumnName) {
         self.render_references.insert(key, value);
     }
@@ -67,17 +72,16 @@ impl SqlNodesFactory {
         self.multi_stage_rank = Some(partition_by);
     }
 
-    pub fn add_leaf_time_dimension(&mut self, dimension_name: &String, granularity: &String) {
-        self.leaf_time_dimensions
-            .insert(dimension_name.clone(), granularity.clone());
-    }
-
     pub fn set_multi_stage_window(&mut self, partition_by: Vec<String>) {
         self.multi_stage_window = Some(partition_by);
     }
 
     pub fn set_rolling_window(&mut self, value: bool) {
         self.rolling_window = value;
+    }
+
+    pub fn set_count_approx_as_state(&mut self, value: bool) {
+        self.count_approx_as_state = value;
     }
 
     pub fn set_ungrouped_measure_references(
@@ -116,7 +120,7 @@ impl SqlNodesFactory {
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
 
         let root_node = RootSqlNode::new(
-            self.dimension_processor(auto_prefix_processor.clone()),
+            self.dimension_processor(evaluate_sql_processor.clone()),
             measure_processor.clone(),
             auto_prefix_processor.clone(),
             evaluate_sql_processor.clone(),
@@ -163,22 +167,26 @@ impl SqlNodesFactory {
         } else if self.rolling_window {
             RollingWindowNode::new(input)
         } else {
-            FinalMeasureSqlNode::new(input)
+            FinalMeasureSqlNode::new(
+                input,
+                self.rendered_as_multiplied_measures.clone(),
+                self.count_approx_as_state,
+            )
         }
     }
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
+
+        let input: Rc<dyn SqlNode> =
+            AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
+
         let input = if !&self.time_shifts.is_empty() {
             TimeShiftSqlNode::new(self.time_shifts.clone(), input)
         } else {
             input
         };
 
-        let input = if !&self.leaf_time_dimensions.is_empty() {
-            LeafTimeDimensionNode::new(input, self.leaf_time_dimensions.clone())
-        } else {
-            input
-        };
         input
     }
 }

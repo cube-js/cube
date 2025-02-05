@@ -23,6 +23,7 @@ impl TraversalVisitor for HasCumulativeMembersCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
+        _path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {

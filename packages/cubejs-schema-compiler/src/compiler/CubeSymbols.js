@@ -609,7 +609,11 @@ export class CubeSymbols {
     return Object.assign({
       filterParams: this.filtersProxyDep(),
       filterGroup: this.filterGroupFunctionDep(),
-      securityContext: BaseQuery.contextSymbolsProxyFrom({}, (param) => param)
+      securityContext: BaseQuery.contextSymbolsProxyFrom({}, (param) => param),
+      sqlUtils: {
+        convertTz: (f) => f
+
+      },
     });
   }
 

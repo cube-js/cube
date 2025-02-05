@@ -1,7 +1,7 @@
 use super::symbols::MemberSymbol;
 use super::Compiler;
 use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::member_sql::MemberSql;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -41,6 +41,7 @@ pub enum ContextSymbolDep {
     SecurityContext,
     FilterParams,
     FilterGroup,
+    SqlUtils,
 }
 
 #[derive(Clone)]
@@ -68,9 +69,12 @@ impl<'a> DependenciesBuilder<'a> {
         cube_name: String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<Dependency>, CubeError> {
-        let call_deps = self
-            .cube_evaluator
-            .resolve_symbols_call_deps(cube_name.clone(), member_sql)?;
+        let call_deps = if member_sql.need_deps_resolve() {
+            self.cube_evaluator
+                .resolve_symbols_call_deps(cube_name.clone(), member_sql)?
+        } else {
+            vec![]
+        };
 
         let mut childs = Vec::new();
         for (i, dep) in call_deps.iter().enumerate() {
@@ -165,6 +169,7 @@ impl<'a> DependenciesBuilder<'a> {
                 ContextSymbolDep::FilterParams,
             )),
             "FILTER_GROUP" => Some(Dependency::ContextDependency(ContextSymbolDep::FilterGroup)),
+            "SQL_UTILS" => Some(Dependency::ContextDependency(ContextSymbolDep::SqlUtils)),
             _ => None,
         }
     }

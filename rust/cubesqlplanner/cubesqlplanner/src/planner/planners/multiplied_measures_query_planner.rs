@@ -1,4 +1,4 @@
-use super::{CommonUtils, JoinPlanner};
+use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::plan::{
     Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
@@ -7,10 +7,13 @@ use crate::plan::{
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::{
     collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
+    collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
-use crate::planner::{BaseMeasure, BaseMember, BaseMemberHelper, QueryProperties};
+use crate::planner::{
+    BaseMeasure, BaseMember, BaseMemberHelper, FullKeyAggregateMeasures, QueryProperties,
+};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -22,21 +25,24 @@ pub struct MultipliedMeasuresQueryPlanner {
     join_planner: JoinPlanner,
     common_utils: CommonUtils,
     context_factory: SqlNodesFactory,
+    full_key_aggregate_measures: FullKeyAggregateMeasures,
 }
 
 impl MultipliedMeasuresQueryPlanner {
-    pub fn new(
+    pub fn try_new(
         query_tools: Rc<QueryTools>,
         query_properties: Rc<QueryProperties>,
         context_factory: SqlNodesFactory,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CubeError> {
+        let full_key_aggregate_measures = query_properties.full_key_aggregate_measures()?;
+        Ok(Self {
             query_tools: query_tools.clone(),
             join_planner: JoinPlanner::new(query_tools.clone()),
             common_utils: CommonUtils::new(query_tools.clone()),
             query_properties,
             context_factory,
-        }
+            full_key_aggregate_measures,
+        })
     }
 
     pub fn plan_queries(&self) -> Result<Vec<Rc<Select>>, CubeError> {
@@ -46,14 +52,16 @@ impl MultipliedMeasuresQueryPlanner {
             )));
         }
 
-        let measures = self.query_properties.full_key_aggregate_measures()?;
+        let full_key_aggregate_measures = &self.full_key_aggregate_measures;
 
         let mut joins = Vec::new();
 
-        if !measures.regular_measures.is_empty() {
+        if !full_key_aggregate_measures.regular_measures.is_empty() {
             let join_multi_fact_groups = self
                 .query_properties
-                .compute_join_multi_fact_groups_with_measures(&measures.regular_measures)?;
+                .compute_join_multi_fact_groups_with_measures(
+                    &full_key_aggregate_measures.regular_measures,
+                )?;
             for (i, (join, measures)) in join_multi_fact_groups.iter().enumerate() {
                 let regular_subquery = self.regular_measures_subquery(
                     measures,
@@ -68,7 +76,7 @@ impl MultipliedMeasuresQueryPlanner {
             }
         }
 
-        for (cube_name, measures) in measures
+        for (cube_name, measures) in full_key_aggregate_measures
             .multiplied_measures
             .clone()
             .into_iter()
@@ -101,7 +109,23 @@ impl MultipliedMeasuresQueryPlanner {
         measures: &Vec<Rc<BaseMeasure>>,
         key_join: Rc<dyn JoinDefinition>,
     ) -> Result<Rc<Select>, CubeError> {
-        let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
+        let subquery_dimensions = collect_sub_query_dimensions_from_members(
+            &BaseMemberHelper::iter_as_base_member(measures).collect_vec(),
+            self.query_tools.clone(),
+        )?;
+
+        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+            &subquery_dimensions,
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+        )?;
+
+        let primary_keys_dimensions = self
+            .common_utils
+            .primary_keys_dimensions(key_cube_name)?
+            .into_iter()
+            .map(|d| d.as_base_member())
+            .collect_vec();
         let keys_query = self.key_query(&primary_keys_dimensions, key_join, key_cube_name)?;
         let keys_query_alias = format!("keys");
         let should_build_join_for_measure_select =
@@ -112,13 +136,14 @@ impl MultipliedMeasuresQueryPlanner {
 
         let pk_cube = self.common_utils.cube_from_path(key_cube_name.clone())?;
         let pk_cube_alias =
-            pk_cube.default_alias_with_prefix(&Some(format!("{key_cube_name}_key")));
+            pk_cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.default_alias())));
         let mut ungrouped_measure_references = HashMap::new();
         if should_build_join_for_measure_select {
             let subquery = self.aggregate_subquery_measure_join(
                 key_cube_name,
                 &measures,
                 &primary_keys_dimensions,
+                &dimension_subquery_planner,
             )?;
 
             let conditions = primary_keys_dimensions
@@ -173,12 +198,15 @@ impl MultipliedMeasuresQueryPlanner {
                 Some(pk_cube_alias.clone()),
                 JoinCondition::new_dimension_join(conditions, false),
             );
+            for sub_dim in subquery_dimensions.iter() {
+                dimension_subquery_planner.add_join(&mut join_builder, sub_dim.clone())?;
+            }
         };
 
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut select_builder = SelectBuilder::new(from.clone());
-        let mut render_references = HashMap::new();
+        let mut render_references = dimension_subquery_planner.dimensions_refs().clone();
         for member in self
             .query_properties
             .all_dimensions_and_measures(&vec![])?
@@ -209,6 +237,11 @@ impl MultipliedMeasuresQueryPlanner {
         let mut context_factory = self.context_factory.clone();
         context_factory.set_render_references(render_references);
         context_factory.set_ungrouped_measure_references(ungrouped_measure_references);
+        context_factory.set_rendered_as_multiplied_measures(
+            self.full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
         Ok(Rc::new(select_builder.build(context_factory)))
     }
 
@@ -241,13 +274,26 @@ impl MultipliedMeasuresQueryPlanner {
         _key_cube_name: &String,
         measures: &Vec<Rc<BaseMeasure>>,
         primary_keys_dimensions: &Vec<Rc<dyn BaseMember>>,
+        dimension_subquery_planner: &DimensionSubqueryPlanner,
     ) -> Result<Rc<Select>, CubeError> {
         let join_hints = collect_join_hints_for_measures(measures)?;
         let from = self
             .join_planner
-            .make_join_node_with_prefix_and_join_hints(&None, join_hints)?;
+            .make_join_node_with_prefix_and_join_hints(
+                &None,
+                join_hints,
+                &dimension_subquery_planner,
+            )?;
         let mut context_factory = self.context_factory.clone();
         context_factory.set_ungrouped_measure(true);
+        context_factory.set_render_references(dimension_subquery_planner.dimensions_refs().clone());
+
+        context_factory.set_rendered_as_multiplied_measures(
+            self.full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
+
         let mut select_builder = SelectBuilder::new(from);
         for dim in primary_keys_dimensions.iter() {
             select_builder.add_projection_member(dim, None);
@@ -264,17 +310,24 @@ impl MultipliedMeasuresQueryPlanner {
         join: Rc<dyn JoinDefinition>,
         alias_prefix: String,
     ) -> Result<Rc<Select>, CubeError> {
-        let source = self
-            .join_planner
-            .make_join_node_impl(&Some(alias_prefix), join)?;
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &self.query_properties.all_member_symbols(false),
+            self.query_tools.clone(),
+        )?;
+
+        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+            &subquery_dimensions,
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+        )?;
+        let source = self.join_planner.make_join_node_impl(
+            &Some(alias_prefix),
+            join,
+            &dimension_subquery_planner,
+        )?;
 
         let mut select_builder = SelectBuilder::new(source.clone());
         let mut context_factory = self.context_factory.clone();
-        for time_dim in self.query_properties.time_dimensions() {
-            if let Some(granularity) = time_dim.get_granularity() {
-                context_factory.add_leaf_time_dimension(&time_dim.full_name(), &granularity);
-            }
-        }
 
         for member in self
             .query_properties
@@ -286,6 +339,15 @@ impl MultipliedMeasuresQueryPlanner {
         let filter = self.query_properties.all_filters();
         select_builder.set_filter(filter);
         select_builder.set_group_by(self.query_properties.group_by());
+
+        let render_references = dimension_subquery_planner.dimensions_refs().clone();
+        context_factory.set_render_references(render_references);
+        context_factory.set_rendered_as_multiplied_measures(
+            self.full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
+
         Ok(Rc::new(select_builder.build(context_factory)))
     }
 
@@ -295,20 +357,50 @@ impl MultipliedMeasuresQueryPlanner {
         key_join: Rc<dyn JoinDefinition>,
         key_cube_name: &String,
     ) -> Result<Rc<Select>, CubeError> {
-        let source = self
-            .join_planner
-            .make_join_node_impl(&Some(format!("{}_key", key_cube_name)), key_join)?;
         let dimensions = self
             .query_properties
             .dimensions_for_select_append(dimensions);
 
+        let mut symbols_for_subquery_dimensions =
+            BaseMemberHelper::extract_symbols_from_members(&dimensions);
+        for item in self.query_properties.dimensions_filters() {
+            item.find_all_member_evaluators(&mut symbols_for_subquery_dimensions);
+        }
+
+        for item in self.query_properties.measures_filters() {
+            item.find_all_member_evaluators(&mut symbols_for_subquery_dimensions);
+        }
+
+        let symbols_for_subquery_dimensions = symbols_for_subquery_dimensions
+            .into_iter()
+            .unique_by(|m| m.full_name())
+            .collect_vec();
+
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &symbols_for_subquery_dimensions,
+            self.query_tools.clone(),
+        )?;
+
+        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+            &subquery_dimensions,
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+        )?;
+
+        let source = self.join_planner.make_join_node_impl(
+            &Some(format!(
+                "{}_key",
+                self.query_tools.alias_for_cube(key_cube_name)?
+            )),
+            key_join,
+            &dimension_subquery_planner,
+        )?;
+
         let mut select_builder = SelectBuilder::new(source);
         let mut context_factory = self.context_factory.clone();
-        for time_dim in self.query_properties.time_dimensions() {
-            if let Some(granularity) = time_dim.get_granularity() {
-                context_factory.add_leaf_time_dimension(&time_dim.full_name(), &granularity);
-            }
-        }
+
+        context_factory.set_render_references(dimension_subquery_planner.dimensions_refs().clone());
+
         for member in dimensions.iter() {
             select_builder.add_projection_member(&member, None);
         }

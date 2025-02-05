@@ -2,6 +2,7 @@ use super::query_tools::QueryTools;
 use super::sql_evaluator::MemberSymbol;
 use super::{evaluate_with_context, VisitorContext};
 use crate::cube_bridge::cube_definition::CubeDefinition;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -37,9 +38,17 @@ impl BaseCube {
         }))
     }
 
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        let cube_sql =
-            evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
+    pub fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        let cube_sql = evaluate_with_context(
+            &self.member_evaluator,
+            self.query_tools.clone(),
+            context,
+            templates,
+        )?;
         Ok(cube_sql)
     }
 
@@ -69,10 +78,11 @@ impl BaseCube {
 
     pub fn default_alias_with_prefix(&self, prefix: &Option<String>) -> String {
         let alias = self.default_alias();
-        if let Some(prefix) = prefix {
+        let res = if let Some(prefix) = prefix {
             format!("{prefix}_{alias}")
         } else {
             alias
-        }
+        };
+        self.query_tools.alias_name(&res)
     }
 }

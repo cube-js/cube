@@ -38,6 +38,7 @@ enum NativeMethodType {
 struct NativeMethodParams {
     pub method_type: NativeMethodType,
     pub is_optional: bool,
+    pub is_vec: bool,
 }
 
 impl Default for NativeMethodParams {
@@ -45,12 +46,14 @@ impl Default for NativeMethodParams {
         Self {
             method_type: NativeMethodType::Call,
             is_optional: false,
+            is_vec: false,
         }
     }
 }
 
 struct NativeOutputParams {
     type_path: Path,
+    original_type: Path,
     dynamic_container_path: Option<Path>,
 }
 
@@ -99,6 +102,7 @@ impl Parse for NativeService {
                                 output_params: Self::get_output_for_deserializer(
                                     &method_item.sig.output,
                                     method_params.is_optional,
+                                    method_params.is_vec,
                                 )
                                 .unwrap(),
                                 method_params,
@@ -159,6 +163,9 @@ impl NativeService {
                     "field" => {
                         method_params.method_type = NativeMethodType::Getter;
                     }
+                    "vec" => {
+                        method_params.is_vec = true;
+                    }
                     _ => {}
                 }
             }
@@ -168,12 +175,15 @@ impl NativeService {
     fn get_output_for_deserializer(
         tp: &ReturnType,
         optional: bool,
+        vec: bool,
     ) -> syn::Result<NativeOutputParams> {
-        let expected_type = if optional {
-            "Result<_>"
-        } else {
-            "Result<Option<_>>"
-        };
+        let mut expected_type = "Result<_>".to_string();
+        if optional {
+            expected_type = expected_type.replace("_", "Option<_>");
+        }
+        if vec {
+            expected_type = expected_type.replace("_", "Vec<_>");
+        }
         let s = match tp {
             ReturnType::Default => Err(syn::Error::new(
                 tp.span(),
@@ -182,7 +192,7 @@ impl NativeService {
             ReturnType::Type(_, tt) => match tt.as_ref() {
                 syn::Type::Path(tp) => {
                     let segs = &tp.path.segments;
-                    Self::get_deserializer_output_for_result(segs, optional)
+                    Self::get_deserializer_output_for_result(segs, optional, vec, &expected_type)
                 }
                 _ => Err(syn::Error::new(
                     tp.span(),
@@ -196,18 +206,22 @@ impl NativeService {
     fn get_deserializer_output_for_result(
         segs: &Punctuated<PathSegment, Colon2>,
         optional: bool,
+        vec: bool,
+        expected_type: &str,
     ) -> syn::Result<NativeOutputParams> {
         let seg = segs.last().ok_or(syn::Error::new(
             segs.span(),
             "Return type should be Result<_>",
         ))?;
         if seg.ident.to_string() == "Result" {
-            let args = &seg.arguments;
+            let mut args = seg.arguments.clone();
             if optional {
-                Self::get_deserializer_output_for_option(args)
-            } else {
-                Self::get_type_for_deserialize_from_result_args(args)
+                args = Self::extract_output_for_nested_type(&args, "Option", expected_type)?;
             }
+            if vec {
+                args = Self::extract_output_for_nested_type(&args, "Vec", expected_type)?;
+            }
+            Self::get_type_for_deserialize_from_result_args(&args, expected_type)
         } else {
             Err(syn::Error::new(
                 seg.span(),
@@ -216,13 +230,18 @@ impl NativeService {
         }
     }
 
-    fn get_deserializer_output_for_option(args: &PathArguments) -> syn::Result<NativeOutputParams> {
+    fn extract_output_for_nested_type(
+        args: &PathArguments,
+        type_to_extract: &str,
+        expected_type: &str,
+    ) -> syn::Result<PathArguments> {
+        let error_message = format!("Return type should be {expected_type}");
         match args {
             syn::PathArguments::AngleBracketed(args) => {
-                let arg = args.args.first().ok_or(syn::Error::new(
-                    args.span(),
-                    "Return type should be Result<Option<_>>",
-                ))?;
+                let arg = args
+                    .args
+                    .first()
+                    .ok_or(syn::Error::new(args.span(), error_message.clone()))?;
                 match arg {
                     syn::GenericArgument::Type(tp) => match tp {
                         Type::Path(tp) => {
@@ -231,55 +250,39 @@ impl NativeService {
                                 tp.span(),
                                 "Return type should be Result<Option<_>>",
                             ))?;
-                            if seg.ident.to_string() == "Option" {
+                            if seg.ident.to_string() == type_to_extract {
                                 let args = &seg.arguments;
-                                Self::get_type_for_deserialize_from_result_args(args)
+                                Ok(args.clone())
                             } else {
-                                Err(syn::Error::new(
-                                    seg.span(),
-                                    "Return type should be Result<Option<_>>",
-                                ))
+                                Err(syn::Error::new(seg.span(), error_message.clone()))
                             }
                         }
-                        _ => Err(syn::Error::new(
-                            arg.span(),
-                            "Return type should be Result<Option<_>>",
-                        )),
+                        _ => Err(syn::Error::new(arg.span(), error_message.clone())),
                     },
-                    _ => Err(syn::Error::new(
-                        arg.span(),
-                        "Return type should be Result<<Option<_>>",
-                    )),
+                    _ => Err(syn::Error::new(arg.span(), error_message.clone())),
                 }
             }
-            _ => Err(syn::Error::new(
-                args.span(),
-                "Return type should be Result<_>",
-            )),
+            _ => Err(syn::Error::new(args.span(), error_message.clone())),
         }
     }
 
     fn get_type_for_deserialize_from_result_args(
         args: &PathArguments,
+        expected_type: &str,
     ) -> syn::Result<NativeOutputParams> {
+        let error_message = format!("Return type should be {expected_type}");
         match args {
             syn::PathArguments::AngleBracketed(args) => {
-                let arg = args.args.first().ok_or(syn::Error::new(
-                    args.span(),
-                    "Return type should be Result<_>",
-                ))?;
+                let arg = args
+                    .args
+                    .first()
+                    .ok_or(syn::Error::new(args.span(), error_message.clone()))?;
                 match arg {
                     syn::GenericArgument::Type(tp) => Self::get_type_from_possible_dyn_type(tp),
-                    _ => Err(syn::Error::new(
-                        arg.span(),
-                        "Return type should be Result<_>",
-                    )),
+                    _ => Err(syn::Error::new(arg.span(), error_message.clone())),
                 }
             }
-            _ => Err(syn::Error::new(
-                args.span(),
-                "Return type should be Result<_>",
-            )),
+            _ => Err(syn::Error::new(args.span(), error_message.clone())),
         }
     }
 
@@ -297,22 +300,26 @@ impl NativeService {
                     || ident.to_string() == "Box"
                 {
                     if let Some(dyn_path) = Self::get_dyn_type_for_deserialize(&seg.arguments) {
+                        let original_type = tp.path.clone();
                         let mut dynamic_container_path = tp.path.clone();
                         let last_seg = dynamic_container_path.segments.last_mut().unwrap();
                         last_seg.arguments = syn::PathArguments::None;
                         Ok(NativeOutputParams {
                             type_path: dyn_path,
+                            original_type,
                             dynamic_container_path: Some(dynamic_container_path),
                         })
                     } else {
                         Ok(NativeOutputParams {
                             type_path: tp.path.clone(),
+                            original_type: tp.path.clone(),
                             dynamic_container_path: None,
                         })
                     }
                 } else {
                     Ok(NativeOutputParams {
                         type_path: tp.path.clone(),
+                        original_type: tp.path.clone(),
                         dynamic_container_path: None,
                     })
                 }
@@ -524,7 +531,7 @@ impl NativeMethod {
             .collect::<Vec<_>>();
         let js_method_name = self.camel_case_name();
 
-        let deseralization = Self::deserialization_impl(&output_params);
+        let deseralization = Self::deserialization_impl(&output_params, method_params.is_vec);
 
         match method_params.method_type {
             NativeMethodType::Call => {
@@ -607,10 +614,15 @@ impl NativeMethod {
         }
     }
 
-    fn deserialization_impl(output_params: &NativeOutputParams) -> proc_macro2::TokenStream {
+    fn deserialization_impl(
+        output_params: &NativeOutputParams,
+        is_vec: bool,
+    ) -> proc_macro2::TokenStream {
         let output_type = &output_params.type_path;
 
-        if let Some(dynamic_container_path) = &output_params.dynamic_container_path {
+        let single_deserialization = if let Some(dynamic_container_path) =
+            &output_params.dynamic_container_path
+        {
             quote! {
                 #dynamic_container_path::new(NativeDeserializer::deserialize::<IT, #output_type<IT>>(res)?)
             }
@@ -618,6 +630,18 @@ impl NativeMethod {
             quote! {
                 NativeDeserializer::deserialize::<IT, #output_type>(res)?
             }
+        };
+
+        if is_vec {
+            let original_type = &output_params.original_type;
+            quote! {
+                res.into_array()?.to_vec()?.into_iter().map(|res| -> Result<#original_type, CubeError> {
+                    let r = #single_deserialization;
+                    Ok(r)
+                }).collect::<Result<Vec<_>, _>>()?
+            }
+        } else {
+            single_deserialization
         }
     }
 

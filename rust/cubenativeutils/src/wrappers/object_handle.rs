@@ -55,13 +55,12 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     pub fn to_boolean(&self) -> Result<IT::Boolean, CubeError> {
         self.object.clone().into_boolean()
     }
-    pub fn is_null(&self) -> bool {
+    pub fn is_null(&self) -> Result<bool, CubeError> {
         self.object.is_null()
     }
-    pub fn is_undefined(&self) -> bool {
+    pub fn is_undefined(&self) -> Result<bool, CubeError> {
         self.object.is_undefined()
     }
-
     pub fn get_context(&self) -> IT::Context {
         self.object.get_context()
     }
