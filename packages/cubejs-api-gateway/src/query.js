@@ -59,11 +59,17 @@ const memberExpression = parsedMemberExpression.keys({
 });
 
 // This should be aligned with cubesql side
+const inputMemberExpressionSqlFunction = Joi.object().keys({
+  type: Joi.valid('SqlFunction').required(),
+  cubeParams: Joi.array().items(Joi.string()).required(),
+  sql: Joi.string().required(),
+});
+
+// This should be aligned with cubesql side
 const inputMemberExpression = Joi.object().keys({
   cubeName: Joi.string().required(),
   alias: Joi.string().required(),
-  cubeParams: Joi.array().items(Joi.string()).required(),
-  expr: Joi.string().required(),
+  expr: Joi.alternatives(inputMemberExpressionSqlFunction),
   groupingSet: Joi.object().keys({
     groupType: Joi.valid('Rollup', 'Cube').required(),
     id: Joi.number().required(),

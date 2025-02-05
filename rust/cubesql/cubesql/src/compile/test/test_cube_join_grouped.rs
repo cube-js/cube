@@ -117,21 +117,21 @@ GROUP BY
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
     // Dimension from ungrouped side
     assert!(query_plan
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.customer_gender}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.customer_gender}\""#));
     // Dimension from grouped side
     assert!(query_plan
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"\\\"kibana_grouped\\\".\\\"avg_price\\\"\""#));
+        .contains(r#"\"sql\":\"\\\"kibana_grouped\\\".\\\"avg_price\\\"\""#));
 }
 
 /// Simple join between ungrouped and grouped query should plan as a push-to-Cube query
@@ -200,21 +200,21 @@ ON (
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
     // Dimension from ungrouped side
     assert!(query_plan
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.customer_gender}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.customer_gender}\""#));
     // Dimension from grouped side
     assert!(query_plan
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"\\\"kibana_grouped\\\".\\\"avg_price\\\"\""#));
+        .contains(r#"\"sql\":\"\\\"kibana_grouped\\\".\\\"avg_price\\\"\""#));
 }
 
 /// Join between ungrouped and grouped query with two columns join condition
@@ -284,7 +284,7 @@ ON (
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
 }
 
 /// Join between ungrouped and grouped query with filter + sort + limit
@@ -362,7 +362,7 @@ GROUP BY 1
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
 }
 
 #[tokio::test]
@@ -451,7 +451,7 @@ LIMIT 1000
     assert!(wrapped_sql_node
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.avgPrice}\""#));
 
     // Outer sort
     assert!(wrapped_sql_node
@@ -553,7 +553,7 @@ GROUP BY
     assert!(wrapped_sql_node
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"(CAST(${MultiTypeCube.dim_str1} AS STRING) = $1)\""#));
+        .contains(r#"\"sql\":\"(CAST(${MultiTypeCube.dim_str1} AS STRING) = $1)\""#));
 
     // Dimension from top aggregation
 
@@ -564,14 +564,14 @@ GROUP BY
     assert!(wrapped_sql_node
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"CAST(${MultiTypeCube.dim_str0} AS STRING)\""#));
+        .contains(r#"\"sql\":\"CAST(${MultiTypeCube.dim_str0} AS STRING)\""#));
 
     // Measure from top aggregation
     assert_eq!(wrapped_sql_node.request.measures.as_ref().unwrap().len(), 1);
     assert!(wrapped_sql_node
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${MultiTypeCube.countDistinct}\""#));
+        .contains(r#"\"sql\":\"${MultiTypeCube.countDistinct}\""#));
 }
 
 /// Ungrouped-grouped join with complex condition should plan as push-to-Cube query
@@ -664,14 +664,14 @@ GROUP BY
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${MultiTypeCube.avgPrice}\""#));
+        .contains(r#"\"sql\":\"${MultiTypeCube.avgPrice}\""#));
     // Dimension from ungrouped side
     assert!(query_plan
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${MultiTypeCube.dim_str0}\""#));
+        .contains(r#"\"sql\":\"${MultiTypeCube.dim_str0}\""#));
 }
 
 #[tokio::test]
@@ -747,7 +747,7 @@ GROUP BY
     assert!(wrapped_sql_node
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"(((${KibanaSampleDataEcommerce.notes} >= $1) AND (${KibanaSampleDataEcommerce.notes} <= $2)) OR ((${KibanaSampleDataEcommerce.notes} >= $3) AND (${KibanaSampleDataEcommerce.notes} <= $4)))\""#));
+        .contains(r#"\"sql\":\"(((${KibanaSampleDataEcommerce.notes} >= $1) AND (${KibanaSampleDataEcommerce.notes} <= $2)) OR ((${KibanaSampleDataEcommerce.notes} >= $3) AND (${KibanaSampleDataEcommerce.notes} <= $4)))\""#));
 
     // Dimension from top aggregation
     assert_eq!(
@@ -757,14 +757,14 @@ GROUP BY
     assert!(wrapped_sql_node
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.customer_gender}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.customer_gender}\""#));
 
     // Measure from top aggregation
     assert_eq!(wrapped_sql_node.request.measures.as_ref().unwrap().len(), 1);
     assert!(wrapped_sql_node
         .wrapped_sql
         .sql
-        .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.sumPrice}\""#));
+        .contains(r#"\"sql\":\"${KibanaSampleDataEcommerce.sumPrice}\""#));
 }
 
 #[tokio::test]
