@@ -58,7 +58,7 @@ views:
         includes:
           - total_revenue
 
-      - join_path: users
+      - join_path: orders.users
         includes:
           - company
 ```
@@ -93,7 +93,7 @@ view(`total_revenue_per_customer`, {
       ]
     },
     {
-      join_path: users,
+      join_path: orders.users,
       includes: [
         `company`
       ]

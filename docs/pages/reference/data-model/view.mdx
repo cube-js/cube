@@ -301,7 +301,7 @@ view(`arr`, {
       ]
     },
     {
-      join_path: customers,
+      join_path: revenue.customers,
       includes: `plan`
     }
   ]
@@ -320,7 +320,7 @@ views:
           - arr
           - date
 
-      - join_path: customers
+      - join_path: revenue.customers
         includes:
           - plan
 ```
