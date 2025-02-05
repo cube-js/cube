@@ -60,19 +60,14 @@ const memberExpression = parsedMemberExpression.keys({
 
 // This should be aligned with cubesql side
 const inputMemberExpression = Joi.object().keys({
-  // eslint-disable-next-line camelcase
-  cube_name: Joi.string().required(),
+  cubeName: Joi.string().required(),
   alias: Joi.string().required(),
-  // eslint-disable-next-line camelcase
-  cube_params: Joi.array().items(Joi.string()).required(),
+  cubeParams: Joi.array().items(Joi.string()).required(),
   expr: Joi.string().required(),
-  // eslint-disable-next-line camelcase
-  grouping_set: Joi.object().keys({
-    // eslint-disable-next-line camelcase
-    group_type: Joi.valid('Rollup', 'Cube').required(),
+  groupingSet: Joi.object().keys({
+    groupType: Joi.valid('Rollup', 'Cube').required(),
     id: Joi.number().required(),
-    // eslint-disable-next-line camelcase
-    sub_id: Joi.number().allow(null),
+    subId: Joi.number().allow(null),
   }).allow(null)
 });
 

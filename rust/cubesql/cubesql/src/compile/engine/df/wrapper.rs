@@ -67,10 +67,13 @@ pub struct SqlQuery {
 
 #[derive(Debug, Clone, Serialize)]
 struct UngrouppedMemberDef {
+    #[serde(rename = "cubeName")]
     cube_name: String,
     alias: String,
+    #[serde(rename = "cubeParams")]
     cube_params: Vec<String>,
     expr: String,
+    #[serde(rename = "groupingSet")]
     grouping_set: Option<GroupingSetDesc>,
 }
 
@@ -82,8 +85,10 @@ pub enum GroupingSetType {
 
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
 pub struct GroupingSetDesc {
+    #[serde(rename = "groupType")]
     pub group_type: GroupingSetType,
     pub id: u64,
+    #[serde(rename = "subId")]
     pub sub_id: Option<u64>,
 }
 
