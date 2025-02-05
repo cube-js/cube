@@ -1,11 +1,11 @@
 use super::join_graph::{JoinGraph, NativeJoinGraph};
+use super::options_member::OptionsMember;
 use crate::cube_bridge::base_tools::{BaseTools, NativeBaseTools};
 use crate::cube_bridge::evaluator::{CubeEvaluator, NativeCubeEvaluator};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
-use cubenativeutils::wrappers::NativeContextHolder;
-use cubenativeutils::wrappers::NativeObjectHandle;
+use cubenativeutils::wrappers::{NativeArray, NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -50,7 +50,6 @@ impl FilterItem {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BaseQueryOptionsStatic {
     pub measures: Option<Vec<String>>,
-    pub dimensions: Option<Vec<String>>,
     #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<TimeDimension>>,
     pub timezone: Option<String>,
@@ -66,9 +65,13 @@ pub struct BaseQueryOptionsStatic {
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]
 pub trait BaseQueryOptions {
     #[field]
-    fn measures(&self) -> Result<Option<Vec<String>>, CubeError>;
+    #[optional]
+    #[vec]
+    fn measures(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
     #[field]
-    fn dimensions(&self) -> Result<Option<Vec<String>>, CubeError>;
+    #[optional]
+    #[vec]
+    fn dimensions(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
     #[field]
     fn cube_evaluator(&self) -> Result<Rc<dyn CubeEvaluator>, CubeError>;
     #[field]

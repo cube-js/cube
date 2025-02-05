@@ -1,5 +1,6 @@
 use super::Expr;
 
+#[derive(Clone)]
 pub struct OrderBy {
     pub expr: Expr,
     pub pos: usize,

@@ -33,7 +33,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if self.input.is_null() || self.input.is_undefined() {
+        if self.input.is_null()? || self.input.is_undefined()? {
             visitor.visit_unit()
         } else if let Ok(val) = self.input.to_boolean() {
             visitor.visit_bool(val.value().unwrap())
@@ -58,7 +58,7 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     where
         V: Visitor<'de>,
     {
-        if self.input.is_null() || self.input.is_undefined() {
+        if self.input.is_null()? || self.input.is_undefined()? {
             visitor.visit_none()
         } else {
             visitor.visit_some(self)

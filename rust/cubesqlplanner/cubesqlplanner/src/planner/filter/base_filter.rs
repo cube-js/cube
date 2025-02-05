@@ -2,6 +2,7 @@ use super::filter_operator::FilterOperator;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::filter::FilterTemplates;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -95,28 +96,89 @@ impl BaseFilter {
         self.member_evaluator.full_name()
     }
 
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        let member_sql =
-            evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
-        let res = match self.filter_operator {
-            FilterOperator::Equal => self.equals_where(&member_sql)?,
-            FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,
-            FilterOperator::InDateRange => self.in_date_range(&member_sql)?,
-            FilterOperator::InDateRangeExtended => self.in_date_range_extended(&member_sql)?,
-            FilterOperator::In => self.in_where(&member_sql)?,
-            FilterOperator::NotIn => self.not_in_where(&member_sql)?,
-            FilterOperator::Set => self.set_where(&member_sql)?,
-            FilterOperator::NotSet => self.not_set_where(&member_sql)?,
-            FilterOperator::Gt => self.gt_where(&member_sql)?,
-            FilterOperator::Gte => self.gte_where(&member_sql)?,
-            FilterOperator::Lt => self.lt_where(&member_sql)?,
-            FilterOperator::Lte => self.lte_where(&member_sql)?,
-            FilterOperator::Contains => self.contains_where(&member_sql)?,
-            FilterOperator::NotContains => self.not_contains_where(&member_sql)?,
-            FilterOperator::StartsWith => self.starts_with_where(&member_sql)?,
-            FilterOperator::NotStartsWith => self.not_starts_with_where(&member_sql)?,
-            FilterOperator::EndsWith => self.ends_with_where(&member_sql)?,
-            FilterOperator::NotEndsWith => self.not_ends_with_where(&member_sql)?,
+    pub fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        plan_templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        if matches!(self.filter_operator, FilterOperator::MeasureFilter) {
+            self.measure_filter_where(context, plan_templates)
+        } else {
+            let member_sql = evaluate_with_context(
+                &self.member_evaluator,
+                self.query_tools.clone(),
+                context,
+                plan_templates,
+            )?;
+            let res = match self.filter_operator {
+                FilterOperator::Equal => self.equals_where(&member_sql)?,
+                FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,
+                FilterOperator::InDateRange => self.in_date_range(&member_sql)?,
+                FilterOperator::RegularRollingWindowDateRange => {
+                    self.regular_rolling_window_date_range(&member_sql)?
+                }
+                FilterOperator::ToDateRollingWindowDateRange => {
+                    self.to_date_rolling_window_date_range(&member_sql)?
+                }
+                FilterOperator::In => self.in_where(&member_sql)?,
+                FilterOperator::NotIn => self.not_in_where(&member_sql)?,
+                FilterOperator::Set => self.set_where(&member_sql)?,
+                FilterOperator::NotSet => self.not_set_where(&member_sql)?,
+                FilterOperator::Gt => self.gt_where(&member_sql)?,
+                FilterOperator::Gte => self.gte_where(&member_sql)?,
+                FilterOperator::Lt => self.lt_where(&member_sql)?,
+                FilterOperator::Lte => self.lte_where(&member_sql)?,
+                FilterOperator::Contains => self.contains_where(&member_sql)?,
+                FilterOperator::NotContains => self.not_contains_where(&member_sql)?,
+                FilterOperator::StartsWith => self.starts_with_where(&member_sql)?,
+                FilterOperator::NotStartsWith => self.not_starts_with_where(&member_sql)?,
+                FilterOperator::EndsWith => self.ends_with_where(&member_sql)?,
+                FilterOperator::NotEndsWith => self.not_ends_with_where(&member_sql)?,
+                FilterOperator::MeasureFilter => {
+                    return Err(CubeError::internal(format!(
+                        "Measure filter should be processed separately"
+                    )));
+                }
+            };
+            Ok(res)
+        }
+    }
+
+    fn measure_filter_where(
+        &self,
+        context: Rc<VisitorContext>,
+        plan_templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
+        let res = match self.member_evaluator.as_ref() {
+            MemberSymbol::Measure(measure_symbol) => {
+                if measure_symbol.measure_filters().is_empty()
+                    && measure_symbol.measure_drill_filters().is_empty()
+                {
+                    self.templates.always_true()?
+                } else {
+                    let visitor = context.make_visitor(self.query_tools.clone());
+                    let node_processor = context.node_processor();
+
+                    measure_symbol
+                        .measure_filters()
+                        .iter()
+                        .chain(measure_symbol.measure_drill_filters().iter())
+                        .map(|filter| -> Result<String, CubeError> {
+                            Ok(format!(
+                                "({})",
+                                filter.eval(
+                                    &visitor,
+                                    node_processor.clone(),
+                                    self.query_tools.clone(),
+                                    plan_templates
+                                )?
+                            ))
+                        })
+                        .collect::<Result<Vec<_>, _>>()?
+                        .join(" AND ")
+                }
+            }
+            _ => self.templates.always_true()?,
         };
         Ok(res)
     }
@@ -154,7 +216,7 @@ impl BaseFilter {
     }
 
     fn in_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params()?;
+        let (from, to) = self.allocate_date_params(true)?;
         self.templates
             .time_range_filter(member_sql.to_string(), from, to)
     }
@@ -179,8 +241,9 @@ impl BaseFilter {
             Ok(date.to_string())
         }
     }
-    fn in_date_range_extended(&self, member_sql: &str) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params()?;
+
+    fn regular_rolling_window_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
+        let (from, to) = self.allocate_date_params(false)?;
 
         let from = if self.values.len() >= 3 {
             self.extend_date_range_bound(from, &self.values[2], true)?
@@ -194,8 +257,37 @@ impl BaseFilter {
             to
         };
 
-        self.templates
-            .time_range_filter(member_sql.to_string(), from, to)
+        let date_field = self
+            .query_tools
+            .base_tools()
+            .convert_tz(member_sql.to_string())?;
+        self.templates.time_range_filter(date_field, from, to)
+    }
+
+    fn to_date_rolling_window_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
+        let (from, to) = self.allocate_date_params(false)?;
+
+        let from = if self.values.len() >= 3 {
+            if let Some(granularity) = &self.values[2] {
+                self.query_tools
+                    .base_tools()
+                    .time_grouped_column(granularity.clone(), from)?
+            } else {
+                return Err(CubeError::user(format!(
+                    "Granularity required for to_date rolling window"
+                )));
+            }
+        } else {
+            return Err(CubeError::user(format!(
+                "Granularity required for to_date rolling window"
+            )));
+        };
+
+        let date_field = self
+            .query_tools
+            .base_tools()
+            .convert_tz(member_sql.to_string())?;
+        self.templates.time_range_filter(date_field, from, to)
     }
 
     fn in_where(&self, member_sql: &str) -> Result<String, CubeError> {
@@ -296,12 +388,16 @@ impl BaseFilter {
         ))
     }
 
-    fn allocate_date_params(&self) -> Result<(String, String), CubeError> {
+    fn allocate_date_params(&self, use_db_time_zone: bool) -> Result<(String, String), CubeError> {
         if self.values.len() >= 2 {
             let from = if let Some(from_str) = &self.values[0] {
-                self.query_tools
-                    .base_tools()
-                    .in_db_time_zone(self.format_from_date(&from_str)?)?
+                let from = self.format_from_date(&from_str)?;
+
+                if use_db_time_zone {
+                    self.query_tools.base_tools().in_db_time_zone(from)?
+                } else {
+                    from
+                }
             } else {
                 return Err(CubeError::user(format!(
                     "Arguments for date range is not valid"
@@ -309,9 +405,13 @@ impl BaseFilter {
             };
 
             let to = if let Some(to_str) = &self.values[1] {
-                self.query_tools
-                    .base_tools()
-                    .in_db_time_zone(self.format_to_date(&to_str)?)?
+                let to = self.format_to_date(&to_str)?;
+
+                if use_db_time_zone {
+                    self.query_tools.base_tools().in_db_time_zone(to)?
+                } else {
+                    to
+                }
             } else {
                 return Err(CubeError::user(format!(
                     "Arguments for date range is not valid"
@@ -354,11 +454,7 @@ impl BaseFilter {
                 "0".repeat(precision as usize)
             ));
         }
-        //FIXME chrono don't support parsing date without specified format
-        Err(CubeError::user(format!(
-            "Unsupported date format: {}",
-            date
-        )))
+        Ok(date.to_string())
     }
 
     fn format_to_date(&self, date: &str) -> Result<String, CubeError> {
@@ -390,11 +486,8 @@ impl BaseFilter {
                 "9".repeat(precision as usize)
             ));
         }
-        //FIXME chrono don't support parsing date without specified format
-        Err(CubeError::user(format!(
-            "Unsupported date format: {}",
-            date
-        )))
+
+        Ok(date.to_string())
     }
 
     fn allocate_param(&self, param: &str) -> String {

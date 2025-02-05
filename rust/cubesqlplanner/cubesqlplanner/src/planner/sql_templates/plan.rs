@@ -105,6 +105,43 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn cast(&self, expr: &str, data_type: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/cast",
+            context! {
+                expr => expr,
+                data_type => data_type,
+            },
+        )
+    }
+
+    pub fn cast_to_string(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/cast_to_string",
+            context! {
+                expr => expr,
+            },
+        )
+    }
+
+    pub fn count_distinct(&self, expr: &str) -> Result<String, CubeError> {
+        self.render.render_template(
+            "functions/COUNT_DISTINCT",
+            context! {
+                args_concat => expr,
+            },
+        )
+    }
+
+    pub fn concat_strings(&self, strings: &Vec<String>) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/concat_strings",
+            context! {
+                strings => strings,
+            },
+        )
+    }
+
     pub fn group_by(&self, items: Vec<TemplateGroupByColumn>) -> Result<String, CubeError> {
         self.render.render_template(
             "statements/group_by_exprs",

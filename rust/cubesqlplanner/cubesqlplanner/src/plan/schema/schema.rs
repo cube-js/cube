@@ -3,7 +3,7 @@ use crate::planner::BaseMember;
 use itertools::Itertools;
 use std::rc::Rc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Schema {
     columns: Vec<SchemaColumn>,
 }

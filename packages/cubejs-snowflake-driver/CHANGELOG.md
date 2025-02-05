@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
+
+### Features
+
+- **snowflake-driver:** set QUOTED_IDENTIFIERS_IGNORE_CASE=FALSE by default ([#9172](https://github.com/cube-js/cube/issues/9172)) ([164b783](https://github.com/cube-js/cube/commit/164b783843efa93ac8ca422634e5b6daccd91883))
+
 ## [1.1.17](https://github.com/cube-js/cube/compare/v1.1.16...v1.1.17) (2025-01-27)
 
 ### Features

@@ -2,6 +2,7 @@ use super::{
     filter_group::{FilterGroup, NativeFilterGroup},
     filter_params::{FilterParams, NativeFilterParams},
     security_context::{NativeSecurityContext, SecurityContext},
+    sql_utils::{NativeSqlUtils, SqlUtils},
 };
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
@@ -24,6 +25,7 @@ pub struct MemberSqlStruct {
 
 pub enum ContextSymbolArg {
     SecurityContext(Rc<dyn SecurityContext>),
+    SqlUtils(Rc<dyn SqlUtils>),
     FilterParams(Rc<dyn FilterParams>),
     FilterGroup(Rc<dyn FilterGroup>),
 }
@@ -37,7 +39,37 @@ pub enum MemberSqlArg {
 pub trait MemberSql {
     fn call(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError>;
     fn args_names(&self) -> &Vec<String>;
+    fn need_deps_resolve(&self) -> bool;
     fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
+}
+
+pub struct CustomMemberSql {
+    sql: String,
+    args_names: Vec<String>,
+}
+
+impl CustomMemberSql {
+    pub fn new(sql: String) -> Rc<Self> {
+        Rc::new(Self {
+            sql,
+            args_names: vec![],
+        })
+    }
+}
+
+impl MemberSql for CustomMemberSql {
+    fn call(&self, _args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
+        Ok(self.sql.clone())
+    }
+    fn args_names(&self) -> &Vec<String> {
+        &self.args_names
+    }
+    fn need_deps_resolve(&self) -> bool {
+        false
+    }
+    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+        self.clone()
+    }
 }
 
 pub struct NativeMemberSql<IT: InnerTypes> {
@@ -50,14 +82,20 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlStruct {
         &self,
         context: NativeContextHolder<IT>,
     ) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let res = context.empty_struct();
+        let res = context.empty_struct()?;
         for (k, v) in self.properties.iter() {
             res.set_field(k, v.to_native(context.clone())?)?;
         }
         if let Some(to_string_fn) = &self.to_string_fn {
             res.set_field(
                 "toString",
-                NativeObjectHandle::new(context.to_string_fn(to_string_fn.clone()).into_object()),
+                NativeObjectHandle::new(context.to_string_fn(to_string_fn.clone())?.into_object()),
+            )?;
+        }
+        if let Some(sql_fn) = &self.sql_fn {
+            res.set_field(
+                "sql",
+                NativeObjectHandle::new(context.to_string_fn(sql_fn.clone())?.into_object()),
             )?;
         }
         Ok(NativeObjectHandle::new(res.into_object()))
@@ -77,6 +115,12 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlArg {
                     .clone()
                     .as_any()
                     .downcast::<NativeSecurityContext<IT>>()
+                    .unwrap()
+                    .to_native(context_holder.clone()),
+                ContextSymbolArg::SqlUtils(context) => context
+                    .clone()
+                    .as_any()
+                    .downcast::<NativeSqlUtils<IT>>()
                     .unwrap()
                     .to_native(context_holder.clone()),
                 ContextSymbolArg::FilterParams(params) => params
@@ -130,6 +174,9 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
     }
     fn args_names(&self) -> &Vec<String> {
         &self.args_names
+    }
+    fn need_deps_resolve(&self) -> bool {
+        !self.args_names.is_empty()
     }
 }
 

@@ -6,7 +6,8 @@ use super::{
     SqlCall, SymbolFactory, TraversalVisitor,
 };
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::cube_bridge::member_sql::MemberSql;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -80,7 +81,7 @@ impl Compiler {
         }
     }
 
-    pub fn join_hints(&self) -> Result<Vec<String>, CubeError> {
+    pub fn join_hints(&self) -> Result<Vec<JoinHintItem>, CubeError> {
         let mut collector = JoinHintsCollector::new();
         for member in self.members.values() {
             collector.apply(member, &())?;

@@ -1,7 +1,8 @@
-use super::join_item::{JoinItemsVec, NativeJoinItemsVec};
+use super::join_item::{JoinItem, NativeJoinItem};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -20,5 +21,6 @@ pub struct JoinDefinitionStatic {
 #[nativebridge::native_bridge(JoinDefinitionStatic)]
 pub trait JoinDefinition {
     #[field]
-    fn joins(&self) -> Result<Rc<dyn JoinItemsVec>, CubeError>;
+    #[vec]
+    fn joins(&self) -> Result<Vec<Rc<dyn JoinItem>>, CubeError>;
 }

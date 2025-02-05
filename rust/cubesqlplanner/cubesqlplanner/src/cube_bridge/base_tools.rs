@@ -1,8 +1,9 @@
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
-use super::memeber_sql::{MemberSql, NativeMemberSql};
+use super::member_sql::{MemberSql, NativeMemberSql};
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
+use super::sql_utils::{NativeSqlUtils, SqlUtils};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -34,6 +35,7 @@ pub trait BaseTools {
         sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<CallDep>, CubeError>;
     fn security_context_for_rust(&self) -> Result<Rc<dyn SecurityContext>, CubeError>;
+    fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError>;
     fn filters_proxy(&self) -> Result<Rc<dyn FilterParams>, CubeError>;
     fn filter_group_function(&self) -> Result<Rc<dyn FilterGroup>, CubeError>;
     fn timestamp_precision(&self) -> Result<u32, CubeError>;
@@ -45,4 +47,9 @@ pub trait BaseTools {
     ) -> Result<Vec<Vec<String>>, CubeError>;
     fn get_allocated_params(&self) -> Result<Vec<String>, CubeError>;
     fn all_cube_members(&self, path: String) -> Result<Vec<String>, CubeError>;
+    //===== TODO Move to templates
+    fn hll_init(&self, sql: String) -> Result<String, CubeError>;
+    fn hll_merge(&self, sql: String) -> Result<String, CubeError>;
+    fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError>;
+    fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError>;
 }

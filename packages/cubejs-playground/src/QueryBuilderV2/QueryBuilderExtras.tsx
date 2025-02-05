@@ -55,6 +55,7 @@ const LIMIT_OPTIONS: { key: number; label: string }[] = [
   { key: 100, label: '100' },
   { key: 1000, label: '1,000' },
   { key: 5000, label: '5,000' },
+  { key: 50000, label: '50,000' },
   { key: 0, label: 'Default limit' },
 ];
 const LIMIT_OPTION_VALUES = LIMIT_OPTIONS.map((option) => option.key) as number[];

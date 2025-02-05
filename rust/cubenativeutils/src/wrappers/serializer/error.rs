@@ -1,3 +1,4 @@
+use cubesql::CubeError;
 use serde::{de, ser};
 use std::{fmt, fmt::Display};
 #[derive(Debug)]
@@ -26,3 +27,9 @@ impl Display for NativeObjSerializerError {
 }
 
 impl std::error::Error for NativeObjSerializerError {}
+
+impl From<CubeError> for NativeObjSerializerError {
+    fn from(value: CubeError) -> Self {
+        Self::Message(value.to_string())
+    }
+}
