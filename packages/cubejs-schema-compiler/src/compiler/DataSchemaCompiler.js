@@ -98,6 +98,10 @@ export class DataSchemaCompiler {
 
       if (getEnv('workerThreadsTranspilation')) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
+        // We need only cubes and all its member names for transpiling.
+        // Communication between main and worker threads uses
+        // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
+        // which doesn't allow passing any function objects, so we need to sanitize the symbols.
         cubeSymbolsNames = Object.fromEntries(
           Object.entries(this.cubeSymbols.symbols)
             .map(
