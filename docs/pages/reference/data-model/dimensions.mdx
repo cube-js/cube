@@ -6,11 +6,11 @@ redirect_from:
 
 # Dimensions
 
-The `dimensions` property contains a set of dimensions. You can think about a
-dimension as an attribute related to a measure, e.g. the measure `user_count`
+You can use the `dimensions` parameter within [cubes][ref-ref-cubes] to define dimensions.
+You can think about a dimension as an attribute related to a measure, e.g. the measure `user_count`
 can have dimensions like `country`, `age`, `occupation`, etc.
 
-Any dimension should have the following parameters: `name`, `sql` and `type`.
+Any dimension should have the following parameters: [`name`](#name), [`sql`](#sql), and [`type`](#type).
 
 Dimensions can be also organized into [hierarchies][ref-ref-hierarchies].
 
@@ -699,6 +699,7 @@ cube(`orders`, {
 </CodeTabs>
 
 
+[ref-ref-cubes]: /reference/data-model/cube
 [ref-schema-ref-joins]: /reference/data-model/joins
 [ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [self-subquery]: #sub-query

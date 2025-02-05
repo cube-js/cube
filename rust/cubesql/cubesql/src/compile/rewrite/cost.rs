@@ -122,6 +122,9 @@ impl BestCubePlan {
             LogicalPlanLanguage::ProjectionSplitPushDownReplacer(_) => 1,
             LogicalPlanLanguage::ProjectionSplitPullUpReplacer(_) => 1,
             LogicalPlanLanguage::QueryParam(_) => 1,
+            LogicalPlanLanguage::JoinCheckStage(_) => 1,
+            LogicalPlanLanguage::JoinCheckPushDown(_) => 1,
+            LogicalPlanLanguage::JoinCheckPullUp(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as
             // there's always rewrite rule it's fine to have replacer cost.
             // Needs to be added as alias rewrite always more expensive than original function.
@@ -234,6 +237,7 @@ impl BestCubePlan {
 /// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
 /// - `filters` > `filter_members` - optimize for push down of filters
+/// - `zero_members_wrapper` > `filter_members` - prefer CubeScan(filters) to WrappedSelect(CubeScan(*), filters)
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
@@ -259,12 +263,12 @@ pub struct CubePlanCost {
     wrapped_select_ungrouped_scan: usize,
     filters: i64,
     structure_points: i64,
-    filter_members: i64,
     // This is separate from both non_detected_cube_scans and cube_members
     // Because it's ok to use all members inside wrapper (so non_detected_cube_scans would be zero)
     // And we want to select representation with less members
     // But only when members are present!
     zero_members_wrapper: i64,
+    filter_members: i64,
     cube_members: i64,
     errors: i64,
     time_dimensions_used_as_dimensions: i64,

@@ -1437,7 +1437,7 @@ impl MemberRules {
         }
     }
 
-    fn replace_alias(
+    pub fn replace_alias(
         alias_to_cube: &Vec<(String, String)>,
         projection_alias: &Option<String>,
     ) -> Vec<(String, String)> {

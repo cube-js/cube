@@ -13,6 +13,7 @@ import {
   CloseIcon,
   TooltipProvider,
   ResizablePanel,
+  ClearIcon,
 } from '@cube-dev/ui-kit';
 import {
   ReactNode,
@@ -434,7 +435,7 @@ export function QueryBuilderSidePanel({
               size="small"
               type="secondary"
               theme="danger"
-              icon={<CloseIcon />}
+              icon={<ClearIcon />}
               onPress={() => {
                 clearQuery();
                 setOpenCubes(

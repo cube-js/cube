@@ -6,9 +6,8 @@ redirect_from:
 
 # Joins
 
-The `joins` parameter declares a block to define relationships between cubes. It
-allows users to access and compare fields from two or more cubes at the same
-time.
+You can use the `joins` parameter within [cubes][ref-ref-cubes] to define joins to other cubes.
+Joins allow to access and compare members from two or more cubes at the same time.
 
 <CodeTabs>
 
@@ -664,6 +663,8 @@ In case there are multiple join paths that can be used to join the same set of c
 Cube makes join trees as predictable and stable as possible, but this isn't guaranteed in case multiple join paths exist.
 Please use views to address join predictability and stability.
 
+
+[ref-ref-cubes]: /reference/data-model/cube
 [ref-restapi-query-filter-op-set]:
   /product/apis-integrations/rest-api/query-format#set
 [ref-schema-fundamentals-join-dir]:

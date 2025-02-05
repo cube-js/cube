@@ -160,6 +160,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 relationship: "belongsTo".to_string(),
             }]),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -208,6 +209,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 relationship: "belongsTo".to_string(),
             }]),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -227,6 +229,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             segments: vec![],
             joins: None,
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -299,6 +302,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             segments: Vec::new(),
             joins: Some(Vec::new()),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
         CubeMeta {
@@ -408,6 +412,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
             segments: Vec::new(),
             joins: Some(Vec::new()),
             folders: None,
+            hierarchies: None,
             meta: None,
         },
     ]
@@ -431,6 +436,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
         segments: vec![],
         joins: None,
         folders: None,
+        hierarchies: None,
         meta: None,
     }]
 }
@@ -471,6 +477,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
         segments: vec![],
         joins: None,
         folders: None,
+        hierarchies: None,
         meta: None,
     }]
 }
@@ -578,7 +585,7 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                         "{{expr}} {{quoted_alias}}".to_string(),
                     ),
                     ("expressions/binary".to_string(), "({{ left }} {{ op }} {{ right }})".to_string()),
-                    ("expressions/is_null".to_string(), "{{ expr }} IS {% if negate %}NOT {% endif %}NULL".to_string()),
+                    ("expressions/is_null".to_string(), "({{ expr }} IS {% if negate %}NOT {% endif %}NULL)".to_string()),
                     ("expressions/case".to_string(), "CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
                     ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),
                     ("expressions/cast".to_string(), "CAST({{ expr }} AS {{ data_type }})".to_string()),
