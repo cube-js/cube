@@ -225,7 +225,6 @@ pub trait QueryEngine {
                 state.auth_context().unwrap(),
                 qtrace,
                 span_id.clone(),
-                self.config_ref().top_down_extractor(),
             )
             .await
             .map_err(|e| match e.cause {
