@@ -1,7 +1,6 @@
 import vm from 'vm';
 import fs from 'fs';
 import path from 'path';
-import { Worker } from 'worker_threads';
 import syntaxCheck from 'syntax-error';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
