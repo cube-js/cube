@@ -58,6 +58,24 @@ const memberExpression = parsedMemberExpression.keys({
   expression: Joi.func().required(),
 });
 
+// This should be aligned with cubesql side
+const inputMemberExpression = Joi.object().keys({
+  // eslint-disable-next-line camelcase
+  cube_name: Joi.string().required(),
+  alias: Joi.string().required(),
+  // eslint-disable-next-line camelcase
+  cube_params: Joi.array().items(Joi.string()).required(),
+  expr: Joi.string().required(),
+  // eslint-disable-next-line camelcase
+  grouping_set: Joi.object().keys({
+    // eslint-disable-next-line camelcase
+    group_type: Joi.valid('Rollup', 'Cube').required(),
+    id: Joi.number().required(),
+    // eslint-disable-next-line camelcase
+    sub_id: Joi.number().allow(null),
+  }).allow(null)
+});
+
 const operators = [
   'equals',
   'notEquals',
@@ -214,6 +232,20 @@ const normalizeQueryFilters = (filter) => (
     return res;
   })
 );
+
+/**
+ * Parse incoming member expression
+ * @param {unknown} expression
+ * @throws {import('./UserError').UserError}
+ * @returns {import('./types/query').InputMemberExpression}
+ */
+function parseInputMemberExpression(expression) {
+  const { error } = inputMemberExpression.validate(expression);
+  if (error) {
+    throw new UserError(`Invalid member expression format: ${error.message || error.toString()}`);
+  }
+  return expression;
+}
 
 /**
  * Normalize incoming network query.
@@ -384,5 +416,6 @@ export {
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryCancelPreAggregations,
+  parseInputMemberExpression,
   remapToQueryAdapterFormat,
 };
