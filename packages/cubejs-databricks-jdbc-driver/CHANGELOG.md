@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
+
+### Bug Fixes
+
+- **databricks-jdbc-driver:** Fix extract epoch from timestamp SQL Generation ([#9160](https://github.com/cube-js/cube/issues/9160)) ([9a73857](https://github.com/cube-js/cube/commit/9a73857b4abc5691b44b8a395176a565cdbf1b2a))
+
 ## [1.1.17](https://github.com/cube-js/cube/compare/v1.1.16...v1.1.17) (2025-01-27)
 
 ### Features

@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
+
+### Bug Fixes
+
+- **cubesql:** Avoid panics during filter rewrites ([#9166](https://github.com/cube-js/cube/issues/9166)) ([4c8de88](https://github.com/cube-js/cube/commit/4c8de882b3cc57e2b0c29c33ca4ee91377176e85))
+- **databricks-jdbc-driver:** Fix extract epoch from timestamp SQL Generation ([#9160](https://github.com/cube-js/cube/issues/9160)) ([9a73857](https://github.com/cube-js/cube/commit/9a73857b4abc5691b44b8a395176a565cdbf1b2a))
+
+### Features
+
+- **cubeclient:** Add hierarchies to Cube meta ([#9180](https://github.com/cube-js/cube/issues/9180)) ([56dbf9e](https://github.com/cube-js/cube/commit/56dbf9edc8c257cd81f00ff119b12543652b76d0))
+- **cubesql:** Add filter flattening rule ([#9148](https://github.com/cube-js/cube/issues/9148)) ([92a4b8e](https://github.com/cube-js/cube/commit/92a4b8e0e65c05f2ca0a683387d3f4434c358fc6))
+- **cubesql:** Add separate ungrouped_scan flag to wrapper replacer context ([#9120](https://github.com/cube-js/cube/issues/9120)) ([50bdbe7](https://github.com/cube-js/cube/commit/50bdbe7f52f653680e32d26c96c41f10e459c341))
+- Support complex join conditions for grouped joins ([#9157](https://github.com/cube-js/cube/issues/9157)) ([28c1e3b](https://github.com/cube-js/cube/commit/28c1e3bba7a100f3152bfdefd86197e818fac941))
+
 ## [1.1.17](https://github.com/cube-js/cube/compare/v1.1.16...v1.1.17) (2025-01-27)
 
 ### Features

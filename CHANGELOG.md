@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
+
+### Bug Fixes
+
+- **@cubejs-client/ngx:** Update APF configuration and build settings for Angular 12+ compatibility ([#9152](https://github.com/cube-js/cube/issues/9152)) Thanks to @HaidarZ! ([57bcbc4](https://github.com/cube-js/cube/commit/57bcbc482002aaa025ba5eab8960ecc5784faa55))
+- **cubejs-playground:** update query builder ([#9175](https://github.com/cube-js/cube/issues/9175)) ([4e9ed0e](https://github.com/cube-js/cube/commit/4e9ed0eae46c4abb1b84e6423bbc94ad93da37c3))
+- **cubejs-playground:** update query builder ([#9184](https://github.com/cube-js/cube/issues/9184)) ([247ac0c](https://github.com/cube-js/cube/commit/247ac0c4028aef5295e88cd501323b94c5a4eaab))
+- **cubesql:** Avoid panics during filter rewrites ([#9166](https://github.com/cube-js/cube/issues/9166)) ([4c8de88](https://github.com/cube-js/cube/commit/4c8de882b3cc57e2b0c29c33ca4ee91377176e85))
+- **databricks-jdbc-driver:** Fix extract epoch from timestamp SQL Generation ([#9160](https://github.com/cube-js/cube/issues/9160)) ([9a73857](https://github.com/cube-js/cube/commit/9a73857b4abc5691b44b8a395176a565cdbf1b2a))
+- **schema-compiler:** make sure view members are resolvable in DAP ([#9059](https://github.com/cube-js/cube/issues/9059)) ([e7b992e](https://github.com/cube-js/cube/commit/e7b992effb6ef90883d059280270c92d903607d4))
+
+### Features
+
+- **cubeclient:** Add hierarchies to Cube meta ([#9180](https://github.com/cube-js/cube/issues/9180)) ([56dbf9e](https://github.com/cube-js/cube/commit/56dbf9edc8c257cd81f00ff119b12543652b76d0))
+- **cubesql:** Add filter flattening rule ([#9148](https://github.com/cube-js/cube/issues/9148)) ([92a4b8e](https://github.com/cube-js/cube/commit/92a4b8e0e65c05f2ca0a683387d3f4434c358fc6))
+- **cubesql:** Add separate ungrouped_scan flag to wrapper replacer context ([#9120](https://github.com/cube-js/cube/issues/9120)) ([50bdbe7](https://github.com/cube-js/cube/commit/50bdbe7f52f653680e32d26c96c41f10e459c341))
+- **snowflake-driver:** set QUOTED_IDENTIFIERS_IGNORE_CASE=FALSE by default ([#9172](https://github.com/cube-js/cube/issues/9172)) ([164b783](https://github.com/cube-js/cube/commit/164b783843efa93ac8ca422634e5b6daccd91883))
+- Support complex join conditions for grouped joins ([#9157](https://github.com/cube-js/cube/issues/9157)) ([28c1e3b](https://github.com/cube-js/cube/commit/28c1e3bba7a100f3152bfdefd86197e818fac941))
+
 ## [1.1.18](https://github.com/cube-js/cube/compare/v1.1.17...v1.1.18) (2025-01-27)
 
 ### Bug Fixes
