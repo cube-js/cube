@@ -13962,11 +13962,7 @@ ORDER BY "source"."str0" ASC
         // CAST(CAST(ta_1.order_date AS Date32) - CAST(CAST(Utf8("1970-01-01") AS Date32) AS Date32) + Int64(3) AS Decimal(38, 10))
         if Rewriter::sql_push_down_enabled() {
             let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-            if Rewriter::top_down_extractor_enabled() {
-                assert!(sql.contains("LIMIT 1000"));
-            } else {
-                assert!(sql.contains("\"limit\": 1000"));
-            }
+            assert!(sql.contains("LIMIT 1000"));
             assert!(sql.contains("% 7"));
 
             let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -16175,18 +16171,10 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
-                    date_range: if Rewriter::top_down_extractor_enabled() {
-                        Some(json!(vec![
-                            "2019-01-01T00:00:00.000Z".to_string(),
-                            "2019-01-31T23:59:59.999Z".to_string()
-                        ]))
-                    } else {
-                        // Non-optimal variant with top down extractor disabled
-                        Some(json!(vec![
-                            "2019-01-01 00:00:00.000".to_string(),
-                            "2019-01-31 23:59:59.999".to_string()
-                        ]))
-                    }
+                    date_range: Some(json!(vec![
+                        "2019-01-01T00:00:00.000Z".to_string(),
+                        "2019-01-31T23:59:59.999Z".to_string()
+                    ]))
                 }]),
                 order: Some(vec![]),
                 ..Default::default()
