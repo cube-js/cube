@@ -6,14 +6,12 @@ use super::{
     },
 };
 use crate::wrappers::{
-    context::{NativeContext, NativeContextHolder},
-    object::NativeObject,
-    object_handle::NativeObjectHandle,
+    context::NativeContext, object::NativeObject, object_handle::NativeObjectHandle,
 };
 use cubesql::CubeError;
 use neon::prelude::*;
 use std::{
-    cell::{RefCell, RefMut},
+    cell::RefCell,
     marker::PhantomData,
     panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
     rc::{Rc, Weak},
