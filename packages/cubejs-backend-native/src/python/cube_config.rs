@@ -47,6 +47,7 @@ impl CubeConfigPy {
             "logger",
             "context_to_app_id",
             "context_to_orchestrator_id",
+            "context_to_cube_store_router_id",
             "driver_factory",
             "external_driver_factory",
             "db_type",
