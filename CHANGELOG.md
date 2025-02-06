@@ -3,17 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [1.2.1](https://github.com/cube-js/cube/compare/v1.2.0...v1.2.1) (2025-02-06)
+## [1.2.2](https://github.com/cube-js/cube/compare/v1.2.1...v1.2.2) (2025-02-06)
 
+### Bug Fixes
+
+- **dremio-driver:** Correct dremio date interval functions ([#9193](https://github.com/cube-js/cube/issues/9193)) ([7cf2287](https://github.com/cube-js/cube/commit/7cf2287e165beff948ddd88eb47bd0048812aa9b))
+- **schema-compiler:** Fix queries with time dimensions without granularities don't hit pre-aggregations with allow_non_strict_date_range_match=true ([#9102](https://github.com/cube-js/cube/issues/9102)) ([eff0736](https://github.com/cube-js/cube/commit/eff073629261c687416a92b8876e46a522bdd1d8))
+- **testing:** avoid cypress crashes ([#9196](https://github.com/cube-js/cube/issues/9196)) ([364d181](https://github.com/cube-js/cube/commit/364d1812d5b3aff85bfbfbb82f6d8d2217d8a4ab))
 
 ### Features
 
-* **schema-compiler:** Move transpiling to worker threads (under the flag) ([#9188](https://github.com/cube-js/cube/issues/9188)) ([7451452](https://github.com/cube-js/cube/commit/745145283b42c891e0e063c4cad1e2102c71616a))
-* **tesseract:** Subqueries support ([#9108](https://github.com/cube-js/cube/issues/9108)) ([0dbf3bb](https://github.com/cube-js/cube/commit/0dbf3bb866b731f97b5588b0e620c3be7cbf9e5b))
+- **cubejs-server-core:** add contextToCubeStoreRouterId config option ([#9197](https://github.com/cube-js/cube/issues/9197)) ([6ee0e41](https://github.com/cube-js/cube/commit/6ee0e416761799acd064ad88241519ad2e1992f4))
 
+## [1.2.1](https://github.com/cube-js/cube/compare/v1.2.0...v1.2.1) (2025-02-06)
 
+### Features
 
-
+- **schema-compiler:** Move transpiling to worker threads (under the flag) ([#9188](https://github.com/cube-js/cube/issues/9188)) ([7451452](https://github.com/cube-js/cube/commit/745145283b42c891e0e063c4cad1e2102c71616a))
+- **tesseract:** Subqueries support ([#9108](https://github.com/cube-js/cube/issues/9108)) ([0dbf3bb](https://github.com/cube-js/cube/commit/0dbf3bb866b731f97b5588b0e620c3be7cbf9e5b))
 
 # [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
 
