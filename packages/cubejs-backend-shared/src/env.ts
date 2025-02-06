@@ -1147,8 +1147,8 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource: string,
   }) => (
     process.env[
-      keyByDataSource('CUBEJS_DB_CLICKHOUSE_SORT_COLLATION', dataSource) || 'en'
-    ]
+      keyByDataSource('CUBEJS_DB_CLICKHOUSE_SORT_COLLATION', dataSource)
+    ] || 'en'
   ),
 
   /**
