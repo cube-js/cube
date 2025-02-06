@@ -2,11 +2,13 @@ use crate::{
     compile::{
         engine::udf::{MEASURE_UDAF_NAME, PATCH_MEASURE_UDAF_NAME},
         rewrite::{
-            aggregate, alias_expr, cube_scan_wrapper, grouping_set_expr, original_expr_name,
-            rewrite,
+            agg_fun_expr, aggregate, alias_expr,
+            analysis::ConstantFolding,
+            binary_expr, case_expr, column_expr, cube_scan_wrapper, grouping_set_expr,
+            literal_null, original_expr_name, rewrite,
             rewriter::{CubeEGraph, CubeRewrite},
             rules::{members::MemberRules, wrapper::WrapperRules},
-            subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
+            subquery, transforming_chain_rewrite, transforming_rewrite, udaf_expr, wrapped_select,
             wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
             wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
             wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
@@ -319,6 +321,84 @@ impl WrapperRules {
                 "GroupingSetExprMembers",
             );
         }
+
+        // incoming structure: agg_fun(?name, case(?cond, (?when_value, measure_column)))
+        // optional "else null" is fine
+        // only single when-then
+        rules.extend(vec![
+            transforming_chain_rewrite(
+                "wrapper-push-down-aggregation-over-filtered-measure",
+                wrapper_pushdown_replacer("?aggr_expr", "?context"),
+                vec![
+                    (
+                        "?aggr_expr",
+                        agg_fun_expr(
+                            "?fun",
+                            vec![case_expr(
+                                Some("?case_expr".to_string()),
+                                vec![("?literal".to_string(), column_expr("?measure_column"))],
+                                // TODO make `ELSE NULL` optional and/or add generic rewrite to normalize it
+                                Some(literal_null()),
+                            )],
+                            "?distinct",
+                        ),
+                    ),
+                    (
+                        "?context",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
+                    ),
+                ],
+                alias_expr(
+                    udaf_expr(
+                        PATCH_MEASURE_UDAF_NAME,
+                        vec![
+                            column_expr("?measure_column"),
+                            // TODO support doing both: changing agg type and adding filters
+                            literal_null(),
+                            wrapper_pushdown_replacer(
+                                // = is a proper way to filter here:
+                                // CASE NULL WHEN ... will return null
+                                // So NULL in ?case_expr is equivalent to hitting ELSE branch
+                                // TODO add "is not null" to cond? just to make is always boolean
+                                binary_expr("?case_expr", "=", "?literal"),
+                                "?context",
+                            ),
+                        ],
+                    ),
+                    "?out_measure_alias",
+                ),
+                self.transform_filtered_measure("?aggr_expr", "?literal", "?out_measure_alias"),
+            ),
+            rewrite(
+                "wrapper-pull-up-aggregation-over-filtered-measure",
+                udaf_expr(
+                    PATCH_MEASURE_UDAF_NAME,
+                    vec![
+                        column_expr("?measure_column"),
+                        "?new_agg_type".to_string(),
+                        wrapper_pullup_replacer("?filter_expr", "?context"),
+                    ],
+                ),
+                wrapper_pullup_replacer(
+                    udaf_expr(
+                        PATCH_MEASURE_UDAF_NAME,
+                        vec![
+                            column_expr("?measure_column"),
+                            "?new_agg_type".to_string(),
+                            "?filter_expr".to_string(),
+                        ],
+                    ),
+                    "?context",
+                ),
+            ),
+        ]);
     }
 
     pub fn aggregate_rules_subquery(&self, rules: &mut Vec<CubeRewrite>) {
@@ -1042,6 +1122,40 @@ impl WrapperRules {
                 &meta,
                 disable_strict_agg_type_match,
             )
+        }
+    }
+
+    fn transform_filtered_measure(
+        &self,
+        aggr_expr_var: &'static str,
+        literal_var: &'static str,
+        out_measure_alias_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let aggr_expr_var = var!(aggr_expr_var);
+        let literal_var = var!(literal_var);
+        let out_measure_alias_var = var!(out_measure_alias_var);
+
+        move |egraph, subst| {
+            match &egraph[subst[literal_var]].data.constant {
+                Some(ConstantFolding::Scalar(_)) => {
+                    // Do nothing
+                }
+                _ => {
+                    return false;
+                }
+            }
+
+            // TODO share code with Self::pushdown_measure: locate cube and measure, check that ?fun matches measure, etc
+            // TODO support both changing agg fun and add filter
+
+            let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
+                return false;
+            };
+            let alias_expr_alias =
+                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias)));
+            subst.insert(out_measure_alias_var, alias_expr_alias);
+
+            true
         }
     }
 }
