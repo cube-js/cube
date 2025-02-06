@@ -123,6 +123,7 @@ export type DatabaseType =
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
@@ -190,6 +191,7 @@ export interface CreateOptions {
   contextToAppId?: ContextToAppIdFn;
   contextToRoles?: ContextToRolesFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuth?: CheckAuthFn;
