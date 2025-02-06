@@ -97,7 +97,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build only
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           context: ./rust/cubestore/
           file: ./rust/cubestore/Dockerfile
