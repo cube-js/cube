@@ -141,7 +141,9 @@ export class DatabricksQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    // Use ` to escape ` itself.
+    // https://docs.databricks.com/en/sql/language-manual/sql-ref-identifiers.html
+    return `\`${name.replaceAll('`', '``')}\``;
   }
 
   public getFieldIndex(id: string) {
