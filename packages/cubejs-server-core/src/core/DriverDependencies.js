@@ -30,4 +30,6 @@ module.exports = {
   pinot: '@cubejs-backend/pinot-driver',
   // List for JDBC drivers
   'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
+  azurefabric: '@cubejs-backend/azurefabric-driver',
+  
 };
