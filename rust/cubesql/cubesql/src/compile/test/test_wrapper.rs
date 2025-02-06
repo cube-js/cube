@@ -1801,3 +1801,104 @@ async fn wrapper_min_from_avg_measure() {
         }
     );
 }
+
+#[tokio::test]
+async fn test_ad_hoc_measure_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"SELECT
+    dim_str0,
+    AVG(
+        CASE (
+            (
+                CAST(TRUNC(EXTRACT(YEAR FROM dim_date0)) AS INTEGER) = 2024
+            )
+            AND
+            (
+                CAST(TRUNC(EXTRACT(MONTH FROM dim_date0)) AS INTEGER) <= 11
+            )
+        )
+        WHEN TRUE
+        THEN avgPrice
+        ELSE NULL
+        END
+    ),
+    SUM(
+        CASE (dim_str1 = 'foo')
+        WHEN TRUE
+        THEN maxPrice
+        ELSE NULL
+        END
+    )
+FROM MultiTypeCube
+GROUP BY
+    1
+;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert_eq!(
+        query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .request,
+        TransportLoadRequestQuery {
+            measures: Some(vec![
+                json!({
+                    "cubeName": "MultiTypeCube",
+                    "alias": "avg_case_cast_tr",
+                    "expr": {
+                        "type": "PatchMeasure",
+                        "sourceMeasure": "MultiTypeCube.avgPrice",
+                        "replaceAggregationType": null,
+                        "addFilters": [{
+                            "cubeParams": ["MultiTypeCube"],
+                            "sql": "(((CAST(TRUNC(EXTRACT(YEAR FROM ${MultiTypeCube.dim_date0})) AS INTEGER) = 2024) AND (CAST(TRUNC(EXTRACT(MONTH FROM ${MultiTypeCube.dim_date0})) AS INTEGER) <= 11)) = TRUE)"
+                        }],
+                    },
+                    "groupingSet": null,
+                }).to_string(),
+                json!({
+                    "cubeName": "MultiTypeCube",
+                    "alias": "sum_case_multity",
+                    "expr": {
+                        "type": "PatchMeasure",
+                        "sourceMeasure": "MultiTypeCube.maxPrice",
+                        "replaceAggregationType": "sum",
+                        "addFilters": [{
+                            "cubeParams": ["MultiTypeCube"],
+                            "sql": "((${MultiTypeCube.dim_str1} = $0$) = TRUE)"
+                        }],
+                    },
+                    "groupingSet": null,
+                }).to_string(),
+            ]),
+            dimensions: Some(vec![json!({
+                "cubeName": "MultiTypeCube",
+                "alias": "dim_str0",
+                "expr": {
+                    "type": "SqlFunction",
+                    "cubeParams": ["MultiTypeCube"],
+                    "sql": "${MultiTypeCube.dim_str0}",
+                },
+                "groupingSet": null,
+            }).to_string(),]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+}
