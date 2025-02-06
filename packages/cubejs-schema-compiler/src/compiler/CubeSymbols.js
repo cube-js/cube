@@ -8,7 +8,7 @@ import { camelizeCube } from './utils';
 import { BaseQuery } from '../adapter';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
-const CONTEXT_SYMBOLS = {
+export const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
   // SECURITY_CONTEXT has been deprecated, however security_context (lowecase)
   // is allowed in RBAC policies for query-time attribute matching
@@ -19,7 +19,7 @@ const CONTEXT_SYMBOLS = {
   SQL_UTILS: 'sqlUtils'
 };
 
-const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
+export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
 export class CubeSymbols {
   constructor(evaluateViews) {

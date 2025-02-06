@@ -64,6 +64,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     contextCompilers: [contextEvaluator],
     cubeFactory: cubeSymbols.createCube.bind(cubeSymbols),
     compilerCache,
+    cubeDictionary,
+    cubeSymbols,
     extensions: {
       Funnels,
       RefreshKeys,

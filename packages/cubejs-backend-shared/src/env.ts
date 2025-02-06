@@ -193,6 +193,12 @@ const variables: Record<string, (...args: any) => any> = {
     .default('1')
     .asInt(),
   nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').asBool(),
+  transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
+    .default('false')
+    .asBoolStrict(),
+  transpilationWorkerThreadsCount: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
+    .default('0')
+    .asInt(),
 
   /** ****************************************************************
    * Common db options                                               *
