@@ -184,6 +184,14 @@ export class ClickHouseQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
+  public getCollation() {
+    const useCollation = getEnv('clickhouseUseCollation', { dataSource: this.dataSource });
+    if (useCollation) {
+      return getEnv('clickhouseSortCollation', { dataSource: this.dataSource });
+    }
+    return null;
+  }
+
   public override orderBy() {
     //
     // ClickHouse orders string by bytes, so we need to use COLLATE 'en' to order by string
@@ -192,12 +200,12 @@ export class ClickHouseQuery extends BaseQuery {
       return '';
     }
 
-    const collation = getEnv('clickhouseSortCollation');
+    const collation = this.getCollation();
 
     const orderByString = R.pipe(
       R.map((order) => {
         let orderString = this.orderHashToString(order);
-        if (this.getFieldType(order) === 'string') && collation !== '' {
+        if (collation && this.getFieldType(order) === 'string') {
           orderString = `${orderString} COLLATE '${collation}'`;
         }
         return orderString;
@@ -326,6 +334,22 @@ export class ClickHouseQuery extends BaseQuery {
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
     delete templates.types.binary;
+
+    const collation = this.getCollation();
+
+    if (collation) {
+      templates.expressions.sort = `${templates.expressions.sort}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
+      templates.expressions.order_by = `${templates.expressions.order_by}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
+
+      const oldOrderBy = '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}';
+
+      const newOrderBy =
+        '{% if order_by %}\nORDER BY {% for item in order_by %}{{ item.expr }}' +
+        `{%- if item.data_type and item.data_type == 'string' %} COLLATE '${collation}'{% endif %}` +
+        '{%- if not loop.last %}, {% endif %}{% endfor %}{% endif %}';
+
+      templates.statements.select = templates.statements.select.replace(oldOrderBy, newOrderBy);
+    }
     return templates;
   }
 }

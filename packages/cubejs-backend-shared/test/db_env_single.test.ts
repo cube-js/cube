@@ -992,6 +992,34 @@ describe('Single datasources', () => {
     expect(getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("clickhouseUseCollation")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION = 'true';
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toEqual(true);
+  
+    process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION = 'false';
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toEqual(false);
+  
+    process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION = 'wrong';
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'default' })).toThrow(
+      'The CUBEJS_DB_CLICKHOUSE_USE_COLLATION must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toThrow(
+      'The CUBEJS_DB_CLICKHOUSE_USE_COLLATION must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toThrow(
+      'The CUBEJS_DB_CLICKHOUSE_USE_COLLATION must be either \'true\' or \'false\'.'
+    );
+  
+    delete process.env.CUBEJS_DB_CLICKHOUSE_USE_COLLATION;
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('clickhouseUseCollation', { dataSource: 'wrong' })).toEqual(true);
+  });
+
   test('getEnv("elasticApiId")', () => {
     process.env.CUBEJS_DB_ELASTIC_APIKEY_ID = 'default1';
     expect(getEnv('elasticApiId', { dataSource: 'default' })).toEqual('default1');
