@@ -24,7 +24,7 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     execution::context::SessionContext,
-    logical_plan::{create_udaf, create_udf},
+    logical_plan::create_udf,
     physical_plan::{
         functions::{
             datetime_expressions::date_trunc, make_scalar_function, make_table_function, Signature,
@@ -2260,13 +2260,30 @@ pub fn create_pg_get_constraintdef_udf() -> ScalarUDF {
 }
 
 pub fn create_measure_udaf() -> AggregateUDF {
-    create_udaf(
+    let signature = Signature::any(1, Volatility::Immutable);
+
+    // MEASURE(cube.measure) should have same type as just cube.measure
+    let return_type: ReturnTypeFunction = Arc::new(move |inputs| {
+        if inputs.len() != 1 {
+            Err(DataFusionError::Internal(format!(
+                "Unexpected argument types for MEASURE: {inputs:?}"
+            )))
+        } else {
+            Ok(Arc::new(inputs[0].clone()))
+        }
+    });
+
+    let accumulator: AccumulatorFunctionImplementation = Arc::new(|| todo!("Not implemented"));
+
+    let state_type = Arc::new(vec![DataType::Float64]);
+    let state_type: StateTypeFunction = Arc::new(move |_| Ok(state_type.clone()));
+
+    AggregateUDF::new(
         "measure",
-        DataType::Float64,
-        Arc::new(DataType::Float64),
-        Volatility::Immutable,
-        Arc::new(|| todo!("Not implemented")),
-        Arc::new(vec![DataType::Float64]),
+        &signature,
+        &return_type,
+        &accumulator,
+        &state_type,
     )
 }
 
