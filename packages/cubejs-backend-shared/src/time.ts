@@ -25,6 +25,8 @@ export const TIME_SERIES: Record<string, (range: DateRange, timestampPrecision: 
     .map(d => [d.format(`YYYY-MM-DDTHH:mm:00.${'0'.repeat(digits)}`), d.format(`YYYY-MM-DDTHH:mm:59.${'9'.repeat(digits)}`)]),
   second: (range: DateRange, digits) => Array.from(range.snapTo('second').by('second'))
     .map(d => [d.format(`YYYY-MM-DDTHH:mm:ss.${'0'.repeat(digits)}`), d.format(`YYYY-MM-DDTHH:mm:ss.${'9'.repeat(digits)}`)]),
+  millisecond: (range: DateRange, digits) => Array.from(range.snapTo('millisecond').by('millisecond'))
+    .map(d => [d.format(`YYYY-MM-DDTHH:mm:ss.SSS${'0'.repeat(Math.max(digits - 3, 0))}`), d.format(`YYYY-MM-DDTHH:mm:ss.SSS${'9'.repeat(Math.max(digits - 3, 0))}`)]),
   week: (range: DateRange, digits) => Array.from(range.snapTo(<unitOfTime.Diff>'isoWeek').by('week'))
     .map(d => [d.startOf('isoWeek').format(`YYYY-MM-DDT00:00:00.${'0'.repeat(digits)}`), d.endOf('isoWeek').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
   quarter: (range: DateRange, digits) => Array.from(range.snapTo('quarter').by('quarter'))
