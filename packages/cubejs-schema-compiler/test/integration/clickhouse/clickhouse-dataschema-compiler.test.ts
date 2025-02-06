@@ -411,6 +411,9 @@ describe('ClickHouse DataSchemaCompiler', () => {
     });
     logSqlAndParams(query);
 
+    const collation = query.getCollation();
+    expect(collation).toEqual('en');
+
     const sqlAndParams = query.buildSqlAndParams();
     const res = await dbRunner.testQuery(sqlAndParams);
     const sql = sqlAndParams[0];

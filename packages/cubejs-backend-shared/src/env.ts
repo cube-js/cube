@@ -1141,15 +1141,16 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * ClickHouse sort collation.
    */
-  clickhouseSortCollation: ({
-    dataSource
-  }: {
-    dataSource: string,
-  }) => (
-    process.env[
+  clickhouseSortCollation: ({ dataSource }: {dataSource: string }) => {
+    const val = process.env[
       keyByDataSource('CUBEJS_DB_CLICKHOUSE_SORT_COLLATION', dataSource)
-    ] || 'en'
-  ),
+    ];
+    if (!val) {
+      // Default to 'en' collation
+      return 'en';
+    }
+    return val;
+  },
 
   /**
    * Clickhouse use collation flag.
