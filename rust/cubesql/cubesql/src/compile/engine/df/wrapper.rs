@@ -1,6 +1,9 @@
 use crate::{
     compile::{
-        engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
+        engine::{
+            df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
+            udf::MEASURE_UDAF_NAME,
+        },
         rewrite::{
             extract_exprlist_from_groupping_set,
             rules::{
@@ -2862,7 +2865,55 @@ impl CubeScanWrapperNode {
                         })?;
                     Ok((resulting_sql, sql_query))
                 }
-                // Expr::AggregateUDF { .. } => {}
+                Expr::AggregateUDF { ref fun, ref args } => {
+                    match fun.name.as_str() {
+                        // TODO allow this only in agg expr
+                        MEASURE_UDAF_NAME => {
+                            let Some(PushToCubeContext {
+                                ungrouped_scan_node,
+                                ..
+                            }) = push_to_cube_context
+                            else {
+                                return Err(DataFusionError::Internal(format!(
+                                    "Unexpected {} UDAF expression without push-to-Cube context: {expr}",
+                                    fun.name,
+                                )));
+                            };
+
+                            let measure_column = match args.as_slice() {
+                                [Expr::Column(measure_column)] => measure_column,
+                                _ => {
+                                    return Err(DataFusionError::Internal(format!(
+                                        "Unexpected arguments for {} UDAF: {expr}",
+                                        fun.name,
+                                    )))
+                                }
+                            };
+
+                            let member = Self::find_member_in_ungrouped_scan(
+                                ungrouped_scan_node,
+                                measure_column,
+                            )?;
+
+                            let MemberField::Member(member) = member else {
+                                return Err(DataFusionError::Internal(format!(
+                                    "First argument for {} UDAF should reference member, not literal: {expr}",
+                                    fun.name,
+                                )));
+                            };
+
+                            if let Some(used_members) = used_members {
+                                used_members.insert(member.clone());
+                            }
+
+                            Ok((format!("${{{member}}}"), sql_query))
+                        }
+                        _ => Err(DataFusionError::Internal(format!(
+                            "Can't generate SQL for UDAF: {}",
+                            fun.name
+                        ))),
+                    }
+                }
                 Expr::InList {
                     expr,
                     list,

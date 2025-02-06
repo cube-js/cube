@@ -1,19 +1,22 @@
 use crate::{
-    compile::rewrite::{
-        aggregate,
-        analysis::LogicalPlanData,
-        cube_scan_wrapper, grouping_set_expr, original_expr_name, rewrite,
-        rewriter::{CubeEGraph, CubeRewrite},
-        rules::{members::MemberRules, wrapper::WrapperRules},
-        subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
-        wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
-        wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
-        wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
-        wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
-        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        wrapper_replacer_context, AggregateFunctionExprDistinct, AggregateFunctionExprFun,
-        AliasExprAlias, ColumnExprColumn, ListType, LogicalPlanLanguage, WrappedSelectPushToCube,
-        WrapperReplacerContextAliasToCube, WrapperReplacerContextPushToCube,
+    compile::{
+        engine::udf::MEASURE_UDAF_NAME,
+        rewrite::{
+            aggregate, alias_expr, cube_scan_wrapper, grouping_set_expr, original_expr_name,
+            rewrite,
+            rewriter::{CubeEGraph, CubeRewrite},
+            rules::{members::MemberRules, wrapper::WrapperRules},
+            subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
+            wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
+            wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
+            wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
+            wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
+            wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
+            wrapper_pushdown_replacer, wrapper_replacer_context, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, ColumnExprColumn,
+            ListType, LogicalPlanData, LogicalPlanLanguage, WrappedSelectPushToCube,
+            WrapperReplacerContextAliasToCube, WrapperReplacerContextPushToCube,
+        },
     },
     copy_flag,
     transport::V1CubeMetaMeasureExt,
@@ -250,7 +253,7 @@ impl WrapperRules {
                     ),
                     vec![("?aggr_expr", aggr_expr)],
                     wrapper_pullup_replacer(
-                        "?measure",
+                        alias_expr("?out_measure_expr", "?out_measure_alias"),
                         wrapper_replacer_context(
                             "?alias_to_cube",
                             "WrapperReplacerContextPushToCube:true",
@@ -267,7 +270,8 @@ impl WrapperRules {
                         distinct,
                         cast_data_type,
                         "?cube_members",
-                        "?measure",
+                        "?out_measure_expr",
+                        "?out_measure_alias",
                     ),
                 )
             },
@@ -827,7 +831,8 @@ impl WrapperRules {
         // TODO support cast push downs
         _cast_data_type_var: Option<&'static str>,
         cube_members_var: &'static str,
-        measure_out_var: &'static str,
+        out_expr_var: &'static str,
+        out_alias_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
@@ -835,7 +840,8 @@ impl WrapperRules {
         let distinct_var = distinct_var.map(|v| var!(v));
         // let cast_data_type_var = cast_data_type_var.map(|v| var!(v));
         let cube_members_var = var!(cube_members_var);
-        let measure_out_var = var!(measure_out_var);
+        let out_expr_var = var!(out_expr_var);
+        let out_alias_var = var!(out_alias_var);
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
@@ -889,23 +895,34 @@ impl WrapperRules {
                                                 egraph.add(LogicalPlanLanguage::ColumnExprColumn(
                                                     ColumnExprColumn(column.clone()),
                                                 ));
-
                                             let column_expr =
                                                 egraph.add(LogicalPlanLanguage::ColumnExpr([
                                                     column_expr_column,
                                                 ]));
+                                            let udaf_name_expr = egraph.add(
+                                                LogicalPlanLanguage::AggregateUDFExprFun(
+                                                    AggregateUDFExprFun(
+                                                        MEASURE_UDAF_NAME.to_string(),
+                                                    ),
+                                                ),
+                                            );
+                                            let udaf_args_expr = egraph.add(
+                                                LogicalPlanLanguage::AggregateUDFExprArgs(vec![
+                                                    column_expr,
+                                                ]),
+                                            );
+                                            let udaf_expr =
+                                                egraph.add(LogicalPlanLanguage::AggregateUDFExpr(
+                                                    [udaf_name_expr, udaf_args_expr],
+                                                ));
+
+                                            subst.insert(out_expr_var, udaf_expr);
+
                                             let alias_expr_alias =
                                                 egraph.add(LogicalPlanLanguage::AliasExprAlias(
                                                     AliasExprAlias(alias.clone()),
                                                 ));
-
-                                            let alias_expr =
-                                                egraph.add(LogicalPlanLanguage::AliasExpr([
-                                                    column_expr,
-                                                    alias_expr_alias,
-                                                ]));
-
-                                            subst.insert(measure_out_var, alias_expr);
+                                            subst.insert(out_alias_var, alias_expr_alias);
 
                                             return true;
                                         }
