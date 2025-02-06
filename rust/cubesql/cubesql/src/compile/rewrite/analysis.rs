@@ -1,5 +1,6 @@
 use crate::{
     compile::{
+        engine::udf::MEASURE_UDAF_NAME,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
             expr_column_name,
@@ -389,7 +390,7 @@ impl LogicalPlanAnalysis {
                 Some(trivial)
             }
             LogicalPlanLanguage::AggregateUDFExprFun(AggregateUDFExprFun(fun)) => {
-                if fun.to_lowercase() == "measure" {
+                if fun.to_lowercase() == MEASURE_UDAF_NAME {
                     Some(0)
                 } else {
                     None
