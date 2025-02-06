@@ -2,7 +2,12 @@ import * as t from '@babel/types';
 import R from 'ramda';
 
 import type { NodePath } from '@babel/traverse';
-import type { TranspilerInterface, TraverseObject } from './transpiler.interface';
+import {
+  TranspilerCubeResolver,
+  TranspilerInterface,
+  TranspilerSymbolResolver,
+  TraverseObject
+} from './transpiler.interface';
 import type { CubeSymbols } from '../CubeSymbols';
 import type { CubeDictionary } from '../CubeDictionary';
 
@@ -39,9 +44,9 @@ transpiledFieldsPatterns?.forEach((r) => {
 
 export class CubePropContextTranspiler implements TranspilerInterface {
   public constructor(
-    protected readonly cubeSymbols: CubeSymbols,
-    protected readonly cubeDictionary: CubeDictionary,
-    protected readonly viewCompiler: CubeSymbols,
+    protected readonly cubeSymbols: TranspilerSymbolResolver,
+    protected readonly cubeDictionary: TranspilerCubeResolver,
+    protected readonly viewCompiler: TranspilerSymbolResolver,
   ) {
   }
 
