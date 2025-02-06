@@ -1,4 +1,5 @@
 const { BaseFilter, BaseQuery } = require('@cubejs-backend/schema-compiler');
+const { parseSqlInterval } = require('@cubejs-backend/shared');
 
 const GRANULARITY_TO_INTERVAL = {
   week: (date) => `DATE_TRUNC('week', ${date})`,
@@ -55,15 +56,39 @@ class DremioQuery extends BaseQuery {
   }
 
   dateTimeCast(value) {
-    return `TO_TIMESTAMP(${value})`;
+    return `TO_TIMESTAMP(${value}, 'YYYY-MM-DD"T"HH24:MI:SS.FFF')`;
   }
 
   subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL ${interval})`;
+    const formattedTimeIntervals = this.formatInterval(interval);
+    const intervalFormatted = formattedTimeIntervals[0];
+    const timeUnit = formattedTimeIntervals[1];
+    return `DATE_SUB(${date}, CAST(${intervalFormatted} as INTERVAL ${timeUnit}))`;
   }
 
   addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL ${interval})`;
+    const formattedTimeIntervals = this.formatInterval(interval);
+    const intervalFormatted = formattedTimeIntervals[0];
+    const timeUnit = formattedTimeIntervals[1];
+    return `DATE_ADD(${date}, CAST(${intervalFormatted} as INTERVAL ${timeUnit}))`;
+  }
+
+  /**
+   * @param {string} timestamp
+   * @param {string} interval
+   * @returns {string}
+   */
+  addTimestampInterval(timestamp, interval) {
+    return this.addInterval(timestamp, interval);
+  }
+
+  /**
+   * @param {string} timestamp
+   * @param {string} interval
+   * @returns {string}
+   */
+  subtractTimestampInterval(timestamp, interval) {
+    return this.subtractInterval(timestamp, interval);
   }
 
   timeGroupedColumn(granularity, dimension) {
@@ -78,7 +103,8 @@ class DremioQuery extends BaseQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
-    return `SELECT TO_TIMESTAMP(dates.f, 'YYYY-MM-DDTHH:MI:SS.FFF') date_from, TO_TIMESTAMP(dates.t, 'YYYY-MM-DDTHH:MI:SS.FFF') date_to FROM (${values}) AS dates`;
+
+    return `SELECT TO_TIMESTAMP(dates.f, 'YYYY-MM-DD"T"HH24:MI:SS.FFF') date_from, TO_TIMESTAMP(dates.t, 'YYYY-MM-DD"T"HH24:MI:SS.FFF') date_to FROM (${values}) AS dates`;
   }
 
   concatStringsSql(strings) {
@@ -91,6 +117,55 @@ class DremioQuery extends BaseQuery {
 
   wrapSegmentForDimensionSelect(sql) {
     return `IF(${sql}, 1, 0)`;
+  }
+
+  /**
+   * The input interval with (possible) plural units, like "1 hour 2 minutes", "2 year", "3 months", "4 weeks", "5 days", "3 months 24 days 15 minutes", ...
+   * will be converted to Dremio dialect.
+   * @see https://docs.dremio.com/24.3.x/reference/sql/sql-functions/functions/DATE_ADD/
+   * @see https://docs.dremio.com/24.3.x/reference/sql/sql-functions/functions/DATE_SUB/
+   * It returns a tuple of (formatted interval, timeUnit to use in date functions)
+   * This function only supports the following scenarios for now:
+   *   ie. n year[s] or n quarter[s] or n month[s] or n week[s] or n day[s]
+   */
+  formatInterval(interval) {
+    const intervalParsed = parseSqlInterval(interval);
+    const intKeys = Object.keys(intervalParsed).length;
+
+    if (intervalParsed.year && intKeys === 1) {
+      return [`${intervalParsed.year}`, 'YEAR'];
+    } else if (intervalParsed.quarter && intKeys === 1) {
+      // dremio interval does not support quarter. Convert to month
+      return [`${intervalParsed.quarter * 3}`, 'MONTH'];
+    } else if (intervalParsed.week && intKeys === 1) {
+      // dremio interval does not support week. Convert to days
+      return [`${intervalParsed.week * 7}`, 'DAY'];
+    } else if (intervalParsed.month && intKeys === 1) {
+      return [`${intervalParsed.month}`, 'MONTH'];
+    } else if (intervalParsed.month && intKeys === 1) {
+      return [`${intervalParsed.day}`, 'DAY'];
+    } else if (intervalParsed.hour && intKeys === 1) {
+      return [`${intervalParsed.hour}`, 'HOUR'];
+    } else if (intervalParsed.minute && intKeys === 1) {
+      return [`${intervalParsed.minute}`, 'MINUTE'];
+    } else if (intervalParsed.second && intKeys === 1) {
+      return [`${intervalParsed.second}`, 'SECOND'];
+    }
+
+    throw new Error(`Cannot transform interval expression "${interval}" to Dremio dialect`);
+  }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.DATETRUNC = 'DATE_TRUNC(\'{{ date_part }}\', {{ args_concat }})';
+    templates.functions.DATEPART = 'DATE_PART(\'{{ date_part }}\', {{ args_concat }})';
+    // really need the date locale formatting here...
+    templates.functions.DATE = 'TO_DATE({{ args_concat }},\'YYYY-MM-DD\', 1)';
+    templates.functions.DATEDIFF = 'DATE_DIFF(DATE, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
+    templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
+    templates.quotes.identifiers = '"';
+    return templates;
   }
 }
 
