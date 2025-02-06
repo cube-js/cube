@@ -29691,6 +29691,11 @@ wordwrap@^1.0.0:
   resolved "https://registry.yarnpkg.com/wordwrap/-/wordwrap-1.0.0.tgz#27584810891456a4171c8d0226441ade90cbcaeb"
   integrity sha1-J1hIEIkUVqQXHI0CJkQa3pDLyus=
 
+workerpool@^9.2.0:
+  version "9.2.0"
+  resolved "https://registry.yarnpkg.com/workerpool/-/workerpool-9.2.0.tgz#f74427cbb61234708332ed8ab9cbf56dcb1c4371"
+  integrity sha512-PKZqBOCo6CYkVOwAxWxQaSF2Fvb5Iv2fCeTP7buyWI2GiynWr46NcXSgK/idoV6e60dgCBfgYc+Un3HMvmqP8w==
+
 "wrap-ansi-cjs@npm:wrap-ansi@^7.0.0":
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/wrap-ansi/-/wrap-ansi-7.0.0.tgz#67e145cff510a6a6984bdf1152911d69d2eb9e43"

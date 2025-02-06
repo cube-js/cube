@@ -6,8 +6,9 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
+import workerpool from 'workerpool';
 
-import { isNativeSupported } from '@cubejs-backend/shared';
+import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
 
@@ -26,6 +27,8 @@ export class DataSchemaCompiler {
     this.preTranspileCubeCompilers = options.preTranspileCubeCompilers || [];
     this.cubeNameCompilers = options.cubeNameCompilers || [];
     this.extensions = options.extensions || {};
+    this.cubeDictionary = options.cubeDictionary;
+    this.cubeSymbols = options.cubeSymbols;
     this.cubeFactory = options.cubeFactory;
     this.filesToCompile = options.filesToCompile;
     this.omitErrors = options.omitErrors;
@@ -38,6 +41,7 @@ export class DataSchemaCompiler {
     this.yamlCompiler = options.yamlCompiler;
     this.yamlCompiler.dataSchemaCompiler = this;
     this.pythonContext = null;
+    this.workerPool = null;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -87,17 +91,52 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
-    // TODO: required in order to get pre transpile compilation work
-    const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
+    if (getEnv('transpilationWorkerThreads')) {
+      const wc = getEnv('transpilationWorkerThreadsCount');
+      this.workerPool = workerpool.pool(
+        path.join(__dirname, 'transpilers/transpiler_worker'),
+        wc > 0 ? { maxWorkers: wc } : undefined,
+      );
+    }
 
-    const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
+    const transpile = async () => {
+      let cubeNames;
+      let cubeSymbolsNames;
+
+      if (getEnv('transpilationWorkerThreads')) {
+        cubeNames = Object.keys(this.cubeDictionary.byId);
+        // We need only cubes and all its member names for transpiling.
+        // Cubes doesn't change during transpiling, but are changed during compilation phase,
+        // so we can prepare them once for every phase.
+        // Communication between main and worker threads uses
+        // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
+        // which doesn't allow passing any function objects, so we need to sanitize the symbols.
+        cubeSymbolsNames = Object.fromEntries(
+          Object.entries(this.cubeSymbols.symbols)
+            .map(
+              ([key, value]) => [key, Object.fromEntries(
+                Object.keys(value).map((k) => [k, true]),
+              )],
+            ),
+        );
+      }
+      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
+      return results.filter(f => !!f);
+    };
+
+    const compilePhase = async (compilers) => this.compileCubeFiles(compilers, await transpile(), errorsReport);
 
     return compilePhase({ cubeCompilers: this.cubeNameCompilers })
       .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
       .then(() => compilePhase({
         cubeCompilers: this.cubeCompilers,
         contextCompilers: this.contextCompilers,
-      }));
+      }))
+      .then(() => {
+        if (this.workerPool) {
+          this.workerPool.terminate();
+        }
+      });
   }
 
   compile() {
@@ -113,7 +152,7 @@ export class DataSchemaCompiler {
     return this.compilePromise;
   }
 
-  transpileFile(file, errorsReport) {
+  async transpileFile(file, errorsReport, options) {
     if (R.endsWith('.jinja', file.fileName) ||
       (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName))
       // TODO do Jinja syntax check with jinja compiler
@@ -132,31 +171,47 @@ export class DataSchemaCompiler {
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       return file;
     } else if (R.endsWith('.js', file.fileName)) {
-      return this.transpileJsFile(file, errorsReport);
+      return this.transpileJsFile(file, errorsReport, options);
     } else {
       return file;
     }
   }
 
-  transpileJsFile(file, errorsReport) {
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbolsNames }) {
     try {
-      const ast = parse(
-        file.content,
-        {
-          sourceFilename: file.fileName,
-          sourceType: 'module',
-          plugins: ['objectRestSpread']
-        },
-      );
+      if (getEnv('transpilationWorkerThreads')) {
+        const data = {
+          fileName: file.fileName,
+          content: file.content,
+          transpilers: this.transpilers.map(t => t.constructor.name),
+          cubeNames,
+          cubeSymbolsNames,
+        };
 
-      this.transpilers.forEach((t) => {
-        errorsReport.inFile(file);
-        babelTraverse(ast, t.traverseObject(errorsReport));
-        errorsReport.exitFile();
-      });
+        const res = await this.workerPool.exec('transpile', [data]);
+        errorsReport.addErrors(res.errors);
+        errorsReport.addWarnings(res.warnings);
 
-      const content = babelGenerator(ast, {}, file.content).code;
-      return Object.assign({}, file, { content });
+        return Object.assign({}, file, { content: res.content });
+      } else {
+        const ast = parse(
+          file.content,
+          {
+            sourceFilename: file.fileName,
+            sourceType: 'module',
+            plugins: ['objectRestSpread'],
+          },
+        );
+
+        this.transpilers.forEach((t) => {
+          errorsReport.inFile(file);
+          babelTraverse(ast, t.traverseObject(errorsReport));
+          errorsReport.exitFile();
+        });
+
+        const content = babelGenerator(ast, {}, file.content).code;
+        return Object.assign({}, file, { content });
+      }
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
         const line = file.content.split('\n')[e.loc.line - 1];
