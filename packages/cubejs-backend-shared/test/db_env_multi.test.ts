@@ -1561,8 +1561,8 @@ describe('Multiple datasources', () => {
     delete process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION;
     delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_SORT_COLLATION;
     delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_SORT_COLLATION;
-    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('en');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('en');
     expect(() => getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );

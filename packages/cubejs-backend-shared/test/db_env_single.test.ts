@@ -987,9 +987,9 @@ describe('Single datasources', () => {
     expect(getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toEqual('default2');
 
     delete process.env.CUBEJS_DB_CLICKHOUSE_SORT_COLLATION;
-    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toBeUndefined();
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'default' })).toEqual('en');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'postgres' })).toEqual('en');
+    expect(getEnv('clickhouseSortCollation', { dataSource: 'wrong' })).toEqual('en');
   });
 
   test('getEnv("clickhouseUseCollation")', () => {
