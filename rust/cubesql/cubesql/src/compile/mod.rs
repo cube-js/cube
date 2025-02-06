@@ -2783,17 +2783,14 @@ limit
 
     #[tokio::test]
     async fn test_select_error() {
-        let variants = [
-            (
-                "SELECT AVG(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
-            ),
+        let variants: &[(&str, _)] = &[
+            // TODO are there any errors that we could test for?
         ];
 
-        for (input_query, expected_error) in variants.iter() {
+        for (input_query, expected_error) in variants {
             let meta = get_test_tenant_ctx();
             let query = convert_sql_to_cube_query(
-                &input_query,
+                input_query,
                 meta.clone(),
                 get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
             )

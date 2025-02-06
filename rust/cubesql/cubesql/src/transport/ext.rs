@@ -10,6 +10,8 @@ pub trait V1CubeMetaMeasureExt {
 
     fn is_same_agg_type(&self, expect_agg_type: &str, disable_strict_match: bool) -> bool;
 
+    fn allow_replace_agg_type(&self, query_agg_type: &str, disable_strict_match: bool) -> bool;
+
     fn get_sql_type(&self) -> ColumnType;
 }
 
@@ -42,6 +44,31 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
                     || agg_type == expect_agg_type
             }
             _ => agg_type == "number" || agg_type == expect_agg_type,
+        }
+    }
+
+    // This should be aligned with BaseMeasure.preparePatchedMeasure
+    // See packages/cubejs-schema-compiler/src/adapter/BaseMeasure.ts:16
+    fn allow_replace_agg_type(&self, query_agg_type: &str, disable_strict_match: bool) -> bool {
+        if disable_strict_match {
+            return true;
+        }
+        let Some(agg_type) = &self.agg_type else {
+            return false;
+        };
+
+        match (agg_type.as_str(), query_agg_type) {
+            (
+                "sum" | "avg" | "min" | "max",
+                "sum" | "avg" | "min" | "max" | "count_distinct" | "count_distinct_approx",
+            ) => true,
+
+            (
+                "count_distinct" | "count_distinct_approx",
+                "count_distinct" | "count_distinct_approx",
+            ) => true,
+
+            _ => false,
         }
     }
 
