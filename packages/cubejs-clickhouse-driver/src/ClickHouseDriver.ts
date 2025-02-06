@@ -142,7 +142,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const dataSource = config.dataSource ?? assertDataSource('default');
     const host = config.host ?? getEnv('dbHost', { dataSource });
     const port = config.port ?? getEnv('dbPort', { dataSource }) ?? 8123;
-    const protocol = config.protocol ?? getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:';
+    const protocol = config.protocol ?? (getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:');
     const url = `${protocol}//${host}:${port}`;
 
     const username = config.username ?? getEnv('dbUser', { dataSource });
