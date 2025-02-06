@@ -13,6 +13,12 @@
       "npmClientArgs": [
         "--frozen-lockfile"
       ]
+    },
+    "version": {
+      "allowBranch": [
+        "master",
+        "lts/*"
+      ]
     }
   }
 }
