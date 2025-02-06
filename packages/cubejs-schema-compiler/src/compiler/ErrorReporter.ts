@@ -137,6 +137,22 @@ export class ErrorReporter {
     }
   }
 
+  public getErrors() {
+    return this.rootReporter().errors;
+  }
+
+  public addErrors(errors: CompilerErrorInterface[]) {
+    this.rootReporter().errors.push(...errors);
+  }
+
+  public getWarnings() {
+    return this.rootReporter().warnings;
+  }
+
+  public addWarnings(warnings: SyntaxErrorInterface[]) {
+    this.rootReporter().warnings.push(...warnings);
+  }
+
   protected rootReporter(): ErrorReporter {
     return this.parent ? this.parent.rootReporter() : this;
   }

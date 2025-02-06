@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.1](https://github.com/cube-js/cube/compare/v1.2.0...v1.2.1) (2025-02-06)
+
+
+### Features
+
+* **schema-compiler:** Move transpiling to worker threads (under the flag) ([#9188](https://github.com/cube-js/cube/issues/9188)) ([7451452](https://github.com/cube-js/cube/commit/745145283b42c891e0e063c4cad1e2102c71616a))
+* **tesseract:** Subqueries support ([#9108](https://github.com/cube-js/cube/issues/9108)) ([0dbf3bb](https://github.com/cube-js/cube/commit/0dbf3bb866b731f97b5588b0e620c3be7cbf9e5b))
+
+
+
+
+
 # [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
 
 ### Bug Fixes
