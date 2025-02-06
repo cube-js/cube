@@ -74,6 +74,7 @@ const schemaOptions = Joi.object().keys({
   contextToAppId: Joi.func(),
   contextToRoles: Joi.func(),
   contextToOrchestratorId: Joi.func(),
+  contextToCubeStoreRouterId: Joi.func(),
   contextToDataSourceId: Joi.func(),
   contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),
