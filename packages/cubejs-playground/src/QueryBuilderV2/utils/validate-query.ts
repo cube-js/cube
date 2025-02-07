@@ -118,7 +118,7 @@ export function validateQuery(query: Record<string, any>): Query {
     sanitizedQuery.segments = query.segments;
   }
 
-  if (typeof query.limit === 'number') {
+  if (typeof query.limit === 'number' && query.limit > 0) {
     sanitizedQuery.limit = query.limit;
   }
 
