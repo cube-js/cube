@@ -274,7 +274,7 @@ impl RewriteRules for MemberRules {
                     "?split",
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
-                    "?old_ungrouped",
+                    "?left_ungrouped",
                 )),
                 cube_scan(
                     "?alias_to_cube",
@@ -288,7 +288,12 @@ impl RewriteRules for MemberRules {
                     "CubeScanWrapped:false",
                     "CubeScanUngrouped:false",
                 ),
-                self.select_distinct_dimensions("?members"),
+                self.select_distinct_dimensions(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?left_ungrouped",
+                ),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -1508,19 +1513,39 @@ impl MemberRules {
 
     fn select_distinct_dimensions(
         &self,
+        alias_to_cube_var: &'static str,
         members_var: &'static str,
+        filters_var: &'static str,
+        left_ungrouped_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
+        let filters_var = var!(filters_var);
+        let left_ungrouped_var = var!(left_ungrouped_var);
         let meta_context = self.meta_context.clone();
 
         move |egraph, subst| {
-            egraph
+            let empty_filters = &egraph
+                .index(subst[filters_var])
+                .data
+                .is_empty_list
+                .unwrap_or(true);
+            let ungrouped = var_iter!(egraph[subst[left_ungrouped_var]], CubeScanUngrouped)
+                .into_iter()
+                .any(|v| *v);
+
+            if !empty_filters && ungrouped {
+                return false;
+            }
+
+            let res = match egraph
                 .index(subst[members_var])
                 .data
                 .member_name_to_expr
                 .as_ref()
-                .map_or(true, |member_names_to_expr| {
-                    !member_names_to_expr.list.iter().all(|(_, member, _)| {
+            {
+                Some(names_to_expr) => {
+                    names_to_expr.list.iter().all(|(_, member, _)| {
                         // we should allow transform for queries with dimensions only,
                         // as it doesn't make sense for measures
                         if let Some(name) = member.name() {
@@ -1532,7 +1557,31 @@ impl MemberRules {
                             true
                         }
                     })
-                })
+                }
+                None => {
+                    // this might be the case of `SELECT DISTINCT *`
+                    // we need to check that there are only dimensions defined in the referenced cube
+                    let aliases_to_cube: Vec<_> =
+                        var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube)
+                            .cloned()
+                            .collect();
+
+                    if let Some(cube_name) = aliases_to_cube
+                        .first()
+                        .and_then(|f| f.first().map(|(_, c)| c))
+                    {
+                        if let Some(cube) = meta_context.find_cube_with_name(cube_name) {
+                            cube.measures.len() == 0 && cube.segments.len() == 0
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+            };
+
+            res
         }
     }
 

@@ -8346,7 +8346,7 @@ ORDER BY "source"."str0" ASC
                 ..Default::default()
             }
         );
-        
+
         let logical_plan = convert_select_to_query_plan(
             "SELECT DISTINCT * FROM KibanaSampleDataEcommerce".to_string(),
             DatabaseProtocol::PostgreSQL,
