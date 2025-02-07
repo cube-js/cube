@@ -16,8 +16,20 @@ export function QueryBuilderSQL() {
     // todo: fix types of normalizedQueries (e.g. order is always an array)
     const [query] = dryRunResponse?.normalizedQueries || [];
 
+    if (isQueryEmpty) {
+      return (
+        <Block padding="1x">
+          <Alert>Compose a query to see an SQL query.</Alert>
+        </Block>
+      );
+    }
+
     if (!query) {
-      return null;
+      return (
+        <Block padding="1x">
+          <Alert>Unable to generate an SQL query.</Alert>
+        </Block>
+      );
     }
 
     if (!isQueryEmpty && meta) {

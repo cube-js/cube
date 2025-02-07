@@ -33,7 +33,7 @@ import { ORDER_LABEL_BY_TYPE } from './utils/labels';
 import { formatNumber } from './utils/formatters';
 import { TIMEZONES } from './utils/timezones';
 
-const DEFAULT_LIMIT = 5_000;
+const DEFAULT_LIMIT = 0; // no limit
 
 const ALL_TIMEZONES: {
   tzCode: string;
