@@ -659,6 +659,41 @@ describe('OptsHandler class', () => {
   );
 
   test(
+    'must configure queueOptions with empty orchestratorOptions function, ' +
+    'with CUBEJS_REFRESH_WORKER_CONCURRENCY, CUBEJS_CONCURRENCY and with default driver concurrency',
+    async () => {
+      process.env.CUBEJS_CONCURRENCY = '11';
+      process.env.CUBEJS_REFRESH_WORKER_CONCURRENCY = '22';
+      process.env.CUBEJS_DB_TYPE = 'postgres';
+
+      const core = new CubejsServerCoreExposed({
+        ...conf,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: () => ({}),
+      });
+
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
+
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency: parseInt(process.env.CUBEJS_CONCURRENCY, 10),
+      });
+
+      expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
+      expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
+      expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
+        concurrency: parseInt(process.env.CUBEJS_REFRESH_WORKER_CONCURRENCY, 10),
+      });
+
+      delete process.env.CUBEJS_CONCURRENCY;
+      delete process.env.CUBEJS_REFRESH_WORKER_CONCURRENCY;
+      delete process.env.CUBEJS_DB_TYPE;
+    }
+  );
+
+  test(
     'multi data source concurrency',
     async () => {
       process.env.CUBEJS_DATASOURCES = 'default,postgres';
