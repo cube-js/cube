@@ -525,13 +525,13 @@ describe('OptsHandler class', () => {
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
-        concurrency: 2,
+        concurrency: 5,
       });
 
       expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
       expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
       expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
-        concurrency: 2,
+        concurrency: 5,
       });
     }
   );
@@ -555,13 +555,13 @@ describe('OptsHandler class', () => {
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
-        concurrency: 2,
+        concurrency: 5,
       });
 
       expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
       expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
       expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
-        concurrency: 2,
+        concurrency: 5,
       });
     }
   );
@@ -585,13 +585,13 @@ describe('OptsHandler class', () => {
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
-        concurrency: 2,
+        concurrency: 5,
       });
 
       expect(opts.preAggregationsOptions.queueOptions).toBeDefined();
       expect(typeof opts.preAggregationsOptions.queueOptions).toEqual('function');
       expect(await opts.preAggregationsOptions.queueOptions()).toEqual({
-        concurrency: 2,
+        concurrency: 5,
       });
     }
   );
