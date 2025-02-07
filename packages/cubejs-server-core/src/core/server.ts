@@ -46,7 +46,9 @@ import type {
   DriverContext,
   LoggerFn,
   DriverConfig,
+  ContextToCubeStoreRouterIdFn,
 } from './types';
+
 import { ContextToOrchestratorIdFn, ContextAcceptanceResult, ContextAcceptanceResultHttp, ContextAcceptanceResultWs, ContextAcceptor } from './types';
 
 const { version } = require('../../../package.json');
@@ -116,6 +118,8 @@ export class CubejsServerCore {
   protected compilerCache: LRUCache<string, CompilerApi>;
 
   protected readonly contextToOrchestratorId: ContextToOrchestratorIdFn;
+
+  protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
@@ -192,6 +196,7 @@ export class CubejsServerCore {
     }
 
     this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
+    this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId;
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
