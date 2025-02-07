@@ -377,7 +377,7 @@ impl SessionState {
         Arc::clone(&self.temp_tables)
     }
 
-    pub fn get_load_request_meta(&self) -> LoadRequestMeta {
+    pub fn get_load_request_meta(&self, api_type: &str) -> LoadRequestMeta {
         let application_name = if let Some(var) = self.get_variable("application_name") {
             Some(var.value.to_string())
         } else {
@@ -386,7 +386,7 @@ impl SessionState {
 
         LoadRequestMeta::new(
             self.protocol.get_name().to_string(),
-            "sql".to_string(),
+            api_type.to_string(),
             application_name,
         )
     }
