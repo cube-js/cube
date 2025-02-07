@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::{ConstantFolding, LogicalPlanData, MemberNamesToExpr, OriginalExpr},
+        analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
         cube_scan_order_empty_tail, dimension_expr, distinct, expr_column_name, fun_expr, join,
@@ -1548,13 +1548,11 @@ impl MemberRules {
                     names_to_expr.list.iter().all(|(_, member, _)| {
                         // we should allow transform for queries with dimensions only,
                         // as it doesn't make sense for measures
-                        if let Some(name) = member.name() {
-                            meta_context
-                                .find_dimension_with_name(name.to_string())
-                                .is_some()
-                                || meta_context.is_synthetic_field(name.to_string())
-                        } else {
-                            true
+                        match member {
+                            Member::Dimension { .. } => true,
+                            Member::VirtualField { .. } => true,
+                            Member::LiteralMember { .. } => true,
+                            _ => false,
                         }
                     })
                 }
