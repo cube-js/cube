@@ -8345,6 +8345,41 @@ ORDER BY "source"."str0" ASC
                 order: Some(vec![]),
                 ..Default::default()
             }
+        );
+        
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT DISTINCT * FROM KibanaSampleDataEcommerce".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        println!("logical_plan: {:?}", logical_plan);
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                ]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.notes".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![]),
+                ungrouped: Some(true),
+                ..Default::default()
+            }
         )
     }
 
