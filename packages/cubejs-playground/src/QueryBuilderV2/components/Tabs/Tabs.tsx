@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { Action, tasty, CloseIcon, Styles } from '@cube-dev/ui-kit';
 
-import { useEvent } from '@/hooks/index';
+import { useEvent } from '../../hooks';
 
 interface TabData {
   content: ReactNode;
