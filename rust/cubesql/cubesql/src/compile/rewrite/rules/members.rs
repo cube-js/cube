@@ -1525,14 +1525,12 @@ impl MemberRules {
         let meta_context = self.meta_context.clone();
 
         move |egraph, subst| {
-            let empty_filters = &egraph
-                .index(subst[filters_var])
+            let empty_filters = &egraph[subst[filters_var]]
                 .data
                 .is_empty_list
                 .unwrap_or(true);
-            let ungrouped = var_iter!(egraph[subst[left_ungrouped_var]], CubeScanUngrouped)
-                .into_iter()
-                .any(|v| *v);
+            let ungrouped =
+                var_iter!(egraph[subst[left_ungrouped_var]], CubeScanUngrouped).any(|v| *v);
 
             if !empty_filters && ungrouped {
                 return false;
@@ -1558,24 +1556,18 @@ impl MemberRules {
                 }
                 None => {
                     // this might be the case of `SELECT DISTINCT *`
-                    // we need to check that there are only dimensions defined in the referenced cube
-                    let aliases_to_cube: Vec<_> =
-                        var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube)
-                            .cloned()
-                            .collect();
-
-                    if let Some(cube_name) = aliases_to_cube
-                        .first()
-                        .and_then(|f| f.first().map(|(_, c)| c))
-                    {
-                        if let Some(cube) = meta_context.find_cube_with_name(cube_name) {
-                            cube.measures.len() == 0 && cube.segments.len() == 0
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
+                    // we need to check that there are only dimensions defined in the referenced cube(s)
+                    var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube)
+                        .cloned()
+                        .all(|alias_to_cube| {
+                            alias_to_cube.iter().all(|(_, cube_name)| {
+                                if let Some(cube) = meta_context.find_cube_with_name(&cube_name) {
+                                    cube.measures.len() == 0 && cube.segments.len() == 0
+                                } else {
+                                    false
+                                }
+                            })
+                        })
                 }
             };
 
