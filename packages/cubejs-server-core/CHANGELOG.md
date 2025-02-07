@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.8](https://github.com/cube-js/cube/compare/v1.0.7...v1.0.8) (2025-02-07)
+
+
+### Features
+
+* **cubejs-server-core:** add contextToCubeStoreRouterId config option ([#9199](https://github.com/cube-js/cube/issues/9199)) ([5213098](https://github.com/cube-js/cube/commit/52130988055dea651809961d14f30e0d6c5b78be))
+
+
+
+
+
 ## [1.0.6](https://github.com/cube-js/cube/compare/v1.0.5...v1.0.6) (2024-12-07)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

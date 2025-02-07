@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.8](https://github.com/cube-js/cube/compare/v1.0.7...v1.0.8) (2025-02-07)
+
+
+### Features
+
+* **schema-compiler:** Move transpiling to worker threads (under the … ([#9191](https://github.com/cube-js/cube/issues/9191)) ([6e6a924](https://github.com/cube-js/cube/commit/6e6a924a9c1b8441622582a436233c258b33da5c))
+
+
+
+
+
 ## [1.0.6](https://github.com/cube-js/cube/compare/v1.0.5...v1.0.6) (2024-12-07)
 
 

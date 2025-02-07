@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.8](https://github.com/cube-js/cube/compare/v1.0.7...v1.0.8) (2025-02-07)
+
+
+### Features
+
+* **cubejs-server-core:** add contextToCubeStoreRouterId config option ([#9199](https://github.com/cube-js/cube/issues/9199)) ([5213098](https://github.com/cube-js/cube/commit/52130988055dea651809961d14f30e0d6c5b78be))
+* **firebolt:** Automatically start the engine after connection ([#9001](https://github.com/cube-js/cube/issues/9001)) ([#9040](https://github.com/cube-js/cube/issues/9040)) ([6d30458](https://github.com/cube-js/cube/commit/6d304584238c5c1064442ce3a58243a5e9af22d2))
+* **schema-compiler:** Move transpiling to worker threads (under the … ([#9191](https://github.com/cube-js/cube/issues/9191)) ([6e6a924](https://github.com/cube-js/cube/commit/6e6a924a9c1b8441622582a436233c258b33da5c))
+
+
+
+
+
 ## [1.0.7](https://github.com/cube-js/cube/compare/v1.0.6...v1.0.7) (2024-12-08)
 
 
