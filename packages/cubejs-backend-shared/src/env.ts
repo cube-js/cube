@@ -177,13 +177,17 @@ const variables: Record<string, (...args: any) => any> = {
       return refreshQueries;
     }
 
-    console.warn(
-      'The CUBEJS_SCHEDULED_REFRESH_CONCURRENCY is deprecated. Please, use the CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID instead.'
-    );
-    return get('CUBEJS_SCHEDULED_REFRESH_CONCURRENCY').asIntPositive();
+    const refreshConcurrency = get('CUBEJS_SCHEDULED_REFRESH_CONCURRENCY').asIntPositive();
+
+    if (refreshConcurrency) {
+      console.warn(
+        'The CUBEJS_SCHEDULED_REFRESH_CONCURRENCY is deprecated. Please, use the CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID instead.'
+      );
+    }
+
+    return refreshConcurrency;
   },
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
-    .default(5)
     .asIntPositive(),
   // eslint-disable-next-line consistent-return
   scheduledRefreshTimezones: () => {
