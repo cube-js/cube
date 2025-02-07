@@ -20,7 +20,7 @@ use crate::{
         },
     },
     copy_flag,
-    transport::V1CubeMetaMeasureExt,
+    transport::{MetaContext, V1CubeMetaMeasureExt},
     var, var_iter,
 };
 use datafusion::{logical_plan::Column, scalar::ScalarValue};
@@ -823,6 +823,203 @@ impl WrapperRules {
         }
     }
 
+    fn insert_regular_measure(
+        egraph: &mut CubeEGraph,
+        subst: &mut Subst,
+        column: Column,
+        alias: String,
+        out_expr_var: Var,
+        out_alias_var: Var,
+    ) {
+        let column_expr_column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+            ColumnExprColumn(column),
+        ));
+        let column_expr = egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+        let udaf_name_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprFun(
+            AggregateUDFExprFun(MEASURE_UDAF_NAME.to_string()),
+        ));
+        let udaf_args_expr =
+            egraph.add(LogicalPlanLanguage::AggregateUDFExprArgs(vec![column_expr]));
+        let udaf_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExpr([
+            udaf_name_expr,
+            udaf_args_expr,
+        ]));
+
+        subst.insert(out_expr_var, udaf_expr);
+
+        let alias_expr_alias =
+            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias)));
+        subst.insert(out_alias_var, alias_expr_alias);
+    }
+
+    fn insert_patch_measure(
+        egraph: &mut CubeEGraph,
+        subst: &mut Subst,
+        column: Column,
+        call_agg_type: Option<String>,
+        alias: String,
+        out_expr_var: Option<Var>,
+        out_replace_agg_type: Option<Var>,
+        out_alias_var: Var,
+    ) {
+        let column_expr_column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+            ColumnExprColumn(column),
+        ));
+        let column_expr = egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+        let new_aggregation_value = match call_agg_type {
+            Some(call_agg_type) => egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                LiteralExprValue(ScalarValue::Utf8(Some(call_agg_type))),
+            )),
+            None => egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                ScalarValue::Null,
+            ))),
+        };
+        let new_aggregation_expr =
+            egraph.add(LogicalPlanLanguage::LiteralExpr([new_aggregation_value]));
+
+        if let Some(out_replace_agg_type) = out_replace_agg_type {
+            subst.insert(out_replace_agg_type, new_aggregation_expr);
+        }
+
+        let add_filters_value = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+            LiteralExprValue(ScalarValue::Null),
+        ));
+        let add_filters_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([add_filters_value]));
+        let udaf_name_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprFun(
+            AggregateUDFExprFun(PATCH_MEASURE_UDAF_NAME.to_string()),
+        ));
+        let udaf_args_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExprArgs(vec![
+            column_expr,
+            new_aggregation_expr,
+            add_filters_expr,
+        ]));
+        let udaf_expr = egraph.add(LogicalPlanLanguage::AggregateUDFExpr([
+            udaf_name_expr,
+            udaf_args_expr,
+        ]));
+
+        if let Some(out_expr_var) = out_expr_var {
+            subst.insert(out_expr_var, udaf_expr);
+        }
+
+        let alias_expr_alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+            alias.clone(),
+        )));
+        subst.insert(out_alias_var, alias_expr_alias);
+    }
+
+    fn pushdown_measure_impl(
+        egraph: &mut CubeEGraph,
+        subst: &mut Subst,
+        original_expr_var: Var,
+        column_var: Option<Var>,
+        fun_name_var: Option<Var>,
+        distinct_var: Option<Var>,
+        cube_members_var: Var,
+        out_expr_var: Var,
+        out_alias_var: Var,
+        meta: &MetaContext,
+        disable_strict_agg_type_match: bool,
+    ) -> bool {
+        let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) else {
+            return false;
+        };
+
+        for fun in fun_name_var
+            .map(|fun_var| {
+                var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
+                    .map(|fun| Some(fun.clone()))
+                    .collect()
+            })
+            .unwrap_or(vec![None])
+        {
+            for distinct in distinct_var
+                .map(|distinct_var| {
+                    var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
+                        .map(|d| *d)
+                        .collect()
+                })
+                .unwrap_or(vec![false])
+            {
+                let call_agg_type = MemberRules::get_agg_type(fun.as_ref(), distinct);
+
+                let column_iter = if let Some(column_var) = column_var {
+                    var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                        .cloned()
+                        .collect()
+                } else {
+                    vec![Column::from_name(MemberRules::default_count_measure_name())]
+                };
+
+                if let Some(member_names_to_expr) = &mut egraph
+                    .index_mut(subst[cube_members_var])
+                    .data
+                    .member_name_to_expr
+                {
+                    for column in column_iter {
+                        if let Some((&(Some(ref member), _, _), _)) =
+                            LogicalPlanData::do_find_member_by_alias(
+                                member_names_to_expr,
+                                &column.name,
+                            )
+                        {
+                            if let Some(measure) = meta.find_measure_with_name(member) {
+                                let Some(call_agg_type) = &call_agg_type else {
+                                    // call_agg_type is None, rewrite as is
+                                    Self::insert_regular_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        alias,
+                                        out_expr_var,
+                                        out_alias_var,
+                                    );
+
+                                    return true;
+                                };
+
+                                if measure
+                                    .is_same_agg_type(call_agg_type, disable_strict_agg_type_match)
+                                {
+                                    Self::insert_regular_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        alias,
+                                        out_expr_var,
+                                        out_alias_var,
+                                    );
+
+                                    return true;
+                                }
+
+                                if measure.allow_replace_agg_type(
+                                    call_agg_type,
+                                    disable_strict_agg_type_match,
+                                ) {
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        Some(call_agg_type.clone()),
+                                        alias,
+                                        Some(out_expr_var),
+                                        None,
+                                        out_alias_var,
+                                    );
+
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     fn pushdown_measure(
         &self,
         original_expr_var: &'static str,
@@ -846,206 +1043,19 @@ impl WrapperRules {
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
-            if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
-                for fun in fun_name_var
-                    .map(|fun_var| {
-                        var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
-                            .map(|fun| Some(fun.clone()))
-                            .collect()
-                    })
-                    .unwrap_or(vec![None])
-                {
-                    for distinct in distinct_var
-                        .map(|distinct_var| {
-                            var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
-                                .map(|d| *d)
-                                .collect()
-                        })
-                        .unwrap_or(vec![false])
-                    {
-                        let call_agg_type = MemberRules::get_agg_type(fun.as_ref(), distinct);
-
-                        let column_iter = if let Some(column_var) = column_var {
-                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-                                .cloned()
-                                .collect()
-                        } else {
-                            vec![Column::from_name(MemberRules::default_count_measure_name())]
-                        };
-
-                        if let Some(member_names_to_expr) = &mut egraph
-                            .index_mut(subst[cube_members_var])
-                            .data
-                            .member_name_to_expr
-                        {
-                            for column in column_iter {
-                                if let Some((&(Some(ref member), _, _), _)) =
-                                    LogicalPlanData::do_find_member_by_alias(
-                                        member_names_to_expr,
-                                        &column.name,
-                                    )
-                                {
-                                    if let Some(measure) = meta.find_measure_with_name(member) {
-                                        fn insert_regular_measure(
-                                            egraph: &mut CubeEGraph,
-                                            subst: &mut Subst,
-                                            column: Column,
-                                            alias: String,
-                                            out_expr_var: Var,
-                                            out_alias_var: Var,
-                                        ) {
-                                            let column_expr_column =
-                                                egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                                                    ColumnExprColumn(column),
-                                                ));
-                                            let column_expr =
-                                                egraph.add(LogicalPlanLanguage::ColumnExpr([
-                                                    column_expr_column,
-                                                ]));
-                                            let udaf_name_expr = egraph.add(
-                                                LogicalPlanLanguage::AggregateUDFExprFun(
-                                                    AggregateUDFExprFun(
-                                                        MEASURE_UDAF_NAME.to_string(),
-                                                    ),
-                                                ),
-                                            );
-                                            let udaf_args_expr = egraph.add(
-                                                LogicalPlanLanguage::AggregateUDFExprArgs(vec![
-                                                    column_expr,
-                                                ]),
-                                            );
-                                            let udaf_expr =
-                                                egraph.add(LogicalPlanLanguage::AggregateUDFExpr(
-                                                    [udaf_name_expr, udaf_args_expr],
-                                                ));
-
-                                            subst.insert(out_expr_var, udaf_expr);
-
-                                            let alias_expr_alias =
-                                                egraph.add(LogicalPlanLanguage::AliasExprAlias(
-                                                    AliasExprAlias(alias),
-                                                ));
-                                            subst.insert(out_alias_var, alias_expr_alias);
-                                        }
-
-                                        fn insert_patch_measure(
-                                            egraph: &mut CubeEGraph,
-                                            subst: &mut Subst,
-                                            column: Column,
-                                            call_agg_type: String,
-                                            alias: String,
-                                            out_expr_var: Var,
-                                            out_alias_var: Var,
-                                        ) {
-                                            let column_expr_column =
-                                                egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                                                    ColumnExprColumn(column.clone()),
-                                                ));
-                                            let column_expr =
-                                                egraph.add(LogicalPlanLanguage::ColumnExpr([
-                                                    column_expr_column,
-                                                ]));
-                                            let new_aggregation_value =
-                                                egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                                                    LiteralExprValue(ScalarValue::Utf8(Some(
-                                                        call_agg_type,
-                                                    ))),
-                                                ));
-                                            let new_aggregation_expr =
-                                                egraph.add(LogicalPlanLanguage::LiteralExpr([
-                                                    new_aggregation_value,
-                                                ]));
-                                            let add_filters_value =
-                                                egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                                                    LiteralExprValue(ScalarValue::Null),
-                                                ));
-                                            let add_filters_expr =
-                                                egraph.add(LogicalPlanLanguage::LiteralExpr([
-                                                    add_filters_value,
-                                                ]));
-                                            let udaf_name_expr = egraph.add(
-                                                LogicalPlanLanguage::AggregateUDFExprFun(
-                                                    AggregateUDFExprFun(
-                                                        PATCH_MEASURE_UDAF_NAME.to_string(),
-                                                    ),
-                                                ),
-                                            );
-                                            let udaf_args_expr = egraph.add(
-                                                LogicalPlanLanguage::AggregateUDFExprArgs(vec![
-                                                    column_expr,
-                                                    new_aggregation_expr,
-                                                    add_filters_expr,
-                                                ]),
-                                            );
-                                            let udaf_expr =
-                                                egraph.add(LogicalPlanLanguage::AggregateUDFExpr(
-                                                    [udaf_name_expr, udaf_args_expr],
-                                                ));
-
-                                            subst.insert(out_expr_var, udaf_expr);
-
-                                            let alias_expr_alias =
-                                                egraph.add(LogicalPlanLanguage::AliasExprAlias(
-                                                    AliasExprAlias(alias.clone()),
-                                                ));
-                                            subst.insert(out_alias_var, alias_expr_alias);
-                                        }
-
-                                        let Some(call_agg_type) = &call_agg_type else {
-                                            // call_agg_type is None, rewrite as is
-                                            insert_regular_measure(
-                                                egraph,
-                                                subst,
-                                                column,
-                                                alias,
-                                                out_expr_var,
-                                                out_alias_var,
-                                            );
-
-                                            return true;
-                                        };
-
-                                        if measure.is_same_agg_type(
-                                            call_agg_type,
-                                            disable_strict_agg_type_match,
-                                        ) {
-                                            insert_regular_measure(
-                                                egraph,
-                                                subst,
-                                                column,
-                                                alias,
-                                                out_expr_var,
-                                                out_alias_var,
-                                            );
-
-                                            return true;
-                                        }
-
-                                        if measure.allow_replace_agg_type(
-                                            call_agg_type,
-                                            disable_strict_agg_type_match,
-                                        ) {
-                                            insert_patch_measure(
-                                                egraph,
-                                                subst,
-                                                column,
-                                                call_agg_type.clone(),
-                                                alias,
-                                                out_expr_var,
-                                                out_alias_var,
-                                            );
-
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            false
+            Self::pushdown_measure_impl(
+                egraph,
+                subst,
+                original_expr_var,
+                column_var,
+                fun_name_var,
+                distinct_var,
+                cube_members_var,
+                out_expr_var,
+                out_alias_var,
+                &meta,
+                disable_strict_agg_type_match,
+            )
         }
     }
 }
