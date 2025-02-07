@@ -287,6 +287,7 @@ export class OptsHandler {
   private queueOptionsWrapper(
     context: RequestContext,
     queueOptions: unknown | ((dataSource?: string) => QueueOptions),
+    queueType: 'query' | 'pre-aggs',
   ): (dataSource?: string) => Promise<QueueOptions> {
     return async (dataSource = 'default') => {
       const options = (
@@ -298,6 +299,14 @@ export class OptsHandler {
         // concurrency specified in cube.js
         return options;
       } else {
+        const workerConcurrency = getEnv('refreshWorkerConcurrency');
+        if (queueType === 'pre-aggs' && workerConcurrency) {
+          return {
+            ...options,
+            concurrency: workerConcurrency,
+          };
+        }
+
         const envConcurrency: number = getEnv('concurrency', { dataSource });
         if (envConcurrency) {
           // concurrency specified in CUBEJS_CONCURRENCY
@@ -320,7 +329,7 @@ export class OptsHandler {
           // no specified concurrency
           return {
             ...options,
-            concurrency: 2,
+            concurrency: 5,
           };
         }
       }
@@ -453,15 +462,12 @@ export class OptsHandler {
       externalDialectFactory,
       apiSecret: process.env.CUBEJS_API_SECRET,
       telemetry: getEnv('telemetry'),
-      scheduledRefreshTimeZones:
-        process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
-        process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
+      scheduledRefreshTimeZones: getEnv('scheduledRefreshTimezones'),
       scheduledRefreshContexts: async () => [null],
       basePath: '/cubejs-api',
       dashboardAppPath: 'dashboard-app',
       dashboardAppPort: 3000,
-      scheduledRefreshConcurrency:
-        parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
+      scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
@@ -662,6 +668,7 @@ export class OptsHandler {
     clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.queryCacheOptions.queueOptions,
+      'query'
     );
 
     // pre-aggs queue options
@@ -669,6 +676,7 @@ export class OptsHandler {
     clone.preAggregationsOptions.queueOptions = this.queueOptionsWrapper(
       context,
       clone.preAggregationsOptions.queueOptions,
+      'pre-aggs'
     );
 
     // pre-aggs external refresh flag (force to run pre-aggs build flow first if
