@@ -74,8 +74,8 @@ use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning,
-    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
+    collect, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, ExecutionPlanProperties,
+    Partitioning, PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use futures_util::{stream, FutureExt, StreamExt, TryStreamExt};
@@ -1614,22 +1614,12 @@ impl ExecutionPlan for ClusterSendExec {
         &self.properties
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        let input_ordering = self.input_for_optimizations.required_input_ordering();
-        if !input_ordering.is_empty() {
-            vec![input_ordering[0].clone()]
-        } else {
-            vec![None]
-        }
-    }
-
     fn maintains_input_order(&self) -> Vec<bool> {
-        let maintains_input_order = self.input_for_optimizations.maintains_input_order();
-        if !maintains_input_order.is_empty() {
-            vec![maintains_input_order[0]]
-        } else {
-            vec![false]
-        }
+        // TODO upgrade DF: If the WorkerExec has the number of partitions so it can produce the same output, we could occasionally return true.
+        // vec![self.partitions.len() <= 1 && self.input_for_optimizations.output_partitioning().partition_count() <= 1]
+
+        // For now, same as default implementation:
+        vec![false]
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
