@@ -1714,22 +1714,12 @@ impl ExecutionPlan for WorkerExec {
         vec![Distribution::SinglePartition; self.children().len()]
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        let input_ordering = self.input.required_input_ordering();
-        if !input_ordering.is_empty() {
-            vec![input_ordering[0].clone()]
-        } else {
-            vec![None]
-        }
-    }
-
     fn maintains_input_order(&self) -> Vec<bool> {
-        let maintains_input_order = self.input.maintains_input_order();
-        if !maintains_input_order.is_empty() {
-            vec![maintains_input_order[0]]
-        } else {
-            vec![false]
-        }
+        // TODO upgrade DF: If the WorkerExec has the number of partitions so it can produce the same output, we could occasionally return true.
+        // vec![self.num_clustersend_partitions <= 1 && self.input_for_optimizations.output_partitioning().partition_count() <= 1]
+
+        // For now, same as default implementation:
+        vec![false]
     }
 }
 
