@@ -1351,10 +1351,10 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Join(params) => {
                 let left_on = match_data_node!(node_by_id, params[2], JoinLeftOn);
                 let right_on = match_data_node!(node_by_id, params[3], JoinRightOn);
-                let left = self.to_logical_plan(params[0]);
-                let right = self.to_logical_plan(params[1]);
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
 
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                if Self::have_cube_scan_inside(&left) && Self::have_cube_scan_inside(&right) {
                     if left_on.iter().any(|c| c.name == "__cubeJoinField")
                         || right_on.iter().any(|c| c.name == "__cubeJoinField")
                     {
@@ -1371,8 +1371,8 @@ impl LanguageToLogicalPlanConverter {
                     }
                 }
 
-                let left = Arc::new(left?);
-                let right = Arc::new(right?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
 
                 let join_type = match_data_node!(node_by_id, params[4], JoinJoinType);
                 let join_constraint = match_data_node!(node_by_id, params[5], JoinJoinConstraint);
@@ -1395,7 +1395,10 @@ impl LanguageToLogicalPlanConverter {
                 })
             }
             LogicalPlanLanguage::CrossJoin(params) => {
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
+
+                if Self::have_cube_scan_inside(&left) && Self::have_cube_scan_inside(&right) {
                     return Err(CubeError::internal(
                         "Can not join Cubes. This is most likely due to one of the following reasons:\n\
                         • one of the cubes contains a group by\n\
@@ -1404,8 +1407,8 @@ impl LanguageToLogicalPlanConverter {
                     ));
                 }
 
-                let left = Arc::new(self.to_logical_plan(params[0])?);
-                let right = Arc::new(self.to_logical_plan(params[1])?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
                 let schema = Arc::new(left.schema().join(right.schema())?);
 
                 LogicalPlan::CrossJoin(CrossJoin {
@@ -2305,16 +2308,18 @@ impl LanguageToLogicalPlanConverter {
         })
     }
 
-    fn is_cube_scan_node(&self, node_id: Id) -> bool {
-        let node_by_id = &self.best_expr;
-        match node_by_id.index(node_id) {
-            LogicalPlanLanguage::CubeScan(_) | LogicalPlanLanguage::CubeScanWrapper(_) => {
-                return true
+    fn have_cube_scan_inside(node: &LogicalPlan) -> bool {
+        match node {
+            LogicalPlan::Projection(Projection { input, .. })
+            | LogicalPlan::Aggregate(Aggregate { input, .. })
+            | LogicalPlan::Filter(Filter { input, .. })
+            | LogicalPlan::Sort(Sort { input, .. })
+            | LogicalPlan::Limit(Limit { input, .. }) => Self::have_cube_scan_inside(input),
+            LogicalPlan::Extension(Extension { node }) => {
+                node.as_any().is::<CubeScanNode>() || node.as_any().is::<CubeScanWrapperNode>()
             }
-            _ => (),
+            _ => false,
         }
-
-        return false;
     }
 }
 
