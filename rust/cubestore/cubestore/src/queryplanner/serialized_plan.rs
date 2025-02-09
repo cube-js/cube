@@ -23,6 +23,8 @@ use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
 //TODO
 // use sqlparser::ast::RollingOffset;
+use super::udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
+use crate::queryplanner::rolling::RollingWindowAggregate;
 use bytes::Bytes;
 use datafusion::catalog::TableProvider;
 use datafusion::catalog_common::TableReference;
@@ -45,8 +47,6 @@ use flexbuffers::FlexbufferSerializer;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-
-use super::udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {
@@ -1031,6 +1031,7 @@ impl PreSerializedPlan {
             LogicalPlan::Extension(Extension { node }) => {
                 if let Some(cluster_send) = node.as_any().downcast_ref::<ClusterSendNode>() {
                     let ClusterSendNode {
+                        id,
                         input,
                         snapshots,
                         limit_and_reverse,
@@ -1042,6 +1043,7 @@ impl PreSerializedPlan {
                     )?;
                     LogicalPlan::Extension(Extension {
                         node: Arc::new(ClusterSendNode {
+                            id: *id,
                             input: Arc::new(input),
                             snapshots: snapshots.clone(),
                             limit_and_reverse: *limit_and_reverse,
@@ -1078,6 +1080,50 @@ impl PreSerializedPlan {
                             having_expr: having_expr.clone(),
                             schema: schema.clone(),
                             snapshots: snapshots.clone(),
+                        }),
+                    })
+                } else if let Some(rolling_window) =
+                    node.as_any().downcast_ref::<RollingWindowAggregate>()
+                {
+                    let RollingWindowAggregate {
+                        schema,
+                        input,
+                        dimension,
+                        dimension_alias,
+                        partition_by,
+                        from,
+                        to,
+                        every,
+                        rolling_aggs,
+                        rolling_aggs_alias,
+                        group_by_dimension,
+                        aggs,
+                        lower_bound,
+                        upper_bound,
+                        offset_to_end,
+                    } = rolling_window;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(RollingWindowAggregate {
+                            schema: schema.clone(),
+                            input: Arc::new(input),
+                            dimension: dimension.clone(),
+                            partition_by: partition_by.clone(),
+                            from: from.clone(),
+                            to: to.clone(),
+                            every: every.clone(),
+                            rolling_aggs: rolling_aggs.clone(),
+                            rolling_aggs_alias: rolling_aggs_alias.clone(),
+                            group_by_dimension: group_by_dimension.clone(),
+                            aggs: aggs.clone(),
+                            lower_bound: lower_bound.clone(),
+                            upper_bound: upper_bound.clone(),
+                            dimension_alias: dimension_alias.clone(),
+                            offset_to_end: *offset_to_end,
                         }),
                     })
                 } else {
@@ -1423,6 +1469,16 @@ impl PreSerializedPlan {
         })
     }
 
+    pub fn replace_logical_plan(&self, logical_plan: LogicalPlan) -> Result<Self, CubeError> {
+        Ok(Self {
+            logical_plan,
+            schema_snapshot: self.schema_snapshot.clone(),
+            partition_ids_to_execute: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
+            trace_obj: self.trace_obj.clone(),
+        })
+    }
+
     /// Note: avoid during normal execution, workers must filter the partitions they execute.
     pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
         self.list_files_to_download(|_| true)
@@ -1735,6 +1791,9 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
                 ExtensionNodeSerialized::PanicWorker(serialized) => {
                     Arc::new(PanicWorkerNode::from_serialized(inputs, serialized))
                 }
+                ExtensionNodeSerialized::RollingWindowAggregate(serialized) => Arc::new(
+                    RollingWindowAggregate::from_serialized(serialized, inputs, ctx)?,
+                ),
             },
         })
     }
@@ -1748,6 +1807,12 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
             ExtensionNodeSerialized::ClusterSend(cluster_send.to_serialized())
         } else if let Some(panic_worker) = node.node.as_any().downcast_ref::<PanicWorkerNode>() {
             ExtensionNodeSerialized::PanicWorker(panic_worker.to_serialized())
+        } else if let Some(rolling_window_aggregate) =
+            node.node.as_any().downcast_ref::<RollingWindowAggregate>()
+        {
+            ExtensionNodeSerialized::RollingWindowAggregate(
+                rolling_window_aggregate.to_serialized()?,
+            )
         } else {
             todo!("{:?}", node)
         };
