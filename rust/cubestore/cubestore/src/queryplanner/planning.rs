@@ -32,6 +32,7 @@ use flatbuffers::bitflags::_core::any::Any;
 use flatbuffers::bitflags::_core::fmt::Formatter;
 use itertools::{EitherOrBoth, Itertools};
 
+use super::serialized_plan::PreSerializedPlan;
 use crate::cluster::Cluster;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
@@ -45,6 +46,7 @@ use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
+use crate::queryplanner::rolling::RollingWindowAggregateSerialized;
 use crate::queryplanner::serialized_plan::{
     IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
 };
@@ -53,6 +55,7 @@ use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
 use crate::CubeError;
 use datafusion::common;
+use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::DFSchemaRef;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::execution::{SessionState, TaskContext};
@@ -60,7 +63,7 @@ use datafusion::logical_expr::expr::Alias;
 use datafusion::logical_expr::utils::expr_to_columns;
 use datafusion::logical_expr::{
     expr, Aggregate, BinaryExpr, Expr, Extension, Filter, Join, Limit, LogicalPlan, Operator,
-    Projection, Sort, SortExpr, SubqueryAlias, TableScan, Union, UserDefinedLogicalNode,
+    Projection, Sort, SortExpr, SubqueryAlias, TableScan, Union, Unnest, UserDefinedLogicalNode,
 };
 use datafusion::physical_expr::{Distribution, LexRequirement};
 use datafusion::physical_plan::repartition::RepartitionExec;
@@ -71,8 +74,6 @@ use serde_derive::Serialize;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
-
-use super::serialized_plan::PreSerializedPlan;
 
 #[cfg(test)]
 pub async fn choose_index(
@@ -170,6 +171,7 @@ pub async fn choose_index_ext(
         next_index: 0,
         enable_topk,
         can_pushdown_limit: true,
+        cluster_send_next_id: 1,
     };
 
     let plan = rewrite_plan(p, &ChooseIndexContext::default(), &mut r)?;
@@ -742,6 +744,7 @@ struct ChooseIndex<'a> {
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
     can_pushdown_limit: bool,
+    cluster_send_next_id: usize,
 }
 
 #[derive(Debug, Default)]
@@ -906,6 +909,7 @@ impl ChooseIndex<'_> {
                         };
 
                         return Ok(ClusterSendNode::new(
+                            self.get_cluster_send_next_id(),
                             Arc::new(p),
                             vec![vec![Snapshot::Index(snapshot)]],
                             limit_and_reverse,
@@ -917,6 +921,7 @@ impl ChooseIndex<'_> {
                     {
                         let id = table.get_id();
                         return Ok(ClusterSendNode::new(
+                            self.get_cluster_send_next_id(),
                             Arc::new(p),
                             vec![vec![Snapshot::Inline(InlineSnapshot { id })]],
                             None,
@@ -949,6 +954,12 @@ impl ChooseIndex<'_> {
             }
             _ => return Ok(p),
         }
+    }
+
+    fn get_cluster_send_next_id(&mut self) -> usize {
+        let id = self.cluster_send_next_id;
+        self.cluster_send_next_id += 1;
+        id
     }
 
     fn get_limit_for_pushdown(
@@ -1370,10 +1381,12 @@ pub type Snapshots = Vec<Snapshot>;
 pub enum ExtensionNodeSerialized {
     ClusterSend(ClusterSendSerialized),
     PanicWorker(PanicWorkerSerialized),
+    RollingWindowAggregate(RollingWindowAggregateSerialized),
 }
 
 #[derive(Debug, Clone)]
 pub struct ClusterSendNode {
+    pub id: usize,
     pub input: Arc<LogicalPlan>,
     pub snapshots: Vec<Snapshots>,
     pub limit_and_reverse: Option<(usize, bool)>,
@@ -1381,17 +1394,20 @@ pub struct ClusterSendNode {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ClusterSendSerialized {
+    pub id: usize,
     pub snapshots: Vec<Snapshots>,
     pub limit_and_reverse: Option<(usize, bool)>,
 }
 
 impl ClusterSendNode {
     pub fn new(
+        id: usize,
         input: Arc<LogicalPlan>,
         snapshots: Vec<Snapshots>,
         limit_and_reverse: Option<(usize, bool)>,
     ) -> Self {
         ClusterSendNode {
+            id,
             input,
             snapshots,
             limit_and_reverse,
@@ -1406,6 +1422,7 @@ impl ClusterSendNode {
 
     pub fn from_serialized(inputs: &[LogicalPlan], serialized: ClusterSendSerialized) -> Self {
         Self {
+            id: serialized.id,
             input: Arc::new(inputs[0].clone()),
             snapshots: serialized.snapshots,
             limit_and_reverse: serialized.limit_and_reverse,
@@ -1414,6 +1431,7 @@ impl ClusterSendNode {
 
     pub fn to_serialized(&self) -> ClusterSendSerialized {
         ClusterSendSerialized {
+            id: self.id,
             snapshots: self.snapshots.clone(),
             limit_and_reverse: self.limit_and_reverse.clone(),
         }
@@ -1458,6 +1476,7 @@ impl UserDefinedLogicalNode for ClusterSendNode {
         assert_eq!(inputs.len(), 1);
 
         Ok(Arc::new(ClusterSendNode {
+            id: self.id,
             input: Arc::new(inputs[0].clone()),
             snapshots: self.snapshots.clone(),
             limit_and_reverse: self.limit_and_reverse.clone(),
@@ -1495,18 +1514,20 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
         // We can always pull cluster send for these nodes.
         LogicalPlan::Projection(Projection { input, .. })
         | LogicalPlan::Filter(Filter { input, .. })
-        | LogicalPlan::SubqueryAlias(SubqueryAlias { input, .. }) => {
+        | LogicalPlan::SubqueryAlias(SubqueryAlias { input, .. })
+        | LogicalPlan::Unnest(Unnest { input, .. }) => {
             let send;
             if let Some(s) = try_extract_cluster_send(input) {
                 send = s;
             } else {
                 return Ok(p);
             }
+            let id = send.id;
             snapshots = send.snapshots.clone();
             let limit = send.limit_and_reverse.clone();
 
             *input = send.input.clone();
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
+            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
         }
         LogicalPlan::Union(Union { inputs, .. }) => {
             // Handle UNION over constants, e.g. inline data series.
@@ -1515,6 +1536,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             }
             let mut union_snapshots = Vec::new();
             let mut limits = Vec::new();
+            let mut id = 0;
             for i in inputs.into_iter() {
                 let send;
                 if let Some(s) = try_extract_cluster_send(i) {
@@ -1523,6 +1545,9 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                     return Err(DataFusionError::Plan(
                         "UNION argument not supported".to_string(),
                     ));
+                }
+                if id == 0 {
+                    id = send.id;
                 }
                 union_snapshots.extend(send.snapshots.concat());
                 limits.push(send.limit_and_reverse);
@@ -1536,7 +1561,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 limits[0]
             };
             snapshots = vec![union_snapshots];
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
+            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, limit).into_plan());
         }
         LogicalPlan::Join(Join { left, right, .. }) => {
             let lsend;
@@ -1548,10 +1573,9 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 lsend = l;
                 rsend = r;
             } else {
-                return Err(DataFusionError::Plan(
-                    "JOIN argument not supported".to_string(),
-                ));
+                return Ok(p);
             }
+            let id = lsend.id;
             snapshots = lsend
                 .snapshots
                 .iter()
@@ -1560,7 +1584,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 .collect();
             *left = lsend.input.clone();
             *right = rsend.input.clone();
-            return Ok(ClusterSendNode::new(Arc::new(p), snapshots, None).into_plan());
+            return Ok(ClusterSendNode::new(id, Arc::new(p), snapshots, None).into_plan());
         }
         x => {
             return Err(DataFusionError::Internal(format!(
@@ -1604,12 +1628,52 @@ impl ExtensionPlanner for CubeExtensionPlanner {
         if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
             assert_eq!(inputs.len(), 1);
             let input = inputs.into_iter().next().unwrap();
+
+            pub struct FindClusterSendCutPoint<'n> {
+                pub parent: Option<&'n LogicalPlan>,
+                pub cluster_send_to_find: &'n ClusterSendNode,
+                pub result: Option<&'n LogicalPlan>,
+            }
+
+            impl<'n> TreeNodeVisitor<'n> for FindClusterSendCutPoint<'n> {
+                type Node = LogicalPlan;
+
+                fn f_down(&mut self, node: &'n Self::Node) -> common::Result<TreeNodeRecursion> {
+                    if let LogicalPlan::Extension(Extension { node: n }) = node {
+                        if let Some(cs) = n.as_any().downcast_ref::<ClusterSendNode>() {
+                            if cs.id == self.cluster_send_to_find.id {
+                                if let Some(LogicalPlan::Aggregate(_)) = self.parent {
+                                    self.result = Some(self.parent.clone().unwrap());
+                                } else {
+                                    self.result = Some(node);
+                                }
+                                return Ok(TreeNodeRecursion::Stop);
+                            }
+                        }
+                    }
+                    self.parent = Some(node);
+                    Ok(TreeNodeRecursion::Continue)
+                }
+            }
+
+            let mut find_cluster_send_cut_point = FindClusterSendCutPoint {
+                parent: None,
+                cluster_send_to_find: cs,
+                result: None,
+            };
+
+            self.serialized_plan
+                .logical_plan()
+                .visit(&mut find_cluster_send_cut_point)?;
             Ok(Some(self.plan_cluster_send(
                 input.clone(),
                 &cs.snapshots,
                 false,
                 usize::MAX,
                 cs.limit_and_reverse.clone(),
+                find_cluster_send_cut_point.result.ok_or_else(|| {
+                    CubeError::internal("ClusterSend cut point not found".to_string())
+                })?,
             )?))
             // TODO upgrade DF
             // } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
@@ -1633,6 +1697,7 @@ impl CubeExtensionPlanner {
         use_streaming: bool,
         max_batch_rows: usize,
         limit_and_reverse: Option<(usize, bool)>,
+        logical_plan_to_send: &LogicalPlan,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if snapshots.is_empty() {
             return Ok(Arc::new(EmptyExec::new(input.schema())));
@@ -1641,7 +1706,10 @@ impl CubeExtensionPlanner {
         if let Some(c) = self.cluster.as_ref() {
             Ok(Arc::new(ClusterSendExec::new(
                 c.clone(),
-                self.serialized_plan.clone(),
+                Arc::new(
+                    self.serialized_plan
+                        .replace_logical_plan(logical_plan_to_send.clone())?,
+                ),
                 snapshots,
                 input,
                 use_streaming,

@@ -3154,6 +3154,8 @@ mod tests {
                         .unwrap();
                 }
 
+                Delay::new(Duration::from_millis(10000)).await;
+
                 let result = service
                     .exec_query("SELECT count(*) from foo.numbers")
                     .await
