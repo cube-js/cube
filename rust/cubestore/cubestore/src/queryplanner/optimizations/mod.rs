@@ -2,6 +2,7 @@ mod check_memory;
 mod distributed_partial_aggregate;
 mod prefer_inplace_aggregates;
 pub mod rewrite_plan;
+pub mod rolling_optimizer;
 mod trace_data_loaded;
 
 use crate::cluster::Cluster;
@@ -10,9 +11,11 @@ use crate::queryplanner::optimizations::distributed_partial_aggregate::{
 };
 use std::fmt::{Debug, Formatter};
 // use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_switch_to_inplace_aggregates;
+use super::serialized_plan::PreSerializedPlan;
 use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_regroup_columns;
 use crate::queryplanner::planning::CubeExtensionPlanner;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
+use crate::queryplanner::rolling::RollingWindowPlanner;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::util::memory::MemoryHandler;
@@ -29,8 +32,6 @@ use datafusion::physical_planner::{DefaultPhysicalPlanner, PhysicalPlanner};
 use rewrite_plan::rewrite_physical_plan;
 use std::sync::Arc;
 use trace_data_loaded::add_trace_data_loaded_exec;
-
-use super::serialized_plan::PreSerializedPlan;
 
 pub struct CubeQueryPlanner {
     cluster: Option<Arc<dyn Cluster>>,
@@ -80,13 +81,15 @@ impl QueryPlanner for CubeQueryPlanner {
         logical_plan: &LogicalPlan,
         ctx_state: &SessionState,
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
-        let p =
-            DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(CubeExtensionPlanner {
+        let p = DefaultPhysicalPlanner::with_extension_planners(vec![
+            Arc::new(CubeExtensionPlanner {
                 cluster: self.cluster.clone(),
                 serialized_plan: self.serialized_plan.clone(),
-            })])
-            .create_physical_plan(logical_plan, ctx_state)
-            .await?;
+            }),
+            Arc::new(RollingWindowPlanner {}),
+        ])
+        .create_physical_plan(logical_plan, ctx_state)
+        .await?;
         // TODO: assert there is only a single ClusterSendExec in the plan.
         finalize_physical_plan(
             p,
