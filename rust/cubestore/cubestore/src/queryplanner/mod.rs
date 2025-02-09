@@ -25,6 +25,7 @@ pub mod merge_sort;
 pub mod metadata_cache;
 pub mod providers;
 mod rewrite_inlist_literals;
+mod rolling;
 #[cfg(test)]
 mod test_utils;
 // pub mod udf_xirr;
@@ -56,6 +57,7 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
 use crate::queryplanner::pretty_printers::{pp_plan, pp_plan_ext, PPOptions};
 use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
@@ -69,7 +71,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::{datatypes::Schema, datatypes::SchemaRef};
 use datafusion::catalog::Session;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
-use datafusion::common::TableReference;
+use datafusion::common::{plan_datafusion_err, TableReference};
 use datafusion::config::ConfigOptions;
 use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::{provider_as_source, DefaultTableSource, TableType};
@@ -254,6 +256,7 @@ impl QueryPlannerImpl {
             context.register_udf(udf);
         }
         context.add_analyzer_rule(Arc::new(RewriteInListLiterals {}));
+        context.add_optimizer_rule(Arc::new(RollingOptimizerRule {}));
 
         // TODO upgrade DF
         // context
@@ -496,6 +499,22 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 name, table_path, self._data
             ))
         })
+    }
+
+    fn get_table_function_source(
+        &self,
+        name: &str,
+        args: Vec<Expr>,
+    ) -> datafusion::common::Result<Arc<dyn TableSource>> {
+        let tbl_func = self
+            .session_state
+            .table_functions()
+            .get(name)
+            .cloned()
+            .ok_or_else(|| plan_datafusion_err!("table function '{name}' not found"))?;
+        let provider = tbl_func.create_table_provider(&args)?;
+
+        Ok(provider_as_source(provider))
     }
 
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {

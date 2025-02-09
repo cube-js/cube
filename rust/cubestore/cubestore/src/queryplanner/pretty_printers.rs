@@ -25,6 +25,7 @@ use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{
     ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
 };
+use crate::queryplanner::rolling::RollingWindowAggregate;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::ClusterAggregateTopK;
@@ -224,8 +225,9 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                         }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                         self.output += &format!("PanicWorker")
-                    // } else if let Some(_) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
-                    //     self.output += &format!("RollingWindowAggreagate");
+                    } else if let Some(_) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
+                        self.output += &format!("RollingWindowAggreagate");
+                    // TODO upgrade DF
                     // } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
                     //     self.output += &format!("LogicalAlias, alias: {}", alias.alias);
                     } else {
