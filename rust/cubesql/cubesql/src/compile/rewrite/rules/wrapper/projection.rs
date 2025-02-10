@@ -1,16 +1,17 @@
 use crate::{
     compile::rewrite::{
-        cube_scan_wrapper, projection,
+        cube_scan_wrapper, projection, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
         wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
         wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
-        wrapped_select_order_expr_empty_tail, wrapped_select_subqueries_empty_tail,
-        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        wrapper_replacer_context, ListType, LogicalPlanLanguage, ProjectionAlias,
-        WrappedSelectAlias, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
-        WrapperReplacerContextPushToCube, WrapperReplacerContextUngroupedScan,
+        wrapped_select_order_expr_empty_tail, wrapped_select_projection_expr_empty_tail,
+        wrapped_select_subqueries_empty_tail, wrapped_select_window_expr_empty_tail,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context, ListType,
+        LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias, WrappedSelectPushToCube,
+        WrappedSelectUngroupedScan, WrapperReplacerContextPushToCube,
+        WrapperReplacerContextUngroupedScan,
     },
     copy_flag, var, var_iter,
 };
@@ -329,6 +330,248 @@ impl WrapperRules {
             ),
         )]);
     }
+
+    pub fn projection_merge_rules(&self, rules: &mut Vec<CubeRewrite>) {
+        rules.extend(vec![rewrite(
+            "wrapper-merge-projection-with-inner-wrapped-select",
+            // Input is not a finished wrapper_pullup_replacer, but WrappedSelect just before pullup
+            // After pullup replacer would disable push to cube, because any node on top would have WrappedSelect in `from`
+            // So there would be no CubeScan to push to
+            // Instead, this rule tries to catch `from` before pulling up, and merge outer Filter into inner WrappedSelect
+            projection(
+                "?projection_expr",
+                cube_scan_wrapper(
+                    wrapped_select(
+                        "WrappedSelectSelectType:Projection",
+                        wrapper_pullup_replacer(
+                            wrapped_select_projection_expr_empty_tail(),
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_subqueries_empty_tail(),
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_group_expr_empty_tail(),
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_aggr_expr_empty_tail(),
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_window_expr_empty_tail(),
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapper_pullup_replacer(
+                            "?inner_from",
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapper_pullup_replacer(
+                            "?inner_joins",
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapper_pullup_replacer(
+                            "?inner_filter",
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        wrapped_select_having_expr_empty_tail(),
+                        // Inner must not have limit and offset, because they are not commutative with aggregation
+                        "WrappedSelectLimit:None",
+                        "WrappedSelectOffset:None",
+                        wrapper_pullup_replacer(
+                            wrapped_select_order_expr_empty_tail(),
+                            wrapper_replacer_context(
+                                "?alias_to_cube",
+                                "WrapperReplacerContextPushToCube:true",
+                                "WrapperReplacerContextInProjection:false",
+                                "?cube_members",
+                                "?grouped_subqueries",
+                                "?ungrouped_scan",
+                            ),
+                        ),
+                        "WrappedSelectAlias:None",
+                        "WrappedSelectDistinct:false",
+                        "WrappedSelectPushToCube:true",
+                        "WrappedSelectUngroupedScan:true",
+                    ),
+                    "CubeScanWrapperFinalized:false",
+                ),
+                // TODO support merging projection with aliases
+                "ProjectionAlias:None",
+                "ProjectionSplit:false",
+            ),
+            cube_scan_wrapper(
+                wrapped_select(
+                    "WrappedSelectSelectType:Projection",
+                    wrapper_pushdown_replacer(
+                        "?projection_expr",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_subqueries_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_group_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_aggr_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_window_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        "?inner_from",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        "?inner_joins",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        "?inner_filter",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    wrapped_select_having_expr_empty_tail(),
+                    "WrappedSelectLimit:None",
+                    "WrappedSelectOffset:None",
+                    wrapper_pullup_replacer(
+                        wrapped_select_order_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:true",
+                            "WrapperReplacerContextInProjection:true",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:true",
+                        ),
+                    ),
+                    "WrappedSelectAlias:None",
+                    "WrappedSelectDistinct:false",
+                    "WrappedSelectPushToCube:true",
+                    "WrappedSelectUngroupedScan:true",
+                ),
+                "CubeScanWrapperFinalized:false",
+            ),
+        )]);
+    }
+
     fn transform_projection(
         &self,
         expr_var: &'static str,
