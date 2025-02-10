@@ -1,0 +1,16 @@
+{
+  "name": "@cubejs-backend/check-dup-prop-transpiler-swc-plugin",
+  "version": "1.2.3",
+  "description": "Check for property duplication Transpiler Plugin for Cube models compilation",
+  "author": "Cube Dev, Inc.",
+  "license": "Apache-2.0",
+  "keywords": [
+    "swc-plugin"
+  ],
+  "main": "target/wasm32-wasi/release/check_dup_prop_transpiler_swc_plugin.wasm",
+  "scripts": {
+    "prepublishOnly": "cargo build-wasi --release"
+  },
+  "files": [],
+  "preferUnplugged": true
+}

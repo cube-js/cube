@@ -1,0 +1,16 @@
+{
+  "name": "@cubejs-backend/import-export-transpiler-swc-plugin",
+  "version": "1.2.3",
+  "description": "Import/Export declarations Transpiler Plugin for Cube models compilation",
+  "author": "Cube Dev, Inc.",
+  "license": "Apache-2.0",
+  "keywords": [
+    "swc-plugin"
+  ],
+  "main": "target/wasm32-wasi/release/import_export_transpiler_swc_plugin.wasm",
+  "scripts": {
+    "prepublishOnly": "cargo build-wasi --release"
+  },
+  "files": [],
+  "preferUnplugged": true
+}
