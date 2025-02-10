@@ -59,7 +59,7 @@ impl SqlCall {
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
                 }
-                Dependency::ContextDependency(_) => {}
+                _ => {}
             }
         }
     }
@@ -71,7 +71,7 @@ impl SqlCall {
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, vec![], result)
                 }
-                Dependency::ContextDependency(_) => {}
+                _ => {}
             }
         }
     }
@@ -89,7 +89,7 @@ impl SqlCall {
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_cube_deps_from_cube_dep(cube_dep, result)
                 }
-                Dependency::ContextDependency(_) => {}
+                _ => {}
             }
         }
     }
@@ -169,6 +169,8 @@ impl SqlCall {
             Dependency::ContextDependency(contex_symbol) => {
                 self.apply_context_symbol(contex_symbol, query_tools.clone())
             }
+            Dependency::FilterParamsDependency(hash_map) => todo!(),
+            Dependency::FilterGroupDependency => todo!(),
         }
     }
 

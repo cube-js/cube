@@ -71,7 +71,8 @@ impl SimpleQueryPlanner {
         select_builder.set_having(having);
         select_builder.set_limit(self.query_properties.row_limit());
         select_builder.set_offset(self.query_properties.offset());
-        let res = Rc::new(select_builder.build(context_factory));
+        let res =
+            Rc::new(select_builder.build(context_factory, self.query_properties.all_filters()));
         Ok(res)
     }
 }

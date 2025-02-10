@@ -360,13 +360,10 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
   const native = loadNative();
   const safeCallFn = (fn: Function, thisArg: any, ...args: any[]) => {
     try {
-      console.log("!!!! this: ", thisArg);
-      console.log("!!!! args: ", args.length);
       return {
         result: fn.apply(thisArg, args),
       };
     } catch (e: any) {
-      console.log("!!! error: ", e);
       return {
         error: e.toString(),
       };

@@ -4,11 +4,12 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::{CallDep, CubeEvaluator};
 use crate::cube_bridge::member_sql::{ContextSymbolArg, MemberSql, MemberSqlArgForResolve};
 use crate::cube_bridge::proxy::{
-    CubeDepsCollector, CubeDepsCollectorProp, CubeDepsCollectorProxyHandler,
+    CubeDepsCollector, CubeDepsCollectorProp, CubeDepsCollectorProxyHandler, FilterParamsCollector,
+    FilterParamsCollectorProxyHandler,
 };
 use cubenativeutils::wrappers::NativeContextHolderRef;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -53,6 +54,8 @@ pub enum ContextSymbolDep {
 pub enum Dependency {
     SymbolDependency(Rc<MemberSymbol>),
     CubeDependency(CubeDependency),
+    FilterParamsDependency(HashMap<String, HashSet<String>>),
+    FilterGroupDependency,
     ContextDependency(ContextSymbolDep),
 }
 
@@ -83,17 +86,17 @@ impl<'a> DependenciesBuilder<'a> {
         cube_name: String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<Dependency>, CubeError> {
-        let call_deps = if member_sql.need_deps_resolve() {
-            self.cube_evaluator
-                .resolve_symbols_call_deps(cube_name.clone(), member_sql.clone())?
-        } else {
-            vec![]
-        };
-
         let arg_names = member_sql.args_names();
         let mut deps_to_resolve = Vec::new();
         for arg_name in arg_names {
-            if let Some(context_arg) = self.build_context_resolve_arg_tmp(arg_name)? {
+            if arg_name == "FILTER_PARAMS" {
+                let collector = FilterParamsCollector::try_new(self.base_tools.clone())?;
+                let proxy =
+                    FilterParamsCollectorProxyHandler::new(collector, self.base_tools.clone());
+                deps_to_resolve.push(MemberSqlArgForResolve::FilterParamsProxy(proxy));
+            } else if arg_name == "FILTER_GROUP" {
+                deps_to_resolve.push(MemberSqlArgForResolve::FilterGroupMock());
+            } else if let Some(context_arg) = self.build_context_resolve_arg_tmp(arg_name)? {
                 deps_to_resolve.push(MemberSqlArgForResolve::ContextSymbol(context_arg));
             } else if self
                 .cube_evaluator
@@ -139,6 +142,15 @@ impl<'a> DependenciesBuilder<'a> {
                         self.build_cube_dependency(proxy_handler.clone())?,
                     ));
                 }
+                MemberSqlArgForResolve::FilterParamsProxy(proxy_handler) => {
+                    proxy_handler.get_collector().collected_result();
+                    let dep = Dependency::ContextDependency(ContextSymbolDep::FilterParams);
+                    result.push(dep);
+                }
+                MemberSqlArgForResolve::FilterGroupMock() => {
+                    let dep = Dependency::ContextDependency(ContextSymbolDep::FilterGroup);
+                    result.push(dep);
+                }
                 MemberSqlArgForResolve::ContextSymbol(context_symbol_arg) => {
                     let dep = match context_symbol_arg {
                         ContextSymbolArg::SecurityContext(_rc) => {
@@ -158,34 +170,6 @@ impl<'a> DependenciesBuilder<'a> {
                 }
             };
         }
-
-        /* let mut childs = Vec::new();
-        for (i, dep) in call_deps.iter().enumerate() {
-            childs.push(vec![]);
-            if let Some(parent) = dep.parent {
-                childs[parent].push(i);
-            }
-        }
-
-        let mut result = Vec::new();
-
-        for (i, dep) in call_deps.iter().enumerate() {
-            if dep.parent.is_some() {
-                continue;
-            }
-            if let Some(context_dep) = self.build_context_dep(&dep.name) {
-                result.push(context_dep);
-                continue;
-            }
-            if childs[i].is_empty() {
-                result.push(Dependency::SymbolDependency(
-                    self.build_evaluator(&cube_name, &dep.name)?,
-                ));
-            } else {
-                let dep = self.build_cube_dependency(&cube_name, i, &call_deps, &childs)?;
-                result.push(Dependency::CubeDependency(dep));
-            }
-        } */
 
         Ok(result)
     }

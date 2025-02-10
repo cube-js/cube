@@ -12,7 +12,7 @@ use cubenativeutils::CubeError;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type CubeDepsCollectorRef = Rc<RefCell<CubeDepsCollector>>;
+pub type CubeDepsCollectorProxyHandler = ProxyHandlerImpl<CubeDepsCollector>;
 
 pub enum CubeDepsCollectorProp {
     Symbol(String),
@@ -182,5 +182,3 @@ impl Drop for CubeDepsCollector {
             .drop(self.context_holder_ref.clone());
     }
 }
-
-pub type CubeDepsCollectorProxyHandler = ProxyHandlerImpl<CubeDepsCollector>;

@@ -1,7 +1,8 @@
 use super::{
     filter_group::{FilterGroup, NativeFilterGroup},
     filter_params::{FilterParams, NativeFilterParams},
-    proxy::CubeDepsCollectorProxyHandler,
+    proxy::{CubeDepsCollectorProxyHandler, FilterParamsCollectorProxyHandler},
+    return_string_fn::ReturnStringFn,
     security_context::{NativeSecurityContext, SecurityContext},
     sql_utils::{NativeSqlUtils, SqlUtils},
 };
@@ -44,6 +45,8 @@ pub enum MemberSqlArg {
 pub enum MemberSqlArgForResolve {
     String(String),
     CubeProxy(Rc<CubeDepsCollectorProxyHandler>),
+    FilterParamsProxy(Rc<FilterParamsCollectorProxyHandler>),
+    FilterGroupMock(),
     ContextSymbol(ContextSymbolArg),
 }
 
@@ -140,6 +143,10 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlArgForResolve {
         let res = match self {
             Self::String(s) => s.to_native(context_holder.clone()),
             Self::CubeProxy(proxy) => proxy.to_native(context_holder.clone()),
+            Self::FilterParamsProxy(proxy) => proxy.to_native(context_holder.clone()),
+            Self::FilterGroupMock() => {
+                ReturnStringFn::new(format!("")).to_native(context_holder.clone())
+            }
             Self::ContextSymbol(s) => s.to_native(context_holder.clone()),
         }?;
         Ok(NativeObjectHandle::new(res.into_object()))
