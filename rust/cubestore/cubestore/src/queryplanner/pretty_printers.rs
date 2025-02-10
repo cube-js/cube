@@ -9,10 +9,12 @@ use datafusion::logical_expr::{
     Aggregate, CrossJoin, EmptyRelation, Explain, Extension, Filter, Join, Limit, LogicalPlan,
     Projection, Repartition, Sort, TableScan, Union, Window,
 };
+use datafusion::physical_expr::ConstExpr;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
-use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanProperties, InputOrderMode};
+use datafusion::physical_plan::{ExecutionPlan, InputOrderMode, PlanProperties};
 use itertools::{repeat_n, Itertools};
 use std::sync::Arc;
 
@@ -507,9 +509,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "PanicWorker";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
             *out += &format!("Worker");
-            // TODO upgrade DF
-            // } else if let Some(_) = a.downcast_ref::<MergeExec>() {
-            //     *out += "Merge";
+        } else if let Some(_) = a.downcast_ref::<CoalescePartitionsExec>() {
+            *out += "CoalescePartitions";
         } else if let Some(s) = a.downcast_ref::<SortPreservingMergeExec>() {
             *out += "MergeSort";
             // } else if let Some(_) = a.downcast_ref::<MergeReSortExec>() {
@@ -569,16 +570,64 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         //     p.output_ordering()
         // );
 
-        // TODO upgrade DF
-        // if o.show_output_hints {
-        //     let hints = p.output_hints();
-        //     if !hints.single_value_columns.is_empty() {
-        //         *out += &format!(", single_vals: {:?}", hints.single_value_columns);
-        //     }
-        //     if let Some(so) = hints.sort_order {
-        //         *out += &format!(", sort_order: {:?}", so);
-        //     }
-        // }
+        if o.show_output_hints {
+            let properties: &PlanProperties = p.properties();
+
+            // What show_output_hints shows is previous Cubestore's output hints.  We convert from
+            // DF's existing properties() to the old output format (and what the old output_hints()
+            // function returned).
+            //
+            // So the choice to show the particular sort_order and single_vals in terms of column
+            // indices is solely based on that past, and to update the `planning_hints` test in a
+            // straightforward and transparent manner.
+
+            let svals: &[ConstExpr] = properties.equivalence_properties().constants();
+            if svals.len() > 0 {
+                let sv_columns: Option<Vec<usize>> = svals
+                    .iter()
+                    .map(|const_expr| {
+                        if const_expr.across_partitions() {
+                            if let Some(column_expr) =
+                                const_expr.expr().as_any().downcast_ref::<Column>()
+                            {
+                                Some(column_expr.index())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if let Some(column_indices) = sv_columns {
+                    *out += &format!(", single_vals: {:?}", column_indices);
+                } else {
+                    *out += &format!(", single_vals: [..., len = {}]", svals.len());
+                }
+            }
+
+            let ordering = properties.output_ordering();
+            if let Some(so) = ordering {
+                let so_columns: Option<Vec<usize>> = so
+                    .iter()
+                    .map(|sort_expr| {
+                        if let Some(column_expr) = sort_expr.expr.as_any().downcast_ref::<Column>()
+                        {
+                            Some(column_expr.index())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if let Some(column_indices) = so_columns {
+                    *out += &format!(", sort_order: {:?}", column_indices);
+                } else {
+                    *out += &format!(", sort_order: [..., len = {}]", so.len());
+                }
+            }
+        }
     }
 }
 

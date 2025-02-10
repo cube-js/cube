@@ -2866,17 +2866,18 @@ mod tests {
                                 \n  Projection, [sel__a, sel__b, sel__c]\
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 2, 3, 4, 2]]\
-                                \n        Union\
-                                \n          Filter\
-                                \n            Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n        SubqueryAlias\
+                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n            Filter\
+                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
@@ -2904,20 +2905,63 @@ mod tests {
                                 \n  Projection, [sel__a, sel__b, sel__c]\
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
-                                \n        Union\
-                                \n          Filter\
-                                \n            Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n        SubqueryAlias\
+                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n            Filter\
+                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
                                );
                 }
                 _ => assert!(false),
             };
+
+            // Modified from pre-DF upgrade to use foo.a.a = foo.a.b in place of 1 = 0.
+            let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
+                         select * from ( \
+                                        select * from foo.a where foo.a.a = foo.a.b \
+                                        ) \
+                             union all
+                             select * from
+                                ( \
+                                        select * from foo.a1 \
+                                        union all \
+                                        select * from foo.b1 \
+                                ) \
+                            union all
+                            select * from foo.b \
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+            match &result.get_rows()[0].values()[0] {
+                TableValue::String(s) => {
+                    assert_eq!(s,
+                                "Sort\
+                                \n  Projection, [sel__a, sel__b, sel__c]\
+                                \n    Aggregate\
+                                \n      ClusterSend, indices: [[1, 3, 4, 2]]\
+                                \n        SubqueryAlias\
+                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n            Filter\
+                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+
+                               );
+                }
+                _ => assert!(false),
+            };
+
+            // Kept from the pre-DF upgrade (with modified query above) -- the select statement with
+            // the 1 = 0 comparison now gets optimized out.  Interesting and perhaps out of scope
+            // for this test.
             let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
                          select * from ( \
                                         select * from foo.a where 1 = 0\
@@ -2938,22 +2982,21 @@ mod tests {
                                 "Sort\
                                 \n  Projection, [sel__a, sel__b, sel__c]\
                                 \n    Aggregate\
-                                \n      ClusterSend, indices: [[1, 3, 4, 2]]\
-                                \n        Union\
-                                \n          Filter\
+                                \n      ClusterSend, indices: [[3, 4, 2]]\
+                                \n        SubqueryAlias\
+                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
                                 \n            Filter\
-                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n          Filter\
-                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            Filter\
+                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
 
-                               );
+                                );
                 }
                 _ => assert!(false),
             };
+
         }).await;
     }
 
@@ -3246,19 +3289,21 @@ mod tests {
                     .unwrap();
                 let plan_regexp = Regex::new(r"ParquetScan.*\.parquet").unwrap();
 
-                let expected = "Projection, [SUM(foo.numbers.num)@0:SUM(num)]\
-                \n  FinalHashAggregate\
+                let expected = "LinearFinalAggregate\
+                \n  CoalescePartitions\
                 \n    Worker\
-                \n      PartialHashAggregate\
-                \n        Filter\
-                \n          MergeSort\
-                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
-                \n              FilterByKeyRange\
-                \n                CheckMemoryExec\
-                \n                  ParquetScan\
-                \n              FilterByKeyRange\
-                \n                CheckMemoryExec\
-                \n                  ParquetScan";
+                \n      CoalescePartitions\
+                \n        LinearPartialAggregate\
+                \n          CoalesceBatchesExec\
+                \n            Filter\
+                \n              MergeSort\
+                \n                Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n                  FilterByKeyRange\
+                \n                    CheckMemoryExec\
+                \n                      ParquetScan\
+                \n                  FilterByKeyRange\
+                \n                    CheckMemoryExec\
+                \n                      ParquetScan";
                 let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
                 let p = plan_regexp.replace_all(&plan, "ParquetScan");
                 println!("pp {}", p);
@@ -4234,9 +4279,9 @@ mod tests {
                 };
             assert_eq!(
                 pp_plan,
-                "Projection, [foo.orders.platform, SUM(foo.orders.amount)]\
-                \n  Aggregate\
-                \n    ClusterSend, indices: [[1]]\
+                "Aggregate\
+                \n  ClusterSend, indices: [[1]]\
+                \n    Projection, [foo.orders.platform:platform, foo.orders.amount:amount]\
                 \n      Filter\
                 \n        Scan foo.orders, source: CubeTable(index: default:1:[1]), fields: [platform, age, amount]"
             );
@@ -4296,8 +4341,8 @@ mod tests {
                         TableValue::String(pp_plan) => {
                             assert_eq!(
                                 pp_plan,
-                                "Projection, [platform, SUM(foo.orders.amount)@1:SUM(amount)]\
-                                \n  FinalHashAggregate\
+                                "LinearFinalAggregate\
+                                \n  CoalescePartitions\
                                 \n    ClusterSend, partitions: [[1]]"
                             );
                         },
@@ -4319,10 +4364,10 @@ mod tests {
                     .values()[2] {
                         TableValue::String(pp_plan) => {
                             let regex = Regex::new(
-                                r"PartialHas+hAggregate\s+Filter\s+Merge\s+Scan, index: default:1:\[1\], fields+: \[platform, age, amount\]\s+ParquetScan, files+: .*\.chunk\.parquet"
+                                r"LinearPartialAggregate\s+CoalesceBatchesExec\s+Filter\s+Scan, index: default:1:\[1\], fields: \[platform, age, amount\]\s+ParquetScan, files: \S*\.chunk\.parquet"
                             ).unwrap();
                             let matches = regex.captures_iter(&pp_plan).count();
-                            assert_eq!(matches, 1);
+                            assert_eq!(matches, 1, "pp_plan = {}", pp_plan);
                         },
                         _ => {assert!(false);}
                     };
