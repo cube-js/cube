@@ -3096,19 +3096,17 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "Projection, [url, SUM(s.Data.hits)@1:SUM(hits)]\
-       \n  FinalInplaceAggregate\
-       \n    ClusterSend, partitions: [[1]]"
+        "SortedFinalAggregate\
+        \n  ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [url, SUM(s.Data.hits)@1:SUM(hits)]\
-      \n  FinalInplaceAggregate\
-      \n    Worker\
-      \n      PartialInplaceAggregate\
-      \n        MergeSort\
-      \n          Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
-      \n            Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n        Sort\
+        \n          Empty"
     );
 
     // When there is no index, we fallback to inplace aggregates.
@@ -3118,19 +3116,19 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "Projection, [day, SUM(s.Data.hits)@1:SUM(hits)]\
-       \n  FinalHashAggregate\
-       \n    ClusterSend, partitions: [[1]]"
+        "LinearFinalAggregate\
+        \n  CoalescePartitions\
+        \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [day, SUM(s.Data.hits)@1:SUM(hits)]\
-       \n  FinalHashAggregate\
-       \n    Worker\
-       \n      PartialHashAggregate\
-       \n        Merge\
-       \n          Scan, index: default:1:[1], fields: [day, hits]\
-       \n            Empty"
+        "LinearFinalAggregate\
+        \n  CoalescePartitions\
+        \n    Worker\
+        \n      CoalescePartitions\
+        \n        LinearPartialAggregate\
+        \n          Scan, index: default:1:[1], fields: [day, hits]\
+        \n            Empty"
     );
 
     service
@@ -3147,14 +3145,14 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
     let phys_plan = pp_phys_plan(p.worker.as_ref());
     assert_eq!(
         phys_plan,
-        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        Filter\
-         \n          MergeSort\
-         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
-         \n              Empty"
+        "PartiallySortedFinalAggregate\
+        \n  Worker\
+        \n    PartiallySortedPartialAggregate\
+        \n      CoalesceBatchesExec\
+        \n        Filter\
+        \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+        \n            Sort\
+        \n              Empty"
     );
     let p = service
         .plan_query(
@@ -3165,14 +3163,14 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
     let phys_plan = pp_phys_plan(p.worker.as_ref());
     assert_eq!(
         phys_plan,
-        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        Filter\
-         \n          MergeSort\
-         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
-         \n              Empty"
+        "PartiallySortedFinalAggregate\
+        \n  Worker\
+        \n    PartiallySortedPartialAggregate\
+        \n      CoalesceBatchesExec\
+        \n        Filter\
+        \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+        \n            Sort\
+        \n              Empty"
     );
 }
 
@@ -3194,10 +3192,10 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0, 1]\
-          \n  Projection, [id1, id2], sort_order: [0, 1]\
-          \n    Merge, sort_order: [0, 1]\
-          \n      Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
-          \n        Empty"
+        \n  CoalescePartitions, sort_order: [0, 1]\
+        \n    Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
+        \n      Sort, sort_order: [0, 1]\
+        \n        Empty"
     );
 
     let p = service
@@ -3207,10 +3205,11 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [1, 0]\
-            \n  Projection, [id2, id1], sort_order: [1, 0]\
-            \n    Merge, sort_order: [0, 1]\
-            \n      Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
-            \n        Empty"
+        \n  Projection, [id2, id1], sort_order: [1, 0]\
+        \n    CoalescePartitions, sort_order: [0, 1]\
+        \n      Scan, index: default:1:[1], fields: [id1, id2], sort_order: [0, 1]\
+        \n        Sort, sort_order: [0, 1]\
+        \n          Empty"
     );
 
     // Unsorted when skips columns from sort prefix.
@@ -3220,11 +3219,11 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Worker\
-          \n  Projection, [id2, id3]\
-          \n    Merge\
-          \n      Scan, index: default:1:[1], fields: [id2, id3]\
-          \n        Empty"
+        "CoalescePartitions\
+        \n  Worker\
+        \n    CoalescePartitions\
+        \n      Scan, index: default:1:[1], fields: [id2, id3]\
+        \n        Empty"
     );
 
     // The prefix columns are still sorted.
@@ -3235,10 +3234,10 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0]\
-           \n  Projection, [id1, id3], sort_order: [0]\
-           \n    Merge, sort_order: [0]\
-           \n      Scan, index: default:1:[1], fields: [id1, id3], sort_order: [0]\
-           \n        Empty"
+        \n  CoalescePartitions, sort_order: [0]\
+        \n    Scan, index: default:1:[1], fields: [id1, id3], sort_order: [0]\
+        \n      Sort, sort_order: [0]\
+        \n        Empty"
     );
 
     // Single value hints.
@@ -3248,29 +3247,30 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Worker, single_vals: [1]\
-           \n  Projection, [id3, id2], single_vals: [1]\
-           \n    Filter, single_vals: [0]\
-           \n      Merge\
-           \n        Scan, index: default:1:[1], fields: [id2, id3]\
-           \n          Empty"
+        "CoalescePartitions, single_vals: [1]\
+        \n  Worker, single_vals: [1]\
+        \n    CoalescePartitions, single_vals: [1]\
+        \n      Projection, [id3, id2], single_vals: [1]\
+        \n        CoalesceBatchesExec, single_vals: [0]\
+        \n          Filter, single_vals: [0]\
+        \n            Scan, index: default:1:[1], fields: [id2, id3]\
+        \n              Empty"
     );
 
-    // TODO
     // Removing single value columns should keep the sort order of the rest.
-    // let p = service
-    //     .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
-    //     .await
-    //     .unwrap();
-    // assert_eq!(
-    //     pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-    //     "Worker, sort_order: [0]\
-    //        \n  Projection, [id3], sort_order: [0]\
-    //        \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
-    //        \n      Merge, sort_order: [0, 1, 2]\
-    //        \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
-    //        \n          Empty"
-    // );
+    let p = service
+        .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Worker, sort_order: [0]\
+        \n  CoalesceBatchesExec, sort_order: [0]\
+        \n    Filter, sort_order: [0]\
+        \n      Scan, index: default:1:[1]:sort_on[id1, id2], fields: *, sort_order: [0, 1, 2]\
+        \n        Sort, sort_order: [0, 1, 2]\
+        \n          Empty"
+    );
     let p = service
         .plan_query("SELECT id1, id3 FROM s.Data WHERE id2 = 234")
         .await
@@ -3278,11 +3278,12 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Worker, sort_order: [0, 1]\
-           \n  Projection, [id1, id3], sort_order: [0, 1]\
-           \n    Filter, single_vals: [1], sort_order: [0, 1, 2]\
-           \n      Merge, sort_order: [0, 1, 2]\
-           \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
-           \n          Empty"
+        \n  CoalesceBatchesExec, sort_order: [0, 1]\
+        \n    Filter, sort_order: [0, 1]\
+        \n      CoalescePartitions, sort_order: [0, 1, 2]\
+        \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+        \n          Sort, sort_order: [0, 1, 2]\
+        \n            Empty"
     );
 }
 
@@ -3578,10 +3579,10 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Worker\
-           \n  Projection, [id, amount]\
-           \n    Merge\
-           \n      Scan, index: default:1:[1], fields: [id, amount]\
-           \n        Empty"
+        \n  CoalescePartitions\
+        \n    Scan, index: default:1:[1], fields: [id, amount]\
+        \n      Sort\
+        \n        Empty"
     );
 
     let p = service
@@ -3595,11 +3596,12 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Worker\
-           \n  Projection, [id, amount]\
-           \n    Filter\
-           \n      Merge\
-           \n        Scan, index: default:1:[1], fields: [id, amount]\
-           \n          Empty"
+        \n  CoalesceBatchesExec\
+        \n    Filter\
+        \n      CoalescePartitions\
+        \n        Scan, index: default:1:[1], fields: [id, amount]\
+        \n          Sort\
+        \n            Empty"
     );
 
     let p = service
@@ -3614,17 +3616,18 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "Sort\
-           \n  ClusterSend, partitions: [[1]]"
+        \n  ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Sort\
-           \n  Worker\
-           \n    Projection, [id, amount]\
-           \n      Filter\
-           \n        Merge\
-           \n          Scan, index: default:1:[1], fields: [id, amount]\
-           \n            Empty"
+        \n  Worker\
+        \n    CoalesceBatchesExec\
+        \n      Filter\
+        \n        CoalescePartitions\
+        \n          Scan, index: default:1:[1], fields: [id, amount]\
+        \n            Sort\
+        \n              Empty"
     );
 
     let p = service
@@ -3639,17 +3642,18 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "GlobalLimit, n: 10\
-           \n  ClusterSend, partitions: [[1]]"
+        \n  ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "GlobalLimit, n: 10\
-           \n  Worker\
-           \n    Projection, [id, amount]\
-           \n      Filter\
-           \n        Merge\
-           \n          Scan, index: default:1:[1], fields: [id, amount]\
-           \n            Empty"
+        \n  Worker\
+        \n    CoalesceBatchesExec\
+        \n      Filter\
+        \n        CoalescePartitions\
+        \n          Scan, index: default:1:[1], fields: [id, amount]\
+        \n            Sort\
+        \n              Empty"
     );
 
     let p = service
@@ -3662,19 +3666,17 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "Projection, [id, SUM(s.Orders.amount)@1:SUM(amount)]\
-       \n  FinalInplaceAggregate\
-       \n    ClusterSend, partitions: [[1]]"
+        "SortedFinalAggregate\
+        \n  ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [id, SUM(s.Orders.amount)@1:SUM(amount)]\
-       \n  FinalInplaceAggregate\
-       \n    Worker\
-       \n      PartialInplaceAggregate\
-       \n        MergeSort\
-       \n          Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-       \n            Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+        \n        Sort\
+        \n          Empty"
     );
 
     let p = service
@@ -3690,24 +3692,22 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     // TODO: test MergeSort node is present if ClusterSend has multiple partitions.
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "Projection, [id, SUM(amount)]\
-       \n  FinalInplaceAggregate\
-       \n    ClusterSend, partitions: [[1, 1]]"
+        "SortedFinalAggregate\
+        \n  ClusterSend, partitions: [[1, 1]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [id, SUM(amount)]\
-       \n  FinalInplaceAggregate\
-       \n    Worker\
-       \n      PartialInplaceAggregate\
-       \n        MergeSort\
-       \n          Union\
-       \n            MergeSort\
-       \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-       \n                Empty\
-       \n            MergeSort\
-       \n              Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
-       \n                Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      MergeSort\
+        \n        Union\
+        \n          Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+        \n            Sort\
+        \n              Empty\
+        \n          Scan, index: default:1:[1]:sort_on[id], fields: [id, amount]\
+        \n            Sort\
+        \n              Empty"
     );
 }
 
@@ -3734,18 +3734,19 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+        "SortedFinalAggregate\
+        \n  ClusterSend, partitions: [[2]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
-           \n  FinalInplaceAggregate\
-           \n    Worker\
-           \n      PartialInplaceAggregate\
-           \n        Filter\
-           \n          MergeSort\
-           \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [b, c, amount]\
-           \n              Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      CoalesceBatchesExec\
+        \n        Filter\
+        \n          Scan, index: cb:2:[2]:sort_on[c, b], fields: [b, c, amount]\
+        \n            Sort\
+        \n              Empty"
     );
 
     let p = service
@@ -3754,18 +3755,22 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalHashAggregate\n    ClusterSend, partitions: [[2]]"
+        "LinearFinalAggregate\
+        \n  CoalescePartitions\
+        \n    ClusterSend, partitions: [[2]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
-           \n  FinalHashAggregate\
-           \n    Worker\
-           \n      PartialHashAggregate\
-           \n        Filter\
-           \n          Merge\
-           \n            Scan, index: cb:2:[2], fields: [b, c, amount]\
-           \n              Empty"
+        "LinearFinalAggregate\
+        \n  CoalescePartitions\
+        \n    Worker\
+        \n      CoalescePartitions\
+        \n        LinearPartialAggregate\
+        \n          CoalesceBatchesExec\
+        \n            Filter\
+        \n              Scan, index: cb:2:[2], fields: [b, c, amount]\
+        \n                Sort\
+        \n                  Empty"
     );
 
     let p = service
@@ -3777,18 +3782,19 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
 
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+        "SortedFinalAggregate\
+        \n  ClusterSend, partitions: [[2]]"
     );
 
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
-        \n  FinalInplaceAggregate\
-        \n    Worker\
-        \n      PartialInplaceAggregate\
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      CoalesceBatchesExec\
         \n        Filter\
-        \n          MergeSort\
-        \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
+        \n          Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
+        \n            Sort\
         \n              Empty"
     );
 }
@@ -3818,19 +3824,22 @@ async fn planning_joins(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "ClusterSend, partitions: [[2, 3]]"
+        "CoalescePartitions\
+        \n  ClusterSend, partitions: [[2, 3]]"
     );
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
-            "Worker\
-           \n  Projection, [order_id, customer_name]\
-           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
-           \n      MergeSort\
-           \n        Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id]\
-           \n          Empty\
-           \n      MergeSort\
-           \n        Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-           \n          Empty"
+            "CoalescePartitions\
+            \n  Worker\
+            \n    CoalescePartitions\
+            \n      Projection, [order_id, customer_name]\
+            \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
+            \n          Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id]\
+            \n            Sort\
+            \n              Empty\
+            \n          Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+            \n            Sort\
+            \n              Empty"
         );
 
     let p = service
@@ -3846,24 +3855,26 @@ async fn planning_joins(service: Box<dyn SqlClient>) {
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "Sort\
-       \n  Projection, [order_id, customer_name, SUM(o.amount)@2:SUM(amount)]\
-       \n    FinalHashAggregate\
-       \n      ClusterSend, partitions: [[2, 3]]"
+        \n  LinearFinalAggregate\
+        \n    CoalescePartitions\
+        \n      ClusterSend, partitions: [[2, 3]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Sort\
-       \n  Projection, [order_id, customer_name, SUM(o.amount)@2:SUM(amount)]\
-       \n    FinalHashAggregate\
-       \n      Worker\
-       \n        PartialHashAggregate\
-       \n          MergeJoin, on: [customer_id@1 = customer_id@0]\
-       \n            MergeSort\
-       \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: *\
-       \n                Empty\
-       \n            MergeSort\
-       \n              Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
-       \n                Empty"
+        \n  LinearFinalAggregate\
+        \n    CoalescePartitions\
+        \n      Worker\
+        \n        CoalescePartitions\
+        \n          LinearPartialAggregate\
+        \n            Projection, [order_id, amount, customer_name]\
+        \n              MergeJoin, on: [customer_id@1 = customer_id@0]\
+        \n                Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: *\
+        \n                  Sort\
+        \n                    Empty\
+        \n                Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+        \n                  Sort\
+        \n                    Empty"
     );
 }
 
@@ -3903,24 +3914,28 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "ClusterSend, partitions: [[2, 4, 5]]"
+        "CoalescePartitions\
+        \n  ClusterSend, partitions: [[2, 4, 5]]"
     );
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
-            "Worker\
-           \n  Projection, [order_id, customer_name, product_name]\
-           \n    MergeJoin, on: [product_id@2 = product_id@0]\
-           \n      MergeResort\
-           \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
-           \n          MergeSort\
-           \n            Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
-           \n              Empty\
-           \n          MergeSort\
-           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
-           \n              Empty\
-           \n      MergeSort\
-           \n        Scan, index: default:5:[5]:sort_on[product_id], fields: *\
-           \n          Empty",
+            "CoalescePartitions\
+            \n  Worker\
+            \n    CoalescePartitions\
+            \n      Projection, [order_id, customer_name, product_name]\
+            \n        MergeJoin, on: [product_id@1 = product_id@0]\
+            \n          Sort\
+            \n            Projection, [order_id, product_id, customer_name]\
+            \n              MergeJoin, on: [customer_id@1 = customer_id@0]\
+            \n                Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
+            \n                  Sort\
+            \n                    Empty\
+            \n                Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
+            \n                  Sort\
+            \n                    Empty\
+            \n          Scan, index: default:5:[5]:sort_on[product_id], fields: *\
+            \n            Sort\
+            \n              Empty",
         );
 
     let p = service
@@ -3939,22 +3954,26 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
     show_filters.show_filters = true;
     assert_eq!(
             pp_phys_plan_ext(p.worker.as_ref(), &show_filters),
-            "Worker\
-           \n  Projection, [order_id, customer_name, product_name]\
-           \n    MergeJoin, on: [product_id@2 = product_id@0]\
-           \n      MergeResort\
-           \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
-           \n          Filter, predicate: product_id@2 = 125\
-           \n            MergeSort\
-           \n              Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
-           \n                Empty\
-           \n          MergeSort\
-           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
-           \n              Empty\
-           \n      Filter, predicate: product_id@0 = 125\
-           \n        MergeSort\
-           \n          Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
-           \n            Empty",
+            "CoalescePartitions\
+            \n  Worker\
+            \n    CoalescePartitions\
+            \n      Projection, [order_id, customer_name, product_name]\
+            \n        MergeJoin, on: [product_id@1 = product_id@0]\
+            \n          Projection, [order_id, product_id, customer_name]\
+            \n            MergeJoin, on: [customer_id@1 = customer_id@0]\
+            \n              CoalesceBatchesExec\
+            \n                Filter, predicate: product_id@2 = 125\
+            \n                  Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: BinaryExpr(BinaryExpr { left: Column(Column { relation: None, name: \"product_id\" }), op: Eq, right: Literal(Int64(125)) })\
+            \n                    Sort\
+            \n                      Empty\
+            \n              Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
+            \n                Sort\
+            \n                  Empty\
+            \n          CoalesceBatchesExec\
+            \n            Filter, predicate: product_id@0 = 125\
+            \n              Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: BinaryExpr(BinaryExpr { left: Column(Column { relation: None, name: \"product_id\" }), op: Eq, right: Literal(Int64(125)) })\
+            \n                Sort\
+            \n                  Empty",
         );
 }
 
@@ -7470,13 +7489,12 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        MergeSort\
-         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
-         \n            Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+        \n        Sort\
+        \n          Empty"
     );
 
     let p = service
@@ -7485,13 +7503,12 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        MergeSort\
-         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: *\
-         \n            Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: *\
+        \n        Sort\
+        \n          Empty"
     );
 
     let p = service
@@ -7500,14 +7517,14 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        Filter\
-         \n          MergeSort\
-         \n            Scan, index: default:3:[3]:sort_on[a, b, c], fields: *\
-         \n              Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      CoalesceBatchesExec\
+        \n        Filter\
+        \n          Scan, index: default:3:[3]:sort_on[a, b, c], fields: *\
+        \n            Sort\
+        \n              Empty"
     );
 
     let p = service
@@ -7518,13 +7535,12 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum), MAX(s.Orders.a_max)@2:MAX(a_max), MIN(s.Orders.a_min)@3:MIN(a_min), MERGE(s.Orders.a_merge)@4:MERGE(a_merge)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        MergeSort\
-         \n          Scan, index: aggr_index:2:[2]:sort_on[a], fields: [a, a_sum, a_max, a_min, a_merge]\
-         \n            Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      Scan, index: aggr_index:2:[2]:sort_on[a], fields: [a, a_sum, a_max, a_min, a_merge]\
+        \n        Sort\
+        \n          Empty"
     );
 
     let p = service
@@ -7533,13 +7549,12 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [a, AVG(s.Orders.a_sum)@1:AVG(a_sum)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        MergeSort\
-         \n          Scan, index: reg_index:1:[1]:sort_on[a], fields: [a, a_sum]\
-         \n            Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      Scan, index: reg_index:1:[1]:sort_on[a], fields: [a, a_sum]\
+        \n        Sort\
+        \n          Empty"
     );
 
     let p = service
@@ -7548,14 +7563,14 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum)]\
-         \n  FinalInplaceAggregate\
-         \n    Worker\
-         \n      PartialInplaceAggregate\
-         \n        Filter\
-         \n          MergeSort\
-         \n            Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
-         \n              Empty"
+        "SortedFinalAggregate\
+        \n  Worker\
+        \n    SortedPartialAggregate\
+        \n      CoalesceBatchesExec\
+        \n        Filter\
+        \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+        \n            Sort\
+        \n              Empty"
     );
 }
 
