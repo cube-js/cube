@@ -4,13 +4,17 @@ pub mod neon_function;
 pub mod neon_struct;
 
 use self::{
-    base_types::{NeonBoolean, NeonNumber, NeonString},
+    base_types::{NeonBoolean, NeonBox, NeonBoxWrapper, NeonNumber, NeonRoot, NeonString},
     neon_array::NeonArray,
     neon_function::NeonFunction,
     neon_struct::NeonStruct,
 };
 use super::inner_types::NeonInnerTypes;
-use crate::wrappers::{neon::context::ContextHolder, object::NativeObject};
+use crate::wrappers::{
+    context::NativeFinalize,
+    neon::context::{ContextHolder, SafeCallFn},
+    object::{NativeBox, NativeObject},
+};
 use cubesql::CubeError;
 use neon::prelude::*;
 
@@ -61,6 +65,30 @@ impl<C: Context<'static> + 'static, V: Value + 'static> NeonTypeHandle<C, V> {
                 .downcast::<JT, _>(cx)
                 .map_err(|_| CubeError::internal("Downcast error".to_string()))?;
             f(cx, &obj)
+        })?
+    }
+
+    pub fn map_neon_object_with_safe_call_fn<T, F>(&self, f: F) -> Result<T, CubeError>
+    where
+        F: FnOnce(&mut C, &Handle<'static, V>, SafeCallFn) -> T,
+    {
+        self.context
+            .with_context_and_safe_fn(|cx, safe_call_fn| f(cx, &self.object, safe_call_fn))
+    }
+
+    pub fn map_downcast_neon_object_with_safe_call_fn<JT: Value, T, F>(
+        &self,
+        f: F,
+    ) -> Result<T, CubeError>
+    where
+        F: FnOnce(&mut C, &Handle<'static, JT>, SafeCallFn) -> Result<T, CubeError>,
+    {
+        self.context.with_context_and_safe_fn(|cx, safe_call_fn| {
+            let obj = self
+                .object
+                .downcast::<JT, _>(cx)
+                .map_err(|_| CubeError::internal("Downcast error".to_string()))?;
+            f(cx, &obj, safe_call_fn)
         })?
     }
 
@@ -118,9 +146,9 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
         msg: &str,
     ) -> Result<NeonTypeHandle<C, U>, CubeError> {
         let obj = self.context.with_context(|cx| {
-            self.object
-                .downcast::<U, _>(cx)
-                .map_err(|_| CubeError::internal(msg.to_string()))
+            self.object.downcast::<U, _>(cx).map_err(|e| {
+                CubeError::internal(format!("{:?} {} {:?}", self.object, msg.to_string(), e))
+            })
         })??;
         Ok(NeonTypeHandle::new(self.context.clone(), obj))
     }
@@ -136,16 +164,22 @@ impl<C: Context<'static> + 'static> NativeObject<NeonInnerTypes<C>> for NeonObje
         Ok(NeonStruct::new(obj))
     }
     fn into_function(self) -> Result<NeonFunction<C>, CubeError> {
-        let obj = self.downcast_with_err_msg::<JsFunction>("NeonObject is not the JsArray")?;
+        let obj = self.downcast_with_err_msg::<JsFunction>("NeonObject is not the JsFunction")?;
         Ok(NeonFunction::new(obj))
+    }
+    fn into_root(self) -> Result<NeonRoot, CubeError> {
+        let obj = self.downcast_with_err_msg::<JsObject>(
+            "Only JsObject and its child types can be converted to root",
+        )?;
+        NeonRoot::try_new(self.context.clone(), obj)
     }
     fn into_array(self) -> Result<NeonArray<C>, CubeError> {
         let obj = self.downcast_with_err_msg::<JsArray>("NeonObject is not the JsArray")?;
         Ok(NeonArray::new(obj))
     }
     fn into_string(self) -> Result<NeonString<C>, CubeError> {
-        let obj = self.downcast_with_err_msg::<JsString>("NeonObject is not the JsString")?;
-        Ok(NeonString::new(obj))
+        let obj = self.downcast_with_err_msg::<JsString>("NeonObject is not the JsString");
+        Ok(NeonString::new(obj?))
     }
     fn into_number(self) -> Result<NeonNumber<C>, CubeError> {
         let obj = self.downcast_with_err_msg::<JsNumber>("NeonObject is not the JsNumber")?;
@@ -154,6 +188,13 @@ impl<C: Context<'static> + 'static> NativeObject<NeonInnerTypes<C>> for NeonObje
     fn into_boolean(self) -> Result<NeonBoolean<C>, CubeError> {
         let obj = self.downcast_with_err_msg::<JsBoolean>("NeonObject is not the JsBoolean")?;
         Ok(NeonBoolean::new(obj))
+    }
+    fn into_boxed<T: 'static + NativeFinalize>(
+        self,
+    ) -> Result<impl NativeBox<NeonInnerTypes<C>, T>, CubeError> {
+        let obj =
+            self.downcast_with_err_msg::<JsBox<NeonBoxWrapper<T>>>("NeonObject is not the JsBox")?;
+        Ok(NeonBox::new(obj))
     }
 
     fn is_null(&self) -> Result<bool, CubeError> {

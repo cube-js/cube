@@ -242,7 +242,10 @@ impl MultipliedMeasuresQueryPlanner {
                 .rendered_as_multiplied_measures
                 .clone(),
         );
-        Ok(Rc::new(select_builder.build(context_factory)))
+        Ok(Rc::new(select_builder.build(
+            context_factory,
+            self.query_properties.all_filters(),
+        )))
     }
 
     fn check_should_build_join_for_measure_select(
@@ -301,7 +304,10 @@ impl MultipliedMeasuresQueryPlanner {
         for meas in measures.iter() {
             select_builder.add_projection_member(&meas.clone().as_base_member(), None);
         }
-        Ok(Rc::new(select_builder.build(context_factory)))
+        Ok(Rc::new(select_builder.build(
+            context_factory,
+            self.query_properties.all_filters(),
+        )))
     }
 
     fn regular_measures_subquery(
@@ -348,7 +354,10 @@ impl MultipliedMeasuresQueryPlanner {
                 .clone(),
         );
 
-        Ok(Rc::new(select_builder.build(context_factory)))
+        Ok(Rc::new(select_builder.build(
+            context_factory,
+            self.query_properties.all_filters(),
+        )))
     }
 
     fn key_query(
@@ -407,6 +416,9 @@ impl MultipliedMeasuresQueryPlanner {
         select_builder.set_distinct();
         select_builder.set_filter(self.query_properties.all_filters());
 
-        Ok(Rc::new(select_builder.build(context_factory)))
+        Ok(Rc::new(select_builder.build(
+            context_factory,
+            self.query_properties.all_filters(),
+        )))
     }
 }

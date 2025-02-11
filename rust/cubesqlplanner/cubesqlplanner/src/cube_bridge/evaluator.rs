@@ -45,4 +45,7 @@ pub trait CubeEvaluator {
         cube_name: String,
         sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<CallDep>, CubeError>;
+    fn is_name_of_cube(&self, name: String) -> Result<bool, CubeError>;
+    fn is_name_of_symbol_in_cube(&self, cube_name: String, name: String)
+        -> Result<bool, CubeError>;
 }

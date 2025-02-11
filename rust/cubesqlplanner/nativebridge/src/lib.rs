@@ -362,7 +362,9 @@ impl NativeService {
     fn imports(&self) -> proc_macro2::TokenStream {
         quote! {
             use cubenativeutils::wrappers::inner_types::InnerTypes;
-            use cubenativeutils::wrappers::object::NativeStruct;
+            use cubenativeutils::wrappers::object::{NativeStruct, NativeRoot};
+            use cubenativeutils::wrappers::context::NativeContextHolderRef;
+            use cubenativeutils::wrappers::{RootHolder, Rootable};
         }
     }
 
@@ -379,7 +381,65 @@ impl NativeService {
             pub trait #service_ident {
                 #( #methods )*
                 fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
+                fn to_root(self: Rc<Self>) -> Result<Rc<dyn RootHolder<dyn #service_ident>>, CubeError>;
                 #static_data_method
+            }
+        }
+    }
+
+    fn root_struct(&self) -> proc_macro2::TokenStream {
+        let root_struct_ident = format_ident!("NativeRoot{}", self.ident);
+        let service_ident = &self.ident;
+        let struct_ident = self.struct_ident();
+        quote! {
+            pub struct #root_struct_ident<IT: InnerTypes> {
+                root: IT::Root,
+            }
+            impl<IT: InnerTypes> #root_struct_ident<IT> {
+                pub fn new(root: IT::Root) -> Rc<Self> {
+                    Rc::new(Self { root })
+                }
+            }
+            impl<IT: InnerTypes> RootHolder<dyn #service_ident> for #root_struct_ident<IT> {
+                fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+                    self.clone()
+                }
+                fn drop(
+                    self: Rc<Self>,
+                    context_holder_ref: Rc<dyn NativeContextHolderRef>,
+                ) -> Result<(), CubeError> {
+                    let context_holder = context_holder_ref
+                        .as_any()
+                        .downcast::<NativeContextHolder<IT>>()
+                        .map_err(|_| {
+                            CubeError::internal(format!(
+                                "Wrong context holder type for obtain valur from root holder"
+                            ))
+                        })?;
+                    self.root.drop_root(context_holder.context())
+                }
+                fn to_inner(
+                    self: Rc<Self>,
+                    context_holder_ref: Rc<dyn NativeContextHolderRef>,
+                ) -> Result<Rc<dyn #service_ident>, CubeError> {
+                    let context_holder = context_holder_ref
+                        .as_any()
+                        .downcast::<NativeContextHolder<IT>>()
+                        .map_err(|_| {
+                            CubeError::internal(format!(
+                                "Wrong context holder type for obtain value from root holder"
+                            ))
+                        })?;
+                    let result = self.root.to_inner(context_holder.context())?;
+                    let result = Rc::new(#struct_ident::from_native(result)?);
+                    Ok(result)
+                }
+            }
+            impl<IT: InnerTypes> Rootable<dyn #service_ident> for #struct_ident<IT> {
+                fn to_root(self: Rc<Self>) -> Result<Rc<dyn RootHolder<dyn #service_ident>>, CubeError> {
+                    let native_root = self.native_object.to_root()?;
+                    Ok(#root_struct_ident::<IT>::new(native_root))
+                }
             }
         }
     }
@@ -467,6 +527,9 @@ impl NativeService {
                 fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
                     self.clone()
                 }
+                fn to_root(self: Rc<Self>) -> Result<Rc<dyn RootHolder<dyn #service_ident>>, CubeError> {
+                    Rootable::to_root(self)
+                }
                 #static_data_method
             }
         }
@@ -477,7 +540,7 @@ impl NativeService {
         quote! {
             impl<IT: InnerTypes> NativeSerialize<IT> for #struct_ident<IT> {
 
-                fn to_native(&self, _context: NativeContextHolder<IT>) -> Result<NativeObjectHandle<IT>, CubeError> {
+                fn to_native(&self, _context: Rc<NativeContextHolder<IT>>) -> Result<NativeObjectHandle<IT>, CubeError> {
                     Ok(self.native_object.clone())
                 }
             }
@@ -691,6 +754,7 @@ impl ToTokens for NativeService {
             self.struct_impl(),
             self.struct_bridge_impl(),
             self.serialization_impl(),
+            self.root_struct(),
         ]);
     }
 }

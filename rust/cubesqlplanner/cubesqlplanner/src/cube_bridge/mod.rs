@@ -18,6 +18,8 @@ pub mod member_expression;
 pub mod member_order_by;
 pub mod member_sql;
 pub mod options_member;
+pub mod proxy;
+pub mod return_string_fn;
 pub mod security_context;
 pub mod sql_templates_render;
 pub mod sql_utils;

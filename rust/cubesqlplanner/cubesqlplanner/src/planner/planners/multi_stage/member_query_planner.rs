@@ -19,7 +19,7 @@ use std::rc::Rc;
 
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
-    _query_properties: Rc<QueryProperties>,
+    query_properties: Rc<QueryProperties>,
     description: Rc<MultiStageQueryDescription>,
 }
 
@@ -31,7 +31,7 @@ impl MultiStageMemberQueryPlanner {
     ) -> Self {
         Self {
             query_tools,
-            _query_properties: query_properties,
+            query_properties: query_properties,
             description,
         }
     }
@@ -185,7 +185,7 @@ impl MultiStageMemberQueryPlanner {
         select_builder.add_projection_member(&query_member, None);
         select_builder.set_group_by(group_by);
         select_builder.set_order_by(self.query_order()?);
-        let select = select_builder.build(context_factory);
+        let select = select_builder.build(context_factory, self.query_properties.all_filters());
 
         Ok(Rc::new(Cte::new_from_select(
             Rc::new(select),
@@ -266,7 +266,7 @@ impl MultiStageMemberQueryPlanner {
         if self.description.member().is_ungrupped() {
             context_factory.set_ungrouped(true);
         }
-        let select = select_builder.build(context_factory);
+        let select = select_builder.build(context_factory, None);
 
         Ok(Rc::new(Cte::new_from_select(
             Rc::new(select),
@@ -352,7 +352,7 @@ impl MultiStageMemberQueryPlanner {
         let mut node_factory = SqlNodesFactory::new();
         node_factory.set_render_references(render_references);
         Ok(QueryPlan::Select(Rc::new(
-            select_builder.build(node_factory),
+            select_builder.build(node_factory, None),
         )))
     }
 

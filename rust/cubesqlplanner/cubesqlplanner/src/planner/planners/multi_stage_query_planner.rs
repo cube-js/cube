@@ -100,7 +100,7 @@ impl MultiStageQueryPlanner {
         let select_builder =
             SelectBuilder::new(From::new_from_table_reference(alias.clone(), schema, None));
 
-        Rc::new(select_builder.build(SqlNodesFactory::new()))
+        Rc::new(select_builder.build(SqlNodesFactory::new(), self.query_properties.all_filters()))
     }
 
     fn create_multi_stage_inode_member(

@@ -1,4 +1,8 @@
-use super::{inner_types::InnerTypes, object::NativeObject};
+use super::{
+    context::NativeFinalize,
+    inner_types::InnerTypes,
+    object::{NativeBox, NativeObject, NativeType},
+};
 use cubesql::CubeError;
 
 #[derive(Clone)]
@@ -9,6 +13,10 @@ pub struct NativeObjectHandle<IT: InnerTypes> {
 impl<IT: InnerTypes> NativeObjectHandle<IT> {
     pub fn new(object: IT::Object) -> Self {
         Self { object }
+    }
+
+    pub fn new_from_type<T: NativeType<IT>>(object: T) -> Self {
+        Self::new(object.into_object())
     }
 
     pub fn object_ref(&self) -> &IT::Object {
@@ -37,6 +45,14 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     pub fn into_boolean(self) -> Result<IT::Boolean, CubeError> {
         self.object.into_boolean()
     }
+    pub fn into_root(self) -> Result<IT::Root, CubeError> {
+        self.object.into_root()
+    }
+    pub fn into_boxed<T: 'static + NativeFinalize>(
+        self,
+    ) -> Result<impl NativeBox<IT, T>, CubeError> {
+        self.object.into_boxed()
+    }
     pub fn to_struct(&self) -> Result<IT::Struct, CubeError> {
         self.object.clone().into_struct()
     }
@@ -54,6 +70,14 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     }
     pub fn to_boolean(&self) -> Result<IT::Boolean, CubeError> {
         self.object.clone().into_boolean()
+    }
+    pub fn to_root(&self) -> Result<IT::Root, CubeError> {
+        self.object.clone().into_root()
+    }
+    pub fn to_boxed<T: 'static + NativeFinalize>(
+        &self,
+    ) -> Result<impl NativeBox<IT, T>, CubeError> {
+        self.object.clone().into_boxed()
     }
     pub fn is_null(&self) -> Result<bool, CubeError> {
         self.object.is_null()

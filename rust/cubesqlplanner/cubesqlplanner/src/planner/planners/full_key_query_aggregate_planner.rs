@@ -161,6 +161,9 @@ impl FullKeyAggregateQueryPlanner {
         let mut context_factory = self.context_factory.clone();
         context_factory.set_render_references(render_references);
 
-        Ok(Rc::new(select_builder.build(context_factory)))
+        Ok(Rc::new(select_builder.build(
+            context_factory,
+            self.query_properties.all_filters(),
+        )))
     }
 }

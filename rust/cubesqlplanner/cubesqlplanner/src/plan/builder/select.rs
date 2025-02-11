@@ -182,7 +182,7 @@ impl SelectBuilder {
         schema
     }
 
-    pub fn build(self, mut nodes_factory: SqlNodesFactory) -> Select {
+    pub fn build(self, mut nodes_factory: SqlNodesFactory, all_filters: Option<Filter>) -> Select {
         let cube_references = self.make_cube_references();
         nodes_factory.set_cube_name_references(cube_references);
         let schema = if self.projection_columns.is_empty() {
@@ -197,7 +197,7 @@ impl SelectBuilder {
             group_by: self.group_by,
             having: self.having,
             order_by: self.order_by,
-            context: Rc::new(VisitorContext::new(&nodes_factory)),
+            context: Rc::new(VisitorContext::new(&nodes_factory, all_filters)),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
             limit: self.limit,

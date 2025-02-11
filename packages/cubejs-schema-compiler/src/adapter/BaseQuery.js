@@ -671,6 +671,14 @@ export class BaseQuery {
     return res;
   }
 
+  nativeProxy(nativeResolver, resolveFunc) {
+    return new Proxy({}, {
+      get(_, prop) {
+        return resolveFunc(nativeResolver, prop.valueOf());
+      }
+    });
+  }
+
   allCubeMembers(path) {
     const fromPath = this.cubeEvaluator.cubeFromPath(path);
 

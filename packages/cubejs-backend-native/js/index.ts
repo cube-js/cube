@@ -358,8 +358,19 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
 
 export const buildSqlAndParams = (cubeEvaluator: any): String => {
   const native = loadNative();
+  const safeCallFn = (fn: Function, thisArg: any, ...args: any[]) => {
+    try {
+      return {
+        result: fn.apply(thisArg, args),
+      };
+    } catch (e: any) {
+      return {
+        error: e.toString(),
+      };
+    }
+  };
 
-  return native.buildSqlAndParams(cubeEvaluator);
+  return native.buildSqlAndParams(cubeEvaluator, safeCallFn);
 };
 
 export type ResultRow = Record<string, string>;
@@ -404,6 +415,12 @@ export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[]
 
   return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
 };
+
+export const nativeProxy = (nativeResolver: any, resolveFunc: any) => new Proxy({}, {
+  get(_, prop) {
+    return resolveFunc(nativeResolver, prop);
+  }
+});
 
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,

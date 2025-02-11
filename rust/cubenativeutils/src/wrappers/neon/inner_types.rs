@@ -30,4 +30,6 @@ impl<C: Context<'static> + 'static> InnerTypes for NeonInnerTypes<C> {
     type Boolean = NeonBoolean<C>;
     type Function = NeonFunction<C>;
     type Number = NeonNumber<C>;
+    type FunctionIT = NeonInnerTypes<FunctionContext<'static>>;
+    type Root = NeonRoot;
 }
