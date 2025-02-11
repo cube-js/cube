@@ -3,7 +3,7 @@ redirect_from:
   - /config/databases/pinot
 ---
 
-# Pinot
+# Apache Pinot
 
 [Apache Pinot][link-pinot] is a real-time distributed OLAP datastore purpose-built
 for low-latency, high-throughput analytics, and perfect for user-facing analytical
@@ -13,6 +13,9 @@ workloads. [StarTree][link-startree] is a fully-managed platform for Pinot.
 
 - The hostname for the [Pinot][pinot] broker
 - The port for the [Pinot][pinot] broker
+
+With the current implementation of the Pinot driver, you have to enable the
+[multi-stage query engine][link-pinot-msqe] in your Pinot cluster.
 
 ## Setup
 
@@ -93,6 +96,7 @@ Cube does not require any additional configuration to enable SSL as Pinot connec
 
 [link-pinot]: https://pinot.apache.org/
 [pinot]: https://docs.pinot.apache.org/
+[link-pinot-msqe]: https://docs.pinot.apache.org/reference/multi-stage-engine
 [pinot-docs-approx-agg-fns]:
   https://docs.pinot.apache.org/users/user-guide-query/query-syntax/how-to-handle-unique-counting
 [ref-recipe-enable-ssl]:
