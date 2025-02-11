@@ -7,7 +7,7 @@
   "keywords": [
     "swc-plugin"
   ],
-  "main": "target/wasm32-wasi/release/import_export_transpiler_swc_plugin.wasm",
+  "main": "target/wasm32-wasip1/release/import_export_transpiler_swc_plugin.wasm",
   "scripts": {
     "prepublishOnly": "cargo build-wasi --release"
   },
