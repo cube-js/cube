@@ -26,6 +26,7 @@ import { BaseTimeDimension } from './BaseTimeDimension';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
 import { SqlParser } from '../parser/SqlParser';
+import { Granularity } from './Granularity';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -1389,7 +1390,47 @@ export class BaseQuery {
   }
 
   granularityHierarchies() {
-    return R.fromPairs(Object.keys(standardGranularitiesParents).map(k => [k, this.granularityParentHierarchy(k)]));
+    return this.cacheValue(
+      // If time dimension custom granularity in data model is defined without
+      // timezone information they are treated in query timezone.
+      // Because of that it's not possible to correctly precalculate
+      // granularities hierarchies on startup as they are specific for each timezone.
+      ['granularityHierarchies', this.timezone],
+      () => R.reduce(
+        (hierarchies, cube) => R.reduce(
+          (acc, [tdName, td]) => {
+            const dimensionKey = `${cube}.${tdName}`;
+
+            // constructing standard granularities for time dimension
+            const standardEntries = R.fromPairs(
+              R.keys(standardGranularitiesParents).map(gr => [
+                `${dimensionKey}.${gr}`,
+                standardGranularitiesParents[gr],
+              ]),
+            );
+
+            // If we have custom granularities in time dimension
+            const customEntries = td.granularities
+              ? R.fromPairs(
+                R.keys(td.granularities).map(granularityName => {
+                  const grObj = new Granularity(this, { dimension: dimensionKey, granularity: granularityName });
+                  return [
+                    `${dimensionKey}.${granularityName}`,
+                    [granularityName, ...standardGranularitiesParents[grObj.minGranularity()]],
+                  ];
+                }),
+              )
+              : {};
+
+            return { ...acc, ...standardEntries, ...customEntries };
+          },
+          hierarchies,
+          R.toPairs(this.cubeEvaluator.timeDimensionsForCube(cube)),
+        ),
+        {},
+        R.keys(this.cubeEvaluator.evaluatedCubes),
+      ),
+    );
   }
 
   granularityParentHierarchy(granularity) {
@@ -1656,7 +1697,8 @@ export class BaseQuery {
 
   /**
    *
-   * @param {{sql: string, on: {cubeName: string, expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}} customJoin
+   * @param {{sql: string, on: {cubeName: string, expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}}
+   *   customJoin
    * @returns {JoinItem}
    */
   customSubQueryJoin(customJoin) {

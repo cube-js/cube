@@ -1,6 +1,6 @@
 import { Alert, Block, Card, PrismCode, Title } from '@cube-dev/ui-kit';
 import cube, { Query } from '@cubejs-client/core';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, ReactNode } from 'react';
 
 import { QueryBuilderContext } from './context';
 import { useLocalStorage } from './hooks';
@@ -13,8 +13,7 @@ export function QueryBuilder(
   props: Omit<QueryBuilderProps, 'apiUrl'> & {
     displayPrivateItems?: boolean;
     apiUrl: string | null;
-    disableLimitEnforcing?: boolean;
-    children?: React.ReactNode;
+    children?: ReactNode;
   }
 ) {
   const {

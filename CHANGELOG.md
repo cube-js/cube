@@ -3,17 +3,42 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [1.2.1](https://github.com/cube-js/cube/compare/v1.2.0...v1.2.1) (2025-02-06)
+## [1.2.4](https://github.com/cube-js/cube/compare/v1.2.3...v1.2.4) (2025-02-11)
 
+### Bug Fixes
+
+- **cubejs-playground:** update query builder ([#9201](https://github.com/cube-js/cube/issues/9201)) ([f8e523b](https://github.com/cube-js/cube/commit/f8e523bbf815b2fb3fb8eb036d04cc3bf4db206d))
 
 ### Features
 
-* **schema-compiler:** Move transpiling to worker threads (under the flag) ([#9188](https://github.com/cube-js/cube/issues/9188)) ([7451452](https://github.com/cube-js/cube/commit/745145283b42c891e0e063c4cad1e2102c71616a))
-* **tesseract:** Subqueries support ([#9108](https://github.com/cube-js/cube/issues/9108)) ([0dbf3bb](https://github.com/cube-js/cube/commit/0dbf3bb866b731f97b5588b0e620c3be7cbf9e5b))
+- **cubesql:** Add projection flattening rule ([#9165](https://github.com/cube-js/cube/issues/9165)) ([8cfb253](https://github.com/cube-js/cube/commit/8cfb2530264b856bf128d391829b18566d8dc057))
+- **cubesql:** Allow providing API type when getting load request meta ([#9202](https://github.com/cube-js/cube/issues/9202)) ([ae5d977](https://github.com/cube-js/cube/commit/ae5d9770a1c00326c446e7ec40bd3f13ca0ce8f4))
+- **server-core:** Introduce CUBEJS_REFRESH_WORKER_CONCURRENCY env and update default concurrency settings for drivers ([#9168](https://github.com/cube-js/cube/issues/9168)) ([7ef6282](https://github.com/cube-js/cube/commit/7ef628273905d47996b108862a52dde89b9525e3))
 
+## [1.2.3](https://github.com/cube-js/cube/compare/v1.2.2...v1.2.3) (2025-02-06)
 
+### Bug Fixes
 
+- **cubejs-backend-native:** support context_to_cube_store_router_id ([#9200](https://github.com/cube-js/cube/issues/9200)) ([f93edd3](https://github.com/cube-js/cube/commit/f93edd3713c58ad62ca8daee034639b0f10a0282))
 
+## [1.2.2](https://github.com/cube-js/cube/compare/v1.2.1...v1.2.2) (2025-02-06)
+
+### Bug Fixes
+
+- **dremio-driver:** Correct dremio date interval functions ([#9193](https://github.com/cube-js/cube/issues/9193)) ([7cf2287](https://github.com/cube-js/cube/commit/7cf2287e165beff948ddd88eb47bd0048812aa9b))
+- **schema-compiler:** Fix queries with time dimensions without granularities don't hit pre-aggregations with allow_non_strict_date_range_match=true ([#9102](https://github.com/cube-js/cube/issues/9102)) ([eff0736](https://github.com/cube-js/cube/commit/eff073629261c687416a92b8876e46a522bdd1d8))
+- **testing:** avoid cypress crashes ([#9196](https://github.com/cube-js/cube/issues/9196)) ([364d181](https://github.com/cube-js/cube/commit/364d1812d5b3aff85bfbfbb82f6d8d2217d8a4ab))
+
+### Features
+
+- **cubejs-server-core:** add contextToCubeStoreRouterId config option ([#9197](https://github.com/cube-js/cube/issues/9197)) ([6ee0e41](https://github.com/cube-js/cube/commit/6ee0e416761799acd064ad88241519ad2e1992f4))
+
+## [1.2.1](https://github.com/cube-js/cube/compare/v1.2.0...v1.2.1) (2025-02-06)
+
+### Features
+
+- **schema-compiler:** Move transpiling to worker threads (under the flag) ([#9188](https://github.com/cube-js/cube/issues/9188)) ([7451452](https://github.com/cube-js/cube/commit/745145283b42c891e0e063c4cad1e2102c71616a))
+- **tesseract:** Subqueries support ([#9108](https://github.com/cube-js/cube/issues/9108)) ([0dbf3bb](https://github.com/cube-js/cube/commit/0dbf3bb866b731f97b5588b0e620c3be7cbf9e5b))
 
 # [1.2.0](https://github.com/cube-js/cube/compare/v1.1.18...v1.2.0) (2025-02-05)
 

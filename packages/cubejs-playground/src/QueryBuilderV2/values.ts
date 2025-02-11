@@ -92,12 +92,12 @@ export const OPERATORS_BY_TYPE = {
 export const OPERATORS: Operator[] = [...UNARY_OPERATORS, ...BINARY_OPERATORS];
 
 export const PREDEFINED_GRANULARITIES: TimeDimensionGranularity[] = [
-  'second',
-  'minute',
-  'hour',
-  'day',
-  'week',
-  'month',
-  'quarter',
   'year',
+  'quarter',
+  'month',
+  'week',
+  'day',
+  'hour',
+  'minute',
+  'second',
 ];
