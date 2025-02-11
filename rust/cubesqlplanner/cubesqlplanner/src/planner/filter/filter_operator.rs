@@ -53,3 +53,31 @@ impl FromStr for FilterOperator {
         }
     }
 }
+
+impl ToString for FilterOperator {
+    fn to_string(&self) -> String {
+        let str = match self {
+            FilterOperator::Equal => "equals",
+            FilterOperator::NotEqual => "notEquals",
+            FilterOperator::InDateRange => "inDateRange",
+            FilterOperator::RegularRollingWindowDateRange => "inDateRange",
+            FilterOperator::ToDateRollingWindowDateRange => "inDateRange",
+            FilterOperator::In => "in",
+            FilterOperator::NotIn => "notIn",
+            FilterOperator::Set => "set",
+            FilterOperator::NotSet => "notSet",
+            FilterOperator::Gt => "gt",
+            FilterOperator::Gte => "gte",
+            FilterOperator::Lt => "lt",
+            FilterOperator::Lte => "lte",
+            FilterOperator::Contains => "contains",
+            FilterOperator::NotContains => "notContains",
+            FilterOperator::StartsWith => "startsWith",
+            FilterOperator::NotStartsWith => "notStartsWith",
+            FilterOperator::NotEndsWith => "notEndsWith",
+            FilterOperator::EndsWith => "endsWith",
+            FilterOperator::MeasureFilter => "measureFilter",
+        };
+        str.to_string()
+    }
+}

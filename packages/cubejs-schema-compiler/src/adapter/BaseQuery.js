@@ -1763,6 +1763,7 @@ export class BaseQuery {
         'collectSubQueryDimensionsFor'
       )
     ), inlineWhereConditions);
+
     return `SELECT ${this.selectAllDimensionsAndMeasures(measures)} FROM ${
       query
     } ${this.baseWhere(filters.concat(inlineWhereConditions))}` +
@@ -3909,6 +3910,23 @@ export class BaseQuery {
     );
   }
 
+  filtersProxyForRust(usedFilters) {
+    const filters = this.extractFiltersAsTree(usedFilters || []);
+    const allFilters = filters.map(this.initFilter.bind(this));
+    return BaseQuery.filterProxyFromAllFilters(
+      allFilters,
+      this.cubeEvaluator,
+      this.paramAllocator.allocateParam.bind(this.paramAllocator),
+      this.newGroupFilter.bind(this),
+    );
+  }
+
+  filterGroupFunctionForRust(usedFilters) {
+    const filters = this.extractFiltersAsTree(usedFilters || []);
+    const allFilters = filters.map(this.initFilter.bind(this));
+    return this.filterGroupFunctionImpl(allFilters);
+  }
+
   static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases) {
     if (!filter) {
       return BaseFilter.ALWAYS_TRUE;
@@ -3954,6 +3972,10 @@ export class BaseQuery {
 
   filterGroupFunction() {
     const { allFilters } = this;
+    return this.filterGroupFunctionImpl(allFilters);
+  }
+
+  filterGroupFunctionImpl(allFilters) {
     const allocateParam = this.paramAllocator.allocateParam.bind(this.paramAllocator);
     const newGroupFilter = this.newGroupFilter.bind(this);
     return (...filterParamArgs) => {

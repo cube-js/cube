@@ -193,11 +193,11 @@ impl SelectBuilder {
         Select {
             projection_columns: self.projection_columns,
             from: self.from,
-            filter: self.filter,
+            filter: self.filter.clone(),
             group_by: self.group_by,
             having: self.having,
             order_by: self.order_by,
-            context: Rc::new(VisitorContext::new(&nodes_factory)),
+            context: Rc::new(VisitorContext::new(&nodes_factory, self.filter)),
             ctes: self.ctes,
             is_distinct: self.is_distinct,
             limit: self.limit,

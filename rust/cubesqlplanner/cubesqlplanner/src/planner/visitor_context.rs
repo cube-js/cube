@@ -1,6 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use super::sql_evaluator::{MemberSymbol, SqlCall};
+use crate::plan::Filter;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -8,17 +9,19 @@ use std::rc::Rc;
 
 pub struct VisitorContext {
     node_processor: Rc<dyn SqlNode>,
+    all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
 }
 
 impl VisitorContext {
-    pub fn new(nodes_factory: &SqlNodesFactory) -> Self {
+    pub fn new(nodes_factory: &SqlNodesFactory, all_filters: Option<Filter>) -> Self {
         Self {
             node_processor: nodes_factory.default_node_processor(),
+            all_filters,
         }
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {
-        SqlEvaluatorVisitor::new(query_tools)
+        SqlEvaluatorVisitor::new(query_tools, self.all_filters.clone())
     }
 
     pub fn node_processor(&self) -> Rc<dyn SqlNode> {
