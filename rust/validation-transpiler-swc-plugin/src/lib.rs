@@ -88,16 +88,125 @@ pub fn process_transform(program: Program, metadata: TransformPluginProgramMetad
     }))
 }
 
-// An example to test plugin transform.
-// Recommended strategy to test plugin's transform is verify
-// the Visitor's behavior, instead of trying to run `process_transform` with mocks
-// unless explicitly required to do so.
-test_inline!(
-    Default::default(),
-    |_| visit_mut_pass(TransformVisitor {}),
-    boo,
-    // Input codes
-    r#"console.log("transform");"#,
-    // Output codes after transformed with plugin
-    r#"console.log("transform");"#
-);
+#[cfg(test)]
+mod tests {
+    // Recommended strategy to test plugin's transform is verify
+    // the Visitor's behavior, instead of trying to run `process_transform` with mocks
+    // unless explicitly required to do so.
+
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+    use swc_core::ecma::ast::{EsVersion, Program};
+    use swc_core::{
+        common::{
+            errors::{DiagnosticBuilder, Emitter, Handler, HandlerFlags},
+            sync::Lrc,
+            FileName, Globals, SourceMap,
+        },
+        ecma::visit::VisitMutWith,
+    };
+    use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
+
+    struct TestEmitter {
+        diagnostics: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl Emitter for TestEmitter {
+        fn emit(&mut self, diagnostic: &DiagnosticBuilder) {
+            let mut diags = self.diagnostics.lock().unwrap();
+            diags.push(diagnostic.message());
+        }
+    }
+
+    #[test]
+    fn test_warning_for_user_context() {
+        let globals = Globals::new();
+        let cm: Lrc<SourceMap> = Default::default();
+        let diagnostics = Arc::new(Mutex::new(Vec::new()));
+        let emitter = Box::new(TestEmitter {
+            diagnostics: diagnostics.clone(),
+        });
+        let handler = Handler::with_emitter_and_flags(
+            emitter,
+            HandlerFlags {
+                can_emit_warnings: true,
+                ..Default::default()
+            },
+        );
+
+        let js_code = "USER_CONTEXT.something;";
+
+        swc_core::common::GLOBALS.set(&globals, || {
+            HANDLER.set(&handler, || {
+                let fm = cm.new_source_file(
+                    Arc::new(FileName::Custom("input.js".into())),
+                    js_code.into(),
+                );
+                let lexer = Lexer::new(
+                    Syntax::Es(Default::default()),
+                    EsVersion::Es2020,
+                    StringInput::from(&*fm),
+                    None,
+                );
+                let mut parser = Parser::new_from(lexer);
+                let mut program: Program =
+                    parser.parse_program().expect("Failed to parse the JS code");
+
+                let mut visitor = TransformVisitor { source_map: None };
+                program.visit_mut_with(&mut visitor);
+            });
+        });
+
+        let diags = diagnostics.lock().unwrap();
+        assert!(
+            diags
+                .iter()
+                .any(|msg| msg.contains("Support for USER_CONTEXT was removed")),
+            "Should emit warning",
+        );
+    }
+
+    #[test]
+    fn test_no_warnings() {
+        let globals = Globals::new();
+        let cm: Lrc<SourceMap> = Default::default();
+        let diagnostics = Arc::new(Mutex::new(Vec::new()));
+        let emitter = Box::new(TestEmitter {
+            diagnostics: diagnostics.clone(),
+        });
+        let handler = Handler::with_emitter_and_flags(
+            emitter,
+            HandlerFlags {
+                can_emit_warnings: true,
+                ..Default::default()
+            },
+        );
+
+        let js_code = "SECURITY_CONTEXT.something; let someOtherVar = 5;";
+
+        swc_core::common::GLOBALS.set(&globals, || {
+            HANDLER.set(&handler, || {
+                let fm = cm.new_source_file(
+                    Arc::new(FileName::Custom("input.js".into())),
+                    js_code.into(),
+                );
+                let lexer = Lexer::new(
+                    Syntax::Es(Default::default()),
+                    EsVersion::Es2020,
+                    StringInput::from(&*fm),
+                    None,
+                );
+                let mut parser = Parser::new_from(lexer);
+                let mut program: Program =
+                    parser.parse_program().expect("Failed to parse the JS code");
+
+                let mut visitor = TransformVisitor { source_map: None };
+                program.visit_mut_with(&mut visitor);
+            });
+        });
+
+        let diags = diagnostics.lock().unwrap();
+        assert!(diags.is_empty(), "Should not emit warning",);
+    }
+}
