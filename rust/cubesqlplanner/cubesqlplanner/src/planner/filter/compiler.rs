@@ -129,7 +129,7 @@ impl<'a> FilterCompiler<'a> {
             } else {
                 Err(CubeError::user(format!(
                     "Member and operator attributes is required for filter"
-                ))) //TODO pring condition
+                ))) //TODO print condition
             }
         }
     }

@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
@@ -565,6 +566,84 @@ describe('SQL Generation', () => {
           sql: 'id_b',
           primaryKey: true
         },
+      }
+    });
+
+    cube('rollingWindowDates', {
+      sql: \`
+        SELECT cast('2024-01-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-02-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-03-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-04-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-05-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-06-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-07-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-08-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-09-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-10-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-11-13' AS timestamp) as time UNION ALL
+        SELECT cast('2024-12-13' AS timestamp) as time
+      \`,
+
+      dimensions: {
+        time: {
+          type: 'time',
+          sql: 'time',
+          primaryKey: true
+        }
+      }
+    });
+
+    cube('rollingWindowTest', {
+      sql: \`
+SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-02-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-03-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-04-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-05-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-06-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-07-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-08-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-09-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-10-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-11-01' AS timestamp) as time UNION ALL
+      SELECT 1 AS revenue,  cast('2024-12-01' AS timestamp) as time
+      \`,
+
+      dimensions: {
+        time: {
+          type: 'time',
+          sql: 'time',
+          primaryKey: true
+        }
+      },
+      measures: {
+        revenue: {
+          sql: 'revenue',
+          type: 'sum',
+          filters: [{
+            sql: \`\${rollingWindowDates.time} <= current_date\`
+          }]
+        },
+        revenue_ytd: {
+          sql: \`\${CUBE.revenue}\`,
+          type: 'sum',
+          rolling_window: {
+            type: 'to_date',
+            granularity: 'year'
+          }
+        },
+        revenue_ms: {
+          sql: \`\${CUBE.revenue}\`,
+          type: 'sum',
+          multi_stage: true,
+        },
+      },
+      joins: {
+        rollingWindowDates: {
+          relationship: 'manyToOne',
+          sql: \`\${CUBE}.time = date_trunc('month', \${rollingWindowDates.time})\`
+        }
       }
     });
     `);
@@ -1170,7 +1249,7 @@ describe('SQL Generation', () => {
     });
   });
 
-  it('filter join', async () => {
+  it('filter join 1', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -1790,7 +1869,7 @@ describe('SQL Generation', () => {
     });
   });
 
-  it('security context', async () => {
+  it('security context 1', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -3131,6 +3210,37 @@ describe('SQL Generation', () => {
       vc__source: null
     }]
   ));
+
+  it('multiplied sum and count no dimensions through view', async () => runQueryTest(
+    {
+      measures: ['visitors_visitors_checkins_view.revenue', 'visitors_visitors_checkins_view.visitor_checkins_count'],
+    },
+    [{
+      visitors_visitors_checkins_view__revenue: '2000',
+      visitors_visitors_checkins_view__visitor_checkins_count: '6'
+    }]
+  ));
+
+  it('multiplied sum no dimensions through view', async () => runQueryTest(
+    {
+      measures: ['visitors_visitors_checkins_view.revenue', 'visitors_visitors_checkins_view.id_sum'],
+    },
+    [{
+      visitors_visitors_checkins_view__revenue: '2000',
+      visitors_visitors_checkins_view__id_sum: '21'
+    }]
+  ));
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('nested aggregations with filtered measures and rolling windows', async () => runQueryTest(
+      {
+        measures: ['rollingWindowTest.revenue_ms'],
+      },
+      [{
+        rolling_window_test__revenue_ms: '12'
+      }]
+    ));
+  }
 
   it('multiplied sum and count no dimensions through view', async () => runQueryTest(
     {
