@@ -1574,6 +1574,30 @@ impl CubeScanWrapperNode {
         })
     }
 
+    fn remap_column_expression(
+        schema: &DFSchema,
+        original_expr: &Expr,
+        column_remapping: Option<&ColumnRemapping>,
+        next_remapper: &mut Remapper,
+        can_rename_columns: bool,
+    ) -> result::Result<(Expr, String), CubeError> {
+        let expr = if let Some(column_remapping) = column_remapping {
+            let mut expr = column_remapping.remap(original_expr)?;
+            if !can_rename_columns {
+                let original_alias = expr_name(original_expr, &schema)?;
+                if original_alias != expr_name(&expr, &schema)? {
+                    expr = Expr::Alias(Box::new(expr), original_alias.clone());
+                }
+            }
+            expr
+        } else {
+            original_expr.clone()
+        };
+        let alias = next_remapper.add_expr(&schema, original_expr, &expr)?;
+
+        Ok((expr, alias))
+    }
+
     async fn generate_column_expr(
         schema: DFSchemaRef,
         exprs: impl IntoIterator<Item = Expr>,
@@ -1587,18 +1611,13 @@ impl CubeScanWrapperNode {
     ) -> result::Result<(Vec<(AliasedColumn, HashSet<String>)>, SqlQuery), CubeError> {
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
-            let expr = if let Some(column_remapping) = column_remapping {
-                let mut expr = column_remapping.remap(&original_expr)?;
-                if !can_rename_columns {
-                    let original_alias = expr_name(&original_expr, &schema)?;
-                    if original_alias != expr_name(&expr, &schema)? {
-                        expr = Expr::Alias(Box::new(expr), original_alias.clone());
-                    }
-                }
-                expr
-            } else {
-                original_expr.clone()
-            };
+            let (expr, alias) = Self::remap_column_expression(
+                schema.as_ref(),
+                &original_expr,
+                column_remapping,
+                next_remapper,
+                can_rename_columns,
+            )?;
 
             let mut used_members = HashSet::new();
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
@@ -1614,7 +1633,6 @@ impl CubeScanWrapperNode {
                 Self::escape_interpolation_quotes(expr_sql, push_to_cube_context.is_some());
             sql = new_sql_query;
 
-            let alias = next_remapper.add_expr(&schema, &original_expr, &expr)?;
             aliased_columns.push((
                 AliasedColumn {
                     expr: expr_sql,
