@@ -167,7 +167,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       }),
       body: JSON.stringify({
         sql: query,
-        queryOptions: `useMultistageEngine=true;timeoutMs=${this.config.queryTimeout}`
+        queryOptions: `useMultistageEngine=true;enableNullHandling=true;timeoutMs=${this.config.queryTimeout}`
       })
     });
 
