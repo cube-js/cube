@@ -411,15 +411,12 @@ describe('ClickHouse DataSchemaCompiler', () => {
     });
     logSqlAndParams(query);
 
-    const collation = query.getCollation();
-    expect(collation).toEqual('en');
-
     const sqlAndParams = query.buildSqlAndParams();
     const res = await dbRunner.testQuery(sqlAndParams);
     const sql = sqlAndParams[0];
     expect(sql).toMatch('ORDER BY `visitors__source` ASC COLLATE \'en\'');
 
-    expect(res).toEqual([{ visitors__source: 'google' }, { visitors__source: 'Gork' }, { visitors__source: 'some' }]);
+    expect(res).toEqual([{ visitors__source: 'google' }, { visitors__source: 'Gork' }, { visitors__source: 'some' }, { visitors__source: null }]);
   });
 
   it('export import', () => {

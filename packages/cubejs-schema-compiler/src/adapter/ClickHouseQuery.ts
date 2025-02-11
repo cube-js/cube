@@ -155,8 +155,12 @@ export class ClickHouseQuery extends BaseQuery {
     return null;
   }
 
-  public getFieldType(id) {
-    const field = this.getField(id);
+  public getFieldType(hash) {
+    if (!hash || !hash.id) {
+      return null;
+    }
+
+    const field = this.getField(hash.id);
 
     if (field) {
       return field.definition().type;
