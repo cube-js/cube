@@ -67,7 +67,7 @@ impl MemberSymbol {
             Self::Dimension(d) => d.is_multi_stage(),
             Self::TimeDimension(d) => d.is_multi_stage(),
             Self::Measure(m) => m.is_multi_stage(),
-            _ => false
+            _ => false,
         }
     }
 
