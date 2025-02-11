@@ -41,7 +41,10 @@ pub trait BaseTools {
         &self,
         used_filters: Option<Vec<FilterItem>>,
     ) -> Result<Rc<dyn FilterParams>, CubeError>;
-    fn filter_group_function_for_rust(&self, used_filters: Option<Vec<FilterItem>>) -> Result<Rc<dyn FilterGroup>, CubeError>;
+    fn filter_group_function_for_rust(
+        &self,
+        used_filters: Option<Vec<FilterItem>>,
+    ) -> Result<Rc<dyn FilterGroup>, CubeError>;
     fn timestamp_precision(&self) -> Result<u32, CubeError>;
     fn in_db_time_zone(&self, date: String) -> Result<String, CubeError>;
     fn generate_time_series(
