@@ -313,9 +313,12 @@ describe('SQL Generation', () => {
 
     cube('visitor_checkins', {
       sql: \`
-      select * from visitor_checkins WHERE
-      \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')} AND
-      \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("(created_at - INTERVAL '3 DAY')"), FILTER_PARAMS.visitor_checkins.source.filter('source'))}
+      select visitor_checkins.* from visitor_checkins left join visitors on visitor_checkins.visitor_id = visitors.id WHERE
+      \${FILTER_PARAMS.visitor_checkins.created_at.filter('visitor_checkins.created_at')} AND
+      \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("(visitor_checkins.created_at - INTERVAL '3 DAY')"), FILTER_PARAMS.visitor_checkins.source.filter('visitor_checkins.source'))}
+      AND \${SECURITY_CONTEXT.source.filter('visitors.source')} AND
+      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`visitors.source in (\${sourceArray.join(',')})\`)}
+
       \`,
       sql_alias: \`vc\`,
 
@@ -1249,7 +1252,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
-  it('filter join 1', async () => {
+  it('filter join', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -1869,7 +1872,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
-  it('security context 1', async () => {
+  it('security context', async () => {
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -2045,7 +2048,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   ]));
 
   it(
-    'contains filter 1',
+    'contains filter',
     () => runQueryTest({
       measures: [],
       dimensions: [
@@ -2840,7 +2843,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     ]
   ));
 
-  it('rank measure 1', async () => runQueryTest(
+  it('rank measure', async () => runQueryTest(
     {
       measures: ['visitors.revenue_rank'],
     },
