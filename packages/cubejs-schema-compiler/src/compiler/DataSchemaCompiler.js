@@ -11,6 +11,7 @@ import workerpool from 'workerpool';
 import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
+import { CONTEXT_SYMBOLS } from './CubeSymbols';
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
@@ -191,6 +192,7 @@ export class DataSchemaCompiler {
           transpilers: this.transpilers.map(t => t.constructor.name),
           cubeNames,
           cubeSymbolsNames,
+          contextSymbols: CONTEXT_SYMBOLS,
         };
 
         const res = await this.workerPool.exec('transpile', [data]);

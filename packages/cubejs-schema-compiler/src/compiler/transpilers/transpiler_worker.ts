@@ -9,6 +9,7 @@ type TransferContent = {
   transpilers: string[];
   cubeNames: string[];
   cubeSymbolsNames: Record<string, Record<string, boolean>>;
+  contextSymbols: Record<string, string>;
 };
 
 type TranspilerPlugin = [string, Record<string, any>];
@@ -25,7 +26,8 @@ const transpilers = {
   CubePropContextTranspiler:
     (data: TransferContent): TranspilerPlugin => ['@cubejs-backend/cube-prop-ctx-transpiler-swc-plugin', {
       cubeNames: data.cubeNames,
-      cubeSymbols: data.cubeSymbolsNames
+      cubeSymbols: data.cubeSymbolsNames,
+      contextSymbols: data.contextSymbols,
     }],
 };
 
