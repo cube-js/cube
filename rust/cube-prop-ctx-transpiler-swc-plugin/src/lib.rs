@@ -323,6 +323,16 @@ impl<'a> VisitMut for SqlAndReferencesFieldVisitor<'a> {
             self.path_stack.pop();
         }
     }
+
+    fn visit_mut_array_lit(&mut self, arr: &mut ArrayLit) {
+        for (idx, el) in arr.elems.iter_mut().enumerate() {
+            if let Some(el) = el {
+                self.path_stack.push(idx.to_string());
+                el.visit_mut_children_with(self);
+                self.path_stack.pop();
+            }
+        }
+    }
 }
 
 pub struct KnownIdentifiersInjectVisitor<'a> {
