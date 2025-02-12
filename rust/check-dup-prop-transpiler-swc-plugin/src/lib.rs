@@ -69,7 +69,10 @@ impl TransformVisitor {
                                 PropName::Str(s) => s.span,
                                 _ => DUMMY_SP,
                             };
-                            self.emit_error(span, &format!("Duplicate property <{}>", key_name));
+                            self.emit_error(
+                                span,
+                                &format!("Duplicate property parsing {}", key_name),
+                            );
                         } else {
                             unique.insert(key_name);
                         }
