@@ -1798,7 +1798,7 @@ const variables: Record<string, (...args: any) => any> = {
         throw new TypeError(
           `The ${
             keyByDataSource(
-              'CUBEJS_DB_NULL_HANDLING',
+              'CUBEJS_DB_PINOT_NULL_HANDLING',
               dataSource,
             )
           } must be either 'true' or 'false'.`
