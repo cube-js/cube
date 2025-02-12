@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/rest-api",
+    "destination": "/product/apis-integrations/rest-api/reference",
+    "permanent": true
+  },
+  {
     "source": "/reference/sql-api",
     "destination": "/product/apis-integrations/sql-api/reference",
     "permanent": true
@@ -591,7 +596,7 @@
   },
   {
     "source": "/rest-api",
-    "destination": "/reference/rest-api",
+    "destination": "/product/apis-integrations/rest-api/reference",
     "permanent": true
   },
   {
