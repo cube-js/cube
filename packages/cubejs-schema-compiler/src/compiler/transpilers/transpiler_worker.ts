@@ -46,10 +46,13 @@ const transpile = (data: TransferContent) => {
     {
       filename: data.fileName,
       jsc: {
+        target: 'es2015',
         experimental: {
           plugins: transpilersConfigs,
         },
       },
+      swcrc: false,
+      inputSourceMap: false,
     });
 
   return {
