@@ -797,7 +797,36 @@ mod tests {
                 status_completed: {
                   sql: `${CUBE}.status = 'completed'`
                 }
-              }
+              },
+              accessPolicy: [
+                    {
+                        role: "*",
+                        rowLevel: {
+                            allowAll: true,
+                        },
+                    },
+                    {
+                        role: 'admin',
+                        conditions: [
+                            {
+                                if: `true`,
+                            },
+                        ],
+                        rowLevel: {
+                            filters: [
+                                {
+                                    member: `${CUBE}.id`,
+                                    operator: 'equals',
+                                    values: [`1`, `2`, `3`],
+                                },
+                            ],
+                        },
+                        memberLevel: {
+                            includes: `*`,
+                            excludes: [`localTime`, `completedAt`],
+                        },
+                    },
+                ]
             });
             "#;
         // Should generate
@@ -897,6 +926,29 @@ mod tests {
         //             sql: CUBE => `${CUBE}.status = 'completed'`,
         //         },
         //     },
+        //     accessPolicy: [{
+        //         role: "*",
+        //         rowLevel: {
+        //              allowAll: true
+        //         }
+        //      },
+        //      {
+        //         role: 'admin',
+        //         conditions: [{
+        //              if: () => `true`
+        //         }],
+        //         rowLevel: {
+        //          filters: [{
+        //             member: CUBE => `${CUBE}.id`,
+        //             operator: 'equals',
+        //             values: () => [`1`, `2`, `3`]
+        //          }]
+        //         },
+        //         memberLevel: {
+        //              includes: `*`,
+        //              excludes: [`localTime`, `completedAt`]
+        //         }
+        //     }]
         // });
 
         let mut transformed_program: Option<Program> = None;
@@ -969,6 +1021,21 @@ mod tests {
         assert!(
             output_code.contains("sql: (SQL_UTILS)=>SQL_UTILS.convertTz(`completed_at`)"),
             "Output code should contain arrow function with SQL_UTILS as parameter for *.sql, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("if: ()=>`true`"),
+            "Output code should contain arrow function for acl if condition, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("member: (CUBE)=>`${CUBE}.id`"),
+            "Output code should contain arrow function for acl rowlevel filters member, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("values: ()=>["),
+            "Output code should contain arrow function for acl rowlevel filters values, got:\n{}",
             output_code
         );
         let diags = diagnostics.lock().unwrap();
@@ -1091,7 +1158,30 @@ mod tests {
                 status_completed: {
                   sql: CUBE => `${CUBE}.status = 'completed'`
                 }
-              }
+              },
+              accessPolicy: [{
+                role: "*",
+                rowLevel: {
+                    allowAll: true
+                }
+              },
+              {
+                role: 'admin',
+                conditions: [{
+                    if: () => `true`
+                }],
+                rowLevel: {
+                filters: [{
+                    member: CUBE => `${CUBE}.id`,
+                    operator: 'equals',
+                    values: () => [`1`, `2`, `3`]
+                }]
+                },
+                memberLevel: {
+                    includes: `*`,
+                    excludes: [`localTime`, `completedAt`]
+                }
+              }]
             });
         "#;
         // Should generate
@@ -1190,7 +1280,30 @@ mod tests {
         //     status_completed: {
         //       sql: CUBE => `${CUBE}.status = 'completed'`
         //     }
-        //   }
+        //   },
+        //   accessPolicy: [{
+        //     role: "*",
+        //     rowLevel: {
+        //         allowAll: true
+        //     }
+        //   },
+        //   {
+        //     role: 'admin',
+        //     conditions: [{
+        //       if: () => `true`
+        //     }],
+        //     rowLevel: {
+        //       filters: [{
+        //         member: CUBE => `${CUBE}.id`,
+        //         operator: 'equals',
+        //         values: () => [`1`, `2`, `3`]
+        //       }]
+        //     },
+        //     memberLevel: {
+        //       includes: `*`,
+        //       excludes: [`localTime`, `completedAt`]
+        //     }
+        //   }]
         // });
 
         let mut transformed_program: Option<Program> = None;
@@ -1287,6 +1400,21 @@ mod tests {
         assert!(
             output_code.contains("sql: (SQL_UTILS)=>SQL_UTILS.convertTz(`completed_at`)"),
             "Output code should contain arrow function with SQL_UTILS as parameter for *.sql, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("if: ()=>`true`"),
+            "Output code should contain arrow function for acl if condition, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("member: (CUBE)=>`${CUBE}.id`"),
+            "Output code should contain arrow function for acl rowlevel filters member, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("values: ()=>["),
+            "Output code should contain arrow function for acl rowlevel filters values, got:\n{}",
             output_code
         );
         let diags = diagnostics.lock().unwrap();
