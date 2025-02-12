@@ -39,7 +39,7 @@ export class AppModule { }
 ```
 
 The `options` object is passed directly to
-[@cubejs-client/core](/reference/frontend/cubejs-client-core).
+[`@cubejs-client/core`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core).
 
 `CubeClientModule` provides `CubeClient`, which you can inject into your
 components or services:
@@ -68,10 +68,10 @@ export class AppComponent {
 ## API
 
 `CubeClient` provides the same API methods as
-[@cubejs-client/core](/reference/frontend/cubejs-client-core#cubeapi). The
+[`@cubejs-client/core`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#cubeapi). The
 difference is that instead of Promise it returns an
 [Observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html),
-which passes [resultSet](/reference/frontend/cubejs-client-core#resultset) into
+which passes [`resultSet`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#resultset) into the
 callback function.
 
 Also you can use [RxJS Subject](https://rxjs-dev.firebaseapp.com/guide/subject)

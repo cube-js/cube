@@ -1,5 +1,30 @@
 [
   {
+    "source": "/reference/frontend/cubejs-client-core",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-core",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-react",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-react",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ngx",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ngx",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-vue",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-vue",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ws-transport",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ws-transport",
+    "permanent": true
+  },
+  {
     "source": "/reference/cli",
     "destination": "/product/workspace/cli/reference",
     "permanent": true
@@ -621,12 +646,12 @@
   },
   {
     "source": "/@cubejs-client-vue",
-    "destination": "/reference/frontend/cubejs-client-vue",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-vue",
     "permanent": true
   },
   {
     "source": "/@cubejs-client-ngx",
-    "destination": "/reference/frontend/cubejs-client-ngx",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ngx",
     "permanent": true
   },
   {

@@ -1,5 +1,6 @@
 module.exports = {
   "react": "React",
   "vue": "Vue",
-  "angular": "Angular"
+  "angular": "Angular",
+  "reference": "Reference"
 }
