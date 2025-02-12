@@ -13,6 +13,10 @@ lto = true
 serde = "1"
 swc_core = { version = "13.2.*", features = ["ecma_plugin_transform"] }
 
+[dev-dependencies]
+swc_ecma_parser = "8.0.1"
+swc_ecma_codegen = "6.0.2"
+
 # .cargo/config.toml defines few alias to build plugin.
 # cargo build-wasi generates wasm-wasi32 binary
 # cargo build-wasm32 generates wasm32-unknown-unknown binary.
