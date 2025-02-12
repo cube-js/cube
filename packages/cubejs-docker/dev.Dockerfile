@@ -18,7 +18,7 @@ ENV CARGO_HOME=/usr/local/cargo
 ENV PATH=/usr/local/cargo/bin:$PATH
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- --profile minimal --default-toolchain nightly-2022-03-08 -y
+    sh -s -- --profile minimal --default-toolchain nightly-2022-03-08 -y --target wasm32-wasip1
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV NODE_ENV=development
@@ -87,6 +87,11 @@ COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/packag
 COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.json
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
+
+COPY rust/check-dup-prop-transpiler-swc-plugin/package.json rust/check-dup-prop-transpiler-swc-plugin/package.json
+COPY rust/cube-prop-ctx-transpiler-swc-plugin/package.json rust/cube-prop-ctx-transpiler-swc-plugin/package.json
+COPY rust/import-export-transpiler-swc-plugin/package.json rust/import-export-transpiler-swc-plugin/package.json
+COPY rust/validation-transpiler-swc-plugin/package.json rust/validation-transpiler-swc-plugin/package.json
 
 RUN yarn policies set-version v1.22.22
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
@@ -165,6 +170,11 @@ COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
 COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
 COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
 COPY packages/cubejs-playground/ packages/cubejs-playground/
+
+COPY rust/check-dup-prop-transpiler-swc-plugin/ rust/check-dup-prop-transpiler-swc-plugin/
+COPY rust/cube-prop-ctx-transpiler-swc-plugin/ rust/cube-prop-ctx-transpiler-swc-plugin/
+COPY rust/import-export-transpiler-swc-plugin/ rust/import-export-transpiler-swc-plugin/
+COPY rust/validation-transpiler-swc-plugin/ rust/validation-transpiler-swc-plugin/
 
 RUN yarn build
 RUN yarn lerna run build
