@@ -53,6 +53,7 @@ const transpile = (data: TransferContent) => {
       },
       swcrc: false,
       inputSourceMap: false,
+      isModule: true,
     });
 
   return {
