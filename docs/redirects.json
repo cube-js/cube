@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/sql-api",
+    "destination": "/product/apis-integrations/sql-api/reference",
+    "permanent": true
+  },
+  {
     "source": "/product/data-modeling/concepts/publicity",
     "destination": "/product/auth/member-level-security",
     "permanent": true
@@ -521,12 +526,12 @@
   },
   {
     "source": "/backend/sql/reference/functions-operators",
-    "destination": "/reference/sql-api/sql-functions-and-operators",
+    "destination": "/product/apis-integrations/sql-api/reference#sql-functions-and-operators",
     "permanent": true
   },
   {
     "source": "/backend/sql/reference/commands",
-    "destination": "/reference/sql-api/sql-commands",
+    "destination": "/product/apis-integrations/sql-api/reference#sql-commands",
     "permanent": true
   },
   {
