@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/ai-api",
+    "destination": "/product/apis-integrations/ai-api/reference",
+    "permanent": true
+  },
+  {
     "source": "/reference/graphql-api",
     "destination": "/product/apis-integrations/graphql-api/reference",
     "permanent": true
