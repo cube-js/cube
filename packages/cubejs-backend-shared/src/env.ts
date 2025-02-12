@@ -1786,7 +1786,7 @@ const variables: Record<string, (...args: any) => any> = {
 
   pinotNullHandling: ({ dataSource }: { dataSource: string }) => {
     const val = process.env[
-      keyByDataSource('CUBEJS_DB_NULL_HANDLING', dataSource)
+      keyByDataSource('CUBEJS_DB_PINOT_NULL_HANDLING', dataSource)
     ];
 
     if (val) {
