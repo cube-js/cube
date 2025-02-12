@@ -9,7 +9,9 @@
   ],
   "main": "target/wasm32-wasip1/release/check_dup_prop_transpiler_swc_plugin.wasm",
   "scripts": {
-    "prepublishOnly": "cargo build-wasi --release"
+    "prepublishOnly": "yarn run build",
+    "build-swc-plugin": "yarn run build",
+    "build": "cargo build-wasi --release"
   },
   "files": [],
   "preferUnplugged": true
