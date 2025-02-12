@@ -1404,38 +1404,27 @@ impl CubeScanWrapperNode {
                                                         ..
                                                     } => {
                                                         let col_name = expr_name(&expr, &schema)?;
-                                                        let aliased_column = aggr_expr
-                                                            .iter()
-                                                            .find_position(|e| {
-                                                                expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
-                                                            })
-                                                            .map(|(i, _)| aggregate[i].clone()).or_else(|| {
-                                                            projection_expr
-                                                                .iter()
-                                                                .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
-                                                                })
-                                                                .map(|(i, _)| {
-                                                                    projection[i].clone()
-                                                                })
-                                                        }).or_else(|| {
-                                                            flat_group_expr
-                                                                .iter()
-                                                                .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
-                                                                })
-                                                                .map(|(i, _)| group_by[i].clone())
-                                                        }).ok_or_else(|| {
-                                                            DataFusionError::Execution(format!(
-                                                                "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
-                                                                col_name,
-                                                                projection_expr,
-                                                                aggr_expr,
-                                                                flat_group_expr
-                                                            ))
-                                                        })?;
+
+                                                        let find_column = |exprs: &[Expr], columns: &[(AliasedColumn, HashSet<String>)]| -> Option<AliasedColumn> {
+                                                            exprs.iter().zip(columns.iter())
+                                                                .find(|(e, _c)| expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false))
+                                                                .map(|(_e, c)| c.0.clone())
+                                                        };
+
+                                                        let aliased_column = find_column(&aggr_expr, &aggregate)
+                                                            .or_else(|| find_column(&projection_expr, &projection))
+                                                            .or_else(|| find_column(&flat_group_expr, &group_by))
+                                                            .ok_or_else(|| {
+                                                                DataFusionError::Execution(format!(
+                                                                    "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
+                                                                    col_name,
+                                                                    projection_expr,
+                                                                    aggr_expr,
+                                                                    flat_group_expr
+                                                                ))
+                                                            })?;
                                                         Ok(vec![
-                                                            aliased_column.0.alias.clone(),
+                                                            aliased_column.alias,
                                                             if *asc { "asc".to_string() } else { "desc".to_string() },
                                                         ])
                                                     }
