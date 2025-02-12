@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/cli",
+    "destination": "/product/workspace/cli/reference",
+    "permanent": true
+  },
+  {
     "source": "/reference/ai-api",
     "destination": "/product/apis-integrations/ai-api/reference",
     "permanent": true
@@ -622,11 +627,6 @@
   {
     "source": "/@cubejs-client-ngx",
     "destination": "/reference/frontend/cubejs-client-ngx",
-    "permanent": true
-  },
-  {
-    "source": "/reference",
-    "destination": "/reference/cli",
     "permanent": true
   },
   {
