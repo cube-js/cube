@@ -18,7 +18,7 @@ async-trait = "0.1.36"
 log = "0.4"
 bytes = "1.2"
 byteorder = "1.4"
-thiserror = "1.0.50"
+thiserror = "2"
 chrono = { version = "0.4", package = "chrono", default-features = false, features = [
     "clock",
 ], optional = true }

@@ -1,7 +1,6 @@
-#![feature(async_closure)]
-#![feature(thread_id_value)]
 #![allow(clippy::result_large_err)]
 
+#[cfg(feature = "python")]
 extern crate findshlibs;
 
 pub mod auth;
