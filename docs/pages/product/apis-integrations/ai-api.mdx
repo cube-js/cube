@@ -108,7 +108,7 @@ Use the `runQuery` request parameter to have the AI API run the query and report
 }
 ```
 
-The response will be the same as above, followed by a second JSON object representing the response (see the [REST API reference](/reference/rest-api#v1load) for its format).
+The response will be the same as above, followed by a second JSON object representing the response (see the [REST API reference](/product/apis-integrations/rest-api/reference#v1load) for its format).
 
 <InfoBox>
   Note that the response now contains two JSON objects separated by a newline
@@ -117,7 +117,7 @@ The response will be the same as above, followed by a second JSON object represe
 
 #### 2. `/load`
 
-Alternatively, you may take the generated `cube_query` from the response and then call the [REST API `/load` endpoint](/reference/rest-api#v1load) with it in the `/load` request body. This is recommended for advanced use-cases where you need more control over formatting, pagination, etc. or if you are adding the AI API to an existing Cube REST API implementation.
+Alternatively, you may take the generated `cube_query` from the response and then call the [REST API `/load` endpoint](/product/apis-integrations/rest-api/reference#v1load) with it in the `/load` request body. This is recommended for advanced use-cases where you need more control over formatting, pagination, etc. or if you are adding the AI API to an existing Cube REST API implementation.
 
 ### Error Handling
 
@@ -262,4 +262,4 @@ deployment. See below for required variables by provider (required unless noted)
 - `OPENAI_API_KEY` - An OpenAI API key (we recommend creating a service account for the AI API)
 
 
-[ref-ref-ai-api]: /reference/ai-api
+[ref-ref-ai-api]: /product/apis-integrations/ai-api/reference

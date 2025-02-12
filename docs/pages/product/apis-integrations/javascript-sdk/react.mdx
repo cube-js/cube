@@ -8,8 +8,8 @@ redirect_from:
 Cube is visualization-agnostic, so you can build any user interface for your
 application.
 
-You can directly query Cube Backend using
-JSON [Query Format](/product/apis-integrations/rest-api/query-format) via [HTTP API](/reference/rest-api)
+You can directly query Cube using the
+JSON [query format](/product/apis-integrations/rest-api/query-format) via the [REST API](/product/apis-integrations/rest-api/reference)
 or
 [WebSockets](/product/apis-integrations/rest-api/real-time-data-fetch#web-sockets)
 and visualize analytical data with tools of your choice. However, it's much
@@ -25,25 +25,25 @@ Chart.js, D3.js, and more.
 The client provides methods to solve common tasks:
 
 **Abstract from the transport and query data.** You can
-[fetch data](/reference/frontend/cubejs-client-core#load) from Cube Backend or
+[fetch data](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#load) from Cube Backend or
 subscribe to
 [real-time updates](/product/apis-integrations/rest-api/real-time-data-fetch)
 regardless of the protocol, be it HTTP or WebSockets.
 
 **Transform data for visualization.** You can
-[pivot](/reference/frontend/cubejs-client-core#pivot) the result set to display
-as a [chart](/reference/frontend/cubejs-client-core#chart-pivot) or as a
-[table](/reference/frontend/cubejs-client-core#table-pivot), split into
-[series](/reference/frontend/cubejs-client-core#series) or
-[table columns](/reference/frontend/cubejs-client-core#table-columns).
+[pivot](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#pivot) the result set to display
+as a [chart](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#chartpivot) or as a
+[table](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#tablepivot), split into
+[series](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#series) or
+[table columns](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#tablecolumns).
 
 **Simplify work with complex query types.** You can build
-[Drill Down](/reference/frontend/cubejs-client-core#drill-down) queries and
-[decompose](/reference/frontend/cubejs-client-core#decompose) the results of
+[drill down](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#drilldown) queries and
+[decompose](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#decompose) the results of
 [compare date range queries][ref-compare-date-range]
-or [Data Blending](/product/data-modeling/concepts/data-blending) queries.
+or [data blending](/product/data-modeling/concepts/data-blending) queries.
 
-[Learn more](/reference/frontend/cubejs-client-core) in the documentation for
+[Learn more](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core) in the documentation for
 the `@cubejs-client/core` package.
 
 ## Cube React Package
@@ -51,17 +51,17 @@ the `@cubejs-client/core` package.
 The package provides convenient tools to work with Cube in React:
 
 **Hooks.** You can add the
-[useCubeQuery hook](/reference/frontend/cubejs-client-react#use-cube-query) to
+[useCubeQuery hook](/product/apis-integrations/javascript-sdk/reference/cubejs-client-react#usecubequery) to
 functional React components to execute Cube queries.
 
 **Components.** You can use
-[QueryBuilder](/reference/frontend/cubejs-client-react#query-builder) and
-[QueryRenderer](/reference/frontend/cubejs-client-react#query-renderer)
+[`QueryBuilder`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-react#querybuilder) and
+[`QueryRenderer`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-react#queryrenderer)
 components to separate state management and API calls from your rendering code.
 You can also use
-[CubeProvider](/reference/frontend/cubejs-client-react#cube-provider) and
-[CubeContext](/reference/frontend/cubejs-client-react#cube-context) components
-for direct access to Cube Client anywhere in your application.
+[`CubeProvider`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-react#cubeprovider) and
+[`CubeContext`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-react#cubecontext) components
+for direct access to Cube client anywhere in your application.
 
 ## Example Usage
 
