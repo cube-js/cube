@@ -59,7 +59,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-          target: x86_64-unknown-linux-gnu
+          target: x86_64-unknown-linux-gnu wasm32-wasip1
           cache: false
       - uses: Swatinem/rust-cache@v2
         with:
