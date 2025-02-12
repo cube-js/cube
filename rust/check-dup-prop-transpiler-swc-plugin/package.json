@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/check-dup-prop-transpiler-swc-plugin",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Check for property duplication Transpiler Plugin for Cube models compilation",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
