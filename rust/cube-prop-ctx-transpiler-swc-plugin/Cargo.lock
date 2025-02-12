@@ -241,10 +241,13 @@ dependencies = [
 name = "cube-prop-ctx-transpiler-swc-plugin"
 version = "0.1.0"
 dependencies = [
+ "indexmap",
  "regex",
  "serde",
  "serde_json",
  "swc_core",
+ "swc_ecma_codegen",
+ "swc_ecma_parser",
 ]
 
 [[package]]
