@@ -552,6 +552,83 @@ mod tests {
     }
 
     #[test]
+    fn test_export_const_expression() {
+        let globals = Globals::new();
+        let cm: Lrc<SourceMap> = Default::default();
+        let diagnostics = Arc::new(Mutex::new(Vec::new()));
+        let emitter = Box::new(TestEmitter {
+            diagnostics: diagnostics.clone(),
+        });
+        let handler = Handler::with_emitter_and_flags(
+            emitter,
+            HandlerFlags {
+                can_emit_warnings: true,
+                ..Default::default()
+            },
+        );
+
+        let js_code = r#"
+            export const sql = (input) => intput + 5;
+            export const a1 = 5, a2 = ()=>111, a3 = (inputA3)=>inputA3+"Done";
+        "#;
+
+        let mut transformed_program: Option<Program> = None;
+
+        swc_core::common::GLOBALS.set(&globals, || {
+            HANDLER.set(&handler, || {
+                let fm = cm.new_source_file(
+                    Arc::new(FileName::Custom("input.js".into())),
+                    js_code.into(),
+                );
+                let lexer = Lexer::new(
+                    Syntax::Es(Default::default()),
+                    EsVersion::Es2020,
+                    StringInput::from(&*fm),
+                    None,
+                );
+                let mut parser = Parser::new_from(lexer);
+                let mut program: Program =
+                    parser.parse_program().expect("Failed to parse the JS code");
+
+                let mut visitor = TransformVisitor { source_map: None };
+                program.visit_mut_with(&mut visitor);
+                transformed_program = Some(program);
+            });
+        });
+
+        let transformed_program = transformed_program.expect("Transformation failed");
+        let output_code = generate_code(&transformed_program, &cm);
+
+        assert!(
+            output_code.contains("const sql = (input)=>intput + 5;"),
+            "Output code should contain original single const definition, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("addExport({\n    sql: sql\n})"),
+            "Output code should contain addExport call, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("const a1 = 5, a2 = ()=>111, a3 = (inputA3)=>inputA3 + \"Done\""),
+            "Output code should contain original multiple const definitions, got:\n{}",
+            output_code
+        );
+        assert!(
+            output_code.contains("addExport({\n    a1: a1,\n    a2: a2,\n    a3: a3\n})"),
+            "Output code should contain addExport call, got:\n{}",
+            output_code
+        );
+
+        let diags = diagnostics.lock().unwrap();
+        assert!(
+            diags.is_empty(),
+            "Should not emit errors, got: {:?}",
+            *diags
+        );
+    }
+
+    #[test]
     fn test_import_named_default() {
         let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
