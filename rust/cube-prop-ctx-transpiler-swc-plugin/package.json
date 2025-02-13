@@ -11,7 +11,7 @@
   "scripts": {
     "prepublishOnly": "yarn run build",
     "build-swc-plugin": "yarn run build",
-    "build": "cargo build-wasi --release"
+    "build": "cargo build --target wasm32-wasip1 --release"
   },
   "files": [],
   "preferUnplugged": true

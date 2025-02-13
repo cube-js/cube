@@ -10,7 +10,8 @@
   "main": "target/wasm32-wasip1/release/validation_transpiler_swc_plugin.wasm",
   "scripts": {
     "prepublishOnly": "yarn run build-swc-plugin",
-    "build-swc-plugin": "cargo build-wasi --release"
+    "build-swc-plugin": "cargo build-wasi --release",
+    "build": "cargo build --target wasm32-wasip1 --release"
   },
   "files": [],
   "preferUnplugged": true
