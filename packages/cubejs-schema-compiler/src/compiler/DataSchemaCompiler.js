@@ -108,7 +108,7 @@ export class DataSchemaCompiler {
 
     const transpile = async () => {
       let cubeNames;
-      let cubeSymbolsNames;
+      let cubeSymbols;
 
       if (getEnv('transpilationWorkerThreads')) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
@@ -118,7 +118,7 @@ export class DataSchemaCompiler {
         // Communication between main and worker threads uses
         // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
         // which doesn't allow passing any function objects, so we need to sanitize the symbols.
-        cubeSymbolsNames = Object.fromEntries(
+        cubeSymbols = Object.fromEntries(
           Object.entries(this.cubeSymbols.symbols)
             .map(
               ([key, value]) => [key, Object.fromEntries(
@@ -141,7 +141,7 @@ export class DataSchemaCompiler {
         (_, _i) => this.transpileJsFile(
           dummyFile,
           errorsReport,
-          { cubeNames, cubeSymbolsNames, transpilerNames, contextSymbols: CONTEXT_SYMBOLS }
+          { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS }
         ),
       );
       await Promise.all(warmups);
@@ -205,7 +205,7 @@ export class DataSchemaCompiler {
     }
   }
 
-  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbolsNames, contextSymbols, transpilerNames }) {
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames }) {
     try {
       if (getEnv('transpilationWorkerThreads')) {
         const data = {
@@ -213,7 +213,7 @@ export class DataSchemaCompiler {
           content: file.content,
           transpilers: transpilerNames,
           cubeNames,
-          cubeSymbolsNames,
+          cubeSymbols,
           contextSymbols,
         };
 
