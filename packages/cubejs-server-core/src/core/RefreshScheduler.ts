@@ -33,6 +33,7 @@ type PreAggregationsQueryingOptions = {
   preAggregations: {
     id: string,
     cacheOnly?: boolean,
+    metaOnly?: boolean,
     partitions?: string[]
   }[],
   forceBuildPreAggregations?: boolean,
@@ -391,7 +392,17 @@ export class RefreshScheduler {
 
     return Promise.all(preAggregations.map(preAggregation => async () => {
       const { timezones } = queryingOptions;
-      const { partitions: partitionsFilter, cacheOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
+      const { partitions: partitionsFilter, cacheOnly, metaOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
+
+      if (metaOnly) {
+        return {
+          timezones,
+          preAggregation,
+          partitions: [],
+          errors: [],
+          partitionsWithDependencies: []
+        };
+      }
 
       const type = preAggregation?.preAggregation?.type;
       const isEphemeralPreAggregation = type === 'rollupJoin' || type === 'rollupLambda';
