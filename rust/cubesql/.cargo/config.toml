@@ -1,11 +1,5 @@
 # Please keep in sync this file with packages/cubejs-backend-native!
 
-[target."x86_64-unknown-linux-gnu"]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
-[target."aarch64-unknown-linux-gnu"]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
-
 # If you are going to use local fork, feel free to uncomment
 #paths = ["../../../sqlparser-rs", "../../../arrow-datafusion/datafusion"]
 #paths = ["../../../arrow-datafusion/datafusion"]

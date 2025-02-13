@@ -51,9 +51,10 @@ impl JinjaEngineWorker {
                 );
             } else {
                 trace!(
-                    "Closing jinja thread, id: {}, threadId: {}",
+                    "Closing jinja thread, id: {}, threadId: {:?}",
                     id,
-                    std::thread::current().id().as_u64()
+                    // TODO: Use as_u64 when it will be stable - https://github.com/rust-lang/rust/issues/67939
+                    std::thread::current().id()
                 );
 
                 return;

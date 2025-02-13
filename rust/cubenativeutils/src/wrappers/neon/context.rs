@@ -59,7 +59,7 @@ impl<'cx, C: Context<'cx> + NoenContextLifetimeExpand<'cx> + 'cx> NeonContextGua
     fn new(cx: C) -> Self {
         Self {
             context: ContextWrapper::new(cx.expand_lifetime()),
-            lifetime: PhantomData::default(),
+            lifetime: PhantomData,
         }
     }
 
@@ -111,9 +111,9 @@ impl<C: Context<'static>> ContextHolder<C> {
             let res = cx.with_context(f);
             Ok(res)
         } else {
-            Err(CubeError::internal(format!(
-                "Call to neon context outside of its lifetime"
-            )))
+            Err(CubeError::internal(
+                "Call to neon context outside of its lifetime".to_string(),
+            ))
         }
     }
 }

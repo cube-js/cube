@@ -41,7 +41,7 @@ impl<'a, 'b> JsValueDeserializer<'a, 'b> {
     }
 }
 
-impl<'de, 'a, 'b> Deserializer<'de> for JsValueDeserializer<'a, 'b> {
+impl<'de> Deserializer<'de> for JsValueDeserializer<'_, '_> {
     type Error = JsDeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -294,7 +294,7 @@ impl<'a, 'b> JsObjectDeserializer<'a, 'b> {
 
 // `MapAccess` is provided to the `Visitor` to give it the ability to iterate
 // through entries of the map.
-impl<'de, 'a, 'b> MapAccess<'de> for JsObjectDeserializer<'a, 'b> {
+impl<'de> MapAccess<'de> for JsObjectDeserializer<'_, '_> {
     type Error = JsDeserializationError;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -343,7 +343,7 @@ impl<'a, 'b> JsArrayDeserializer<'a, 'b> {
 
 // `SeqAccess` is provided to the `Visitor` to give it the ability to iterate
 // through elements of the sequence.
-impl<'de, 'a, 'b> SeqAccess<'de> for JsArrayDeserializer<'a, 'b> {
+impl<'de> SeqAccess<'de> for JsArrayDeserializer<'_, '_> {
     type Error = JsDeserializationError;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -381,7 +381,7 @@ impl<'a, 'b> JsEnumDeserializer<'a, 'b> {
 
 // `EnumAccess` is provided to the `Visitor` to give it the ability to determine
 // which variant of the enum is supposed to be deserialized.
-impl<'de, 'a, 'b> EnumAccess<'de> for JsEnumDeserializer<'a, 'b> {
+impl<'de> EnumAccess<'de> for JsEnumDeserializer<'_, '_> {
     type Error = JsDeserializationError;
     type Variant = Self;
 
@@ -394,7 +394,7 @@ impl<'de, 'a, 'b> EnumAccess<'de> for JsEnumDeserializer<'a, 'b> {
     }
 }
 
-impl<'de, 'a, 'b> VariantAccess<'de> for JsEnumDeserializer<'a, 'b> {
+impl<'de> VariantAccess<'de> for JsEnumDeserializer<'_, '_> {
     type Error = JsDeserializationError;
 
     // If the `Visitor` expected this variant to be a unit variant, the input
