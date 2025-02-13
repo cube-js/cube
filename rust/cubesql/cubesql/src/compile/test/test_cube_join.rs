@@ -1,5 +1,6 @@
 use cubeclient::models::{
-    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+    V1LoadRequestQuery, V1LoadRequestQueryFilterBase, V1LoadRequestQueryFilterItem,
+    V1LoadRequestQueryTimeDimension,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -208,13 +209,15 @@ async fn test_join_three_cubes_split() {
                 date_range: None
             }]),
             order: Some(vec![]),
-            filters: Some(vec![V1LoadRequestQueryFilterItem {
-                member: Some("Logs.read".to_string()),
-                operator: Some("equals".to_string()),
-                values: Some(vec!["true".to_string()]),
-                or: None,
-                and: None
-            }]),
+            filters: Some(vec![
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                    }
+                ))
+            ]),
             ..Default::default()
         }
     )
@@ -249,20 +252,20 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
                 "asc".to_string(),
             ]]),
             filters: Some(vec![
-                V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None
-                },
-                V1LoadRequestQueryFilterItem {
-                    member: Some("Logs.read".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["true".to_string()]),
-                    or: None,
-                    and: None
-                }
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                    }
+                )),
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                    }
+                ))
             ]),
             ..Default::default()
         }
@@ -304,20 +307,20 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                 "asc".to_string(),
             ]]),
             filters: Some(vec![
-                V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None
-                },
-                V1LoadRequestQueryFilterItem {
-                    member: Some("Logs.read".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["true".to_string()]),
-                    or: None,
-                    and: None
-                }
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                    }
+                )),
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                    }
+                ))
             ]),
             ..Default::default()
         }
@@ -353,20 +356,20 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
                 "asc".to_string(),
             ]]),
             filters: Some(vec![
-                V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None
-                },
-                V1LoadRequestQueryFilterItem {
-                    member: Some("Logs.read".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["true".to_string()]),
-                    or: None,
-                    and: None
-                }
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                    }
+                )),
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                    }
+                ))
             ]),
             ..Default::default()
         }
@@ -408,20 +411,20 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                 "asc".to_string(),
             ]]),
             filters: Some(vec![
-                V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None
-                },
-                V1LoadRequestQueryFilterItem {
-                    member: Some("Logs.read".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["true".to_string()]),
-                    or: None,
-                    and: None
-                }
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                    }
+                )),
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                    }
+                ))
             ]),
             ..Default::default()
         }
@@ -469,20 +472,20 @@ async fn test_join_two_subqueries_filter_push_down() {
                 "asc".to_string(),
             ]]),
             filters: Some(vec![
-                V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None
-                },
-                V1LoadRequestQueryFilterItem {
-                    member: Some("Logs.read".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None
-                }
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                    }
+                )),
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                    }
+                ))
             ]),
             ..Default::default()
         }
