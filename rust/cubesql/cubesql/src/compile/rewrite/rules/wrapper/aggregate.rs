@@ -360,8 +360,7 @@ impl WrapperRules {
                         PATCH_MEASURE_UDAF_NAME,
                         vec![
                             column_expr("?measure_column"),
-                            // TODO support doing both: changing agg type and adding filters
-                            literal_null(),
+                            "?replace_agg_type".to_string(),
                             wrapper_pushdown_replacer(
                                 // = is a proper way to filter here:
                                 // CASE NULL WHEN ... will return null
@@ -374,7 +373,15 @@ impl WrapperRules {
                     ),
                     "?out_measure_alias",
                 ),
-                self.transform_filtered_measure("?aggr_expr", "?literal", "?out_measure_alias"),
+                self.transform_filtered_measure(
+                    "?aggr_expr",
+                    "?literal",
+                    "?measure_column",
+                    "?fun",
+                    "?cube_members",
+                    "?replace_agg_type",
+                    "?out_measure_alias",
+                ),
             ),
             rewrite(
                 "wrapper-pull-up-aggregation-over-filtered-measure",
@@ -936,20 +943,31 @@ impl WrapperRules {
         egraph: &mut CubeEGraph,
         subst: &mut Subst,
         column: Column,
-        call_agg_type: String,
+        call_agg_type: Option<String>,
         alias: String,
-        out_expr_var: Var,
+        out_expr_var: Option<Var>,
+        out_replace_agg_type: Option<Var>,
         out_alias_var: Var,
     ) {
         let column_expr_column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-            ColumnExprColumn(column.clone()),
+            ColumnExprColumn(column),
         ));
         let column_expr = egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
-        let new_aggregation_value = egraph.add(LogicalPlanLanguage::LiteralExprValue(
-            LiteralExprValue(ScalarValue::Utf8(Some(call_agg_type))),
-        ));
+        let new_aggregation_value = match call_agg_type {
+            Some(call_agg_type) => egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                LiteralExprValue(ScalarValue::Utf8(Some(call_agg_type))),
+            )),
+            None => egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                ScalarValue::Null,
+            ))),
+        };
         let new_aggregation_expr =
             egraph.add(LogicalPlanLanguage::LiteralExpr([new_aggregation_value]));
+
+        if let Some(out_replace_agg_type) = out_replace_agg_type {
+            subst.insert(out_replace_agg_type, new_aggregation_expr);
+        }
+
         let add_filters_value = egraph.add(LogicalPlanLanguage::LiteralExprValue(
             LiteralExprValue(ScalarValue::Null),
         ));
@@ -967,7 +985,9 @@ impl WrapperRules {
             udaf_args_expr,
         ]));
 
-        subst.insert(out_expr_var, udaf_expr);
+        if let Some(out_expr_var) = out_expr_var {
+            subst.insert(out_expr_var, udaf_expr);
+        }
 
         let alias_expr_alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
             alias.clone(),
@@ -1068,9 +1088,10 @@ impl WrapperRules {
                                         egraph,
                                         subst,
                                         column,
-                                        call_agg_type.clone(),
+                                        Some(call_agg_type.clone()),
                                         alias,
-                                        out_expr_var,
+                                        Some(out_expr_var),
+                                        None,
                                         out_alias_var,
                                     );
 
@@ -1129,11 +1150,22 @@ impl WrapperRules {
         &self,
         aggr_expr_var: &'static str,
         literal_var: &'static str,
+        column_var: &'static str,
+        fun_name_var: &'static str,
+        cube_members_var: &'static str,
+        replace_agg_type_var: &'static str,
         out_measure_alias_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let aggr_expr_var = var!(aggr_expr_var);
         let literal_var = var!(literal_var);
+        let column_var = var!(column_var);
+        let fun_name_var = var!(fun_name_var);
+        let cube_members_var = var!(cube_members_var);
+        let replace_agg_type_var = var!(replace_agg_type_var);
         let out_measure_alias_var = var!(out_measure_alias_var);
+
+        let meta = self.meta_context.clone();
+        let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
 
         move |egraph, subst| {
             match &egraph[subst[literal_var]].data.constant {
@@ -1145,17 +1177,96 @@ impl WrapperRules {
                 }
             }
 
-            // TODO share code with Self::pushdown_measure: locate cube and measure, check that ?fun matches measure, etc
-            // TODO support both changing agg fun and add filter
-
             let Some(alias) = original_expr_name(egraph, subst[aggr_expr_var]) else {
                 return false;
             };
-            let alias_expr_alias =
-                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias)));
-            subst.insert(out_measure_alias_var, alias_expr_alias);
 
-            true
+            for fun in var_iter!(egraph[subst[fun_name_var]], AggregateFunctionExprFun)
+                .cloned()
+                .collect::<Vec<_>>()
+            {
+                let call_agg_type = MemberRules::get_agg_type(Some(&fun), false);
+
+                let column_iter = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                if let Some(member_names_to_expr) = &mut egraph
+                    .index_mut(subst[cube_members_var])
+                    .data
+                    .member_name_to_expr
+                {
+                    for column in column_iter {
+                        if let Some((&(Some(ref member), _, _), _)) =
+                            LogicalPlanData::do_find_member_by_alias(
+                                member_names_to_expr,
+                                &column.name,
+                            )
+                        {
+                            if let Some(measure) = meta.find_measure_with_name(member) {
+                                if !measure.allow_add_filter(call_agg_type.as_deref()) {
+                                    continue;
+                                }
+
+                                let Some(call_agg_type) = &call_agg_type else {
+                                    // call_agg_type is None, rewrite as is
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        None,
+                                        alias,
+                                        None,
+                                        Some(replace_agg_type_var),
+                                        out_measure_alias_var,
+                                    );
+
+                                    return true;
+                                };
+
+                                if measure
+                                    .is_same_agg_type(call_agg_type, disable_strict_agg_type_match)
+                                {
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        None,
+                                        alias,
+                                        None,
+                                        Some(replace_agg_type_var),
+                                        out_measure_alias_var,
+                                    );
+
+                                    return true;
+                                }
+
+                                if measure.allow_replace_agg_type(
+                                    call_agg_type,
+                                    disable_strict_agg_type_match,
+                                ) {
+                                    Self::insert_patch_measure(
+                                        egraph,
+                                        subst,
+                                        column,
+                                        Some(call_agg_type.clone()),
+                                        alias,
+                                        None,
+                                        Some(replace_agg_type_var),
+                                        out_measure_alias_var,
+                                    );
+
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+
+            // TODO share code with Self::pushdown_measure: locate cube and measure, check that ?fun matches measure, etc
         }
     }
 }
