@@ -1,7 +1,7 @@
 use indexmap::IndexSet;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
-use std::sync::{LazyLock, RwLock};
+use std::sync::LazyLock;
 use swc_core::atoms::Atom;
 use swc_core::common::{BytePos, Span, SyntaxContext, DUMMY_SP};
 use swc_core::ecma::visit::{Visit, VisitMutWith, VisitWith};
@@ -64,8 +64,6 @@ static TRANSPILLED_FIELDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
     }
     set
 });
-
-static CONFIG_CACHE: RwLock<Option<TransformConfig>> = RwLock::new(None);
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -406,39 +404,14 @@ impl<'a> Visit for CollectIdentifiersVisitor<'a> {
 pub fn process_transform(program: Program, metadata: TransformPluginProgramMetadata) -> Program {
     let config_str = metadata.get_transform_plugin_config().unwrap_or_default();
 
-    let ts_config: Option<TransformConfig> = serde_json::from_str(&config_str).ok();
+    let ts_config: TransformConfig =
+        serde_json::from_str(&config_str).expect("Incorrect plugin configuration");
 
-    if let Some(new_config) = ts_config {
-        let mut config_lock = CONFIG_CACHE.write().unwrap();
-        *config_lock = Some(new_config.clone());
-        return apply_transform(program, &new_config, metadata.source_map);
-    }
-
-    if let Some(cached_config) = CONFIG_CACHE.read().unwrap().as_ref() {
-        return apply_transform(program, cached_config, metadata.source_map);
-    }
-
-    apply_transform(
-        program,
-        &TransformConfig {
-            cube_names: HashSet::new(),
-            cube_symbols: HashMap::new(),
-            context_symbols: HashMap::new(),
-        },
-        metadata.source_map,
-    )
-}
-
-fn apply_transform(
-    program: Program,
-    config: &TransformConfig,
-    source_map: PluginSourceMapProxy,
-) -> Program {
     let visitor = TransformVisitor {
-        cube_names: config.cube_names.clone(),
-        cube_symbols: config.cube_symbols.clone(),
-        context_symbols: config.context_symbols.clone(),
-        source_map: Some(source_map),
+        cube_names: ts_config.cube_names,
+        cube_symbols: ts_config.cube_symbols,
+        context_symbols: ts_config.context_symbols,
+        source_map: Some(metadata.source_map),
     };
 
     program.apply(&mut visit_mut_pass(visitor))
