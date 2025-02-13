@@ -11,3 +11,4 @@ Useful links:
 * [How to implement a SWC Plugin](https://swc.rs/docs/plugin/ecmascript/getting-started)
 * [A comprehensive list of possible visitor methods](https://rustdoc.swc.rs/swc_ecma_visit/trait.VisitMut.html)
 * [Important info on Identifiers](https://rustdoc.swc.rs/swc_ecma_ast/struct.Ident.html)
+* [SWC AST Explorer](https://play.swc.rs)
