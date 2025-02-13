@@ -144,6 +144,13 @@ impl<C: Context<'static> + 'static> NativeContext<NeonInnerTypes<C>> for Context
         )))
     }
 
+    fn null(&self) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
+        Ok(NativeObjectHandle::new(NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| cx.null().upcast())?,
+        )))
+    }
+
     fn empty_array(&self) -> Result<NeonArray<C>, CubeError> {
         let obj = NeonObject::new(
             self.clone(),
