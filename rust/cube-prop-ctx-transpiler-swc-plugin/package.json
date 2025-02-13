@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cube-prop-ctx-transpiler-swc-plugin",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Cube property context Transpiler Plugin for Cube models compilation",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
