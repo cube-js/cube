@@ -1994,9 +1994,14 @@ export class BaseQuery {
   }
 
   traverseSymbol(s) {
-    return s.path() ?
-      [s.cube().name].concat(this.evaluateSymbolSql(s.path()[0], s.path()[1], s.definition())) :
-      this.evaluateSql(s.cube().name, s.definition().sql);
+    // TODO why not just evaluateSymbolSql for every branch?
+    if (s.path()) {
+      return [s.cube().name].concat(this.evaluateSymbolSql(s.path()[0], s.path()[1], s.definition()));
+    } else if (s.patchedMeasure?.patchedFrom) {
+      return [s.patchedMeasure.patchedFrom[0]].concat(this.evaluateSymbolSql(s.patchedMeasure.patchedFrom[0], s.patchedMeasure.patchedFrom[1], s.definition()));
+    } else {
+      return this.evaluateSql(s.cube().name, s.definition().sql);
+    }
   }
 
   collectCubeNames(excludeTimeDimensions) {
@@ -2342,6 +2347,9 @@ export class BaseQuery {
     const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
+    }
+    if (symbol.patchedFrom) {
+      this.pushMemberNameForCollectionIfNecessary(symbol.patchedFrom[0], symbol.patchedFrom[1]);
     }
     const memberPathArray = [cubeName, name];
     // Member path needs to be expanded to granularity if subPropertyName is provided.
