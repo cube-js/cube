@@ -44,7 +44,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.2.4",
-    "@cubejs-backend/shared": "^0.35.67",
+    "@cubejs-backend/shared": "1.2.4",
     "@types/generic-pool": "^3.1.9",
     "@types/node": "^18",
     "@types/sqlstring": "^2.3.0",
