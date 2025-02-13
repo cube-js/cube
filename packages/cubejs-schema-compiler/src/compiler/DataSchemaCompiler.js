@@ -7,7 +7,6 @@ import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 import workerpool from 'workerpool';
-import { transform } from '@swc/core';
 
 import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
@@ -19,21 +18,6 @@ const NATIVE_IS_SUPPORTED = isNativeSupported();
 const moduleFileCache = {};
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
-
-const transpilers = {
-  ValidationTranspiler:
-    (_data) => ['@cubejs-backend/validation-transpiler-swc-plugin', {}],
-  ImportExportTranspiler:
-    (_data) => ['@cubejs-backend/import-export-transpiler-swc-plugin', {}],
-  CubeCheckDuplicatePropTranspiler:
-    (_data) => ['@cubejs-backend/check-dup-prop-transpiler-swc-plugin', {}],
-  CubePropContextTranspiler:
-    (data) => ['@cubejs-backend/cube-prop-ctx-transpiler-swc-plugin', {
-      cubeNames: data.cubeNames,
-      cubeSymbols: data.cubeSymbolsNames,
-      contextSymbols: data.contextSymbols,
-    }],
-};
 
 export class DataSchemaCompiler {
   constructor(repository, options = {}) {
@@ -110,11 +94,15 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
+    let workersCount;
+
     if (getEnv('transpilationWorkerThreads')) {
       const wc = getEnv('transpilationWorkerThreadsCount');
+      workersCount = wc > 0 ? wc : Math.max(1, workerpool.cpus - 1);
+
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
-        wc > 0 ? { maxWorkers: wc } : undefined,
+        { maxWorkers: workersCount },
       );
     }
 
@@ -140,32 +128,24 @@ export class DataSchemaCompiler {
         );
       }
 
-      // Transpiler configs are the same for all files within phase.
-      let transpilersConfigs = this.transpilers.map(tr => {
-        const ts = transpilers[tr.constructor.name];
-        if (ts) {
-          return ts({ cubeNames, cubeSymbolsNames, contextSymbols: CONTEXT_SYMBOLS });
-        } else {
-          throw new Error(`Transpiler ${ts} not supported`);
-        }
-      });
+      // Transpilers are the same for all files within phase.
+      const transpilerNames = this.transpilers.map(t => t.constructor.name);
 
       // Warming up swc compiler cache
       const dummyFile = {
         fileName: 'dummy.js',
         content: ';',
       };
-      await this.transpileJsFile(dummyFile, errorsReport, { transpilersConfigs });
-
-      transpilersConfigs = this.transpilers.map(tr => {
-        const ts = transpilers[tr.constructor.name];
-        if (ts) {
-          return ts({});
-        } else {
-          throw new Error(`Transpiler ${ts} not supported`);
-        }
-      });
-      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilersConfigs })));
+      const warmups = Array.from(
+        { length: workersCount },
+        (_, _i) => this.transpileJsFile(
+          dummyFile,
+          errorsReport,
+          { cubeNames, cubeSymbolsNames, transpilerNames, contextSymbols: CONTEXT_SYMBOLS }
+        ),
+      );
+      await Promise.all(warmups);
+      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
       return results.filter(f => !!f);
     };
 
@@ -225,25 +205,22 @@ export class DataSchemaCompiler {
     }
   }
 
-  async transpileJsFile(file, errorsReport, { transpilersConfigs }) {
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbolsNames, contextSymbols, transpilerNames }) {
     try {
       if (getEnv('transpilationWorkerThreads')) {
+        const data = {
+          fileName: file.fileName,
+          content: file.content,
+          transpilers: transpilerNames,
+          cubeNames,
+          cubeSymbolsNames,
+          contextSymbols,
+        };
+
         errorsReport.inFile(file);
-        const res = await transform(file.content,
-          {
-            filename: file.fileName,
-            jsc: {
-              target: 'es2015',
-              experimental: {
-                plugins: transpilersConfigs,
-              },
-            },
-            swcrc: false,
-            inputSourceMap: false,
-            isModule: true,
-          });
+        const res = await this.workerPool.exec('transpile', [data]);
         errorsReport.exitFile();
-        return Object.assign({}, file, { content: res.code });
+        return Object.assign({}, file, { content: res.content });
       } else {
         const ast = parse(
           file.content,
@@ -254,11 +231,11 @@ export class DataSchemaCompiler {
           },
         );
 
+        errorsReport.inFile(file);
         this.transpilers.forEach((t) => {
-          errorsReport.inFile(file);
           babelTraverse(ast, t.traverseObject(errorsReport));
-          errorsReport.exitFile();
         });
+        errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
         return Object.assign({}, file, { content });
