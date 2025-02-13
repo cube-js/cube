@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.5](https://github.com/cube-js/cube/compare/v1.2.4...v1.2.5) (2025-02-13)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix SELECT DISTINCT on pushdown ([#9144](https://github.com/cube-js/cube/issues/9144)) ([6483f66](https://github.com/cube-js/cube/commit/6483f66c826ad9a638af8770850219d923b3e7d9))
+
+
+### Features
+
+* Upgrade rust to 1.84.1 (stable) ([#9222](https://github.com/cube-js/cube/issues/9222)) ([cfc95b5](https://github.com/cube-js/cube/commit/cfc95b5e5601166d2a0aa388a211d4be66630cd8))
+
+
+
+
+
 ## [1.2.4](https://github.com/cube-js/cube/compare/v1.2.3...v1.2.4) (2025-02-11)
 
 ### Bug Fixes
