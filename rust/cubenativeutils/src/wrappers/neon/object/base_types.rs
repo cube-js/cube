@@ -85,7 +85,7 @@ impl<C: Context<'static>, T: 'static> NeonBox<C, T> {
     pub fn new(object: NeonTypeHandle<C, JsBox<T>>) -> Self {
         Self {
             object,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }

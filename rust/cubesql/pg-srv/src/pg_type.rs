@@ -31,7 +31,7 @@ pub struct PgType<'a> {
     pub typreceive_oid: u32,
 }
 
-impl<'a> PgType<'a> {
+impl PgType<'_> {
     pub fn get_typinput(&self) -> String {
         if let Some(ty_id) = PgTypeId::from_oid(self.oid) {
             // TODO: It requires additional verification
