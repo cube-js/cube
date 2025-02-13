@@ -386,7 +386,7 @@ pub fn is_const_expr(expr: &Expr) -> bool {
             _ => false,
         },
         Expr::InList { expr, list, .. } => {
-            is_const_expr(expr) && list.iter().map(|item| is_const_expr(item)).all(|item| item)
+            is_const_expr(expr) && list.iter().all(|item| is_const_expr(item))
         }
         _ => false,
     }
