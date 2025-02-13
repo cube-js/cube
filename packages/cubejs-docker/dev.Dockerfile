@@ -92,6 +92,10 @@ COPY rust/check-dup-prop-transpiler-swc-plugin/package.json rust/check-dup-prop-
 COPY rust/cube-prop-ctx-transpiler-swc-plugin/package.json rust/cube-prop-ctx-transpiler-swc-plugin/package.json
 COPY rust/import-export-transpiler-swc-plugin/package.json rust/import-export-transpiler-swc-plugin/package.json
 COPY rust/validation-transpiler-swc-plugin/package.json rust/validation-transpiler-swc-plugin/package.json
+COPY rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml
+COPY rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml
+COPY rust/import-export-transpiler-swc-plugin/Cargo.toml rust/import-export-transpiler-swc-plugin/Cargo.toml
+COPY rust/validation-transpiler-swc-plugin/Cargo.toml rust/validation-transpiler-swc-plugin/Cargo.toml
 
 RUN yarn policies set-version v1.22.22
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890

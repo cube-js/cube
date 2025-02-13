@@ -14,6 +14,10 @@
 !rust/cube-prop-ctx-transpiler-swc-plugin/package.json
 !rust/import-export-transpiler-swc-plugin/package.json
 !rust/validation-transpiler-swc-plugin/package.json
+!rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml
+!rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml
+!rust/import-export-transpiler-swc-plugin/Cargo.toml
+!rust/validation-transpiler-swc-plugin/Cargo.toml
 
 # Ignoring builds for native from local machime to protect a problem with different architecture
 packages/cubejs-backend-native/index.node
