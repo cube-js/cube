@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.4](https://github.com/cube-js/cube/compare/v1.2.3...v1.2.4) (2025-02-11)
+
+### Bug Fixes
+
+- **cubejs-playground:** update query builder ([#9201](https://github.com/cube-js/cube/issues/9201)) ([f8e523b](https://github.com/cube-js/cube/commit/f8e523bbf815b2fb3fb8eb036d04cc3bf4db206d))
+
+### Features
+
+- **cubesql:** Add projection flattening rule ([#9165](https://github.com/cube-js/cube/issues/9165)) ([8cfb253](https://github.com/cube-js/cube/commit/8cfb2530264b856bf128d391829b18566d8dc057))
+- **cubesql:** Allow providing API type when getting load request meta ([#9202](https://github.com/cube-js/cube/issues/9202)) ([ae5d977](https://github.com/cube-js/cube/commit/ae5d9770a1c00326c446e7ec40bd3f13ca0ce8f4))
+- **server-core:** Introduce CUBEJS_REFRESH_WORKER_CONCURRENCY env and update default concurrency settings for drivers ([#9168](https://github.com/cube-js/cube/issues/9168)) ([7ef6282](https://github.com/cube-js/cube/commit/7ef628273905d47996b108862a52dde89b9525e3))
+
 ## [1.2.3](https://github.com/cube-js/cube/compare/v1.2.2...v1.2.3) (2025-02-06)
 
 ### Bug Fixes

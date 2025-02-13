@@ -1417,3 +1417,42 @@ async fn wrapper_agg_dimension_over_limit() {
         .sql
         .contains("\"ungrouped\": true"));
 }
+
+// TODO allow number measures and add test for those
+/// Projection(Filter(CubeScan(ungrouped))) should have projection expressions pushed down to Cube
+#[tokio::test]
+async fn wrapper_projection_flatten_simple_measure() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+  maxPrice
+FROM
+  MultiTypeCube
+WHERE
+  LOWER(CAST(dim_num0 AS TEXT)) = 'all'
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures.unwrap().len(), 1);
+    assert_eq!(request.dimensions.unwrap().len(), 0);
+}
