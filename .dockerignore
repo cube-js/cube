@@ -18,6 +18,10 @@
 !rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml
 !rust/import-export-transpiler-swc-plugin/Cargo.toml
 !rust/validation-transpiler-swc-plugin/Cargo.toml
+!rust/check-dup-prop-transpiler-swc-plugin/target/wasm32-wasip1/release/*.wasm
+!rust/cube-prop-ctx-transpiler-swc-plugin/target/wasm32-wasip1/release/*.wasm
+!rust/import-export-transpiler-swc-plugin/target/wasm32-wasip1/release/*.wasm
+!rust/validation-transpiler-swc-plugin/target/wasm32-wasip1/release/*.wasm
 
 # Ignoring builds for native from local machime to protect a problem with different architecture
 packages/cubejs-backend-native/index.node
@@ -29,3 +33,8 @@ packages/*/dist/
 packages/*/coverage/
 # Other
 packages/cubejs-server-core/playground/
+# Rust swc caches
+rust/check-dup-prop-transpiler-swc-plugin/target
+rust/cube-prop-ctx-transpiler-swc-plugin/target
+rust/import-export-transpiler-swc-plugin/target
+rust/validation-transpiler-swc-plugin/target

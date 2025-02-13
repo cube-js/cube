@@ -25,12 +25,7 @@ ENV NODE_ENV=development
 
 WORKDIR /cubejs
 
-COPY package.json .
-COPY lerna.json .
-COPY yarn.lock .
-COPY tsconfig.base.json .
-COPY rollup.config.js .
-COPY packages/cubejs-linter packages/cubejs-linter
+COPY package.json lerna.json yarn.lock tsconfig.base.json rollup.config.js ./
 
 # Backend
 COPY rust/cubesql/package.json rust/cubesql/package.json
@@ -88,14 +83,10 @@ COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-COPY rust/check-dup-prop-transpiler-swc-plugin/package.json rust/check-dup-prop-transpiler-swc-plugin/package.json
-COPY rust/cube-prop-ctx-transpiler-swc-plugin/package.json rust/cube-prop-ctx-transpiler-swc-plugin/package.json
-COPY rust/import-export-transpiler-swc-plugin/package.json rust/import-export-transpiler-swc-plugin/package.json
-COPY rust/validation-transpiler-swc-plugin/package.json rust/validation-transpiler-swc-plugin/package.json
-COPY rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml
-COPY rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml
-COPY rust/import-export-transpiler-swc-plugin/Cargo.toml rust/import-export-transpiler-swc-plugin/Cargo.toml
-COPY rust/validation-transpiler-swc-plugin/Cargo.toml rust/validation-transpiler-swc-plugin/Cargo.toml
+COPY rust/check-dup-prop-transpiler-swc-plugin/package.json rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml rust/check-dup-prop-transpiler-swc-plugin/
+COPY rust/cube-prop-ctx-transpiler-swc-plugin/package.json rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml rust/cube-prop-ctx-transpiler-swc-plugin/
+COPY rust/import-export-transpiler-swc-plugin/package.json rust/import-export-transpiler-swc-plugin/Cargo.toml rust/import-export-transpiler-swc-plugin/
+COPY rust/validation-transpiler-swc-plugin/package.json rust/validation-transpiler-swc-plugin/Cargo.toml rust/validation-transpiler-swc-plugin/
 
 RUN yarn policies set-version v1.22.22
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890

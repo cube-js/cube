@@ -737,6 +737,8 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build transpilers swc plugins
+        run: yarn lerna run build-swc-plugin
       - name: Build cubejs-backend-native (without Python)
         run: yarn run native:build-release
         working-directory: ./packages/cubejs-backend-native
