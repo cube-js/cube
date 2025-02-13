@@ -67,7 +67,7 @@ static TRANSPILLED_FIELDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
 
 static CONFIG_CACHE: RwLock<Option<TransformConfig>> = RwLock::new(None);
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TransformConfig {
     cube_names: HashSet<String>,
