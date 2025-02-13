@@ -55,6 +55,80 @@ impl VisitMut for TransformVisitor {
     // We don't need to do anything besides imports here
     noop_visit_mut_type!();
 
+    // Can't use visit_mut_module_item for cases when we need to replace
+    // the item with multiple statements
+    fn visit_mut_module(&mut self, module: &mut Module) {
+        let mut new_body = Vec::with_capacity(module.body.len());
+
+        for mut item in module.body.drain(..) {
+            self.visit_mut_module_item(&mut item);
+
+            match &item {
+                ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(export_decl)) => {
+                    let decl = export_decl.decl.clone();
+                    let stmt_decl = ModuleItem::Stmt(Stmt::Decl(decl.clone()));
+
+                    let mut ids = vec![];
+
+                    match decl {
+                        Decl::Var(var_decl) => {
+                            for var_declarator in var_decl.decls.iter() {
+                                if let Pat::Ident(BindingIdent { id, .. }) = &var_declarator.name {
+                                    ids.push(id.clone());
+                                }
+                            }
+                        }
+                        Decl::Fn(fn_decl) => {
+                            ids.push(fn_decl.ident.clone());
+                        }
+                        Decl::Class(class_decl) => {
+                            ids.push(class_decl.ident.clone());
+                        }
+                        _ => {}
+                    }
+
+                    let props: Vec<PropOrSpread> = ids
+                        .iter()
+                        .map(|ident| {
+                            PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                                key: PropName::Ident(IdentName::from(ident.sym.clone())),
+                                value: Box::new(Expr::Ident(ident.clone())),
+                            })))
+                        })
+                        .collect();
+
+                    let add_export_call = Expr::Call(CallExpr {
+                        span: DUMMY_SP,
+                        callee: Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                            "addExport".into(),
+                            DUMMY_SP,
+                            SyntaxContext::empty(),
+                        )))),
+                        args: vec![ExprOrSpread {
+                            spread: None,
+                            expr: Box::new(Expr::Object(ObjectLit {
+                                span: DUMMY_SP,
+                                props,
+                            })),
+                        }],
+                        type_args: None,
+                        ctxt: SyntaxContext::empty(),
+                    });
+
+                    let stmt_add_export = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+                        span: DUMMY_SP,
+                        expr: Box::new(add_export_call),
+                    }));
+
+                    new_body.extend(vec![stmt_decl, stmt_add_export]);
+                }
+                _ => new_body.push(item),
+            }
+        }
+
+        module.body = new_body;
+    }
+
     fn visit_mut_module_item(&mut self, item: &mut ModuleItem) {
         if let ModuleItem::ModuleDecl(decl) = item {
             match decl {
