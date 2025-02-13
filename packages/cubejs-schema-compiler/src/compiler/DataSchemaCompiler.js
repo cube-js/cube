@@ -109,6 +109,7 @@ export class DataSchemaCompiler {
     const transpile = async () => {
       let cubeNames;
       let cubeSymbols;
+      let transpilerNames;
 
       if (getEnv('transpilationWorkerThreads')) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
@@ -126,25 +127,26 @@ export class DataSchemaCompiler {
               )],
             ),
         );
+
+        // Transpilers are the same for all files within phase.
+        transpilerNames = this.transpilers.map(t => t.constructor.name);
+
+        // Warming up swc compiler cache
+        const dummyFile = {
+          fileName: 'dummy.js',
+          content: ';',
+        };
+        const warmups = Array.from(
+          { length: workersCount },
+          (_, _i) => this.transpileJsFile(
+            dummyFile,
+            errorsReport,
+            { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS }
+          ),
+        );
+        await Promise.all(warmups);
       }
 
-      // Transpilers are the same for all files within phase.
-      const transpilerNames = this.transpilers.map(t => t.constructor.name);
-
-      // Warming up swc compiler cache
-      const dummyFile = {
-        fileName: 'dummy.js',
-        content: ';',
-      };
-      const warmups = Array.from(
-        { length: workersCount },
-        (_, _i) => this.transpileJsFile(
-          dummyFile,
-          errorsReport,
-          { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS }
-        ),
-      );
-      await Promise.all(warmups);
       const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
       return results.filter(f => !!f);
     };
