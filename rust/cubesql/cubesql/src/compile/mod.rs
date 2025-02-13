@@ -2219,7 +2219,10 @@ limit
                     V1LoadRequestQueryTimeDimension {
                         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                         granularity: Some("month".to_string()),
-                        date_range: None,
+                        date_range: Some(json!(vec![
+                            "2023-07-08T00:00:00.000Z".to_string(),
+                            "2023-10-07T23:59:59.999Z".to_string()
+                        ])),
                     }
                 ]),
                 order: Some(vec![]),
