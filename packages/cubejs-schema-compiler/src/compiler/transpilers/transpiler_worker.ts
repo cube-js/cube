@@ -1,8 +1,6 @@
 import workerpool from 'workerpool';
 import { transformSync } from '@swc/core';
 
-import { ErrorReporter } from '../ErrorReporter';
-
 type TransferContent = {
   fileName: string;
   content: string;
@@ -14,7 +12,6 @@ type TransferContent = {
 
 type TranspilerPlugin = [string, Record<string, any>];
 
-const errorsReport = new ErrorReporter(null, []);
 
 const transpilers = {
   ValidationTranspiler:
@@ -58,8 +55,6 @@ const transpile = (data: TransferContent) => {
 
   return {
     content: result.code,
-    errors: errorsReport.getErrors(),
-    warnings: errorsReport.getWarnings()
   };
 };
 
