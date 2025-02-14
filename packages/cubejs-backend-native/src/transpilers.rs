@@ -1,5 +1,6 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::node_obj_serializer::NodeObjSerializer;
+use anyhow::anyhow;
 use cubetranspilers::{run_transpilers, TransformConfig, Transpilers};
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::prelude::{JsPromise, JsResult, JsValue, NeonResult};
@@ -36,43 +37,45 @@ pub fn transpile_js(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let content = cx.argument::<JsString>(0)?.value(&mut cx);
     let transform_data_js_object = cx.argument::<JsValue>(1)?;
     let deserializer = JsValueDeserializer::new(&mut cx, transform_data_js_object);
-
-    let transform_config: TransformConfig = match TransformRequestConfig::deserialize(deserializer)
-    {
-        Ok(data) => match data.meta_data {
-            Some(meta_data) => {
-                let mut config_lock = METADATA_CACHE.write().unwrap();
-                let cache = TransformMetaData {
-                    cube_names: meta_data.cube_names,
-                    cube_symbols: meta_data.cube_symbols,
-                    context_symbols: meta_data.context_symbols,
-                };
-                let cfg = TransformConfig {
-                    file_name: data.file_name,
-                    transpilers: data.transpilers,
-                    cube_names: cache.cube_names.clone(),
-                    cube_symbols: cache.cube_symbols.clone(),
-                    context_symbols: cache.context_symbols.clone(),
-                };
-                *config_lock = Some(cache);
-                cfg
-            }
-            None => {
-                let cache = METADATA_CACHE.read().unwrap().clone().unwrap_or_default();
-                TransformConfig {
-                    file_name: data.file_name,
-                    transpilers: data.transpilers,
-                    cube_names: cache.cube_names.clone(),
-                    cube_symbols: cache.cube_symbols.clone(),
-                    context_symbols: cache.context_symbols.clone(),
-                }
-            }
-        },
-        Err(err) => return cx.throw_error(err.to_string()),
-    };
+    let transform_request_config = TransformRequestConfig::deserialize(deserializer);
 
     let promise = cx
-        .task(move || run_transpilers(content, transform_config))
+        .task(move || {
+            let transform_config: TransformConfig = match transform_request_config {
+                Ok(data) => match data.meta_data {
+                    Some(meta_data) => {
+                        let mut config_lock = METADATA_CACHE.write().unwrap();
+                        let cache = TransformMetaData {
+                            cube_names: meta_data.cube_names,
+                            cube_symbols: meta_data.cube_symbols,
+                            context_symbols: meta_data.context_symbols,
+                        };
+                        let cfg = TransformConfig {
+                            file_name: data.file_name,
+                            transpilers: data.transpilers,
+                            cube_names: cache.cube_names.clone(),
+                            cube_symbols: cache.cube_symbols.clone(),
+                            context_symbols: cache.context_symbols.clone(),
+                        };
+                        *config_lock = Some(cache);
+                        cfg
+                    }
+                    None => {
+                        let cache = METADATA_CACHE.read().unwrap().clone().unwrap_or_default();
+                        TransformConfig {
+                            file_name: data.file_name,
+                            transpilers: data.transpilers,
+                            cube_names: cache.cube_names.clone(),
+                            cube_symbols: cache.cube_symbols.clone(),
+                            context_symbols: cache.context_symbols.clone(),
+                        }
+                    }
+                },
+                Err(err) => return Err(anyhow!("Failed to deserialize input data: {}", err)),
+            };
+
+            run_transpilers(content, transform_config)
+        })
         .promise(move |mut cx, res| match res {
             Ok(result) => {
                 let obj = match NodeObjSerializer::serialize(&result, &mut cx) {
