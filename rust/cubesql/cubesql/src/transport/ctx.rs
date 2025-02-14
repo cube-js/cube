@@ -191,12 +191,12 @@ impl MetaContext {
             .df_data_type(member_name)
     }
 
-    pub fn find_cube_table_with_oid(&self, oid: u32) -> Option<CubeMetaTable> {
-        self.tables.iter().find(|table| table.oid == oid).cloned()
+    pub fn find_cube_table_with_oid(&self, oid: u32) -> Option<&CubeMetaTable> {
+        self.tables.iter().find(|table| table.oid == oid)
     }
 
-    pub fn find_cube_table_with_name(&self, name: String) -> Option<CubeMetaTable> {
-        self.tables.iter().find(|table| table.name == name).cloned()
+    pub fn find_cube_table_with_name(&self, name: &str) -> Option<&CubeMetaTable> {
+        self.tables.iter().find(|table| table.name == name)
     }
 
     pub fn cube_has_join(&self, cube_name: &str, join_name: String) -> bool {
@@ -255,7 +255,7 @@ mod tests {
             _ => panic!("wrong oid!"),
         }
 
-        match test_context.find_cube_table_with_name("test2".to_string()) {
+        match test_context.find_cube_table_with_name("test2") {
             Some(table) => assert_eq!(18005, table.oid),
             _ => panic!("wrong name!"),
         }
