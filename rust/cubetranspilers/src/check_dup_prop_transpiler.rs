@@ -1,32 +1,30 @@
 use std::collections::HashSet;
 
+use swc_core::common::errors::Handler;
 use swc_core::common::{BytePos, Span, DUMMY_SP};
 use swc_core::ecma::visit::VisitMutWith;
-use swc_core::plugin::errors::HANDLER;
-use swc_core::plugin::proxies::TransformPluginProgramMetadata;
 use swc_core::{
-    ecma::{
-        ast::*,
-        visit::{visit_mut_pass, VisitMut},
-    },
+    ecma::{ast::*, visit::VisitMut},
     plugin::proxies::PluginSourceMapProxy,
 };
 
-pub struct CheckDupPropTransformVisitor {
+pub struct CheckDupPropTransformVisitor<'a> {
     pub(crate) source_map: Option<PluginSourceMapProxy>,
+    handler: &'a Handler,
 }
 
-impl CheckDupPropTransformVisitor {
-    pub fn new(source_map: Option<PluginSourceMapProxy>) -> Self {
-        CheckDupPropTransformVisitor { source_map }
+impl<'a> CheckDupPropTransformVisitor<'a> {
+    pub fn new(source_map: Option<PluginSourceMapProxy>, handler: &'a Handler) -> Self {
+        CheckDupPropTransformVisitor {
+            source_map,
+            handler,
+        }
     }
 
     fn emit_error(&mut self, span: Span, message: &str) {
-        HANDLER.with(|handler| {
-            handler
-                .struct_span_err(span, &self.format_msg(span, message))
-                .emit();
-        });
+        self.handler
+            .struct_span_err(span, &self.format_msg(span, message))
+            .emit();
     }
 
     fn format_msg(&self, span: Span, message: &str) -> String {
@@ -87,7 +85,7 @@ impl CheckDupPropTransformVisitor {
     }
 }
 
-impl VisitMut for CheckDupPropTransformVisitor {
+impl VisitMut for CheckDupPropTransformVisitor<'_> {
     // Implement necessary visit_mut_* methods for actual custom transform.
     // A comprehensive list of possible visitor methods can be found here:
     // https://rustdoc.swc.rs/swc_ecma_visit/trait.VisitMut.html
@@ -108,12 +106,6 @@ impl VisitMut for CheckDupPropTransformVisitor {
     }
 }
 
-pub fn process_transform(program: Program, metadata: TransformPluginProgramMetadata) -> Program {
-    program.apply(&mut visit_mut_pass(CheckDupPropTransformVisitor {
-        source_map: Some(metadata.source_map),
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     // Recommended strategy to test plugin's transform is verify
@@ -128,7 +120,7 @@ mod tests {
         common::{
             errors::{DiagnosticBuilder, Emitter, Handler, HandlerFlags},
             sync::Lrc,
-            FileName, Globals, SourceMap,
+            FileName, SourceMap,
         },
         ecma::visit::VisitMutWith,
     };
@@ -147,7 +139,6 @@ mod tests {
 
     #[test]
     fn test_errors_for_duplicates_first_level() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -210,26 +201,21 @@ mod tests {
             });
             "#;
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                let mut visitor = CheckDupPropTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-            });
-        });
+        let mut visitor = CheckDupPropTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
         let diags = diagnostics.lock().unwrap();
         let msgs: Vec<_> = diags
@@ -241,7 +227,6 @@ mod tests {
 
     #[test]
     fn test_errors_for_duplicates_deep_level() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -304,26 +289,21 @@ mod tests {
             });
             "#;
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                let mut visitor = CheckDupPropTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-            });
-        });
+        let mut visitor = CheckDupPropTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
         let diags = diagnostics.lock().unwrap();
         let msgs: Vec<_> = diags
@@ -335,7 +315,6 @@ mod tests {
 
     #[test]
     fn test_no_errors() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -391,26 +370,21 @@ mod tests {
             });
             "#;
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                let mut visitor = CheckDupPropTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-            });
-        });
+        let mut visitor = CheckDupPropTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
         let diags = diagnostics.lock().unwrap();
         assert!(diags.is_empty(), "Should not emit errors",);

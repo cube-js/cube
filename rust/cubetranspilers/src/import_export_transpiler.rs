@@ -1,30 +1,29 @@
-use swc_core::common::{errors::HANDLER, BytePos};
+use swc_core::common::errors::Handler;
+use swc_core::common::BytePos;
 use swc_core::common::{Span, SyntaxContext, DUMMY_SP};
 use swc_core::ecma::visit::{noop_visit_mut_type, VisitMutWith};
-use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
 use swc_core::{
-    ecma::{
-        ast::*,
-        visit::{visit_mut_pass, VisitMut},
-    },
+    ecma::{ast::*, visit::VisitMut},
     plugin::proxies::PluginSourceMapProxy,
 };
 
-pub struct ImportExportTransformVisitor {
+pub struct ImportExportTransformVisitor<'a> {
     pub(crate) source_map: Option<PluginSourceMapProxy>,
+    handler: &'a Handler,
 }
 
-impl ImportExportTransformVisitor {
-    pub fn new(source_map: Option<PluginSourceMapProxy>) -> Self {
-        ImportExportTransformVisitor { source_map }
+impl<'a> ImportExportTransformVisitor<'a> {
+    pub fn new(source_map: Option<PluginSourceMapProxy>, handler: &'a Handler) -> Self {
+        ImportExportTransformVisitor {
+            source_map,
+            handler,
+        }
     }
 
     fn emit_error(&self, span: Span, message: &str) {
-        HANDLER.with(|handler| {
-            handler
-                .struct_span_err(span, &self.format_msg(span, message))
-                .emit();
-        });
+        self.handler
+            .struct_span_err(span, &self.format_msg(span, message))
+            .emit();
     }
 
     fn format_msg(&self, span: Span, message: &str) -> String {
@@ -48,7 +47,7 @@ impl ImportExportTransformVisitor {
     }
 }
 
-impl VisitMut for ImportExportTransformVisitor {
+impl VisitMut for ImportExportTransformVisitor<'_> {
     // Implement necessary visit_mut_* methods for actual custom transform.
     // A comprehensive list of possible visitor methods can be found here:
     // https://rustdoc.swc.rs/swc_ecma_visit/trait.VisitMut.html
@@ -356,28 +355,6 @@ impl VisitMut for ImportExportTransformVisitor {
     }
 }
 
-/// An example plugin function with macro support.
-/// `plugin_transform` macro interop pointers into deserialized structs, as well
-/// as returning ptr back to host.
-///
-/// It is possible to opt out from macro by writing transform fn manually
-/// if plugin need to handle low-level ptr directly via
-/// `__transform_plugin_process_impl(
-///     ast_ptr: *const u8, ast_ptr_len: i32,
-///     unresolved_mark: u32, should_enable_comments_proxy: i32) ->
-///     i32 /*  0 for success, fail otherwise.
-///             Note this is only for internal pointer interop result,
-///             not actual transform result */`
-///
-/// This requires manual handling of serialization / deserialization from ptrs.
-/// Refer swc_plugin_macro to see how does it work internally.
-#[plugin_transform]
-pub fn process_transform(program: Program, metadata: TransformPluginProgramMetadata) -> Program {
-    program.apply(&mut visit_mut_pass(ImportExportTransformVisitor {
-        source_map: Some(metadata.source_map),
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     // Recommended strategy to test plugin's transform is verify
@@ -392,7 +369,7 @@ mod tests {
         common::{
             errors::{DiagnosticBuilder, Emitter, Handler, HandlerFlags},
             sync::Lrc,
-            FileName, Globals, SourceMap,
+            FileName, SourceMap,
         },
         ecma::visit::VisitMutWith,
     };
@@ -428,7 +405,6 @@ mod tests {
 
     #[test]
     fn test_export_default_declaration() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -446,32 +422,23 @@ mod tests {
             export default function exp() { console.log('exported function'); };
         "#;
 
-        let mut transformed_program: Option<Program> = None;
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let mut visitor = ImportExportTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
-                let mut visitor = ImportExportTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-                transformed_program = Some(program);
-            });
-        });
-
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
 
         assert!(
             output_code.contains("setExport(function()"),
@@ -493,7 +460,6 @@ mod tests {
 
     #[test]
     fn test_export_default_expression() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -512,32 +478,23 @@ mod tests {
             export default myVar;
         "#;
 
-        let mut transformed_program: Option<Program> = None;
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let mut visitor = ImportExportTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
-                let mut visitor = ImportExportTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-                transformed_program = Some(program);
-            });
-        });
-
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
 
         assert!(
             output_code.contains("setExport(myVar)"),
@@ -554,7 +511,6 @@ mod tests {
 
     #[test]
     fn test_export_const_expression() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -573,32 +529,23 @@ mod tests {
             export const a1 = 5, a2 = ()=>111, a3 = (inputA3)=>inputA3+"Done";
         "#;
 
-        let mut transformed_program: Option<Program> = None;
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let mut visitor = ImportExportTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
-                let mut visitor = ImportExportTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-                transformed_program = Some(program);
-            });
-        });
-
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
 
         assert!(
             output_code.contains("const sql = (input)=>intput + 5;"),
@@ -631,7 +578,6 @@ mod tests {
 
     #[test]
     fn test_import_named_default() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -652,33 +598,23 @@ mod tests {
         // const def = require("module"), foo = require("module").foo, baz = require("module").bar;
         //
 
-        let mut transformed_program: Option<Program> = None;
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("import.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("import.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                {
-                    let mut visitor = super::ImportExportTransformVisitor { source_map: None };
-                    program.visit_mut_with(&mut visitor);
-                }
-                transformed_program = Some(program);
-            });
-        });
+        let mut visitor = ImportExportTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
         assert!(
             output_code.contains("const"),
             "Output code should contain a const declaration, got:\n{}",
@@ -709,7 +645,6 @@ mod tests {
 
     #[test]
     fn test_namespace_import() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -727,30 +662,21 @@ mod tests {
             import * as ns from "module";
         "#;
 
-        let mut transformed_program: Option<Program> = None;
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("ns_import.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("ns_import.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                {
-                    let mut visitor = super::ImportExportTransformVisitor { source_map: None };
-                    program.visit_mut_with(&mut visitor);
-                }
-                transformed_program = Some(program);
-            });
-        });
+        let mut visitor = ImportExportTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
         let diags = diagnostics.lock().unwrap();
         let errors: Vec<_> = diags
@@ -766,7 +692,6 @@ mod tests {
 
     #[test]
     fn test_export_named() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -789,33 +714,23 @@ mod tests {
         //     baz: bar
         // });
 
-        let mut transformed_program: Option<Program> = None;
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("export_named.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("export_named.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                {
-                    let mut visitor = super::ImportExportTransformVisitor { source_map: None };
-                    program.visit_mut_with(&mut visitor);
-                }
-                transformed_program = Some(program);
-            });
-        });
+        let mut visitor = ImportExportTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
         assert!(
             output_code.contains("addExport"),
             "Output code should contain addExport call, got:\n{}",
@@ -841,7 +756,6 @@ mod tests {
 
     #[test]
     fn test_export_default_ts_interface() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -859,33 +773,23 @@ mod tests {
             export default interface Foo {}
         "#;
 
-        let mut transformed_program: Option<Program> = None;
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("export_default_ts_interface.ts".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Typescript(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the TS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("export_default_ts_interface.ts".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Typescript(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the TS code");
 
-                {
-                    let mut visitor = super::ImportExportTransformVisitor { source_map: None };
-                    program.visit_mut_with(&mut visitor);
-                }
-                transformed_program = Some(program);
-            });
-        });
+        let mut visitor = ImportExportTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
         // When exporting a TS interface, setExport is called with null as a fallback.
         assert!(
             output_code.contains("setExport"),

@@ -1,31 +1,30 @@
+use swc_core::common::errors::Handler;
+use swc_core::common::BytePos;
 use swc_core::common::Span;
-use swc_core::common::{errors::HANDLER, BytePos};
 use swc_core::ecma::visit::noop_visit_mut_type;
 use swc_core::plugin::proxies::PluginSourceMapProxy;
-use swc_core::plugin::proxies::TransformPluginProgramMetadata;
 use swc_core::{
     atoms::JsWord,
-    ecma::{
-        ast::*,
-        visit::{visit_mut_pass, VisitMut},
-    },
+    ecma::{ast::*, visit::VisitMut},
 };
 
-pub struct ValidationTransformVisitor {
+pub struct ValidationTransformVisitor<'a> {
     pub(crate) source_map: Option<PluginSourceMapProxy>,
+    handler: &'a Handler,
 }
 
-impl ValidationTransformVisitor {
-    pub fn new(source_map: Option<PluginSourceMapProxy>) -> Self {
-        ValidationTransformVisitor { source_map }
+impl<'a> ValidationTransformVisitor<'a> {
+    pub fn new(source_map: Option<PluginSourceMapProxy>, handler: &'a Handler) -> Self {
+        ValidationTransformVisitor {
+            source_map,
+            handler,
+        }
     }
 
     fn emit_warn(&self, span: Span, message: &str) {
-        HANDLER.with(|handler| {
-            handler
-                .struct_span_warn(span, &self.format_msg(span, message))
-                .emit();
-        });
+        self.handler
+            .struct_span_warn(span, &self.format_msg(span, message))
+            .emit();
     }
 
     fn format_msg(&self, span: Span, message: &str) -> String {
@@ -49,7 +48,7 @@ impl ValidationTransformVisitor {
     }
 }
 
-impl VisitMut for ValidationTransformVisitor {
+impl VisitMut for ValidationTransformVisitor<'_> {
     // Implement necessary visit_mut_* methods for actual custom transform.
     // A comprehensive list of possible visitor methods can be found here:
     // https://rustdoc.swc.rs/swc_ecma_visit/trait.VisitMut.html
@@ -70,12 +69,6 @@ impl VisitMut for ValidationTransformVisitor {
     }
 }
 
-pub fn process_transform(program: Program, metadata: TransformPluginProgramMetadata) -> Program {
-    program.apply(&mut visit_mut_pass(ValidationTransformVisitor {
-        source_map: Some(metadata.source_map),
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     // Recommended strategy to test plugin's transform is verify
@@ -90,7 +83,7 @@ mod tests {
         common::{
             errors::{DiagnosticBuilder, Emitter, Handler, HandlerFlags},
             sync::Lrc,
-            FileName, Globals, SourceMap,
+            FileName, SourceMap,
         },
         ecma::visit::VisitMutWith,
     };
@@ -109,7 +102,6 @@ mod tests {
 
     #[test]
     fn test_warning_for_user_context() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -125,26 +117,21 @@ mod tests {
 
         let js_code = "USER_CONTEXT.something;";
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                let mut visitor = ValidationTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-            });
-        });
+        let mut visitor = ValidationTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
         let diags = diagnostics.lock().unwrap();
         assert!(
@@ -157,7 +144,6 @@ mod tests {
 
     #[test]
     fn test_no_warnings() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -173,26 +159,21 @@ mod tests {
 
         let js_code = "SECURITY_CONTEXT.something; let someOtherVar = 5;";
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-                let mut visitor = ValidationTransformVisitor { source_map: None };
-                program.visit_mut_with(&mut visitor);
-            });
-        });
+        let mut visitor = ValidationTransformVisitor::new(None, &handler);
+        program.visit_mut_with(&mut visitor);
 
         let diags = diagnostics.lock().unwrap();
         assert!(diags.is_empty(), "Should not emit warning",);

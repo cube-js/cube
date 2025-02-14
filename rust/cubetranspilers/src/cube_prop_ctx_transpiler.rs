@@ -3,17 +3,12 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 use swc_core::atoms::Atom;
+use swc_core::common::errors::Handler;
 use swc_core::common::{BytePos, Span, SyntaxContext, DUMMY_SP};
 use swc_core::ecma::visit::{Visit, VisitMutWith, VisitWith};
-use swc_core::plugin::errors::HANDLER;
 
-use crate::TransformConfig;
-use swc_core::plugin::proxies::TransformPluginProgramMetadata;
 use swc_core::{
-    ecma::{
-        ast::*,
-        visit::{visit_mut_pass, VisitMut},
-    },
+    ecma::{ast::*, visit::VisitMut},
     plugin::proxies::PluginSourceMapProxy,
 };
 
@@ -65,34 +60,35 @@ static TRANSPILLED_FIELDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
     set
 });
 
-pub struct CubePropTransformVisitor {
+pub struct CubePropTransformVisitor<'a> {
     pub(crate) cube_names: HashSet<String>,
     pub(crate) cube_symbols: HashMap<String, HashMap<String, bool>>,
     pub(crate) context_symbols: HashMap<String, String>,
     pub(crate) source_map: Option<PluginSourceMapProxy>,
+    handler: &'a Handler,
 }
 
-impl CubePropTransformVisitor {
+impl<'a> CubePropTransformVisitor<'a> {
     pub fn new(
         cube_names: HashSet<String>,
         cube_symbols: HashMap<String, HashMap<String, bool>>,
         context_symbols: HashMap<String, String>,
         source_map: Option<PluginSourceMapProxy>,
+        handler: &'a Handler,
     ) -> Self {
         CubePropTransformVisitor {
             source_map,
             cube_names,
             cube_symbols,
             context_symbols,
+            handler,
         }
     }
 
     fn emit_error(&self, span: Span, message: &str) {
-        HANDLER.with(|handler| {
-            handler
-                .struct_span_err(span, &self.format_msg(span, message))
-                .emit();
-        });
+        self.handler
+            .struct_span_err(span, &self.format_msg(span, message))
+            .emit();
     }
 
     fn format_msg(&self, span: Span, message: &str) -> String {
@@ -151,10 +147,13 @@ impl CubePropTransformVisitor {
         }
     }
 
-    fn sql_and_references_field_visitor(
-        &mut self,
+    fn sql_and_references_field_visitor<'b>(
+        &'b mut self,
         cube_name: Option<String>,
-    ) -> SqlAndReferencesFieldVisitor {
+    ) -> SqlAndReferencesFieldVisitor<'b, 'a>
+    where
+        'a: 'b,
+    {
         SqlAndReferencesFieldVisitor {
             cube_name,
             parent: self,
@@ -162,9 +161,15 @@ impl CubePropTransformVisitor {
         }
     }
 
-    fn known_identifiers_inject_visitor(&mut self, field: &str) -> KnownIdentifiersInjectVisitor {
+    fn known_identifiers_inject_visitor<'b>(
+        &'b mut self,
+        field: String,
+    ) -> KnownIdentifiersInjectVisitor<'b, 'a>
+    where
+        'a: 'b,
+    {
         KnownIdentifiersInjectVisitor {
-            field: field.to_string(),
+            field,
             parent: self,
         }
     }
@@ -219,7 +224,7 @@ impl CubePropTransformVisitor {
     }
 }
 
-impl VisitMut for CubePropTransformVisitor {
+impl VisitMut for CubePropTransformVisitor<'_> {
     // Implement necessary visit_mut_* methods for actual custom transform.
     // A comprehensive list of possible visitor methods can be found here:
     // https://rustdoc.swc.rs/swc_ecma_visit/trait.VisitMut.html
@@ -263,13 +268,17 @@ impl VisitMut for CubePropTransformVisitor {
                             }
                             {
                                 let mut known_visitor =
-                                    self.known_identifiers_inject_visitor("extends");
+                                    self.known_identifiers_inject_visitor("extends".to_string());
                                 last_arg.visit_mut_with(&mut known_visitor);
                             }
                         }
                     } else if callee_name == "context" {
                         if let Some(last_arg) = call_expr.args.last_mut() {
-                            let mut sql_visitor = self.sql_and_references_field_visitor(None);
+                            let mut sql_visitor = {
+                                let self_ref = &mut *self;
+                                self_ref.sql_and_references_field_visitor(None)
+                            };
+
                             last_arg.expr.visit_mut_with(&mut sql_visitor);
                         }
                     }
@@ -280,19 +289,19 @@ impl VisitMut for CubePropTransformVisitor {
     }
 }
 
-pub struct SqlAndReferencesFieldVisitor<'a> {
+pub struct SqlAndReferencesFieldVisitor<'b, 'a: 'b> {
     pub cube_name: Option<String>,
-    pub parent: &'a mut CubePropTransformVisitor,
+    pub parent: &'b mut CubePropTransformVisitor<'a>,
     pub path_stack: Vec<String>,
 }
 
-impl SqlAndReferencesFieldVisitor<'_> {
+impl SqlAndReferencesFieldVisitor<'_, '_> {
     fn current_path(&self) -> String {
         self.path_stack.join(".")
     }
 }
 
-impl VisitMut for SqlAndReferencesFieldVisitor<'_> {
+impl VisitMut for SqlAndReferencesFieldVisitor<'_, '_> {
     fn visit_mut_prop(&mut self, prop: &mut Prop) {
         let mut added = false;
         if let Prop::KeyValue(ref kv) = prop {
@@ -338,12 +347,12 @@ impl VisitMut for SqlAndReferencesFieldVisitor<'_> {
     }
 }
 
-pub struct KnownIdentifiersInjectVisitor<'a> {
+pub struct KnownIdentifiersInjectVisitor<'b, 'a: 'b> {
     pub field: String,
-    pub parent: &'a mut CubePropTransformVisitor,
+    pub parent: &'b mut CubePropTransformVisitor<'a>,
 }
 
-impl VisitMut for KnownIdentifiersInjectVisitor<'_> {
+impl VisitMut for KnownIdentifiersInjectVisitor<'_, '_> {
     fn visit_mut_prop(&mut self, prop: &mut Prop) {
         let ident_name = match &prop {
             Prop::Shorthand(ident) => ident.sym.clone().to_string(),
@@ -387,22 +396,6 @@ impl Visit for CollectIdentifiersVisitor<'_> {
     }
 }
 
-pub fn process_transform(program: Program, metadata: TransformPluginProgramMetadata) -> Program {
-    let config_str = metadata.get_transform_plugin_config().unwrap_or_default();
-
-    let ts_config: TransformConfig =
-        serde_json::from_str(&config_str).expect("Incorrect plugin configuration");
-
-    let visitor = CubePropTransformVisitor {
-        cube_names: ts_config.cube_names,
-        cube_symbols: ts_config.cube_symbols,
-        context_symbols: ts_config.context_symbols,
-        source_map: Some(metadata.source_map),
-    };
-
-    program.apply(&mut visit_mut_pass(visitor))
-}
-
 #[cfg(test)]
 mod tests {
     // Recommended strategy to test plugin's transform is verify
@@ -417,7 +410,7 @@ mod tests {
         common::{
             errors::{DiagnosticBuilder, Emitter, Handler, HandlerFlags},
             sync::Lrc,
-            FileName, Globals, SourceMap,
+            FileName, SourceMap,
         },
         ecma::visit::VisitMutWith,
     };
@@ -470,7 +463,6 @@ mod tests {
 
     #[test]
     fn test_incorrect_args_to_cube() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -488,37 +480,29 @@ mod tests {
             cube(`cube1`, { sql: `xxx` }, 25);
         "#;
 
-        let mut transformed_program: Option<Program> = None;
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let mut visitor = CubePropTransformVisitor::new(
+            HashSet::new(),
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            &handler,
+        );
+        program.visit_mut_with(&mut visitor);
 
-                let mut visitor = CubePropTransformVisitor {
-                    source_map: None,
-                    cube_names: HashSet::new(),
-                    cube_symbols: HashMap::new(),
-                    context_symbols: HashMap::new(),
-                };
-                program.visit_mut_with(&mut visitor);
-                transformed_program = Some(program);
-            });
-        });
-
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let _output_code = generate_code(&transformed_program, &cm);
+        let _output_code = generate_code(&program, &cm);
         let diags = diagnostics.lock().unwrap();
         let msgs: Vec<_> = diags
             .iter()
@@ -529,7 +513,6 @@ mod tests {
 
     #[test]
     fn test_simple_transform() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -623,37 +606,29 @@ mod tests {
         //   }
         // });
 
-        let mut transformed_program: Option<Program> = None;
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let mut visitor = CubePropTransformVisitor::new(
+            HashSet::new(),
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            &handler,
+        );
+        program.visit_mut_with(&mut visitor);
 
-                let mut visitor = CubePropTransformVisitor {
-                    source_map: None,
-                    cube_names: HashSet::new(),
-                    cube_symbols: HashMap::new(),
-                    context_symbols: HashMap::new(),
-                };
-                program.visit_mut_with(&mut visitor);
-                transformed_program = Some(program);
-            });
-        });
-
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
 
         assert!(
             output_code.contains("sql: ()=>`"),
@@ -670,7 +645,6 @@ mod tests {
 
     #[test]
     fn test_complicated_transform_1st_stage() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -937,37 +911,30 @@ mod tests {
         //     }]
         // });
 
-        let mut transformed_program: Option<Program> = None;
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
+        let mut visitor = CubePropTransformVisitor::new(
+            HashSet::new(),
+            HashMap::new(),
+            CONTEXT_SYMBOLS.clone(),
+            None,
+            &handler,
+        );
 
-                let mut visitor = CubePropTransformVisitor {
-                    source_map: None,
-                    cube_names: HashSet::new(),
-                    cube_symbols: HashMap::new(),
-                    context_symbols: CONTEXT_SYMBOLS.clone(),
-                };
-                program.visit_mut_with(&mut visitor);
-                transformed_program = Some(program);
-            });
-        });
+        program.visit_mut_with(&mut visitor);
 
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
 
         assert!(
             output_code.contains("sql: ()=>`"),
@@ -1034,7 +1001,6 @@ mod tests {
 
     #[test]
     fn test_complicated_transform_2nd_stage() {
-        let globals = Globals::new();
         let cm: Lrc<SourceMap> = Default::default();
         let diagnostics = Arc::new(Mutex::new(Vec::new()));
         let emitter = Box::new(TestEmitter {
@@ -1292,56 +1258,48 @@ mod tests {
         //   }]
         // });
 
-        let mut transformed_program: Option<Program> = None;
+        let fm = cm.new_source_file(
+            Arc::new(FileName::Custom("input.js".into())),
+            js_code.into(),
+        );
+        let lexer = Lexer::new(
+            Syntax::Es(Default::default()),
+            EsVersion::Es2020,
+            StringInput::from(&*fm),
+            None,
+        );
+        let mut parser = Parser::new_from(lexer);
+        let mut program: Program = parser.parse_program().expect("Failed to parse the JS code");
+        let mut cube_names = HashSet::new();
+        cube_names.insert("Orders".to_string());
+        let mut cube_symbols = HashMap::<String, HashMap<String, bool>>::new();
+        let mut orders_cube_symbols = HashMap::new();
+        orders_cube_symbols.insert("division_error_test".to_string(), true);
+        orders_cube_symbols.insert("zero_sum".to_string(), true);
+        orders_cube_symbols.insert("rolling_count_month".to_string(), true);
+        orders_cube_symbols.insert("count".to_string(), true);
+        orders_cube_symbols.insert("countShipped".to_string(), true);
+        orders_cube_symbols.insert("id".to_string(), true);
+        orders_cube_symbols.insert("status".to_string(), true);
+        orders_cube_symbols.insert("createdAt".to_string(), true);
+        orders_cube_symbols.insert("completedAt".to_string(), true);
+        orders_cube_symbols.insert("test_boolean".to_string(), true);
+        orders_cube_symbols.insert("localTime".to_string(), true);
+        orders_cube_symbols.insert("localYear".to_string(), true);
+        orders_cube_symbols.insert("status_completed".to_string(), true);
+        orders_cube_symbols.insert("main_test_range".to_string(), true);
+        cube_symbols.insert("Orders".to_string(), orders_cube_symbols);
 
-        swc_core::common::GLOBALS.set(&globals, || {
-            HANDLER.set(&handler, || {
-                let fm = cm.new_source_file(
-                    Arc::new(FileName::Custom("input.js".into())),
-                    js_code.into(),
-                );
-                let lexer = Lexer::new(
-                    Syntax::Es(Default::default()),
-                    EsVersion::Es2020,
-                    StringInput::from(&*fm),
-                    None,
-                );
-                let mut parser = Parser::new_from(lexer);
-                let mut program: Program =
-                    parser.parse_program().expect("Failed to parse the JS code");
-                let mut cube_names = HashSet::new();
-                cube_names.insert("Orders".to_string());
-                let mut cube_symbols = HashMap::<String, HashMap<String, bool>>::new();
-                let mut orders_cube_symbols = HashMap::new();
-                orders_cube_symbols.insert("division_error_test".to_string(), true);
-                orders_cube_symbols.insert("zero_sum".to_string(), true);
-                orders_cube_symbols.insert("rolling_count_month".to_string(), true);
-                orders_cube_symbols.insert("count".to_string(), true);
-                orders_cube_symbols.insert("countShipped".to_string(), true);
-                orders_cube_symbols.insert("id".to_string(), true);
-                orders_cube_symbols.insert("status".to_string(), true);
-                orders_cube_symbols.insert("createdAt".to_string(), true);
-                orders_cube_symbols.insert("completedAt".to_string(), true);
-                orders_cube_symbols.insert("test_boolean".to_string(), true);
-                orders_cube_symbols.insert("localTime".to_string(), true);
-                orders_cube_symbols.insert("localYear".to_string(), true);
-                orders_cube_symbols.insert("status_completed".to_string(), true);
-                orders_cube_symbols.insert("main_test_range".to_string(), true);
-                cube_symbols.insert("Orders".to_string(), orders_cube_symbols);
+        let mut visitor = CubePropTransformVisitor::new(
+            cube_names,
+            cube_symbols,
+            CONTEXT_SYMBOLS.clone(),
+            None,
+            &handler,
+        );
+        program.visit_mut_with(&mut visitor);
 
-                let mut visitor = CubePropTransformVisitor {
-                    source_map: None,
-                    cube_names,
-                    cube_symbols,
-                    context_symbols: CONTEXT_SYMBOLS.clone(),
-                };
-                program.visit_mut_with(&mut visitor);
-                transformed_program = Some(program);
-            });
-        });
-
-        let transformed_program = transformed_program.expect("Transformation failed");
-        let output_code = generate_code(&transformed_program, &cm);
+        let output_code = generate_code(&program, &cm);
 
         assert!(
             output_code.contains("sql: ()=>`"),

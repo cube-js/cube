@@ -3,9 +3,11 @@ use crate::cube_prop_ctx_transpiler::CubePropTransformVisitor;
 use crate::import_export_transpiler::ImportExportTransformVisitor;
 use crate::validation_transpiler::ValidationTransformVisitor;
 use anyhow::{anyhow, Result};
+use error_reporter::ErrorReporter;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use swc_core::common::errors::{Handler, HandlerFlags};
 use swc_core::common::input::StringInput;
 use swc_core::common::sync::{Lrc, OnceCell};
 use swc_core::common::{FileName, SourceMap};
@@ -19,6 +21,7 @@ use swc_ecma_parser::{Parser, Syntax};
 
 pub mod check_dup_prop_transpiler;
 pub mod cube_prop_ctx_transpiler;
+pub mod error_reporter;
 pub mod import_export_transpiler;
 pub mod validation_transpiler;
 
@@ -80,13 +83,25 @@ pub fn run_transpilers(
         source_file: sm_cell,
     };
 
+    let errors = Arc::new(Mutex::new(Vec::new()));
+    let warnings = Arc::new(Mutex::new(Vec::new()));
+
+    let reporter = Box::new(ErrorReporter::new(errors.clone(), warnings.clone()));
+    let handler = Handler::with_emitter_and_flags(
+        reporter,
+        HandlerFlags {
+            can_emit_warnings: true,
+            ..Default::default()
+        },
+    );
+
     transform_config
         .transpilers
         .into_iter()
         .for_each(|transpiler| match transpiler {
             Transpilers::CubeCheckDuplicatePropTranspiler => {
                 let mut visitor =
-                    CheckDupPropTransformVisitor::new(Some(plugin_source_map.clone()));
+                    CheckDupPropTransformVisitor::new(Some(plugin_source_map.clone()), &handler);
                 program.visit_mut_with(&mut visitor);
             }
             Transpilers::CubePropContextTranspiler => {
@@ -95,26 +110,30 @@ pub fn run_transpilers(
                     transform_config.cube_symbols.clone(),
                     transform_config.context_symbols.clone(),
                     Some(plugin_source_map.clone()),
+                    &handler,
                 );
                 program.visit_mut_with(&mut visitor);
             }
             Transpilers::ImportExportTranspiler => {
                 let mut visitor =
-                    ImportExportTransformVisitor::new(Some(plugin_source_map.clone()));
+                    ImportExportTransformVisitor::new(Some(plugin_source_map.clone()), &handler);
                 program.visit_mut_with(&mut visitor);
             }
             Transpilers::ValidationTranspiler => {
-                let mut visitor = ValidationTransformVisitor::new(Some(plugin_source_map.clone()));
+                let mut visitor =
+                    ValidationTransformVisitor::new(Some(plugin_source_map.clone()), &handler);
                 program.visit_mut_with(&mut visitor);
             }
         });
 
     let output_code = generate_code(&program, &sm)?;
+    let errors = errors.lock().unwrap().clone();
+    let warnings = warnings.lock().unwrap().clone();
 
     Ok(TransformResult {
         code: output_code,
-        errors: vec![],
-        warnings: vec![],
+        errors,
+        warnings,
     })
 }
 
