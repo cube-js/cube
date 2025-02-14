@@ -141,16 +141,16 @@ export class ErrorReporter {
     return this.rootReporter().errors;
   }
 
-  public addErrors(errors: CompilerErrorInterface[]) {
-    this.rootReporter().errors.push(...errors);
+  public addErrors(errors: any[]) {
+    errors.forEach((e: any) => { this.error(e); });
   }
 
   public getWarnings() {
     return this.rootReporter().warnings;
   }
 
-  public addWarnings(warnings: SyntaxErrorInterface[]) {
-    this.rootReporter().warnings.push(...warnings);
+  public addWarnings(warnings: any[]) {
+    warnings.forEach((w: any) => { this.warning(w); });
   }
 
   protected rootReporter(): ErrorReporter {

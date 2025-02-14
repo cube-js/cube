@@ -510,6 +510,9 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     //========= sql orchestrator exports =================
     crate::orchestrator::register_module(&mut cx)?;
 
+    //========= transpilers exports =================
+    crate::transpilers::register_module(&mut cx)?;
+
     crate::template::template_register_module(&mut cx)?;
 
     #[cfg(feature = "python")]
