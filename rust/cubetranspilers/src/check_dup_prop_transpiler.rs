@@ -17,7 +17,11 @@ pub struct CheckDupPropTransformVisitor {
 }
 
 impl CheckDupPropTransformVisitor {
-    fn emit_error(&self, span: Span, message: &str) {
+    pub fn new(source_map: Option<PluginSourceMapProxy>) -> Self {
+        CheckDupPropTransformVisitor { source_map }
+    }
+
+    fn emit_error(&mut self, span: Span, message: &str) {
         HANDLER.with(|handler| {
             handler
                 .struct_span_err(span, &self.format_msg(span, message))

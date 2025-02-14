@@ -30,7 +30,7 @@ pub enum Transpilers {
     ValidationTranspiler,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TransformConfig {
     pub file_name: String,
@@ -38,18 +38,6 @@ pub struct TransformConfig {
     pub cube_names: HashSet<String>,
     pub cube_symbols: HashMap<String, HashMap<String, bool>>,
     pub context_symbols: HashMap<String, String>,
-}
-
-impl Default for TransformConfig {
-    fn default() -> Self {
-        Self {
-            file_name: String::new(),
-            transpilers: Vec::new(),
-            cube_names: HashSet::new(),
-            cube_symbols: HashMap::new(),
-            context_symbols: HashMap::new(),
-        }
-    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -84,7 +72,9 @@ pub fn run_transpilers(
     };
 
     let sm_cell = OnceCell::new();
-    sm_cell.set(sf.clone()).map_err(|_err| anyhow!("Failed to init OnceCell with source file"))?;
+    sm_cell
+        .set(sf.clone())
+        .map_err(|_err| anyhow!("Failed to init OnceCell with source file"))?;
 
     let plugin_source_map = PluginSourceMapProxy {
         source_file: sm_cell,
@@ -95,30 +85,26 @@ pub fn run_transpilers(
         .into_iter()
         .for_each(|transpiler| match transpiler {
             Transpilers::CubeCheckDuplicatePropTranspiler => {
-                let mut visitor = CheckDupPropTransformVisitor {
-                    source_map: Some(plugin_source_map.clone()),
-                };
+                let mut visitor =
+                    CheckDupPropTransformVisitor::new(Some(plugin_source_map.clone()));
                 program.visit_mut_with(&mut visitor);
             }
             Transpilers::CubePropContextTranspiler => {
-                let mut visitor = CubePropTransformVisitor {
-                    cube_names: transform_config.cube_names.clone(),
-                    cube_symbols: transform_config.cube_symbols.clone(),
-                    context_symbols: transform_config.context_symbols.clone(),
-                    source_map: Some(plugin_source_map.clone()),
-                };
+                let mut visitor = CubePropTransformVisitor::new(
+                    transform_config.cube_names.clone(),
+                    transform_config.cube_symbols.clone(),
+                    transform_config.context_symbols.clone(),
+                    Some(plugin_source_map.clone()),
+                );
                 program.visit_mut_with(&mut visitor);
             }
             Transpilers::ImportExportTranspiler => {
-                let mut visitor = ImportExportTransformVisitor {
-                    source_map: Some(plugin_source_map.clone()),
-                };
+                let mut visitor =
+                    ImportExportTransformVisitor::new(Some(plugin_source_map.clone()));
                 program.visit_mut_with(&mut visitor);
             }
             Transpilers::ValidationTranspiler => {
-                let mut visitor = ValidationTransformVisitor {
-                    source_map: Some(plugin_source_map.clone()),
-                };
+                let mut visitor = ValidationTransformVisitor::new(Some(plugin_source_map.clone()));
                 program.visit_mut_with(&mut visitor);
             }
         });

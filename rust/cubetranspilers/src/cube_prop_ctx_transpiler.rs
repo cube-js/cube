@@ -73,6 +73,20 @@ pub struct CubePropTransformVisitor {
 }
 
 impl CubePropTransformVisitor {
+    pub fn new(
+        cube_names: HashSet<String>,
+        cube_symbols: HashMap<String, HashMap<String, bool>>,
+        context_symbols: HashMap<String, String>,
+        source_map: Option<PluginSourceMapProxy>,
+    ) -> Self {
+        CubePropTransformVisitor {
+            source_map,
+            cube_names,
+            cube_symbols,
+            context_symbols,
+        }
+    }
+
     fn emit_error(&self, span: Span, message: &str) {
         HANDLER.with(|handler| {
             handler

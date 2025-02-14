@@ -16,6 +16,10 @@ pub struct ValidationTransformVisitor {
 }
 
 impl ValidationTransformVisitor {
+    pub fn new(source_map: Option<PluginSourceMapProxy>) -> Self {
+        ValidationTransformVisitor { source_map }
+    }
+
     fn emit_warn(&self, span: Span, message: &str) {
         HANDLER.with(|handler| {
             handler

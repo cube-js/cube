@@ -15,6 +15,10 @@ pub struct ImportExportTransformVisitor {
 }
 
 impl ImportExportTransformVisitor {
+    pub fn new(source_map: Option<PluginSourceMapProxy>) -> Self {
+        ImportExportTransformVisitor { source_map }
+    }
+
     fn emit_error(&self, span: Span, message: &str) {
         HANDLER.with(|handler| {
             handler
