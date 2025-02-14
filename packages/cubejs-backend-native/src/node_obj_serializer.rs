@@ -53,7 +53,7 @@ impl<'a, 'b, C: Context<'a>> NodeObjSerializer<'a, 'b, C> {
     }
 }
 
-impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'a, 'b, C> {
+impl<'a, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
     type SerializeSeq = NodeObjSeqSerializer<'a, 'c, C>;
@@ -242,7 +242,7 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeMap for NodeObjMapSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeMap for NodeObjMapSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
@@ -284,7 +284,7 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeMap for NodeObjMapSerializer<'a, 'b, 
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeTuple for NodeObjTupleSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeTuple for NodeObjTupleSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
@@ -299,7 +299,7 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeTuple for NodeObjTupleSerializer<'a, 
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeTupleStruct for NodeObjTupleSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeTupleStruct for NodeObjTupleSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
@@ -314,7 +314,7 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeTupleStruct for NodeObjTupleSerialize
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeTupleVariant for NodeObjTupleSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeTupleVariant for NodeObjTupleSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
@@ -329,7 +329,7 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeTupleVariant for NodeObjTupleSerializ
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeStruct for NodeObjMapSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeStruct for NodeObjMapSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
@@ -350,7 +350,7 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeStruct for NodeObjMapSerializer<'a, '
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeStructVariant for NodeObjMapSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeStructVariant for NodeObjMapSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
@@ -369,7 +369,7 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeStructVariant for NodeObjMapSerialize
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeSeq for NodeObjSeqSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeSeq for NodeObjSeqSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 

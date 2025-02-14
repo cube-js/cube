@@ -6,13 +6,22 @@ const cn = classnames.bind(styles);
 
 export type YouTubeVideoProps = {
   url: string;
+  aspectRatio?: number;
 };
 
-export const YouTubeVideo = ({ url }: YouTubeVideoProps) => {
+function formatAspectRatioAsPercentage(aspectRatio: number) {
+  return `${((1 / aspectRatio) * 100).toFixed(2)}%`;
+}
+
+export const YouTubeVideo = ({ url, aspectRatio = 16/9 }: YouTubeVideoProps) => {
   return (
     <div
       className={cn('YoutubeVideo__Wrapper')}
-      style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}
+      style={{
+        position: 'relative',
+        paddingBottom: formatAspectRatioAsPercentage(aspectRatio),
+        height: 0
+      }}
     >
       <iframe
         src={url}

@@ -109,7 +109,7 @@ impl PostgresIntegrationTestSuite {
         client
     }
 
-    async fn print_query_result<'a>(
+    async fn print_query_result(
         &self,
         res: Vec<Row>,
         with_description: bool,
