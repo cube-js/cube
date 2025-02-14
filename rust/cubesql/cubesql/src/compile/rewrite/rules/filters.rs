@@ -3730,15 +3730,15 @@ impl FilterRules {
         }
     }
 
-    fn filter_member_name(
+    fn filter_member_name<'meta>(
         egraph: &mut CubeEGraph,
         subst: &Subst,
-        meta_context: &Arc<MetaContext>,
+        meta_context: &'meta MetaContext,
         alias_to_cube_var: Var,
         column_var: Var,
         members_var: Var,
         aliases: &Vec<(String, String)>,
-    ) -> Option<(String, V1CubeMeta)> {
+    ) -> Option<(String, &'meta V1CubeMeta)> {
         Self::filter_member_name_with_granularity(
             egraph,
             subst,
@@ -3751,15 +3751,15 @@ impl FilterRules {
         .map(|(name, _, meta)| (name, meta))
     }
 
-    fn filter_member_name_with_granularity(
+    fn filter_member_name_with_granularity<'meta>(
         egraph: &mut CubeEGraph,
         subst: &Subst,
-        meta_context: &Arc<MetaContext>,
+        meta_context: &'meta MetaContext,
         alias_to_cube_var: Var,
         column_var: Var,
         members_var: Var,
         aliases: &Vec<(String, String)>,
-    ) -> Option<(String, Option<String>, V1CubeMeta)> {
+    ) -> Option<(String, Option<String>, &'meta V1CubeMeta)> {
         let alias_to_cubes: Vec<_> =
             var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
                 .cloned()

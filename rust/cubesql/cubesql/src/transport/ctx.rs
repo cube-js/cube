@@ -92,21 +92,15 @@ impl MetaContext {
             .cloned()
     }
 
-    pub fn find_cube_with_name(&self, name: &str) -> Option<CubeMeta> {
-        for cube in self.cubes.iter() {
-            if cube.name.eq(&name) {
-                return Some(cube.clone());
-            }
-        }
-
-        None
+    pub fn find_cube_with_name(&self, name: &str) -> Option<&CubeMeta> {
+        self.cubes.iter().find(|&cube| cube.name == name)
     }
 
     pub fn find_cube_by_column(
         &self,
         alias_to_cube: &Vec<(String, String)>,
         column: &Column,
-    ) -> Option<(String, CubeMeta)> {
+    ) -> Option<(String, &CubeMeta)> {
         (if let Some(rel) = column.relation.as_ref() {
             alias_to_cube.iter().find(|(a, _)| a == rel)
         } else {
@@ -128,7 +122,7 @@ impl MetaContext {
         &self,
         alias_to_cube: &Vec<((String, String), String)>,
         column: &Column,
-    ) -> Vec<((String, String), CubeMeta)> {
+    ) -> Vec<((String, String), &CubeMeta)> {
         if let Some(rel) = column.relation.as_ref() {
             alias_to_cube
                 .iter()
@@ -208,7 +202,7 @@ impl MetaContext {
 
     pub fn cube_has_join(&self, cube_name: &str, join_name: String) -> bool {
         if let Some(cube) = self.find_cube_with_name(cube_name) {
-            if let Some(joins) = cube.joins {
+            if let Some(joins) = &cube.joins {
                 return joins.iter().any(|j| j.name == join_name);
             }
         }
