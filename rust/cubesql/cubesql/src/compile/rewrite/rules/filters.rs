@@ -34,7 +34,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
+    DateTime, Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -4836,7 +4836,7 @@ impl FilterRules {
             };
             let ts_seconds = *ts / 1_000_000_000;
             let ts_nanos = (*ts % 1_000_000_000) as u32;
-            let dt = NaiveDateTime::from_timestamp_opt(ts_seconds, ts_nanos).map(|dt| Some(dt));
+            let dt = DateTime::from_timestamp(ts_seconds, ts_nanos).map(|dt| Some(dt.naive_utc()));
             return dt;
         };
 
