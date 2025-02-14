@@ -184,9 +184,11 @@ impl MetaContext {
         field_name == "__user" || field_name == "__cubeJoinField"
     }
 
-    pub fn find_df_data_type(&self, member_name: String) -> Option<DataType> {
-        self.find_cube_with_name(member_name.split(".").next()?)?
-            .df_data_type(member_name.as_str())
+    pub fn find_df_data_type(&self, member_name: &str) -> Option<DataType> {
+        let (cube_name, _) = member_name.split_once(".")?;
+
+        self.find_cube_with_name(cube_name)?
+            .df_data_type(member_name)
     }
 
     pub fn find_cube_table_with_oid(&self, oid: u32) -> Option<CubeMetaTable> {
