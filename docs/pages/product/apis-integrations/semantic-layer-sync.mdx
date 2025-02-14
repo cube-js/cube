@@ -7,7 +7,7 @@ layer from Cube to BI tools. It's the easiest way to connect a BI tool to Cube.
 
 Semantic Layer Sync is available in Cube Cloud.
 <br/>Support for Metabase, Preset, and Superset is available on [all product tiers](https://cube.dev/pricing).
-<br/>Support for Tableau and Power BI is available on [Enterprise and above](https://cube.dev/pricing) product tiers.
+<br/>Support for Tableau is available on [Enterprise and above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
 
@@ -43,11 +43,6 @@ on configuration and features for specific tools:
     title="Metabase"
   />
   <GridItem
-    url="semantic-layer-sync/power-bi"
-    imageUrl="https://static.cube.dev/icons/powerbi.svg"
-    title="Microsoft Power BI"
-  />
-  <GridItem
     url="semantic-layer-sync/preset"
     imageUrl="https://static.cube.dev/icons/preset.svg"
     title="Preset"
@@ -58,6 +53,13 @@ on configuration and features for specific tools:
     title="Tableau"
   />
 </Grid>
+
+<InfoBox>
+
+Previously, Semantic Layer Sync provided a way to connect to [Microsoft Power BI][ref-powerbi].
+Currently, it's recommended to use the [DAX API][ref-dax-api].
+
+</InfoBox>
 
 ## Creating syncs
 
@@ -396,6 +398,8 @@ on, i.e., your development mode branch, shared branch, or main branch.
 
 [ref-data-model]: /product/data-modeling/overview
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-dax-api]: /product/apis-integrations/dax-api
 [ref-config-file]: /product/configuration#configuration-options
 [ref-config-sls]: /reference/configuration/config#semanticlayersync
 [ref-config-contexts]: /reference/configuration/config#scheduledrefreshcontexts

@@ -26,6 +26,13 @@ Here's a step-by-step breakdown of the authentication flow:
 * Cube verifies the credentials via the Secure LDAP service.
 * If credentials are correct, users get access to the dataset.
 
+<InfoBox>
+
+In this recipe, the SQL API is used to connect to [Power BI][ref-powerbi].
+Currently, it's recommended to use the [DAX API][ref-dax-api].
+
+</InfoBox>
+
 ## Configuration
 
 To verify the credentials, use the
@@ -178,3 +185,7 @@ module.exports = {
 };
 
 ```
+
+
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi

@@ -1,7 +1,6 @@
 module.exports = {
   "superset": "Apache Superset",
-  "metabase": "Metabase",
-  "power-bi": "Power BI",
+  "metabase": "Metabase",≈
   "preset": "Preset",
   "tableau": "Tableau"
 }

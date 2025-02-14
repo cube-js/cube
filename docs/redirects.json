@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/apis-integrations/semantic-layer-sync/power-bi",
+    "destination": "/product/configuration/visualization-tools/powerbi",
+    "permanent": true
+  },
+  {
     "source": "/reference/frontend/cubejs-client-core",
     "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-core",
     "permanent": true

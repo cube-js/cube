@@ -1,12 +1,12 @@
 # MDX API
 
-The MDX (MultiDimensional eXpressions) API provides a robust interface for connecting applications, such as Microsoft Excel, to the Cube Cloud semantic layer via the XMLA (XML for Analysis) standard.
+The MDX API enables Cube to connect to [Microsoft Excel][ref-excel]. It derives
+its name from [multidimensional data expressions][link-mdx], a query language
+for OLAP in the Microsoft ecosystem.
 
-Key Features:
-
-- <b>Direct connectivity:</b> Connect Excel directly to Cube Cloud using standard XMLA protocols.
-- <b>Advanced analytical functions:</b> Utilize the power of MDX to execute sophisticated queries that include slicing, dicing, drilling down, and rolling up of data.
-- <b>Real-time access:</b> Fetch live data from Cube Cloud, ensuring that your analyses and reports always reflect the most current information.
+Unlike [Cube Cloud for Excel][ref-cube-cloud-for-excel], it only works with Excel
+on Microsoft Windows. However, it allows using the data from the MDX API with the
+native [PivotTable][link-pivottable] in Excel.
 
 <SuccessBox>
 
@@ -22,22 +22,30 @@ The MDX API is currently in preview.
 
 </WarningBox>
 
+Key features:
+
+- <b>Direct connectivity:</b> Connect Excel directly to Cube Cloud using standard XMLA protocols.
+- <b>Advanced analytical functions:</b> Utilize the power of MDX to execute sophisticated queries that include slicing, dicing, drilling down, and rolling up of data.
+- <b>Real-time access:</b> Fetch live data from Cube Cloud, ensuring that your analyses and reports always reflect the most current information.
+
 ## Configuration
+
+<WarningBox>
 
 While the MDX API is in preview, your Cube account team will enable and configure it for you.
 
-If you wish to enable or disable the MDX API on a specific Cube deployment, you may do so by going to "Settings" in the Cube Cloud sidebar, then "Configuration", and then toggling the "Enable MDX API" configuration flag switch.
+</WarningBox>
 
-To find your MDX API credentials and the XMLA endpoint in Cube Cloud, go to the
-<Btn>Overview</Btn> page, click <Btn>API credentials</Btn>, and choose the
-<Btn>AI API</Btn> tab.
+To enable or disable the MDX API on a specific deployment, go to <Btn>Settings</Btn>
+in the Cube Cloud sidebar, then <Btn>Configuration</Btn>, and then toggle the
+<Btn>Enable MDX API</Btn> option.
 
 ## Using MDX API with Excel
 
-Once MDX API is enabled, you can use it to connect to Cube from Excel. In Excel, go to the **Data tab**, click **Get Data** and select **From Database -> From Analysis Services**.
-
 <InfoBox>
-  Please note that only the [views](/reference/data-model/view) will be available for connections via MDX API
+
+The MDX API works only with [views][ref-views], not cubes.
+
 </InfoBox>
 
 The following section describes Excel-specific configuration options.
@@ -164,5 +172,10 @@ This is going to be harmonized in the future.
 Authentication and authorization work the same as for the [SQL API](/product/apis-integrations/sql-api/security).
 
 
+[ref-excel]: /product/configuration/visualization-tools/excel
+[link-mdx]: https://learn.microsoft.com/en-us/analysis-services/multidimensional-models/mdx/multidimensional-model-data-access-analysis-services-multidimensional-data?view=asallproducts-allversions#bkmk_querylang
+[link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
+[ref-cube-cloud-for-excel]: /product/apis-integrations/microsoft-excel
 [ref-hierarchies]: /reference/data-model/hierarchies
 [ref-folders]: /reference/data-model/view#folders
+[ref-views]: /product/data-modeling/concepts#views
