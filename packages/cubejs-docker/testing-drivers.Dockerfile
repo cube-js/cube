@@ -68,6 +68,11 @@ COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/packag
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
 
+COPY rust/check-dup-prop-transpiler-swc-plugin/package.json rust/check-dup-prop-transpiler-swc-plugin/package.json
+COPY rust/cube-prop-ctx-transpiler-swc-plugin/package.json rust/cube-prop-ctx-transpiler-swc-plugin/package.json
+COPY rust/import-export-transpiler-swc-plugin/package.json rust/import-export-transpiler-swc-plugin/package.json
+COPY rust/validation-transpiler-swc-plugin/package.json rust/validation-transpiler-swc-plugin/package.json
+
 # We dont need client libraries
 #COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 #COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
@@ -146,6 +151,11 @@ COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
+
+COPY rust/check-dup-prop-transpiler-swc-plugin/ rust/check-dup-prop-transpiler-swc-plugin/
+COPY rust/cube-prop-ctx-transpiler-swc-plugin/ rust/cube-prop-ctx-transpiler-swc-plugin/
+COPY rust/import-export-transpiler-swc-plugin/ rust/import-export-transpiler-swc-plugin/
+COPY rust/validation-transpiler-swc-plugin/ rust/validation-transpiler-swc-plugin/
 
 # We dont need client libraries
 #COPY packages/cubejs-templates/ packages/cubejs-templates/

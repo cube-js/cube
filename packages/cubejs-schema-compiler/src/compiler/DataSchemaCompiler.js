@@ -11,6 +11,7 @@ import workerpool from 'workerpool';
 import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
+import { CONTEXT_SYMBOLS } from './CubeSymbols';
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
@@ -93,17 +94,22 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
+    let workersCount;
+
     if (getEnv('transpilationWorkerThreads')) {
       const wc = getEnv('transpilationWorkerThreadsCount');
+      workersCount = wc > 0 ? wc : Math.max(1, workerpool.cpus - 1);
+
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
-        wc > 0 ? { maxWorkers: wc } : undefined,
+        { maxWorkers: workersCount },
       );
     }
 
     const transpile = async () => {
       let cubeNames;
-      let cubeSymbolsNames;
+      let cubeSymbols;
+      let transpilerNames;
 
       if (getEnv('transpilationWorkerThreads')) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
@@ -113,7 +119,7 @@ export class DataSchemaCompiler {
         // Communication between main and worker threads uses
         // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
         // which doesn't allow passing any function objects, so we need to sanitize the symbols.
-        cubeSymbolsNames = Object.fromEntries(
+        cubeSymbols = Object.fromEntries(
           Object.entries(this.cubeSymbols.symbols)
             .map(
               ([key, value]) => [key, Object.fromEntries(
@@ -121,8 +127,27 @@ export class DataSchemaCompiler {
               )],
             ),
         );
+
+        // Transpilers are the same for all files within phase.
+        transpilerNames = this.transpilers.map(t => t.constructor.name);
+
+        // Warming up swc compiler cache
+        const dummyFile = {
+          fileName: 'dummy.js',
+          content: ';',
+        };
+        const warmups = Array.from(
+          { length: workersCount },
+          (_, _i) => this.transpileJsFile(
+            dummyFile,
+            errorsReport,
+            { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS }
+          ),
+        );
+        await Promise.all(warmups);
       }
-      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
+
+      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
       return results.filter(f => !!f);
     };
 
@@ -182,21 +207,21 @@ export class DataSchemaCompiler {
     }
   }
 
-  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbolsNames }) {
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames }) {
     try {
       if (getEnv('transpilationWorkerThreads')) {
         const data = {
           fileName: file.fileName,
           content: file.content,
-          transpilers: this.transpilers.map(t => t.constructor.name),
+          transpilers: transpilerNames,
           cubeNames,
-          cubeSymbolsNames,
+          cubeSymbols,
+          contextSymbols,
         };
 
+        errorsReport.inFile(file);
         const res = await this.workerPool.exec('transpile', [data]);
-        errorsReport.addErrors(res.errors);
-        errorsReport.addWarnings(res.warnings);
-
+        errorsReport.exitFile();
         return Object.assign({}, file, { content: res.content });
       } else {
         const ast = parse(
@@ -208,11 +233,11 @@ export class DataSchemaCompiler {
           },
         );
 
+        errorsReport.inFile(file);
         this.transpilers.forEach((t) => {
-          errorsReport.inFile(file);
           babelTraverse(ast, t.traverseObject(errorsReport));
-          errorsReport.exitFile();
         });
+        errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
         return Object.assign({}, file, { content });

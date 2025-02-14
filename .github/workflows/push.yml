@@ -13,6 +13,10 @@ on:
       - 'rust/cubeorchestrator/**'
       - 'rust/cubeshared/**'
       - 'rust/cubesqlplanner/**'
+      - 'rust/check-dup-prop-transpiler-swc-plugin/**'
+      - 'rust/cube-prop-ctx-transpiler-swc-plugin/**'
+      - 'rust/import-export-transpiler-swc-plugin/**'
+      - 'rust/validation-transpiler-swc-plugin/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -32,6 +36,10 @@ on:
       - 'rust/cubeorchestrator/**'
       - 'rust/cubeshared/**'
       - 'rust/cubesqlplanner/**'
+      - 'rust/check-dup-prop-transpiler-swc-plugin/**'
+      - 'rust/cube-prop-ctx-transpiler-swc-plugin/**'
+      - 'rust/import-export-transpiler-swc-plugin/**'
+      - 'rust/validation-transpiler-swc-plugin/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -76,6 +84,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
+          target: wasm32-wasip1
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -111,6 +120,8 @@ jobs:
         run: yarn tsc
       - name: Build client
         run: yarn build
+      - name: Build transpilers swc plugins
+        run: yarn lerna run build-swc-plugin
       - name: Build cubejs-backend-native (with Python)
         run: yarn run native:build-release-python
         working-directory: ./packages/cubejs-backend-native
@@ -139,6 +150,18 @@ jobs:
 #      - name: Cargo test cubesqlplanner
 #        run: |
 #          cargo test --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 1
+      - name: Cargo test check-dup-prop-transpiler-swc-plugin
+        run: |
+          cargo test --manifest-path rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml -j 1
+      - name: Cargo test cube-prop-ctx-transpiler-swc-plugin
+        run: |
+          cargo test --manifest-path rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml -j 1
+      - name: Cargo test import-export-transpiler-swc-plugin
+        run: |
+          cargo test --manifest-path rust/import-export-transpiler-swc-plugin/Cargo.toml -j 1
+      - name: Cargo test validation-transpiler-swc-plugin
+        run: |
+          cargo test --manifest-path rust/validation-transpiler-swc-plugin/Cargo.toml -j 1
 
   lint:
     runs-on: ubuntu-20.04
@@ -156,6 +179,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
+          target: wasm32-wasip1
       - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
@@ -202,6 +226,18 @@ jobs:
 #      - name: Cargo fmt cubesqlplanner
 #        run: |
 #          cargo fmt --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -- --check
+      - name: Cargo fmt check-dup-prop-transpiler-swc-plugin
+        run: |
+          cargo fmt --manifest-path rust/check-dup-prop-transpiler-swc-plugin/Cargo.toml -- --check
+      - name: Cargo fmt cube-prop-ctx-transpiler-swc-plugin
+        run: |
+          cargo fmt --manifest-path rust/cube-prop-ctx-transpiler-swc-plugin/Cargo.toml -- --check
+      - name: Cargo fmt import-export-transpiler-swc-plugin
+        run: |
+          cargo fmt --manifest-path rust/import-export-transpiler-swc-plugin/Cargo.toml -- --check
+      - name: Cargo fmt validation-transpiler-swc-plugin
+        run: |
+          cargo fmt --manifest-path rust/validation-transpiler-swc-plugin/Cargo.toml -- --check
 
   build:
     runs-on: ubuntu-20.04
@@ -219,6 +255,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
+          target: wasm32-wasip1
       - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
@@ -418,6 +455,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
+          target: wasm32-wasip1
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -484,8 +522,11 @@ jobs:
       matrix:
         node-version: [ 20.x ]
         python-version: [ 3.11 ]
+        transpile-worker-threads: [false, true]
       fail-fast: false
 
+    env:
+      CUBEJS_TRANSPILATION_WORKER_THREADS: ${{ matrix.transpile-worker-threads }}
     steps:
       - name: Maximize build space (disk space limitations)
         run: |
@@ -509,6 +550,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-07-15
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
+          target: wasm32-wasip1
       - name: Install Python
         uses: actions/setup-python@v5
         with:
@@ -540,6 +589,8 @@ jobs:
         uses: GoodManWEN/oracle-client-action@main
       - name: Build client
         run: yarn build
+      - name: Build transpilers swc plugins
+        run: yarn lerna run build-swc-plugin
       - name: Build cubejs-backend-native (with Python)
         run: yarn run native:build-release-python
         working-directory: ./packages/cubejs-backend-native
@@ -645,7 +696,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }} wasm32-wasip1
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -686,6 +737,8 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build transpilers swc plugins
+        run: yarn lerna run build-swc-plugin
       - name: Build cubejs-backend-native (without Python)
         run: yarn run native:build-release
         working-directory: ./packages/cubejs-backend-native

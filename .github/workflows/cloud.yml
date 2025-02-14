@@ -75,7 +75,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }} wasm32-wasip1
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:

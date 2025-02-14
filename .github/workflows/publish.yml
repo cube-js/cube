@@ -26,6 +26,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
+          target: wasm32-wasip1
       - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
@@ -99,7 +100,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }} wasm32-wasip1
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -189,7 +190,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }} wasm32-wasip1
       - name: Install Python
         uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
@@ -264,6 +265,7 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
+          target: wasm32-wasip1
       - name: Install Python
         uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
@@ -618,7 +620,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2024-01-29
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }} wasm32-wasip1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -705,7 +707,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2024-01-29
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }} wasm32-wasip1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt

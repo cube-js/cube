@@ -1,64 +1,75 @@
 import workerpool from 'workerpool';
-import { parse } from '@babel/parser';
-import babelGenerator from '@babel/generator';
-import babelTraverse from '@babel/traverse';
-
-import { ValidationTranspiler } from './ValidationTranspiler';
-import { ImportExportTranspiler } from './ImportExportTranspiler';
-import { CubeCheckDuplicatePropTranspiler } from './CubeCheckDuplicatePropTranspiler';
-import { CubePropContextTranspiler } from './CubePropContextTranspiler';
-import { ErrorReporter } from '../ErrorReporter';
-import { LightweightSymbolResolver } from './LightweightSymbolResolver';
-import { LightweightNodeCubeDictionary } from './LightweightNodeCubeDictionary';
+import { transformSync } from '@swc/core';
 
 type TransferContent = {
   fileName: string;
   content: string;
   transpilers: string[];
   cubeNames: string[];
-  cubeSymbolsNames: Record<string, Record<string, boolean>>;
+  cubeSymbols: Record<string, Record<string, boolean>>;
+  contextSymbols: Record<string, string>;
 };
 
-const cubeDictionary = new LightweightNodeCubeDictionary();
-const cubeSymbols = new LightweightSymbolResolver();
-const errorsReport = new ErrorReporter(null, []);
+type CubeMetaData = {
+  cubeNames: string[];
+  cubeSymbols: Record<string, Record<string, boolean>>;
+  contextSymbols: Record<string, string>;
+};
+
+type TranspilerPlugin = [string, Record<string, any>];
+
+let cache: CubeMetaData;
 
 const transpilers = {
-  ValidationTranspiler: new ValidationTranspiler(),
-  ImportExportTranspiler: new ImportExportTranspiler(),
-  CubeCheckDuplicatePropTranspiler: new CubeCheckDuplicatePropTranspiler(),
-  CubePropContextTranspiler: new CubePropContextTranspiler(cubeSymbols, cubeDictionary, cubeSymbols),
+  ValidationTranspiler:
+    (_data: CubeMetaData): TranspilerPlugin => ['@cubejs-backend/validation-transpiler-swc-plugin', {}],
+  ImportExportTranspiler:
+    (_data: CubeMetaData): TranspilerPlugin => ['@cubejs-backend/import-export-transpiler-swc-plugin', {}],
+  CubeCheckDuplicatePropTranspiler:
+    (_data: CubeMetaData): TranspilerPlugin => ['@cubejs-backend/check-dup-prop-transpiler-swc-plugin', {}],
+  CubePropContextTranspiler:
+    (data: CubeMetaData): TranspilerPlugin => ['@cubejs-backend/cube-prop-ctx-transpiler-swc-plugin', {
+      cubeNames: data.cubeNames,
+      cubeSymbols: data.cubeSymbols,
+      contextSymbols: data.contextSymbols,
+    }],
 };
 
 const transpile = (data: TransferContent) => {
-  cubeDictionary.setCubeNames(data.cubeNames);
-  cubeSymbols.setSymbols(data.cubeSymbolsNames);
+  if (data.cubeNames) {
+    cache = {
+      cubeNames: data.cubeNames,
+      cubeSymbols: data.cubeSymbols,
+      contextSymbols: data.contextSymbols,
+    };
+  }
 
-  const ast = parse(
-    data.content,
-    {
-      sourceFilename: data.fileName,
-      sourceType: 'module',
-      plugins: ['objectRestSpread']
-    },
-  );
-
-  data.transpilers.forEach(transpilerName => {
-    if (transpilers[transpilerName]) {
-      errorsReport.inFile(data);
-      babelTraverse(ast, transpilers[transpilerName].traverseObject(errorsReport));
-      errorsReport.exitFile();
+  const transpilersConfigs = data.transpilers.map(transpilerName => {
+    const ts = transpilers[transpilerName];
+    if (ts) {
+      return ts(cache);
     } else {
-      throw new Error(`Transpiler ${transpilerName} not supported`);
+      throw new Error(`Transpiler ${ts} not supported`);
     }
   });
 
-  const content = babelGenerator(ast, {}, data.content).code;
+  // We're already in dedicated worker, no need to use async here
+  const result = transformSync(data.content,
+    {
+      filename: data.fileName,
+      jsc: {
+        target: 'es2015',
+        experimental: {
+          plugins: transpilersConfigs,
+        },
+      },
+      swcrc: false,
+      inputSourceMap: false,
+      isModule: true,
+    });
 
   return {
-    content,
-    errors: errorsReport.getErrors(),
-    warnings: errorsReport.getWarnings()
+    content: result.code,
   };
 };
 
