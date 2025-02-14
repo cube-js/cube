@@ -2205,7 +2205,7 @@ impl MemberRules {
                                 }
 
                                 if let Some(dimension) =
-                                    meta_context.find_dimension_with_name(measure_name.to_string())
+                                    meta_context.find_dimension_with_name(&measure_name)
                                 {
                                     let alias_to_cube = alias_to_cube.clone();
                                     subst.insert(

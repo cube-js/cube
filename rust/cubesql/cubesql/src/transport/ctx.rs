@@ -156,13 +156,12 @@ impl MetaContext {
         cube.lookup_measure(member_name)
     }
 
-    pub fn find_dimension_with_name(&self, name: String) -> Option<CubeMetaDimension> {
-        let cube_and_member_name = name.split(".").collect::<Vec<_>>();
-        if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0]) {
-            cube.lookup_dimension(cube_and_member_name[1]).cloned()
-        } else {
-            None
-        }
+    pub fn find_dimension_with_name(&self, name: &str) -> Option<&CubeMetaDimension> {
+        let mut cube_and_member_name = name.split(".");
+        let cube_name = cube_and_member_name.next()?;
+        let member_name = cube_and_member_name.next()?;
+        let cube = self.find_cube_with_name(cube_name)?;
+        cube.lookup_dimension(member_name)
     }
 
     pub fn is_synthetic_field(&self, name: String) -> bool {
