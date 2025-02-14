@@ -164,15 +164,17 @@ impl MetaContext {
         cube.lookup_dimension(member_name)
     }
 
-    pub fn is_synthetic_field(&self, name: String) -> bool {
-        let cube_and_member_name = name.split(".").collect::<Vec<_>>();
-        if cube_and_member_name.len() == 1
-            && MetaContext::is_synthetic_field_name(cube_and_member_name[0])
-        {
-            return true;
-        }
-        if let Some(_) = self.find_cube_with_name(cube_and_member_name[0]) {
-            MetaContext::is_synthetic_field_name(cube_and_member_name[1])
+    pub fn is_synthetic_field(&self, name: &str) -> bool {
+        let mut cube_and_member_name = name.split(".");
+        let Some(cube_name) = cube_and_member_name.next() else {
+            return false;
+        };
+        let Some(member_name) = cube_and_member_name.next() else {
+            return MetaContext::is_synthetic_field_name(cube_name);
+        };
+
+        if self.find_cube_with_name(cube_name).is_some() {
+            MetaContext::is_synthetic_field_name(member_name)
         } else {
             false
         }

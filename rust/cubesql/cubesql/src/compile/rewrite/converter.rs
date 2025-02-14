@@ -1705,7 +1705,7 @@ impl LanguageToLogicalPlanConverter {
                                         if self
                                             .cube_context
                                             .meta
-                                            .is_synthetic_field(column.member_name().to_string())
+                                            .is_synthetic_field(column.member_name())
                                         {
                                             fields.push((
                                                 DFField::new(
