@@ -199,7 +199,7 @@ impl MetaContext {
         self.tables.iter().find(|table| table.name == name)
     }
 
-    pub fn cube_has_join(&self, cube_name: &str, join_name: String) -> bool {
+    pub fn cube_has_join(&self, cube_name: &str, join_name: &str) -> bool {
         if let Some(cube) = self.find_cube_with_name(cube_name) {
             if let Some(joins) = &cube.joins {
                 return joins.iter().any(|j| j.name == join_name);
