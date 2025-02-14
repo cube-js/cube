@@ -1,1 +1,2 @@
-imports_granularity = "Crate"
+# TODO: Uncomment, when it will become stable in rustfmt - https://github.com/rust-lang/rustfmt/issues/4991
+# imports_granularity = "Crate"
