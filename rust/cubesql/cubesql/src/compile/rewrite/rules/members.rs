@@ -2166,7 +2166,7 @@ impl MemberRules {
                             .cloned()
                             {
                                 if let Some(measure) =
-                                    meta_context.find_measure_with_name(measure_name.to_string())
+                                    meta_context.find_measure_with_name(&measure_name)
                                 {
                                     let measure_cube_name = measure_name.split(".").next().unwrap();
                                     if let Some(((_, cube_alias), _)) = alias_to_cube

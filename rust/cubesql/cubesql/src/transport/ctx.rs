@@ -148,13 +148,12 @@ impl MetaContext {
         }
     }
 
-    pub fn find_measure_with_name(&self, name: String) -> Option<CubeMetaMeasure> {
-        let cube_and_member_name = name.split(".").collect::<Vec<_>>();
-        if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0]) {
-            cube.lookup_measure(cube_and_member_name[1]).cloned()
-        } else {
-            None
-        }
+    pub fn find_measure_with_name(&self, name: &str) -> Option<&CubeMetaMeasure> {
+        let mut cube_and_member_name = name.split(".");
+        let cube_name = cube_and_member_name.next()?;
+        let member_name = cube_and_member_name.next()?;
+        let cube = self.find_cube_with_name(cube_name)?;
+        cube.lookup_measure(member_name)
     }
 
     pub fn find_dimension_with_name(&self, name: String) -> Option<CubeMetaDimension> {
