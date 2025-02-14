@@ -38,7 +38,9 @@ use crate::{
     CubeError,
 };
 use cubeclient::models::{
-    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+    V1LoadRequestQuery, V1LoadRequestQueryFilterBase, V1LoadRequestQueryFilterItem,
+    V1LoadRequestQueryFilterLogicalAnd, V1LoadRequestQueryFilterLogicalOr,
+    V1LoadRequestQueryTimeDimension,
 };
 use datafusion::{
     arrow::datatypes::{DataType, TimeUnit},
@@ -1771,18 +1773,14 @@ impl LanguageToLogicalPlanConverter {
                                 )?;
                                 match op.as_str() {
                                     "and" => {
-                                        result.push(V1LoadRequestQueryFilterItem {
-                                            member: None,
-                                            operator: None,
-                                            values: None,
-                                            or: None,
+                                        result.push(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalAnd(Box::new(V1LoadRequestQueryFilterLogicalAnd {
                                             and: Some(
                                                 filters
                                                     .into_iter()
                                                     .map(|f| serde_json::json!(f))
                                                     .collect(),
                                             ),
-                                        });
+                                        })));
                                         segments_result.extend(segments);
 
                                         if change_user.is_some() {
@@ -1790,18 +1788,14 @@ impl LanguageToLogicalPlanConverter {
                                         }
                                     }
                                     "or" => {
-                                        result.push(V1LoadRequestQueryFilterItem {
-                                            member: None,
-                                            operator: None,
-                                            values: None,
+                                        result.push(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(V1LoadRequestQueryFilterLogicalOr {
                                             or: Some(
                                                 filters
                                                     .into_iter()
                                                     .map(|f| serde_json::json!(f))
                                                     .collect(),
                                             ),
-                                            and: None,
-                                        });
+                                        })));
                                         if !segments.is_empty() {
                                             return Err(CubeError::internal(
                                                 "Can't use OR operator with segments".to_string(),
@@ -1843,17 +1837,19 @@ impl LanguageToLogicalPlanConverter {
                                         query_time_dimensions.push(dimension);
                                     }
                                 } else {
-                                    result.push(V1LoadRequestQueryFilterItem {
-                                        member: Some(member),
-                                        operator: Some(op),
-                                        values: if !values.is_empty() {
-                                            Some(values)
-                                        } else {
-                                            None
-                                        },
-                                        or: None,
-                                        and: None,
-                                    });
+                                    result.push(
+                                        V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                            Box::new(V1LoadRequestQueryFilterBase {
+                                                member: Some(member),
+                                                operator: Some(op),
+                                                values: if !values.is_empty() {
+                                                    Some(values)
+                                                } else {
+                                                    None
+                                                },
+                                            }),
+                                        ),
+                                    );
                                 }
                             }
                             LogicalPlanLanguage::SegmentMember(params) => {
