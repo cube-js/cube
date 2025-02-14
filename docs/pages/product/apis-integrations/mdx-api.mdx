@@ -36,14 +36,16 @@ While the MDX API is in preview, your Cube account team will enable and configur
 
 </WarningBox>
 
-If you wish to enable or disable the MDX API on a specific deployment,
-go to <Btn>Settings</Btn> in the Cube Cloud sidebar, then <Btn>Configuration</Btn>,
-and then toggle the <Btn>Enable MDX API</Btn> option.
+To enable or disable the MDX API on a specific deployment, go to <Btn>Settings</Btn>
+in the Cube Cloud sidebar, then <Btn>Configuration</Btn>, and then toggle the
+<Btn>Enable MDX API</Btn> option.
 
 ## Using MDX API with Excel
 
 <InfoBox>
-  Please note that only the [views](/reference/data-model/view) will be available for connections via MDX API
+
+The MDX API works only with [views][ref-views], not cubes.
+
 </InfoBox>
 
 The following section describes Excel-specific configuration options.
@@ -176,3 +178,4 @@ Authentication and authorization work the same as for the [SQL API](/product/api
 [ref-cube-cloud-for-excel]: /product/apis-integrations/microsoft-excel
 [ref-hierarchies]: /reference/data-model/hierarchies
 [ref-folders]: /reference/data-model/view#folders
+[ref-views]: /product/data-modeling/concepts#views
