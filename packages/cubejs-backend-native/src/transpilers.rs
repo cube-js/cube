@@ -8,22 +8,12 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Default, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TransformMetaData {
     pub cube_names: HashSet<String>,
     pub cube_symbols: HashMap<String, HashMap<String, bool>>,
     pub context_symbols: HashMap<String, String>,
-}
-
-impl Default for TransformMetaData {
-    fn default() -> Self {
-        Self {
-            cube_names: HashSet::new(),
-            cube_symbols: HashMap::new(),
-            context_symbols: HashMap::new(),
-        }
-    }
 }
 
 #[derive(Deserialize, Clone, Debug)]
