@@ -81,8 +81,6 @@ pub fn transpile_js(mut cx: FunctionContext) -> JsResult<JsPromise> {
         Err(err) => return cx.throw_error(err.to_string()),
     };
 
-    println!("\ntransform_config {:?}\n", transform_config);
-
     let promise = cx
         .task(move || run_transpilers(content, transform_config))
         .promise(move |mut cx, res| match res {
