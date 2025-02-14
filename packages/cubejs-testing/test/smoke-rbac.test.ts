@@ -198,6 +198,28 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  describe('RBAC via SQL changing users', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('restricted', 'restricted_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('Switching user should allow more members to be visible', async () => {
+      const resDefault = await connection.query('SELECT * FROM line_items limit 10');
+      expect(resDefault.rows).toMatchSnapshot('line_items_default');
+
+      await connection.query('SET USER=admin');
+
+      const resAdmin = await connection.query('SELECT * FROM line_items limit 10');
+      expect(resAdmin.rows).toMatchSnapshot('line_items');
+    });
+  });
+
   describe('RBAC via REST API', () => {
     let client: CubeApi;
     let defaultClient: CubeApi;

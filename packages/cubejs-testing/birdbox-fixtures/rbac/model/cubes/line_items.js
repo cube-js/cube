@@ -61,6 +61,12 @@ cube('line_items', {
       },
     },
     {
+      role: 'restricted',
+      memberLevel: {
+        excludes: ['count', 'price', 'price_dim'],
+      },
+    },
+    {
       role: 'admin',
       conditions: [
         {
