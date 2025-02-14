@@ -96,11 +96,11 @@ impl MetaContext {
         self.cubes.iter().find(|&cube| cube.name == name)
     }
 
-    pub fn find_cube_by_column(
-        &self,
-        alias_to_cube: &Vec<(String, String)>,
+    pub fn find_cube_by_column<'meta, 'alias>(
+        &'meta self,
+        alias_to_cube: &'alias Vec<(String, String)>,
         column: &Column,
-    ) -> Option<(String, &CubeMeta)> {
+    ) -> Option<(&'alias str, &'meta CubeMeta)> {
         (if let Some(rel) = column.relation.as_ref() {
             alias_to_cube.iter().find(|(a, _)| a == rel)
         } else {
@@ -112,24 +112,21 @@ impl MetaContext {
                 }
             })
         })
-        .and_then(|(a, c)| {
-            self.find_cube_with_name(c)
-                .map(|cube| (a.to_string(), cube))
-        })
+        .and_then(|(a, c)| self.find_cube_with_name(c).map(|cube| (a.as_str(), cube)))
     }
 
-    pub fn find_cube_by_column_for_replacer(
+    pub fn find_cube_by_column_for_replacer<'alias>(
         &self,
-        alias_to_cube: &Vec<((String, String), String)>,
+        alias_to_cube: &'alias Vec<((String, String), String)>,
         column: &Column,
-    ) -> Vec<((String, String), &CubeMeta)> {
+    ) -> Vec<((&'alias str, &'alias str), &CubeMeta)> {
         if let Some(rel) = column.relation.as_ref() {
             alias_to_cube
                 .iter()
                 .filter_map(|((old, new), c)| {
                     if old == rel {
                         self.find_cube_with_name(c)
-                            .map(|cube| ((old.to_string(), new.to_string()), cube))
+                            .map(|cube| ((old.as_str(), new.as_str()), cube))
                     } else {
                         None
                     }
@@ -141,7 +138,7 @@ impl MetaContext {
                 .filter_map(|((old, new), c)| {
                     if let Some(cube) = self.find_cube_with_name(c) {
                         if cube.contains_member(&cube.member_name(&column.name)) {
-                            return Some(((old.to_string(), new.to_string()), cube));
+                            return Some(((old.as_str(), new.as_str()), cube));
                         }
                     }
 

@@ -2309,7 +2309,7 @@ impl MemberRules {
                                                 call_agg_type,
                                                 alias,
                                                 measure_out_var,
-                                                cube_alias,
+                                                cube_alias.to_string(),
                                                 subst[aggr_expr_var],
                                                 alias_to_cube,
                                                 disable_strict_agg_type_match,
