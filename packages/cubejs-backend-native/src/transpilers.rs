@@ -39,6 +39,8 @@ pub fn transpile_js(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let deserializer = JsValueDeserializer::new(&mut cx, transform_data_js_object);
     let transform_request_config = TransformRequestConfig::deserialize(deserializer);
 
+    println!("\ntransform_config {:?}\n", transform_config);
+
     let promise = cx
         .task(move || {
             let transform_config: TransformConfig = match transform_request_config {
