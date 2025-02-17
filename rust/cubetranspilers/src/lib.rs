@@ -5,8 +5,8 @@ use crate::validation_transpiler::ValidationTransformVisitor;
 use anyhow::{anyhow, Result};
 use error_reporter::ErrorReporter;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 use swc_core::common::errors::{Handler, HandlerFlags};
 use swc_core::common::input::StringInput;
 use swc_core::common::sync::{Lrc, OnceCell};
@@ -57,7 +57,7 @@ pub fn run_transpilers(
 ) -> Result<TransformResult> {
     let sm: Lrc<SourceMap> = Default::default();
     let sf = sm.new_source_file(
-        Lrc::new(FileName::Custom(transform_config.file_name)),
+        Arc::new(FileName::Custom(transform_config.file_name)),
         sources,
     );
 
@@ -83,8 +83,8 @@ pub fn run_transpilers(
         source_file: sm_cell,
     };
 
-    let errors = RefCell::new(Vec::new());
-    let warnings = RefCell::new(Vec::new());
+    let errors = Arc::new(Mutex::new(Vec::new()));
+    let warnings = Arc::new(Mutex::new(Vec::new()));
 
     let reporter = Box::new(ErrorReporter::new(errors.clone(), warnings.clone()));
     let handler = Handler::with_emitter_and_flags(
@@ -127,8 +127,8 @@ pub fn run_transpilers(
         });
 
     let output_code = generate_code(&program, &sm)?;
-    let errors = errors.borrow().clone();
-    let warnings = warnings.borrow().clone();
+    let errors = errors.lock().unwrap().clone();
+    let warnings = warnings.lock().unwrap().clone();
 
     Ok(TransformResult {
         code: output_code,
