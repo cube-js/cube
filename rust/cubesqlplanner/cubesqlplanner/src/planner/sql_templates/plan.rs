@@ -1,7 +1,7 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
-use convert_case::{Case, Casing};
+use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
 use std::rc::Rc;
@@ -17,7 +17,12 @@ impl PlanSqlTemplates {
     }
 
     pub fn alias_name(name: &str) -> String {
-        name.to_case(Case::Snake).replace(".", "__")
+        let res = name
+            .from_case(Case::Camel)
+            .without_boundaries(&[Boundary::LOWER_DIGIT, Boundary::UPPER_DIGIT])
+            .to_case(Case::Snake)
+            .replace(".", "__");
+        res
     }
 
     pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
