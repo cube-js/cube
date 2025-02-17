@@ -7,7 +7,7 @@ use neon::prelude::{JsPromise, JsResult, JsValue, NeonResult};
 use neon::types::JsString;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use std::sync::RwLock;
+use std::sync::{LazyLock, RwLock};
 
 #[derive(Deserialize, Default, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -22,10 +22,12 @@ pub struct TransformMetaData {
 pub struct TransformRequestConfig {
     pub file_name: String,
     pub transpilers: Vec<Transpilers>,
+    pub compiler_id: String,
     pub meta_data: Option<TransformMetaData>,
 }
 
-static METADATA_CACHE: RwLock<Option<TransformMetaData>> = RwLock::new(None);
+static METADATA_CACHE: LazyLock<RwLock<HashMap<String, TransformMetaData>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("transpileJs", transpile_js)?;
@@ -57,17 +59,27 @@ pub fn transpile_js(mut cx: FunctionContext) -> JsResult<JsPromise> {
                             cube_symbols: cache.cube_symbols.clone(),
                             context_symbols: cache.context_symbols.clone(),
                         };
-                        *config_lock = Some(cache);
+                        config_lock.insert(data.compiler_id.clone(), cache);
                         cfg
                     }
                     None => {
-                        let cache = METADATA_CACHE.read().unwrap().clone().unwrap_or_default();
-                        TransformConfig {
-                            file_name: data.file_name,
-                            transpilers: data.transpilers,
-                            cube_names: cache.cube_names.clone(),
-                            cube_symbols: cache.cube_symbols.clone(),
-                            context_symbols: cache.context_symbols.clone(),
+                        let cache = METADATA_CACHE.read().unwrap();
+
+                        match cache.get(&data.compiler_id) {
+                            Some(cached) => TransformConfig {
+                                file_name: data.file_name,
+                                transpilers: data.transpilers,
+                                cube_names: cached.cube_names.clone(),
+                                cube_symbols: cached.cube_symbols.clone(),
+                                context_symbols: cached.context_symbols.clone(),
+                            },
+                            None => TransformConfig {
+                                file_name: data.file_name,
+                                transpilers: data.transpilers,
+                                cube_names: HashSet::new(),
+                                cube_symbols: HashMap::new(),
+                                context_symbols: HashMap::new(),
+                            },
                         }
                     }
                 },
