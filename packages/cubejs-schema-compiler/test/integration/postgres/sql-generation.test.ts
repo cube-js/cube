@@ -3118,4 +3118,49 @@ describe('SQL Generation', () => {
       [{ visitors__id_case: 0 }]
     );
   });
+
+  it('patched measure expression', async () => {
+    await runQueryTest(
+      {
+        measures: [
+          'visitors.revenue',
+          'visitors.visitor_revenue',
+          {
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'visitors.revenue',
+              replaceAggregationType: 'max',
+              addFilters: [],
+            },
+            cubeName: 'visitors',
+            name: 'max_revenue',
+            // TODO
+            definition: 'TODO fill me for max_revenue',
+          },
+          {
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'visitors.revenue',
+              replaceAggregationType: null,
+              addFilters: [
+                {
+                  sql: (visitors) => `${visitors.source} IN ('google', 'some')`,
+                },
+              ],
+            },
+            cubeName: 'visitors',
+            name: 'google_revenue',
+            // TODO
+            definition: 'TODO fill me for google_revenue',
+          },
+        ],
+      },
+      [{
+        visitors__revenue: '2000',
+        visitors__visitor_revenue: '300',
+        visitors__max_revenue: 500,
+        visitors__google_revenue: '600',
+      }]
+    );
+  });
 });
