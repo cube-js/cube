@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use common::{generate_code, TestEmitter};
 use cubetranspilers::import_export_transpiler::*;
+use insta::assert_snapshot;
 use swc_core::ecma::ast::{EsVersion, Program};
 use swc_core::{
     common::{
@@ -56,16 +57,8 @@ fn test_export_default_declaration() {
 
     let output_code = generate_code(&program, &cm);
 
-    assert!(
-        output_code.contains("setExport(function()"),
-        "Output code should contain setExport call, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("console.log('exported function')"),
-        "Output code should contain func body, got:\n{}",
-        output_code
-    );
+    assert_snapshot!("export_default_declaration", output_code);
+
     let diags = diagnostics.lock().unwrap();
     assert!(
         diags.is_empty(),
@@ -112,11 +105,8 @@ fn test_export_default_expression() {
 
     let output_code = generate_code(&program, &cm);
 
-    assert!(
-        output_code.contains("setExport(myVar)"),
-        "Output code should contain setExport call, got:\n{}",
-        output_code
-    );
+    assert_snapshot!("export_default_expression", output_code);
+
     let diags = diagnostics.lock().unwrap();
     assert!(
         diags.is_empty(),
@@ -163,26 +153,7 @@ fn test_export_const_expression() {
 
     let output_code = generate_code(&program, &cm);
 
-    assert!(
-        output_code.contains("const sql = (input)=>intput + 5;"),
-        "Output code should contain original single const definition, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("addExport({\n    sql: sql\n})"),
-        "Output code should contain addExport call, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("const a1 = 5, a2 = ()=>111, a3 = (inputA3)=>inputA3 + \"Done\""),
-        "Output code should contain original multiple const definitions, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("addExport({\n    a1: a1,\n    a2: a2,\n    a3: a3\n})"),
-        "Output code should contain addExport call, got:\n{}",
-        output_code
-    );
+    assert_snapshot!("export_const_expression", output_code);
 
     let diags = diagnostics.lock().unwrap();
     assert!(
@@ -231,26 +202,9 @@ fn test_import_named_default() {
     program.visit_mut_with(&mut visitor);
 
     let output_code = generate_code(&program, &cm);
-    assert!(
-        output_code.contains("const"),
-        "Output code should contain a const declaration, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("def = require(\"module\")"),
-        "Output code should contain 'def', got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("foo = require(\"module\").foo"),
-        "Output code should contain 'foo', got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("baz = require(\"module\").bar"),
-        "Output code should contain 'baz', got:\n{}",
-        output_code
-    );
+
+    assert_snapshot!("import_named_default", output_code);
+
     let diags = diagnostics.lock().unwrap();
     assert!(
         diags.is_empty(),
@@ -347,21 +301,9 @@ fn test_export_named() {
     program.visit_mut_with(&mut visitor);
 
     let output_code = generate_code(&program, &cm);
-    assert!(
-        output_code.contains("addExport"),
-        "Output code should contain addExport call, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("foo: foo"),
-        "Output code should contain 'foo', got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("baz: bar"),
-        "Output code should contain 'baz', got:\n{}",
-        output_code
-    );
+
+    assert_snapshot!("export_named", output_code);
+
     let diags = diagnostics.lock().unwrap();
     assert!(
         diags.is_empty(),
@@ -407,16 +349,9 @@ fn test_export_default_ts_interface() {
 
     let output_code = generate_code(&program, &cm);
     // When exporting a TS interface, setExport is called with null as a fallback.
-    assert!(
-        output_code.contains("setExport"),
-        "Output code should contain setExport call, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("null"),
-        "Output code should contain 'null' fallback, got:\n{}",
-        output_code
-    );
+
+    assert_snapshot!("export_default_ts_interface", output_code);
+
     let diags = diagnostics.lock().unwrap();
     let errors: Vec<_> = diags
         .iter()
