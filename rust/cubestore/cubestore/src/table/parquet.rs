@@ -7,12 +7,14 @@ use datafusion::arrow::array::ArrayRef;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
+use datafusion::parquet::file::metadata::KeyValue;
 use datafusion::parquet::file::properties::{
     WriterProperties, WriterPropertiesBuilder, WriterVersion,
 };
 use datafusion::physical_plan::parquet::{MetadataCacheFactory, ParquetMetadataCache};
 use std::fs::File;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {
     fn cache(self: &Self) -> Arc<dyn ParquetMetadataCache>;
@@ -130,12 +132,20 @@ impl ParquetTableStore {
     }
 
     pub async fn writer_props(&self, table: &IdRow<Table>) -> Result<WriterProperties, CubeError> {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH);
+        let created_at_key_value = KeyValue::new(
+            "created_at".to_string(),
+            now?.as_secs().to_string(),
+        );
+        let mut metadata = Vec::new();
+        metadata.push(created_at_key_value);
         self.metadata_cache_factory
             .build_writer_props(
                 table,
                 WriterProperties::builder()
                     .set_max_row_group_size(self.row_group_size)
-                    .set_writer_version(WriterVersion::PARQUET_2_0),
+                    .set_writer_version(WriterVersion::PARQUET_2_0)
+                    .set_key_value_metadata(Some(metadata)),
             )
             .await
             .map_err(CubeError::from)
