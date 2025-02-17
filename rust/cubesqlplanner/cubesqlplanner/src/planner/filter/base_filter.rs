@@ -9,6 +9,10 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::rc::Rc;
 
+const FROM_PARTITION_RANGE: &'static str = "__FROM_PARTITION_RANGE";
+
+const TO_PARTITION_RANGE: &'static str = "__TO_PARTITION_RANGE";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FilterType {
     Dimension,
@@ -393,7 +397,7 @@ impl BaseFilter {
             let from = if let Some(from_str) = &self.values[0] {
                 let from = self.format_from_date(&from_str)?;
 
-                if use_db_time_zone {
+                if use_db_time_zone && &from != FROM_PARTITION_RANGE {
                     self.query_tools.base_tools().in_db_time_zone(from)?
                 } else {
                     from
@@ -407,7 +411,7 @@ impl BaseFilter {
             let to = if let Some(to_str) = &self.values[1] {
                 let to = self.format_to_date(&to_str)?;
 
-                if use_db_time_zone {
+                if use_db_time_zone && &to != TO_PARTITION_RANGE {
                     self.query_tools.base_tools().in_db_time_zone(to)?
                 } else {
                     to
