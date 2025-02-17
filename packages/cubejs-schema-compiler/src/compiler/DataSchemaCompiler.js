@@ -129,12 +129,12 @@ export class DataSchemaCompiler {
               )],
             ),
         );
+
+        // Transpilers are the same for all files within phase.
+        transpilerNames = this.transpilers.map(t => t.constructor.name);
       }
 
       if (transpilationNative) {
-        // Transpilers are the same for all files within phase.
-        transpilerNames = this.transpilers.map(t => t.constructor.name);
-
         // Warming up swc compiler cache
         const dummyFile = {
           fileName: 'dummy.js',
@@ -145,7 +145,7 @@ export class DataSchemaCompiler {
 
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
       } else if (transpilationWorkerThreads) {
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols })));
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       } else {
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
       }
@@ -245,7 +245,7 @@ export class DataSchemaCompiler {
         const data = {
           fileName: file.fileName,
           content: file.content,
-          transpilers: this.transpilers.map(t => t.constructor.name),
+          transpilers: transpilerNames,
           cubeNames,
           cubeSymbols,
         };
