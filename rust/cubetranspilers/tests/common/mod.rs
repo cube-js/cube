@@ -16,6 +16,7 @@ impl Emitter for TestEmitter {
     }
 }
 
+#[allow(dead_code)]
 pub fn generate_code(program: &Program, cm: &Lrc<SourceMap>) -> String {
     let mut buf = vec![];
     {
