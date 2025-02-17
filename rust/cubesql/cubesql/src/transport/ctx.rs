@@ -104,6 +104,7 @@ impl MetaContext {
         } else {
             alias_to_cube.iter().find(|(_, c)| {
                 if let Some(cube) = self.find_cube_with_name(c) {
+                    // TODO replace cube.contains_member(&cube.member_name(...)) with searching by prepared column names
                     cube.contains_member(&cube.member_name(&column.name))
                 } else {
                     false
@@ -135,6 +136,7 @@ impl MetaContext {
                 .iter()
                 .filter_map(|((old, new), c)| {
                     if let Some(cube) = self.find_cube_with_name(c) {
+                        // TODO replace cube.contains_member(&cube.member_name(...)) with searching by prepared column names
                         if cube.contains_member(&cube.member_name(&column.name)) {
                             return Some(((old.as_str(), new.as_str()), cube));
                         }
