@@ -79,17 +79,15 @@ impl MetaContext {
         &self,
         alias_to_cube: &Vec<(String, String)>,
     ) -> Option<Arc<dyn SqlGenerator + Send + Sync>> {
-        let data_sources = alias_to_cube
+        let data_source = alias_to_cube
             .iter()
             .map(|(_, c)| self.cube_to_data_source.get(c))
-            .unique()
-            .collect::<Option<Vec<_>>>()?;
-        if data_sources.len() != 1 {
-            return None;
-        }
-        self.data_source_to_sql_generator
-            .get(data_sources[0].as_str())
-            .cloned()
+            .all_equal_value();
+
+        // Don't care for non-equal data sources, nor for missing cube_to_data_source keys
+        let data_source = data_source.ok()??;
+
+        self.data_source_to_sql_generator.get(data_source).cloned()
     }
 
     pub fn find_cube_with_name(&self, name: &str) -> Option<&CubeMeta> {
