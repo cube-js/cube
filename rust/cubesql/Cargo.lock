@@ -579,7 +579,7 @@ dependencies = [
  "ciborium",
  "clap",
  "criterion-plot",
- "itertools",
+ "itertools 0.10.3",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -600,7 +600,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.10.3",
 ]
 
 [[package]]
@@ -766,7 +766,7 @@ dependencies = [
  "hashbrown 0.14.3",
  "indexmap 1.9.3",
  "insta",
- "itertools",
+ "itertools 0.14.0",
  "log",
  "lru",
  "minijinja",
@@ -853,7 +853,7 @@ dependencies = [
  "datafusion-physical-expr",
  "futures",
  "hashbrown 0.12.1",
- "itertools",
+ "itertools 0.10.3",
  "lazy_static",
  "log",
  "num_cpus",
@@ -1518,6 +1518,15 @@ name = "itertools"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]
