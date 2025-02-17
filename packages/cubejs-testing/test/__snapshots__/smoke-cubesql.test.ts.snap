@@ -378,3 +378,13 @@ Array [
   },
 ]
 `;
+
+exports[`SQL API Postgres (Data) wrapper with duplicated members: wrapper-duplicated-members 1`] = `
+Array [
+  Object {
+    "bar": "shipped",
+    "bar_expr": "0",
+    "foo": "shipped",
+  },
+]
+`;
