@@ -6,6 +6,7 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
+import workerpool from 'workerpool';
 
 import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { transpileJs } from '@cubejs-backend/native';
@@ -94,16 +95,32 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
+    const transpilationWorkerThreads = getEnv('transpilationWorkerThreads');
+    const transpilationNative = getEnv('transpilationNative');
+
+    if (!transpilationNative && transpilationWorkerThreads) {
+      const wc = getEnv('transpilationWorkerThreadsCount');
+      this.workerPool = workerpool.pool(
+        path.join(__dirname, 'transpilers/transpiler_worker'),
+        wc > 0 ? { maxWorkers: wc } : undefined,
+      );
+    }
+
     const transpile = async () => {
       let cubeNames;
       let cubeSymbols;
       let transpilerNames;
+      let results;
 
-      if (getEnv('transpilationWorkerThreads')) {
+      if (transpilationNative || transpilationWorkerThreads) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
         // We need only cubes and all its member names for transpiling.
         // Cubes doesn't change during transpiling, but are changed during compilation phase,
         // so we can prepare them once for every phase.
+        // Communication between main and worker threads uses
+        // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
+        // which doesn't allow passing any function objects, so we need to sanitize the symbols.
+        // Communication with native backend also involves deserialization.
         cubeSymbols = Object.fromEntries(
           Object.entries(this.cubeSymbols.symbols)
             .map(
@@ -112,7 +129,9 @@ export class DataSchemaCompiler {
               )],
             ),
         );
+      }
 
+      if (transpilationNative) {
         // Transpilers are the same for all files within phase.
         transpilerNames = this.transpilers.map(t => t.constructor.name);
 
@@ -123,9 +142,14 @@ export class DataSchemaCompiler {
         };
 
         await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS });
+
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
+      } else if (transpilationWorkerThreads) {
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols })));
+      } else {
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
       }
 
-      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
       return results.filter(f => !!f);
     };
 
@@ -141,7 +165,7 @@ export class DataSchemaCompiler {
         contextCompilers: this.contextCompilers,
       }))
       .then(() => {
-        if (getEnv('transpilationWorkerThreads')) {
+        if (transpilationNative) {
           // Clean up cache
           const dummyFile = {
             fileName: 'terminate.js',
@@ -149,6 +173,8 @@ export class DataSchemaCompiler {
           };
 
           return this.transpileJsFile(dummyFile, errorsReport, { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {} });
+        } else if (transpilationWorkerThreads && this.workerPool) {
+          this.workerPool.terminate();
         }
 
         return Promise.resolve();
@@ -195,7 +221,7 @@ export class DataSchemaCompiler {
 
   async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames }) {
     try {
-      if (getEnv('transpilationWorkerThreads')) {
+      if (getEnv('transpilationNative')) {
         const reqData = {
           fileName: file.fileName,
           transpilers: transpilerNames,
@@ -215,6 +241,20 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         return Object.assign({}, file, { content: res.code });
+      } else if (getEnv('transpilationWorkerThreads')) {
+        const data = {
+          fileName: file.fileName,
+          content: file.content,
+          transpilers: this.transpilers.map(t => t.constructor.name),
+          cubeNames,
+          cubeSymbols,
+        };
+
+        const res = await this.workerPool.exec('transpile', [data]);
+        errorsReport.addErrors(res.errors);
+        errorsReport.addWarnings(res.warnings);
+
+        return Object.assign({}, file, { content: res.content });
       } else {
         const ast = parse(
           file.content,

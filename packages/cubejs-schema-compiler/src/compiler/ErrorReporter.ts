@@ -108,7 +108,7 @@ export class ErrorReporter {
   }
 
   public error(e: any, fileName?: any, lineNumber?: any, position?: any) {
-    const message = `${this.context.length ? `${this.context.join(' -> ')}: ` : ''}${e instanceof UserError ? e.message : (e.stack || e)}`;
+    const message = `${this.context.length ? `${this.context.join(' -> ')}: ` : ''}${e.message ? e.message : (e.stack || e)}`;
     if (this.rootReporter().errors.find(m => (m.message || m) === message)) {
       return;
     }
