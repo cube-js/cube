@@ -101,6 +101,7 @@ export type SQLInterfaceOptions = {
 export interface TransformConfig {
   fileName: string;
   transpilers: string[];
+  compilerId: string;
   metaData?: {
     cubeNames: string[];
     cubeSymbols: Record<string, Record<string, boolean>>;

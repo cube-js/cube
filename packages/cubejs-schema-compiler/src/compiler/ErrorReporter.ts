@@ -3,6 +3,12 @@ import { codeFrameColumns, SourceLocation } from '@babel/code-frame';
 import { UserError } from './UserError';
 import { CompileError } from './CompileError';
 
+export type ErrorLikeObject = {
+  message: string;
+};
+
+export type PossibleError = Error | UserError | string | ErrorLikeObject;
+
 export interface CompilerErrorInterface {
   message: string;
   plainMessage?: string
@@ -141,7 +147,7 @@ export class ErrorReporter {
     return this.rootReporter().errors;
   }
 
-  public addErrors(errors: CompilerErrorInterface[]) {
+  public addErrors(errors: PossibleError[]) {
     errors.forEach((e: any) => { this.error(e); });
   }
 
@@ -149,7 +155,7 @@ export class ErrorReporter {
     return this.rootReporter().warnings;
   }
 
-  public addWarnings(warnings: any[]) {
+  public addWarnings(warnings: SyntaxErrorInterface[]) {
     warnings.forEach((w: any) => { this.warning(w); });
   }
 

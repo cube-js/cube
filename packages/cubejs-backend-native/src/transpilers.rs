@@ -1,14 +1,16 @@
-@@ -0,0 +1,91 @@
 use crate::node_obj_deserializer::JsValueDeserializer;
 use crate::node_obj_serializer::NodeObjSerializer;
 use anyhow::anyhow;
 use cubetranspilers::{run_transpilers, TransformConfig, Transpilers};
+use lru::LruCache;
 use neon::context::{Context, FunctionContext, ModuleContext};
 use neon::prelude::{JsPromise, JsResult, JsValue, NeonResult};
 use neon::types::JsString;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use std::sync::RwLock;
+use std::env;
+use std::num::NonZeroUsize;
+use std::sync::{LazyLock, Mutex};
 
 #[derive(Deserialize, Default, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -23,10 +25,25 @@ pub struct TransformMetaData {
 pub struct TransformRequestConfig {
     pub file_name: String,
     pub transpilers: Vec<Transpilers>,
+    pub compiler_id: String,
     pub meta_data: Option<TransformMetaData>,
 }
 
-static METADATA_CACHE: RwLock<Option<TransformMetaData>> = RwLock::new(None);
+/// It should be equal or more then number of internal libuv threads used by Neon
+/// By 01.2025 it defaults to 4. But maybe changed via `UV_THREADPOOL_SIZE` env var.
+/// `CUBEJS_TRANSPILER_METADATA_CACHE_SIZE` env var is provided for fine tuning.
+/// @see https://docs.libuv.org/en/v1.x/threadpool.html
+/// @see https://nodejs.org/api/cli.html#cli_uv_threadpool_size_size
+static DEFAULT_CACHE_SIZE: usize = 16;
+
+static METADATA_CACHE: LazyLock<Mutex<LruCache<String, TransformMetaData>>> = LazyLock::new(|| {
+    let cache_size = env::var("CUBEJS_TRANSPILER_METADATA_CACHE_SIZE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .and_then(NonZeroUsize::new)
+        .unwrap_or(NonZeroUsize::new(DEFAULT_CACHE_SIZE).unwrap());
+    Mutex::new(LruCache::new(cache_size))
+});
 
 pub fn register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("transpileJs", transpile_js)?;
@@ -45,7 +62,7 @@ pub fn transpile_js(mut cx: FunctionContext) -> JsResult<JsPromise> {
             let transform_config: TransformConfig = match transform_request_config {
                 Ok(data) => match data.meta_data {
                     Some(meta_data) => {
-                        let mut config_lock = METADATA_CACHE.write().unwrap();
+                        let mut config_lock = METADATA_CACHE.lock().unwrap();
                         let cache = TransformMetaData {
                             cube_names: meta_data.cube_names,
                             cube_symbols: meta_data.cube_symbols,
@@ -58,17 +75,27 @@ pub fn transpile_js(mut cx: FunctionContext) -> JsResult<JsPromise> {
                             cube_symbols: cache.cube_symbols.clone(),
                             context_symbols: cache.context_symbols.clone(),
                         };
-                        *config_lock = Some(cache);
+                        config_lock.put(data.compiler_id.clone(), cache);
                         cfg
                     }
                     None => {
-                        let cache = METADATA_CACHE.read().unwrap().clone().unwrap_or_default();
-                        TransformConfig {
-                            file_name: data.file_name,
-                            transpilers: data.transpilers,
-                            cube_names: cache.cube_names.clone(),
-                            cube_symbols: cache.cube_symbols.clone(),
-                            context_symbols: cache.context_symbols.clone(),
+                        let mut config_lock = METADATA_CACHE.lock().unwrap();
+
+                        match config_lock.get(&data.compiler_id) {
+                            Some(cached) => TransformConfig {
+                                file_name: data.file_name,
+                                transpilers: data.transpilers,
+                                cube_names: cached.cube_names.clone(),
+                                cube_symbols: cached.cube_symbols.clone(),
+                                context_symbols: cached.context_symbols.clone(),
+                            },
+                            None => TransformConfig {
+                                file_name: data.file_name,
+                                transpilers: data.transpilers,
+                                cube_names: HashSet::new(),
+                                cube_symbols: HashMap::new(),
+                                context_symbols: HashMap::new(),
+                            },
                         }
                     }
                 },

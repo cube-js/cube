@@ -44,6 +44,7 @@ export class DataSchemaCompiler {
     this.yamlCompiler.dataSchemaCompiler = this;
     this.pythonContext = null;
     this.workerPool = null;
+    this.compilerId = options.compilerId;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -95,6 +96,7 @@ export class DataSchemaCompiler {
 
     const transpilationWorkerThreads = getEnv('transpilationWorkerThreads');
     const transpilationNative = getEnv('transpilationNative');
+    const { compilerId } = this;
 
     if (!transpilationNative && transpilationWorkerThreads) {
       const wc = getEnv('transpilationWorkerThreadsCount');
@@ -138,9 +140,9 @@ export class DataSchemaCompiler {
           content: ';',
         };
 
-        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS });
+        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId });
 
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId })));
       } else if (transpilationWorkerThreads) {
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       } else {
@@ -166,7 +168,11 @@ export class DataSchemaCompiler {
             content: ';',
           };
 
-          return this.transpileJsFile(dummyFile, errorsReport, { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {} });
+          return this.transpileJsFile(
+            dummyFile,
+            errorsReport,
+            { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId }
+          );
         } else if (transpilationWorkerThreads && this.workerPool) {
           this.workerPool.terminate();
         }
@@ -213,12 +219,13 @@ export class DataSchemaCompiler {
     }
   }
 
-  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames }) {
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId }) {
     try {
       if (getEnv('transpilationNative')) {
         const reqData = {
           fileName: file.fileName,
           transpilers: transpilerNames,
+          compilerId,
           ...(cubeNames && {
             metaData: {
               cubeNames,
