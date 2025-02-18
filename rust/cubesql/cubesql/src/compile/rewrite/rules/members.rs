@@ -2166,7 +2166,7 @@ impl MemberRules {
                             .cloned()
                             {
                                 if let Some(measure) =
-                                    meta_context.find_measure_with_name(measure_name.to_string())
+                                    meta_context.find_measure_with_name(&measure_name)
                                 {
                                     let measure_cube_name = measure_name.split(".").next().unwrap();
                                     if let Some(((_, cube_alias), _)) = alias_to_cube
@@ -2205,7 +2205,7 @@ impl MemberRules {
                                 }
 
                                 if let Some(dimension) =
-                                    meta_context.find_dimension_with_name(measure_name.to_string())
+                                    meta_context.find_dimension_with_name(&measure_name)
                                 {
                                     let alias_to_cube = alias_to_cube.clone();
                                     subst.insert(
@@ -2309,7 +2309,7 @@ impl MemberRules {
                                                 call_agg_type,
                                                 alias,
                                                 measure_out_var,
-                                                cube_alias,
+                                                cube_alias.to_string(),
                                                 subst[aggr_expr_var],
                                                 alias_to_cube,
                                                 disable_strict_agg_type_match,

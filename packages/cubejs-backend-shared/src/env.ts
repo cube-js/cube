@@ -229,6 +229,10 @@ const variables: Record<string, (...args: any) => any> = {
   transpilationWorkerThreadsCount: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
     .default('0')
     .asInt(),
+  // This one takes precedence over CUBEJS_TRANSPILATION_WORKER_THREADS
+  transpilationNative: () => get('CUBEJS_TRANSPILATION_NATIVE')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *

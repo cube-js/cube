@@ -82,6 +82,13 @@ pub struct GroupingSet {
     pub sub_id: Option<u32>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CompareDateRangeType {
+    Single(Vec<String>),
+    Multi(Vec<Vec<String>>),
+}
+
 // We can do nothing with JS functions here,
 // but to keep DTOs in sync with reality, let's keep it.
 pub type JsFunction = String;
@@ -120,7 +127,7 @@ pub struct ParsedMemberExpression {
 pub struct QueryTimeDimension {
     pub dimension: String,
     pub date_range: Option<Vec<String>>,
-    pub compare_date_range: Option<Vec<String>>,
+    pub compare_date_range: Option<CompareDateRangeType>,
     pub granularity: Option<String>,
 }
 
@@ -161,6 +168,8 @@ pub struct ConfigItem {
     pub drill_members_grouped: Option<DrillMembersGrouped>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub granularities: Option<Vec<GranularityMeta>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub granularity: Option<GranularityMeta>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
