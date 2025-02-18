@@ -1,0 +1,150 @@
+---
+source: tests/cube_prop_ctx_test.rs
+expression: output_code
+---
+cube(`Orders`, {
+    sql: (FILTER_GROUP, FILTER_PARAMS)=>`
+               SELECT *
+                    FROM public.orders
+                    WHERE ${FILTER_GROUP(FILTER_PARAMS.Orders.status.filter('status'))}
+              `,
+    preAggregations: {
+        main_test_range: {
+            measures: (count, rolling_count_month)=>[
+                    count,
+                    rolling_count_month
+                ],
+            dimensions: (status)=>[
+                    status
+                ],
+            timeDimension: (createdAt)=>createdAt,
+            granularity: `day`,
+            partitionGranularity: `month`,
+            refreshKey: {
+                every: `1 day`
+            },
+            buildRangeStart: {
+                sql: ()=>`SELECT '2021-01-01'::DATE`
+            },
+            build_range_end: {
+                sql: ()=>`SELECT '2021-12-31'::DATE`
+            }
+        }
+    },
+    measures: {
+        division_error_test: {
+            sql: (zero_sum)=>`CASE WHEN ${zero_sum} = 0 THEN 1 ELSE 1/${zero_sum} end`,
+            type: `sum`
+        },
+        zero_sum: {
+            sql: ()=>`id`,
+            type: `sum`
+        },
+        rolling_count_month: {
+            sql: ()=>`id`,
+            type: `count`,
+            rollingWindow: {
+                trailing: `1 month`
+            }
+        },
+        count: {
+            type: `count`,
+            drillMembers: (id, createdAt)=>[
+                    id,
+                    createdAt
+                ],
+            meta: {
+                test: 1
+            }
+        },
+        countShipped: {
+            type: `count`,
+            filters: [
+                {
+                    sql: (CUBE)=>`${CUBE}.status = 'shipped'`
+                }
+            ],
+            drillMembers: (id, createdAt)=>[
+                    id,
+                    createdAt
+                ]
+        },
+        maxDate: {
+            type: `max`,
+            sql: (CUBE)=>`${CUBE.completedAt}`
+        }
+    },
+    dimensions: {
+        id: {
+            sql: ()=>`id`,
+            type: `number`,
+            primaryKey: true,
+            shown: true
+        },
+        status: {
+            sql: ()=>`status`,
+            type: `string`
+        },
+        createdAt: {
+            sql: ()=>`created_at`,
+            type: `time`
+        },
+        completedAt: {
+            sql: ()=>`completed_at`,
+            type: `time`
+        },
+        test_boolean: {
+            sql: ()=>`CASE WHEN status = 'completed' THEN TRUE ELSE FALSE END`,
+            type: `boolean`
+        },
+        localTime: {
+            type: 'time',
+            sql: (SQL_UTILS)=>SQL_UTILS.convertTz(`completed_at`)
+        },
+        localYear: {
+            type: 'number',
+            sql: (SQL_UTILS)=>`EXTRACT(year from ${SQL_UTILS.convertTz('completed_at')})`
+        }
+    },
+    segments: {
+        status_completed: {
+            sql: (CUBE)=>`${CUBE}.status = 'completed'`
+        }
+    },
+    accessPolicy: [
+        {
+            role: "*",
+            rowLevel: {
+                allowAll: true
+            }
+        },
+        {
+            role: 'admin',
+            conditions: [
+                {
+                    if: ()=>`true`
+                }
+            ],
+            rowLevel: {
+                filters: [
+                    {
+                        member: (CUBE)=>`${CUBE}.id`,
+                        operator: 'equals',
+                        values: ()=>[
+                                `1`,
+                                `2`,
+                                `3`
+                            ]
+                    }
+                ]
+            },
+            memberLevel: {
+                includes: `*`,
+                excludes: [
+                    `localTime`,
+                    `completedAt`
+                ]
+            }
+        }
+    ]
+});

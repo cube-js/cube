@@ -878,9 +878,7 @@ impl WrapperRules {
                                         &column.name,
                                     )
                                 {
-                                    if let Some(measure) =
-                                        meta.find_measure_with_name(member.to_string())
-                                    {
+                                    if let Some(measure) = meta.find_measure_with_name(member) {
                                         if call_agg_type.is_none()
                                             || measure.is_same_agg_type(
                                                 call_agg_type.as_ref().unwrap(),

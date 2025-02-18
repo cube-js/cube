@@ -1,0 +1,40 @@
+---
+source: tests/cube_prop_ctx_test.rs
+expression: output_code
+---
+cube(`cube1`, {
+    sql: ()=>`SELECT * FROM table`,
+    dimensions: {
+        id: {
+            sql: ()=>`id`,
+            type: `number`,
+            primary_key: true
+        },
+        created_at: {
+            sql: ()=>`created_at`,
+            type: `time`
+        },
+        dim1Number: {
+            sql: ()=>`dim1Number`,
+            type: `number`
+        },
+        dim2Number: {
+            sql: ()=>`dim2Number`,
+            type: `number`
+        }
+    },
+    measures: {
+        count: {
+            type: `count`,
+            sql: ()=>`id`
+        },
+        measureDim1: {
+            sql: ()=>`dim1Number`,
+            type: `max`
+        },
+        measureDim2: {
+            sql: ()=>`dim1Number`,
+            type: `min`
+        }
+    }
+});

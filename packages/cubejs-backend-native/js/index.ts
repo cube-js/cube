@@ -101,6 +101,23 @@ export type SQLInterfaceOptions = {
   gatewayPort?: number,
 };
 
+export interface TransformConfig {
+  fileName: string;
+  transpilers: string[];
+  compilerId: string;
+  metaData?: {
+    cubeNames: string[];
+    cubeSymbols: Record<string, Record<string, boolean>>;
+    contextSymbols: Record<string, string>;
+  }
+}
+
+export interface TransformResponse {
+  code: string;
+  errors: string[];
+  warnings: string[];
+}
+
 export type DBResponsePrimitive =
   null |
   boolean |
@@ -403,6 +420,12 @@ export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[]
   const native = loadNative();
 
   return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
+};
+
+export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+  const native = loadNative();
+
+  return native.transpileJs(content, metadata);
 };
 
 export interface PyConfiguration {
