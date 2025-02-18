@@ -27,6 +27,8 @@ COPY yarn.lock .
 COPY tsconfig.base.json .
 COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
+
+# Backend
 COPY rust/cubesql/package.json rust/cubesql/package.json
 COPY rust/cubestore/package.json rust/cubestore/package.json
 COPY rust/cubestore/bin rust/cubestore/bin
@@ -43,6 +45,7 @@ COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-d
 COPY packages/cubejs-crate-driver/package.json packages/cubejs-crate-driver/package.json
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
+COPY packages/cubejs-duckdb-driver/package.json packages/cubejs-duckdb-driver/package.json
 COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
 COPY packages/cubejs-firebolt-driver/package.json packages/cubejs-firebolt-driver/package.json
 COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/package.json
@@ -67,6 +70,7 @@ COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/pa
 COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
+COPY packages/cubejs-vertica-driver/package.json packages/cubejs-vertica-driver/package.json
 
 # We dont need client libraries
 #COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
@@ -84,28 +88,24 @@ RUN yarn config set network-timeout 120000 -g
 ######################################################################
 # Databricks driver dependencies                                     #
 ######################################################################
-FROM base AS prod_base_dependencies
+FROM base as prod_base_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
-FROM prod_base_dependencies AS prod_dependencies
+FROM prod_base_dependencies as prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
 ######################################################################
 # Build dependencies                                                 #
 ######################################################################
-FROM base AS build_dependencies
+FROM base AS build
 
 RUN yarn install
 
-######################################################################
-# Build layer                                                        #
-######################################################################
-FROM build_dependencies AS build
-
+# Backend
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
@@ -121,6 +121,7 @@ COPY packages/cubejs-clickhouse-driver/ packages/cubejs-clickhouse-driver/
 COPY packages/cubejs-crate-driver/ packages/cubejs-crate-driver/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
+COPY packages/cubejs-duckdb-driver/ packages/cubejs-duckdb-driver/
 COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
 COPY packages/cubejs-firebolt-driver/ packages/cubejs-firebolt-driver/
 COPY packages/cubejs-hive-driver/ packages/cubejs-hive-driver/
@@ -146,6 +147,7 @@ COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
+COPY packages/cubejs-vertica-driver/ packages/cubejs-vertica-driver/
 
 # We dont need client libraries
 #COPY packages/cubejs-templates/ packages/cubejs-templates/
@@ -158,7 +160,8 @@ COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-dri
 #COPY packages/cubejs-playground/ packages/cubejs-playground/
 
 # As we don't need any UI to test drivers, it's enough to transpile ts only.
-RUN yarn lerna run tsc
+RUN yarn lerna run build
+
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
 ######################################################################
@@ -177,7 +180,7 @@ COPY --from=prod_dependencies /cubejs .
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
-ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
+ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 

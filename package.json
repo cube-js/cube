@@ -64,6 +64,7 @@
     "url": "https://github.com/cube-js/cube.git"
   },
   "resolutions": {
+    "es5-ext": "0.10.53",
     "@types/node": "^18",
     "@types/ramda": "0.27.40",
     "thrift": "0.20.0"
