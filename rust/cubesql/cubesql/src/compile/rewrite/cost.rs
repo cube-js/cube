@@ -143,7 +143,7 @@ impl BestCubePlan {
 
         let time_dimensions_used_as_dimensions = match enode {
             LogicalPlanLanguage::DimensionName(DimensionName(name)) => {
-                if let Some(dimension) = self.meta_context.find_dimension_with_name(name.clone()) {
+                if let Some(dimension) = self.meta_context.find_dimension_with_name(name) {
                     if dimension.is_time() {
                         1
                     } else {
