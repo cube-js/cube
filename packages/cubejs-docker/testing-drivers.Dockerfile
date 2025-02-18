@@ -27,6 +27,8 @@ COPY yarn.lock .
 COPY tsconfig.base.json .
 COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
+
+# Backend
 COPY rust/cubesql/package.json rust/cubesql/package.json
 COPY rust/cubestore/package.json rust/cubestore/package.json
 COPY rust/cubestore/bin rust/cubestore/bin
@@ -86,28 +88,24 @@ RUN yarn config set network-timeout 120000 -g
 ######################################################################
 # Databricks driver dependencies                                     #
 ######################################################################
-FROM base AS prod_base_dependencies
+FROM base as prod_base_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
-FROM prod_base_dependencies AS prod_dependencies
+FROM prod_base_dependencies as prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
 ######################################################################
 # Build dependencies                                                 #
 ######################################################################
-FROM base AS build_dependencies
+FROM base AS build
 
 RUN yarn install
 
-######################################################################
-# Build layer                                                        #
-######################################################################
-FROM build_dependencies AS build
-
+# Backend
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
@@ -162,7 +160,7 @@ COPY packages/cubejs-vertica-driver/ packages/cubejs-vertica-driver/
 #COPY packages/cubejs-playground/ packages/cubejs-playground/
 
 # As we don't need any UI to test drivers, it's enough to transpile ts only.
-RUN yarn lerna run tsc
+RUN yarn lerna run build
 
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
@@ -182,7 +180,7 @@ COPY --from=prod_dependencies /cubejs .
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
-ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
+ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 
