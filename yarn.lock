@@ -9797,7 +9797,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/node@*", "@types/node@^12", "@types/node@^18":
+"@types/node@*", "@types/node@^18":
   version "18.19.46"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.46.tgz#51801396c01153e0626e36f43386e83bc768b072"
   integrity sha512-vnRgMS7W6cKa1/0G3/DTtQYpVrZ8c0Xm6UkLaVFrb9jtcVC3okokW09Ki1Qdrj9ISokszD69nY4WDLRlvHlhAA==
@@ -19821,7 +19821,7 @@ jest-worker@^28.0.2:
     merge-stream "^2.0.0"
     supports-color "^8.0.0"
 
-jest@27, jest@^27, jest@^27.1.0, jest@^27.5.1:
+jest@^27, jest@^27.1.0:
   version "27.5.1"
   resolved "https://registry.yarnpkg.com/jest/-/jest-27.5.1.tgz#dadf33ba70a779be7a6fc33015843b51494f63fc"
   integrity sha512-Yn0mADZB89zTtjkPJEXwrac3LHudkQMR+Paqa8uxJHCBr9agxztUifWCyiYrjhMPBoUVBjyny0I7XH6ozDr7QQ==
