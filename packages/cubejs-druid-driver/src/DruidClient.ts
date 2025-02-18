@@ -63,7 +63,7 @@ export class DruidClient {
           },
         });
 
-        if (cancelled) {
+        if (cancelled && response.headers['x-druid-sql-query-id']) {
           await this.cancel(response.headers['x-druid-sql-query-id']);
 
           throw new Error('Query cancelled');
