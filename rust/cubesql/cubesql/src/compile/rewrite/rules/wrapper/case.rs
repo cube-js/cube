@@ -1,43 +1,25 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, case_expr_var_arg, rewrite, rules::wrapper::WrapperRules,
+        case_expr_var_arg, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn case_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn case_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-case",
-                wrapper_pushdown_replacer(
-                    case_expr_var_arg("?when", "?then", "?else"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?cube_members",
-                ),
+                wrapper_pushdown_replacer(case_expr_var_arg("?when", "?then", "?else"), "?context"),
                 case_expr_var_arg(
-                    wrapper_pushdown_replacer(
-                        "?when",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?then",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?else",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?when", "?context"),
+                    wrapper_pushdown_replacer("?then", "?context"),
+                    wrapper_pushdown_replacer("?else", "?context"),
                 ),
             ),
             transforming_rewrite(
@@ -45,28 +27,48 @@ impl WrapperRules {
                 case_expr_var_arg(
                     wrapper_pullup_replacer(
                         "?when",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?then",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?else",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                 ),
                 wrapper_pullup_replacer(
                     case_expr_var_arg("?when", "?then", "?else"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_case_expr("?alias_to_cube"),
             ),
@@ -86,13 +88,13 @@ impl WrapperRules {
     fn transform_case_expr(
         &self,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

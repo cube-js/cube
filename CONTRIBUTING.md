@@ -26,7 +26,7 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 2. Follow the directions in the [Getting Started guide](https://cube.dev/docs/getting-started) to get Cube up and running (incl. the [Developer Playground](https://cube.dev/docs/dev-tools/dev-playground)). 
 3. Clone the [Cube repo](https://github.com/cube-js/cube).
 4. Submit your Pull Request. 
-5. Testing: Please include test(s) for your code contribution. See some of the test examples for [drivers](https://github.com/cube-js/cube/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube/tree/master/packages/cubejs-backend-shared/test). 
+5. Testing: Please include test(s) for your code contribution. Depending on a change it can be tested by unit, integration or E2E test. See some of the test examples for [drivers](https://github.com/cube-js/cube/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube/tree/master/packages/cubejs-backend-shared/test). There're separate packages for [E2E testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing/) and [E2E driver testing](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing-drivers/). **Tests are required for most of the contributions.**
 6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs` folder](https://github.com/cube-js/cube/tree/master/docs). To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
 7. Relevant team(s) will be pinged automatically for a review based on information in the `CODEOWNERS` file. 
 
@@ -34,7 +34,7 @@ By contributing to Cube Dev, Inc., You accept and agree to the terms and conditi
 
 ### Prerequisites
 
-Cube works with Node.js 10+ and uses Yarn as a package manager.
+Cube works with Node.js 20+ and uses Yarn as a package manager.
 
 ### Cube Docker
 
@@ -53,7 +53,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 #### Development
 
 1. After cloning Cube repository run `yarn install` to install dependencies.
-2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build stable development image.
+2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` in `packages/cubejs-docker` to build stable development image.
 
 ### Cube Client
 
@@ -96,9 +96,18 @@ Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and
 7. Run `yarn install` in `packages/cubejs-<pkg>` to install dependencies for drivers and dependent packages.
 8. Run `yarn link @cubejs-backend/<pkg>` in `packages/cubejs-server-core` to link drivers and dependent packages.
 9. Run `yarn link` in `packages/cubejs-server-core`.
-10. Create or choose an existing project for testing.
+10. Create or choose an existing project for testing. You can generate a new one with 
+    [cubejs-cli](https://cube.dev/docs/reference/cli) tool.
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
 12. Run `yarn dev` to start your testing project and verify changes.
+
+Instead of running all of the above commands manually you can use the `dev_env_setup.sh` script:
+
+1. Clone the Cube repository, `git clone https://github.com/cube-js/cube`.
+2. Navigate to your working projects directory and run `/path/to/cube/repo/dev_env_setup.sh`. The script will
+   ask you some questions and run all the required commands. In case you decide to create a new testing project,
+   it will be created in the current directory (that is why you probably don't want to run this script within 
+   cube repo directory).
 
 ### Debugging with WebStorm
 
@@ -137,7 +146,7 @@ The rest will be done by `BaseDriver` class.
 ### Implementing a JDBC Driver
 
 If there's existing JDBC Driver in place for Database of interest you can just create `DbTypes` configuration inside
-[cubejs-jdbc-driver/driver/JDBCDriver.js](https://github.com/statsbotco/cube.js/blob/master/packages/cubejs-jdbc-driver/driver/JDBCDriver.js#L31).
+[cubejs-jdbc-driver/driver/JDBCDriver.ts](https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/src/JDBCDriver.ts).
 Most of the time no additional adjustments required for base `JDBCDriver` implementation as JDBC is pretty standard.
 In case you need to tweak it a little please follow [Implementing Driver](#implementing-driver) steps but use `JDBCDriver` as your base driver class.
 
@@ -205,6 +214,7 @@ Client packages has it's own `.eslintrc.js` files.
 2. Run `yarn test` before committing if package has tests.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.
-All PRs are merged using squash so only PR name matters.
-4. For the scope part of commit name please use package name if it's within one package or don't use it if change spans multiple packages. For example `feat(@cubejs-backend/server-core):` or `fix(cubestore):`.
-5. Do not reformat code you aren't really changing unless it's absolutely necessary (e.g. fixing linter). Such changes make it really hard to use git blame feature when we need to find a commit where line change of interest was introduced.
+All PRs are merged using the squash strategy. PR title usually would be used as a name for commit. So please make sure it has a sensible name.  
+4. For the scope part of commit name please use package name if it's within one package or don't use it if change spans multiple packages. For example `feat(server-core):` or `fix(cubestore):`.
+5. Commit messages that are getting merged should contain mostly "Why" those changes are made as opposed to "What" changes are done. "Why" can be a feature, reference to issue or reasons to fix something like a chore.
+6. Do not reformat code you aren't really changing unless it's absolutely necessary (e.g. fixing linter). Such changes make it really hard to use git blame feature when we need to find a commit where line change of interest was introduced. Please do not include files that contain only reformatting changes in the commit.

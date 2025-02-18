@@ -1,16 +1,16 @@
 use core::mem;
-use core::slice::memchr;
+use memchr;
 use std::convert::TryFrom;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
+use datafusion::arrow::array::{ArrayBuilder, ArrayRef};
 use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
@@ -43,6 +43,7 @@ use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
+use cubedatasketches::HLLDataSketch;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use tokio::time::{sleep, Duration};
 
@@ -209,6 +210,11 @@ impl ImportFormat {
                 let data = parse_binary_data(value)?;
                 is_valid_plain_binary_hll(&data, *f)?;
                 TableValue::Bytes(data)
+            }
+            ColumnType::HyperLogLog(HllFlavour::DataSketches) => {
+                let data = parse_binary_data(value)?;
+                let hll = HLLDataSketch::read(&data)?;
+                TableValue::Bytes(hll.write())
             }
             ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
             ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),
@@ -567,7 +573,7 @@ impl ImportServiceImpl {
             Ok((temp_file, None))
         } else {
             Ok((
-                File::open(location.clone()).await.map_err(|e| {
+                File::open(location).await.map_err(|e| {
                     CubeError::internal(format!("Open location {}: {}", location, e))
                 })?,
                 None,
@@ -631,7 +637,16 @@ impl ImportServiceImpl {
             })?
             .into_parts();
         let mut file = File::from_std(file);
-        let mut stream = reqwest::get(location).await?.bytes_stream();
+
+        let res = reqwest::get(location).await?;
+        if !res.status().is_success() {
+            return Err(CubeError::user(format!(
+                "Unable to import from http location, status code: {}",
+                res.status()
+            )));
+        }
+
+        let mut stream = res.bytes_stream();
         let mut size = 0;
         while let Some(bytes) = stream.next().await {
             let bytes = bytes?;
@@ -639,7 +654,9 @@ impl ImportServiceImpl {
             size += slice.len();
             file.write_all(slice).await?;
         }
+
         file.seek(SeekFrom::Start(0)).await?;
+
         Ok((file, size, path))
     }
 
@@ -681,7 +698,7 @@ impl ImportServiceImpl {
             })?;
 
         let (file, tmp_path) = self
-            .resolve_location(location.clone(), table.get_id(), &temp_dir)
+            .resolve_location(location, table.get_id(), &temp_dir)
             .await?;
         let mut row_stream = format
             .row_stream(
@@ -851,7 +868,20 @@ impl LocationHelper {
     ) -> Result<Option<u64>, CubeError> {
         let res = if location.starts_with("http") {
             let client = reqwest::Client::new();
-            let res = client.head(location).send().await?;
+            let req = client.head(location).build()?;
+
+            // S3 doesn't support HEAD for pre signed urls with GetObject command
+            if req
+                .url()
+                .domain()
+                .map(|v| v.contains("amazonaws.com"))
+                .unwrap_or(false)
+            {
+                return Ok(None);
+            }
+
+            let res = client.execute(req).await?;
+
             let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
 
             if let Some(length) = length {

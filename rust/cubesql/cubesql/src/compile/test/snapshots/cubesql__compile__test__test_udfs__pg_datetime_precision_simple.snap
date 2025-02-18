@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT information_schema._pg_datetime_precision(1184, 3) p\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---+
+| p |
++---+
+| 3 |
++---+

@@ -1,14 +1,16 @@
 import R from 'ramda';
 
 export class ContextEvaluator {
+  /**
+   * @param {import('./CubeEvaluator').CubeEvaluator} cubeEvaluator
+   */
   constructor(cubeEvaluator) {
     this.cubeEvaluator = cubeEvaluator;
-
     this.contextDefinitions = {};
   }
 
   // eslint-disable-next-line no-unused-vars
-  compile(contexts, errorReporter) {
+  compile(contexts, _errorReporter) {
     if (contexts.length === 0) {
       return;
     }

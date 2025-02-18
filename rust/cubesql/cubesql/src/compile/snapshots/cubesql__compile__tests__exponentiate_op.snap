@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT 3^5 AS e\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----+
+| e   |
++-----+
+| 243 |
++-----+

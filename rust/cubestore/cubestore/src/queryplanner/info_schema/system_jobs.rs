@@ -2,9 +2,9 @@ use crate::metastore::job::Job;
 use crate::metastore::IdRow;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
-use arrow::array::{ArrayRef, StringArray, TimestampNanosecondArray, UInt64Array};
-use arrow::datatypes::{DataType, Field, TimeUnit};
 use async_trait::async_trait;
+use datafusion::arrow::array::{ArrayRef, StringArray, TimestampNanosecondArray, UInt64Array};
+use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
 
 pub struct SystemJobsTableDef;

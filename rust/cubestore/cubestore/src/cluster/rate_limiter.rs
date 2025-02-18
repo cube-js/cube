@@ -11,6 +11,8 @@ use tokio::task::JoinHandle;
 pub enum TaskType {
     Select,
     Job,
+    Cache,
+    Queue,
 }
 
 impl TaskType {
@@ -18,6 +20,8 @@ impl TaskType {
         match self {
             Self::Select => "select".to_string(),
             Self::Job => "job".to_string(),
+            Self::Cache => "cache".to_string(),
+            Self::Queue => "queue".to_string(),
         }
     }
 }

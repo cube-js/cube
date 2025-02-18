@@ -1,10 +1,10 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { config } from 'dotenv';
 import yargs from 'yargs/yargs';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
-import { pausePromise } from '@cubejs-backend/shared';
+import { isCI, pausePromise } from '@cubejs-backend/shared';
 import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
 import { getComposePath } from './getComposePath';
@@ -74,18 +74,28 @@ class CubeCliEnvironment implements CubeEnvironment {
 
   public async down() {
     if (this.cli) {
-      process.kill(-this.cli.pid, 'SIGINT');
+      const { cli } = this;
+      await new Promise((resolve) => {
+        cli.once('disconnect', () => resolve(null));
+        cli.once('exit', () => resolve(null));
+        cli.kill('SIGKILL');
+      });
       process.stdout.write('Cube Exited\n');
     }
   }
 }
 
-export async function runEnvironment(type: string, suf?: string): Promise<Environment> {
-  const fixtures = getFixtures(type);
+export async function runEnvironment(
+  type: string,
+  suf?: string,
+  { extendedEnv }: { extendedEnv?: string } = {}
+): Promise<Environment> {
+  const fixture = getFixtures(type, extendedEnv);
   getTempPath();
   getSchemaPath(type, suf);
   getCubeJsPath(type);
   getPackageJsonPath(type);
+
   const { mode } = yargs(process.argv.slice(2))
     .exitProcess(false)
     .options({
@@ -100,39 +110,46 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
     })
     .argv;
   const isLocal = mode === 'local';
-  const [composePath, composeFile] = getComposePath(type, isLocal);
+  const [composePath, composeFile] = getComposePath(type, fixture, isLocal);
   const compose = new DockerComposeEnvironment(
     composePath,
     composeFile,
   );
-  compose.withStartupTimeout(30 * 1000);
-  compose.withEnvironment({ CUBEJS_TELEMETRY: 'false' });
-  const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;
-  if (fs.existsSync(_path)) {
-    config({
-      path: _path,
-      encoding: 'utf8',
-      override: true,
-    });
-  }
-  Object.keys(fixtures.cube.environment).forEach((key) => {
-    const val = fixtures.cube.environment[key];
+  compose.withStartupTimeout((isCI() ? 60 : 30) * 1000);
+  compose.withEnvironment({
+    CUBEJS_TELEMETRY: 'false',
+  });
+
+  Object.keys(fixture.cube.environment).forEach((key) => {
+    const val = fixture.cube.environment[key];
     const { length } = val;
+
     if (val.indexOf('${') === 0 && val.indexOf('}') === length - 1) {
       const name = val.slice(2, length - 1).trim();
-      process.env[key] = process.env[name];
+      const value = process.env[name];
+      if (value) {
+        process.env[key] = process.env[name];
+      } else {
+        throw new Error(`Env variable ${name} must be defined, because it's used as ${key}`);
+      }
     }
 
     if (process.env[key]) {
       compose.withEnvironment({ [key]: <string>process.env[key] });
-    } else if (fixtures.cube.environment[key]) {
-      process.env[key] = fixtures.cube.environment[key];
+    } else if (fixture.cube.environment[key]) {
+      process.env[key] = fixture.cube.environment[key];
     }
   });
+
   // TODO extract as a config
   if (type === 'mssql') {
-    compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
+    compose.withWaitStrategy('data', Wait.forLogMessage('SQL Server is now ready for client connections'));
   }
+  // TODO: Add health checks for all drivers
+  if (type === 'clickhouse') {
+    compose.withWaitStrategy('data', Wait.forHealthCheck());
+  }
+
   const environment = await compose.up();
 
   const store = {
@@ -141,8 +158,8 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   };
 
   const cliEnv = isLocal ? new CubeCliEnvironment(composePath) : null;
-  const mappedDataPort = fixtures.data ? environment.getContainer('data').getMappedPort(
-    parseInt(fixtures.data.ports[0], 10),
+  const mappedDataPort = fixture.data ? environment.getContainer('data').getMappedPort(
+    parseInt(fixture.data.ports[0], 10),
   ) : null;
   if (cliEnv) {
     cliEnv.withEnvironment({
@@ -159,15 +176,19 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   }
   const cube = cliEnv ? {
     port: 4000,
+    pgPort: parseInt(fixture.cube.ports[1], 10),
     logs: cliEnv.cli?.stdout || process.stdout
   } : {
     port: environment.getContainer('cube').getMappedPort(
-      parseInt(fixtures.cube.ports[0], 10),
+      parseInt(fixture.cube.ports[0], 10),
     ),
+    pgPort: fixture.cube.ports[1] && environment.getContainer('cube').getMappedPort(
+      parseInt(fixture.cube.ports[1], 10),
+    ) || undefined,
     logs: await environment.getContainer('cube').logs(),
   };
 
-  if (fixtures.data) {
+  if (fixture.data) {
     const data = {
       port: mappedDataPort!,
       logs: await environment.getContainer('data').logs(),
@@ -178,6 +199,9 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
       data,
       stop: async () => {
         await environment.down({ timeout: 30 * 1000 });
+        if (cliEnv) {
+          await cliEnv.down();
+        }
       },
     };
   }

@@ -14,16 +14,28 @@ import {
   isSslKey,
   isSslCert,
 } from '@cubejs-backend/shared';
-import { reduce } from 'ramda';
 import fs from 'fs';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
+import { Storage } from '@google-cloud/storage';
+import {
+  BlobServiceClient,
+  StorageSharedKeyCredential,
+  ContainerSASPermissions,
+  SASProtocol,
+  generateBlobSASQueryParameters,
+} from '@azure/storage-blob';
+import {
+  DefaultAzureCredential,
+  ClientSecretCredential,
+} from '@azure/identity';
+
 import { cancelCombinator } from './utils';
 import {
   ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
-  DownloadTableCSVData,
   DownloadTableData,
-  DownloadTableMemoryData,
   DriverInterface,
   ExternalDriverCompatibilities,
   IndexesSQL,
@@ -37,8 +49,51 @@ import {
   DriverCapabilities,
   QuerySchemasResult,
   QueryTablesResult,
-  QueryColumnsResult
+  QueryColumnsResult,
+  TableMemoryData,
+  PrimaryKeysQueryResult,
+  ForeignKeysQueryResult,
+  DatabaseStructure,
 } from './driver.interface';
+
+/**
+ * @see {@link DefaultAzureCredential} constructor options
+ */
+export type AzureStorageClientConfig = {
+  azureKey?: string,
+  sasToken?: string,
+  /**
+   * The client ID of a Microsoft Entra app registration.
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_CLIENT_ID env
+   */
+  clientId?: string,
+  /**
+   * ID of the application's Microsoft Entra tenant. Also called its directory ID.
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_TENANT_ID env
+   */
+  tenantId?: string,
+  /**
+   * Azure service principal client secret.
+   * Enables authentication to Microsoft Entra ID using a client secret that was generated
+   * for an App Registration. More information on how to configure a client secret can be found here:
+   * https://learn.microsoft.com/entra/identity-platform/quickstart-configure-app-access-web-apis#add-credentials-to-your-web-application
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_CLIENT_SECRET env
+   */
+  clientSecret?: string,
+  /**
+   * The path to a file containing a Kubernetes service account token that authenticates the identity.
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_FEDERATED_TOKEN_FILE env
+   */
+  tokenFilePath?: string,
+};
+
+export type GoogleStorageClientConfig = {
+  credentials: any,
+};
 
 const sortByKeys = (unordered: any) => {
   const ordered: any = {};
@@ -126,7 +181,7 @@ const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
  * Base driver class.
  */
 export abstract class BaseDriver implements DriverInterface {
-  private testConnectionTimeoutValue = 10000;
+  private readonly testConnectionTimeoutValue: number = 10000;
 
   protected logger: any;
 
@@ -150,7 +205,7 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
   }
 
@@ -158,7 +213,7 @@ export abstract class BaseDriver implements DriverInterface {
     return `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')}
       FROM information_schema.tables
-      WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
       GROUP BY table_schema
     `;
   }
@@ -167,7 +222,7 @@ export abstract class BaseDriver implements DriverInterface {
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')},
             table_name as ${this.quoteIdentifier('table_name')}
-      FROM information_schema.tables
+      FROM information_schema.tables as columns
       WHERE table_schema IN (${schemasPlaceholders})
     `;
     return query;
@@ -179,18 +234,65 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_name as ${this.quoteIdentifier('table_name')},
              columns.table_schema as ${this.quoteIdentifier('schema_name')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
-      FROM information_schema.columns
+      FROM information_schema.columns as columns
       WHERE ${conditionString}
     `;
+
     return query;
   }
 
+  protected primaryKeysQuery(_?: string): string | null {
+    return null;
+  }
+
+  protected foreignKeysQuery(_?: string): string | null {
+    return null;
+  }
+
+  protected async primaryKeys(conditionString?: string, params?: string[]): Promise<PrimaryKeysQueryResult[]> {
+    const query = this.primaryKeysQuery(conditionString);
+
+    if (!query) {
+      return [];
+    }
+
+    try {
+      return (await this.query<PrimaryKeysQueryResult>(query, params));
+    } catch (error: any) {
+      if (this.logger) {
+        this.logger('Primary Keys Query failed. Primary Keys will be defined by heuristics', {
+          error: (error.stack || error).toString()
+        });
+      }
+      return [];
+    }
+  }
+
+  protected async foreignKeys(conditionString?: string, params?: string[]): Promise<ForeignKeysQueryResult[]> {
+    const query = this.foreignKeysQuery(conditionString);
+
+    if (!query) {
+      return [];
+    }
+
+    try {
+      return (await this.query<ForeignKeysQueryResult>(query, params));
+    } catch (error: any) {
+      if (this.logger) {
+        this.logger('Foreign Keys Query failed. Joins will be defined by heuristics', {
+          error: (error.stack || error).toString()
+        });
+      }
+      return [];
+    }
+  }
+
   protected getColumnNameForSchemaName() {
-    return 'table_schema';
+    return 'columns.table_schema';
   }
 
   protected getColumnNameForTableName() {
-    return 'table_name';
+    return 'columns.table_name';
   }
 
   protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
@@ -310,24 +412,61 @@ export abstract class BaseDriver implements DriverInterface {
     return false;
   }
 
-  protected informationColumnsSchemaReducer(result: any, i: any) {
+  protected informationColumnsSchemaReducer(result: any, i: any): DatabaseStructure {
     let schema = (result[i.table_schema] || {});
-    const tables = (schema[i.table_name] || []);
+    const columns = (schema[i.table_name] || []);
 
-    tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
+    columns.push({
+      name: i.column_name,
+      type: i.data_type,
+      attributes: i.key_type ? ['primaryKey'] : []
+    });
 
-    tables.sort();
-    schema[i.table_name] = tables;
+    columns.sort();
+    schema[i.table_name] = columns;
     schema = sortByKeys(schema);
     result[i.table_schema] = schema;
 
     return sortByKeys(result);
   }
 
-  public tablesSchema() {
+  public tablesSchema(): Promise<DatabaseStructure> {
     const query = this.informationSchemaQuery();
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    return this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
+  }
+
+  // Extended version of tablesSchema containing primary and foreign keys
+  public async tablesSchemaV2() {
+    const tablesSchema = await this.tablesSchema();
+    const [primaryKeys, foreignKeys] = await Promise.all([this.primaryKeys(), this.foreignKeys()]);
+
+    for (const pk of primaryKeys) {
+      if (Array.isArray(tablesSchema?.[pk.table_schema]?.[pk.table_name])) {
+        tablesSchema[pk.table_schema][pk.table_name] = tablesSchema[pk.table_schema][pk.table_name].map((it: any) => {
+          if (it.name === pk.column_name) {
+            it.attributes = ['primaryKey'];
+          }
+          return it;
+        });
+      }
+    }
+
+    for (const foreignKey of foreignKeys) {
+      if (Array.isArray(tablesSchema?.[foreignKey.table_schema]?.[foreignKey.table_name])) {
+        tablesSchema[foreignKey.table_schema][foreignKey.table_name] = tablesSchema[foreignKey.table_schema][foreignKey.table_name].map((it: any) => {
+          if (it.name === foreignKey.column_name) {
+            it.foreign_keys = [...(it.foreign_keys || []), {
+              target_table: foreignKey.target_table,
+              target_column: foreignKey.target_column
+            }];
+          }
+          return it;
+        });
+      }
+    }
+
+    return tablesSchema;
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
@@ -341,12 +480,12 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  public getSchemas() {
+  public getSchemas(): Promise<QuerySchemasResult[]> {
     const query = this.getSchemasQuery();
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]) {
+  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
     const schemaNames = schemas.map(s => s.schema_name);
 
@@ -354,7 +493,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     const groupedBySchema: Record<string, string[]> = {};
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {
@@ -380,7 +519,25 @@ export abstract class BaseDriver implements DriverInterface {
 
     const query = this.getColumnsForSpecificTablesQuery(conditionString);
 
-    return this.query<QueryColumnsResult>(query, parameters);
+    const [primaryKeys, foreignKeys] = await Promise.all([
+      this.primaryKeys(conditionString, parameters),
+      this.foreignKeys(conditionString, parameters)
+    ]);
+
+    const columns = await this.query<QueryColumnsResult>(query, parameters);
+
+    for (const column of columns) {
+      if (primaryKeys.some(pk => pk.table_schema === column.schema_name && pk.table_name === column.table_name && pk.column_name === column.column_name)) {
+        column.attributes = ['primaryKey'];
+      }
+
+      column.foreign_keys = foreignKeys.filter(fk => fk.table_schema === column.schema_name && fk.table_name === column.table_name && fk.column_name === column.column_name).map(fk => ({
+        target_table: fk.target_table,
+        target_column: fk.target_column
+      }));
+    }
+
+    return columns;
   }
 
   public getTablesQuery(schemaName: string) {
@@ -406,7 +563,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.testConnectionTimeoutValue;
   }
 
-  public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<DownloadTableMemoryData | DownloadTableCSVData> {
+  public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<TableMemoryData> {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
@@ -463,13 +620,18 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<{ name: any; type: string; }[]> {
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: any; type: string; }[]> {
     return [];
   }
 
-  public createTable(quotedTableName: string, columns: TableColumn[]) {
+  // This is only for use in tests
+  public async createTableRaw(query: string): Promise<void> {
+    await this.query(query);
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
     const createTableSql = this.createTableSql(quotedTableName, columns);
-    return this.query(createTableSql, []).catch(e => {
+    await this.query(createTableSql, []).catch(e => {
       e.message = `Error during create table: ${createTableSql}: ${e.message}`;
       throw e;
     });
@@ -531,5 +693,166 @@ export abstract class BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+  }
+
+  /**
+   * Returns an array of signed AWS S3 URLs of the unloaded csv files.
+   */
+  protected async extractUnloadedFilesFromS3(
+    clientOptions: S3ClientConfig,
+    bucketName: string,
+    prefix: string
+  ): Promise<string[]> {
+    const storage = new S3(clientOptions);
+    // It looks that different driver configurations use different formats
+    // for the bucket - some expect only names, some - full url-like names.
+    // So we unify this.
+    bucketName = bucketName.replace(/^[a-zA-Z]+:\/\//, '');
+
+    const list = await storage.listObjectsV2({
+      Bucket: bucketName,
+      Prefix: prefix,
+    });
+    if (list) {
+      if (!list.Contents) {
+        return [];
+      } else {
+        const csvFile = await Promise.all(
+          list.Contents.map(async (file) => {
+            const command = new GetObjectCommand({
+              Bucket: bucketName,
+              Key: file.Key,
+            });
+            return getSignedUrl(storage, command, { expiresIn: 3600 });
+          })
+        );
+        return csvFile;
+      }
+    }
+
+    throw new Error('Unable to retrieve list of files from S3 storage after unloading.');
+  }
+
+  /**
+   * Returns an array of signed GCS URLs of the unloaded csv files.
+   */
+  protected async extractFilesFromGCS(
+    gcsConfig: GoogleStorageClientConfig,
+    bucketName: string,
+    tableName: string
+  ): Promise<string[]> {
+    const storage = new Storage({
+      credentials: gcsConfig.credentials,
+      projectId: gcsConfig.credentials.project_id
+    });
+    const bucket = storage.bucket(bucketName);
+    const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
+    if (files.length) {
+      const csvFile = await Promise.all(files.map(async (file) => {
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+        });
+        return url;
+      }));
+      return csvFile;
+    } else {
+      return [];
+    }
+  }
+
+  protected async extractFilesFromAzure(
+    azureConfig: AzureStorageClientConfig,
+    bucketName: string,
+    tableName: string
+  ): Promise<string[]> {
+    const splitter = bucketName.includes('blob.core') ? '.blob.core.windows.net/' : '.dfs.core.windows.net/';
+    const parts = bucketName.split(splitter);
+    const account = parts[0];
+    const container = parts[1].split('/')[0];
+    let credential: StorageSharedKeyCredential | ClientSecretCredential | DefaultAzureCredential;
+    let blobServiceClient: BlobServiceClient;
+    let getSas;
+
+    if (azureConfig.azureKey) {
+      credential = new StorageSharedKeyCredential(account, azureConfig.azureKey);
+      getSas = async (name: string, startsOn: Date, expiresOn: Date) => generateBlobSASQueryParameters(
+        {
+          containerName: container,
+          blobName: name,
+          permissions: ContainerSASPermissions.parse('r'),
+          startsOn,
+          expiresOn,
+          protocol: SASProtocol.Https,
+          version: '2020-08-04',
+        },
+        credential as StorageSharedKeyCredential
+      ).toString();
+    } else if (azureConfig.clientSecret && azureConfig.tenantId && azureConfig.clientId) {
+      credential = new ClientSecretCredential(
+        azureConfig.tenantId,
+        azureConfig.clientId,
+        azureConfig.clientSecret,
+      );
+      getSas = async (name: string, startsOn: Date, expiresOn: Date) => {
+        const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
+        return generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn,
+            expiresOn,
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          userDelegationKey,
+          account
+        ).toString();
+      };
+    } else {
+      const opts = {
+        tenantId: azureConfig.tenantId,
+        clientId: azureConfig.clientId,
+        tokenFilePath: azureConfig.tokenFilePath,
+      };
+      credential = new DefaultAzureCredential(opts);
+      getSas = async (name: string, startsOn: Date, expiresOn: Date) => {
+        // getUserDelegationKey works only for authorization with Microsoft Entra ID
+        const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
+        return generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn,
+            expiresOn,
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          userDelegationKey,
+          account,
+        ).toString();
+      };
+    }
+
+    const url = `https://${account}.blob.core.windows.net`;
+    blobServiceClient = azureConfig.sasToken ?
+      new BlobServiceClient(`${url}?${azureConfig.sasToken}`) :
+      new BlobServiceClient(url, credential);
+
+    const csvFiles: string[] = [];
+    const containerClient = blobServiceClient.getContainerClient(container);
+    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}` });
+    for await (const blob of blobsList) {
+      if (blob.name && (blob.name.endsWith('.csv.gz') || blob.name.endsWith('.csv'))) {
+        const starts = new Date();
+        const expires = new Date(starts.valueOf() + 1000 * 60 * 60);
+        const sas = await getSas(blob.name, starts, expires);
+        csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
+      }
+    }
+
+    return csvFiles;
   }
 }

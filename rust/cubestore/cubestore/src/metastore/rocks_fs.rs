@@ -30,7 +30,7 @@ pub trait MetaStoreFs: Send + Sync {
         &self,
         dir: &str,
         seq_number: u64,
-        serializer: &WriteBatchContainer,
+        serializer: WriteBatchContainer,
     ) -> Result<u64, CubeError>;
     async fn upload_checkpoint(
         &self,
@@ -348,11 +348,13 @@ impl MetaStoreFs for BaseRocksStoreFs {
         &self,
         dir: &str,
         seq_number: u64,
-        serializer: &WriteBatchContainer,
+        serializer: WriteBatchContainer,
     ) -> Result<u64, CubeError> {
         let log_name = format!("{}/{}.flex", dir, seq_number);
         let file_name = self.remote_fs.local_file(log_name.clone()).await?;
+
         serializer.write_to_file(&file_name).await?;
+
         // TODO persist file size
         self.remote_fs.upload_file(file_name, log_name).await
     }

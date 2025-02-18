@@ -8,5 +8,3 @@ pub use clrepr::{CLRepr, CLReprKind, CLReprObject, StringType};
 
 #[cfg(feature = "python")]
 pub use clrepr_python::{CLReprPython, PythonRef};
-#[cfg(feature = "python")]
-pub use py_in_js::{BoxedJsPyFunctionWrapper, JsPyFunctionWrapper};

@@ -3,7 +3,9 @@ redirect_from:
   - /config/databases/databricks/jdbc
 ---
 
-# Databricks (JDBC)
+# Databricks
+
+[Databricks](https://www.databricks.com) is a unified data intelligence platform.
 
 ## Prerequisites
 
@@ -43,22 +45,23 @@ RUN npm install
 
 You can then build and run the image using the following commands:
 
-```bash{promptUser: user}
-docker build -t cubejs-jdk .
-docker run -it -p 4000:4000 --env-file=.env cubejs-jdk
+```bash
+docker build -t cube-jdk .
+docker run -it -p 4000:4000 --env-file=.env cube-jdk
 ```
 
 ## Environment Variables
 
-| Environment Variable                 | Description                                                                                     | Possible Values       | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------- | :------: | :----------------------------------------------------------------------: |
-| `CUBEJS_DB_NAME`                     | The name of the database to connect to                                                          | A valid database name |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_DATABRICKS_URL`           | The URL for a JDBC connection                                                                   | A valid JDBC URL      |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY` | Whether or not to accept the license terms for the Databricks JDBC driver                       | `true`, `false`       |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection | A valid token         |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs]                                  | A valid mount path    |    ❌    |                                    ✅                                    |
-| `CUBEJS_CONCURRENCY`                 | The number of concurrent connections each queue has to the database. Default is `2`             | A valid number        |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_MAX_POOL`                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |                                    ✅                                    |
+| Environment Variable                 | Description                                                                                     | Possible Values       | Required |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------- | :------: |
+| `CUBEJS_DB_NAME`                     | The name of the database to connect to                                                          | A valid database name |    ✅    |
+| `CUBEJS_DB_DATABRICKS_URL`           | The URL for a JDBC connection                                                                   | A valid JDBC URL      |    ✅    |
+| `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY` | Whether or not to accept the license terms for the Databricks JDBC driver                       | `true`, `false`       |    ✅    |
+| `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection | A valid token         |    ✅    |
+| `CUBEJS_DB_DATABRICKS_CATALOG`       | The name of the [Databricks catalog][databricks-catalog] to connect to                                                | A valid catalog name  |    ❌    |
+| `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs] (Not needed if using Unity Catalog connection)         | A valid mount path    |    ❌    |
+| `CUBEJS_CONCURRENCY`                 | The number of concurrent connections each queue has to the database. Default is `2`             | A valid number        |    ❌    |
+| `CUBEJS_DB_MAX_POOL`                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -66,7 +69,9 @@ docker run -it -p 4000:4000 --env-file=.env cubejs-jdk
 
 Measures of type
 [`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
-not be used in pre-aggregations when using Databricks as a data source.
+be used in pre-aggregations when using Databricks as a source database. To learn
+more about Databricks's support for approximate aggregate functions, [click
+here][databricks-docs-approx-agg-fns].
 
 ## Pre-Aggregation Build Strategies
 
@@ -79,7 +84,7 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
-| Simple        |             ❌             |     ✅      |
+| Simple        |             ✅             |     ✅      |
 | Export Bucket |             ❌             |     ❌      |
 
 By default, Databricks JDBC uses a [simple][self-preaggs-simple] strategy to
@@ -98,7 +103,7 @@ Storage][azure-bs] for export bucket functionality.
 #### AWS S3
 
 To use AWS S3 as an export bucket, first complete [the Databricks guide on
-mounting S3 buckets to Databricks DBFS][databricks-docs-dbfs-s3].
+connecting to cloud object storage using Unity Catalog][databricks-docs-uc-s3].
 
 <InfoBox>
 
@@ -118,7 +123,7 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 #### Azure Blob Storage
 
 To use Azure Blob Storage as an export bucket, follow [the Databricks guide on
-mounting Azure Blob Storage to Databricks DBFS][databricks-docs-dbfs-azure].
+connecting to Azure Data Lake Storage Gen2 and Blob Storage][databricks-docs-azure].
 
 [Retrieve the storage account access key][azure-bs-docs-get-key] from your Azure
 account and use as follows:
@@ -127,6 +132,17 @@ account and use as follows:
 CUBEJS_DB_EXPORT_BUCKET_TYPE=azure
 CUBEJS_DB_EXPORT_BUCKET=wasbs://my-bucket@my-account.blob.core.windows.net
 CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY=<AZURE_STORAGE_ACCOUNT_ACCESS_KEY>
+```
+
+Access key provides full access to the configuration and data, 
+to use a fine-grained control over access to storage resources, follow [the Databricks guide on authorize with Azure Active Directory][authorize-with-azure-active-directory].
+
+[Create the service principal][azure-authentication-with-service-principal] and replace the access key as follows:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID=<AZURE_TENANT_ID>
+CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID=<AZURE_CLIENT_ID>
+CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET=<AZURE_CLIENT_SECRET>
 ```
 
 ## SSL/TLS
@@ -145,26 +161,28 @@ bucket][self-preaggs-export-bucket] **must be** configured.
 [azure-bs]: https://azure.microsoft.com/en-gb/services/storage/blobs/
 [azure-bs-docs-get-key]:
   https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&tabs=azure-portal#view-account-access-keys
+[authorize-with-azure-active-directory]:
+  https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-azure-active-directory
+[azure-authentication-with-service-principal]:
+  https://learn.microsoft.com/en-us/azure/developer/java/sdk/identity-service-principal-auth
 [databricks]: https://databricks.com/
-[databricks-docs-dbfs]:
-  https://docs.databricks.com/data/databricks-file-system.html#mount-object-storage-to-dbfs
-[databricks-docs-dbfs-azure]:
-  https://docs.databricks.com/data/data-sources/azure/azure-storage.html#mount-azure-blob-storage-containers-to-dbfs
-[databricks-docs-dbfs-s3]:
-  https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-through-dbfs
+[databricks-docs-dbfs]: https://docs.databricks.com/en/dbfs/mounts.html
+[databricks-docs-azure]:
+  https://docs.databricks.com/data/data-sources/azure/azure-storage.html
+[databricks-docs-uc-s3]:
+  https://docs.databricks.com/en/connect/unity-catalog/index.html
 [databricks-docs-jdbc-url]:
   https://docs.databricks.com/integrations/bi/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url
 [databricks-docs-pat]:
   https://docs.databricks.com/dev-tools/api/latest/authentication.html#token-management
+[databricks-catalog]: (https://docs.databricks.com/en/data-governance/unity-catalog/create-catalogs.html)
 [gh-cubejs-jdbc-install]:
   https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 [ref-caching-large-preaggs]:
   /product/caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-config-multiple-ds-decorating-env]:
-  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
-[ref-schema-ref-types-formats-countdistinctapprox]:
-  /reference/data-model/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[databricks-docs-approx-agg-fns]: https://docs.databricks.com/en/sql/language-manual/functions/approx_count_distinct.html
 [self-preaggs-simple]: #simple
 [self-preaggs-export-bucket]: #export-bucket

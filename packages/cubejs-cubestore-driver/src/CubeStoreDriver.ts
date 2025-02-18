@@ -28,6 +28,8 @@ const GenericTypeToCubeStore: Record<string, string> = {
   // Cube Store uses an old version of sql parser which doesn't support timestamp with custom precision, but
   // athena driver (I believe old version) allowed to use it
   'timestamp(3)': 'timestamp',
+  // TODO comes from JDBC. We might consider decimal96 here
+  bigdecimal: 'decimal'
 };
 
 type Column = {
@@ -44,6 +46,7 @@ type CreateTableOptions = {
   files?: string[]
   aggregations?: string
   selectStatement?: string
+  sourceTable?: any
   sealAt?: string
   delimiter?: string
 };
@@ -61,13 +64,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     this.config = {
       batchingRowSplitCount: getEnv('batchingRowSplitCount'),
       ...config,
-      // TODO Can arrive as null somehow?
-      host: config?.host || getEnv('cubeStoreHost'),
-      port: config?.port || getEnv('cubeStorePort'),
+      // We use ip here instead of localhost, because Node.js 18 resolve localhost to IPV6 by default
+      // https://github.com/node-fetch/node-fetch/issues/1624
+      host: config?.host || getEnv('cubeStoreHost') || '127.0.0.1',
+      port: config?.port || getEnv('cubeStorePort') || '3030',
       user: config?.user || getEnv('cubeStoreUser'),
       password: config?.password || getEnv('cubeStorePass'),
     };
-    this.baseUrl = (this.config.url || `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
+    this.baseUrl = (this.config.url || `ws://${this.config.host}:${this.config.port}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
   }
 
@@ -114,6 +118,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
     if (options.selectStatement) {
       withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
+    }
+    if (options.sourceTable) {
+      withEntries.push(`source_table = ${escape(`CREATE TABLE ${options.sourceTable.tableName} (${options.sourceTable.types.map(t => `${t.name} ${this.fromGenericType(t.type)}`).join(', ')})`)}`);
     }
     if (options.streamOffset) {
       withEntries.push(`stream_offset = '${options.streamOffset}'`);
@@ -428,6 +435,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       indexes,
       files: locations,
       selectStatement: tableData.selectStatement,
+      sourceTable: tableData.sourceTable,
       streamOffset: tableData.streamOffset,
       sealAt
     };

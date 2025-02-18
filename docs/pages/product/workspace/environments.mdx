@@ -1,0 +1,118 @@
+# Environments
+
+Every Cube Cloud deployment provides a number of environments:
+- A single [production environment](#production-environment).
+- Multiple [staging environments](#staging-environments).
+- Per-user [development environments](#development-environments).
+
+<SuccessBox>
+
+Environments are available in Cube Cloud on
+[all product tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+## Production environment
+
+This is the main environment. It runs the data model from the _main branch_.
+
+### Availability
+
+The production environment is _always available_ unless [suspended][ref-suspend].
+
+### Resources and costs
+
+Depending on the [deployment type][ref-deployment-types], the production environment
+either runs on a development instance or on a production cluster with [multiple API
+instances][ref-api-instance-scalability], incurring [relevant
+costs][ref-pricing-deployment-tiers].
+
+### Cube version
+
+Production environments run a [Cube version][ref-version] from the selected
+[update channel][ref-version-channel].
+
+## Staging environments
+
+Staging environments are activated automatically for specific source code branches
+when a branch is switched to in the Cube Cloud UI. Any [development mode][ref-dev-mode]
+changes must be committed to a branch to be available in this environment.
+
+### Availability
+
+By default, they are only active and accessible while viewed by at least one user.
+When no users are viewing the branch, the environment becomes inactive and inaccessible.
+
+If you'd like to update this setting for a specific branch (e.g., for testing purposes),
+go to <Btn>Settings → Staging Environments</Btn> and check the toggle next to it:
+
+- **Toggle off** (default). A staging environment is only active when viewed by users.
+When no users are viewing the branch, queries to this environment will fail.
+- **Toggle on**. A staging environment remains _always active_ and accessible,
+regardless of user activity.
+
+<Screenshot src="https://ucarecdn.com/e0dcce34-a53a-4087-b021-25dbaf730a92/"/>
+
+### Resources and costs
+
+Staging environments run on development instances, incurring [relevant
+costs][ref-pricing-deployment-tiers]. However, they automatically suspend after 10 minutes
+of inactivity, regardless of the [availability](#availability) setting, so you are only
+charged for the time when staging environments are being used.
+
+### Cube version
+
+Staging environments always run the _most up-to-date_ Cube version.
+
+## Development environments
+
+A development environment is activated automatically when a user enters the [development
+mode][ref-dev-mode] on a specific branch of the source code. It updates automatically
+when a user saves changes to the data model.
+
+Only one development environment is allocated per user.
+
+### Availability
+
+A development environment is only active and accessible while viewed by a user in the
+development mode. Otherwise, queries to this environment will fail.
+
+### Resources and costs
+
+Development environments run on development instances, incurring [relevant
+costs][ref-pricing-deployment-tiers]. However, they automatically suspend after 10 minutes
+of inactivity, so you are only charged for the time when development environments are
+being used.
+
+### Cube version
+
+Development environments always run the _most up-to-date_ Cube version.
+
+{/*
+
+TODO:
+Consumption? Resources? Move from  http://localhost:3000/product/deployment/cloud/deployments#resource-consumption
+
+*/}
+
+## API endpoints
+
+Each environment provides its own set of API endpoints.
+
+You can access them on the [<Btn>Overview</Btn> page][ref-overview] of your deployment
+or by navigating to the <Btn>Integrations</Btn> page and [clicking <Btn>API
+credentials</Btn>][ref-credentials].
+
+<Screenshot src="https://ucarecdn.com/36cdf2c0-311f-4023-b7ca-e156c6ac288b/" />
+
+
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-data-model]: /product/workspace/data-model
+[ref-deployment-types]: /product/deployment/cloud/deployment-types
+[ref-api-instance-scalability]: /product/deployment/cloud/scalability#auto-scaling-of-api-instances
+[ref-pricing-deployment-tiers]: /product/deployment/cloud/pricing#deployment-tiers
+[ref-suspend]: /product/deployment/cloud/auto-suspension
+[ref-overview]: /product/workspace/integrations#review-integrations
+[ref-credentials]: /product/workspace/integrations#view-api-credentials
+[ref-version]: /product/deployment/cloud/deployments#cube-version
+[ref-version-channel]: /product/deployment/cloud/deployments#update-channels

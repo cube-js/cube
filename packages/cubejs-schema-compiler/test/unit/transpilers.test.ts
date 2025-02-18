@@ -27,34 +27,8 @@ describe('Transpilers', () => {
 
       throw new Error('Compile should thrown an error');
     } catch (e: any) {
-      expect(e.message).toMatch(/Duplicate property parsing test1 in main.js/);
+      expect(e.message).toMatch(/Duplicate property parsing test1/);
     }
-  });
-
-  it('ValidationTranspiler', async () => {
-    const warnings: string[] = [];
-
-    const { compiler } = prepareCompiler(`
-        cube(\`Test\`, {
-          sql: \`select * from test \${USER_CONTEXT.test1.filter('test1')}\`,
-          dimensions: {
-            test1: {
-              sql: 'test_1',
-              type: 'number'
-            },
-          }
-        });
-      `, {
-      errorReport: {
-        logger: (msg) => {
-          warnings.push(msg);
-        }
-      }
-    });
-
-    await compiler.compile();
-
-    expect(warnings[0]).toMatch(/Warning: USER_CONTEXT was deprecated in favor of SECURITY_CONTEXT. in main.js/);
   });
 
   it('CubePropContextTranspiler', async () => {

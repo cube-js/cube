@@ -31,6 +31,8 @@ describe('MaterializeDriver', () => {
       user: 'materialize',
       password: 'materialize',
       database: 'materialize',
+      cluster: 'quickstart',
+      ssl: false,
     });
     await driver.query('CREATE SCHEMA IF NOT EXISTS test;', []);
   });
@@ -71,8 +73,8 @@ describe('MaterializeDriver', () => {
   test('schema detection', async () => {
     await Promise.all([
       driver.query('CREATE TABLE A (a INT, b BIGINT, c TEXT, d DOUBLE, e FLOAT);', []),
-      driver.query('CREATE VIEW V AS SELECT * FROM mz_views;', []),
-      driver.query('CREATE MATERIALIZED VIEW MV AS SELECT * FROM mz_views;', []),
+      driver.query('CREATE VIEW V AS SELECT * FROM A;', []),
+      driver.query('CREATE MATERIALIZED VIEW MV AS SELECT * FROM A;', []),
     ]);
 
     const tablesSchemaData = await driver.tablesSchema();
@@ -149,4 +151,13 @@ describe('MaterializeDriver', () => {
       );
     }
   });
+
+  test('cluster', async () => {
+    const data = await driver.query(`SHOW CLUSTER;`, []);
+    expect(data).toEqual([
+      {
+        'cluster': 'quickstart',
+      }]);
+  });
+
 });

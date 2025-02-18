@@ -25,17 +25,32 @@ pub struct PostgresIntegrationTestSuite {
     // connection: tokio_postgres::Connection<Socket, NoTlsStream>,
 }
 
+fn get_env_var(env_name: &'static str) -> Option<String> {
+    if let Ok(value) = env::var(env_name) {
+        // Variable can be defined, but be empty on the CI
+        if value.is_empty() {
+            log::warn!("Environment variable {} is declared, but empty", env_name);
+
+            None
+        } else {
+            Some(value)
+        }
+    } else {
+        None
+    }
+}
+
 impl PostgresIntegrationTestSuite {
     pub(crate) async fn before_all() -> AsyncTestConstructorResult {
         let mut env_defined = false;
 
-        if let Ok(testing_cube_token) = env::var("CUBESQL_TESTING_CUBE_TOKEN".to_string()) {
+        if let Some(testing_cube_token) = get_env_var("CUBESQL_TESTING_CUBE_TOKEN") {
             env::set_var("CUBESQL_CUBE_TOKEN", testing_cube_token);
 
             env_defined = true;
         };
 
-        if let Ok(testing_cube_url) = env::var("CUBESQL_TESTING_CUBE_URL".to_string()) {
+        if let Some(testing_cube_url) = get_env_var("CUBESQL_TESTING_CUBE_URL") {
             env::set_var("CUBESQL_CUBE_URL", testing_cube_url);
         } else {
             env_defined = false;
@@ -68,7 +83,7 @@ impl PostgresIntegrationTestSuite {
             services.wait_processing_loops().await.unwrap();
         });
 
-        sleep(Duration::from_millis(1 * 1000)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let client = PostgresIntegrationTestSuite::create_client(
             format!("host=127.0.0.1 port={} user=test password=test", port)
@@ -94,7 +109,7 @@ impl PostgresIntegrationTestSuite {
         client
     }
 
-    async fn print_query_result<'a>(
+    async fn print_query_result(
         &self,
         res: Vec<Row>,
         with_description: bool,
@@ -127,7 +142,7 @@ impl PostgresIntegrationTestSuite {
                         column.type_().oid(),
                         PgType::get_by_tid(
                             PgTypeId::from_oid(column.type_().oid())
-                                .expect(&format!("Unknown oid {}", column.type_().oid()))
+                                .unwrap_or_else(|| panic!("Unknown oid {}", column.type_().oid()))
                         )
                         .typname,
                     ));
@@ -135,7 +150,7 @@ impl PostgresIntegrationTestSuite {
 
                 // We dont need data when with_rows = false, but it's useful for testing that data type is correct
                 match PgTypeId::from_oid(column.type_().oid())
-                    .expect(&format!("Unknown type oid: {}", column.type_().oid()))
+                    .unwrap_or_else(|| panic!("Unknown type oid: {}", column.type_().oid()))
                 {
                     PgTypeId::INT8 => {
                         let value: Option<i64> = row.get(idx);
@@ -274,7 +289,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(10000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
@@ -303,7 +318,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(10000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
@@ -918,8 +933,212 @@ impl PostgresIntegrationTestSuite {
 
         assert_eq!(
             err.to_string(),
-            "db error: ERROR: Internal: Unexpected panic. Reason: attempt to multiply with overflow"
+            "db error: ERROR: Unexpected panic. Reason: value can not be represented in a timestamp with nanosecond precision."
         );
+
+        Ok(())
+    }
+
+    async fn test_temp_tables(&self) -> RunResult<()> {
+        // Create temporary table in current session
+        self.test_simple_query(
+            r#"
+            CREATE TEMPORARY TABLE temp_table AS
+            SELECT 5 AS i, 'c' AS s
+            UNION ALL
+            SELECT 10 AS i, 'd' AS s
+        "#
+            .to_string(),
+            |messages| {
+                let SimpleQueryMessage::CommandComplete(rows) = &messages[0] else {
+                    panic!("Must be CommandComplete");
+                };
+
+                assert_eq!(*rows, 2);
+            },
+        )
+        .await?;
+
+        // Check that we can query it and we get the correct data
+        self.test_simple_query(
+            "SELECT i AS i, s AS s FROM temp_table GROUP BY 1, 2 ORDER BY i ASC".to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 3);
+
+                let SimpleQueryMessage::Row(row) = &messages[0] else {
+                    panic!("Must be Row, 0");
+                };
+
+                assert_eq!(row.get(0), Some("5"));
+                assert_eq!(row.get(1), Some("c"));
+
+                let SimpleQueryMessage::Row(row) = &messages[1] else {
+                    panic!("Must be Row, 1");
+                };
+
+                assert_eq!(row.get(0), Some("10"));
+                assert_eq!(row.get(1), Some("d"));
+
+                let SimpleQueryMessage::CommandComplete(rows) = &messages[2] else {
+                    panic!("Must be CommandComplete, 2");
+                };
+
+                assert_eq!(*rows, 2);
+            },
+        )
+        .await?;
+
+        // Try to create temporary table with the same name
+        let result = self
+            .test_simple_query(
+                r#"
+            CREATE TEMPORARY TABLE temp_table AS
+            SELECT 5 AS i, 'c' AS s
+            UNION ALL
+            SELECT 10 AS i, 'd' AS s
+        "#
+                .to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_err());
+
+        // Other sessions must have no access to temp tables
+        let new_client = Self::create_client(
+            format!(
+                "host=127.0.0.1 port={} dbname=meow user=test password=test",
+                self.port
+            )
+            .parse()
+            .unwrap(),
+        )
+        .await;
+
+        let result = new_client
+            .simple_query("SELECT i AS i, s AS s FROM temp_table GROUP BY 1, 2 ORDER BY i ASC")
+            .await;
+        assert!(result.is_err());
+
+        // But we can create a table with the same name as on another session
+        let result = new_client
+            .simple_query(
+                r#"
+            CREATE TEMPORARY TABLE temp_table AS
+            SELECT 5 AS i, 'c' AS s
+            UNION ALL
+            SELECT 10 AS i, 'd' AS s
+        "#,
+            )
+            .await;
+        assert!(result.is_ok());
+
+        // Drop table, make sure we can't query it anymore
+        self.test_simple_query("DROP TABLE temp_table".to_string(), |messages| {
+            let SimpleQueryMessage::CommandComplete(rows) = &messages[0] else {
+                panic!("Must be CommandComplete");
+            };
+
+            assert_eq!(*rows, 0);
+        })
+        .await?;
+
+        let result = self
+            .test_simple_query(
+                "SELECT i AS i, s AS s FROM temp_table GROUP BY 1, 2 ORDER BY i ASC".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_err());
+
+        // Set memory limits for testing: 5 MiB for session, 7 MiB total
+        env::set_var("CUBESQL_TEMP_TABLE_SESSION_MEM", "5");
+        env::set_var("CUBESQL_TEMP_TABLE_TOTAL_MEM", "7");
+
+        // Test that we can hit the session memory limit
+        let large_table_query = "
+            CREATE TEMPORARY TABLE tmp1 AS
+            WITH t1 AS (
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            UNION ALL
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            UNION ALL
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            UNION ALL
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            )
+            SELECT c1, c2, c3, c4, c5
+            FROM t1
+            CROSS JOIN (SELECT c1 AS c2 FROM t1) AS t2
+            CROSS JOIN (SELECT c1 AS c3 FROM t1) AS t3
+            CROSS JOIN (SELECT c1 AS c4 FROM t1) AS t4
+            CROSS JOIN (SELECT c1 AS c5 FROM t1) AS t5
+        "; // Estimation might change with arrow upgrades; currently almost 1.5 MiB
+
+        // We can create 3 tables estimating ~4.5 MiB
+        let result = self
+            .test_simple_query(large_table_query.to_string(), |_| {})
+            .await;
+        assert!(result.is_ok());
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp2 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_ok());
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp3 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_ok());
+
+        // Attempting to allocate one more table should throw an error
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp4 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("temporary table memory limit reached"));
+
+        // We are currently at 4.5 MiB total limit, hence we should be allowed
+        // to allocate one more similar table in a separate session
+        let result = new_client.simple_query(large_table_query).await;
+        assert!(result.is_ok());
+
+        // Next attempt must hit total memory limit
+        let result = new_client
+            .simple_query("CREATE TEMPORARY TABLE tmp2 AS SELECT * FROM tmp1")
+            .await;
+        assert!(result.is_err());
+
+        // Dropping a table from first session makes quota allow allocation from the second session
+        let result = self
+            .test_simple_query("DROP TABLE tmp3".to_string(), |_| {})
+            .await;
+        assert!(result.is_ok());
+        let result = new_client
+            .simple_query("CREATE TEMPORARY TABLE tmp2 AS SELECT * FROM tmp1")
+            .await;
+        assert!(result.is_ok());
+
+        // Now that the total memory limit is almost hit, make sure the first session
+        // can't get over the limit
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp3 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("temporary table memory limit reached"));
 
         Ok(())
     }
@@ -963,7 +1182,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_simple_cursors_close_all().await?;
         self.test_simple_query_prepare().await?;
         self.test_snapshot_execute_query(
-            "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
+            "SELECT COUNT(*) count, status FROM Orders GROUP BY status ORDER BY count DESC"
+                .to_string(),
             None,
             false,
         )
@@ -973,6 +1193,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_df_panic_handle().await?;
         self.test_simple_query_discard_all().await?;
         self.test_database_change().await?;
+        self.test_temp_tables().await?;
 
         // PostgreSQL doesn't support unsigned integers in the protocol, it's a constraint only
         self.test_snapshot_execute_query(
@@ -1048,7 +1269,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
             |rows| {
                 assert_eq!(rows.len(), 1);
 
-                let columns = rows.get(0).unwrap().columns();
+                let columns = rows.first().unwrap().columns();
                 assert_eq!(
                     columns
                         .into_iter()

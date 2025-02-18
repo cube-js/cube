@@ -4,10 +4,10 @@ module.exports = {
   "configuration": "Configuration",
   "data-modeling": "Data modeling",
   "caching": "Caching",
-  "auth": "Authentication & authorization",
+  "auth": "Access control",
   "apis-integrations": "APIs & integrations",
   "workspace": "Workspace",
   "deployment": "Deployment",
-  "monitoring": "Monitoring",
+  "distribution": "Distribution",
   "faqs": "FAQs"
 }

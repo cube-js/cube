@@ -10,7 +10,7 @@ export function getCore(
   source: BaseDriver,
   storage: BaseDriver,
 ): CubejsServerCoreExposed {
-  const _path = path.resolve(process.cwd(), './.temp/schema/ecommerce.yaml');
+  const _path = path.resolve(process.cwd(), './.temp/model/ecommerce.yaml');
   return new CubejsServerCore({
     apiSecret: 'mysupersecret',
     // devServer: true,

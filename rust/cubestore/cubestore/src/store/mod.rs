@@ -1,7 +1,7 @@
 pub mod compaction;
 
-use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
 use async_trait::async_trait;
+use datafusion::arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::common::collect as common_collect;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -24,7 +24,7 @@ use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
 use crate::CubeError;
-use arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Write},
@@ -38,10 +38,10 @@ use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::table::data::cmp_partition_key;
-use crate::table::parquet::{arrow_schema, ParquetTableStore};
-use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
-use arrow::record_batch::RecordBatch;
+use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
 use compaction::{merge_chunks, merge_replay_handles};
+use datafusion::arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::cube_ext::util::lexcmp_array_rows;
 use deepsize::DeepSizeOf;
@@ -182,7 +182,8 @@ pub struct ChunkStore {
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
     config: Arc<dyn ConfigObj>,
-    memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
+    metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
+    memory_chunks: RwLock<HashMap<String, RecordBatch>>,
     chunk_size: usize,
 }
 
@@ -250,9 +251,13 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         index: IdRow<Index>,
         sort_key_size: usize,
     ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError>;
-    async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
-    async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
-    async fn free_deleted_memory_chunks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError>;
+    async fn add_memory_chunk(
+        &self,
+        chunk_name: String,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError>;
+    async fn free_memory_chunk(&self, chunk_name: String) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(&self, chunk_names: Vec<String>) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
         &self,
         index: IdRow<Index>,
@@ -338,6 +343,7 @@ impl ChunkStore {
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
         config: Arc<dyn ConfigObj>,
+        metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
@@ -345,6 +351,7 @@ impl ChunkStore {
             remote_fs,
             cluster,
             config,
+            metadata_cache_factory,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
         };
@@ -443,7 +450,7 @@ impl ChunkDataStore for ChunkStore {
 
         let mut columns = Vec::new();
         for i in 0..batches[0].num_columns() {
-            columns.push(arrow::compute::concat(
+            columns.push(datafusion::arrow::compute::concat(
                 &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
             )?)
         }
@@ -508,7 +515,7 @@ impl ChunkDataStore for ChunkStore {
         }
         let mut columns = Vec::new();
         for i in 0..batches[0].num_columns() {
-            columns.push(arrow::compute::concat(
+            columns.push(datafusion::arrow::compute::concat(
                 &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
             )?)
         }
@@ -575,16 +582,19 @@ impl ChunkDataStore for ChunkStore {
                 return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
             }
             let memory_chunks = self.memory_chunks.read().await;
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
             Ok(vec![memory_chunks
-                .get(&chunk.get_id())
+                .get(&chunk_name)
                 .map(|b| b.clone())
                 .unwrap_or(RecordBatch::new_empty(Arc::new(
                     arrow_schema(&index.get_row()),
                 )))])
         } else {
             let (local_file, index) = self.download_chunk(chunk, partition, index).await?;
+            let metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory> =
+                self.metadata_cache_factory.clone();
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, metadata_cache_factory);
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
@@ -630,7 +640,7 @@ impl ChunkDataStore for ChunkStore {
             let num_columns = data[0].num_columns();
             let mut columns = Vec::with_capacity(num_columns);
             for i in 0..num_columns {
-                let v = arrow::compute::concat(
+                let v = datafusion::arrow::compute::concat(
                     &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
                 )?;
                 columns.push(v);
@@ -649,7 +659,11 @@ impl ChunkDataStore for ChunkStore {
             let indices = lexsort_to_indices(&sort_key, None)?;
             let mut new = Vec::with_capacity(num_columns);
             for c in columns {
-                new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
+                new.push(datafusion::arrow::compute::take(
+                    c.as_ref(),
+                    &indices,
+                    None,
+                )?)
             }
             Ok(new)
         })
@@ -669,8 +683,9 @@ impl ChunkDataStore for ChunkStore {
             if node_name != server_name {
                 return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
             }
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
             let memory_chunks = self.memory_chunks.read().await;
-            Ok(memory_chunks.contains_key(&chunk.get_id()))
+            Ok(memory_chunks.contains_key(&chunk_name))
         } else {
             return Err(CubeError::internal(format!(
                 "Chunk {:?} is not in memory",
@@ -679,10 +694,14 @@ impl ChunkDataStore for ChunkStore {
         }
     }
 
-    async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError> {
+    async fn add_memory_chunk(
+        &self,
+        chunk_name: String,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError> {
         self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
-        memory_chunks.insert(chunk_id, batch);
+        memory_chunks.insert(chunk_name, batch);
         Ok(())
     }
     async fn add_persistent_chunk(
@@ -701,19 +720,19 @@ impl ChunkDataStore for ChunkStore {
         .await?
     }
 
-    async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
+    async fn free_memory_chunk(&self, chunk_name: String) -> Result<(), CubeError> {
         self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
-        memory_chunks.remove(&chunk_id);
+        memory_chunks.remove(&chunk_name);
         Ok(())
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn free_deleted_memory_chunks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError> {
-        let ids_set = chunk_ids.into_iter().collect::<HashSet<_>>();
+    async fn free_deleted_memory_chunks(&self, chunk_names: Vec<String>) -> Result<(), CubeError> {
+        let names_set = chunk_names.into_iter().collect::<HashSet<_>>();
         {
             let mut memory_chunks = self.memory_chunks.write().await;
-            memory_chunks.retain(|id, _| !ids_set.contains(id));
+            memory_chunks.retain(|name, _| !names_set.contains(name));
         }
 
         self.report_in_memory_metrics().await?;
@@ -787,11 +806,26 @@ mod tests {
     use crate::metastore::{BaseRocksStoreFs, IndexDef, IndexType, RocksMetaStore};
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
+    use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use crate::{metastore::ColumnType, table::TableValue};
-    use arrow::array::{Int64Array, StringArray};
-    use rocksdb::{Options, DB};
+    use cuberockstore::rocksdb::{Options, DB};
+    use datafusion::arrow::array::{Int64Array, StringArray};
+    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use std::fs;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn dataframe_deep_size_of() {
+        for (v, expected_size) in [(
+            DataFrame::new(
+                vec![Column::new("payload".to_string(), ColumnType::String, 0)],
+                vec![Row::new(vec![TableValue::String("foo".to_string())])],
+            ),
+            162_usize,
+        )] {
+            assert_eq!(v.deep_size_of(), expected_size, "size for {:?}", v);
+        }
+    }
 
     #[tokio::test]
     async fn create_wal_test() {
@@ -860,6 +894,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -914,6 +950,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
                 10,
             );
 
@@ -954,6 +991,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
+                    false,
                     None,
                 )
                 .await
@@ -1015,6 +1054,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
                 10,
             );
 
@@ -1063,6 +1103,8 @@ mod tests {
                     None,
                     Some(vec![("sum".to_string(), "sum_int".to_string())]),
                     None,
+                    None,
+                    false,
                     None,
                 )
                 .await
@@ -1184,7 +1226,7 @@ impl ChunkStore {
                 let to_write = UInt64Array::from(to_write);
                 let columns = columns
                     .iter()
-                    .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
+                    .map(|c| datafusion::arrow::compute::take(c.as_ref(), &to_write, None))
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
 
@@ -1304,7 +1346,7 @@ impl ChunkStore {
         }
     }
 
-    /// Processes data into parquet files in the current task and schedules an async file upload.
+    /// Processes data intuet files in the current task and schedules an async file upload.
     /// Join the returned handle to wait for the upload to finish.
     async fn add_chunk_columns(
         &self,
@@ -1328,9 +1370,10 @@ impl ChunkStore {
             let node_name = self.cluster.node_name_by_partition(&partition);
             let cluster = self.cluster.clone();
 
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
             Ok(cube_ext::spawn(async move {
                 cluster
-                    .add_memory_chunk(&node_name, chunk.get_id(), batch)
+                    .add_memory_chunk(&node_name, chunk_name, batch)
                     .await?;
 
                 Ok((chunk, None))
@@ -1341,10 +1384,23 @@ impl ChunkStore {
             let local_file = self.remote_fs.temp_upload_path(remote_path.clone()).await?;
             let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
+            let metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory> =
+                self.metadata_cache_factory.clone();
+
+            let table = self
+                .meta_store
+                .get_table_by_id(index.get_row().table_id())
+                .await?;
+
+            let parquet = ParquetTableStore::new(
+                index.get_row().clone(),
+                ROW_GROUP_SIZE,
+                metadata_cache_factory,
+            );
+
+            let writer_props = parquet.writer_props(&table).await?;
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
-                parquet.write_data(&local_file_copy, data)?;
-                Ok(())
+                parquet.write_data_given_props(&local_file_copy, data, writer_props)
             })
             .await??;
 

@@ -2,12 +2,17 @@
 export type GenericDataBaseType = string;
 
 export interface TableColumn {
-  // eslint-disable-next-line camelcase
   name: string;
-  // eslint-disable-next-line camelcase
   type: GenericDataBaseType;
   attributes?: string[]
 }
+
+export type ForeignKey = {
+  // eslint-disable-next-line camelcase
+  target_table: string;
+  // eslint-disable-next-line camelcase
+  target_column: string;
+};
 
 export interface TableColumnQueryResult {
   // eslint-disable-next-line camelcase
@@ -15,6 +20,8 @@ export interface TableColumnQueryResult {
   // eslint-disable-next-line camelcase
   data_type: GenericDataBaseType;
   attributes?: string[]
+  // eslint-disable-next-line camelcase
+  foreign_keys?: ForeignKey[]
 }
 
 export type TableStructure = TableColumn[];
@@ -38,7 +45,7 @@ export interface DownloadTableBase {
   release?: () => Promise<void>;
 }
 
-export interface DownloadTableMemoryData extends DownloadTableBase {
+export interface TableMemoryData extends DownloadTableBase {
   rows: Rows;
   /**
    * Some drivers know types of response
@@ -46,7 +53,7 @@ export interface DownloadTableMemoryData extends DownloadTableBase {
   types?: TableStructure;
 }
 
-export interface DownloadTableCSVData extends DownloadTableBase {
+export interface TableCSVData extends DownloadTableBase {
   /**
    * An array of unloaded CSV data temporary URLs.
    */
@@ -81,6 +88,7 @@ export interface StreamTableData extends DownloadTableBase {
 export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
   selectStatement?: string;
+  sourceTable?: any,
   partitions?: number;
   streamOffset?: string;
   streamingSource: {
@@ -94,18 +102,15 @@ export interface StreamingSourceTableData extends DownloadTableBase {
   types?: TableStructure;
 }
 
-export type StreamTableDataWithTypes = StreamTableData & {
-  /**
-   * Some drivers know types of response
-   */
-  types: TableStructure;
-};
-
-export function isDownloadTableMemoryData(tableData: any): tableData is DownloadTableMemoryData {
+export function isDownloadTableMemoryData(tableData: any): tableData is TableMemoryData {
   return Boolean(tableData.rows);
 }
 
-export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData;
+export function isDownloadTableCSVData(tableData: any): tableData is TableCSVData {
+  return Boolean(tableData.csvFile);
+}
+
+export type DownloadTableData = TableMemoryData | TableCSVData | StreamTableData | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
   csvImport?: boolean,
@@ -124,6 +129,7 @@ export type StreamOptions = {
 
 export type StreamingSourceOptions = {
   streamOffset?: boolean;
+  outputColumnTypes?: TableColumn[]
 };
 
 export interface DownloadQueryResultsBase {
@@ -162,7 +168,15 @@ export type ExternalCreateTableOptions = {
   createTableIndexes?: CreateTableIndex[],
   sealAt?: string
 };
-export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData | StreamTableDataWithTypes);
+
+export type DownloadTableMemoryData = TableMemoryData & DownloadQueryResultsBase;
+export type DownloadTableCSVData = TableCSVData & DownloadQueryResultsBase;
+export type DownloadStreamTableData = StreamTableData & DownloadQueryResultsBase;
+export type DownloadStreamingSourceTableData = StreamingSourceTableData & DownloadQueryResultsBase;
+export type DownloadQueryResultsResult = DownloadTableMemoryData | DownloadTableCSVData | DownloadStreamTableData | DownloadStreamingSourceTableData;
+
+// OLD alias for DownloadStreamTableData
+export type StreamTableDataWithTypes = DownloadStreamTableData;
 
 // eslint-disable-next-line camelcase
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
@@ -176,6 +190,33 @@ export type QueryTablesResult = { schema_name: string, table_name: string };
 // eslint-disable-next-line camelcase
 export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
 
+export type PrimaryKeysQueryResult = {
+  // eslint-disable-next-line camelcase
+  table_schema: string
+  // eslint-disable-next-line camelcase
+  table_name: string
+  // eslint-disable-next-line camelcase
+  column_name: string
+};
+
+export type ForeignKeysQueryResult = {
+  // eslint-disable-next-line camelcase
+  table_schema: string
+  // eslint-disable-next-line camelcase
+  table_name: string
+  // eslint-disable-next-line camelcase
+  column_name: string
+  // eslint-disable-next-line camelcase
+  target_table: string
+  // eslint-disable-next-line camelcase
+  target_column: string
+};
+
+export type TableKeysFilter = {
+  tableSchema: string,
+  tableName: string[]
+};
+
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(
@@ -186,9 +227,10 @@ export interface DriverInterface {
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
-  queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
+  queryColumnTypes: (sql: string, params: unknown[]) => Promise<{ name: any; type: string; }[]>;
   //
   getSchemas: () => Promise<QuerySchemasResult[]>;
+  tablesSchema: () => Promise<any>;
   getTablesForSpecificSchemas: (schemas: QuerySchemasResult[]) => Promise<QueryTablesResult[]>;
   getColumnsForSpecificTables: (tables: QueryTablesResult[]) => Promise<QueryColumnsResult[]>;
   // eslint-disable-next-line camelcase
@@ -198,25 +240,26 @@ export interface DriverInterface {
   // Download data from Query (for readOnly)
   downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
-  downloadTable: (table: string, options: ExternalDriverCompatibilities & StreamingSourceOptions) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
-  
+  downloadTable: (table: string, options: ExternalDriverCompatibilities & StreamingSourceOptions) => Promise<TableMemoryData>;
+
   /**
    * Returns stream table object that includes query result stream and
    * queried fields types.
    */
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
-  
+
   /**
    * Returns to the Cubestore an object with links to unloaded to an
    * export bucket data.
    */
-  unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
-  
+  unload?: (table: string, options: UnloadOptions) => Promise<TableCSVData>;
+  unloadFromQuery?: (sql: string, params: unknown[], options: UnloadOptions) => Promise<DownloadTableCSVData>;
+
   /**
    * Determines whether export bucket feature is configured or not.
    */
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
-  
+
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
   // Shutdown the driver

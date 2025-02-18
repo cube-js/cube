@@ -1,7 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8726
-expression: "execute_query(r#\"SELECT TRUE AS \"_\" FROM \"public\".\"KibanaSampleDataEcommerce\" WHERE 1 <> 1 LIMIT 0;\"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(r#\"SELECT TRUE AS \"_\" FROM \"public\".\"KibanaSampleDataEcommerce\" WHERE 1 <> 1 LIMIT 0;\"#.to_string(),\nDatabaseProtocol::PostgreSQL,).await?"
 ---
 +---+
 | _ |

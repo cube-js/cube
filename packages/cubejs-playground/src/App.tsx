@@ -1,23 +1,25 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import { Component, useEffect } from 'react';
 import '@ant-design/compatible/assets/index.css';
-import { Layout, Alert } from 'antd';
+import { Alert, Layout } from 'antd';
+import { Component, PropsWithChildren, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 import styled from 'styled-components';
+import { Root } from '@cube-dev/ui-kit';
 
-import Header from './components/Header/Header';
-import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
+import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
+import GlobalStyles from './components/GlobalStyles';
+import Header from './components/Header/Header';
+import { LivePreviewContextProvider } from './components/LivePreviewContext/LivePreviewContextProvider';
 import {
   event,
   setAnonymousId,
-  setTracker,
   setTelemetry,
+  setTracker,
   trackImpl,
 } from './events';
-import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
 import { useAppContext } from './hooks';
-import { LivePreviewContextProvider } from './components/LivePreviewContext/LivePreviewContextProvider';
+import { QUERY_BUILDER_COLOR_TOKENS } from './QueryBuilderV2';
 
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
@@ -30,7 +32,14 @@ type AppState = {
   isAppContextSet: boolean;
 };
 
-class App extends Component<RouteComponentProps, AppState> {
+const ROOT_STYLES = {
+  height: 'min 100vh',
+  display: 'grid',
+  gridTemplateRows: 'min-content 1fr',
+  ...QUERY_BUILDER_COLOR_TOKENS,
+};
+
+class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
   static getDerivedStateFromError(error) {
     return { fatalError: error };
   }
@@ -101,9 +110,9 @@ class App extends Component<RouteComponentProps, AppState> {
 
     return (
       <LivePreviewContextProvider
-        disabled={context!.livePreview == null || !context!.livePreview}
+        disabled={!context?.livePreview}
       >
-        <Layout>
+        <Root styles={ROOT_STYLES}>
           <GlobalStyles />
 
           <Header selectedKeys={[location.pathname]} />
@@ -119,7 +128,7 @@ class App extends Component<RouteComponentProps, AppState> {
               children
             )}
           </StyledLayoutContent>
-        </Layout>
+        </Root>
       </LivePreviewContextProvider>
     );
   }

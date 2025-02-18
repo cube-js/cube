@@ -1,5 +1,105 @@
 [
   {
+    "source": "/product/apis-integrations/semantic-layer-sync/power-bi",
+    "destination": "/product/configuration/visualization-tools/powerbi",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-core",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-core",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-react",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-react",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ngx",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ngx",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-vue",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-vue",
+    "permanent": true
+  },
+  {
+    "source": "/reference/frontend/cubejs-client-ws-transport",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ws-transport",
+    "permanent": true
+  },
+  {
+    "source": "/reference/cli",
+    "destination": "/product/workspace/cli/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/ai-api",
+    "destination": "/product/apis-integrations/ai-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/graphql-api",
+    "destination": "/product/apis-integrations/graphql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/rest-api",
+    "destination": "/product/apis-integrations/rest-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/sql-api",
+    "destination": "/product/apis-integrations/sql-api/reference",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/publicity",
+    "destination": "/product/auth/member-level-security",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/data-modeling/fiscal-year-quarter-dimensions",
+    "destination": "/guides/recipes/data-modeling/custom-granularity",
+    "permanent": true
+  },
+  {
+    "source": "/product/workspace/semantic-layer-sync",
+    "destination": "/product/apis-integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/cloudwatch",
+    "destination": "/product/workspace/monitoring/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/s3",
+    "destination": "/product/workspace/monitoring/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/datadog",
+    "destination": "/product/workspace/monitoring/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/grafana-cloud",
+    "destination": "/product/workspace/monitoring/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations",
+    "destination": "/product/workspace/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/subquery-dimensions",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
     "source": "/product/data-modeling/fundamentals/additional-concepts",
     "destination": "/product/data-modeling/concepts/subquery-dimensions",
     "permanent": true
@@ -176,12 +276,12 @@
   },
   {
     "source": "/cloud/workspace/alerts",
-    "destination": "/product/monitoring/alerts",
+    "destination": "/product/monitoring",
     "permanent": true
   },
   {
     "source": "/cloud/dev-tools/alerts/",
-    "destination": "/product/monitoring/alerts",
+    "destination": "/product/monitoring",
     "permanent": true
   },
   {
@@ -476,12 +576,12 @@
   },
   {
     "source": "/backend/sql/reference/functions-operators",
-    "destination": "/reference/sql-api/sql-functions-and-operators",
+    "destination": "/product/apis-integrations/sql-api/reference#sql-functions-and-operators",
     "permanent": true
   },
   {
     "source": "/backend/sql/reference/commands",
-    "destination": "/reference/sql-api/sql-commands",
+    "destination": "/product/apis-integrations/sql-api/reference#sql-commands",
     "permanent": true
   },
   {
@@ -541,27 +641,22 @@
   },
   {
     "source": "/rest-api",
-    "destination": "/reference/rest-api",
+    "destination": "/product/apis-integrations/rest-api/reference",
     "permanent": true
   },
   {
     "source": "/backend/graphql",
-    "destination": "/reference/graphql-api",
+    "destination": "/product/apis-integrations/graphql-api/reference",
     "permanent": true
   },
   {
     "source": "/@cubejs-client-vue",
-    "destination": "/reference/frontend/cubejs-client-vue",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-vue",
     "permanent": true
   },
   {
     "source": "/@cubejs-client-ngx",
-    "destination": "/reference/frontend/cubejs-client-ngx",
-    "permanent": true
-  },
-  {
-    "source": "/reference",
-    "destination": "/reference/cli",
+    "destination": "/product/apis-integrations/javascript-sdk/reference/cubejs-client-ngx",
     "permanent": true
   },
   {
@@ -596,22 +691,22 @@
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc",
-    "destination": "/product/configuration/vpc",
+    "destination": "/product/deployment/cloud/vpc",
     "permanent": true
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc/gcp",
-    "destination": "/product/configuration/vpc/gcp",
+    "destination": "/product/deployment/cloud/vpc/gcp",
     "permanent": true
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc/azure",
-    "destination": "/product/configuration/vpc/azure",
+    "destination": "/product/deployment/cloud/vpc/azure",
     "permanent": true
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc/aws",
-    "destination": "/product/configuration/vpc/aws",
+    "destination": "/product/deployment/cloud/vpc/aws",
     "permanent": true
   },
   {
@@ -667,11 +762,6 @@
   {
     "source": "/config/downstream/hex",
     "destination": "/product/configuration/visualization-tools/hex",
-    "permanent": true
-  },
-  {
-    "source": "/config/downstream/delphi",
-    "destination": "/product/configuration/visualization-tools/delphi",
     "permanent": true
   },
   {

@@ -133,8 +133,10 @@ class MockDriver {
     return {};
   }
 
-  async streamQuery(sql) {
-    return Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)));
+  async stream(sql) {
+    return {
+      rowStream: Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)))
+    };
   }
 }
 
@@ -1060,6 +1062,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(timestamp) FROM orders', []],
         ],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'range partitions',
@@ -1102,6 +1105,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(timestamp) FROM orders', []],
         ],
         partitionGranularity: 'hour',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'range partitions',
@@ -1142,6 +1146,7 @@ describe('QueryOrchestrator', () => {
           ['SELECT MAX(created_at) FROM orders', []],
         ],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'empty partitions',
@@ -1180,6 +1185,7 @@ describe('QueryOrchestrator', () => {
           [endQuery || 'SELECT MAX(created_at) FROM orders', []],
         ],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC',
         matchedTimeDimensionDateRange
       }],
@@ -1230,6 +1236,7 @@ describe('QueryOrchestrator', () => {
         ],
         matchedTimeDimensionDateRange: ['2021-08-01T00:00:00.000', '2021-08-30T00:00:00.000'],
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC'
       }],
       requestId: 'empty intersection',
@@ -1264,6 +1271,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC',
         rollupLambdaId: 'orders.d_lambda',
         matchedTimeDimensionDateRange
@@ -1286,6 +1294,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'hour',
+        timestampPrecision: 3,
         timezone: 'UTC',
         rollupLambdaId: 'orders.d_lambda',
         lastRollupLambda: true,
@@ -1339,6 +1348,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'week',
+        timestampPrecision: 3,
         timezone: 'UTC',
         rollupLambdaId: 'orders.d_lambda',
         matchedTimeDimensionDateRange
@@ -1361,6 +1371,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC',
         rollupLambdaId: 'orders.d_lambda',
         matchedTimeDimensionDateRange
@@ -1383,6 +1394,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'hour',
+        timestampPrecision: 3,
         timezone: 'UTC',
         rollupLambdaId: 'orders.d_lambda',
         lastRollupLambda: true,
@@ -1425,6 +1437,7 @@ describe('QueryOrchestrator', () => {
         ],
         external: true,
         partitionGranularity: 'day',
+        timestampPrecision: 3,
         timezone: 'UTC',
         matchedTimeDimensionDateRange
       }],

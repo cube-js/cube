@@ -15,6 +15,23 @@ case.
 Under the hood, the GraphQL API is exposed via the `/graphql` endpoint of the
 [REST API][ref-rest-api].
 
+See [GraphQL API reference][ref-ref-graphql-api] for the list of supported
+requests and parameters.
+
+<WarningBox>
+
+Compared to the [REST API][ref-rest-api], GraphQL API currently has the
+following limitations:
+
+- No support for the [WebSockets transport][ref-websockets].
+- No support for [subscriptions to changes][ref-subscriptions].
+- No support for referencing [segments][ref-segments] in queries.
+- No support for [compare date range queries][ref-compare-date-range].
+- No support for querying [data model metadata][ref-metadata].
+- No ability to apply a [pivot config][ref-pivot-config] on the front-end.
+
+</WarningBox>
+
 ## Configuration
 
 GraphQL API is enabled by default and secured using [API scopes][ref-api-scopes]
@@ -22,13 +39,10 @@ and [CORS][ref-cors]. To disallow access to GraphQL API, disable the `graphql`
 scope, e.g., by setting the `CUBEJS_DEFAULT_API_SCOPES` environment variable to
 `meta,data`.
 
-## Getting started
+To find your GraphQL API endpoint in Cube Cloud, go to the <Btn>Overview</Btn>
+page, click <Btn>API credentials</Btn>, and choose the <Btn>GraphQL API</Btn> tab.
 
-First, ensure you're running Cube v0.28.58 or later. Then start the project
-locally in development mode, and navigate to `http://localhost:4000/` in your
-browser. After generating data models and running query you should see the
-GraphiQL interface if you click 'GraphiQL' button. If you click the 'Docs'
-button in the top-right, you can explore the introspected schema.
+## Getting started
 
 As an example, let's use the `orders` cube from the example eCommerce database:
 
@@ -219,3 +233,10 @@ to our query as follows:
 [ref-cors]: /product/apis-integrations/rest-api#configuration-cors
 [graphql]: https://graphql.org
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
+[ref-ref-graphql-api]: /product/apis-integrations/graphql-api/reference
+[ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch#web-sockets
+[ref-subscriptions]: /product/apis-integrations/rest-api/real-time-data-fetch#client-subscriptions
+[ref-compare-date-range]: /product/apis-integrations/queries#compare-date-range-query
+[ref-metadata]: /product/apis-integrations/rest-api/reference#v1meta
+[ref-pivot-config]: /product/apis-integrations/javascript-sdk/reference/cubejs-client-core#pivotconfig
+[ref-segments]: /reference/data-model/segments

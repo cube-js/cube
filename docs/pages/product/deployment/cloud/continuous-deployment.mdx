@@ -22,7 +22,7 @@ click <Btn>Generate Git credentials</Btn> to obtain Git credentials:
 The instructions to set up Cube Cloud as a Git remote are also available on the
 same screen:
 
-```bash{promptUser: user}
+```bash
 git config credential.helper store
 git remote add cubecloud <YOUR-CUBE-CLOUD-GIT-URL>
 git push cubecloud master
@@ -33,6 +33,13 @@ git push cubecloud master
 First, ensure your deployment is configured to deploy with Git. Then connect
 your GitHub repository to your deployment by clicking the <Btn>Connect to
 GitHub</Btn> button, and selecting your repository.
+
+<WarningBox>
+
+If your organization uses SAML SSO for GitHub authentication, make sure to start an active SAML 
+session prior to connecting to your GitHub account from Cube.
+
+</WarningBox>
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -68,7 +75,7 @@ configuration files directly from your local project directory.
 You can obtain a Cube Cloud deploy token from your
 deployment's <Btn>Settings</Btn> screen.
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli deploy --token TOKEN
 ```
 
@@ -101,14 +108,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Use Node.js 20.x
         uses: actions/setup-node@v1
         with:
-          node-version: 14.x
+          node-version: 20.x
+      - name: Install Cube backend server core
+        run: npm i @cubejs-backend/server-core
       - name: Deploy to Cube Cloud
-        run: npx cubejs-cli deploy
-        env:
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+        run: npx cubejs-cli deploy --token ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
 ```
 
 [ref-workspace-cli]: /product/workspace/cli

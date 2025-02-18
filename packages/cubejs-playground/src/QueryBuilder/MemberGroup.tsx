@@ -24,7 +24,7 @@ export default function MemberGroup({
   const handleClick = useCallback((m) => updateMethods.add(m), []);
 
   return (
-    <SectionRow>
+    <SectionRow className="cube-section">
       {members.map((m) => {
         const isMissing = missingMembers.includes(m.title);
 

@@ -1,19 +1,19 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules, transforming_rewrite,
-        window_fun_expr_var_arg, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WindowFunctionExprFun, WrapperPullupReplacerAliasToCube,
+        rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, window_fun_expr_var_arg, wrapper_pullup_replacer,
+        wrapper_pushdown_replacer, wrapper_replacer_context, WindowFunctionExprFun,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
-use datafusion::physical_plan::window_functions::WindowFunction;
-use egg::{EGraph, Rewrite, Subst};
+use datafusion::physical_plan::windows::WindowFunction;
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn aggregate_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn aggregate_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-window-function",
@@ -25,30 +25,13 @@ impl WrapperRules {
                         "?order_by",
                         "?window_frame",
                     ),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?cube_members",
+                    "?context",
                 ),
                 window_fun_expr_var_arg(
                     "?fun",
-                    wrapper_pushdown_replacer(
-                        "?expr",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?partition_by",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?order_by",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?expr", "?context"),
+                    wrapper_pushdown_replacer("?partition_by", "?context"),
+                    wrapper_pushdown_replacer("?order_by", "?context"),
                     "?window_frame",
                 ),
             ),
@@ -58,21 +41,36 @@ impl WrapperRules {
                     "?fun",
                     wrapper_pullup_replacer(
                         "?expr",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?partition_by",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?order_by",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     "?window_frame",
                 ),
@@ -84,9 +82,14 @@ impl WrapperRules {
                         "?order_by",
                         "?window_frame",
                     ),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_window_fun_expr("?fun", "?alias_to_cube"),
             ),
@@ -115,14 +118,14 @@ impl WrapperRules {
         &self,
         fun_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

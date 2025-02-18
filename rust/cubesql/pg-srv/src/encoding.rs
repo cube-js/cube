@@ -4,7 +4,10 @@ use crate::{protocol::Format, ProtocolError};
 use bytes::{BufMut, BytesMut};
 #[cfg(feature = "with-chrono")]
 use chrono::{NaiveDate, NaiveDateTime};
-use std::io::{Error, ErrorKind};
+use std::{
+    fmt::{Display, Formatter},
+    io::{Error, ErrorKind},
+};
 
 /// This trait explains how to encode values to the protocol format
 pub trait ToProtocolValue: std::fmt::Debug {
@@ -210,7 +213,7 @@ impl IntervalValue {
 
         if self.hours != 0 || self.mins != 0 || self.secs != 0 || self.usecs != 0 {
             if self.hours < 0 || self.mins < 0 || self.secs < 0 || self.usecs < 0 {
-                res.push_str("-")
+                res.push('-')
             };
 
             res.push_str(&format!(
@@ -221,7 +224,7 @@ impl IntervalValue {
             ));
 
             if self.usecs != 0 {
-                res.push_str(&format!(".{:06}", self.usecs))
+                res.push_str(&format!(".{:06}", self.usecs.abs()))
             }
         }
 
@@ -231,27 +234,36 @@ impl IntervalValue {
     pub fn as_postgresql_str(&self) -> String {
         let (years, months) = self.extract_years_month();
 
+        // We manually format sign for the case where self.secs == 0, self.usecs < 0.
+        // We follow assumptions about consistency of hours/mins/secs/usecs signs as in
+        // as_iso_str here.
         format!(
-            "{} years {} mons {} days {} hours {} mins {}.{} secs",
+            "{} years {} mons {} days {} hours {} mins {}{}.{} secs",
             years,
             months,
             self.days,
             self.hours,
             self.mins,
-            self.secs,
+            if self.secs < 0 || self.usecs < 0 {
+                "-"
+            } else {
+                ""
+            },
+            self.secs.abs(),
             if self.usecs == 0 {
                 "00".to_string()
             } else {
-                format!("{:06}", self.usecs)
+                format!("{:06}", self.usecs.abs())
             }
         )
     }
 }
 
-impl ToString for IntervalValue {
-    // https://github.com/postgres/postgres/blob/REL_14_4/src/interfaces/ecpg/pgtypeslib/interval.c#L763
-    fn to_string(&self) -> String {
-        self.as_postgresql_str()
+impl Display for IntervalValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // TODO lift formatter higher, to as_postgresql_str
+        // https://github.com/postgres/postgres/blob/REL_14_4/src/interfaces/ecpg/pgtypeslib/interval.c#L763
+        f.write_str(&self.as_postgresql_str())
     }
 }
 
@@ -286,7 +298,7 @@ mod tests {
         let mut buf = BytesMut::new();
         value.to_text(&mut buf).unwrap();
 
-        assert_eq!(&buf.as_ref()[..], expected);
+        assert_eq!(buf.as_ref(), expected);
     }
 
     #[test]
@@ -302,7 +314,7 @@ mod tests {
         let mut buf = BytesMut::new();
         value.to_binary(&mut buf).unwrap();
 
-        assert_eq!(&buf.as_ref()[..], expected);
+        assert_eq!(buf.as_ref(), expected);
     }
 
     #[test]
@@ -344,6 +356,26 @@ mod tests {
         assert_eq!(
             IntervalValue::new(0, 0, 0, 0, 0, 0).to_string(),
             "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, 0, 0, 1, 23).to_string(),
+            "0 years 0 mons 0 days 0 hours 0 mins 1.000023 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, 0, 0, -1, -23).to_string(),
+            "0 years 0 mons 0 days 0 hours 0 mins -1.000023 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, 0, 0, -1, 0).to_string(),
+            "0 years 0 mons 0 days 0 hours 0 mins -1.00 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, -14, -5, -1, 0).to_string(),
+            "0 years 0 mons 0 days -14 hours -5 mins -1.00 secs".to_string()
         );
 
         Ok(())

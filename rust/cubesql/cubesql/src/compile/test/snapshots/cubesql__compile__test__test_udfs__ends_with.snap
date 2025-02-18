@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"select \\\n                    ends_with('rust is killing me', 'me') as r1,\n                    ends_with('rust is killing me', 'no') as r2\n                \".to_string(),\nDatabaseProtocol::MySQL).await?"
+---
++------+-------+
+| r1   | r2    |
++------+-------+
+| true | false |
++------+-------+

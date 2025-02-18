@@ -20,6 +20,7 @@ cube(`SecurityContextTest`, {
     uid: {
       sql: `uid`,
       type: `string`,
+      primaryKey: true,
     },
   },
 });

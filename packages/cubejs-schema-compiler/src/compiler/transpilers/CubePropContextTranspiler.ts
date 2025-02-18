@@ -1,8 +1,13 @@
 import * as t from '@babel/types';
 import R from 'ramda';
-import { NodePath } from '@babel/traverse';
 
-import { TranspilerInterface, TraverseObject } from './transpiler.interface';
+import type { NodePath } from '@babel/traverse';
+import {
+  TranspilerCubeResolver,
+  TranspilerInterface,
+  TranspilerSymbolResolver,
+  TraverseObject
+} from './transpiler.interface';
 import type { CubeSymbols } from '../CubeSymbols';
 import type { CubeDictionary } from '../CubeDictionary';
 
@@ -12,12 +17,22 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /sql$/,
   /(sqlTable|sql_table)$/,
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillMemberReferences|drillMembers|drill_members)$/,
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(orderBy|order_by)\.[0-9]+\.sql$/,
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeShift|time_shift)\.[0-9]+\.(timeDimension|time_dimension)$/,
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(reduceBy|reduce_by|groupBy|group_by|addGroupBy|add_group_by)$/,
+  /^dimensions\.[_a-zA-Z][_a-zA-Z0-9]*\.(reduceBy|reduce_by|groupBy|group_by|addGroupBy|add_group_by)$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|time_dimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,
+  /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensions|time_dimensions)\.\d+\.dimension$/,
+  /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(outputColumnTypes|output_column_types)\.\d+\.member$/,
   /^contextMembers$/,
   /^includes$/,
   /^excludes$/,
+  /^hierarchies\.[_a-zA-Z][_a-zA-Z0-9]*\.levels$/,
   /^cubes\.[0-9]+\.(joinPath|join_path)$/,
+  /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.member$/,
+  /^(accessPolicy|access_policy)\.[0-9]+\.(rowLevel|row_level)\.filters\.[0-9]+.*\.values$/,
+  /^(accessPolicy|access_policy)\.[0-9]+\.conditions.[0-9]+\.if$/,
 ];
 
 export const transpiledFields: Set<String> = new Set<String>();
@@ -29,8 +44,9 @@ transpiledFieldsPatterns?.forEach((r) => {
 
 export class CubePropContextTranspiler implements TranspilerInterface {
   public constructor(
-    protected readonly cubeSymbols: CubeSymbols,
-    protected readonly cubeDictionary: CubeDictionary,
+    protected readonly cubeSymbols: TranspilerSymbolResolver,
+    protected readonly cubeDictionary: TranspilerCubeResolver,
+    protected readonly viewCompiler: TranspilerSymbolResolver,
   ) {
   }
 
@@ -78,7 +94,9 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   }
 
   protected sqlAndReferencesFieldVisitor(cubeName): TraverseObject {
-    const resolveSymbol = n => this.cubeSymbols.resolveSymbol(cubeName, n) || this.cubeSymbols.isCurrentCube(n);
+    const resolveSymbol = n => this.viewCompiler.resolveSymbol(cubeName, n) ||
+      this.cubeSymbols.resolveSymbol(cubeName, n) ||
+      this.cubeSymbols.isCurrentCube(n);
 
     return {
       ObjectProperty: (path) => {

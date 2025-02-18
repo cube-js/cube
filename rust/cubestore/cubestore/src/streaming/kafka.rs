@@ -7,10 +7,11 @@ use crate::streaming::traffic_sender::TrafficSender;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
-use arrow::array::ArrayRef;
 use async_std::stream;
 use async_trait::async_trait;
+use datafusion::arrow::array::ArrayRef;
 use datafusion::cube_ext;
+use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use futures::Stream;
 use json::object::Object;
 use json::JsonValue;
@@ -59,6 +60,7 @@ impl KafkaStreamingSource {
         kafka_client: Arc<dyn KafkaClientService>,
         use_ssl: bool,
         trace_obj: Option<String>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Result<Self, CubeError> {
         let (post_processing_plan, columns, unique_key_columns, seq_column_index) =
             if let Some(select_statement) = select_statement {
@@ -69,7 +71,7 @@ impl KafkaStreamingSource {
                     columns.clone(),
                     source_columns,
                 );
-                let plan = planner.build(select_statement.clone())?;
+                let plan = planner.build(select_statement.clone(), metadata_cache_factory)?;
                 let columns = plan.source_columns().clone();
                 let seq_column_index = plan.source_seq_column_index();
                 let unique_columns = plan.source_unique_columns().clone();
@@ -304,6 +306,13 @@ impl StreamingSource for KafkaStreamingSource {
         let unique_key_columns = self.unique_key_columns.clone();
         let seq_column_index_to_move = self.seq_column_index;
         let traffic_sender = TrafficSender::new(self.trace_obj.clone());
+        let hosts = self
+            .host
+            .clone()
+            .split(",")
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
         let stream = self
             .kafka_client
             .create_message_stream(
@@ -319,7 +328,7 @@ impl StreamingSource for KafkaStreamingSource {
                         })
                         .unwrap_or(Offset::End),
                 ),
-                vec![self.host.clone()],
+                hosts,
                 &self.user,
                 &self.password,
                 self.use_ssl,
@@ -402,11 +411,11 @@ impl StreamingSource for KafkaStreamingSource {
 mod tests {
     use super::*;
     use crate::metastore::{Column, ColumnType};
-    use crate::queryplanner::query_executor::batch_to_dataframe;
+    use crate::queryplanner::query_executor::batches_to_dataframe;
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::topic_table_provider::TopicTableProvider;
-    use arrow::array::StringArray;
-    use arrow::record_batch::RecordBatch;
+    use datafusion::arrow::array::StringArray;
+    use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::datasource::TableProvider;
     use datafusion::physical_plan::collect;
     use datafusion::physical_plan::memory::MemoryExec;
@@ -432,7 +441,7 @@ mod tests {
         let phys_plan = plan_ctx.create_physical_plan(&logical_plan).unwrap();
 
         let batches = collect(phys_plan).await.unwrap();
-        let res = batch_to_dataframe(&batches).unwrap();
+        let res = batches_to_dataframe(batches).unwrap();
         res.get_rows()[0].values()[0].clone()
     }
 
@@ -462,7 +471,7 @@ mod tests {
         let phys_plan = phys_plan.with_new_children(vec![inp]).unwrap();
 
         let batches = collect(phys_plan).await.unwrap();
-        let res = batch_to_dataframe(&batches).unwrap();
+        let res = batches_to_dataframe(batches).unwrap();
         res.get_rows().to_vec()
     }
 

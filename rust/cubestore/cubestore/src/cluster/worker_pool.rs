@@ -215,10 +215,15 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                         break;
                     }
                 };
-                let (args_tx, res_rx) = if args_channel.is_none()
-                    || handle_guard.is_none()
-                    || !handle_guard.as_mut().unwrap().is_alive()
-                {
+
+                let can_use_existing_process = !P::is_single_job_process()
+                    && args_channel.is_some()
+                    && handle_guard.is_some()
+                    && handle_guard.as_mut().unwrap().is_alive();
+
+                let (args_tx, res_rx) = if can_use_existing_process {
+                    args_channel.unwrap()
+                } else {
                     let process = self.spawn_process().await;
                     match process {
                         Ok((args_tx, res_rx, handle, c_t)) => {
@@ -241,8 +246,6 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                             break;
                         }
                     }
-                } else {
-                    args_channel.unwrap()
                 };
 
                 let process_message_res_timeout = tokio::time::timeout(
@@ -276,6 +279,10 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                         }
                         break;
                     }
+                }
+
+                if P::is_single_job_process() {
+                    break;
                 }
             }
         }
@@ -369,6 +376,14 @@ pub struct WorkerProcessArgs<C: Configurator, P: WorkerProcessing, S: ServicesTr
     timeout: Duration,
 }
 
+struct TeardownGuard<C: Configurator>(PhantomData<C>);
+
+impl<C: Configurator> Drop for TeardownGuard<C> {
+    fn drop(&mut self) {
+        C::teardown();
+    }
+}
+
 pub fn worker_main<C, P, S>(a: WorkerProcessArgs<C, P, S>) -> i32
 where
     C: Configurator,
@@ -392,6 +407,7 @@ where
     tokio_builder.thread_stack_size(stack_size);
     let runtime = tokio_builder.build().unwrap();
     C::setup(&runtime);
+    let _teardown_guard = TeardownGuard::<C>(PhantomData);
     runtime.block_on(async move {
         let services_client = S::connect(services_sender, services_reciever, timeout);
         let config = match C::configure(services_client).await {
@@ -443,8 +459,8 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use arrow::datatypes::{DataType, Field, Schema};
     use async_trait::async_trait;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::logical_plan::ToDFSchema;
     use futures_timer::Delay;
     use serde::{Deserialize, Serialize};
@@ -496,6 +512,8 @@ mod tests {
             config.configure_injector().await;
             Ok(config)
         }
+
+        fn teardown() {}
     }
 
     pub struct Processor;
@@ -508,6 +526,10 @@ mod tests {
 
         fn spawn_background_processes(_config: Self::Config) -> Result<(), CubeError> {
             Ok(())
+        }
+
+        fn is_single_job_process() -> bool {
+            false
         }
         async fn process(_config: &Config, args: Message) -> Result<Response, CubeError> {
             match args {
@@ -700,6 +722,8 @@ mod tests {
             let config = TestConfig { services_client };
             Ok(config)
         }
+
+        fn teardown() {}
     }
 
     pub struct ServProcessor;
@@ -712,6 +736,10 @@ mod tests {
 
         fn spawn_background_processes(_config: Self::Config) -> Result<(), CubeError> {
             Ok(())
+        }
+
+        fn is_single_job_process() -> bool {
+            false
         }
         async fn process(
             config: &Self::Config,

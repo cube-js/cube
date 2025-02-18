@@ -130,6 +130,11 @@ data comes from a [streaming pre-aggregation][streaming-pre-agg].
 You can use lambda pre-aggregations to combine data from multiple
 pre-aggregations, where one pre-aggregation can have batch data and another
 streaming.
+Please note that build ranges of all rollups referenced by lambda rollup should have enough intersection between each other that anticipates partition build times for those rollups.
+Cube will maximize the coverage of the requested date range by partitions from different rollups.
+The first rollup in a list of referenced rollups that has a fully built partition for a particular date range will be used to serve this date range.
+The last rollup in a list will be used to cover the remaining uncovered part of a date range.
+Partitions of the last rollup will be used even if not completely built.
 
 <CodeTabs>
 

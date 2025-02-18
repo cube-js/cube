@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 5691
 expression: "execute_query(\"show create table `db`.`KibanaSampleDataEcommerce`;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------+--------------------------------------------+
@@ -8,6 +9,7 @@ expression: "execute_query(\"show create table `db`.`KibanaSampleDataEcommerce`;
 | KibanaSampleDataEcommerce | CREATE TABLE `KibanaSampleDataEcommerce` ( |
 |                           |   `count` int,                             |
 |                           |   `maxPrice` numeric,                      |
+|                           |   `sumPrice` numeric,                      |
 |                           |   `minPrice` numeric,                      |
 |                           |   `avgPrice` numeric,                      |
 |                           |   `countDistinct` int,                     |

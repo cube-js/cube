@@ -2,66 +2,83 @@
 import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
+import type { Request as ExpressRequest } from 'express';
+import { ResultWrapper } from './ResultWrapper';
+
+export * from './ResultWrapper';
 
 export interface BaseMeta {
-    // postgres or mysql
-    protocol: string,
-    // always sql
-    apiType: string,
-    // Application name, for example Metabase
-    appName?: string,
+  // postgres or mysql
+  protocol: string,
+  // always sql
+  apiType: string,
+  // Application name, for example Metabase
+  appName?: string,
 }
 
 export interface LoadRequestMeta extends BaseMeta {
-    // Security Context switching
-    changeUser?: string,
+  // Security Context switching
+  changeUser?: string,
 }
 
 export interface Request<Meta> {
-    id: string,
-    meta: Meta,
+  id: string,
+  meta: Meta,
 }
 
 export interface CheckAuthResponse {
-    password: string | null,
-    superuser: boolean
+  password: string | null,
+  superuser: boolean,
+  securityContext: any,
+  skipPasswordCheck?: boolean,
 }
 
 export interface CheckAuthPayload {
-    request: Request<undefined>,
-    user: string | null
+  request: Request<undefined>,
+  user: string | null,
+  password: string | null,
 }
 
 export interface SessionContext {
-    user: string | null,
-    superuser: boolean,
+  user: string | null,
+  superuser: boolean,
+  securityContext: any,
 }
 
 export interface LoadPayload {
-    request: Request<LoadRequestMeta>,
-    session: SessionContext,
-    query: any,
+  request: Request<LoadRequestMeta>,
+  session: SessionContext,
+  query: any,
 }
 
 export interface SqlPayload {
-    request: Request<LoadRequestMeta>,
-    session: SessionContext,
-    query: any,
-    memberToAlias: Record<string, string>,
-    expressionParams: string[],
+  request: Request<LoadRequestMeta>,
+  session: SessionContext,
+  query: any,
+  memberToAlias: Record<string, string>,
+  expressionParams: string[],
 }
 
 export interface SqlApiLoadPayload {
-    request: Request<LoadRequestMeta>,
-    session: SessionContext,
-    query: any,
-    sqlQuery: any,
-    streaming: boolean,
+  request: Request<LoadRequestMeta>,
+  session: SessionContext,
+  query: any,
+  queryKey: any,
+  sqlQuery: any,
+  streaming: boolean,
+}
+
+export interface LogLoadEventPayload {
+  request: Request<LoadRequestMeta>,
+  session: SessionContext,
+  event: string,
+  properties: any,
 }
 
 export interface MetaPayload {
-    request: Request<undefined>,
-    session: SessionContext,
+  request: Request<undefined>,
+  session: SessionContext,
+  onlyCompilerId?: boolean,
 }
 
 export interface CanSwitchUserPayload {
@@ -70,40 +87,68 @@ export interface CanSwitchUserPayload {
 }
 
 export type SQLInterfaceOptions = {
-    port?: number,
-    pgPort?: number,
-    nonce?: string,
-    checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
-    load: (payload: LoadPayload) => unknown | Promise<unknown>,
-    sql: (payload: SqlPayload) => unknown | Promise<unknown>,
-    meta: (payload: MetaPayload) => unknown | Promise<unknown>,
-    stream: (payload: LoadPayload) => unknown | Promise<unknown>,
-    sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
-    sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
-    canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
+  pgPort?: number,
+  checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
+  load: (payload: LoadPayload) => unknown | Promise<unknown>,
+  sql: (payload: SqlPayload) => unknown | Promise<unknown>,
+  meta: (payload: MetaPayload) => unknown | Promise<unknown>,
+  stream: (payload: LoadPayload) => unknown | Promise<unknown>,
+  sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
+  logLoadEvent: (payload: LogLoadEventPayload) => unknown | Promise<unknown>,
+  sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
+  canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
+  // gateway options
+  gatewayPort?: number,
 };
 
-function loadNative() {
+export interface TransformConfig {
+  fileName: string;
+  transpilers: string[];
+  compilerId: string;
+  metaData?: {
+    cubeNames: string[];
+    cubeSymbols: Record<string, Record<string, boolean>>;
+    contextSymbols: Record<string, string>;
+  }
+}
+
+export interface TransformResponse {
+  code: string;
+  errors: string[];
+  warnings: string[];
+}
+
+export type DBResponsePrimitive =
+  null |
+  boolean |
+  number |
+  string;
+
+let loadedNative: any = null;
+
+export function loadNative() {
+  if (loadedNative) {
+    return loadedNative;
+  }
+
   // Development version
   if (fs.existsSync(path.join(__dirname, '/../../index.node'))) {
-    return require(path.join(__dirname, '/../../index.node'));
+    loadedNative = require(path.join(__dirname, '/../../index.node'));
+    return loadedNative;
   }
 
   if (fs.existsSync(path.join(__dirname, '/../../native/index.node'))) {
-    return require(path.join(__dirname, '/../../native/index.node'));
+    loadedNative = require(path.join(__dirname, '/../../native/index.node'));
+    return loadedNative;
   }
 
   throw new Error(
-    `Unable to load @cubejs-backend/native, probably your system (${process.arch}-${process.platform}) with Node.js ${process.version} is not supported.`
+    `Unable to load @cubejs-backend/native, probably your system (${process.arch}-${process.platform}) with Node.js ${process.version} is not supported.`,
   );
 }
 
-export function isSupported(): boolean {
-  return fs.existsSync(path.join(__dirname, '/../../index.node')) || fs.existsSync(path.join(__dirname, '/../../native/index.node'));
-}
-
 function wrapNativeFunctionWithChannelCallback(
-  fn: (extra: any) => unknown | Promise<unknown>
+  fn: (extra: any) => unknown | Promise<unknown>,
 ) {
   return async (extra: any, channel: any) => {
     try {
@@ -111,7 +156,7 @@ function wrapNativeFunctionWithChannelCallback(
 
       if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
         console.debug('[js] channel.resolve', {
-          result
+          result,
         });
       }
 
@@ -123,7 +168,7 @@ function wrapNativeFunctionWithChannelCallback(
     } catch (e: any) {
       if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
         console.debug('[js] channel.reject', {
-          e
+          e,
         });
       }
       try {
@@ -131,7 +176,7 @@ function wrapNativeFunctionWithChannelCallback(
       } catch (rejectErr: unknown) {
         if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
           console.debug('[js] channel.reject exception', {
-            e: rejectErr
+            e: rejectErr,
           });
         }
       }
@@ -236,8 +281,11 @@ function wrapNativeFunctionWithStream(
         response.stream.on('error', (err: any) => {
           writable.destroy(err);
         });
+      } else if (response.error) {
+        writerOrChannel.reject(errorString(response));
+      } else if (response.isWrapper) { // Native wrapped result
+        writerOrChannel.resolve(response);
       } else {
-        // TODO remove JSON.stringify()
         writerOrChannel.resolve(JSON.stringify(response));
       }
     } catch (e: any) {
@@ -306,24 +354,106 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     stream: wrapNativeFunctionWithStream(options.stream),
     sqlApiLoad: wrapNativeFunctionWithStream(options.sqlApiLoad),
     sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),
+    logLoadEvent: wrapRawNativeFunctionWithChannelCallback(options.logLoadEvent),
     canSwitchUserForSession: wrapRawNativeFunctionWithChannelCallback(options.canSwitchUserForSession),
   });
 };
 
-export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise<void> => {
+export type ShutdownMode = 'fast' | 'semifast' | 'smart';
+
+export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdownMode: ShutdownMode): Promise<void> => {
   const native = loadNative();
 
-  await native.shutdownInterface(instance);
+  await native.shutdownInterface(instance, shutdownMode);
+};
 
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {
+  const native = loadNative();
+
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const buildSqlAndParams = (cubeEvaluator: any): String => {
+  const native = loadNative();
+
+  return native.buildSqlAndParams(cubeEvaluator);
+};
+
+export type ResultRow = Record<string, string>;
+
+export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
+  const native = loadNative();
+
+  const msg = await native.parseCubestoreResultMessage(message);
+  return new ResultWrapper(msg);
+};
+
+export const getCubestoreResult = (ref: ResultWrapper): ResultRow[] => {
+  const native = loadNative();
+
+  return native.getCubestoreResult(ref);
+};
+
+/**
+ * Transform and prepare single query final result data that is sent to the client.
+ *
+ * @param transformDataObj Data needed to transform raw query results
+ * @param rows Raw data received from the source DB via driver or reference to a native CubeStore response result
+ * @param resultData Final query result structure without actual data
+ * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
+ */
+export const getFinalQueryResult = (transformDataObj: Object, rows: any, resultData: Object): Promise<ArrayBuffer> => {
+  const native = loadNative();
+
+  return native.getFinalQueryResult(transformDataObj, rows, resultData);
+};
+
+/**
+ * Transform and prepare multiple query final results data into a single response structure.
+ *
+ * @param transformDataArr Array of data needed to transform raw query results
+ * @param rows Array of raw data received from the source DB via driver or reference to native CubeStore response results
+ * @param responseData Final combined query result structure without actual data
+ * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
+ */
+export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[], responseData: Object): Promise<ArrayBuffer> => {
+  const native = loadNative();
+
+  return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
+};
+
+export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+  const native = loadNative();
+
+  return native.transpileJs(content, metadata);
 };
 
 export interface PyConfiguration {
-    repositoryFactory?: (ctx: unknown) => Promise<unknown>,
-    logger?: (msg: string, params: Record<string, any>) => void,
-    checkAuth?: (req: unknown, authorization: string) => Promise<void>
-    queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
-    contextToApiScopes?: () => Promise<string[]>
+  repositoryFactory?: (ctx: unknown) => Promise<unknown>,
+  logger?: (msg: string, params: Record<string, any>) => void,
+  checkAuth?: (req: unknown, authorization: string) => Promise<{ 'security_context'?: unknown }>
+  extendContext?: (req: unknown) => Promise<unknown>
+  queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
+  contextToApiScopes?: () => Promise<string[]>
+  scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
+  scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
+  contextToRoles?: (ctx: unknown) => Promise<string[]>
+}
+
+function simplifyExpressRequest(req: ExpressRequest) {
+  // Req is a large object, let's simplify it
+  // Important: Dont pass circular references
+  return {
+    url: req.url,
+    method: req.method,
+    headers: req.headers,
+    ip: req.ip,
+
+    // req.securityContext is an extension of request done by api-gateway
+    // But its typings currently live in api-gateway package, which has native-backend (this package) as it's dependency
+    // TODO extract typings to separate package and drop as any
+    ...(Object.hasOwn(req, 'securityContext') ? { securityContext: (req as any).securityContext } : {}),
+  };
 }
 
 export const pythonLoadConfig = async (content: string, options: { fileName: string }): Promise<PyConfiguration> => {
@@ -336,14 +466,22 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 
   if (config.checkAuth) {
     const nativeCheckAuth = config.checkAuth;
-    config.checkAuth = async (req: any, authorization: string) => nativeCheckAuth(
-      // Req is a large object, let's simplify it
-      {
-        url: req.url,
-        method: req.method,
-        headers: req.headers,
-      },
-      authorization
+    config.checkAuth = async (req: ExpressRequest, authorization: string) => {
+      const nativeResult = await nativeCheckAuth(
+        simplifyExpressRequest(req),
+        authorization,
+      );
+      const securityContext = nativeResult?.security_context;
+      return {
+        ...(securityContext ? { security_context: securityContext } : {})
+      };
+    };
+  }
+
+  if (config.extendContext) {
+    const nativeExtendContext = config.extendContext;
+    config.extendContext = async (req: ExpressRequest) => nativeExtendContext(
+      simplifyExpressRequest(req),
     );
   }
 
@@ -351,8 +489,8 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
     const nativeRepositoryFactory = config.repositoryFactory;
     config.repositoryFactory = (ctx: any) => ({
       dataSchemaFiles: async () => nativeRepositoryFactory(
-        ctx
-      )
+        ctx,
+      ),
     });
   }
 
@@ -369,7 +507,7 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 };
 
 export type PythonCtx = {
-    __type: 'PythonCtx'
+  __type: 'PythonCtx'
 } & {
   filters: Record<string, Function>
   functions: Record<string, Function>
@@ -383,8 +521,9 @@ export type JinjaEngineOptions = {
 };
 
 export interface JinjaEngine {
-    loadTemplate(templateName: string, templateContent: string): void;
-    renderTemplate(templateName: string, context: unknown, pythonContext: Record<string, any> | null): Promise<string>;
+  loadTemplate(templateName: string, templateContent: string): void;
+
+  renderTemplate(templateName: string, context: unknown, pythonContext: Record<string, any> | null): Promise<string>;
 }
 
 export class NativeInstance {
@@ -408,7 +547,7 @@ export class NativeInstance {
     if (isFallbackBuild()) {
       throw new Error(
         'Python (loadPythonContext) is not supported because you are using the fallback build of native extension. Read more: ' +
-          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+        'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms',
       );
     }
 

@@ -7,8 +7,6 @@
 
 Debian based: `<version>`, `latest`, `dev`
 
-Alpine based: `alpine`, `<version>-alpine`
-
 # Quick reference
 
 Where to get help? Check out our [Slack][link-slack], [Stack

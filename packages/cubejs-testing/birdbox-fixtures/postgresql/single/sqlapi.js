@@ -12,10 +12,13 @@ module.exports = {
 
     return query;
   },
-  checkSqlAuth: async (req, user) => {
+  checkSqlAuth: async (req, user, password) => {
     if (user === 'admin') {
+      if (password && password !== 'admin_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
       return {
-        password: 'admin_password',
+        password,
         superuser: true,
         securityContext: {
           user: 'admin'

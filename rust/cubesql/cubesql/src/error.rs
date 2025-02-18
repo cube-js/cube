@@ -74,10 +74,8 @@ impl CubeError {
 impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.cause {
-            CubeErrorCauseType::User(_) => f.write_fmt(format_args!("User: {}", self.message)),
-            CubeErrorCauseType::Internal(_) => {
-                f.write_fmt(format_args!("Internal: {}", self.message))
-            }
+            CubeErrorCauseType::User(_) => f.write_fmt(format_args!("{}", self.message)),
+            CubeErrorCauseType::Internal(_) => f.write_fmt(format_args!("{}", self.message)),
         }
     }
 }
@@ -117,7 +115,8 @@ impl From<crate::compile::CompilationError> for CubeError {
         let cause = match &v {
             crate::compile::CompilationError::User(_, meta)
             | crate::compile::CompilationError::Unsupported(_, meta)
-            | crate::compile::CompilationError::Internal(_, _, meta) => {
+            | crate::compile::CompilationError::Internal(_, _, meta)
+            | crate::compile::CompilationError::Fatal(_, meta) => {
                 CubeErrorCauseType::Internal(meta.clone())
             }
         };
@@ -220,8 +219,8 @@ impl From<Box<bincode::ErrorKind>> for CubeError {
     }
 }
 
-impl From<tokio::sync::watch::error::SendError<bool>> for CubeError {
-    fn from(v: tokio::sync::watch::error::SendError<bool>) -> Self {
+impl<T> From<tokio::sync::watch::error::SendError<T>> for CubeError {
+    fn from(v: tokio::sync::watch::error::SendError<T>) -> Self {
         CubeError::internal(v.to_string())
     }
 }
@@ -233,12 +232,6 @@ impl From<tokio::sync::watch::error::RecvError> for CubeError {
 }
 impl From<ParseIntError> for CubeError {
     fn from(v: ParseIntError) -> Self {
-        CubeError::internal(v.to_string())
-    }
-}
-
-impl From<reqwest::Error> for CubeError {
-    fn from(v: reqwest::Error) -> Self {
         CubeError::internal(v.to_string())
     }
 }

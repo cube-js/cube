@@ -27,7 +27,8 @@ pub struct NodeObjSeqSerializer<'a, 'b, C>
 where
     C: Context<'a>,
 {
-    _context: &'b mut C,
+    context: &'b mut C,
+    last_id: u32,
     seq: Handle<'a, JsArray>,
 }
 
@@ -40,22 +41,19 @@ where
 }
 
 impl<'a, 'b, C: Context<'a>> NodeObjSerializer<'a, 'b, C> {
-    pub fn serialize<T: ?Sized>(
+    pub fn serialize<T: ?Sized + Serialize>(
         value: &T,
         context: &'b mut C,
-    ) -> Result<Handle<'a, JsValue>, NodeObjSerializerError>
-    where
-        T: Serialize,
-    {
+    ) -> Result<Handle<'a, JsValue>, NodeObjSerializerError> {
         let mut serializer = NodeObjSerializer {
             context,
-            phantom: PhantomData::default(),
+            phantom: Default::default(),
         };
         value.serialize(&mut serializer)
     }
 }
 
-impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'a, 'b, C> {
+impl<'a, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
     type SerializeSeq = NodeObjSeqSerializer<'a, 'c, C>;
@@ -107,7 +105,7 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        Ok(self.context.number(v as f64).upcast())
+        Ok(self.context.number(v).upcast())
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
@@ -119,17 +117,16 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
     }
 
     fn serialize_bytes(self, _v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        Err(NodeObjSerializerError::Message(
+            "serialize_bytes is not implemented".to_string(),
+        ))
     }
 
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
         Ok(self.context.undefined().upcast())
     }
 
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> Result<Self::Ok, Self::Error> {
         NodeObjSerializer::serialize(value, self.context)
     }
 
@@ -147,39 +144,47 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
         _variant_index: u32,
         _variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        Err(NodeObjSerializerError::Message(
+            "serialize_unit_variant is not implemented".to_string(),
+        ))
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T: ?Sized + Serialize>(
         self,
         _name: &'static str,
         _value: &T,
-    ) -> Result<Self::Ok, Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "serialize_newtype_struct is not implemented".to_string(),
+        ))
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T: ?Sized + Serialize>(
         self,
         _name: &'static str,
         _variant_index: u32,
         _variant: &'static str,
         _value: &T,
-    ) -> Result<Self::Ok, Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "serialize_newtype_variant is not implemented".to_string(),
+        ))
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        todo!()
+        let seq = self.context.empty_array();
+
+        Ok(NodeObjSeqSerializer {
+            context: self.context,
+            last_id: 0,
+            seq,
+        })
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        todo!()
+        Err(NodeObjSerializerError::Message(
+            "serialize_tuple is not implemented".to_string(),
+        ))
     }
 
     fn serialize_tuple_struct(
@@ -187,7 +192,9 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        todo!()
+        Err(NodeObjSerializerError::Message(
+            "serialize_tuple_struct is not implemented".to_string(),
+        ))
     }
 
     fn serialize_tuple_variant(
@@ -197,7 +204,9 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        todo!()
+        Err(NodeObjSerializerError::Message(
+            "serialize_tuple_variant is not implemented".to_string(),
+        ))
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
@@ -227,37 +236,33 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        todo!()
+        Err(NodeObjSerializerError::Message(
+            "serialize_struct_variant is not implemented".to_string(),
+        ))
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeMap for NodeObjMapSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeMap for NodeObjMapSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_key<T: ?Sized>(&mut self, _key: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    fn serialize_key<T: ?Sized + Serialize>(&mut self, _key: &T) -> Result<(), Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "SerializeMap.serialize_key is not implemented".to_string(),
+        ))
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    fn serialize_value<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "SerializeMap.serialize_value is not implemented".to_string(),
+        ))
     }
 
-    fn serialize_entry<K: ?Sized, V: ?Sized>(
+    fn serialize_entry<K: ?Sized + Serialize, V: ?Sized + Serialize>(
         &mut self,
         key: &K,
         value: &V,
-    ) -> Result<(), Self::Error>
-    where
-        K: Serialize,
-        V: Serialize,
-    {
+    ) -> Result<(), Self::Error> {
         let key_value = NodeObjSerializer::serialize(key, self.context)?;
         let value_value = NodeObjSerializer::serialize(value, self.context)?;
         let string_down_cast = key_value
@@ -279,15 +284,14 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeMap for NodeObjMapSerializer<'a, 'b, 
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeTuple for NodeObjTupleSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeTuple for NodeObjTupleSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_element<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "NodeObjTupleSerializer is not implemented".to_string(),
+        ))
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -295,15 +299,14 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeTuple for NodeObjTupleSerializer<'a, 
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeTupleStruct for NodeObjTupleSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeTupleStruct for NodeObjTupleSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "SerializeTupleStruct is not implemented".to_string(),
+        ))
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -311,15 +314,14 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeTupleStruct for NodeObjTupleSerialize
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeTupleVariant for NodeObjTupleSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeTupleVariant for NodeObjTupleSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _value: &T) -> Result<(), Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "SerializeTupleVariant is not implemented".to_string(),
+        ))
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -327,18 +329,15 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeTupleVariant for NodeObjTupleSerializ
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeStruct for NodeObjMapSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeStruct for NodeObjMapSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T: ?Sized + Serialize>(
         &mut self,
         key: &'static str,
         value: &T,
-    ) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    ) -> Result<(), Self::Error> {
         let value_value = NodeObjSerializer::serialize(value, self.context)?;
         self.obj.set(self.context, key, value_value).map_err(|e| {
             NodeObjSerializerError::Message(format!("Can't set value to obj: {}", e))
@@ -351,19 +350,18 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeStruct for NodeObjMapSerializer<'a, '
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeStructVariant for NodeObjMapSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeStructVariant for NodeObjMapSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T: ?Sized + Serialize>(
         &mut self,
         _key: &'static str,
         _value: &T,
-    ) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    ) -> Result<(), Self::Error> {
+        Err(NodeObjSerializerError::Message(
+            "SerializeStructVariant is not implemented".to_string(),
+        ))
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -371,15 +369,20 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeStructVariant for NodeObjMapSerialize
     }
 }
 
-impl<'a, 'b, C: Context<'a>> ser::SerializeSeq for NodeObjSeqSerializer<'a, 'b, C> {
+impl<'a, C: Context<'a>> ser::SerializeSeq for NodeObjSeqSerializer<'a, '_, C> {
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_element<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
-        todo!()
+    fn serialize_element<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), Self::Error> {
+        let value_value = NodeObjSerializer::serialize(value, self.context)?;
+        self.seq
+            .set(self.context, self.last_id, value_value)
+            .map_err(|e| {
+                NodeObjSerializerError::Message(format!("Can't set value to array: {}", e))
+            })?;
+
+        self.last_id += 1;
+        Ok(())
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {

@@ -1,4 +1,47 @@
 {
+  "extendedEnvs": {
+    "export-bucket-s3": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1"
+        }
+      }
+    },
+    "export-bucket-azure": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
+          "CUBEJS_DB_EXPORT_BUCKET": "coreteamdevtest.blob.core.windows.net/snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN}"
+        }
+      }
+    },
+    "export-bucket-azure-via-storage-integration": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
+          "CUBEJS_DB_EXPORT_BUCKET": "coreteamdevtest.blob.core.windows.net/snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_INTEGRATION": "drivers_tests_preaggs_azure",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
+        }
+      }
+    },
+    "export-bucket-gcs": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_INTEGRATION": "drivers_tests_preaggs_gcs",
+          "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
+        }
+      }
+    }
+  },
   "cube": {
     "environment": {
       "CUBEJS_API_SECRET": "mysupersecret",
@@ -11,17 +54,16 @@
       "CUBEJS_DB_NAME": "DEMO_DB",
       "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
 
-      "CUBEJS_DB_SNOWFLAKE_ACCOUNT": "lxb31104.us-west-2",
+      "CUBEJS_DB_SNOWFLAKE_ACCOUNT": "lxb31104",
       "CUBEJS_DB_SNOWFLAKE_REGION": "us-west-2",
       "CUBEJS_DB_SNOWFLAKE_WAREHOUSE": "COMPUTE_WH",
       "CUBEJS_DB_SNOWFLAKE_ROLE": "PUBLIC",
-      "CUBEJS_DB_EXPORT_BUCKET": "athena-drivers-tests-preaggs",
-      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "cast": {
     "SELECT_PREFIX": "",
@@ -70,6 +112,16 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
       }
     ],
     "BigECommerce": [
@@ -84,6 +136,33 @@
           "CUBE.avgDiscount",
           "CUBE.totalSales",
           "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
         ]
       }
     ]
@@ -104,7 +183,7 @@
     "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
-    "SKIPED FOR ALL                         ",
+    "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",

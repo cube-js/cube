@@ -3,10 +3,12 @@
 //! Message Data Types: <https://www.postgresql.org/docs/14/protocol-message-types.html>
 
 use std::{
+    any::Any,
     collections::HashMap,
     convert::TryFrom,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     io::{Cursor, Error},
+    sync::Arc,
 };
 
 use async_trait::async_trait;
@@ -122,8 +124,8 @@ impl Serialize for StartupMessage {
         buffer.put_u16(self.minor);
 
         for (name, value) in &self.parameters {
-            buffer::write_string(&mut buffer, &name);
-            buffer::write_string(&mut buffer, &value);
+            buffer::write_string(&mut buffer, name);
+            buffer::write_string(&mut buffer, value);
         }
 
         buffer.push(0);
@@ -215,6 +217,14 @@ impl ErrorResponse {
             severity: ErrorSeverity::Error,
             code: ErrorCode::QueryCanceled,
             message: "canceling statement due to user request".to_string(),
+        }
+    }
+
+    pub fn admin_shutdown() -> Self {
+        Self {
+            severity: ErrorSeverity::Fatal,
+            code: ErrorCode::AdminShutdown,
+            message: "terminating connection due to shutdown signal".to_string(),
         }
     }
 }
@@ -463,7 +473,7 @@ impl Serialize for CommandComplete {
             CommandComplete::Fetch(rows) => {
                 buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
-            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
+            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, tag),
         }
 
         Some(buffer)
@@ -905,8 +915,12 @@ pub enum Format {
     Binary,
 }
 
+pub trait FrontendMessageExtension: Send + Sync + Debug {
+    fn as_any(&self) -> &dyn Any;
+}
+
 /// All frontend messages (request which client sends to the server).
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum FrontendMessage {
     PasswordMessage(PasswordMessage),
     /// Simple Query
@@ -927,6 +941,8 @@ pub enum FrontendMessage {
     Execute(Execute),
     /// Extended Query. Close Portal/Statement
     Close(Close),
+    /// Extension
+    Extension(Box<dyn FrontendMessageExtension>),
 }
 
 /// <https://www.postgresql.org/docs/14/errcodes-appendix.html>
@@ -953,11 +969,13 @@ pub enum ErrorCode {
     DuplicateCursor,
     SyntaxError,
     // Class 53 — Insufficient Resources
+    TooManyConnections,
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
     // Class 57 - Operator Intervention
     QueryCanceled,
+    AdminShutdown,
     // XX - Internal Error
     InternalError,
 }
@@ -976,9 +994,11 @@ impl Display for ErrorCode {
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
             Self::SyntaxError => "42601",
+            Self::TooManyConnections => "53300",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::QueryCanceled => "57014",
+            Self::AdminShutdown => "57P01",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -1043,9 +1063,17 @@ impl TransactionStatus {
     }
 }
 
+pub trait AuthenticationRequestExtension: Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+
+    fn to_code(&self) -> u32;
+}
+
+#[derive(Clone)]
 pub enum AuthenticationRequest {
     Ok,
     CleartextPassword,
+    Extension(Arc<dyn AuthenticationRequestExtension>),
 }
 
 impl AuthenticationRequest {
@@ -1057,6 +1085,7 @@ impl AuthenticationRequest {
         match self {
             Self::Ok => 0,
             Self::CleartextPassword => 3,
+            Self::Extension(extension) => extension.to_code(),
         }
     }
 }
@@ -1081,7 +1110,7 @@ pub trait Deserialize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{read_message, ProtocolError};
+    use crate::{read_message, MessageTagParserDefaultImpl, ProtocolError};
 
     use std::io::Cursor;
 
@@ -1123,7 +1152,12 @@ mod tests {
 
         // First step, We write struct to the buffer
         let mut cursor = Cursor::new(vec![]);
-        buffer::write_message(&mut cursor, expected_message.clone()).await?;
+        buffer::write_message(
+            &mut bytes::BytesMut::new(),
+            &mut cursor,
+            expected_message.clone(),
+        )
+        .await?;
 
         // Second step, We read form the buffer and output structure must be the same as original
         let buffer = cursor.get_ref()[..].to_vec();
@@ -1154,7 +1188,7 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
         match message {
             FrontendMessage::Parse(parse) => {
                 assert_eq!(
@@ -1184,7 +1218,7 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
         match message {
             FrontendMessage::Bind(bind) => {
                 assert_eq!(
@@ -1219,7 +1253,7 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
         match message {
             FrontendMessage::Bind(body) => {
                 assert_eq!(
@@ -1255,7 +1289,7 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
         match message {
             FrontendMessage::Describe(desc) => {
                 assert_eq!(
@@ -1282,7 +1316,7 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
         match message {
             FrontendMessage::PasswordMessage(body) => {
                 assert_eq!(
@@ -1308,7 +1342,7 @@ mod tests {
         );
         let mut cursor = Cursor::new(buffer);
 
-        let message = read_message(&mut cursor).await?;
+        let message = read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
         match message {
             FrontendMessage::Execute(body) => {
                 assert_eq!(
@@ -1338,8 +1372,8 @@ mod tests {
 
         // This test demonstrates that protocol can decode two
         // simple messages without body in sequence
-        read_message(&mut cursor).await?;
-        read_message(&mut cursor).await?;
+        read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
+        read_message(&mut cursor, MessageTagParserDefaultImpl::with_arc()).await?;
 
         Ok(())
     }
@@ -1348,7 +1382,7 @@ mod tests {
     async fn test_frontend_message_write_complete_parse() -> Result<(), ProtocolError> {
         let mut cursor = Cursor::new(vec![]);
 
-        buffer::write_message(&mut cursor, ParseComplete {}).await?;
+        buffer::write_message(&mut bytes::BytesMut::new(), &mut cursor, ParseComplete {}).await?;
 
         assert_eq!(cursor.get_ref()[0..], vec![49, 0, 0, 0, 4]);
 
@@ -1375,7 +1409,7 @@ mod tests {
                 Format::Text,
             ),
         ]);
-        buffer::write_message(&mut cursor, desc).await?;
+        buffer::write_message(&mut bytes::BytesMut::new(), &mut cursor, desc).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],

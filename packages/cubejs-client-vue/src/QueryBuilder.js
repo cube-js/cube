@@ -76,7 +76,7 @@ export default {
       type: Object,
       default: () => ({}),
     },
-    cubejsApi: {
+    cubeApi: {
       type: Object,
       required: true,
     },
@@ -134,7 +134,7 @@ export default {
   render(createElement) {
     const {
       chartType,
-      cubejsApi,
+      cubeApi,
       dimensions,
       filters,
       measures,
@@ -261,7 +261,7 @@ export default {
       {
         props: {
           query: this.validatedQuery,
-          cubejsApi,
+          cubeApi,
           builderProps,
         },
         scopedSlots: this.$scopedSlots,
@@ -414,13 +414,13 @@ export default {
   },
 
   async mounted() {
-    this.meta = await this.cubejsApi.meta();
+    this.meta = await this.cubeApi.meta();
 
     this.copyQueryFromProps();
 
     if (isQueryPresent(this.initialQuery)) {
       try {
-        const dryRunResponse = await this.cubejsApi.dryRun(this.initialQuery);
+        const dryRunResponse = await this.cubeApi.dryRun(this.initialQuery);
 
         this.pivotConfig = ResultSet.getNormalizedPivotConfig(
           dryRunResponse?.pivotQuery || {},
@@ -654,7 +654,7 @@ export default {
         }
 
         if (isQueryPresent(query) && hasQueryChanged) {
-          this.cubejsApi
+          this.cubeApi
             .dryRun(query, {
               mutexObj: this.mutex,
             })

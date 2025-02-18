@@ -32,24 +32,28 @@ use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::{SqlService, SqlServiceImpl};
+use crate::sql::{TableExtensionService, TableExtensionServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::kafka::{KafkaClientService, KafkaClientServiceImpl};
 use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
-use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
+use crate::table::parquet::{
+    CubestoreMetadataCacheFactory, CubestoreMetadataCacheFactoryImpl,
+    CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl,
+};
 use crate::telemetry::tracing::{TracingHelper, TracingHelperImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
 use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
+use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
-use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
+use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
-use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
@@ -430,6 +434,10 @@ pub trait ConfigObj: DIService {
 
     fn metastore_remote_address(&self) -> &Option<String>;
 
+    fn cachestore_log_upload_interval(&self) -> u64;
+
+    fn cachestore_log_enabled(&self) -> bool;
+
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
 
     fn cachestore_gc_loop_interval(&self) -> u64;
@@ -490,6 +498,8 @@ pub trait ConfigObj: DIService {
 
     fn query_cache_max_capacity_bytes(&self) -> u64;
 
+    fn query_queue_cache_max_capacity(&self) -> u64;
+
     fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
@@ -529,12 +539,13 @@ pub trait ConfigObj: DIService {
     fn remote_files_cleanup_interval_secs(&self) -> u64;
 
     fn local_files_cleanup_size_threshold(&self) -> u64;
-
     fn local_files_cleanup_delay_secs(&self) -> u64;
 
     fn remote_files_cleanup_delay_secs(&self) -> u64;
 
     fn remote_files_cleanup_batch_size(&self) -> u64;
+
+    fn create_table_max_retries(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -579,6 +590,8 @@ pub struct ConfigObjImpl {
     pub metastore_bind_address: Option<String>,
     pub metastore_remote_address: Option<String>,
     pub metastore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_log_upload_interval: u64,
+    pub cachestore_log_enabled: bool,
     pub cachestore_rocks_store_config: RocksStoreConfig,
     pub cachestore_gc_loop_interval: u64,
     pub cachestore_cache_eviction_loop_interval: u64,
@@ -608,6 +621,7 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub query_cache_max_capacity_bytes: u64,
+    pub query_queue_cache_max_capacity: u64,
     pub query_cache_time_to_idle_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
@@ -631,6 +645,7 @@ pub struct ConfigObjImpl {
     pub local_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
+    pub create_table_max_retries: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -781,6 +796,14 @@ impl ConfigObj for ConfigObjImpl {
         &self.metastore_remote_address
     }
 
+    fn cachestore_log_upload_interval(&self) -> u64 {
+        self.cachestore_log_upload_interval
+    }
+
+    fn cachestore_log_enabled(&self) -> bool {
+        self.cachestore_log_enabled
+    }
+
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
         &self.cachestore_rocks_store_config
     }
@@ -891,6 +914,9 @@ impl ConfigObj for ConfigObjImpl {
     fn query_cache_max_capacity_bytes(&self) -> u64 {
         self.query_cache_max_capacity_bytes
     }
+    fn query_queue_cache_max_capacity(&self) -> u64 {
+        self.query_queue_cache_max_capacity
+    }
     fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
         self.query_cache_time_to_idle_secs
     }
@@ -987,6 +1013,10 @@ impl ConfigObj for ConfigObjImpl {
         self.remote_files_cleanup_batch_size
     }
 
+    fn create_table_max_retries(&self) -> u64 {
+        self.create_table_max_retries
+    }
+
     fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
         self.cachestore_cache_eviction_below_threshold
     }
@@ -1015,9 +1045,9 @@ fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
         .map(|x| match x.as_str() {
-            "0" => false,
-            "1" => true,
-            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+            "0" | "false" => false,
+            "1" | "true" => true,
+            _ => panic!("expected '0'/'1'/true/false for '{}', found '{}'", name, &x),
         })
         .unwrap_or(default)
 }
@@ -1076,7 +1106,12 @@ where
 pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
     let v = match env::var(name).ok() {
         None => {
-            return default;
+            if cfg!(debug_assertions) {
+                // It's needed to check that default values are correct
+                default.to_string()
+            } else {
+                return default;
+            }
         }
         Some(v) => v,
     };
@@ -1128,17 +1163,16 @@ where
 
 impl Config {
     fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
-        match cache_max_size >> 20 {
-            // TODO: Enable this limits after moving to separate CF for cache
-            // d if d < 32 => 32 * 9,
-            // d if d < 64 => 64 * 8,
-            // d if d < 128 => 128 * 7,
-            // d if d < 256 => 256 * 6,
-            d if d < 512 => 512 * 5,
+        let trigger_size = match cache_max_size >> 20 {
+            d if d < 32 => 640 << 20,
+            d if d < 64 => 1280 << 20,
+            d if d < 512 => cache_max_size * 5,
             d if d < 1024 => cache_max_size * 4,
             d if d < 4096 => cache_max_size * 3,
             _ => cache_max_size * 2,
-        }
+        };
+
+        std::cmp::max(trigger_size, 512 << 20)
     }
 
     pub fn default() -> Config {
@@ -1318,6 +1352,13 @@ impl Config {
                 }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: env_parse_duration(
+                    "CACHESTORE_LOG_UPLOAD_INTERVAL",
+                    30,
+                    Some(60),
+                    Some(15),
+                ),
+                cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", false),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: env_parse_duration(
                     "CUBESTORE_CACHESTORE_GC_LOOP",
@@ -1411,6 +1452,10 @@ impl Config {
                     Some(16384 << 20),
                     Some(0),
                 ) as u64,
+                query_queue_cache_max_capacity: env_parse(
+                    "CUBESTORE_QUEUE_CACHE_MAX_CAPACITY",
+                    10000,
+                ),
                 query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
                     None
                 } else {
@@ -1496,15 +1541,30 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
                     50000,
                 ),
+                create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
             }),
         }
     }
 
     pub fn test(name: &str) -> Config {
-        let query_timeout = 15;
+        Self::make_test_config(Self::test_config_obj(name))
+    }
+
+    /// Possibly there is nothing test-specific about this; its purpose is to be publicly used by Config::test.
+    pub fn make_test_config(config_obj_impl: ConfigObjImpl) -> Config {
         Config {
             injector: Injector::new(),
-            config_obj: Arc::new(ConfigObjImpl {
+            config_obj: Arc::new(config_obj_impl),
+        }
+    }
+
+    /// Constructs the underlying ConfigObjImpl used in `Config::test`, so that you can modify it
+    /// before passing it to Config::make_test_config.
+    pub fn test_config_obj(name: &str) -> ConfigObjImpl {
+        let query_timeout = 15;
+        // Git blame history preserving block
+        {
+            ConfigObjImpl {
                 data_dir: env::current_dir()
                     .unwrap()
                     .join(format!("{}-local-store", name)),
@@ -1547,6 +1607,8 @@ impl Config {
                 metastore_bind_address: None,
                 metastore_remote_address: None,
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: 30,
+                cachestore_log_enabled: true,
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: 30,
                 cachestore_cache_eviction_loop_interval: 60,
@@ -1577,6 +1639,7 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 query_cache_max_capacity_bytes: 512 << 20,
+                query_queue_cache_max_capacity: 10000,
                 query_cache_time_to_idle_secs: Some(600),
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
@@ -1604,7 +1667,8 @@ impl Config {
                 local_files_cleanup_delay_secs: 600,
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
-            }),
+                create_table_max_retries: 3,
+            }
         }
     }
 
@@ -1955,11 +2019,15 @@ impl Config {
 
         self.injector
             .register_typed::<dyn ChunkDataStore, _, _, _>(async move |i| {
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await;
                 ChunkStore::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    metadata_cache_factory,
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
@@ -1970,10 +2038,14 @@ impl Config {
         self.injector
             .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
+                let cubestore_metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await;
+                let metadata_cache_factory: &_ = cubestore_metadata_cache_factory.cache_factory();
                 CubestoreParquetMetadataCacheImpl::new(
                     match c.metadata_cache_max_capacity_bytes() {
-                        0 => NoopParquetMetadataCache::new(),
-                        max_cached_metadata => LruParquetMetadataCache::new(
+                        0 => metadata_cache_factory.make_noop_cache(),
+                        max_cached_metadata => metadata_cache_factory.make_lru_cache(
                             max_cached_metadata,
                             Duration::from_secs(c.metadata_cache_time_to_idle_secs()),
                         ),
@@ -1984,11 +2056,15 @@ impl Config {
 
         self.injector
             .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await;
                 CompactionServiceImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    metadata_cache_factory,
                 )
             })
             .await;
@@ -2014,6 +2090,12 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn TableExtensionService, _, _, _>(async move |_| {
+                TableExtensionServiceImpl::new()
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn StreamingService, _, _, _>(async move |i| {
                 StreamingServiceImpl::new(
                     i.get_service_typed().await,
@@ -2021,6 +2103,10 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory()
+                        .clone(),
                 )
             })
             .await;
@@ -2090,6 +2176,12 @@ impl Config {
 
     pub async fn configure_common(&self) {
         self.injector
+            .register_typed::<dyn CubestoreMetadataCacheFactory, _, _, _>(async move |_| {
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new()))
+            })
+            .await;
+
+        self.injector
             .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
                 QueueRemoteFs::new(
                     i.get_service_typed::<dyn ConfigObj>().await,
@@ -2107,23 +2199,37 @@ impl Config {
         let query_cache = Arc::new(SqlResultCache::new(
             self.config_obj.query_cache_max_capacity_bytes(),
             self.config_obj.query_cache_time_to_idle_secs(),
+            self.config_obj.query_queue_cache_max_capacity(),
         ));
 
         let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await
+                    .cache_factory()
+                    .clone();
                 QueryPlannerImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     query_cache_to_move,
+                    metadata_cache_factory,
                 )
             })
             .await;
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
-                QueryExecutorImpl::new(i.get_service_typed().await, i.get_service_typed().await)
+                QueryExecutorImpl::new(
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory()
+                        .clone(),
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
             })
             .await;
 
@@ -2162,10 +2268,12 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
                     query_cache_to_move,
+                    i.get_service_typed().await,
                 )
             })
             .await;

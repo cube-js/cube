@@ -10,26 +10,25 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "3fb79c32defa4ec39ccf658b6185704d1980f228", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
-anyhow = "1.0"
-thiserror = "1.0"
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "dcf3e4aa26fd112043ef26fa4a78db5dbd443c86", default-features = false, features = [
+    "regex_expressions",
+    "unicode_expressions",
+] }
+thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "037562f7975fcc92b725efbfbaaf050272668593" }
-lazy_static = "1.4.0"
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "6a54d27d3b75a04b9f9cbe309a83078aa54b32fd" }
 base64 = "0.13.0"
-tokio = { version = "1.0", features = ["full", "rt", "tracing"] }
+tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
-itertools = "0.10.2"
-serde_derive = "^1.0"
+itertools = "0.14.0"
 serde_json = "^1.0"
 bytes = "1.2"
 futures = "0.3.23"
 rand = "0.8.3"
-smallvec = "1.7.0"
-byteorder = "1.3.4"
-log = "=0.4.11"
-rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
+hashbrown = "0.14.3"
+log = "0.4.21"
+rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"] }
 postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
 # which panic with Could not determine the UTC offset on this system.
@@ -38,40 +37,43 @@ postgres-types = "0.2.3"
 simple_logger = "=1.13.0"
 async-trait = "0.1.36"
 regex = "1.5"
-uuid = { version = "0.8", features = ["serde", "v4"] }
-msql-srv = { git = 'https://github.com/cube-js/msql-srv', rev = '76ea0132564959c41ea13f25511fbd84acd06464' }
+uuid = { version = "1", features = ["serde", "v4"] }
 bincode = "1.3.1"
-chrono = "0.4.16"
+chrono = "0.4.39"
 chrono-tz = "0.6"
-mockall = "0.8.1"
-reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
-nanoid = "0.3.0"
-tokio-util = { version = "0.6.2", features=["compat"] }
-mysql_common = "0.26.0"
-comfy-table = "4.1.1"
+tokio-util = { version = "0.7", features = ["compat"] }
+comfy-table = "7.1.0"
 bitflags = "1.3.2"
-egg = "0.7.1"
+egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.com/cube-js/egg.git", features = [
+    "serde-1",
+] }
 paste = "1.0.6"
-csv = "1.1.6"
-tracing = { version = "0.1.35", features = ["async-await"] }
+tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
 futures-core = "0.3.23"
 futures-util = "0.3.23"
 sha1_smol = "1.0.0"
 tera = { version = "1", default-features = false }
 minijinja = { version = "1", features = ["json", "loader"] }
+lru = "0.13.0"
+sha2 = "0.10.8"
+bigdecimal = "0.4.2"
+indexmap = "1.9.3"
 
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 insta = "1.12"
-mysql_async = "0.29"
 portpicker = "0.1.1"
-tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] }
+tokio-postgres = { version = "0.7.7", features = [
+    "with-chrono-0_4",
+    "runtime",
+] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
 criterion = { version = "0.4.0", features = ["html_reports"] }
-console-subscriber = "0.1.6"
+# Only for local debugging
+#console-subscriber = "0.3.0"
 
 [[test]]
 name = "e2e"
@@ -81,3 +83,74 @@ harness = false
 [[bench]]
 name = "benchmarks"
 harness = false
+
+[[bench]]
+name = "large_model"
+harness = false
+
+# Code in cubesql workspace is not ready for full-blown clippy
+# So we disable some rules to enable per-rule latch in CI, not for a whole clippy run
+# Feel free to remove any rule from here and fix all warnings with it
+# Or to write a comment why rule should stay disabled
+[lints.clippy]
+clone_on_copy = "allow"
+collapsible_if = "allow"
+collapsible_match = "allow"
+collapsible_else_if = "allow"
+comparison_chain = "allow"
+derive_ord_xor_partial_ord = "allow"
+field_reassign_with_default = "allow"
+if_same_then_else = "allow"
+into_iter_on_ref = "allow"
+iter_cloned_collect = "allow"
+iter_next_slice = "allow"
+len_without_is_empty = "allow"
+len_zero = "allow"
+let_and_return = "allow"
+manual_flatten = "allow"
+manual_range_contains = "allow"
+map_clone = "allow"
+map_flatten = "allow"
+map_identity = "allow"
+match_like_matches_macro = "allow"
+match_ref_pats = "allow"
+match_single_binding = "allow"
+missing_transmute_annotations = "allow"
+needless_borrow = "allow"
+needless_borrows_for_generic_args = "allow"
+needless_late_init = "allow"
+needless_lifetimes = "allow"
+needless_question_mark = "allow"
+needless_range_loop = "allow"
+needless_return = "allow"
+neg_multiply = "allow"
+never_loop = "allow"
+new_without_default = "allow"
+non_canonical_partial_ord_impl = "allow"
+nonminimal_bool = "allow"
+only_used_in_recursion = "allow"
+op_ref = "allow"
+option_as_ref_deref = "allow"
+partialeq_ne_impl = "allow"
+ptr_arg = "allow"
+redundant_closure = "allow"
+redundant_field_names = "allow"
+redundant_pattern = "allow"
+redundant_pattern_matching = "allow"
+result_large_err = "allow"
+single_match = "allow"
+should_implement_trait = "allow"
+to_string_trait_impl = "allow"
+too_many_arguments = "allow"
+type_complexity = "allow"
+unnecessary_cast = "allow"
+unnecessary_lazy_evaluations = "allow"
+unnecessary_mut_passed = "allow"
+unnecessary_to_owned = "allow"
+unnecessary_unwrap = "allow"
+unused_unit = "allow"
+unwrap_or_default = "allow"
+useless_conversion = "allow"
+useless_format = "allow"
+useless_vec = "allow"
+wrong_self_convention = "allow"

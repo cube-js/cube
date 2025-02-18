@@ -1,13 +1,13 @@
 /**
  * @license Apache-2.0
  * @copyright Cube Dev, Inc.
- * @fileoverview CubejsApi class unit tests.
+ * @fileoverview CubeApi class unit tests.
  */
 
 /* globals describe,test,expect,beforeEach,jest */
 
 import ResultSet from './ResultSet';
-import { CubejsApi } from './index';
+import { CubeApi } from './index';
 
 jest.mock('./ResultSet');
 beforeEach(() => {
@@ -203,9 +203,9 @@ const mockData = {
   }],
 };
 
-describe('CubejsApi', () => {
-  test('CubejsApi#loadResponseInternal should work with the "default" resType for regular query', () => {
-    const api = new CubejsApi(undefined, {
+describe('CubeApi', () => {
+  test('CubeApi#loadResponseInternal should work with the "default" resType for regular query', () => {
+    const api = new CubeApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -236,8 +236,8 @@ describe('CubejsApi', () => {
     });
   });
 
-  test('CubejsApi#loadResponseInternal should work with the "default" resType for compare date range query', () => {
-    const api = new CubejsApi(undefined, {
+  test('CubeApi#loadResponseInternal should work with the "default" resType for compare date range query', () => {
+    const api = new CubeApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -282,8 +282,8 @@ describe('CubejsApi', () => {
     });
   });
 
-  test('CubejsApi#loadResponseInternal should work with the "default" resType for blending query', () => {
-    const api = new CubejsApi(undefined, {
+  test('CubeApi#loadResponseInternal should work with the "default" resType for blending query', () => {
+    const api = new CubeApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -328,8 +328,8 @@ describe('CubejsApi', () => {
     });
   });
 
-  test('CubejsApi#loadResponseInternal should work with the "compact" resType for regular query', () => {
-    const api = new CubejsApi(undefined, {
+  test('CubeApi#loadResponseInternal should work with the "compact" resType for regular query', () => {
+    const api = new CubeApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -360,8 +360,8 @@ describe('CubejsApi', () => {
     });
   });
 
-  test('CubejsApi#loadResponseInternal should work with the "compact" resType for compare date range query', () => {
-    const api = new CubejsApi(undefined, {
+  test('CubeApi#loadResponseInternal should work with the "compact" resType for compare date range query', () => {
+    const api = new CubeApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {
@@ -406,8 +406,8 @@ describe('CubejsApi', () => {
     });
   });
 
-  test('CubejsApi#loadResponseInternal should work with the "compact" resType for blending query', () => {
-    const api = new CubejsApi(undefined, {
+  test('CubeApi#loadResponseInternal should work with the "compact" resType for blending query', () => {
+    const api = new CubeApi(undefined, {
       apiUrl: 'http://localhost:4000/cubejs-api/v1',
     });
     const income = {

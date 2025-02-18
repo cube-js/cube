@@ -20,12 +20,20 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
+  BaseDriver,
+  DatabaseStructure,
   DriverCapabilities,
-  DriverInterface, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, StreamTableData,
+  DriverInterface,
+  QueryColumnsResult,
+  QueryOptions,
+  QuerySchemasResult,
+  QueryTablesResult,
+  StreamTableData,
+  TableCSVData,
 } from '@cubejs-backend/base-driver';
-import { Query } from '@google-cloud/bigquery/build/src/bigquery';
-import { HydrationStream } from './HydrationStream';
+import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
+
+import { HydrationStream, transformRow } from './HydrationStream';
 
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
@@ -148,11 +156,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.bigquery.query({
-      query: 'SELECT ? AS number',
-      params: ['1'],
-      jobTimeoutMs: this.testConnectionTimeout(),
-    });
+    // From the BigQuery Docs:
+    // You are not charged for list, get, patch, update and delete calls.
+    // Examples include (but are not limited to): listing datasets, updating
+    // a dataset's access control list, updating a table's description, or
+    // listing user-defined functions in a dataset.
+    // @see https://cloud.google.com/bigquery/pricing#free
+    await this.bigquery.getDatasets();
   }
 
   public readOnly() {
@@ -169,7 +179,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
     return <any>(
       data[0] && data[0].map(
-        row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
+        row => transformRow(row)
       )
     );
   }
@@ -193,7 +203,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         );
       }
 
-      return [];
+      return {};
     } catch (e) {
       if ((<any>e).message.includes('Permission bigquery.tables.get denied on table')) {
         return {};
@@ -203,7 +213,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async tablesSchema() {
+  public async tablesSchema(): Promise<DatabaseStructure> {
     const dataSets = await this.bigquery.getDatasets();
     const dataSetsColumns = await Promise.all(
       dataSets[0].map((dataSet) => this.loadTablesForDataset(dataSet))
@@ -212,14 +222,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return dataSetsColumns.reduce((prev, current) => Object.assign(prev, current), {});
   }
 
-  public async getSchemas(): Promise<QuerySchemasResult[]> {
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
     const dataSets = await this.bigquery.getDatasets();
     return dataSets[0].filter((dataSet) => dataSet.id).map((dataSet) => ({
       schema_name: dataSet.id!,
     }));
   }
 
-  public async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     try {
       const allTablePromises = schemas.map(async schema => {
         const tables = await this.getTablesQuery(schema.schema_name);
@@ -237,7 +247,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     try {
       const allColumnPromises = tables.map(async table => {
         const tableName = `${table.schema_name}.${table.table_name}`;
@@ -308,7 +318,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public async unload(table: string): Promise<DownloadTableCSVData> {
+  public async unload(table: string): Promise<TableCSVData> {
     if (!this.bucket) {
       throw new Error('Unload is not configured');
     }
@@ -318,6 +328,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
     const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
     await this.waitForJobResult(job, { table }, false);
+    // There is an implementation for extracting and signing urls from S3
+    // @see BaseDriver->extractUnloadedFilesFromS3()
+    // Please use that if you need. Here is a different flow
+    // because bigquery requires storage/bucket object for other things,
+    // and there is no need to initiate another one (created in extractUnloadedFilesFromS3()).
     const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
     const urls = await Promise.all(files.map(async file => {
       const [url] = await file.getSignedUrl({

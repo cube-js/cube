@@ -1,7 +1,14 @@
 import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
 import { CubeSymbols } from '../../src/compiler/CubeSymbols';
+import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 
 describe('Cube Validation', () => {
+  class ConsoleErrorReporter extends ErrorReporter {
+    public error(message: any, _e: any) {
+      console.log(message);
+    }
+  }
+
   it('transpiledFieldsPatterns', async () => {
     const transpiledFieldsPatterns = functionFieldsPatterns()
       .filter((p) => p.indexOf('extends') < 0 && p.indexOf('allDefinitions') < 0)
@@ -61,12 +68,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
     };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
-        console.log(message);
-      }
-    });
-
+    const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
     expect(validationResult.error).toBeFalsy();
   });
 
@@ -78,11 +80,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
     };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
-        console.log(message);
-      }
-    });
+    const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
 
     expect(validationResult.error).toBeFalsy();
   });
@@ -95,12 +93,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
     };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
-        console.log(message);
-      }
-    });
-
+    const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
     expect(validationResult.error).toBeFalsy();
   });
 
@@ -114,11 +107,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('You must use either sql or sqlTable within a model, but not both');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -133,10 +126,10 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeFalsy();
   });
@@ -153,12 +146,13 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
+        expect(message).toContain('(refreshKey.every = 12h)');
         expect(message).toContain('does not match regexp');
         expect(message).toContain('CronParser');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -176,11 +170,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('unknown timezone');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -199,11 +193,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('must be one of [count, number,');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -223,11 +217,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('timeDimension) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -246,12 +240,12 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('granularity) is required');
         expect(message).toContain('rollups) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -281,11 +275,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('granularity) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -306,11 +300,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('(preAggregations.eventsByType.scheduledRefresh = true) must be [false]');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -334,17 +328,17 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('number.sql) is required');
         expect(message).toContain('number.columns) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
 
-  it('preAggregations alternatives', async () => {
+  it('preAggregations custom granularities', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
       name: 'name',
@@ -356,7 +350,7 @@ describe('Cube Validation', () => {
           measureReferences: () => '',
           dimensionReferences: () => '',
           partitionGranularity: 'month',
-          granularity: 'days',
+          granularity: 'custom_granularity_name',
           timeDimensionReference: () => '',
           external: true,
           refreshKey: {
@@ -369,14 +363,13 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
-        console.log(message);
-        expect(message).toContain('must be one of');
-        expect(message).not.toContain('rollup) must be');
+      error: (_message: any, _e: any) => {
+        // this callback should not be invoked
+        expect(true).toBeFalsy();
       }
-    });
+    } as any);
 
-    expect(validationResult.error).toBeTruthy();
+    expect(validationResult.error).toBeFalsy();
   });
 
   it('preAggregations type unknown', async () => {
@@ -393,11 +386,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('must be');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -417,11 +410,11 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('are deprecated, please, use');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -441,11 +434,46 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         // this callback should not be invoked
         expect(true).toBeFalsy();
       }
-    });
+    } as any);
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
+  it('Partition with multi time dimensions', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => '',
+      fileName: 'fileName',
+      preAggregations: {
+        eventsByType: {
+          type: 'rollup',
+          timeDimensions: [
+            {
+              dimension: () => 'field1',
+              granularity: 'day'
+            },
+            {
+              dimension: () => 'field2',
+              granularity: 'day'
+            }
+          ],
+          partitionGranularity: 'day',
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message: any, _e: any) => {
+        console.log(message);
+        // this callback should not be invoked
+        expect(true).toBeFalsy();
+      }
+    } as any);
 
     expect(validationResult.error).toBeFalsy();
   });
@@ -509,11 +537,447 @@ describe('Cube Validation', () => {
     const cubeValidator = new CubeValidator(cubeSymbols);
     const validationResult = cubeValidator.validate(cubeSymbols.getCubeDefinition('CubeA'), {
       inContext: () => false,
-      error: (message, _e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
+      }
+    } as any);
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
+  describe('Custom dimension granularities: ', () => {
+    const newCube = (granularities) => ({
+      name: 'Orders',
+      fileName: 'fileName',
+      sql: () => 'select * from tbl',
+      public: true,
+      dimensions: {
+        createdAt: {
+          public: true,
+          sql: () => 'created_at',
+          type: 'time',
+          granularities
+        },
+        status: {
+          type: 'string',
+          sql: () => 'status',
+        }
+      },
+      measures: {
+        count: {
+          sql: () => 'count',
+          type: 'count'
+        }
       }
     });
 
-    expect(validationResult.error).toBeFalsy();
+    it('no granularity interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        half_year: {}
+      });
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, e: any) => {
+          console.log(message);
+          expect(message).toContain('(dimensions.createdAt.granularities.half_year.interval) is required');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('granularity with aligned interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 years' // useless, but still valid
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 months',
+            title: 'Half year intervals'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '1 day'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 hours'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 minutes'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '30 seconds'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+    });
+
+    it('granularity with aligned interval + offset', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 years', // useless, but still valid
+            offset: '2 months 3 weeks 4 days',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 months',
+            offset: '4 weeks 5 days 6 hours',
+            title: 'Half year intervals title'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '1 day',
+            offset: '5 days 6 hours 7 minutes',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 hours',
+            offset: '5 days 6 hours 7 minutes 8 seconds',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 minutes',
+            offset: '1 hours 7 minutes 8 seconds',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '30 seconds',
+            offset: '8 seconds',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+    });
+
+    it('granularity with unaligned interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '5 months',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+            expect(message).toContain('Arbitrary intervals cannot be used without origin point specified');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '3 quarters',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+            expect(message).toContain('Arbitrary intervals cannot be used without origin point specified');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '3 weeks',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+            expect(message).toContain('Arbitrary intervals cannot be used without origin point specified');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+
+      // Offset doesn't matter in this case
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 days',
+            offset: '1 hours 7 minutes 8 seconds',
+            title: 'Just title'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+    });
+
+    it('granularity with invalid interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        half_year: {
+          interval: 'invalid',
+        }
+      });
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('granularity with origin + invalid interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        half_year: {
+          origin: '2024',
+          interval: 'invalid',
+        }
+      });
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('granularity with invalid origin + interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        half_year: {
+          origin: 'invalid',
+          interval: '3 months',
+        }
+      });
+
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, _e: any) => {
+          console.log(message);
+          expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
+    });
+
+    it('granularity with origin + interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 years', // useless, but still valid
+            origin: '2024',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 months',
+            origin: '2024-04',
+            title: 'Someone loves number 10'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '2 quarters',
+            origin: '2024-04',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 day',
+            origin: '2024-05-25',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '8 hours',
+            origin: '2024-09-20 10:00'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 minutes',
+            origin: '2024-09-20 16:40'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '30 seconds',
+            origin: '2024-09-20 16:40:33'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '2 months 30 seconds',
+            origin: '2024-09-20T16:40:33.345'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '2 months 12 days 14 hours 30 seconds',
+            origin: '2024-09-20T16:40:33.345Z'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+    });
   });
 });

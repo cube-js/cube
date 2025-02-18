@@ -47,7 +47,6 @@ const dbTypes = Joi.alternatives().try(
 
 const schemaOptions = Joi.object().keys({
   // server CreateOptions
-  initApp: Joi.func(),
   webSockets: Joi.boolean(),
   http: Joi.object().strict(true).keys({
     cors: corsOptions,
@@ -71,14 +70,15 @@ const schemaOptions = Joi.object().keys({
   externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
   //
-  cacheAndQueueDriver: Joi.string().valid('cubestore', 'redis', 'memory'),
+  cacheAndQueueDriver: Joi.string().valid('cubestore', 'memory'),
   contextToAppId: Joi.func(),
+  contextToRoles: Joi.func(),
   contextToOrchestratorId: Joi.func(),
+  contextToCubeStoreRouterId: Joi.func(),
   contextToDataSourceId: Joi.func(),
   contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
-  checkAuthMiddleware: Joi.func(),
   jwt: jwtOptions,
   queryTransformer: Joi.func(),
   queryRewrite: Joi.func(),
@@ -93,7 +93,10 @@ const schemaOptions = Joi.object().keys({
     Joi.boolean(),
     Joi.number().min(0).integer()
   ),
-  scheduledRefreshTimeZones: Joi.array().items(Joi.string()),
+  scheduledRefreshTimeZones: Joi.alternatives().try(
+    Joi.array().items(Joi.string()),
+    Joi.func()
+  ),
   scheduledRefreshContexts: Joi.func(),
   scheduledRefreshConcurrency: Joi.number().min(1).integer(),
   scheduledRefreshBatchSize: Joi.number().min(1).integer(),
@@ -107,27 +110,6 @@ const schemaOptions = Joi.object().keys({
     Joi.func(),
     Joi.object().strict(true).keys({
       redisPrefix: Joi.string().allow(''),
-      redisPoolOptions: Joi.object().strict(true).keys({
-        poolMin: Joi.number().min(0),
-        poolMax: Joi.number().min(0),
-        idleTimeoutSeconds: Joi.number().min(0),
-        softIdleTimeoutSeconds: Joi.number().min(0),
-        createClient: Joi.func(),
-        destroyClient: Joi.func(),
-        poolOptions: Joi.object().keys({
-          maxWaitingClients: Joi.number(),
-          testOnBorrow: Joi.bool(),
-          testOnReturn: Joi.bool(),
-          acquireTimeoutMillis: Joi.number(),
-          fifo: Joi.bool(),
-          priorityRange: Joi.number(),
-          autostart: Joi.bool(),
-          evictionRunIntervalMillis: Joi.number().min(0),
-          numTestsPerEvictionRun: Joi.number().min(1),
-          softIdleTimeoutMillis: Joi.number().min(0),
-          idleTimeoutMillis: Joi.number().min(0),
-        })
-      }),
       continueWaitTimeout: Joi.number().min(0).max(90).integer(),
       skipExternalCacheAndQueue: Joi.boolean(),
       queryCacheOptions: Joi.object().keys({
@@ -153,6 +135,7 @@ const schemaOptions = Joi.object().keys({
   // SQL API
   sqlPort: Joi.number(),
   pgSqlPort: Joi.number(),
+  gatewayPort: Joi.number(),
   sqlSuperUser: Joi.string(),
   checkSqlAuth: Joi.func(),
   canSwitchSqlUser: Joi.func(),

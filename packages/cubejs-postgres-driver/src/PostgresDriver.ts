@@ -16,13 +16,14 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
   double: 'decimal',
+  int: 'int8',
   // Revert mapping for internal pre-aggregations
   HLL_POSTGRES: 'hll',
 };
@@ -32,6 +33,8 @@ const NativeTypeToPostgresType: Record<string, string> = {};
 Object.entries(types.builtins).forEach(([key, value]) => {
   NativeTypeToPostgresType[value] = key;
 });
+// pg-types lacks the default `unknown` type since it's a pseudo-type
+NativeTypeToPostgresType['705'] = 'UNKNOWN';
 
 const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // bpchar (“blank-padded char”, the internal name of the character data type)
@@ -115,7 +118,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+
     this.pool = new Pool({
       idleTimeoutMillis: 30000,
       max:
@@ -140,6 +143,38 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       ...config,
     };
     this.enabled = true;
+  }
+
+  protected primaryKeysQuery(conditionString?: string): string | null {
+    return `SELECT
+      columns.table_schema as ${this.quoteIdentifier('table_schema')},
+      columns.table_name as ${this.quoteIdentifier('table_name')},
+      columns.column_name as ${this.quoteIdentifier('column_name')}
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+    JOIN information_schema.columns AS columns ON columns.table_schema = tc.constraint_schema
+      AND tc.table_name = columns.table_name AND ccu.column_name = columns.column_name
+    WHERE constraint_type = 'PRIMARY KEY' AND columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`;
+  }
+
+  protected foreignKeysQuery(conditionString?: string): string | null {
+    return `SELECT
+        tc.table_schema as ${this.quoteIdentifier('table_schema')},
+        tc.table_name as ${this.quoteIdentifier('table_name')},
+        kcu.column_name as ${this.quoteIdentifier('column_name')},
+        columns.table_name as ${this.quoteIdentifier('target_table')},
+        columns.column_name as ${this.quoteIdentifier('target_column')}
+      FROM
+        information_schema.table_constraints AS tc
+      JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+      JOIN information_schema.constraint_column_usage AS columns
+        ON columns.constraint_name = tc.constraint_name
+      WHERE
+         constraint_type = 'FOREIGN KEY'
+         AND ${this.getColumnNameForSchemaName()} NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+         ${conditionString ? ` AND (${conditionString})` : ''}
+    `;
   }
 
   /**
@@ -256,36 +291,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     });
   }
 
-  public async streamQuery(sql: string, values: string[]): Promise<QueryStream> {
-    const conn = await this.pool.connect();
-    try {
-      await this.prepareConnection(conn);
-      const query: QueryStream = new QueryStream(sql, values, {
-        types: { getTypeParser: this.getTypeParser },
-        highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
-      });
-      const rowsStream: QueryStream = await conn.query(query);
-      const cleanup = (err?: Error) => {
-        if (!rowsStream.destroyed) {
-          conn.release();
-          rowsStream.destroy(err);
-        }
-      };
-      rowsStream.once('end', cleanup);
-      rowsStream.once('error', cleanup);
-      rowsStream.once('close', cleanup);
-      return rowsStream;
-    } catch (e) {
-      await conn.release();
-      throw e;
-    }
-  }
-
   public async stream(
     query: string,
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
+    PostgresDriver.checkValuesLimit(values);
+
     const conn = await this.pool.connect();
 
     try {
@@ -314,7 +326,22 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  protected static checkValuesLimit(values?: unknown[]) {
+    // PostgreSQL protocol allows sending up to 65535 params in a single bind message
+    // See https://github.com/postgres/postgres/blob/REL_16_0/src/backend/tcop/postgres.c#L1698-L1708
+    // See https://github.com/postgres/postgres/blob/REL_16_0/src/backend/libpq/pqformat.c#L428-L431
+    // But 'pg' module does not check for params count, and ends up sending incorrect bind message
+    // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/serializer.ts#L155
+    // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/buffer-writer.ts#L32-L37
+    const length = (values?.length ?? 0);
+    if (length >= 65536) {
+      throw new Error(`PostgreSQL protocol does not support more than 65535 parameters, but ${length} passed`);
+    }
+  }
+
   protected async queryResponse(query: string, values: unknown[]) {
+    PostgresDriver.checkValuesLimit(values);
+
     const conn = await this.pool.connect();
 
     try {
@@ -331,6 +358,14 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     } finally {
       await conn.release();
     }
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 63) {
+      throw new Error('PostgreSQL can not work with table names longer than 63 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+    return super.createTable(quotedTableName, columns);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

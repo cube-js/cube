@@ -10,6 +10,8 @@ class CubeStoreHandlerOpen extends CubeStoreHandler {
 }
 
 describe('CubeStoreHandler', () => {
+  jest.setTimeout(60 * 1000);
+
   beforeAll(() => {
     try {
       fs.unlinkSync(getBinaryPath());
@@ -19,8 +21,6 @@ describe('CubeStoreHandler', () => {
   });
 
   it('acquire with release', async () => {
-    jest.setTimeout(60 * 1000);
-
     const handler = new CubeStoreHandlerOpen({
       stdout: (v) => {
         console.log(v.toString());
@@ -42,8 +42,6 @@ describe('CubeStoreHandler', () => {
   });
 
   it('auto restart', async () => {
-    jest.setTimeout(60 * 1000);
-
     let restartCount = 0;
 
     const handler = new CubeStoreHandlerOpen({
@@ -81,8 +79,6 @@ describe('CubeStoreHandler', () => {
   });
 
   it('auto kill if parent dies', async () => {
-    jest.setTimeout(60 * 1000);
-
     {
       const startedProcess = fork('./dist/test/process-test-fork', {
         stdio: 'pipe'

@@ -102,10 +102,9 @@ export class PrestodbQuery extends BaseQuery {
     return `approx_distinct(${sql})`;
   }
 
-  public groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
-    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
-
+  protected limitOffsetClause(limit, offset) {
+    const limitClause = limit != null ? ` LIMIT ${limit}` : '';
+    const offsetClause = offset != null ? ` OFFSET ${offset}` : '';
     return `${offsetClause}${limitClause}`;
   }
 
@@ -113,8 +112,25 @@ export class PrestodbQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.statements.select = 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+      'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
+      '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
+      '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
+      '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}' +
+      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
-    templates.expressions.interval = 'INTERVAL \'{{ num }}\' {{ date_part }}';
+    templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
+    templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
+    delete templates.expressions.ilike;
+    templates.types.string = 'VARCHAR';
+    templates.types.float = 'REAL';
+    // Presto intervals have a YearMonth or DayTime type variants, but no universal type
+    delete templates.types.interval;
+    templates.types.binary = 'VARBINARY';
     return templates;
+  }
+
+  public castToString(sql: any): string {
+    return `CAST(${sql} as VARCHAR)`;
   }
 }

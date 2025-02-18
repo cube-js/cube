@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
+import cubejs, { Query, CubeApi } from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 import { BirdBox } from '../src';
 
@@ -78,8 +78,8 @@ export function createBirdBoxTestCase(
 
     let birdbox: BirdBox;
     let wsTransport: WebSocketTransport;
-    let httpClient: CubejsApi;
-    let wsClient: CubejsApi;
+    let httpClient: CubeApi;
+    let wsClient: CubeApi;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {
@@ -150,8 +150,8 @@ export function createBirdBoxTestCase(
     describe('responseFormat', () => {
       const responses: unknown[] = [];
       let transport: WebSocketTransport;
-      let http: CubejsApi;
-      let ws: CubejsApi;
+      let http: CubeApi;
+      let ws: CubeApi;
   
       beforeAll(async () => {
         try {

@@ -39,13 +39,22 @@ const getPivotQuery = (queryType, queries) => {
 };
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
-const memberExpression = Joi.object().keys({
-  expression: Joi.func().required(),
+const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
+const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
+const parsedMemberExpression = Joi.object().keys({
+  expression: Joi.array().items(Joi.string()).min(1).required(),
   cubeName: Joi.string().required(),
   name: Joi.string().required(),
   expressionName: Joi.string(),
   definition: Joi.string(),
+  groupingSet: Joi.object().keys({
+    groupType: Joi.valid('Rollup', 'Cube').required(),
+    id: Joi.number().required(),
+    subId: Joi.number()
+  })
+});
+const memberExpression = parsedMemberExpression.keys({
+  expression: Joi.func().required(),
 });
 
 const operators = [
@@ -87,14 +96,23 @@ const oneCondition = Joi.object().keys({
   and: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
 }).xor('or', 'and');
 
+const subqueryJoin = Joi.object().keys({
+  sql: Joi.string(),
+  // TODO This is _always_ a member expression, maybe pass as parsed, without intermediate string?
+  // TODO there are three different types instead of alternatives for this actually
+  on: Joi.alternatives(Joi.string(), memberExpression, parsedMemberExpression),
+  joinType: Joi.string().valid('LEFT', 'INNER'),
+  alias: Joi.string(),
+});
+
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
-  measures: Joi.array().items(Joi.alternatives(id, memberExpression)),
-  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression)),
+  measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
+  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression, parsedMemberExpression)),
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
-    granularity: Joi.valid('quarter', 'day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
+    granularity: Joi.string().max(128, 'utf8'), // Custom granularities may have arbitrary names
     dateRange: [
       Joi.array().items(Joi.string()).min(1).max(2),
       Joi.string()
@@ -102,17 +120,18 @@ const querySchema = Joi.object().keys({
     compareDateRange: Joi.array()
   }).oxor('dateRange', 'compareDateRange')),
   order: Joi.alternatives(
-    Joi.object().pattern(id, Joi.valid('asc', 'desc')),
-    Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
+    Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
+    Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
-  segments: Joi.array().items(id),
+  segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(1),
+  limit: Joi.number().integer().min(0),
   offset: Joi.number().integer().min(0),
   total: Joi.boolean(),
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
+  subqueryJoins: Joi.array().items(subqueryJoin),
 });
 
 const normalizeQueryOrder = order => {
@@ -213,9 +232,9 @@ const normalizeQuery = (query, persistent) => {
 
   return {
     ...query,
+    ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
-    order: normalizeQueryOrder(query.order),
     filters: normalizeQueryFilters(query.filters || []),
     dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
@@ -260,7 +279,7 @@ const remapQueryOrder = order => {
 const remapToQueryAdapterFormat = (query) => (query ? {
   ...query,
   rowLimit: query.limit,
-  order: remapQueryOrder(query.order),
+  ...(query.order ? { order: remapQueryOrder(query.order) } : {}),
 } : query);
 
 const queryPreAggregationsSchema = Joi.object().keys({

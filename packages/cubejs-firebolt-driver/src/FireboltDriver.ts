@@ -46,7 +46,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 5;
+    return 10;
   }
 
   private config: FireboltDriverConfiguration;
@@ -77,23 +77,27 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       testConnectionTimeout?: number,
     } = {},
   ) {
-    super(config);
+    // Set connection timeout to 2 minutes to allow the engine to start if it's stopped
+    super({ testConnectionTimeout: 120000, ...config });
 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
 
+    const username = getEnv('dbUser', { dataSource });
+    const auth = username.includes('@')
+      ? { username, password: getEnv('dbPass', { dataSource }) }
+      : { client_id: username, client_secret: getEnv('dbPass', { dataSource }) };
+
     this.config = {
       readOnly: true,
-      apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }),
+      apiEndpoint:
+        getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
       ...config,
       connection: {
-        username: getEnv('dbUser', { dataSource }),
-        password: getEnv('dbPass', { dataSource }),
+        auth,
         database: getEnv('dbName', { dataSource }),
-        // The propery `account` is deprecated according to Firebolt SDK docs
-        // and will be removed in the future.
-        // account: <string>process.env.CUBEJS_FIREBOLT_ACCOUNT,
+        account: getEnv('fireboltAccount', { dataSource }),
         engineName: getEnv('fireboltEngineName', { dataSource }),
         // engineEndpoint was deprecated in favor of engineName + account
         engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource }),
@@ -119,6 +123,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   private async initConnection() {
     try {
       const connection = await this.firebolt.connect(this.config.connection);
+      await this.ensureEngineRunning();
       return connection;
     } catch (e) {
       this.connection = null;
@@ -167,10 +172,11 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection(): Promise<void> {
     try {
-      await this.query('select 1');
+      const connection = await this.getConnection();
+      await connection.testConnection();
     } catch (error) {
       console.log(error);
-      throw new Error('Unable to connect');
+      throw error;
     }
   }
 
@@ -349,7 +355,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   public async release() {
     if (this.connection) {
       const connection = await this.connection;
-      connection.destroy();
+      await connection.destroy();
       this.connection = null;
     }
   }

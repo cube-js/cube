@@ -29,7 +29,12 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let config_module = PyModule::from_code(py, &file_content_arg, &options_file_name, "")?;
         let settings_py = if config_module.hasattr("__execution_context_locals")? {
             let execution_context_locals = config_module.getattr("__execution_context_locals")?;
-            execution_context_locals.get_item("settings")?
+
+            if config_module.hasattr("config")? {
+                execution_context_locals.get_item("config")?
+            } else {
+                config_module.getattr("settings")?
+            }
         } else if config_module.hasattr("config")? {
             config_module.getattr("config")?
         } else {

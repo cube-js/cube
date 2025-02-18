@@ -15,7 +15,7 @@ class DuckDBFilter extends BaseFilter {
 }
 
 export class DuckDBQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new DuckDBFilter(this, filter);
   }
 
@@ -27,6 +27,23 @@ export class DuckDBQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * DuckDB operates with whole intervals as is without measuring them in plain seconds,
+   * so the resulting date will be human-expected aligned with intervals.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = this.dateTimeCast('\'1970-01-01 00:00:00.000\'');
+
+    return `${this.dateTimeCast(`'${origin}'`)}' + INTERVAL '${interval}' *
+      floor(
+        date_diff('${timeUnit}', ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
+        date_diff('${timeUnit}', ${beginOfTime}, ${beginOfTime} + INTERVAL '${interval}')
+      )::int`;
+  }
+
   public countDistinctApprox(sql: string) {
     return `approx_count_distinct(${sql})`;
   }
@@ -34,6 +51,8 @@ export class DuckDBQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     return templates;
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.34.26",
+  "version": "1.2.6",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -12,7 +12,7 @@
   "scripts": {
     "tsc": "tsc",
     "build": "tsc",
-    "native:build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
+    "native:build": "cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
     "native:build-debug": "npm run native:build --",
     "native:build-release": "npm run native:build -- --release",
     "native:build-debug-python": "npm run native:build -- --features python",
@@ -21,7 +21,8 @@
     "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:server:stream": "CUBESQL_STREAM_MODE=true CUBESQL_LOG_LEVEL=error CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
-    "test:unit": "jest --forceExit",
+    "unit": "jest --forceExit",
+    "test:unit": "yarn run unit",
     "test:cargo": "cargo test",
     "lint": "eslint test/ js/ --ext .ts",
     "lint:fix": "eslint --fix test/ js/ --ext .ts"
@@ -33,17 +34,18 @@
     "dist/js"
   ],
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.34.25",
-    "@types/jest": "^26",
-    "@types/node": "^14",
-    "cargo-cp-artifact": "^0.1",
-    "jest": "^26",
-    "mysql2": "^2.3.3",
-    "typescript": "~5.2.2"
+    "@cubejs-backend/linter": "1.2.6",
+    "@types/jest": "^27",
+    "@types/node": "^18",
+    "cargo-cp-artifact": "^0.1.9",
+    "jest": "^27",
+    "pg": "^8.11.3",
+    "typescript": "~5.2.2",
+    "uuid": "^8.3.2"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "^0.34.26",
-    "@cubejs-backend/shared": "^0.34.25",
+    "@cubejs-backend/cubesql": "1.2.6",
+    "@cubejs-backend/shared": "1.2.6",
     "@cubejs-infra/post-installer": "^0.0.7"
   },
   "resources": {
@@ -53,6 +55,7 @@
         "value": [
           "libpython",
           [
+            "3.12",
             "3.11",
             "3.10",
             "3.9"

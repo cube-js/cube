@@ -6,6 +6,7 @@
  */
 
 import type { Request as ExpressRequest } from 'express';
+import type { DataResult } from '@cubejs-backend/native';
 import { RequestType, ApiType, ResultType } from './strings';
 import { Query } from './query';
 
@@ -52,6 +53,8 @@ interface Request extends ExpressRequest {
    */
   securityContext?: any,
 
+  requestStarted?: Date,
+
   /**
    * @deprecated
    */
@@ -59,9 +62,9 @@ interface Request extends ExpressRequest {
 }
 
 /**
- * Function that should provides basic query conversion mechanic.
+ * Function that should provide basic query conversion mechanic.
  * Used as a part of a main configuration object of the server-core
- * to provide extendabillity to a query processing logic.
+ * to provide extendability to a query processing logic.
  */
 type QueryRewriteFn =
   (query: Query, context: RequestContext) => Promise<Query>;
@@ -69,7 +72,7 @@ type QueryRewriteFn =
 /**
  * Function that should provides a logic for extracting security
  * context from the request. Used as a part of a main configuration
- * object of the server-core to provide extendabillity to a query
+ * object of the server-core to provide extendability to a query
  * security processing logic.
  * @todo any could be changed to unknown?
  * @todo Maybe we can add type limitations?
@@ -78,25 +81,32 @@ type SecurityContextExtractorFn =
   (ctx: Readonly<RequestContext>) => any;
 
 /**
- * Function that should provides a logic for extracting request
- * extesion context from the request. Used as a part of a main
- * configuration object of the server-core to provide extendabillity
+ * Function that should provide a logic for extracting request
+ * extension context from the request. Used as a part of a main
+ * configuration object of the server-core to provide extendability
  * to a query processing logic.
  */
 type ExtendContextFn =
   (req: ExpressRequest) =>
     Promise<RequestExtension> | RequestExtension;
 
+type ErrorResponse = {
+  error: string,
+};
+
+type MetaResponse = { cubes: any[], compilerId?: string };
+type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
+
 /**
  * Function that should provides a logic for the response result
  * processing. Used as a part of a main configuration object of the
- * server-core to provide extendabillity for this logic.
+ * server-core to provide extendability for this logic.
  * @todo any could be changed to unknown?
  * @todo Maybe we can add type limitations?
  */
 type ResponseResultFn =
   (
-    message: Record<string, any> | Record<string, any>[],
+    message: (Record<string, any> | Record<string, any>[]) | DataResult | ErrorResponse,
     extra?: { status: number }
   ) => void;
 
@@ -121,13 +131,17 @@ type QueryRequest = BaseRequest & {
   expressionParams?: string[];
   exportAnnotatedSql?: boolean;
   memberExpressions?: boolean;
+  disableExternalPreAggregations?: boolean;
+  disableLimitEnforcing?: boolean;
 };
 
 type SqlApiRequest = BaseRequest & {
   query: Record<string, any>;
   sqlQuery?: [string, string[]];
   apiType?: ApiType;
+  queryKey: any;
   streaming?: boolean;
+  memberExpressions?: boolean;
 };
 
 /**
@@ -169,19 +183,22 @@ type PreAggsJobsRequest = {
   resType?: 'object' | 'array'
 };
 
-type PreAggJobStatusItem = {
+type PreAggJobStatusItemNotFound = {
   token: string;
-  table: string;
+  status: 'not_found' | 'pre_agg_not_found';
+};
+
+type PreAggJobStatusItemFound = {
+  token: string;
   status: string;
+  table: string;
   selector: PreAggsSelector;
 };
 
+type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFound;
+
 type PreAggJobStatusObject = {
-  [token: string]: {
-    table: string;
-    status: string;
-    selector: PreAggsSelector;
-  }
+  [token: string]: Omit<PreAggJobStatusItem, 'token'>
 };
 
 type PreAggJobStatusResponse =
@@ -198,6 +215,7 @@ export {
   SecurityContextExtractorFn,
   ExtendContextFn,
   ResponseResultFn,
+  MetaResponseResultFn,
   BaseRequest,
   QueryRequest,
   PreAggsJobsRequest,

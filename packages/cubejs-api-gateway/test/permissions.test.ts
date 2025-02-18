@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import { ApiGateway, ApiGatewayOptions } from '../src';
 import {
   compilerApi,
   DataSourceStorageMock,
@@ -37,7 +37,7 @@ function createApiGateway(
 describe('Gateway Api Scopes', () => {
   test('CUBEJS_DEFAULT_API_SCOPES', async () => {
     process.env.CUBEJS_DEFAULT_API_SCOPES = '';
-    
+
     let res: request.Response;
     const { app, apiGateway } = createApiGateway();
 
@@ -75,29 +75,25 @@ describe('Gateway Api Scopes', () => {
 
   test('/readyz and /livez accessible', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['graphql', 'meta', 'data', 'jobs']);
-      }),
+      contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
     });
-  
+
     await request(app)
       .get('/readyz')
       .set('Authorization', AUTH_TOKEN)
       .expect(200);
-  
+
     await request(app)
       .get('/livez')
       .set('Authorization', AUTH_TOKEN)
       .expect(200);
-  
+
     apiGateway.release();
   });
 
   test('GraphQL declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['meta', 'data', 'jobs']);
-      }),
+      contextToApiScopes: async () => ['meta', 'data', 'jobs'],
     });
 
     const res = await request(app)
@@ -113,9 +109,7 @@ describe('Gateway Api Scopes', () => {
 
   test('Meta declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['graphql', 'data', 'jobs']);
-      }),
+      contextToApiScopes: async () => ['graphql', 'data', 'jobs'],
     });
 
     const res1 = await request(app)
@@ -137,11 +131,24 @@ describe('Gateway Api Scopes', () => {
     apiGateway.release();
   });
 
+  test('catch error from contextToApiScopes (server should crash)', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => {
+        throw new Error('Random error');
+      },
+    });
+
+    await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(500);
+
+    apiGateway.release();
+  });
+
   test('Data declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['graphql', 'meta', 'jobs']);
-      }),
+      contextToApiScopes: async () => ['graphql', 'meta', 'jobs'],
     });
 
     const res1 = await request(app)
@@ -207,9 +214,7 @@ describe('Gateway Api Scopes', () => {
 
   test('Jobs declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['graphql', 'data', 'meta']);
-      }),
+      contextToApiScopes: async () => ['graphql', 'data', 'meta'],
     });
 
     const res1 = await request(app)
@@ -218,14 +223,6 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('API scope is missing: jobs');
-
-    const res2 = await request(app)
-      .get('/cubejs-api/v1/run-scheduled-refresh')
-      .set('Authorization', AUTH_TOKEN)
-      .expect(403);
-
-    expect(res2.body && res2.body.error)
       .toStrictEqual('API scope is missing: jobs');
 
     apiGateway.release();

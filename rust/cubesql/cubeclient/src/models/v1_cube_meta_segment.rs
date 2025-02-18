@@ -14,8 +14,12 @@ pub struct V1CubeMetaSegment {
     pub name: String,
     #[serde(rename = "title")]
     pub title: String,
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     #[serde(rename = "shortTitle")]
     pub short_title: String,
+    #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<serde_json::Value>,
 }
 
 impl V1CubeMetaSegment {
@@ -23,7 +27,9 @@ impl V1CubeMetaSegment {
         V1CubeMetaSegment {
             name,
             title,
+            description: None,
             short_title,
+            meta: None,
         }
     }
 }

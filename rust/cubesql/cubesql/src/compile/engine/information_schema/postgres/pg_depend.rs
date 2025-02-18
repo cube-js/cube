@@ -39,14 +39,15 @@ impl PgCatalogDependBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.classid.finish()));
-        columns.push(Arc::new(self.objid.finish()));
-        columns.push(Arc::new(self.objsubid.finish()));
-        columns.push(Arc::new(self.refclassid.finish()));
-        columns.push(Arc::new(self.refobjid.finish()));
-        columns.push(Arc::new(self.refobjsubid.finish()));
-        columns.push(Arc::new(self.deptype.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.classid.finish()),
+            Arc::new(self.objid.finish()),
+            Arc::new(self.objsubid.finish()),
+            Arc::new(self.refclassid.finish()),
+            Arc::new(self.refobjid.finish()),
+            Arc::new(self.refobjsubid.finish()),
+            Arc::new(self.deptype.finish()),
+        ];
 
         columns
     }

@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT TO_CHAR(DATE('2023-10-02 13:47:01')::TIMESTAMP, 'YYYY-Mon') AS \\\"CalendarMonth\\\"\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------+
+| CalendarMonth |
++---------------+
+| 2023-Oct      |
++---------------+

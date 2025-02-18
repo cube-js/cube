@@ -1,8 +1,11 @@
+const uuidv4 = require('uuid').v4;
+
 module.exports = {
   cubes: [
     {
       name: 'KibanaSampleDataEcommerce',
       title: 'Ecommerce',
+      type: 'cube',
       measures: [
         {
           name: 'KibanaSampleDataEcommerce.count',
@@ -124,6 +127,7 @@ module.exports = {
     {
       name: 'Logs',
       title: 'Logs',
+      type: 'cube',
       measures: [
         {
           name: 'Logs.count',
@@ -215,5 +219,6 @@ module.exports = {
       ],
       segments: []
     }
-  ]
+  ],
+  compilerId: uuidv4()
 };

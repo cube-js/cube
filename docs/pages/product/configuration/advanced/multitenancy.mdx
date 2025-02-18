@@ -9,19 +9,22 @@ Cube supports multitenancy out of the box, both on database and data model
 levels. Multiple drivers are also supported, meaning that you can have one
 customer’s data in MongoDB and others in Postgres with one Cube instance.
 
-There are 6 [configuration options][ref-config-opts] you can leverage to make
+There are several [configuration options][ref-config-opts] you can leverage for
 your multitenancy setup. You can use all of them or just a couple, depending on
 your specific case. The options are:
 
-- `contextToAppId`
-- `contextToOrchestratorId`
-- `driverFactory`
-- `repositoryFactory`
-- `preAggregationsSchema`
-- `queryRewrite`
+- `context_to_app_id`
+- `schema_version`
+- `repository_factory`
+- `driver_factory`
+- `context_to_orchestrator_id`
+- `pre_aggregations_schema`
+- `query_rewrite`
+- `scheduled_refresh_contexts`
+- `scheduled_refresh_time_zones`
 
-All of the above options are functions, which you provide to Cube in the
-[`cube.js` configuration file][ref-config]. The functions accept one argument -
+All of the above options are functions, which you provide in the
+[configuration file][ref-config]. The functions accept one argument:
 a context object, which has a [`securityContext`][ref-config-security-ctx]
 property where you can provide all the necessary data to identify a user e.g.,
 organization, app, etc. By default, the
@@ -255,7 +258,7 @@ so we can access them through the [security context][ref-config-security-ctx].
 const jwt = require("jsonwebtoken");
 const CUBE_API_SECRET = "secret";
 
-const cubejsToken = jwt.sign({ appId: "1", userId: "2" }, CUBE_API_SECRET, {
+const cubeToken = jwt.sign({ appId: "1", userId: "2" }, CUBE_API_SECRET, {
   expiresIn: "30d",
 });
 ```
@@ -285,9 +288,9 @@ data model or data of one tenant being used for another.
 ```javascript
 module.exports = {
   contextToAppId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
+    `CUBE_APP_${securityContext.appId}_${securityContext.userId}`,
   contextToOrchestratorId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
+    `CUBE_APP_${securityContext.appId}_${securityContext.userId}`,
   driverFactory: ({ securityContext }) => ({
     type: "postgres",
     database: `my_app_${securityContext.appId}_${securityContext.userId}`,
@@ -308,7 +311,7 @@ requesting data.
 ```javascript
 module.exports = {
   contextToAppId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.userId}`,
+    `CUBE_APP_${securityContext.userId}`,
   preAggregationsSchema: ({ securityContext }) =>
     `pre_aggregations_${securityContext.userId}`,
 };
@@ -334,9 +337,9 @@ const { FileRepository } = require("@cubejs-backend/server-core");
 
 module.exports = {
   contextToAppId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
+    `CUBE_APP_${securityContext.appId}_${securityContext.userId}`,
   contextToOrchestratorId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
+    `CUBE_APP_${securityContext.appId}_${securityContext.userId}`,
   driverFactory: ({ securityContext }) => {
     if (securityContext.appId === 3) {
       return {
@@ -360,36 +363,36 @@ module.exports = {
 
 If you need scheduled refreshes for your pre-aggregations in a multi-tenant
 deployment, ensure you have configured
-[`scheduledRefreshContexts`][ref-config-refresh-ctx] correctly. You may also
-need to configure [`scheduledRefreshTimeZones`][ref-config-refresh-tz].
+[`scheduled_refresh_contexts`][ref-config-refresh-ctx] correctly. You may also
+need to configure [`scheduled_refresh_time_zones`][ref-config-refresh-tz].
 
 <WarningBox>
 
-Leaving [`scheduledRefreshContexts`][ref-config-refresh-ctx] unconfigured will
+Leaving [`scheduled_refresh_contexts`][ref-config-refresh-ctx] unconfigured will
 lead to issues where the security context will be `undefined`. This is because
 there is no way for Cube to know how to generate a context without the required
 input.
 
 </WarningBox>
 
-[ref-config]: /reference/configuration/config
+[ref-config]: /product/configuration#configuration-options
 [ref-config-opts]: /reference/configuration/config
 [ref-config-db]: /product/configuration/data-sources
-[ref-config-driverfactory]: /reference/configuration/config#driverfactory
-[ref-config-repofactory]: /reference/configuration/config#repositoryfactory
+[ref-config-driverfactory]: /reference/configuration/config#driver_factory
+[ref-config-repofactory]: /reference/configuration/config#repository_factory
 [ref-config-preagg-schema]:
-  /reference/configuration/config#preaggregationsschema
-[ref-config-ctx-to-appid]: /reference/configuration/config#contexttoappid
+  /reference/configuration/config#pre_aggregations_schema
+[ref-config-ctx-to-appid]: /reference/configuration/config#context_to_app_id
 [ref-config-ctx-to-orch-id]:
-  /reference/configuration/config#contexttoorchestratorid
+  /reference/configuration/config#context_to_orchestrator_id
 [ref-config-multi-data-src]:
   /product/configuration/advanced/multiple-data-sources
-[ref-config-query-rewrite]: /reference/configuration/config#queryrewrite
+[ref-config-query-rewrite]: /reference/configuration/config#query_rewrite
 [ref-config-refresh-ctx]:
-  /reference/configuration/config#scheduledrefreshcontexts
+  /reference/configuration/config#scheduled_refresh_contexts
 [ref-config-refresh-tz]:
-  /reference/configuration/config#scheduledrefreshtimezones
-[ref-config-security-ctx]: /reference/configuration/config#securitycontext
+  /reference/configuration/config#scheduled_refresh_timezones
+[ref-config-security-ctx]: /product/auth/context
 [ref-security]: /product/auth
 [ref-cube-datasource]: /reference/data-model/cube#data_source
-[ref-cube-security-ctx]: /reference/data-model/cube#security-context
+[ref-cube-security-ctx]: /reference/data-model/context-variables#compile_context

@@ -9,7 +9,7 @@ import { getFixtures } from './getFixtures';
  * Returns schema yaml file by data source type.
  */
 export function getSchemaPath(type: string, suf?: string): [path: string, file: string] {
-  const _path = path.resolve(process.cwd(), './.temp/schema');
+  const _path = path.resolve(process.cwd(), './.temp/model');
   const _file = 'ecommerce.yaml';
   const { tables, preAggregations } = getFixtures(type);
   const _content = JSON.parse(fs.readFileSync(
@@ -67,7 +67,7 @@ export function getSchemaPath(type: string, suf?: string): [path: string, file: 
 
   fs.writeFileSync(
     path.resolve(_path, _file),
-    YAML.stringify(_content),
+    YAML.stringify(_content, { version: '1.1' }),
   );
   return [_path, _file];
 }

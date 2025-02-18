@@ -247,7 +247,7 @@ dump:
 `;
 
 exports[`Jinja (new api) render template_error_python.jinja: template_error_python.jinja 1`] = `
-[Error: could not render block: Call error: Internal: Python error: Exception: Random Exception
+[Error: could not render block: Call error: Python error: Exception: Random Exception
 Traceback (most recent call last):
   File "jinja-instance.py", line 110, in throw_exception
 

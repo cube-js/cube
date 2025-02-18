@@ -7,8 +7,8 @@ redirect_from:
 
 Cube can be configured with dynamic username & password verification system by
 setting a [`checkSqlAuth()`][ref-config-check-sql-auth] function in the
-`cube.js` configuration file. This function should verify username and return
-object with password and security context.
+configuration file. This function should verify username and return
+an object with password and security context.
 
 If password returned from this function matches provided in connection string
 user will be authenticated with provided security context.
@@ -28,17 +28,14 @@ module.exports = {
 };
 ```
 
-As Cube expects passwords to be provided by `checkSqlAuth` implementation best
-practice is to use a generated password here instead of an actual user password.
-Generated passwords can be implemented as an HMAC of the user name or requested
-from some service that provides the mapping of the user name to passwords for
-additional security.
+Check [this recipe](/guides/recipes/auth/sql-api-ldap) for an example of
+using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
 
 ## Security Context (Row-Level Security)
 
 Cube's SQL API can also use the Security Context for [Dynamic data model
 creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite]
-property in your `cube.js` configuration file.
+property in your configuration file.
 
 By default, the SQL API uses the current user's Security Context, but this
 behaviour can be modified so that certain users are allowed to switch. To do
@@ -140,6 +137,8 @@ cubes:
         type: count
 
 ```
+
+## Virtual User Filter
 
 With the above now configured, we can query Cube using SQL with a user that is
 part of a trusted team:

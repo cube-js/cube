@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.34.0",
+  "version": "1.2.6",
   "author": "Cube Dev, Inc.",
   "engines": {},
   "repository": {
@@ -9,50 +9,31 @@
     "directory": "packages/cubejs-client-ngx"
   },
   "description": "Cube.js client for Angular",
-  "main": "dist/bundles/cubejs-client-ngx.umd.js",
   "files": [
     "dist"
   ],
   "license": "MIT",
-  "watch": {
-    "dev:publish": "dist/*"
-  },
   "scripts": {
-    "build": "./node_modules/ng-packagr/cli/main.js -c tsconfig.json -p  ng-package.json && rm dist/package.json",
-    "ng:watch": "./node_modules/ng-packagr/cli/main.js -c tsconfig.json -p  ng-package.json --watch && rm dist/package.json",
+    "build": "ng build",
+    "ng:watch": "ng build --watch --configuration development",
     "dev": "yarn build && yalc publish --push"
   },
   "dependencies": {
     "fast-deep-equal": "^3.1.3",
-    "tslib": "^2.0.0"
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^12.1.2",
-    "@angular/cli": "^12.1.2",
-    "@angular/compiler": "^12.1.2",
-    "@angular/compiler-cli": "^12.1.2",
-    "@angular/core": "^12.1.2",
-    "ng-packagr": "^12.1.2",
-    "npm-watch": "^0.7.0",
-    "tsickle": "^0.39.1",
-    "typescript": "~4.3.5"
+    "@angular-devkit/build-angular": "^13.3.11",
+    "@angular/cli": "^13.3.11",
+    "@angular/compiler": "^13.3.11",
+    "@angular/compiler-cli": "^13.3.11",
+    "@angular/core": "^13.3.11",
+    "ng-packagr": "^13.3.1",
+    "rxjs": "~7.5.0",
+    "typescript": "~4.6.2"
   },
   "peerDependencies": {
     "@cubejs-client/core": ">=0.28.1",
     "rxjs": ">=6.6.0"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "module": "dist/fesm5/cubejs-client-ngx.js",
-  "es2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/cubejs-client-ngx.js",
-  "es2015": "dist/fesm2015/cubejs-client-ngx.js",
-  "esm5": "dist/esm5/cubejs-client-ngx.js",
-  "esm2015": "dist/esm2015/cubejs-client-ngx.js",
-  "fesm5": "dist/fesm5/cubejs-client-ngx.js",
-  "fesm2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/cubejs-client-ngx.js",
-  "fesm2015": "dist/fesm2015/cubejs-client-ngx.js",
-  "typings": "dist/cubejs-client-ngx.d.ts",
-  "metadata": "dist/cubejs-client-ngx.metadata.json",
-  "sideEffects": false
+  }
 }

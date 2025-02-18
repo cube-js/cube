@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { CubejsApi } from '@cubejs-client/core';
+import { CubeApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
 
 export const DEFAULT_CONFIG = {
@@ -17,7 +17,10 @@ export const DEFAULT_API_TOKEN = sign({}, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
   expiresIn: '2 days'
 });
 
-export async function testQueryMeasure(client: CubejsApi) {
+export const JEST_BEFORE_ALL_DEFAULT_TIMEOUT = 2 * 60 * 1000;
+export const JEST_AFTER_ALL_DEFAULT_TIMEOUT = 60 * 1000;
+
+export async function testQueryMeasure(client: CubeApi) {
   const response = await client.load({
     measures: [
       'Orders.totalAmount',

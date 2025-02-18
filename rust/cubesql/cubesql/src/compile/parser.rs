@@ -1,15 +1,13 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
 
+use regex::Regex;
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
     parser::Parser,
 };
 
-use crate::{
-    compile::{qtrace::Qtrace, CompilationError},
-    sql::session::DatabaseProtocol,
-};
+use super::{qtrace::Qtrace, CompilationError, DatabaseProtocol};
 
 use super::CompilationResult;
 
@@ -25,8 +23,8 @@ impl Dialect for MySqlDialectWithBackTicks {
         // See https://dev.mysql.com/doc/refman/8.0/en/identifiers.html.
         // We don't yet support identifiers beginning with numbers, as that
         // makes it hard to distinguish numeric literals.
-        ('a'..='z').contains(&ch)
-            || ('A'..='Z').contains(&ch)
+        ch.is_ascii_lowercase()
+            || ch.is_ascii_uppercase()
             || ch == '_'
             || ch == '$'
             || ch == '@'
@@ -34,13 +32,13 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 
     fn is_identifier_part(&self, ch: char) -> bool {
-        self.is_identifier_start(ch) || ('0'..='9').contains(&ch)
+        self.is_identifier_start(ch) || ch.is_ascii_digit()
     }
 }
 
-lazy_static! {
-    static ref SIGMA_WORKAROUND: regex::Regex = regex::Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s(?P<nspname>'[^']+'|\$\d+).*\),\s+tbl\sas\s\(.*relname\s=\s(?P<relname>'[^']+'|\$\d+).*\).*$"#).unwrap();
-}
+static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap()
+});
 
 pub fn parse_sql_to_statements(
     query: &String,
@@ -62,7 +60,7 @@ pub fn parse_sql_to_statements(
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
-    // DBEver
+    // DBeaver
     let query = query.replace(
         "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
         "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
@@ -76,85 +74,20 @@ pub fn parse_sql_to_statements(
         "SELECT n.oid as _oid,n.*,d.description FROM",
     );
 
-    // TODO support these introspection Superset queries
-    let query = query.replace(
-        "(SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid)\
-\n                FROM pg_catalog.pg_attrdef d\
-\n               WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum\
-\n               AND a.atthasdef)\
-\n              AS DEFAULT",
-        "NULL AS DEFAULT",
-    );
-
-    let query = query.replace(
-        "SELECT\
-\n                  i.relname as relname,\
-\n                  ix.indisunique, ix.indexprs, ix.indpred,\
-\n                  a.attname, a.attnum, c.conrelid, ix.indkey::varchar,\
-\n                  ix.indoption::varchar, i.reloptions, am.amname,\
-\n                  ix.indnkeyatts as indnkeyatts\
-\n              FROM\
-\n                  pg_class t\
-\n                        join pg_index ix on t.oid = ix.indrelid\
-\n                        join pg_class i on i.oid = ix.indexrelid\
-\n                        left outer join\
-\n                            pg_attribute a\
-\n                            on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)\
-\n                        left outer join\
-\n                            pg_constraint c\
-\n                            on (ix.indrelid = c.conrelid and\
-\n                                ix.indexrelid = c.conindid and\
-\n                                c.contype in ('p', 'u', 'x'))\
-\n                        left outer join\
-\n                            pg_am am\
-\n                            on i.relam = am.oid\
-\n              WHERE\
-\n                  t.relkind IN ('r', 'v', 'f', 'm', 'p')",
-        "SELECT\
-\n                  i.relname as relname,\
-\n                  ix.indisunique, ix.indexprs, ix.indpred,\
-\n                  a.attname, a.attnum, c.conrelid, ix.indkey,\
-\n                  ix.indoption, i.reloptions, am.amname,\
-\n                  ix.indnkeyatts as indnkeyatts\
-\n              FROM\
-\n                  pg_class t\
-\n                        join pg_index ix on t.oid = ix.indrelid\
-\n                        join pg_class i on i.oid = ix.indexrelid\
-\n                        left outer join\
-\n                            pg_attribute a\
-\n                            on t.oid = a.attrelid\
-\n                        left outer join\
-\n                            pg_constraint c\
-\n                            on (ix.indrelid = c.conrelid and\
-\n                                ix.indexrelid = c.conindid and\
-\n                                c.contype in ('p', 'u', 'x'))\
-\n                        left outer join\
-\n                            pg_am am\
-\n                            on i.relam = am.oid\
-\n              WHERE\
-\n                  t.relkind IN ('r', 'v', 'f', 'm', 'p')",
-    );
-
-    let query = query.replace(
-        "and ix.indisprimary = 'f'\
-\n              ORDER BY\
-\n                  t.relname,\
-\n                  i.relname",
-        "and ix.indisprimary = false",
-    );
-
+    // TODO Superset introspection: LEFT JOIN by ANY() is not supported
     let query = query.replace(
         "on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)",
         "on t.oid = a.attrelid",
     );
 
     // TODO: Quick workaround for Tableau Desktop (ODBC), waiting for DF rebase...
-    // Right now, our fork of DF doesn't support ON conditions with this filter
+    // LEFT JOIN by Boolean is not supported
     let query = query.replace(
         "left outer join pg_attrdef d on a.atthasdef and",
         "left outer join pg_attrdef d on",
     );
 
+    // TODO: Likely for Superset with JOINs
     let query = query.replace("a.attnum = ANY(cons.conkey)", "1 = 1");
     let query = query.replace("pg_get_constraintdef(cons.oid) as src", "NULL as src");
 
@@ -165,7 +98,6 @@ pub fn parse_sql_to_statements(
         "AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = ",
         "AS REF_GENERATION  FROM svv_tables) as svv_tables WHERE current_database() =",
     );
-    let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
     let query = query.replace(
         // Subquery must have alias
         // Incorrect alias for subquery
@@ -184,41 +116,24 @@ pub fn parse_sql_to_statements(
     );
 
     // Sigma Computing WITH query workaround
-    let query = match SIGMA_WORKAROUND.captures(&query) {
-        Some(c) => {
-            let nspname = c.name("nspname").unwrap().as_str();
-            let relname = c.name("relname").unwrap().as_str();
-            format!(
-                "
-                select
-                    attname,
-                    typname,
-                    description
-                from pg_attribute a
-                join pg_type on atttypid = pg_type.oid
-                left join pg_description on
-                    attrelid = objoid and
-                    attnum = objsubid
-                join pg_catalog.pg_namespace nsp ON nspname = {}
-                join pg_catalog.pg_class tbl ON relname = {} and relnamespace = nsp.oid
-                where
-                    attnum > 0 and
-                    attrelid = tbl.oid
-                order by attnum
-                ;
-                ",
-                nspname, relname
-            )
-        }
-        None => query,
-    };
+    // TODO: remove workaround when subquery is supported in JOIN ON conditions
+    let query = if SIGMA_WORKAROUND.is_match(&query) {
+        static RELNAMESPACE_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"(?s)from\spg_catalog\.pg_class\s+where\s+relname\s=\s(?P<relname>'(?:[^']|'')+'|\$\d+)\s+and\s+relnamespace\s=\s\(select\soid\sfrom\snsp\)"#).unwrap()
+        });
+        static ATTRELID_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"(?s)left\sjoin\spg_description\son\s+attrelid\s=\sobjoid\sand\s+attnum\s=\sobjsubid\s+where\s+attnum\s>\s0\s+and\s+attrelid\s=\s\(select\soid\sfrom\stbl\)"#).unwrap()
+        });
 
-    // Metabase
-    // TODO: To Support InSubquery Node (waiting for rebase DF)
-    let query = query.replace(
-        "WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e)",
-        "WHERE t.oid = 0",
-    );
+        let relnamespace_replaced = RELNAMESPACE_RE.replace(
+            &query,
+            "from pg_catalog.pg_class join nsp on relnamespace = nsp.oid where relname = $relname",
+        );
+        let attrelid_replaced = ATTRELID_RE.replace(&relnamespace_replaced, "left join pg_description on attrelid = objoid and attnum = objsubid join tbl on attrelid = tbl.oid where attnum > 0");
+        attrelid_replaced.to_string()
+    } else {
+        query
+    };
 
     // Holistics.io
     // TODO: Waiting for rebase DF
@@ -236,19 +151,9 @@ pub fn parse_sql_to_statements(
         "ON c.confrelid=fa.attrelid",
     );
 
-    // Holistics.io
-    // TODO: To Support InSubquery Node (waiting for rebase DF)
-    let query = query.replace(
-        "AND c.relname IN (SELECT table_name\nFROM information_schema.tables\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\n)\n",
-        "",
-    );
-
-    // Microstrategy
-    // TODO: Support Subquery Node
-    let query = query.replace("= (SELECT current_schema())", "= current_schema()");
-
     // Grafana
-    // TODO: Support InSubquery Node
+    // TODO: PostgreSQL accepts any function in FROM as table, even scalars
+    // string_to_array is *NOT* a UDTF! It returns one row of type list even in FROM!
     let query = query.replace(
         "WHERE quote_ident(table_schema) NOT IN ('information_schema', 'pg_catalog', '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_internal', '_timescaledb_config', 'timescaledb_information', 'timescaledb_experimental') AND table_type = 'BASE TABLE' AND quote_ident(table_schema) IN (SELECT CASE WHEN TRIM(s[i]) = '\"$user\"' THEN user ELSE TRIM(s[i]) END FROM generate_series(array_lower(string_to_array(current_setting('search_path'), ','), 1), array_upper(string_to_array(current_setting('search_path'), ','), 1)) AS i, string_to_array(current_setting('search_path'), ',') AS s)",
         "WHERE quote_ident(table_schema) IN (current_user, current_schema()) AND table_type = 'BASE TABLE'"
@@ -282,6 +187,55 @@ pub fn parse_sql_to_statements(
         "select NULL, NULL AS NULL2, NULL AS NULL3",
     );
 
+    // Work around an issue with lowercase table name when queried as uppercase,
+    // an uncommon way of casting literals, and skip a few funcs along the way
+    let query = query.replace(
+        "(CASE\
+        \n  WHEN c.reltuples < 0 THEN NULL\
+        \n  WHEN c.relpages = 0 THEN float8 '0'\
+        \n  ELSE c.reltuples / c.relpages END\
+        \n  * (pg_relation_size(c.oid) / pg_catalog.current_setting('block_size')::int)\
+        \n)::bigint",
+        "NULL::bigint",
+    );
+
+    // Work around an aliasing issue (lowercase-uppercase). This is fine
+    // since it must be equivalent in PostgreSQL
+    let query = query.replace(
+        "c.relname AS PARTITION_NAME,",
+        "c.relname AS partition_name,",
+    );
+
+    // Work around an issue with NULL, NULL, NULL in SELECT
+    let query = query.replace(
+        "p.proname AS PROCEDURE_NAME, NULL, NULL, NULL, ",
+        "p.proname AS PROCEDURE_NAME, NULL AS NULL, NULL AS NULL2, NULL AS NULL3, ",
+    );
+
+    // Quicksight workarounds
+    // subquery must have an alias
+    let query = query.replace(
+        "ORDER BY nspname,c.relname,attnum  ) UNION ALL",
+        "ORDER BY nspname,c.relname,attnum  ) _internal_unaliased_1 UNION ALL",
+    );
+    // SELECT expression referencing column aliased above
+    let query = query.replace(
+        "AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN",
+        "AS IS_AUTOINCREMENT, 'NO' AS IS_GENERATEDCOLUMN",
+    );
+    // WHERE expressions referencing SELECT aliases
+    let query = {
+        static WHERE_TABLE_SCHEMA_NAME_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"\slbv_columns\s+WHERE\s+table_schema\sLIKE\s(?P<tableschema>[^\s]+)\s+AND\stable_name\sLIKE\s(?P<tablename>[^\s]+)\s*$"#).unwrap()
+        });
+        WHERE_TABLE_SCHEMA_NAME_RE
+            .replace(
+                &query,
+                " lbv_columns WHERE schemaname LIKE $tableschema AND tablename LIKE $tablename",
+            )
+            .to_string()
+    };
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }
@@ -289,6 +243,7 @@ pub fn parse_sql_to_statements(
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
+        DatabaseProtocol::Extension(_) => unimplemented!(),
     };
 
     parse_result.map_err(|err| {
@@ -338,11 +293,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -355,11 +308,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 
@@ -394,11 +345,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -411,11 +360,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 

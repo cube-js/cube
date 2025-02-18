@@ -1,9 +1,12 @@
 use crate::cachestore::cache_eviction_manager::EvictionResult;
-use crate::cachestore::cache_rocksstore::{CachestoreInfo, QueueAddResponse};
+use crate::cachestore::cache_rocksstore::{
+    CachestoreInfo, QueueAddPayload, QueueAddResponse, QueueAllItem, QueueGetResponse,
+    QueueListItem,
+};
 use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResult, QueueResultResponse,
-    RocksCacheStore,
+    CacheItem, CacheStore, QueueCancelResponse, QueueItem, QueueItemStatus, QueueKey, QueueResult,
+    QueueResultResponse, RocksCacheStore,
 };
 use crate::config::ConfigObj;
 use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow};
@@ -204,7 +207,7 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.cache_incr(path).await
     }
 
-    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<QueueAllItem>, CubeError> {
         self.init().await?.queue_all(limit).await
     }
 
@@ -219,8 +222,8 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_results_multi_delete(ids).await
     }
 
-    async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError> {
-        self.init().await?.queue_add(item).await
+    async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
+        self.init().await?.queue_add(payload).await
     }
 
     async fn queue_truncate(&self) -> Result<(), CubeError> {
@@ -244,18 +247,19 @@ impl CacheStore for LazyRocksCacheStore {
         prefix: String,
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
-    ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+        with_payload: bool,
+    ) -> Result<Vec<QueueListItem>, CubeError> {
         self.init()
             .await?
-            .queue_list(prefix, status_filter, priority_sort)
+            .queue_list(prefix, status_filter, priority_sort, with_payload)
             .await
     }
 
-    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError> {
         self.init().await?.queue_get(key).await
     }
 
-    async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_cancel(&self, key: QueueKey) -> Result<Option<QueueCancelResponse>, CubeError> {
         self.init().await?.queue_cancel(key).await
     }
 

@@ -33,11 +33,12 @@ impl PgCatalogAmBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.amname.finish()));
-        columns.push(Arc::new(self.amhandler.finish()));
-        columns.push(Arc::new(self.amtype.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.amname.finish()),
+            Arc::new(self.amhandler.finish()),
+            Arc::new(self.amtype.finish()),
+        ];
 
         columns
     }

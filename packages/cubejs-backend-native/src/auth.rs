@@ -7,8 +7,7 @@ use cubesql::{
 };
 use log::trace;
 use neon::prelude::*;
-use serde::Deserialize;
-use serde_derive::Serialize;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -40,18 +39,24 @@ pub struct TransportRequest {
 struct CheckAuthRequest {
     request: TransportRequest,
     user: Option<String>,
+    password: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct CheckAuthResponse {
     password: Option<String>,
     superuser: bool,
+    #[serde(rename = "securityContext", skip_serializing_if = "Option::is_none")]
+    security_context: Option<serde_json::Value>,
+    #[serde(rename = "skipPasswordCheck", skip_serializing_if = "Option::is_none")]
+    skip_password_check: Option<bool>,
 }
 
 #[derive(Debug)]
 pub struct NativeAuthContext {
     pub user: Option<String>,
     pub superuser: bool,
+    pub security_context: Option<serde_json::Value>,
 }
 
 impl AuthContext for NativeAuthContext {
@@ -62,7 +67,11 @@ impl AuthContext for NativeAuthContext {
 
 #[async_trait]
 impl SqlAuthService for NodeBridgeAuthService {
-    async fn authenticate(&self, user: Option<String>) -> Result<AuthenticateResponse, CubeError> {
+    async fn authenticate(
+        &self,
+        user: Option<String>,
+        password: Option<String>,
+    ) -> Result<AuthenticateResponse, CubeError> {
         trace!("[auth] Request ->");
 
         let request_id = Uuid::new_v4().to_string();
@@ -73,6 +82,7 @@ impl SqlAuthService for NodeBridgeAuthService {
                 meta: None,
             },
             user: user.clone(),
+            password: password.clone(),
         })?;
         let response: CheckAuthResponse = call_js_with_channel_as_callback(
             self.channel.clone(),
@@ -86,8 +96,10 @@ impl SqlAuthService for NodeBridgeAuthService {
             context: Arc::new(NativeAuthContext {
                 user,
                 superuser: response.superuser,
+                security_context: response.security_context,
             }),
             password: response.password,
+            skip_password_check: response.skip_password_check.unwrap_or(false),
         })
     }
 }

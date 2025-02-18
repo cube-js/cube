@@ -12,10 +12,15 @@
 pub struct V1MetaResponse {
     #[serde(rename = "cubes", skip_serializing_if = "Option::is_none")]
     pub cubes: Option<Vec<crate::models::V1CubeMeta>>,
+    #[serde(rename = "compilerId", skip_serializing_if = "Option::is_none")]
+    pub compiler_id: Option<String>,
 }
 
 impl V1MetaResponse {
     pub fn new() -> V1MetaResponse {
-        V1MetaResponse { cubes: None }
+        V1MetaResponse {
+            cubes: None,
+            compiler_id: None,
+        }
     }
 }

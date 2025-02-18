@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { driverTest, driverTestFn, driverTestWithError } from './driverTest';
+import { driverTest, driverTestFn, driverTestMulti, driverTestWithError } from './driverTest';
 
 const commonSchemas = [
   'CAST.js',
@@ -189,7 +189,7 @@ export const filteringCustomersCubeThird = driverTest(
     },
     schemas: commonSchemas,
   }
-  
+
 );
 
 export const filteringCustomersEndsWithFilterFirst = driverTest({
@@ -932,6 +932,55 @@ export const queryingECommerceCountByCitiesOrder = driverTest({
   schemas: commonSchemas
 });
 
+export const queryingECommerceCountApproxByCustomerOverProductNameByMonth = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over productName by month',
+  query: {
+    timeDimensions: [{
+      dimension: 'ECommerce.orderDate',
+      granularity: 'month'
+    }],
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+    order: {
+      'ECommerce.orderDate': 'desc',
+      'ECommerce.countApproxByCustomer': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCountApproxByCustomerOverProductName = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over productName',
+  query: {
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+    order: {
+      'ECommerce.countApproxByCustomer': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCountApproxByCustomer = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer',
+  query: {
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+  },
+  schemas: commonSchemas
+});
+
 export const queryingECommerceTotalQuantityAvgDiscountTotalSales = driverTest({
   name: 'querying ECommerce: total quantity, avg discount, total sales, ' +
     'total profit by product + order + total -- rounding in athena',
@@ -1244,6 +1293,31 @@ export const preAggsCustomersRunningTotal = driverTest({
       'Customers.runningTotal'
     ]
   },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCompareDateRangesByCustomerOverProductNameByMonth = driverTestMulti({
+  name: 'querying ECommerce: compare DateRanges by customer over productName by month',
+  query: [{
+    timeDimensions: [{
+      dimension: 'ECommerce.orderDate',
+      granularity: 'month',
+      compareDateRange: [
+        ['2023-01-01', '2024-01-01'],
+        ['2024-01-01', '2025-01-01']
+      ]
+    }],
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.count'
+    ],
+    order: {
+      'ECommerce.orderDate': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  }],
   schemas: commonSchemas
 });
 

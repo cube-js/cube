@@ -1,12 +1,11 @@
 source_code = """
 from cube import (
-    settings,
     config
 )
 
-settings.schema_path = "models"
-settings.pg_sql_port = 5555
-settings.telemetry = False
+config.schema_path = "models"
+config.pg_sql_port = 5555
+config.telemetry = False
 
 @config
 def query_rewrite(query, ctx):

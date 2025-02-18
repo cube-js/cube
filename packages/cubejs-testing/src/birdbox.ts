@@ -48,7 +48,7 @@ interface Args {
   log: Log,
 }
 
-export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'trino' | 'oracle' | 'duckdb' | 'snowflake';
+export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'trino' | 'oracle' | 'duckdb' | 'snowflake' | 'vertica';
 
 export type Schemas = string[];
 
@@ -103,6 +103,7 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
   questdb: 'postgresql',
   redshift: 'postgresql',
   'databricks-jdbc': 'databricks-jdbc',
+  vertica: 'vertica',
   prestodb: 'postgresql',
   mssql: 'mssql',
   trino: 'postgresql',
@@ -198,7 +199,7 @@ function runSchemasGeneration(type: DriverType, schemas: Schemas) {
 function prepareTestData(type: DriverType, schemas?: Schemas) {
   const targetFolder = getTargetFolder(type);
   clearTestData(type);
-  
+
   if (schemas) {
     runSchemasGeneration(type, schemas);
   } else {
@@ -212,7 +213,7 @@ function prepareTestData(type: DriverType, schemas?: Schemas) {
       const originalContent = fs.readFileSync(
         path.join(SOURCE, name), 'utf8'
       );
-  
+
       const updatedContent = originalContent.replace('_type_', type);
       fs.writeFileSync(
         path.join(targetFolder, name),
@@ -222,11 +223,17 @@ function prepareTestData(type: DriverType, schemas?: Schemas) {
   }
 }
 
+// Some logic to kill Cube in stop is more precise if we know killCube is only used to send signals
+// that get the process terminated.
+type KillCubeSignal = 'SIGINT' | 'SIGTERM';
+
 /**
  * Birdbox object interface.
  */
 export interface BirdBox {
   stop: () => Promise<void>;
+  killCube: (signal: KillCubeSignal) => void;
+  onCubeExit: () => Promise<number | null>;
   stdout: internal.Readable | null;
   configuration: {
     playgroundUrl: string;
@@ -246,11 +253,21 @@ export async function startBirdBoxFromContainer(
   if (process.env.TEST_CUBE_HOST) {
     const host = process.env.TEST_CUBE_HOST || 'localhost';
     const port = process.env.TEST_CUBE_PORT || '8888';
+    const pid = process.env.TEST_CUBE_PID ? Number(process.env.TEST_CUBE_PID) : null;
 
     return {
       stop: async () => {
         process.stdout.write('[Birdbox] Closed\n');
       },
+      killCube: (signal: KillCubeSignal) => {
+        if (pid !== null) {
+          process.kill(pid, signal);
+        } else {
+          process.stdout.write('[Birdbox] Cannot kill Cube instance running in TEST_CUBE_HOST mode without TEST_CUBE_PID defined\n');
+          throw new Error('Attempted to use killCube while running with TEST_CUBE_HOST');
+        }
+      },
+      onCubeExit: (): Promise<number | null> => Promise.reject(new Error('onCubeExit not implemented')), // TODO: Implement
       stdout: null,
       configuration: {
         playgroundUrl: `http://${host}:${port}`,
@@ -277,7 +294,7 @@ export async function startBirdBoxFromContainer(
   if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
     process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
   }
-  
+
   const composeFileName = `${options.type}.yml`;
   const composeFilePath = path.resolve(path.dirname(__filename), '../../birdbox-fixtures/');
   let dc: DockerComposeEnvironment;
@@ -296,7 +313,7 @@ export async function startBirdBoxFromContainer(
 
     const newComposeFileName = `${options.type}.json`;
     fs.writeFileSync(path.join(composeFilePath, newComposeFileName), JSON.stringify(yamlContent));
-    
+
     dc = new DockerComposeEnvironment(
       composeFilePath,
       newComposeFileName
@@ -309,12 +326,7 @@ export async function startBirdBoxFromContainer(
   }
 
   if (options.env) {
-    for (const k of Object.keys(options.env)) {
-      const val = options.env[k];
-      if (val) {
-        dc = dc.withEnv(k, val);
-      }
-    }
+    dc = dc.withEnvironment(options.env as any);
   }
   if (options.log === Log.PIPE) {
     process.stdout.write(
@@ -324,15 +336,12 @@ export async function startBirdBoxFromContainer(
 
   const env = await dc
     .withStartupTimeout(30 * 1000)
-    .withEnv(
-      'BIRDBOX_CUBEJS_VERSION',
-      process.env.BIRDBOX_CUBEJS_VERSION
-    )
-    .withEnv(
-      'BIRDBOX_CUBESTORE_VERSION',
-      process.env.BIRDBOX_CUBESTORE_VERSION
-    )
-    .withEnv('CUBEJS_TELEMETRY', 'false')
+    .withEnvironment({
+      BIRDBOX_CUBEJS_VERSION: process.env.BIRDBOX_CUBEJS_VERSION,
+      BIRDBOX_CUBESTORE_VERSION: process.env.BIRDBOX_CUBESTORE_VERSION,
+      CUBEJS_TELEMETRY: 'false',
+      CUBEJS_SCHEMA_PATH: 'schema',
+    })
     .up();
 
   const host = '127.0.0.1';
@@ -352,11 +361,13 @@ export async function startBirdBoxFromContainer(
     proxyServer = HttpProxy.createProxyServer({
       target: `http://localhost:${port}`
     }).listen(4000);
-    proxyServer.on('error', async (err, req, res) => {
+    proxyServer.on('error', async (err, req, res: any) => {
       process.stderr.write(`[Proxy Server] error: ${err}\n`);
-      if (!res.headersSent) {
+
+      if ('headersSent' in res && !res.headersSent) {
         res.writeHead(500, { 'content-type': 'application/json' });
       }
+
       res.end(JSON.stringify({ error: err.message }));
     });
   }
@@ -405,6 +416,15 @@ export async function startBirdBoxFromContainer(
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Closed\n');
       }
+    },
+    killCube: (signal: KillCubeSignal) => {
+      process.stdout.write(`[Birdbox] killCube (with signal ${signal}) not implemented for containers\n`);
+      throw new Error('killCube not implemented for containers');
+    },
+    onCubeExit: (): Promise<number | null> => {
+      const _ = 0;
+      return Promise.reject(new Error('onCubeExit not implemented for containers'));
+      // TODO: Implement.
     },
     configuration: {
       playgroundUrl: `http://${host}:${playgroundPort}`,
@@ -522,9 +542,15 @@ export async function startBirdBoxFromCli(
   }
 
   if (options.cubejsConfig) {
+    const configType = options.cubejsConfig.split('.').at(-1);
+    for (const configFile of ['cube.js', 'cube.py']) {
+      if (fs.existsSync(path.join(testDir, configFile))) {
+        fs.removeSync(path.join(testDir, configFile));
+      }
+    }
     fs.copySync(
       path.join(process.cwd(), 'birdbox-fixtures', options.cubejsConfig),
-      path.join(testDir, 'cube.js')
+      path.join(testDir, `cube.${configType}`)
     );
   }
 
@@ -537,6 +563,7 @@ export async function startBirdBoxFromCli(
     CUBEJS_DB_TYPE: options.type === 'postgresql'
       ? 'postgres'
       : options.type,
+    CUBEJS_SCHEMA_PATH: 'schema',
     CUBEJS_DEV_MODE: 'true',
     CUBEJS_API_SECRET: 'mysupersecret',
     CUBEJS_WEB_SOCKETS: 'true',
@@ -554,6 +581,11 @@ export async function startBirdBoxFromCli(
       }),
     ...options.env,
   };
+
+  let exitResolve: (code: number | null) => void;
+  const exitPromise = new Promise<number | null>((res, _rej) => {
+    exitResolve = res;
+  });
 
   try {
     cli = spawn(
@@ -585,6 +617,10 @@ export async function startBirdBoxFromCli(
         process.stdout.write(msg);
       });
     }
+    cli.on('exit', (code, signal) => {
+      process.stdout.write(`[Birdbox] Child process '${cli.pid}' exited with 'exit' event code ${code}, signal ${signal}\n`);
+      exitResolve(code);
+    });
     await pausePromise(10 * 1000);
   } catch (e) {
     process.stdout.write(`Error spawning cube: ${e}\n`);
@@ -592,6 +628,7 @@ export async function startBirdBoxFromCli(
     db.stop();
   }
 
+  let sentKillSignal = false;
   return {
     // @ts-expect-error
     stdout: cli.stdout,
@@ -606,11 +643,31 @@ export async function startBirdBoxFromCli(
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Done with DB\n');
       }
-      process.kill(-cli.pid, 'SIGINT');
+      if (cli.pid) {
+        process.stdout.write(`[Birdbox] Killing process group '${cli.pid}'\n`);
+        // Here, normally, we kill the process group by passing -cli.pid (a negative value), but
+        // with killCube we just kill the main process, and then can't kill any process group --
+        // maybe that test has poor cleanup actions.
+        try {
+          process.kill(-cli.pid, 'SIGINT');
+        } catch (error) {
+          if (!sentKillSignal) {
+            throw error;
+          }
+        }
+      }
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Closed\n');
       }
     },
+    killCube: (signal: KillCubeSignal) => {
+      process.stdout.write(`[Birdbox] Killing Cube (pid = '${cli.pid}') with signal ${signal}\n`);
+      if (cli.pid) {
+        process.kill(cli.pid, signal);
+        sentKillSignal = true;
+      }
+    },
+    onCubeExit: (): Promise<number | null> => exitPromise,
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',
       apiUrl: 'http://127.0.0.1:4000/cubejs-api/v1',

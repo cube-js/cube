@@ -1,23 +1,51 @@
----
-redirect_from:
-  - /config/databases/ksqldb
----
-
 # ksqlDB
 
-<WarningBox>
-  ksqlDB driver is in preview. Please{" "}
-  <a href="https://cube.dev/contact">contact us</a> if you need help running it
-  in production.
-</WarningBox>
+[ksqlDB](https://ksqldb.io) is a purpose-built database for stream processing
+applications, ingesting data from [Apache Kafka](https://kafka.apache.org).
+
+<SuccessBox>
+
+ksqlDB support is available in Cube Cloud on the
+[Enterprise Premier](https://cube.dev/pricing) product tier.
+[Contact us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+See how you can use ksqlDB and Cube Cloud to power real-time analytics in Power BI:
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/RD_HZ7xE8G0"
+  aspectRatio={4/3.55}
+/>
+
+<InfoBox>
+
+In this video, the SQL API is used to connect to [Power BI][ref-powerbi].
+Currently, it's recommended to use the [DAX API][ref-dax-api].
+
+</InfoBox>
 
 ## Prerequisites
 
 - Hostname for the ksqlDB server
-- Username and password to connect to ksqlDB server
+- Username and password (or an API key) to connect to ksqlDB server
 
-If you are using Confluent Cloud, you need to generate API key and use **key as
-username** and **secret as password**.
+### Confluent Cloud
+
+If you are using [Confluent Cloud](https://www.confluent.io/confluent-cloud/),
+you need to generate an API key and use the API key name as your username and
+the API key secret as your password.
+
+You can generate an API key by installing `confluent-cli` and running the
+following commands in the command line:
+
+```sh
+brew install --cask confluent-cli
+confluent login
+confluent environment use <YOUR-ENVIRONMENT-ID>
+confluent ksql cluster list
+confluent api-key create --resource <YOUR-KSQL-CLUSTER-ID>
+```
 
 ## Setup
 
@@ -34,17 +62,18 @@ CUBEJS_DB_PASS=password
 
 ## Environment Variables
 
-| Environment Variable | Description                                                                   | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
-| -------------------- | ----------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
-| `CUBEJS_DB_URL`      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_USER`     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |                                    ✅                                    |
-| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the DB. Default is `1` | A valid number            |    ❌    |                                    ✅                                    |
+| Environment Variable | Description                                                                   | Possible Values           | Required |
+| -------------------- | ----------------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_URL`      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |
+| `CUBEJS_DB_USER`     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |
+| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the DB. Default is `1` | A valid number            |    ❌    |
 
 ## Pre-Aggregations Support
 
 ksqlDB supports only
 [streaming pre-aggregations](/product/caching/using-pre-aggregations#streaming-pre-aggregations).
 
-[ref-config-multiple-ds-decorating-env]:
-  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-dax-api]: /product/apis-integrations/dax-api

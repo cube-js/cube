@@ -1,4 +1,5 @@
 import moment from 'moment-timezone';
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
@@ -42,27 +43,90 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public timeStampCast(value) {
-    return `CAST(${value} as TIMESTAMP)`; // TODO
+    return `CAST(${value} as TIMESTAMP)`;
   }
 
   public timestampFormat() {
-    return moment.HTML5_FMT.DATETIME_LOCAL_MS;
+    return 'YYYY-MM-DDTHH:mm:ss.SSS';
   }
 
   public dateTimeCast(value) {
     return `to_timestamp(${value})`;
   }
 
-  public subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL '${interval}')`;
+  public subtractInterval(date: string, interval: string) {
+    return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
-  public addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL '${interval}')`;
+  public addInterval(date: string, interval: string) {
+    return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    return `DATE_BIN(INTERVAL ${this.formatInterval(interval)}, ${this.dateTimeCast(source)}, ${this.dateTimeCast(`'${origin}'`)})`;
+  }
+
+  /**
+   * The input interval with (possible) plural units, like "2 years", "3 months", "4 weeks", "5 days"...
+   * will be converted to CubeStore (DataFusion) dialect.
+   */
+  private formatInterval(interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    const intKeys = Object.keys(intervalParsed).length;
+
+    if (intervalParsed.year && intKeys === 1) {
+      return `'${intervalParsed.year} YEAR'`;
+    } else if (intervalParsed.year && intervalParsed.month && intKeys === 2) {
+      return `'${intervalParsed.year} YEAR ${intervalParsed.month} MONTH'`;
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.quarter && intKeys === 3) {
+      return `'${intervalParsed.year} YEAR ${intervalParsed.quarter} QUARTER ${intervalParsed.month} MONTH'`;
+    } else if (intervalParsed.quarter && intKeys === 1) {
+      return `'${intervalParsed.quarter} QUARTER'`;
+    } else if (intervalParsed.quarter && intervalParsed.month && intKeys === 2) {
+      return `'${intervalParsed.quarter} QUARTER ${intervalParsed.month} MONTH'`;
+    } else if (intervalParsed.month && intKeys === 1) {
+      return `'${intervalParsed.month} MONTH'`;
+    } else if (intervalParsed.week && intKeys === 1) {
+      return `'${intervalParsed.week} WEEK'`;
+    } else if (intervalParsed.week && intervalParsed.day && intKeys === 2) {
+      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY'`;
+    } else if (intervalParsed.week && intervalParsed.day && intervalParsed.hour && intKeys === 3) {
+      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY ${intervalParsed.hour} HOUR'`;
+    } else if (intervalParsed.week && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 4) {
+      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
+    } else if (intervalParsed.week && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 5) {
+      return `'${intervalParsed.week} WEEK ${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
+    } else if (intervalParsed.day && intKeys === 1) {
+      return `'${intervalParsed.day} DAY'`;
+    } else if (intervalParsed.day && intervalParsed.hour && intKeys === 2) {
+      return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR'`;
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 3) {
+      return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 4) {
+      return `'${intervalParsed.day} DAY ${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
+    } else if (intervalParsed.hour && intKeys === 1) {
+      return `'${intervalParsed.hour} HOUR'`;
+    } else if (intervalParsed.hour && intervalParsed.minute && intKeys === 2) {
+      return `'${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE'`;
+    } else if (intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 3) {
+      return `'${intervalParsed.hour} HOUR ${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
+    } else if (intervalParsed.minute && intKeys === 1) {
+      return `'${intervalParsed.minute} MINUTE'`;
+    } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
+      return `'${intervalParsed.minute} MINUTE ${intervalParsed.second} SECOND'`;
+    }
+
+    // No need to support microseconds.
+
+    throw new Error(`Cannot transform interval expression "${interval}" to CubeStore dialect`);
   }
 
   public escapeColumnName(name) {
@@ -122,7 +186,8 @@ export class CubeStoreQuery extends BaseQuery {
     const allMeasures = regularMeasures.concat(multipliedMeasures).concat(
       cumulativeMeasuresWithoutMultiplied
     );
-    const timeDimension = this.timeDimensions.find(d => d.granularity);
+    const timeDimension = this.timeDimensions.find(d => d.granularity || d.dateRange);
+    const timeDimensionWithGranularity = timeDimension?.granularity ? timeDimension : null;
     const baseQueryAlias = this.cubeAlias('base');
     const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
     const commonDateCondition =
@@ -131,8 +196,8 @@ export class CubeStoreQuery extends BaseQuery {
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(commonDateCondition, true, true) || []
     );
     const rollupGranularity = this.preAggregations?.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
-    const granularityOverride = timeDimension &&
-      cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimension.granularity) || rollupGranularity;
+    const granularityOverride = timeDimensionWithGranularity &&
+      cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimensionWithGranularity.granularity) || rollupGranularity;
     return this.evaluateSymbolSqlWithContext(
       () => this.overTimeSeriesSelectRollup(
         cumulativeMeasuresWithoutMultiplied,
@@ -142,7 +207,7 @@ export class CubeStoreQuery extends BaseQuery {
           overTimeSeriesAggregate: true
         }),
         baseQueryAlias,
-        timeDimension,
+        timeDimensionWithGranularity,
         preAggregationForQuery
       ),
       {
@@ -228,7 +293,7 @@ export class CubeStoreQuery extends BaseQuery {
           const preceding = rollingWindow.trailing ? `${this.toInterval(rollingWindow.trailing)} PRECEDING` : '';
           const following = rollingWindow.leading ? `${this.toInterval(rollingWindow.leading)} FOLLOWING` : '';
           const offset = ` OFFSET ${rollingWindow.offset || 'end'}`;
-          const rollingMeasure = `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following}${offset})`;
+          const rollingMeasure = `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' AND ' : ''}${following}${offset})`;
           return this.topAggregateWrap(m.measureDefinition(), rollingMeasure);
         } else {
           const conditionFn = m.isCumulative() ? this.dateFromStartToEndConditionSql(m.dateJoinCondition(), true, true)[0] : timeDimension;

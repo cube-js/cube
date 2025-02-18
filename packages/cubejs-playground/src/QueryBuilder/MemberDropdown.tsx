@@ -6,7 +6,7 @@ import FlexSearch from 'flexsearch';
 import { LockOutlined } from '@ant-design/icons';
 import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
-import ButtonDropdown from './ButtonDropdown';
+import { ButtonDropdown } from './ButtonDropdown';
 import { useDeepMemo } from '../hooks';
 import { getNameMemberPairs } from '../shared/members';
 
@@ -20,9 +20,9 @@ const Menu = styled(AntdMenu)`
   }
 `;
 
-const SearchMenuItem = styled(Menu.Item)`
-  position: sticky;
-  top: 0;
+const SearchMenuItem = styled.li`
+  position: sticky !important;
+  top: 0  !important;
   // this isn't the best solution ever, but according to the situation other solutions are worse
   // antd uses double class pattern (.disabled.active.active) to override the value of background color. actually the
   // easiest way to override it is to use smtn with higher specificity
@@ -31,6 +31,7 @@ const SearchMenuItem = styled(Menu.Item)`
   padding-bottom: 8px;
   margin-bottom: 8px;
   cursor: default;
+  z-index: 9;
 
   ::after {
     display: block;
@@ -44,7 +45,7 @@ const SearchMenuItem = styled(Menu.Item)`
       to bottom,
       rgba(255, 255, 255, 1),
       rgba(255, 255, 255, 0)
-    );
+    ) !important;
   }
 `;
 
@@ -81,9 +82,7 @@ export default function MemberMenu({
   const [search, setSearch] = useState<string>('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
-  const hasMembers = availableCubes.some(
-    (cube) => cube.members.length > 0
-  );
+  const hasMembers = availableCubes.some((cube) => cube.members.length > 0);
 
   const indexedMembers = useDeepMemo(() => {
     getNameMemberPairs(availableCubes).forEach(([name, { title }]) =>
@@ -111,18 +110,26 @@ export default function MemberMenu({
     };
   }, [index, search]);
 
+  const [show, setShow] = useState(false);
+
   const members = search
     ? filterMembersByKeys(availableCubes, filteredKeys)
     : availableCubes;
 
   return (
     <ButtonDropdown
+      show={show}
       {...buttonProps}
+      overlayStyles={{
+        minWidth: 280
+      }}
       onOverlayClose={() => {
+        setShow(false);
         setFilteredKeys([]);
         setSearch('');
         searchInputRef.current?.setValue('');
       }}
+      onOverlayOpen={() => setShow(true)}
       onClick={() => {
         // we need to delay focusing since React needs to render <Menu /> first :)
         setTimeout(() => {
@@ -130,106 +137,118 @@ export default function MemberMenu({
         });
       }}
       overlay={
-        <Menu
-          onKeyDown={(e) => {
-            if (
-              [
-                'ArrowDown',
-                'ArrowUp',
-                'ArrowLeft',
-                'ArrowRight',
-                'Enter',
-                'Escape',
-                'Tab',
-                'CapsLock',
-              ].includes(e.key)
-            ) {
-              return;
-            }
+        <div className="test">
+          <Menu
+            className="ant-dropdown-menu ant-dropdown-menu-root"
+            onKeyDown={(e) => {
+              if (
+                [
+                  'ArrowDown',
+                  'ArrowUp',
+                  'ArrowLeft',
+                  'ArrowRight',
+                  'Enter',
+                  'Escape',
+                  'Tab',
+                  'CapsLock',
+                ].includes(e.key)
+              ) {
+                return;
+              }
 
-            if (document.activeElement === searchInputRef.current?.input)
-              return;
+              if (document.activeElement === searchInputRef.current?.input)
+                return;
 
-            searchInputRef.current?.focus({ preventScroll: true });
-          }}
-          onClick={(event) => {
-            if (['__not-found__', '__search_field__'].includes(event.key)) {
-              return;
-            }
+              searchInputRef.current?.focus({ preventScroll: true });
+            }}
+            onClick={(event) => {
+              if (['__not-found__', '__search_field__'].includes(event.key)) {
+                return;
+              }
 
-            setSearch('');
-            setFilteredKeys([]);
-            onClick(indexedMembers[event.key]);
-            searchInputRef.current?.setValue('');
-          }}
-        >
-          {hasMembers ? (
-            <>
-              <SearchMenuItem disabled key="__search_field__">
-                <Input
-                  ref={searchInputRef}
-                  placeholder="Search"
-                  autoFocus
-                  allowClear
-                  onKeyDown={(event) => {
-                    if (['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) {
-                      event.preventDefault();
-                    }
+              setSearch('');
+              setFilteredKeys([]);
+              onClick(indexedMembers[event.key]);
+              searchInputRef.current?.setValue('');
+              setShow(false);
+            }}
+          >
+            {hasMembers ? (
+              <>
+                <SearchMenuItem id="hhhh" className="ant-menu-item ant-menu-item-active ant-menu-item-disabled ant-menu-item-only-child">
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Search"
+                    autoFocus
+                    allowClear
+                    onKeyDown={(event) => {
+                      if (
+                        ['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)
+                      ) {
+                        event.preventDefault();
+                      }
 
-                    if (['ArrowLeft', 'ArrowRight'].includes(event.key)) {
-                      event.stopPropagation();
-                    }
-                  }}
-                  onChange={(event) => {
-                    setSearch(event.target.value);
-                  }}
-                />
-              </SearchMenuItem>
+                      if (['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                        event.stopPropagation();
+                      }
+                    }}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                    }}
+                  />
+                </SearchMenuItem>
 
-              {members.map((cube) => {
-                if (!cube.members.length) {
-                  return null;
-                }
+                {members.map((cube) => {
+                  if (!cube.members.length) {
+                    return null;
+                  }
 
-                return (
-                  <Menu.ItemGroup
-                    key={cube.cubeName}
-                    title={
-                      cube.type ? (
-                        <span>
-                          {cube.cubeTitle}{' '}
-                          {cube.public === false ? <LockOutlined /> : null}
-                          {' '}
-                          <Tag
-                            color={cube.type === 'view' ? '#D26E0B' : '#7A77FF'}
-                            style={{
-                              padding: '0 4px',
-                              lineHeight: 1.5
-                            }}
-                          >
-                            {cube.type}
-                          </Tag>
-                        </span>
-                      ) : (
-                        cube.cubeTitle
-                      )
-                    }
-                  >
-                    {cube.members.map((m) => (
-                      <Menu.Item key={m.name} data-testid={m.name}>
-                        {m.shortTitle}{' '}{m.isVisible === false ? <LockOutlined /> : null}
-                      </Menu.Item>
-                    ))}
-                  </Menu.ItemGroup>
-                );
-              })}
-            </>
-          ) : showNoMembersPlaceholder ? (
-            <Menu.Item key="__not-found__" disabled>
-              No members found
-            </Menu.Item>
-          ) : null}
-        </Menu>
+                  return (
+                    <Menu.ItemGroup
+                      key={cube.cubeName}
+                      title={
+                        cube.type ? (
+                          <span>
+                            {cube.cubeTitle}{' '}
+                            {cube.public === false ? <LockOutlined /> : null}{' '}
+                            <Tag
+                              color={
+                                cube.type === 'view' ? '#D26E0B' : '#7A77FF'
+                              }
+                              style={{
+                                padding: '0 4px',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {cube.type}
+                            </Tag>
+                          </span>
+                        ) : (
+                          cube.cubeTitle
+                        )
+                      }
+                    >
+                      {cube.members.map((m) => (
+                        <Menu.Item
+                          key={m.name}
+                          data-testid={m.name}
+                          className="ant-dropdown-menu-item"
+                        >
+                          {m.shortTitle}{' '}
+                          {m.isVisible === false ? <LockOutlined /> : null}
+                        </Menu.Item>
+                      ))}
+                    </Menu.ItemGroup>
+                  );
+                })}
+              </>
+            ) : showNoMembersPlaceholder ? (
+              <Menu.Item key="__not-found__" disabled>
+                No members found
+              </Menu.Item>
+            ) : null}
+          </Menu>
+        </div>
       }
     />
   );

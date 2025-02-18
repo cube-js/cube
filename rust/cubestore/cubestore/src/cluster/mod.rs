@@ -41,12 +41,12 @@ use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchSt
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
-use crate::telemetry::tracing::TracingHelper;
+use crate::telemetry::tracing::{TraceIdAndSpanId, TracingHelper};
 use crate::CubeError;
-use arrow::datatypes::SchemaRef;
-use arrow::error::ArrowError;
-use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::error::ArrowError;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
 use flatbuffers::bitflags::_core::pin::Pin;
@@ -60,6 +60,8 @@ use ingestion::job_runner::JobRunner;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use mockall::automock;
+use opentelemetry::trace::{SpanContext, SpanId, TraceContextExt, TraceFlags, TraceId};
+use opentelemetry::Context as OtelContext;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -76,6 +78,7 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[automock]
 #[async_trait]
@@ -134,15 +137,16 @@ pub trait Cluster: DIService + Send + Sync {
     async fn add_memory_chunk(
         &self,
         node_name: &str,
-        chunk_id: u64,
+        chunk_name: String,
         batch: RecordBatch,
     ) -> Result<(), CubeError>;
 
-    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
+    async fn free_memory_chunk(&self, node_name: &str, chunk_name: String)
+        -> Result<(), CubeError>;
     async fn free_deleted_memory_chunks(
         &self,
         node_name: &str,
-        chunk_ids: Vec<u64>,
+        chunk_names: Vec<String>,
     ) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
@@ -173,6 +177,7 @@ crate::di_service!(MockCluster, [Cluster]);
 pub enum JobEvent {
     Started(RowKey, JobType),
     Success(RowKey, JobType),
+    Orphaned(RowKey, JobType),
     Error(RowKey, JobType, String),
 }
 
@@ -213,7 +218,7 @@ pub enum WorkerMessage {
         SerializedPlan,
         HashMap<String, String>,
         HashMap<u64, Vec<SerializedRecordBatchStream>>,
-        Option<(u64, u64)>,
+        Option<TraceIdAndSpanId>,
     ),
 }
 
@@ -249,6 +254,13 @@ impl Configurator for WorkerConfigurator {
         };
         Ok(config)
     }
+
+    fn teardown() {
+        let teardown = SELECT_WORKER_SHUTDOWN.read().unwrap();
+        if teardown.is_some() {
+            teardown.as_ref().unwrap()();
+        }
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -267,6 +279,10 @@ impl WorkerProcessing for WorkerProcessor {
             func(config);
         }
         Ok(())
+    }
+
+    fn is_single_job_process() -> bool {
+        false
     }
 
     async fn process(
@@ -314,13 +330,25 @@ impl WorkerProcessing for WorkerProcessor {
                     let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
                     Ok((schema, records, data_loaded_size))
                 };
+
                 let span = trace_id_and_span_id.map(|(t, s)| {
-                    tracing::info_span!(
-                        "Process on selec worker",
-                        cube_dd_trace_id = t,
-                        cube_dd_parent_span_id = s
-                    )
+                    let trace_id = TraceId::from(t);
+                    let span_id = SpanId::from(s);
+                    let span_context = SpanContext::new(
+                        trace_id,
+                        span_id,
+                        TraceFlags::SAMPLED,
+                        true,
+                        Default::default(),
+                    );
+
+                    let context = OtelContext::new().with_remote_span_context(span_context);
+                    let span = tracing::info_span!("Process on select worker");
+
+                    span.set_parent(context);
+                    span
                 });
+
                 if let Some(span) = span {
                     future.instrument(span).await
                 } else {
@@ -363,9 +391,20 @@ lazy_static! {
         std::sync::RwLock::new(None);
 }
 
+lazy_static! {
+    static ref SELECT_WORKER_SHUTDOWN: std::sync::RwLock<Option<Box<dyn Fn() + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
 pub fn register_select_worker_setup(f: fn(&Runtime)) {
     let mut setup = SELECT_WORKER_SETUP.write().unwrap();
     assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
+}
+
+pub fn register_select_worker_teardown(f: fn()) {
+    let mut setup = SELECT_WORKER_SHUTDOWN.write().unwrap();
+    assert!(setup.is_none(), "select worker teardown already registered");
     *setup = Some(Box::new(f));
 }
 
@@ -497,7 +536,7 @@ impl Cluster for ClusterImpl {
     async fn add_memory_chunk(
         &self,
         node_name: &str,
-        chunk_id: u64,
+        chunk_name: String,
         batch: RecordBatch,
     ) -> Result<(), CubeError> {
         let record_batch = SerializedRecordBatchStream::write(&batch.schema(), vec![batch])?;
@@ -505,7 +544,7 @@ impl Cluster for ClusterImpl {
             .send_or_process_locally(
                 node_name,
                 NetworkMessage::AddMemoryChunk {
-                    chunk_id,
+                    chunk_name,
                     data: record_batch.into_iter().next().unwrap(),
                 },
             )
@@ -516,9 +555,13 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError> {
+    async fn free_memory_chunk(
+        &self,
+        node_name: &str,
+        chunk_name: String,
+    ) -> Result<(), CubeError> {
         let response = self
-            .send_or_process_locally(node_name, NetworkMessage::FreeMemoryChunk { chunk_id })
+            .send_or_process_locally(node_name, NetworkMessage::FreeMemoryChunk { chunk_name })
             .await?;
         match response {
             NetworkMessage::FreeMemoryChunkResult(r) => r,
@@ -529,12 +572,12 @@ impl Cluster for ClusterImpl {
     async fn free_deleted_memory_chunks(
         &self,
         node_name: &str,
-        chunk_ids: Vec<u64>,
+        chunk_names: Vec<String>,
     ) -> Result<(), CubeError> {
         let response = self
             .send_or_process_locally(
                 node_name,
-                NetworkMessage::FreeDeletedMemoryChunks(chunk_ids),
+                NetworkMessage::FreeDeletedMemoryChunks(chunk_names),
             )
             .await?;
         match response {
@@ -653,7 +696,7 @@ impl Cluster for ClusterImpl {
             | NetworkMessage::ExplainAnalyzeResult(_) => {
                 panic!("result sent to worker");
             }
-            NetworkMessage::AddMemoryChunk { chunk_id, data } => {
+            NetworkMessage::AddMemoryChunk { chunk_name, data } => {
                 let res = match data.read() {
                     Ok(batch) => {
                         let chunk_store = self
@@ -662,7 +705,7 @@ impl Cluster for ClusterImpl {
                             .unwrap()
                             .get_service_typed::<dyn ChunkDataStore>()
                             .await;
-                        chunk_store.add_memory_chunk(chunk_id, batch).await
+                        chunk_store.add_memory_chunk(chunk_name, batch).await
                     }
                     Err(e) => Err(e),
                 };
@@ -671,24 +714,24 @@ impl Cluster for ClusterImpl {
             NetworkMessage::AddMemoryChunkResult(_) => {
                 panic!("AddChunkResult sent to worker");
             }
-            NetworkMessage::FreeMemoryChunk { chunk_id } => {
+            NetworkMessage::FreeMemoryChunk { chunk_name } => {
                 let chunk_store = self
                     .injector
                     .upgrade()
                     .unwrap()
                     .get_service_typed::<dyn ChunkDataStore>()
                     .await;
-                let res = chunk_store.free_memory_chunk(chunk_id).await;
+                let res = chunk_store.free_memory_chunk(chunk_name).await;
                 NetworkMessage::FreeMemoryChunkResult(res)
             }
-            NetworkMessage::FreeDeletedMemoryChunks(ids) => {
+            NetworkMessage::FreeDeletedMemoryChunks(names) => {
                 let chunk_store = self
                     .injector
                     .upgrade()
                     .unwrap()
                     .get_service_typed::<dyn ChunkDataStore>()
                     .await;
-                let res = chunk_store.free_deleted_memory_chunks(ids).await;
+                let res = chunk_store.free_deleted_memory_chunks(names).await;
                 NetworkMessage::FreeDeletedMemoryChunksResult(res)
             }
             NetworkMessage::FreeMemoryChunkResult(_) => {
@@ -815,6 +858,10 @@ impl JobResultListener {
                             new.get_row().row_reference().clone(),
                             new.get_row().job_type().clone(),
                             "Job timed out".to_string(),
+                        )),
+                        JobStatus::Orphaned => Some(JobEvent::Orphaned(
+                            new.get_row().row_reference().clone(),
+                            new.get_row().job_type().clone(),
                         )),
                         JobStatus::Error(e) => Some(JobEvent::Error(
                             new.get_row().row_reference().clone(),
@@ -1094,7 +1141,7 @@ impl ClusterImpl {
         on_socket_bound: oneshot::Sender<()>,
         process_fn: impl Fn(Arc<ClusterImpl>, TcpStream) -> F + Send + Sync + Clone + 'static,
     ) -> Result<(), CubeError> {
-        let listener = TcpListener::bind(address.clone()).await?;
+        let listener = TcpListener::bind(address).await?;
         let _ = on_socket_bound.send(());
 
         info!("{} port open on {}", name, address);

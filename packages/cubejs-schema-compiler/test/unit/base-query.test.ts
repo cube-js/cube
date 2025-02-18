@@ -1,7 +1,15 @@
 import moment from 'moment-timezone';
-import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
+import { BaseQuery, PostgresQuery, MssqlQuery, UserError, CubeStoreQuery } from '../../src';
 import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema } from './utils';
+import {
+  createCubeSchema,
+  createCubeSchemaWithCustomGranularities,
+  createCubeSchemaYaml,
+  createJoinedCubesSchema,
+  createSchemaYaml,
+  createSchemaYamlForGroupFilterParamsTests
+} from './utils';
+import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 
 describe('SQL Generation', () => {
   describe('Common - Yaml - syntax sugar', () => {
@@ -32,7 +40,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Simple query', async () => {
+    it('Simple query - count measure', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -43,10 +51,898 @@ describe('SQL Generation', () => {
         filters: [],
       });
       const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
       expect(queryAndParams[0]).toContain('card_tbl');
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+
+    it('Simple query - sum measure', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.sum'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      sum("cards".amount) "cards__sum"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
+      expect(queryAndParams[0]).toContain('card_tbl');
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+
+    it('Simple query - dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        dimensions: [
+          'cards.type'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - time dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        dimensions: [
+          'cards.type'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'day',
+            dateRange: ['2021-01-01', '2021-01-02']
+          }
+        ],
+        timezone: 'America/Los_Angeles',
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      expect(queryAndParams[0]).toContain('"cards".type "cards__type", date_trunc(\'day\', ("cards".created_at::timestamptz AT TIME ZONE \'America/Los_Angeles\')) "cards__created_at_day"');
+      expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
+      expect(queryAndParams[0]).toContain('ORDER BY 2');
+    });
+    it('Simple query - complex measure', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - complex dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type_complex'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      CONCAT("cards".type, \' \', "cards".location) "cards__type_complex", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - CUBE dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type_with_cube'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type_with_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - CUBE id', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.id_cube'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".id "cards__id_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - simple filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['type_value']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['not_type_value']
+              },
+
+            ]
+
+          },
+          {
+            member: 'cards.type',
+            operator: 'equals',
+            values: ['type_value']
+          }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) AND ("cards".type = $3) GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['type_value', 'not_type_value', 'type_value'];
+      expect(queryAndParams[1]).toEqual(expectedParams);
+    });
+    it('Simple query - null and many equals filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: [null]
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: [null]
+              },
+
+            ]
+
+          },
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['t1', 't2']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['t1', 't2']
+              },
+
+            ]
+
+          },
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['t1', null, 't2']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['t1', null, 't2']
+              },
+
+            ]
+
+          },
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type IS NULL) OR ("cards".type IS NOT NULL)) AND (("cards".type IN ($1, $2)) OR ("cards".type NOT IN ($3, $4) OR "cards".type IS NULL)) AND (("cards".type IN ($5, $6) OR "cards".type IS NULL) OR ("cards".type NOT IN ($7, $8))) GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      // let expectedParams = [ 'type_value', 'not_type_value', 'type_value' ];
+      // expect(queryAndParams[1]).toEqual(expectedParams);
+    });
+
+    it('Simple query - dimension and measure filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['type_value']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['not_type_value']
+              },
+
+            ]
+
+          },
+          {
+            member: 'cards.count',
+            operator: 'equals',
+            values: ['3']
+          }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) GROUP BY 1 HAVING (count("cards".id) = $3) ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['type_value', 'not_type_value', '3'];
+      expect(queryAndParams[1]).toEqual(expectedParams);
     });
   });
 
+  describe('Custom granularities', () => {
+    const compilers = /** @type Compilers */ prepareCompiler(
+      createCubeSchemaWithCustomGranularities('orders')
+    );
+
+    const granularityQueries = [
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_march',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_june',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByTrailing2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByTrailing2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByLeading2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByLeading2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      // requesting via view
+      {
+        measures: [
+          'orders_view.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
+            granularity: 'half_year_by_1st_june',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders_view.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_view.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+    ];
+
+    const proxiedGranularitiesQueries = [
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtHalfYearBy1stJune'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_june',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtHalfYearBy1stMarch'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtPredefinedYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtPredefinedQuarter'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders_users.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_users.proxyCreatedAtPredefinedYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders_users.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_users.proxyCreatedAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      // requesting via views
+      {
+        measures: [
+          'orders_view.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_view.createdAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders_view.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_users.proxyCreatedAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+    ];
+
+    it('Test time series with different granularities', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BaseQuery(compilers, granularityQueries[0]);
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'orders.createdAt',
+          granularity: 'half_year',
+          dateRange: ['2021-01-01', '2021-12-31']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2021-01-01T00:00:00.000', '2021-06-30T23:59:59.999'],
+          ['2021-07-01T00:00:00.000', '2021-12-31T23:59:59.999']
+        ]);
+      }
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'orders.createdAt',
+          granularity: 'half_year_by_1st_april',
+          dateRange: ['2021-01-01', '2021-12-31']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2020-10-01T00:00:00.000', '2021-03-31T23:59:59.999'],
+          ['2021-04-01T00:00:00.000', '2021-09-30T23:59:59.999'],
+          ['2021-10-01T00:00:00.000', '2022-03-31T23:59:59.999']
+        ]);
+      }
+    });
+
+    describe('via PostgresQuery', () => {
+      beforeAll(async () => {
+        await compilers.compiler.compile();
+      });
+
+      granularityQueries.forEach(q => {
+        it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
+          const query = new PostgresQuery(compilers, q);
+          const queryAndParams = query.buildSqlAndParams();
+          const queryString = queryAndParams[0];
+
+          expect(queryString.includes('undefined')).toBeFalsy();
+          if (q.measures[0].includes('count')) {
+            expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
+            expect(queryString.includes('- interval \'2 day\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
+            expect(queryString.includes('+ interval \'3 day\'')).toBeTruthy();
+          }
+        });
+      });
+
+      proxiedGranularitiesQueries.forEach(q => {
+        it(`proxy granularity reference "${q.dimensions[0]}"`, () => {
+          const query = new PostgresQuery(compilers, q);
+          const queryAndParams = query.buildSqlAndParams();
+          const queryString = queryAndParams[0];
+          console.log('Generated query: ', queryString);
+
+          expect(queryString.includes('undefined')).toBeFalsy();
+          if (q.dimensions[0].includes('PredefinedYear')) {
+            expect(queryString.includes('date_trunc(\'year\'')).toBeTruthy();
+          } else if (q.dimensions[0].includes('PredefinedQuarter')) {
+            expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
+          } else {
+            expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
+          }
+        });
+      });
+    });
+
+    describe('via CubeStoreQuery', () => {
+      beforeAll(async () => {
+        await compilers.compiler.compile();
+      });
+
+      granularityQueries.forEach(q => {
+        it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
+          const query = new CubeStoreQuery(compilers, q);
+          const queryAndParams = query.buildSqlAndParams();
+          const queryString = queryAndParams[0];
+
+          if (q.measures[0].includes('count')) {
+            expect(queryString.includes('DATE_BIN(INTERVAL')).toBeTruthy();
+            expect(queryString.includes('INTERVAL \'6 MONTH\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
+            expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
+            expect(queryString.includes('INTERVAL \'2 DAY\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
+            expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
+            expect(queryString.includes('INTERVAL \'3 DAY\'')).toBeTruthy();
+          }
+        });
+      });
+    });
+  });
+
+  describe('Base joins', () => {
+    const compilers = /** @type Compilers */ prepareCompiler([
+      createCubeSchema({
+        name: 'cardsA',
+        sqlTable: 'card_tbl',
+        joins: `{
+          cardsB: {
+            sql: \`\${CUBE}.other_id = \${cardsB}.id\`,
+            relationship: 'one_to_one'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'cardsB',
+        sqlTable: 'card2_tbl',
+        joins: `{
+          cardsC: {
+            sql: \`\${CUBE}.other_id = \${cardsC}.id\`,
+            relationship: 'hasMany'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'cardsC',
+        sqlTable: 'card3_tbl',
+      }),
+
+    ]);
+
+    it('Base joins - one-one join', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cardsA.type',
+          'cardsB.type'
+        ],
+        measures: [
+          'cardsC.count',
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id');
+    });
+
+    it('Base joins - multiplied join', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cardsB.type',
+        ],
+        measures: [
+          'cardsB.sum',
+          'cardsC.count',
+        ],
+        timezone: 'America/Los_Angeles',
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      /* expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id'); */
+    });
+  });
   describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
@@ -59,7 +955,54 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Test time series with different granularity', async () => {
+    it('Test time series with 6 digits timestamp precision - bigquery', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BigqueryQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2021-01-01', '2021-01-02']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2021-01-01T00:00:00.000000', '2021-01-01T23:59:59.999999'],
+          ['2021-01-02T00:00:00.000000', '2021-01-02T23:59:59.999999']
+        ]);
+      }
+
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'day',
+        dateRange: ['2021-01-01', '2021-01-02']
+      });
+
+      expect(timeDimension.formatFromDate('2021-01-01T00:00:00.000')).toEqual(
+        '2021-01-01T00:00:00.000000'
+      );
+      expect(timeDimension.formatFromDate('2021-01-01T00:00:00.000000')).toEqual(
+        '2021-01-01T00:00:00.000000'
+      );
+
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.998')).toEqual(
+        '2021-01-01T23:59:59.998000'
+      );
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.999')).toEqual(
+        '2021-01-01T23:59:59.999999'
+      );
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.999999')).toEqual(
+        '2021-01-01T23:59:59.999999'
+      );
+    });
+
+    it('Test time series with different granularity - postgres', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -137,6 +1080,34 @@ describe('SQL Generation', () => {
           ])
         );
       }
+    });
+
+    it('Test same dimension with different granularities - postgres', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'quarter',
+          },
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'month',
+          }
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_quarter')).toBeTruthy();
+      expect(queryString.includes('date_trunc(\'month\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_month')).toBeTruthy();
     });
 
     it('Test for everyRefreshKeySql', async () => {
@@ -385,7 +1356,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIME2) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
+          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
           [
             '__TO_PARTITION_RANGE',
           ],
@@ -610,21 +1581,56 @@ describe('SQL Generation', () => {
 
   describe('FILTER_PARAMS', () => {
     /** @type {Compilers} */
-    const compilers = prepareCompiler(`cube('Order', {
-        sql: \`select * from order where \${FILTER_PARAMS.Order.type.filter('type')}\`,
-        measures: {
-          count: {
-            sql: 'id',
-            type: 'count',
-          },
-        },
-        dimensions: {
-          type: {
-            sql: 'type',
-            type: 'string',
-          },
-        },
-      })`);
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [{
+          name: 'Order',
+          sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
+          measures: [
+            {
+              name: 'count',
+              type: 'count',
+            },
+            {
+              name: 'avg_filtered',
+              sql: 'product_id',
+              type: 'avg',
+              filters: [
+                { sql: '{FILTER_PARAMS.Order.category.filter(\'category\')}' }
+              ]
+            }
+          ],
+          dimensions: [
+            {
+              name: 'type',
+              sql: 'type',
+              type: 'string'
+            },
+            {
+              name: 'category',
+              sql: 'category',
+              type: 'string'
+            },
+            {
+              name: 'proxied',
+              sql: '{FILTER_PARAMS.Order.type.filter("x => type = \'online\'")}',
+              type: 'boolean',
+            }
+          ]
+        }],
+        views: [{
+          name: 'orders_view',
+          cubes: [{
+            join_path: 'Order',
+            prefix: true,
+            includes: [
+              'type',
+              'count',
+            ]
+          }]
+        }]
+      })
+    );
 
     it('inserts filter params into query', async () => {
       await compilers.compiler.compile();
@@ -639,7 +1645,7 @@ describe('SQL Generation', () => {
         ],
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where type = \$\d\$\)/);
+      expect(cubeSQL).toContain('where ((type = $0$))');
     });
 
     it('inserts "or" filter', async () => {
@@ -664,7 +1670,7 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)/);
+      expect(cubeSQL).toContain('where (((type = $0$) OR (type = $1$)))');
     });
 
     it('inserts "and" filter', async () => {
@@ -689,7 +1695,579 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)/);
+      expect(cubeSQL).toContain('where (((type = $0$) AND (type = $1$)))');
+    });
+
+    it('inserts "or + and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                and: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value1'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value2'],
+                  }
+                ]
+              },
+              {
+                and: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value3'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value4'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where ((((type = $0$) AND (type = $1$)) OR ((type = $2$) AND (type = $3$))))');
+    });
+
+    it('inserts "and + or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                or: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value1'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value2'],
+                  }
+                ]
+              },
+              {
+                or: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value3'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value4'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
+    });
+
+    it('equals NULL filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'equals',
+                values: [null],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NULL)))');
+    });
+
+    it('notSet(IS NULL) filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'notSet',
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NULL)))');
+    });
+
+    it('notEquals NULL filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'notEquals',
+                values: [null],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NOT NULL)))');
+    });
+
+    it('set(IS NOT NULL) filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.type',
+                operator: 'set',
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((type IS NOT NULL)))');
+    });
+
+    it('propagate filter params from view into cube\'s query', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_type',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString).toContain('select * from order where ((type = ?))');
+    });
+
+    it('propagate filter params within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYaml({
+          cubes: [{
+            name: 'Order',
+            sql: `WITH cte as (select *
+                               from order
+                               where {FILTER_PARAMS.Order.type.filter('type')}
+                    )
+                    select * from cte`,
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [{
+              name: 'type',
+              sql: 'type',
+              type: 'string'
+            }]
+          }],
+          views: [{
+            name: 'orders_view',
+            cubes: [{
+              join_path: 'Order',
+              prefix: true,
+              includes: [
+                'type',
+                'count',
+              ]
+            }]
+          }]
+        })
+      );
+
+      await compiler.compiler.compile();
+      const query = new BaseQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_type',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(type\s=\s\?\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('correctly substitute filter params in cube\'s query dimension used in filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        dimensions: ['Order.proxied'],
+        filters: [
+          {
+            member: 'Order.proxied',
+            operator: 'equals',
+            values: [true],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString).toContain(`SELECT
+      (1 = 1) "order__proxied", count(*) "order__count"
+    FROM
+      (select * from order where (1 = 1)) AS "order"  WHERE ((1 = 1) = ?)`);
+    });
+
+    it('correctly substitute filter params in cube\'s query measure used in filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.avg_filtered'],
+        dimensions: ['Order.type'],
+        filters: [
+          {
+            member: 'Order.type',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'Order.category',
+            operator: 'equals',
+            values: ['category'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString).toContain(`SELECT
+      "order".type "order__type", avg(CASE WHEN ((category = ?)) THEN "order".product_id END) "order__avg_filtered"
+    FROM
+      (select * from order where (type = ?)) AS "order"  WHERE ("order".type = ?) AND ("order".category = ?)`);
+    });
+  });
+
+  describe('FILTER_GROUP', () => {
+    /** @type {Compilers} */
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'Order',
+            sql: `select * from order where {FILTER_GROUP(
+              FILTER_PARAMS.Order.dim0.filter('dim0'),
+              FILTER_PARAMS.Order.dim1.filter('dim1')
+            )}`,
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'dim0',
+                sql: 'dim0',
+                type: 'string'
+              },
+              {
+                name: 'dim1',
+                sql: 'dim1',
+                type: 'string'
+              }
+            ]
+          },
+        ]
+      })
+    );
+
+    it('inserts "or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) OR (dim1 = $1$)))');
+    });
+
+    it('inserts "and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) AND (dim1 = $1$)))');
+    });
+
+    it('inserts "or + and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['val1'],
+                  }
+                ]
+              },
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['another_val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['another_val1'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where ((((dim0 = $0$) AND (dim1 = $1$)) OR ((dim0 = $2$) AND (dim1 = $3$))))');
+    });
+
+    it('propagate 1 filter param from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `select *
+           from order
+           where {FILTER_GROUP(
+             FILTER_PARAMS.Order.dim0.filter('dim0')
+               , FILTER_PARAMS.Order.dim1.filter('dim1')
+             )}`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 2 filter params from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `select *
+                    from order
+                    where {FILTER_GROUP(
+                            FILTER_PARAMS.Order.dim0.filter('dim0'),
+                            FILTER_PARAMS.Order.dim1.filter('dim1')
+                      )}`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'orders_view.Order_dim1',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\s+AND\s+\(dim1\s+=\s+\$2\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 1 filter param within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.Order.dim1.filter('dim1')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 2 filter params within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.Order.dim1.filter('dim1')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'orders_view.Order_dim1',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\s+AND\s+\(dim1\s+=\s+\$2\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 1 filter param within cte (ref as cube and view dimensions)', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.orders_view.dim0.filter('dim0')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
     });
   });
 });
@@ -728,19 +2306,20 @@ describe('Class unit tests', () => {
     expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('camel_case_cube__id');
     expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('camel_case_cube__description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('camel_case_cube__grant_total');
-    
+
     // aliasName for pre-agg
     expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('camel_case_cube');
     expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('camel_case_cube_id');
     expect(baseQuery.aliasName('CamelCaseCube.description', true)).toEqual('camel_case_cube_description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', true)).toEqual('camel_case_cube_grant_total');
-    
+
     // cubeAlias
     expect(baseQuery.cubeAlias('CamelCaseCube')).toEqual('"camel_case_cube"');
     expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"camel_case_cube__id"');
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"camel_case_cube__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"camel_case_cube__grant_total"');
   });
+
   it('Test BaseQuery with aliased cube', async () => {
     const set = /** @type Compilers */ prepareCompiler(`
       cube('CamelCaseCube', {
@@ -776,7 +2355,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('t1__id');
     expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('t1__description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('t1__grant_total');
-    
+
     // aliasName for pre-agg
     expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('t1');
     expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('t1_id');
@@ -789,6 +2368,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
   });
+
   it('Test BaseQuery columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();

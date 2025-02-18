@@ -1,11 +1,13 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"show columns from KibanaSampleDataEcommerce like '%ice%';\".to_string(),\n              DatabaseProtocol::MySQL).await?"
+assertion_line: 6878
+expression: "execute_query(\"show columns from KibanaSampleDataEcommerce like '%ice%';\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +--------------------+---------+------+-----+---------+-------+
 | Field              | Type    | Null | Key | Default | Extra |
 +--------------------+---------+------+-----+---------+-------+
 | maxPrice           | numeric | NO   |     | NULL    |       |
+| sumPrice           | numeric | NO   |     | NULL    |       |
 | minPrice           | numeric | NO   |     | NULL    |       |
 | avgPrice           | numeric | NO   |     | NULL    |       |
 | taxful_total_price | numeric | YES  |     | NULL    |       |

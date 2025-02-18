@@ -20,8 +20,8 @@ use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use arrow::datatypes::{Field, SchemaRef};
 use async_trait::async_trait;
+use datafusion::arrow::datatypes::{Field, SchemaRef};
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode};
@@ -670,6 +670,16 @@ fn single_value_filter_columns<'a>(
             columns.push(c);
             true
         }
+        Expr::Not(e) => {
+            let expr = e.as_ref();
+            match expr {
+                Expr::Column(c) => {
+                    columns.push(c);
+                    true
+                }
+                _ => false,
+            }
+        }
         Expr::Literal(_) => true,
         Expr::BinaryExpr { left, op, right } => match op {
             Operator::Eq => {
@@ -1301,7 +1311,7 @@ fn pick_partitions(
     Ok(partition_snapshots)
 }
 
-fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
+fn partition_filter_schema(index: &IdRow<Index>) -> datafusion::arrow::datatypes::Schema {
     let schema_fields: Vec<Field>;
     schema_fields = index
         .get_row()
@@ -1310,7 +1320,7 @@ fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
         .map(|c| c.clone().into())
         .take(index.get_row().sort_key_size() as usize)
         .collect();
-    arrow::datatypes::Schema::new(schema_fields)
+    datafusion::arrow::datatypes::Schema::new(schema_fields)
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -1630,8 +1640,8 @@ pub fn get_worker_plan(
 pub mod tests {
     use std::sync::Arc;
 
-    use arrow::datatypes::Schema as ArrowSchema;
     use async_trait::async_trait;
+    use datafusion::arrow::datatypes::Schema as ArrowSchema;
     use datafusion::datasource::TableProvider;
     use datafusion::execution::context::ExecutionContext;
     use datafusion::logical_plan::LogicalPlan;
@@ -2132,6 +2142,7 @@ pub mod tests {
             Vec::new(),
             None,
             None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -2181,6 +2192,7 @@ pub mod tests {
             None,
             None,
             Vec::new(),
+            None,
             None,
             None,
         ));
@@ -2238,6 +2250,7 @@ pub mod tests {
             None,
             None,
             Vec::new(),
+            None,
             None,
             None,
         ));

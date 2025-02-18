@@ -1,0 +1,21 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT TO_CHAR(CAST(NULL AS TIMESTAMP), 'FMDay')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'FMDay')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-02 00:00:00' AS TIMESTAMP), 'FMDay')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-07 00:00:00' AS TIMESTAMP), 'FMDay')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'Day')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-02 00:00:00' AS TIMESTAMP), 'Day')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-07 00:00:00' AS TIMESTAMP), 'Day')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'FMMonth')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-03-01 00:00:00' AS TIMESTAMP), 'FMMonth')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-12-01 00:00:00' AS TIMESTAMP), 'FMMonth')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'Month')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-03-01 00:00:00' AS TIMESTAMP), 'Month')\n                UNION ALL\n                SELECT TO_CHAR(CAST('2024-12-01 00:00:00' AS TIMESTAMP), 'Month')\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------------------------------------------------------------+
+| to_char(CAST(NULL AS Timestamp(Nanosecond, None)),Utf8("FMDay")) |
++------------------------------------------------------------------+
+| NULL                                                             |
+| Monday                                                           |
+| Tuesday                                                          |
+| Sunday                                                           |
+| Monday                                                           |
+| Tuesday                                                          |
+| Sunday                                                           |
+| January                                                          |
+| March                                                            |
+| December                                                         |
+| January                                                          |
+| March                                                            |
+| December                                                         |
++------------------------------------------------------------------+

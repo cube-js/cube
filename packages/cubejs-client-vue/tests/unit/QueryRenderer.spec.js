@@ -3,18 +3,18 @@ import flushPromises from 'flush-promises';
 
 import QueryRenderer from '../../src/QueryRenderer';
 import fetchMock, { load } from './__mocks__/responses';
-import { createCubejsApi } from './utils';
+import { createCubeApi } from './utils';
 
 describe('QueryRenderer.vue', () => {
   describe('Loads single query from api', () => {
     it('Loads empty state', () => {
-      const cube = createCubejsApi();
+      const cube = createCubeApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
       const wrapper = shallowMount(QueryRenderer, {
         propsData: {
           query: {},
-          cubejsApi: cube,
+          cubeApi: cube,
         },
         slots: {
           empty: `<div>i'm empty</div>`,
@@ -26,7 +26,7 @@ describe('QueryRenderer.vue', () => {
     });
 
     it('Loads error state', async () => {
-      const cube = createCubejsApi();
+      const cube = createCubeApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock({ error: 'error message' }, 400));
 
       const wrapper = shallowMount(QueryRenderer, {
@@ -34,7 +34,7 @@ describe('QueryRenderer.vue', () => {
           query: {
             measures: ['Stories.count'],
           },
-          cubejsApi: cube,
+          cubeApi: cube,
         },
         scopedSlots: {
           error: `<div>{{props.error}}</div>`,
@@ -48,7 +48,7 @@ describe('QueryRenderer.vue', () => {
     });
 
     it('Loads resultSet', async () => {
-      const cube = createCubejsApi();
+      const cube = createCubeApi();
       jest.spyOn(cube, 'request').mockImplementation(fetchMock(load));
 
       const wrapper = shallowMount(QueryRenderer, {
@@ -56,7 +56,7 @@ describe('QueryRenderer.vue', () => {
           query: {
             measures: ['Stories.count'],
           },
-          cubejsApi: cube,
+          cubeApi: cube,
         },
         scopedSlots: {
           default: `<div>Result set is loaded</div>`,
@@ -71,7 +71,7 @@ describe('QueryRenderer.vue', () => {
 
     // todo: fix
     // it('Rerender on query nested property change', async () => {
-    //   const cube = createCubejsApi();
+    //   const cube = createCubeApi();
     //   jest.spyOn(cube, 'request').mockImplementation(fetchMock(single));
     //
     //   const parent = mount({
@@ -87,7 +87,7 @@ describe('QueryRenderer.vue', () => {
     //     `,
     //     data() {
     //       return {
-    //         cubejsApi: cube,
+    //         cubeApi: cube,
     //         query: {
     //           measures: ['Stories.count'],
     //           dimensions: [],

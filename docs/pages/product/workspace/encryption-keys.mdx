@@ -1,0 +1,90 @@
+# Encryption keys
+
+The <Btn>Encryption Keys</Btn> page in Cube Cloud allows to manage [data-at-rest
+encryption in Cube Store][ref-cube-store-encryption].
+
+<SuccessBox>
+
+Data-at-rest encryption in Cube Store is available in Cube Cloud on the
+[Enterprise Premier](https://cube.dev/pricing) product tier.
+It also requires the M [Cube Store Worker tier](/product/deployment/cloud/pricing#cube-store-worker-tiers).
+
+</SuccessBox>
+ 
+Navigate to <Btn>Settings → Encryption Keys</Btn> in your Cube Cloud deployment
+to [provide](#add-a-key), [rotate](#rotate-a-key), or [drop](#drop-a-key)
+your own customer-managed keys (CMK) for Cube Store.
+
+## Customer-managed keys for Cube Store
+
+On the <Btn>Encryption Keys</Btn> page, you can see all previously provided keys:
+
+<Screenshot src="https://ucarecdn.com/48038ac1-fdf1-4c87-8860-ac503bfcdac3/" />
+
+### Add a key
+
+To add an encryption key, click <Btn>Create</Btn> to open a modal window.
+Provide the key name and the key value: an 256-bit AES encryption key, encoded
+in [standard Base64][link-base64] in its canonical representation.
+
+<Screenshot src="https://ucarecdn.com/9338679e-9ed0-4ac2-86a8-975e08699c34/" />
+
+**Once the first encryption key is added, Cube Store will assume that data-at-rest
+encryption is enabled.** After that, querying unencrypted pre-aggregation partitions
+will yield the following error: `Invalid Parquet file in encrypted mode. File (or
+at least the Parquet footer) is not encrypted`.
+
+<InfoBox>
+
+It may take a few minutes for any changes to encryption keys to take effect.
+
+</InfoBox>
+
+After the refresh worker builds or rebuilds pre-aggregation partitions with
+respect to their [refresh strategy][ref-pre-aggs-refresh-strategy] or after they
+are [built manually][ref-pre-aggs-build-manually], their data will be encrypted.
+
+**For encryption, the most recently added encryption key is used.** For decryption,
+all previously provided keys can be used, if there are still any pre-aggregation
+partitions encrypted with those keys.
+
+### Rotate a key
+
+To rotate an encryption key, you have to [add a new key](#add-a-key) and then
+rebuild pre-aggregation partitions using this key, either by the means of the
+refresh worker, or manually.
+
+You can check which encryption key is used by any pre-aggregation partition by
+querying `system.tables` in Cube Store via [SQL Runner][ref-sql-runner]:
+
+<Screenshot src="https://ucarecdn.com/017ca9d6-e8d2-4896-9324-1bec38aaa621/" />
+
+<WarningBox>
+
+Only newly built or rebuilt pre-aggregation partitions will be encrypted using the
+newly added encryption key. Previously built partitions will still be encrypted
+using previously provided keys. If you [drop a key](#drop-a-key) before these
+partitions are rebuilt, querying them will yield an error.
+
+</WarningBox>
+
+<InfoBox>
+
+If you're using [incremental pre-aggregations][ref-pre-aggs-incremental], the
+refresh worker will likely only rebuild some of their partitions. You have to [rebuild
+them manually][ref-pre-aggs-build-manually] to ensure that the new encryption key
+is used.
+
+</InfoBox>
+
+### Drop a key
+
+To drop an encryption key, click <Btn>Delete</Btn> next to it.
+
+
+[ref-cube-store-encryption]: /product/caching/running-in-production#data-at-rest-encryption
+[link-base64]: https://datatracker.ietf.org/doc/html/rfc4648#section-4
+[ref-pre-aggs-refresh-strategy]: /product/caching/using-pre-aggregations#refresh-strategy
+[ref-pre-aggs-build-manually]: /product/workspace/pre-aggregations
+[ref-pre-aggs-incremental]: /reference/data-model/pre-aggregations#incremental
+[ref-sql-runner]: /product/workspace/sql-runner

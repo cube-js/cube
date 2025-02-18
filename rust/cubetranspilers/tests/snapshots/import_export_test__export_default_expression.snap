@@ -1,0 +1,6 @@
+---
+source: tests/import_export_test.rs
+expression: output_code
+---
+let myVar = 5;
+setExport(myVar);

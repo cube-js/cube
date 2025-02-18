@@ -6,8 +6,9 @@ use crate::table::{Row, TableValue};
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Duration, Utc};
-use rocksdb::WriteBatch;
+use cuberockstore::rocksdb::WriteBatch;
 use std::cmp::Ordering;
+use std::sync::Arc;
 
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -35,7 +36,12 @@ fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum QueueResultAckEventResult {
     Empty,
-    WithResult { result: String },
+    WithResult {
+        // It can be a large string, 20 mb
+        // Arc is used as temporarily solution to protect cloning on receiving from broadcast::channel
+        // TODO(ovr): Rewrite Queue without holding queue result in channel
+        result: Arc<String>,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
@@ -67,9 +73,7 @@ impl ToString for QueueItemStatus {
 pub struct QueueItem {
     prefix: Option<String>,
     pub(crate) key: String,
-    // Immutable field
-    value: String,
-    extra: Option<String>,
+    pub(crate) extra: Option<String>,
     #[serde(default = "QueueItem::status_default")]
     pub(crate) status: QueueItemStatus,
     #[serde(default)]
@@ -80,11 +84,13 @@ pub struct QueueItem {
     pub(crate) heartbeat: Option<DateTime<Utc>>,
     #[serde(with = "ts_seconds_option")]
     orphaned: Option<DateTime<Utc>>,
+    #[serde(with = "ts_seconds")]
+    expire: DateTime<Utc>,
 }
 
 impl RocksEntity for QueueItem {
     fn version() -> u32 {
-        2
+        4
     }
 }
 
@@ -105,6 +111,15 @@ impl PartialOrd for QueueItem {
 }
 
 impl QueueItem {
+    pub fn extract_prefix(path: String) -> Option<String> {
+        let parts: Vec<&str> = path.rsplitn(2, ":").collect();
+
+        match parts.len() {
+            2 => Some(parts[1].to_string()),
+            _ => None,
+        }
+    }
+
     pub fn parse_path(path: String) -> (Option<String>, String) {
         let parts: Vec<&str> = path.rsplitn(2, ":").collect();
 
@@ -116,7 +131,6 @@ impl QueueItem {
 
     pub fn new(
         path: String,
-        value: String,
         status: QueueItemStatus,
         priority: i64,
         orphaned: Option<u32>,
@@ -127,7 +141,6 @@ impl QueueItem {
         QueueItem {
             prefix,
             key,
-            value,
             status,
             priority,
             extra: None,
@@ -137,47 +150,13 @@ impl QueueItem {
             } else {
                 None
             },
+            expire: if let Some(orphaned) = orphaned {
+                created + Duration::seconds(orphaned as i64) + Duration::hours(2)
+            } else {
+                created.clone() + Duration::hours(4)
+            },
             created,
         }
-    }
-
-    pub fn into_queue_cancel_row(self) -> Row {
-        let res = vec![
-            TableValue::String(self.value),
-            if let Some(extra) = self.extra {
-                TableValue::String(extra)
-            } else {
-                TableValue::Null
-            },
-        ];
-
-        Row::new(res)
-    }
-
-    pub fn into_queue_retrieve_row(self) -> Row {
-        let res = vec![
-            TableValue::String(self.value),
-            if let Some(extra) = self.extra {
-                TableValue::String(extra)
-            } else {
-                TableValue::Null
-            },
-        ];
-
-        Row::new(res)
-    }
-
-    pub fn into_queue_get_row(self) -> Row {
-        let res = vec![
-            TableValue::String(self.value),
-            if let Some(extra) = self.extra {
-                TableValue::String(extra)
-            } else {
-                TableValue::Null
-            },
-        ];
-
-        Row::new(res)
     }
 
     pub fn queue_to_cancel_row(item: IdRow<QueueItem>) -> Row {
@@ -188,28 +167,6 @@ impl QueueItem {
             TableValue::String(row.key),
             TableValue::String(row_id.to_string()),
         ])
-    }
-
-    pub fn queue_list_row(item: IdRow<QueueItem>, with_payload: bool) -> Row {
-        let row_id = item.get_id();
-        let row = item.into_row();
-
-        let mut res = vec![
-            TableValue::String(row.key),
-            TableValue::String(row_id.to_string()),
-            TableValue::String(row.status.to_string()),
-            if let Some(extra) = row.extra {
-                TableValue::String(extra)
-            } else {
-                TableValue::Null
-            },
-        ];
-
-        if with_payload {
-            res.push(TableValue::String(row.value));
-        }
-
-        Row::new(res)
     }
 
     pub fn get_key(&self) -> &String {
@@ -226,10 +183,6 @@ impl QueueItem {
         } else {
             self.key.clone()
         }
-    }
-
-    pub fn get_value(&self) -> &String {
-        &self.value
     }
 
     pub fn get_priority(&self) -> &i64 {
@@ -254,6 +207,10 @@ impl QueueItem {
 
     pub fn get_orphaned(&self) -> &Option<DateTime<Utc>> {
         &self.orphaned
+    }
+
+    pub fn get_expire(&self) -> &DateTime<Utc> {
+        &self.expire
     }
 
     pub fn status_default() -> QueueItemStatus {
@@ -287,6 +244,7 @@ pub enum QueueRetrieveResponse {
     Success {
         id: u64,
         item: QueueItem,
+        payload: String,
         pending: u64,
         active: Vec<String>,
     },
@@ -310,10 +268,11 @@ impl QueueRetrieveResponse {
             QueueRetrieveResponse::Success {
                 id,
                 item,
+                payload,
                 pending,
                 active,
             } => vec![Row::new(vec![
-                TableValue::String(item.value),
+                TableValue::String(payload),
                 if let Some(extra) = item.extra {
                     TableValue::String(extra)
                 } else {
@@ -466,11 +425,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
     }
 
     fn get_expire(&self, row: &QueueItem) -> Option<DateTime<Utc>> {
-        if let Some(orphaned) = row.orphaned {
-            Some(orphaned.clone() + Duration::hours(1))
-        } else {
-            Some(row.get_created().clone() + Duration::hours(2))
-        }
+        Some(row.expire.clone())
     }
 
     fn get_id(&self) -> IndexId {
@@ -486,48 +441,12 @@ mod tests {
 
     #[test]
     fn test_queue_item_sort() -> Result<(), CubeError> {
-        let priority0_1 = QueueItem::new(
-            "1".to_string(),
-            "1".to_string(),
-            QueueItemStatus::Active,
-            0,
-            None,
-        );
-        let priority0_2 = QueueItem::new(
-            "2".to_string(),
-            "2".to_string(),
-            QueueItemStatus::Active,
-            0,
-            None,
-        );
-        let priority0_3 = QueueItem::new(
-            "3".to_string(),
-            "3".to_string(),
-            QueueItemStatus::Active,
-            0,
-            None,
-        );
-        let priority10_4 = QueueItem::new(
-            "4".to_string(),
-            "4".to_string(),
-            QueueItemStatus::Active,
-            10,
-            None,
-        );
-        let priority0_5 = QueueItem::new(
-            "5".to_string(),
-            "5".to_string(),
-            QueueItemStatus::Active,
-            0,
-            None,
-        );
-        let priority_n5_6 = QueueItem::new(
-            "6".to_string(),
-            "6".to_string(),
-            QueueItemStatus::Active,
-            -5,
-            None,
-        );
+        let priority0_1 = QueueItem::new("1".to_string(), QueueItemStatus::Active, 0, None);
+        let priority0_2 = QueueItem::new("2".to_string(), QueueItemStatus::Active, 0, None);
+        let priority0_3 = QueueItem::new("3".to_string(), QueueItemStatus::Active, 0, None);
+        let priority10_4 = QueueItem::new("4".to_string(), QueueItemStatus::Active, 10, None);
+        let priority0_5 = QueueItem::new("5".to_string(), QueueItemStatus::Active, 0, None);
+        let priority_n5_6 = QueueItem::new("6".to_string(), QueueItemStatus::Active, -5, None);
 
         assert_eq!(
             vec![

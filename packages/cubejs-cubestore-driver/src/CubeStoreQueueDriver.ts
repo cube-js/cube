@@ -136,34 +136,13 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse> {
-    const rows = await this.driver.query<CubeStoreListResponse>('QUEUE LIST ?', [
-      this.options.redisQueuePrefix
-    ]);
-    if (rows.length) {
-      const active: QueryKeysTuple[] = [];
-      const toProcess: QueryKeysTuple[] = [];
-
-      for (const row of rows) {
-        if (row.status === 'active') {
-          active.push([
-            row.id as QueryKeyHash,
-            row.queue_id ? parseInt(row.queue_id, 10) : null,
-          ]);
-        } else {
-          toProcess.push([
-            row.id as QueryKeyHash,
-            row.queue_id ? parseInt(row.queue_id, 10) : null,
-          ]);
-        }
-      }
-
-      return [
-        active,
-        toProcess,
-      ];
-    }
-
-    return [[], []];
+    return [
+      // We don't return active queries, because it's useless
+      // There is only one place where it's used, and it's QueryQueue.reconcileQueueImpl
+      // Cube Store provides strict guarantees that queue item cannot be active & pending in the same time
+      [],
+      await this.getToProcessQueries()
+    ];
   }
 
   public async getNextProcessingId(): Promise<number | string> {

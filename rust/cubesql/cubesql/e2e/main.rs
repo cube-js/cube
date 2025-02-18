@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use crate::tests::mysql::MySqlIntegrationTestSuite;
 use cubesql::telemetry::{LocalReporter, ReportingLogger};
 use log::Level;
 use simple_logger::SimpleLogger;
@@ -49,7 +48,6 @@ fn main() {
 
     rt.block_on(async {
         let mut runner = TestsRunner::new();
-        runner.register_suite(MySqlIntegrationTestSuite::before_all().await);
         runner.register_suite(PostgresIntegrationTestSuite::before_all().await);
 
         for suites in runner.suites.iter_mut() {

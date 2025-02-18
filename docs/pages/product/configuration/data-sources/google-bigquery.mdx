@@ -11,7 +11,9 @@ redirect_from:
 
 In order to connect Google BigQuery to Cube, you need to provide service account
 credentials. Cube requires the service account to have **BigQuery Data Viewer**
-and **BigQuery Job User** roles enabled. You can learn more about acquiring
+and **BigQuery Job User** roles enabled. If you plan to use pre-aggregations, 
+the account will need the **BigQuery Data Editor** role instead of **BigQuery Data Viewer**. 
+You can learn more about acquiring
 Google BigQuery credentials [here][bq-docs-getting-started].
 
 </InfoBox>
@@ -60,34 +62,25 @@ The following fields are required when creating a BigQuery connection:
   src="https://ucarecdn.com/9fdfbd5d-5556-48b3-aa6e-fff0f24b30e9/"
 />
 
-Cube Cloud also supports connecting to data sources within private VPCs. If you
-already have VPCs enabled in your account, check out the [VPC
-documentation][ref-cloud-conf-vpc] to learn how to get started.
+Cube Cloud also supports connecting to data sources within private VPCs
+if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
+[VPC connectivity guide][ref-cloud-conf-vpc] for details.
 
-<SuccessBox>
-
-VPC connectivity is available in Cube Cloud on
-[Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
-details.
-
-</SuccessBox>
-
-[cube-pricing]: https://cube.dev/pricing/
-[cube-contact]: https://cube.dev/contact/
-[ref-cloud-conf-vpc]: /product/configuration/vpc
+[ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
+[ref-cloud-conf-vpc]: /product/deployment/cloud/vpc
 
 ## Environment Variables
 
-| Environment Variable           | Description                                                                                                                                                                                     | Possible Values                                                         | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | :------: | :----------------------------------------------------------------------: |
-| `CUBEJS_DB_BQ_PROJECT_ID`      | The Google BigQuery project ID to connect to                                                                                                                                                    | A valid Google BigQuery Project ID                                      |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_BQ_KEY_FILE`        | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                   | A valid Google BigQuery JSON key file                                   |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_BQ_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to. Required if used with pre-aggregations outside of US. If not set then BQ driver will fail with `Dataset was not found in location US` error | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ⚠️    |                                    ✅                                    |
-| `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                                                                                                                                                           | A valid bucket name from cloud storage                                  |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |                                    ✅                                    |
-| `CUBEJS_CONCURRENCY`           | The number of concurrent connections each queue has to the database. Default is `10`                                                                                                            | A valid number                                                          |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_MAX_POOL`           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |                                    ✅                                    |
+| Environment Variable           | Description                                                                                                                                                                                     | Possible Values                                                         | Required |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | :------: |
+| `CUBEJS_DB_BQ_PROJECT_ID`      | The Google BigQuery project ID to connect to                                                                                                                                                    | A valid Google BigQuery Project ID                                      |    ✅    |
+| `CUBEJS_DB_BQ_KEY_FILE`        | The path to a JSON key file for connecting to Google BigQuery                                                                                                                                   | A valid Google BigQuery JSON key file                                   |    ✅    |
+| `CUBEJS_DB_BQ_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google BigQuery                                                                                                                                | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
+| `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to. Required if used with pre-aggregations outside of US. If not set then BQ driver will fail with `Dataset was not found in location US` error | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ⚠️    |
+| `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                                                                                                                                                           | A valid bucket name from cloud storage                                  |    ❌    |
+| `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |
+| `CUBEJS_CONCURRENCY`           | The number of concurrent connections each queue has to the database. Default is `10`                                                                                                            | A valid number                                                          |    ❌    |
+| `CUBEJS_DB_MAX_POOL`           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -168,8 +161,5 @@ BigQuery connections are made over HTTPS.
   /product/caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-config-multiple-ds-decorating-env]:
-  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
-[ref-schema-ref-types-formats-countdistinctapprox]:
-  /reference/data-model/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching

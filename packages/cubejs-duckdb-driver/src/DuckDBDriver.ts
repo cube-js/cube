@@ -14,6 +14,8 @@ import { Connection, Database } from 'duckdb';
 import { DuckDBQuery } from './DuckDBQuery';
 import { HydrationStream, transformRow } from './HydrationStream';
 
+const { version } = require('../../package.json');
+
 export type DuckDBDriverConfiguration = {
   dataSource?: string,
   initSql?: string,
@@ -55,37 +57,29 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   protected async init(): Promise<InitPromise> {
     const token = getEnv('duckdbMotherDuckToken', this.config);
+    const dbPath = getEnv('duckdbDatabasePath', this.config);
     
-    const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
+    // Determine the database URL based on the provided db_path or token
+    let dbUrl: string;
+    if (dbPath) {
+      dbUrl = dbPath;
+    } else if (token) {
+      dbUrl = `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}`;
+    } else {
+      dbUrl = ':memory:';
+    }
+
+    let dbOptions;
+    if (token) {
+      dbOptions = { custom_user_agent: `Cube/${version}` };
+    }
+
+    // Create a new Database instance with the determined URL and custom user agent
+    const db = new Database(dbUrl, dbOptions);
+
     // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
     const defaultConnection = db.connect();
     const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
-
-    try {
-      await execAsync('INSTALL httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on httpfs installation', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
-
-    try {
-      await execAsync('LOAD httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on loading httpfs', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
 
     const configuration = [
       {
@@ -112,6 +106,18 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         key: 'schema',
         value: getEnv('duckdbSchema', this.config),
       },
+      {
+        key: 's3_use_ssl',
+        value: getEnv('duckdbS3UseSsl', this.config),
+      },
+      {
+        key: 's3_url_style',
+        value: getEnv('duckdbS3UrlStyle', this.config),
+      },
+      {
+        key: 's3_session_token',
+        value: getEnv('duckdbS3SessionToken', this.config),
+      }
     ];
     
     for (const { key, value } of configuration) {
@@ -125,6 +131,36 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
             });
           }
         }
+      }
+    }
+
+    // Install & load extensions if configured in env variable.
+    const extensions = getEnv('duckdbExtensions', this.config);
+    for (const extension of extensions) {
+      try {
+        await execAsync(`INSTALL ${extension}`);
+      } catch (e) {
+        if (this.logger) {
+          console.error(`DuckDB - error on installing ${extension}`, {
+            e
+          });
+        }
+
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
+      }
+
+      try {
+        await execAsync(`LOAD ${extension}`);
+      } catch (e) {
+        if (this.logger) {
+          console.error(`DuckDB - error on loading ${extension}`, {
+            e
+          });
+        }
+
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
       }
     }
 

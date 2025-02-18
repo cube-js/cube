@@ -3,21 +3,22 @@
  * @license Apache-2.0
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
-/* eslint-disable camelcase */
+
 import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
-  BlobServiceClient,
-  StorageSharedKeyCredential,
-  ContainerSASPermissions,
-  SASProtocol,
-  generateBlobSASQueryParameters,
-} from '@azure/storage-blob';
-import { DriverCapabilities, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, UnloadOptions } from '@cubejs-backend/base-driver';
+  DriverCapabilities,
+  QueryColumnsResult,
+  QueryOptions,
+  QuerySchemasResult,
+  QueryTablesResult,
+  UnloadOptions,
+  GenericDataBaseType,
+  TableColumn,
+  DatabaseStructure,
+} from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -71,7 +72,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Export bucket AWS account region.
      */
     awsRegion?: string,
-    
+
     /**
      * Export bucket Azure account key.
      */
@@ -87,6 +88,21 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Databricks security token (PWD).
      */
     token?: string,
+
+    /**
+     * Azure tenant Id
+     */
+    azureTenantId?: string,
+
+    /**
+     * Azure service principal client Id
+     */
+    azureClientId?: string,
+
+    /**
+     * Azure service principal client secret
+     */
+    azureClientSecret?: string,
   };
 
 type ShowTableRow = {
@@ -99,7 +115,13 @@ type ShowDatabasesRow = {
   databaseName: string,
 };
 
+type ColumnInfo = {
+  name: any;
+  type: GenericDataBaseType;
+};
+
 const DatabricksToGenericType: Record<string, string> = {
+  binary: 'hll_datasketches',
   'decimal(10,0)': 'bigint',
 };
 
@@ -113,7 +135,7 @@ export class DatabricksDriver extends JDBCDriver {
   private showSparkProtocolWarn: boolean;
 
   /**
-   * Read-only mode flag.
+   * Driver Configuration.
    */
   protected readonly config: DatabricksDriverConfiguration;
 
@@ -125,7 +147,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 10;
   }
 
   /**
@@ -214,7 +236,22 @@ export class DatabricksDriver extends JDBCDriver {
         getEnv('dbExportBucketAzureKey', { dataSource }),
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      // Azure service principal
+      azureTenantId:
+        conf?.azureTenantId ||
+        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+      azureClientId:
+        conf?.azureClientId ||
+        getEnv('dbExportBucketAzureClientId', { dataSource }),
+      azureClientSecret:
+        conf?.azureClientSecret ||
+        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
     };
+    if (config.readOnly === undefined) {
+      // we can set readonly to true if there is no bucket config provided
+      config.readOnly = !config.exportBucket;
+    }
+
     super(config);
     this.config = config;
     this.showSparkProtocolWarn = showSparkProtocolWarn;
@@ -283,10 +320,11 @@ export class DatabricksDriver extends JDBCDriver {
     values: unknown[],
   ): Promise<R[]> {
     if (this.config.catalog) {
+      const preAggSchemaName = this.getPreAggrSchemaName();
       return super.query(
         query.replace(
-          new RegExp(`(?<=\\s)${this.getPreaggsSchemaName()}\\.(?=[^\\s]+)`, 'g'),
-          `${this.config.catalog}.${this.getPreaggsSchemaName()}.`
+          new RegExp(`(?<=\\s)${preAggSchemaName}\\.(?=[^\\s]+)`, 'g'),
+          `${this.config.catalog}.${preAggSchemaName}.`
         ),
         values,
       );
@@ -298,7 +336,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns pre-aggregation schema name.
    */
-  public getPreaggsSchemaName(): string {
+  protected getPreAggrSchemaName(): string {
     const schema = getEnv('preAggregationsSchema');
     if (schema) {
       return schema;
@@ -321,7 +359,7 @@ export class DatabricksDriver extends JDBCDriver {
     return super.dropTable(tableFullName, options);
   }
 
-  public showDeprecations() {
+  private showDeprecations() {
     if (this.config.url) {
       const result = this.config.url
         .split(';')
@@ -381,10 +419,10 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns tables meta data object.
    */
-  public async tablesSchema(): Promise<Record<string, Record<string, object>>> {
+  public override async tablesSchema(): Promise<DatabaseStructure> {
     const tables = await this.getTables();
 
-    const metadata: Record<string, Record<string, object>> = {};
+    const metadata: DatabaseStructure = {};
 
     await Promise.all(tables.map(async ({ database, tableName }) => {
       if (!(database in metadata)) {
@@ -401,7 +439,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns list of accessible tables.
    */
-  public async getTables(): Promise<ShowTableRow[]> {
+  private async getTables(): Promise<ShowTableRow[]> {
     if (this.config.database) {
       return <any> this.query<ShowTableRow>(
         `SHOW TABLES IN ${
@@ -474,7 +512,9 @@ export class DatabricksDriver extends JDBCDriver {
         return columnTypes.map(({ name, type }) => ({
           column_name: name,
           data_type: type,
+          // eslint-disable-next-line camelcase
           table_name,
+          // eslint-disable-next-line camelcase
           schema_name,
         }));
       })
@@ -486,7 +526,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns table columns types.
    */
-  public async tableColumnTypes(table: string): Promise<{ name: any; type: string; }[]> {
+  public override async tableColumnTypes(table: string): Promise<TableColumn[]> {
     let tableFullName = '';
     const tableArray = table.split('.');
 
@@ -525,6 +565,7 @@ export class DatabricksDriver extends JDBCDriver {
       result.push({
         name: column.col_name,
         type: this.toGenericType(column.data_type),
+        attributes: [],
       });
     }
 
@@ -537,8 +578,9 @@ export class DatabricksDriver extends JDBCDriver {
   public async queryColumnTypes(
     sql: string,
     params?: unknown[]
-  ): Promise<{ name: any; type: string; }[]> {
+  ): Promise<ColumnInfo[]> {
     const result = [];
+
     // eslint-disable-next-line camelcase
     const response = await this.query<{col_name: string; data_type: string}>(
       `DESCRIBE QUERY ${sql}`,
@@ -560,7 +602,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns schema full name.
    */
-  public getSchemaFullName(schema: string): string {
+  private getSchemaFullName(schema: string): string {
     if (this.config?.catalog) {
       return `${
         this.quoteIdentifier(this.config.catalog)
@@ -575,14 +617,17 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns quoted string.
    */
-  public quoteIdentifier(identifier: string): string {
+  protected quoteIdentifier(identifier: string): string {
+    if (identifier.startsWith('`') && identifier.endsWith('`')) {
+      return identifier;
+    }
     return `\`${identifier}\``;
   }
 
   /**
    * Returns the JS type by the Databricks type.
    */
-  public toGenericType(columnType: string): string {
+  protected toGenericType(columnType: string): string {
     return DatabricksToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 
@@ -615,8 +660,7 @@ export class DatabricksDriver extends JDBCDriver {
         options.query.params,
       )
       : await this.unloadWithTable(tableFullName);
-    const pathname = `${this.config.exportBucket}/${tableFullName}.csv`;
-    const csvFile = await this.getCsvFiles(pathname);
+    const csvFile = await this.getCsvFiles(tableFullName);
     return {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
@@ -631,8 +675,8 @@ export class DatabricksDriver extends JDBCDriver {
   private async unloadWithSql(tableFullName: string, sql: string, params: unknown[]) {
     const types = await this.queryColumnTypes(sql, params);
 
-    await this.createExternalTableFromSql(tableFullName, sql, params);
-    
+    await this.createExternalTableFromSql(tableFullName, sql, params, types);
+
     return types;
   }
 
@@ -641,10 +685,9 @@ export class DatabricksDriver extends JDBCDriver {
    */
   private async unloadWithTable(tableFullName: string) {
     const types = await this.tableColumnTypes(tableFullName);
-    const columns = types.map(t => t.name).join(', ');
 
-    await this.createExternalTableFromTable(tableFullName, columns);
-    
+    await this.createExternalTableFromTable(tableFullName, types);
+
     return types;
   }
 
@@ -652,113 +695,59 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns an array of signed URLs of unloaded csv files.
    */
   private async getCsvFiles(
-    pathname: string,
+    tableName: string,
   ): Promise<string[]> {
-    let res;
-    switch (this.config.bucketType) {
-      case 'azure':
-        res = await this.getSignedAzureUrls(pathname);
-        break;
-      case 's3':
-        res = await this.getSignedS3Urls(pathname);
-        break;
-      default:
-        throw new Error(`Unsupported export bucket type: ${
-          this.config.bucketType
-        }`);
-    }
-    return res;
-  }
+    // this.config.exportBucket includes schema
+    // so it looks like:
+    // s3://real-bucket-name
+    // wasbs://real-container-name@account.blob.core.windows.net
+    // The extractors in BaseDriver expect just clean bucket name
+    const url = new URL(this.config.exportBucket || '');
 
-  /**
-   * Returns Azure signed URLs of unloaded scv files.
-   */
-  private async getSignedAzureUrls(
-    pathname: string,
-  ): Promise<string[]> {
-    const csvFile: string[] = [];
-    const [container, account] =
-      pathname.split('wasbs://')[1].split('.blob')[0].split('@');
-    const foldername =
-      pathname.split(`${this.config.exportBucket}/`)[1];
-    const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
-
-    const credential = new StorageSharedKeyCredential(
-      account,
-      this.config.azureKey as string,
-    );
-    const blobClient = new BlobServiceClient(
-      `https://${account}.blob.core.windows.net`,
-      credential,
-    );
-    const containerClient = blobClient.getContainerClient(container);
-    const blobsList = containerClient.listBlobsFlat({ prefix: foldername });
-    for await (const blob of blobsList) {
-      if (blob.name && expr.test(blob.name)) {
-        const sas = generateBlobSASQueryParameters(
-          {
-            containerName: container,
-            blobName: blob.name,
-            permissions: ContainerSASPermissions.parse('r'),
-            startsOn: new Date(new Date().valueOf()),
-            expiresOn:
-              new Date(new Date().valueOf() + 1000 * 60 * 60),
-            protocol: SASProtocol.Https,
-            version: '2020-08-04',
+    if (this.config.bucketType === 'azure') {
+      const {
+        azureKey,
+        azureClientId: clientId,
+        azureTenantId: tenantId,
+        azureClientSecret: clientSecret
+      } = this.config;
+      return this.extractFilesFromAzure(
+        { azureKey, clientId, tenantId, clientSecret },
+        // Databricks uses different bucket address form, so we need to transform it
+        // to the one understandable by extractFilesFromAzure implementation
+        `${url.host}/${url.username}`,
+        tableName,
+      );
+    } else if (this.config.bucketType === 's3') {
+      return this.extractUnloadedFilesFromS3(
+        {
+          credentials: {
+            accessKeyId: this.config.awsKey || '',
+            secretAccessKey: this.config.awsSecret || '',
           },
-          credential,
-        ).toString();
-        csvFile.push(`https://${
-          account
-        }.blob.core.windows.net/${
-          container
-        }/${blob.name}?${sas}`);
-      }
+          region: this.config.awsRegion || '',
+        },
+        url.host,
+        tableName,
+      );
+    } else {
+      throw new Error(`Unsupported export bucket type: ${
+        this.config.bucketType
+      }`);
     }
-    if (csvFile.length === 0) {
-      throw new Error('No CSV files were exported to the specified bucket. ' +
-        'Please check your export bucket configuration.');
-    }
-    return csvFile;
   }
 
-  /**
-   * Returns S3 signed URLs of unloaded scv files.
-   */
-  private async getSignedS3Urls(
-    pathname: string,
-  ): Promise<string[]> {
-    const client = new S3({
-      credentials: {
-        accessKeyId: this.config.awsKey as string,
-        secretAccessKey: this.config.awsSecret as string,
-      },
-      region: this.config.awsRegion,
+  protected generateTableColumnsForExport(columns: ColumnInfo[]): string {
+    const wrapped = columns.map((c) => {
+      if (c.type === 'hll_datasketches') {
+        // [UNSUPPORTED_DATA_TYPE_FOR_DATASOURCE] The CSV datasource doesn't support type \"BINARY\". SQLSTATE: 0A000
+        return `base64(${c.name})`;
+      } else {
+        return c.name;
+      }
     });
-    const url = new URL(pathname);
-    const list = await client.listObjectsV2({
-      Bucket: url.host,
-      Prefix: url.pathname.slice(1),
-    });
-    if (list.Contents === undefined) {
-      throw new Error(`No content in specified path: ${pathname}`);
-    }
-    const csvFile = await Promise.all(
-      list.Contents
-        .filter(file => file.Key && /.csv$/i.test(file.Key))
-        .map(async (file) => {
-          const command = new GetObjectCommand({
-            Bucket: url.host,
-            Key: file.Key,
-          });
-          return getSignedUrl(client, command, { expiresIn: 3600 });
-        })
-    );
-    if (csvFile.length === 0) {
-      throw new Error('No CSV files were exported to the specified bucket. ' +
-        'Please check your export bucket configuration.');
-    }
-    return csvFile;
+
+    return wrapped.join(', ');
   }
 
   /**
@@ -778,14 +767,20 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[]) {
+  private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[], columns: ColumnInfo[]) {
+    let select = sql;
+
+    if (columns.find((column) => column.type === 'hll_datasketches')) {
+      select = `SELECT ${this.generateTableColumnsForExport(columns)} FROM (${sql})`;
+    }
+
     try {
       await this.query(
         `
         CREATE TABLE ${tableFullName}
         USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
         OPTIONS (escape = '"')
-        AS (${sql});
+        AS (${select});
         `,
         params,
       );
@@ -811,14 +806,14 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTableFromTable(tableFullName: string, columns: string) {
+  private async createExternalTableFromTable(tableFullName: string, columns: ColumnInfo[]) {
     try {
       await this.query(
         `
         CREATE TABLE _${tableFullName}
         USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
         OPTIONS (escape = '"')
-        AS SELECT ${columns} FROM ${tableFullName}
+        AS SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
         `,
         [],
       );

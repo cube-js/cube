@@ -4,14 +4,15 @@ use crate::metastore::{
 use crate::TableId;
 
 use chrono::{DateTime, Utc};
-use log::trace;
-use rocksdb::compaction_filter::CompactionFilter;
-use rocksdb::compaction_filter_factory::{CompactionFilterContext, CompactionFilterFactory};
-use rocksdb::CompactionDecision;
+use cuberockstore::rocksdb::compaction_filter::CompactionFilter;
+use cuberockstore::rocksdb::compaction_filter_factory::{
+    CompactionFilterContext, CompactionFilterFactory,
+};
+use cuberockstore::rocksdb::CompactionDecision;
+use log::{error, trace, warn};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::sync::{Arc, Mutex};
-use tracing::{error, warn};
 
 pub struct MetaStoreCacheCompactionFilter {
     name: CString,
@@ -19,6 +20,8 @@ pub struct MetaStoreCacheCompactionFilter {
     scanned: u64,
     removed: u64,
     orphaned: u64,
+    no_ttl: u64,
+    not_expired: u64,
     state: CompactionSharedState,
     context: CompactionFilterContext,
 }
@@ -31,6 +34,8 @@ impl MetaStoreCacheCompactionFilter {
             scanned: 0,
             removed: 0,
             orphaned: 0,
+            no_ttl: 0,
+            not_expired: 0,
             state,
             context,
         }
@@ -42,13 +47,15 @@ impl Drop for MetaStoreCacheCompactionFilter {
         let elapsed = Utc::now() - self.current;
 
         trace!(
-            "Compaction finished in {}.{} secs (is_full: {}), scanned: {}, removed: {}, orphaned: {}",
+            "Compaction finished in {}.{} secs (is_full: {}), scanned: {}, removed: {}, orphaned: {}, no_ttl: {}, not_expired: {})",
             elapsed.num_seconds(),
             elapsed.num_milliseconds(),
             self.context.is_full_compaction,
             self.scanned,
             self.removed,
-            self.orphaned
+            self.orphaned,
+            self.no_ttl,
+            self.not_expired
         );
     }
 }
@@ -71,8 +78,18 @@ impl MetaStoreCacheCompactionFilter {
         };
 
         let root = reader.as_map();
-        let expire_key_id = match root.index_key(&"expire") {
+        let expire_key_id = match root.index_key(&table_id.get_ttl_field()) {
             None => {
+                if cfg!(debug_assertions) {
+                    warn!(
+                        "There is no {} field in row specified with TTL for {:?}",
+                        table_id.get_ttl_field(),
+                        table_id
+                    );
+                }
+
+                self.orphaned += 1;
+
                 return CompactionDecision::Keep;
             }
             Some(idx) => idx,
@@ -81,6 +98,8 @@ impl MetaStoreCacheCompactionFilter {
         let expire = root.idx(expire_key_id);
 
         if expire.flexbuffer_type() == flexbuffers::FlexBufferType::Null {
+            self.no_ttl += 1;
+
             return CompactionDecision::Keep;
         }
 
@@ -91,6 +110,8 @@ impl MetaStoreCacheCompactionFilter {
 
                     CompactionDecision::Remove
                 } else {
+                    self.not_expired += 1;
+
                     CompactionDecision::Keep
                 }
             }
@@ -249,7 +270,7 @@ mod tests {
     use crate::metastore::{BaseRocksSecondaryIndex, RocksTable};
     use crate::TableId;
     use chrono::Duration;
-    use rocksdb::compaction_filter::Decision;
+    use cuberockstore::rocksdb::compaction_filter::Decision;
     use serde::Serialize;
 
     fn get_test_filter_context() -> CompactionFilterContext {

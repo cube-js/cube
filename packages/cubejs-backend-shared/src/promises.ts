@@ -3,6 +3,24 @@ import crypto from 'crypto';
 
 import { Optional } from './type-helpers';
 
+export type PromiseLock = {
+  promise: Promise<void>,
+  resolve: () => void,
+};
+
+export function createPromiseLock(): PromiseLock {
+  let resolve: any = null;
+
+  return {
+    promise: new Promise<void>((resolver) => {
+      resolve = resolver;
+    }),
+    resolve: () => {
+      resolve();
+    }
+  };
+}
+
 export type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
 
 export interface CancelablePromise<T> extends Promise<T> {

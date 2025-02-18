@@ -14,15 +14,19 @@ import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public readonly optsHandler: OptsHandler;
+  public declare optsHandler: OptsHandler;
 
-  public readonly options: ServerCoreInitializedOptions;
+  public declare options: ServerCoreInitializedOptions;
 
   public getRefreshScheduler = super.getRefreshScheduler;
 
   public isReadyForQueryProcessing = super.isReadyForQueryProcessing;
 
   public createOrchestratorApi = super.createOrchestratorApi;
+
+  public pubScheduledRefreshTimeZones(ctx: any) {
+    return this.scheduledRefreshTimeZones(ctx);
+  }
 }
 
 const repositoryWithoutPreAggregations: SchemaFileRepository = {
@@ -209,7 +213,6 @@ describe('index.test', () => {
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
-      initApp: () => {},
       processSubscriptionsInterval: 5000,
       devServer: false,
       apiSecret: 'randomstring',
@@ -226,12 +229,11 @@ describe('index.test', () => {
         release: () => {}
       },
       externalDialectFactory: () => {},
-      cacheAndQueueDriver: 'redis',
+      cacheAndQueueDriver: 'cubestore',
       contextToAppId: () => 'STANDALONE',
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
       checkAuth: () => {},
-      checkAuthMiddleware: () => {},
       queryTransformer: () => {},
       preAggregationsSchema: () => {},
       schemaVersion: () => {},
@@ -302,6 +304,7 @@ describe('index.test', () => {
 
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
+    expect(cubejsServerCore.pubScheduledRefreshTimeZones({} as any)).toEqual(['Europe/Moscow']);
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
@@ -314,7 +317,7 @@ describe('index.test', () => {
     expect(createOrchestratorApiSpy.mock.calls[0]).toEqual([
       expect.any(Function),
       {
-        cacheAndQueueDriver: 'redis',
+        cacheAndQueueDriver: 'cubestore',
         contextToDbType: expect.any(Function),
         contextToExternalDbType: expect.any(Function),
         continueWaitTimeout: 10,
@@ -351,8 +354,8 @@ describe('index.test', () => {
     const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
 
     test('CompilerApi metaConfig', async () => {
-      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
-      expect(metaConfig?.length).toBeGreaterThan(0);
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
+      expect((<any[]>metaConfig)?.length).toBeGreaterThan(0);
       expect(metaConfig[0]).toHaveProperty('config');
       expect(metaConfig[0].config.hasOwnProperty('sql')).toBe(false);
       expect(metaConfigSpy).toHaveBeenCalled();
@@ -360,7 +363,7 @@ describe('index.test', () => {
     });
 
     test('CompilerApi metaConfigExtended', async () => {
-      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
       expect(metaConfigExtended.metaConfig.length).toBeGreaterThan(0);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
@@ -380,14 +383,14 @@ describe('index.test', () => {
     const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
 
     test('CompilerApi metaConfig', async () => {
-      const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
+      const metaConfig = await compilerApi.metaConfig({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfig).toEqual([]);
       expect(metaConfigSpy).toHaveBeenCalled();
       metaConfigSpy.mockClear();
     });
 
     test('CompilerApi metaConfigExtended', async () => {
-      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ securityContext: {} }, { requestId: 'XXX' });
       expect(metaConfigExtended).toHaveProperty('metaConfig');
       expect(metaConfigExtended.metaConfig).toEqual([]);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
@@ -425,7 +428,7 @@ describe('index.test', () => {
         dataSource: 'main',
         dbType: 'mysql',
       }]);
-      
+
       expect(dataSourcesSpy).toHaveBeenCalled();
       dataSourcesSpy.mockClear();
     });
@@ -481,7 +484,7 @@ describe('index.test', () => {
       [
         'Cube Store is not supported on your system',
         {
-          warning: 'You are using MockOS platform with x64 architecture, which is not supported by Cube Store.'
+          warning: `You are using MockOS platform with ${process.arch} architecture, which is not supported by Cube Store.`
         }
       ]
     ]);
@@ -834,5 +837,80 @@ describe('index.test', () => {
     await cubejsServerCore.shutdown();
 
     jest.restoreAllMocks();
+  });
+
+  test('scheduledRefreshTimeZones option', async () => {
+    jest.spyOn(
+      CubejsServerCoreOpen.prototype,
+      'isReadyForQueryProcessing',
+    ).mockImplementation(
+      () => true,
+    );
+
+    const timeoutKiller = withTimeout(
+      () => {
+        throw new Error('scheduledRefreshTimeZones was not called');
+      },
+      3 * 1000,
+    );
+
+    let counter = 0;
+
+    const cubejsServerCore = new CubejsServerCoreOpen({
+      dbType: 'mysql',
+      apiSecret: 'secret',
+      // 250ms
+      scheduledRefreshTimer: 1,
+      scheduledRefreshConcurrency: 1,
+      scheduledRefreshContexts: async () => [
+        {
+          securityContext: {
+            appid: 'test1',
+            u: {
+              prop1: 'value1'
+            }
+          }
+        },
+        // securityContext is required in typings, but can be empty in user-space
+        <any>{
+          // Renamed to securityContext, let's test that it migrate automatically
+          authInfo: {
+            appid: 'test2',
+            u: {
+              prop2: 'value2'
+            }
+          },
+        },
+        // Null is a default placeholder
+        null
+      ],
+      scheduledRefreshTimeZones: async (ctx) => {
+        counter++;
+        if (counter === 1) {
+          expect(ctx.securityContext).toEqual({ appid: 'test1', u: { prop1: 'value1' } });
+          return ['Europe/Kyiv'];
+        } else if (counter === 2) {
+          expect(ctx.securityContext).toEqual({ appid: 'test2', u: { prop2: 'value2' } });
+          return ['Europe/London'];
+        } else if (counter === 3) {
+          expect(ctx.securityContext).toEqual(undefined);
+
+          // Kill the timer after processing all 3 test contexts
+          await timeoutKiller.cancel();
+
+          return ['America/Los_Angeles'];
+        }
+
+        return ['Europe/Kyiv', 'Europe/London', 'America/Los_Angeles'];
+      }
+    });
+
+    await timeoutKiller;
+
+    expect(cubejsServerCore).toBeInstanceOf(CubejsServerCoreOpen);
+    expect(counter).toBe(3);
+
+    await cubejsServerCore.beforeShutdown();
+    await cubejsServerCore.shutdown();
   });
 });

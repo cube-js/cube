@@ -94,7 +94,7 @@ button.
 </div>
 
 In the 'New API' popup, set a name for this API and an identifier (e.g.
-`cubejs-app`), then click the Create button.
+`cube-app`), then click the Create button.
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -121,7 +121,7 @@ application front-end, this might look something like this:
   client_id={process.env.AUTH_CLIENT_ID}
   redirect_uri={window.location.origin}
   onRedirectCallback={() => {}}
-  audience="cubejs"
+  audience="cube"
 >
 ```
 
@@ -226,7 +226,7 @@ models using the [Security Context][ref-sec-ctx] should now work as expected.
 ## Example
 
 To help you get up and running, we have [an example project which is configured
-to use Auth0][gh-cubejs-auth0-example]. You can use it as a starting point for
+to use Auth0][gh-cube-auth0-example]. You can use it as a starting point for
 your own Cube application. You can also use our [Multi-Tenant Analytics with
 Auth0 and Cube guide][link-multitenant-auth0-guide] for a more detailed
 walkthrough.
@@ -247,6 +247,6 @@ walkthrough.
 [link-openid-playground]: https://openidconnect.net/
 [ref-config-auth0]: #configure-cube
 [ref-sec-ctx]: /product/auth/context
-[gh-cubejs-auth0-example]:
+[gh-cube-auth0-example]:
   https://github.com/cube-js/cube/tree/master/examples/auth0
 [link-multitenant-auth0-guide]: https://multi-tenant-analytics.cube.dev/

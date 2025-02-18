@@ -1,41 +1,25 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, binary_expr, rewrite, rules::wrapper::WrapperRules,
+        binary_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn binary_expr_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn binary_expr_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-binary-expr",
-                wrapper_pushdown_replacer(
-                    binary_expr("?left", "?op", "?right"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?cube_members",
-                ),
+                wrapper_pushdown_replacer(binary_expr("?left", "?op", "?right"), "?context"),
                 binary_expr(
-                    wrapper_pushdown_replacer(
-                        "?left",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?left", "?context"),
                     "?op",
-                    wrapper_pushdown_replacer(
-                        "?right",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?right", "?context"),
                 ),
             ),
             transforming_rewrite(
@@ -43,23 +27,38 @@ impl WrapperRules {
                 binary_expr(
                     wrapper_pullup_replacer(
                         "?left",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     "?op",
                     wrapper_pullup_replacer(
                         "?right",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                 ),
                 wrapper_pullup_replacer(
                     binary_expr("?left", "?op", "?right"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_binary_expr("?op", "?alias_to_cube"),
             ),
@@ -70,14 +69,14 @@ impl WrapperRules {
         &self,
         _operator_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         // let operator_var = var!(operator_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

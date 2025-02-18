@@ -2,7 +2,6 @@ use crate::cross::*;
 use pyo3::exceptions::PyNotImplementedError;
 use pyo3::prelude::*;
 use pyo3::types::{PyFunction, PyString, PyTuple};
-use pyo3::AsPyPointer;
 
 pub fn python_fn_call_sync(py_fun: &Py<PyFunction>, arguments: Vec<CLRepr>) -> PyResult<CLRepr> {
     Python::with_gil(|py| {

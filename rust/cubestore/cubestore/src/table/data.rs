@@ -2,11 +2,11 @@ use crate::metastore::{Column, ColumnType};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
-use arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
-use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
+use datafusion::arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
@@ -136,7 +136,7 @@ pub fn cmp_same_types(l: &TableValueR, r: &TableValueR) -> Ordering {
 #[macro_export]
 macro_rules! match_column_type {
     ($t: expr, $matcher: ident) => {{
-        use arrow::array::*;
+        use datafusion::arrow::array::*;
         let t = $t;
         match t {
             ColumnType::String => $matcher!(String, StringBuilder, String),

@@ -1,7 +1,6 @@
-use crate::sql::shim::ConnectionError;
+use crate::{compile::rewrite::rules::utils::DatePartToken, sql::shim::ConnectionError};
 use itertools::Itertools;
 use log::trace;
-use msql_srv::Column as MysqlColumn;
 use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
     BindValue, PgType,
@@ -11,7 +10,7 @@ use sqlparser::ast::{
 };
 use std::{collections::HashMap, error::Error};
 
-use super::types::{ColumnFlags, ColumnType};
+use super::types::ColumnType;
 
 enum PlaceholderType {
     String,
@@ -119,6 +118,9 @@ trait Visitor<'ast, E: Error> {
             Expr::InSubquery { expr, subquery, .. } => {
                 self.visit_expr(expr)?;
                 self.visit_query(subquery)?;
+            }
+            Expr::AnyAllSubquery(query) => {
+                self.visit_query(query)?;
             }
             Expr::InUnnest {
                 expr, array_expr, ..
@@ -335,6 +337,10 @@ trait Visitor<'ast, E: Error> {
             self.visit_expr(having)?;
         }
 
+        for group_by in &mut select.group_by {
+            self.visit_expr(group_by)?;
+        }
+
         Ok(())
     }
 
@@ -366,6 +372,14 @@ trait Visitor<'ast, E: Error> {
         }
         if let Some(limit) = query.limit.as_mut() {
             self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number)?;
+        }
+        if let Some(offset) = query.offset.as_mut() {
+            self.visit_expr_with_placeholder_type(&mut offset.value, PlaceholderType::Number)?;
+        }
+        if let Some(fetch) = query.fetch.as_mut() {
+            if let Some(quantity) = fetch.quantity.as_mut() {
+                self.visit_expr_with_placeholder_type(quantity, PlaceholderType::Number)?;
+            }
         }
 
         Ok(())
@@ -466,9 +480,7 @@ trait Visitor<'ast, E: Error> {
                 ConnectionError::from(ErrorResponse::error(
                     ErrorCode::SyntaxError,
                     format!(
-                        "Unable to extract position for placeholder, actual: {}, err: {}",
-                        name,
-                        err.to_string()
+                        "Unable to extract position for placeholder, actual: {name}, err: {err}"
                     ),
                 ))
             })?;
@@ -501,17 +513,6 @@ pub struct FoundParameter {
 impl FoundParameter {
     fn new(coltype: ColumnType) -> Self {
         Self { coltype }
-    }
-}
-
-impl Into<MysqlColumn> for FoundParameter {
-    fn into(self) -> MysqlColumn {
-        MysqlColumn {
-            table: String::new(),
-            column: "not implemented".to_owned(),
-            coltype: self.coltype.to_mysql(),
-            colflags: ColumnFlags::empty().to_mysql(),
-        }
     }
 }
 
@@ -551,42 +552,6 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
 
                 self.parameters
                     .insert(position.to_string(), FoundParameter::new(pt.to_coltype()));
-            }
-            _ => {}
-        };
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct MySQLStatementParamsFinder {
-    parameters: Vec<FoundParameter>,
-}
-
-impl MySQLStatementParamsFinder {
-    pub fn new() -> Self {
-        Self {
-            parameters: Vec::new(),
-        }
-    }
-
-    pub fn find(mut self, stmt: &ast::Statement) -> Result<Vec<FoundParameter>, ConnectionError> {
-        self.visit_statement(&mut stmt.clone())?;
-
-        Ok(self.parameters)
-    }
-}
-
-impl<'ast> Visitor<'ast, ConnectionError> for MySQLStatementParamsFinder {
-    fn visit_value(
-        &mut self,
-        v: &mut ast::Value,
-        pt: PlaceholderType,
-    ) -> Result<(), ConnectionError> {
-        match v {
-            Value::Placeholder(_) => {
-                self.parameters.push(FoundParameter::new(pt.to_coltype()));
             }
             _ => {}
         };
@@ -658,73 +623,6 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsBinder {
 }
 
 #[derive(Debug)]
-pub struct MysqlStatementParamsBinder {
-    values: Vec<BindValue>,
-    position: usize,
-}
-
-impl MysqlStatementParamsBinder {
-    pub fn new(values: Vec<BindValue>) -> Self {
-        Self {
-            values,
-            position: 0,
-        }
-    }
-
-    pub fn bind(mut self, stmt: &mut ast::Statement) -> Result<(), ConnectionError> {
-        self.visit_statement(stmt)
-    }
-}
-
-impl<'ast> Visitor<'ast, ConnectionError> for MysqlStatementParamsBinder {
-    fn visit_value(
-        &mut self,
-        value: &mut ast::Value,
-        placeholder_type: PlaceholderType,
-    ) -> Result<(), ConnectionError> {
-        match &value {
-            ast::Value::Placeholder(_) => {
-                let to_replace = self.values.get(self.position).ok_or({
-                    ConnectionError::from(ErrorResponse::error(
-                        ErrorCode::InternalError,
-                        format!(
-                            "Unable to find value for placeholder at position: {}",
-                            self.position
-                        ),
-                    ))
-                })?;
-                match to_replace {
-                    BindValue::String(v) => {
-                        // FIXME: this workaround is needed as we don't know types on Bind
-                        *value = match placeholder_type {
-                            PlaceholderType::String => ast::Value::SingleQuotedString(v.clone()),
-                            PlaceholderType::Number => ast::Value::Number(v.clone(), false),
-                        };
-                    }
-                    BindValue::Bool(v) => {
-                        *value = ast::Value::Boolean(*v);
-                    }
-                    BindValue::Int64(v) => {
-                        *value = ast::Value::Number(v.to_string(), *v < 0_i64);
-                    }
-                    BindValue::Float64(v) => {
-                        *value = ast::Value::Number(v.to_string(), *v < 0_f64);
-                    }
-                    BindValue::Null => {
-                        *value = ast::Value::Null;
-                    }
-                };
-
-                self.position += 1;
-            }
-            _ => {}
-        };
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
 pub struct StatementPlaceholderReplacer {}
 
 impl StatementPlaceholderReplacer {
@@ -732,8 +630,8 @@ impl StatementPlaceholderReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> Result<ast::Statement, ConnectionError> {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> Result<ast::Statement, ConnectionError> {
+        let mut result = stmt;
 
         self.visit_statement(&mut result)?;
 
@@ -771,8 +669,8 @@ impl CastReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -902,6 +800,70 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
     }
 }
 
+// This approach is limited to literals-in-query, but it's better than nothing
+// It would be simpler to do in rewrite rules, by relying on constant folding, but would require cumbersome top-down extraction
+// TODO remove this if/when DF starts supporting all of PostgreSQL aliases
+#[derive(Debug)]
+pub struct DateTokenNormalizeReplacer {}
+
+impl DateTokenNormalizeReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast, ConnectionError> for DateTokenNormalizeReplacer {
+    // TODO support EXTRACT normalization after support in sqlparser
+    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
+        for res in fun.name.0.iter_mut() {
+            self.visit_identifier(res)?;
+        }
+
+        let fn_name = fun.name.to_string().to_lowercase();
+        match (fn_name.as_str(), fun.args.len()) {
+            ("date_trunc", 2) | ("date_part", 2) => {
+                match &mut fun.args[0] {
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                        Value::SingleQuotedString(token),
+                    ))) => {
+                        if let Ok(parsed) = token.parse::<DatePartToken>() {
+                            *token = parsed.as_str().to_string();
+                        } else {
+                            // Do nothing
+                        };
+                    }
+                    _ => {
+                        // Do nothing
+                    }
+                }
+            }
+            _ => {
+                // Do nothing
+            }
+        }
+
+        self.visit_function_args(&mut fun.args)?;
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res)?;
+            }
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct RedshiftDatePartReplacer {}
 
@@ -910,8 +872,8 @@ impl RedshiftDatePartReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -966,8 +928,8 @@ impl ToTimestampReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -993,8 +955,8 @@ impl UdfWildcardArgReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1082,8 +1044,8 @@ impl ApproximateCountDistinctVisitor {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1111,8 +1073,8 @@ impl SensitiveDataSanitizer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1145,14 +1107,17 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compile::parser::MySqlDialectWithBackTicks, CubeError};
+    use crate::CubeError;
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let replacer = CastReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmt);
 
         assert_eq!(res.to_string(), output);
 
@@ -1180,7 +1145,7 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let replacer = RedshiftDatePartReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmts[0].clone());
 
         assert_eq!(res.to_string(), output);
 
@@ -1212,10 +1177,13 @@ mod tests {
         output: &str,
         values: Vec<BindValue>,
     ) -> Result<(), ConnectionError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = PostgresStatementParamsBinder::new(values);
-        let mut res = stmts[0].clone();
+        let mut res = stmt;
         binder.bind(&mut res)?;
 
         assert_eq!(res.to_string(), output);
@@ -1375,35 +1343,27 @@ mod tests {
             ],
         )?;
 
-        Ok(())
-    }
+        assert_pg_params_finder(
+            "SELECT 1 OFFSET $1",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
-    fn assert_mysql_params_finder(
-        input: &str,
-        expected: Vec<FoundParameter>,
-    ) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&MySqlDialectWithBackTicks {}, &input).unwrap();
-
-        let finder = MySQLStatementParamsFinder::new();
-        let result = finder.find(&stmts[0]).unwrap();
-
-        assert_eq!(result, expected);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_mysql_placeholder_find() -> Result<(), CubeError> {
-        assert_mysql_params_finder("SELECT ?", vec![FoundParameter::new(ColumnType::String)])?;
+        assert_pg_params_finder(
+            "SELECT 1 FETCH FIRST $1 ROWS ONLY",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
         Ok(())
     }
 
     fn assert_placeholder_replacer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = StatementPlaceholderReplacer::new();
-        let result = binder.replace(&stmts[0]).unwrap();
+        let result = binder.replace(stmt).unwrap();
 
         assert_eq!(result.to_string(), output);
 
@@ -1414,15 +1374,23 @@ mod tests {
     fn test_placeholder_replacer() -> Result<(), CubeError> {
         assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
         assert_placeholder_replacer("SELECT 1 LIMIT ?", "SELECT 1 LIMIT 1")?;
+        assert_placeholder_replacer("SELECT 1 OFFSET ?", "SELECT 1 OFFSET 1")?;
+        assert_placeholder_replacer(
+            "SELECT 1 FETCH FIRST ? ROWS ONLY",
+            "SELECT 1 FETCH FIRST 1 ROWS ONLY",
+        )?;
 
         Ok(())
     }
 
     fn assert_sensitive_data_sanitizer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = SensitiveDataSanitizer::new();
-        let result = binder.replace(&stmts[0]);
+        let result = binder.replace(stmt);
 
         assert_eq!(result.to_string(), output);
 

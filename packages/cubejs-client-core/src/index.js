@@ -30,7 +30,7 @@ function mutexPromise(promise) {
   });
 }
 
-class CubejsApi {
+class CubeApi {
   constructor(apiToken, options) {
     if (apiToken !== null && !Array.isArray(apiToken) && typeof apiToken === 'object') {
       options = apiToken;
@@ -56,6 +56,7 @@ class CubejsApi {
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
+    this.castNumerics = typeof options.castNumerics === 'boolean' ? options.castNumerics : false;
 
     this.updateAuthorizationPromise = null;
   }
@@ -270,22 +271,22 @@ class CubejsApi {
             if (v.type === 'number') {
               return k;
             }
-            
+
             return undefined;
           }).filter(Boolean);
-          
+
           result.data = result.data.map((row) => {
             numericMembers.forEach((key) => {
               if (row[key] != null) {
                 row[key] = Number(row[key]);
               }
             });
-            
+
             return row;
           });
         });
       }
-      
+
       if (response.results[0].query.responseFormat &&
         response.results[0].query.responseFormat === ResultType.COMPACT) {
         response.results.forEach((result, j) => {
@@ -301,13 +302,18 @@ class CubejsApi {
         });
       }
     }
-    
+
     return new ResultSet(response, {
       parseDateMeasures: this.parseDateMeasures
     });
   }
 
   load(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    options = {
+      castNumerics: this.castNumerics,
+      ...options
+    };
+
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
         query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
@@ -327,6 +333,11 @@ class CubejsApi {
   }
 
   subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    options = {
+      castNumerics: this.castNumerics,
+      ...options
+    };
+
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
         query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
@@ -373,7 +384,8 @@ class CubejsApi {
   }
 }
 
-export default (apiToken, options) => new CubejsApi(apiToken, options);
+export default (apiToken, options) => new CubeApi(apiToken, options);
 
-export { CubejsApi, CubejsApi as CubeApi, HttpTransport, ResultSet, RequestError, Meta };
+export { CubeApi, HttpTransport, ResultSet, RequestError, Meta };
 export * from './utils';
+export * from './time';

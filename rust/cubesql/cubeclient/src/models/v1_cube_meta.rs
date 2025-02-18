@@ -14,6 +14,12 @@ pub struct V1CubeMeta {
     pub name: String,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(rename = "type")]
+    pub r#type: crate::models::V1CubeMetaType,
+    #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<serde_json::Value>,
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     #[serde(rename = "measures")]
     pub measures: Vec<crate::models::V1CubeMetaMeasure>,
     #[serde(rename = "dimensions")]
@@ -22,23 +28,32 @@ pub struct V1CubeMeta {
     pub segments: Vec<crate::models::V1CubeMetaSegment>,
     #[serde(rename = "joins", skip_serializing_if = "Option::is_none")]
     pub joins: Option<Vec<crate::models::V1CubeMetaJoin>>,
+    #[serde(rename = "folders", skip_serializing_if = "Option::is_none")]
+    pub folders: Option<Vec<crate::models::V1CubeMetaFolder>>,
+    #[serde(rename = "hierarchies", skip_serializing_if = "Option::is_none")]
+    pub hierarchies: Option<Vec<crate::models::V1CubeMetaHierarchy>>,
 }
 
 impl V1CubeMeta {
     pub fn new(
         name: String,
+        r#type: crate::models::V1CubeMetaType,
         measures: Vec<crate::models::V1CubeMetaMeasure>,
         dimensions: Vec<crate::models::V1CubeMetaDimension>,
         segments: Vec<crate::models::V1CubeMetaSegment>,
-        joins: Option<Vec<crate::models::V1CubeMetaJoin>>,
     ) -> V1CubeMeta {
         V1CubeMeta {
             name,
             title: None,
+            r#type,
+            meta: None,
+            description: None,
             measures,
             dimensions,
             segments,
-            joins,
+            joins: None,
+            folders: None,
+            hierarchies: None,
         }
     }
 }

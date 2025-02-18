@@ -47,34 +47,25 @@ the required fields:
   src="https://ucarecdn.com/d30fa31d-e6ea-4a73-9950-1786634a1e32/"
 />
 
-Cube Cloud also supports connecting to data sources within private VPCs. If you
-already have VPCs enabled in your account, check out the [VPC
-documentation][ref-cloud-conf-vpc] to learn how to get started.
+Cube Cloud also supports connecting to data sources within private VPCs
+if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
+[VPC connectivity guide][ref-cloud-conf-vpc] for details.
 
-<SuccessBox>
-
-VPC connectivity is available in Cube Cloud on
-[Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
-details.
-
-</SuccessBox>
-
-[cube-pricing]: https://cube.dev/pricing/
-[cube-contact]: https://cube.dev/contact/
-[ref-cloud-conf-vpc]: /product/configuration/vpc
+[ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
+[ref-cloud-conf-vpc]: /product/deployment/cloud/vpc
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                                                                            | Possible Values                                  | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :------: | :----------------------------------------------------------------------: |
-| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                                                                  | A valid AWS Access Key ID                        |    ✅    |                                    ✅                                    |
-| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                                                              | A valid AWS Secret Access Key                    |    ✅    |                                    ✅                                    |
-| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                                                                  | [A valid AWS region][aws-docs-regions]           |    ✅    |                                    ✅                                    |
-| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |                                    ✅                                    |
-| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |                                    ✅                                    |
-| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |                                    ✅                                    |
-| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5`                                    | A valid number                                   |    ❌    |                                    ✅                                    |
+| Environment Variable            | Description                                                                                                            | Possible Values                                  | Required |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :------: |
+| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                                                                  | A valid AWS Access Key ID                        |    ✅    |
+| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                                                              | A valid AWS Secret Access Key                    |    ✅    |
+| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                                                                  | [A valid AWS region][aws-docs-regions]           |    ✅    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
+| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |
+| `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5`                                    | A valid number                                   |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -159,8 +150,5 @@ connections are made over HTTPS.
   /product/caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-config-multiple-ds-decorating-env]:
-  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
-[ref-schema-ref-types-formats-countdistinctapprox]:
-  /reference/data-model/types-and-formats#count_distinct_approx
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching

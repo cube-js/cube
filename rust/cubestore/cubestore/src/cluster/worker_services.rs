@@ -34,6 +34,8 @@ pub trait Configurator: Send + Sync + 'static {
             dyn Callable<Request = Self::ServicesRequest, Response = Self::ServicesResponse>,
         >,
     ) -> Result<Self::Config, CubeError>;
+
+    fn teardown();
 }
 
 #[async_trait]
@@ -48,6 +50,8 @@ pub trait WorkerProcessing: Send + Sync + 'static {
         config: &Self::Config,
         args: Self::Request,
     ) -> Result<Self::Response, CubeError>;
+
+    fn is_single_job_process() -> bool;
 
     fn process_titile() -> String;
 }
@@ -391,9 +395,8 @@ impl<P: Callable> ServicesServerImpl<P> {
                 payload,
             } = match req {
                 Ok(message) => message,
-                Err(e) => {
+                Err(_) => {
                     if !cancel_token.is_cancelled() {
-                        log::error!("Error while reading ipc service request: {:?}", e);
                         cancel_token.cancel();
                     }
                     break;

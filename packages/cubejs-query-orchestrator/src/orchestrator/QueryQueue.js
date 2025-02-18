@@ -6,7 +6,6 @@ import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
-import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { QueryStream } from './QueryStream';
 
@@ -17,8 +16,6 @@ import { QueryStream } from './QueryStream';
  */
 function factoryQueueDriver(cacheAndQueueDriver, queueDriverOptions) {
   switch (cacheAndQueueDriver || 'memory') {
-    case 'redis':
-      return new RedisQueueDriver(queueDriverOptions);
     case 'memory':
       return new LocalQueueDriver(queueDriverOptions);
     case 'cubestore':
@@ -123,10 +120,12 @@ export class QueryQueue {
       processUid: this.processUid,
     };
 
+    const queueDriverFactory = options.queueDriverFactory || factoryQueueDriver;
+
     /**
      * @type {QueueDriverInterface}
      */
-    this.queueDriver = factoryQueueDriver(options.cacheAndQueueDriver, queueDriverOptions);
+    this.queueDriver = queueDriverFactory(options.cacheAndQueueDriver, queueDriverOptions);
     /**
      * @protected
      * @type {boolean}
@@ -148,24 +147,26 @@ export class QueryQueue {
    * Returns stream object which will be used to pipe data from data source.
    *
    * @param {QueryKeyHash} queryKeyHash
+   * @return {QueryStream | undefined}
    */
   getQueryStream(queryKeyHash) {
     return this.streams.get(queryKeyHash);
   }
 
   /**
-   * @param {*} queryKey
+   * @param {QueryKeyHash} key
    * @param {{ [alias: string]: string }} aliasNameToMember
+   * @return {QueryStream}
    */
-  createQueryStream(queryKeyHash, aliasNameToMember) {
-    const key = queryKeyHash;
+  createQueryStream(key, aliasNameToMember) {
     const stream = new QueryStream({
       key,
       streams: this.streams,
       aliasNameToMember,
     });
     this.streams.set(key, stream);
-    this.streamEvents.emit('streamStarted', queryKeyHash);
+    this.streamEvents.emit('streamStarted', key);
+
     return stream;
   }
 
@@ -262,6 +263,15 @@ export class QueryQueue {
       );
 
       if (added > 0) {
+        waitingContext = {
+          queueId,
+          spanId: options.spanId,
+          queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: options.requestId,
+          waitingForRequestId: options.requestId
+        };
+
         this.logger('Added to queue', {
           queueId,
           spanId: options.spanId,
@@ -282,50 +292,64 @@ export class QueryQueue {
 
       await this.reconcileQueue();
 
-      const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
+      if (!added) {
+        const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
+        if (queryDef) {
+          waitingContext = {
+            queueId,
+            spanId: options.spanId,
+            queryKey: queryDef.queryKey,
+            queuePrefix: this.redisQueuePrefix,
+            requestId: options.requestId,
+            waitingForRequestId: queryDef.requestId
+          };
+        }
+      }
+
       const [active, toProcess] = await queueConnection.getQueryStageState(true);
 
-      if (queryDef) {
-        waitingContext = {
-          queueId,
-          spanId: options.spanId,
-          queryKey: queryDef.queryKey,
-          queuePrefix: this.redisQueuePrefix,
-          requestId: options.requestId,
-          waitingForRequestId: queryDef.requestId
-        };
-
-        this.logger('Waiting for query', {
-          ...waitingContext,
-          queueSize,
-          activeQueryKeys: active,
-          toProcessQueryKeys: toProcess,
-          active: active.indexOf(queryKeyHash) !== -1,
-          queueIndex: toProcess.indexOf(queryKeyHash),
-        });
-      }
+      this.logger('Waiting for query', {
+        ...waitingContext,
+        queueSize,
+        activeQueryKeys: active,
+        toProcessQueryKeys: toProcess,
+        active: active.indexOf(queryKeyHash) !== -1,
+        queueIndex: toProcess.indexOf(queryKeyHash),
+      });
 
       // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
       // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
+      // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
+      // while EventListener doesnt start to listen for started stream event
       if (queryHandler === 'stream') {
         const self = this;
         result = await new Promise((resolve) => {
+          let timeoutTimerId = null;
+
           const onStreamStarted = (streamStartedHash) => {
             if (streamStartedHash === queryKeyHash) {
+              if (timeoutTimerId) {
+                clearTimeout(timeoutTimerId);
+              }
+
               resolve(self.getQueryStream(queryKeyHash));
             }
           };
 
-          setTimeout(() => {
-            self.streamEvents.removeListener('streamStarted', onStreamStarted);
-            resolve(null);
-          }, this.continueWaitTimeout * 1000);
-
           self.streamEvents.addListener('streamStarted', onStreamStarted);
-          const stream = this.getQueryStream(this.redisHash(queryKey));
+
+          const stream = this.getQueryStream(queryKeyHash);
           if (stream) {
             self.streamEvents.removeListener('streamStarted', onStreamStarted);
             resolve(stream);
+          } else {
+            timeoutTimerId = setTimeout(
+              () => {
+                self.streamEvents.removeListener('streamStarted', onStreamStarted);
+                resolve(null);
+              },
+              this.continueWaitTimeout * 10000
+            );
           }
         });
       } else {
@@ -533,6 +557,13 @@ export class QueryQueue {
         }
       }));
 
+      /**
+       * There is a bug somewhere in Redis (maybe in memory too?),
+       * which doesn't remove queue item from pending, while it's in active state
+       *
+       * TODO(ovr): Check LocalQueueDriver for strict guarantees that item cannot be in active & pending in the same time
+       * TODO(ovr): Migrate to getToProcessQueries after removal of Redis
+       */
       const [active, toProcess] = await queueConnection.getActiveAndToProcess();
 
       await Promise.all(

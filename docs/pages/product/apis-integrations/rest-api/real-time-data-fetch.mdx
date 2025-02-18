@@ -23,15 +23,15 @@ CUBEJS_WEB_SOCKETS=true
 ```
 
 Clients can be switched to Web Sockets by passing `WebSocketTransport` to
-`CubejsApi` constructor:
+`CubeApi` constructor:
 
 ```javascript
-import cubejs from "@cubejs-client/core";
+import cube from "@cubejs-client/core";
 import WebSocketTransport from "@cubejs-client/ws-transport";
 
-const cubejsApi = cubejs({
+const cubeApi = cube({
   transport: new WebSocketTransport({
-    authorization: CUBEJS_TOKEN,
+    authorization: CUBE_TOKEN,
     apiUrl: "ws://localhost:4000/",
   }),
 });
@@ -44,18 +44,18 @@ Multiple APIs are provided to support data subscription scenarios.
 ### Vanilla JavaScript
 
 ```javascript
-import cubejs from "@cubejs-client/core";
+import cube from "@cubejs-client/core";
 import WebSocketTransport from "@cubejs-client/ws-transport";
 
-const cubejsApi = cubejs({
+const cubeApi = cube({
   transport: new WebSocketTransport({
-    authorization: CUBEJS_TOKEN,
+    authorization: CUBE_TOKEN,
     apiUrl: "ws://localhost:4000/",
   }),
 });
 
 // Create a subscription
-const subscription = cubejsApi.subscribe(
+const subscription = cubeApi.subscribe(
   {
     measures: ["logs.count"],
     timeDimensions: [

@@ -1,0 +1,177 @@
+{
+  "extendedEnvs": {
+    "export-bucket-s3": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "redshift-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+        }
+      }
+    }
+  },
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+
+      "CUBEJS_DB_TYPE": "redshift",
+      "CUBEJS_DB_HOST": "${DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_HOST}",
+      "CUBEJS_DB_PORT": "5439",
+      "CUBEJS_DB_NAME": "dev",
+      "CUBEJS_DB_USER": "${DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_USER}",
+      "CUBEJS_DB_PASS": "${DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_PASS}",
+
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
+    },
+    "ports" : ["4000", "5656"]
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "to_date(",
+    "DATE_SUFFIX": ", 'YYYY-MM-DD')",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "public.products",
+    "customers": "public.customers",
+    "ecommerce": "public.ecommerce",
+    "bigecommerce": "public.bigecommerce"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
+      }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": [],
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
+      }
+    ]
+  },
+  "skip": [
+    "---------------------------------------",
+    "Error: Interval values with month or year parts are not supported",
+    "---------------------------------------",
+    "querying BigECommerce: rolling window by 2 month",
+    "querying custom granularities ECommerce: count by half_year + no dimension",
+    "querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by half_year + dimension",
+    "querying custom granularities ECommerce: count by half_year_by_1st_april + dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
+
+    "---------------------------------------",
+    "SKIPPED FOR ALL                        ",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+  ]
+}

@@ -4,24 +4,29 @@
  * @fileoverview The `JDBCDriver` and related types declaration.
  */
 
-/* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
-import { Readable } from 'stream';
 import {
   getEnv,
   assertDataSource,
   CancelablePromise,
 } from '@cubejs-backend/shared';
-import { BaseDriver } from '@cubejs-backend/base-driver';
+import {
+  BaseDriver,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  StreamOptions,
+} from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
 import genericPool, { Factory, Pool } from 'generic-pool';
 import path from 'path';
 
-import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { JDBCDriverConfiguration } from './types';
-import { QueryStream, nextFn, Row } from './QueryStream';
+import { SupportedDrivers } from './supported-drivers';
+import type { DriverOptionsInterface } from './supported-drivers';
+import type { JDBCDriverConfiguration } from './types';
+import { QueryStream, transformRow } from './QueryStream';
+import type { nextFn } from './QueryStream';
 
+/* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
 const Connection = require('@cubejs-backend/jdbc/lib/connection');
 const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
@@ -29,11 +34,6 @@ const jinst = require('@cubejs-backend/jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
-
-type JdbcStatement = {
-  setQueryTimeout: (t: number) => any,
-  execute: (q: string) => any,
-};
 
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
@@ -48,6 +48,11 @@ const initMvn = (customClassPath: any) => {
           if (!jinst.isJvmCreated()) {
             jinst.addOption('-Xrs');
             jinst.addOption('-Dfile.encoding=UTF8');
+
+            // Workaround for Databricks JDBC driver
+            // Issue when deserializing Apache Arrow data with Java JVMs version 11 or higher, due to compatibility issues.
+            jinst.addOption('--add-opens=java.base/java.nio=ALL-UNNAMED');
+
             const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
             jinst.setupClasspath(classPath);
           }
@@ -73,7 +78,7 @@ interface ExtendedPool extends Pool<any> {
 
 export class JDBCDriver extends BaseDriver {
   protected readonly config: JDBCDriverConfiguration;
-  
+
   protected pool: ExtendedPool;
 
   protected jdbcProps: any;
@@ -143,8 +148,7 @@ export class JDBCDriver extends BaseDriver {
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
         return new Connection(await getConnection(this.config.url, this.jdbcProps));
       },
-      // @ts-expect-error Promise<Function> vs Promise<void>
-      destroy: async (connection) => promisify(connection.close.bind(connection)),
+      destroy: async (connection) => promisify(connection.close.bind(connection))(),
       validate: async (connection) => (
         new Promise((resolve) => {
           const isValid = promisify(connection.isValid.bind(connection));
@@ -179,6 +183,14 @@ export class JDBCDriver extends BaseDriver {
       acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
     }) as ExtendedPool;
+
+    // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
+    this.pool.on('factoryCreateError', (err) => {
+      this.databasePoolError(err);
+    });
+    this.pool.on('factoryDestroyError', (err) => {
+      this.databasePoolError(err);
+    });
   }
 
   protected async getCustomClassPath() {
@@ -241,6 +253,7 @@ export class JDBCDriver extends BaseDriver {
 
   protected async queryPromised(query: string, cancelObj: any, options: any) {
     options = options || {};
+
     try {
       const conn = await this.pool.acquire();
       try {
@@ -261,7 +274,7 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
-  public async streamQuery(sql: string, values: string[]): Promise<Readable> {
+  public async stream(sql: string, values: unknown[], { highWaterMark }: StreamOptions): Promise<DownloadQueryResultsResult> {
     const conn = await this.pool.acquire();
     const query = applyParams(sql, values);
     const cancelObj: {cancel?: Function} = {};
@@ -275,7 +288,7 @@ export class JDBCDriver extends BaseDriver {
 
       const executeQuery = promisify(statement.execute.bind(statement));
       const resultSet = await executeQuery(query);
-      return new Promise((resolve, reject) => {
+      return (await new Promise((resolve, reject) => {
         resultSet.toObjectIter(
           (
             err: unknown,
@@ -285,25 +298,25 @@ export class JDBCDriver extends BaseDriver {
                 rows: { next: nextFn },
               },
           ) => {
-            if (err) reject(err);
-            const rowsStream = new QueryStream(res.rows.next);
-            let connectionReleased = false;
-            const cleanup = (e?: Error) => {
-              if (!connectionReleased) {
-                this.pool.release(conn);
-                connectionReleased = true;
-              }
-              if (!rowsStream.destroyed) {
-                rowsStream.destroy(e);
-              }
-            };
-            rowsStream.once('end', cleanup);
-            rowsStream.once('error', cleanup);
-            rowsStream.once('close', cleanup);
-            resolve(rowsStream);
+            if (err) {
+              reject(err);
+              return;
+            }
+
+            const rowStream = new QueryStream(res.rows.next, highWaterMark);
+            resolve({
+              rowStream,
+              release: () => this.pool.release(conn),
+              types: res.types.map(
+                (t, i) => ({
+                  name: res.labels[i],
+                  type: this.toGenericType(((t === -5 ? 'bigint' : resultSet._types[t]) || 'string').toLowerCase())
+                })
+              )
+            });
           }
         );
-      });
+      }));
     } catch (ex: any) {
       await this.pool.release(conn);
       if (ex.cause) {
@@ -312,6 +325,14 @@ export class JDBCDriver extends BaseDriver {
         throw ex;
       }
     }
+  }
+
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    if (options.streamImport) {
+      return this.stream(query, values, options);
+    }
+
+    return super.downloadQueryResults(query, values, options);
   }
 
   protected async executeStatement(conn: any, query: any, cancelObj?: any) {
@@ -324,11 +345,18 @@ export class JDBCDriver extends BaseDriver {
     await setQueryTimeout(600);
     const executeQueryAsync = promisify(statement.execute.bind(statement));
     const resultSet = await executeQueryAsync(query);
-    const toObjArrayAsync =
-      resultSet.toObjArray && promisify(resultSet.toObjArray.bind(resultSet)) ||
-      (() => Promise.resolve(resultSet));
 
-    return toObjArrayAsync();
+    if (resultSet.toObjArray) {
+      const result: any = await (promisify(resultSet.toObjArray.bind(resultSet)))();
+
+      for (const [key, row] of Object.entries(result)) {
+        result[key] = transformRow(row);
+      }
+
+      return result;
+    }
+
+    return resultSet;
   }
 
   public async release() {
@@ -339,7 +367,7 @@ export class JDBCDriver extends BaseDriver {
   public static getSupportedDrivers(): string[] {
     return Object.keys(SupportedDrivers);
   }
-  
+
   public static dbTypeDescription(dbType: string): DriverOptionsInterface {
     return SupportedDrivers[dbType];
   }

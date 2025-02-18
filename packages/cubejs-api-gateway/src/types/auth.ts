@@ -39,15 +39,19 @@ interface JWTOptions {
   claimsNamespace?: string,
 }
 
+type CheckAuthResponse = {
+  'security_context'?: unknown,
+};
+
 /**
  * Function that should provides basic auth mechanic. Used as a part
  * of a main configuration object of the server-core to provide base
- * auth logic.
+ * auth logic. Can return new security context.
  * @todo ctx can be passed from SubscriptionServer that will cause
  * incapability with Express.Request
  */
 type CheckAuthFn =
-  (ctx: any, authorization?: string) => Promise<void> | void;
+  (ctx: any, authorization?: string) => Promise<void | CheckAuthResponse> | CheckAuthResponse | void;
 
 /**
  * Result of the SQL auth workflow.
@@ -55,7 +59,8 @@ type CheckAuthFn =
 type CheckSQLAuthSuccessResponse = {
   password: string | null,
   superuser?: boolean,
-  securityContext?: any
+  securityContext?: any,
+  skipPasswordCheck?: boolean,
 };
 
 /**
@@ -64,7 +69,7 @@ type CheckSQLAuthSuccessResponse = {
  * auth logic.
  */
 type CheckSQLAuthFn =
-  (ctx: any, user: string | null) =>
+  (ctx: any, user: string | null, password: string | null) =>
     Promise<CheckSQLAuthSuccessResponse> |
     CheckSQLAuthSuccessResponse;
 

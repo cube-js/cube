@@ -310,7 +310,7 @@ impl BatchWriter {
     }
 }
 
-impl<'a> Serialize for BatchWriter {
+impl Serialize for BatchWriter {
     const CODE: u8 = b'D';
 
     fn serialize(&self) -> Option<Vec<u8>> {
@@ -337,7 +337,7 @@ mod tests {
         let mut buf = BytesMut::new();
         value.to_text(&mut buf).unwrap();
 
-        assert_eq!(&buf.as_ref()[..], expected);
+        assert_eq!(buf.as_ref(), expected);
     }
 
     #[test]
@@ -364,7 +364,7 @@ mod tests {
         let mut buf = BytesMut::new();
         value.to_binary(&mut buf).unwrap();
 
-        assert_eq!(&buf.as_ref()[..], expected);
+        assert_eq!(buf.as_ref(), expected);
     }
 
     #[test]
@@ -394,7 +394,7 @@ mod tests {
         writer.write_value(true)?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
@@ -422,7 +422,7 @@ mod tests {
         writer.write_value(true)?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
@@ -450,7 +450,7 @@ mod tests {
         writer.write_value(Decimal128Value::new(2, 15))?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
@@ -488,7 +488,7 @@ mod tests {
         writer.write_value(ListValue::new(Arc::new(col.finish()) as ArrayRef))?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
