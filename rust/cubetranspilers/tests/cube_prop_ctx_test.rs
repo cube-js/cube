@@ -9,6 +9,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use common::{generate_code, TestEmitter};
 use cubetranspilers::cube_prop_ctx_transpiler::*;
+use insta::assert_snapshot;
 use swc_core::ecma::ast::{EsVersion, Program};
 use swc_core::{
     common::{
@@ -206,11 +207,8 @@ fn test_simple_transform() {
 
     let output_code = generate_code(&program, &cm);
 
-    assert!(
-        output_code.contains("sql: ()=>`"),
-        "Output code should contain arrow function for *.sql, got:\n{}",
-        output_code
-    );
+    assert_snapshot!("simple_transform", output_code);
+
     let diags = diagnostics.lock().unwrap();
     assert!(
         diags.is_empty(),
@@ -512,61 +510,8 @@ fn test_complicated_transform_1st_stage() {
 
     let output_code = generate_code(&program, &cm);
 
-    assert!(
-        output_code.contains("sql: ()=>`"),
-        "Output code should contain arrow function for *.sql, got:\n{}",
-        output_code
-    );
-    assert!(
-            output_code.contains("sql: (FILTER_GROUP, FILTER_PARAMS)=>`"),
-            "Output code should contain `sql` arrow function with (FILTER_GROUP, FILTER_PARAMS), got:\n{}",
-            output_code
-        );
-    assert!(
-        output_code.contains("measures: ()=>["),
-        "Output code should contain arrow function for preAggregations.measures, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("dimensions: ()=>["),
-        "Output code should contain arrow function for preAggregations.dimensions, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("timeDimension: ()=>"),
-        "Output code should contain arrow function for preAggregations.timeDimension, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("drillMembers: ()=>["),
-        "Output code should contain arrow function for measure.drillMembers, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("sql: (CUBE)=>`${CUBE}.status = 'shipped'`"),
-        "Output code should contain arrow function with CUBE as parameter for *.sql, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("sql: (SQL_UTILS)=>SQL_UTILS.convertTz(`completed_at`)"),
-        "Output code should contain arrow function with SQL_UTILS as parameter for *.sql, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("if: ()=>`true`"),
-        "Output code should contain arrow function for acl if condition, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("member: (CUBE)=>`${CUBE}.id`"),
-        "Output code should contain arrow function for acl rowlevel filters member, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("values: ()=>["),
-        "Output code should contain arrow function for acl rowlevel filters values, got:\n{}",
-        output_code
-    );
+    assert_snapshot!("complicated_transform_1st_stage", output_code);
+
     let diags = diagnostics.lock().unwrap();
     assert!(
         diags.is_empty(),
@@ -877,67 +822,8 @@ fn test_complicated_transform_2nd_stage() {
 
     let output_code = generate_code(&program, &cm);
 
-    assert!(
-        output_code.contains("sql: ()=>`"),
-        "Output code should contain arrow function for *.sql, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code
-            .contains("sql: (zero_sum)=>`CASE WHEN ${zero_sum} = 0 THEN 1 ELSE 1/${zero_sum} end`"),
-        "Output code should contain arrow function for sql() with local member as param, got:\n{}",
-        output_code
-    );
-    assert!(
-            output_code.contains("sql: (FILTER_GROUP, FILTER_PARAMS)=>`"),
-            "Output code should contain `sql` arrow function with (FILTER_GROUP, FILTER_PARAMS), got:\n{}",
-            output_code
-        );
-    assert!(
-        output_code.contains("measures: (count, rolling_count_month)=>["),
-        "Output code should contain arrow function for preAggregations.measures, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("dimensions: (status)=>["),
-        "Output code should contain arrow function for preAggregations.dimensions, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("timeDimension: (createdAt)=>createdAt"),
-        "Output code should contain arrow function for preAggregations.timeDimension, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("drillMembers: (id, createdAt)=>["),
-        "Output code should contain arrow function for measure.drillMembers, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("sql: (CUBE)=>`${CUBE}.status = 'shipped'`"),
-        "Output code should contain arrow function with CUBE as parameter for *.sql, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("sql: (SQL_UTILS)=>SQL_UTILS.convertTz(`completed_at`)"),
-        "Output code should contain arrow function with SQL_UTILS as parameter for *.sql, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("if: ()=>`true`"),
-        "Output code should contain arrow function for acl if condition, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("member: (CUBE)=>`${CUBE}.id`"),
-        "Output code should contain arrow function for acl rowlevel filters member, got:\n{}",
-        output_code
-    );
-    assert!(
-        output_code.contains("values: ()=>["),
-        "Output code should contain arrow function for acl rowlevel filters values, got:\n{}",
-        output_code
-    );
+    assert_snapshot!("complicated_transform_2nd_stage", output_code);
+
     let diags = diagnostics.lock().unwrap();
     assert!(
         diags.is_empty(),
