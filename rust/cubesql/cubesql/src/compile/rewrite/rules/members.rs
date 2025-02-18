@@ -240,8 +240,8 @@ impl RewriteRules for MemberRules {
                         "?members",
                         "?filters",
                         "?orders",
-                        "?cube_fetch",
-                        "?offset",
+                        "?inner_fetch",
+                        "?inner_skip",
                         "?split",
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
@@ -260,7 +260,14 @@ impl RewriteRules for MemberRules {
                     "CubeScanWrapped:false",
                     "?ungrouped",
                 ),
-                self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
+                self.push_down_limit(
+                    "?skip",
+                    "?fetch",
+                    "?inner_skip",
+                    "?inner_fetch",
+                    "?new_skip",
+                    "?new_fetch",
+                ),
             ),
             transforming_rewrite(
                 "select-distinct-dimensions",
@@ -1694,47 +1701,90 @@ impl MemberRules {
         &self,
         skip_var: &'static str,
         fetch_var: &'static str,
+        inner_skip_var: &'static str,
+        inner_fetch_var: &'static str,
         new_skip_var: &'static str,
         new_fetch_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let skip_var = var!(skip_var);
         let fetch_var = var!(fetch_var);
+        let inner_skip_var = var!(inner_skip_var);
+        let inner_fetch_var = var!(inner_fetch_var);
         let new_skip_var = var!(new_skip_var);
         let new_fetch_var = var!(new_fetch_var);
         move |egraph, subst| {
+            // This transform expects only single value in every (eclass, kind)
+            // No two different values of fetch or skip should ever get unified
+
             let mut skip_value = None;
             for skip in var_iter!(egraph[subst[skip_var]], LimitSkip) {
-                if skip.unwrap_or_default() > 0 {
-                    skip_value = *skip;
-                    break;
-                }
+                skip_value = *skip;
+                break;
             }
             let mut fetch_value = None;
             for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
-                if fetch.unwrap_or_default() > 0 {
-                    fetch_value = *fetch;
-                    break;
+                fetch_value = *fetch;
+                break;
+            }
+            // TODO support this case
+            if fetch_value == Some(0) {
+                // Broken and unsupported case for now
+                return false;
+            }
+
+            let mut inner_skip_value = None;
+            for inner_skip in var_iter!(egraph[subst[inner_skip_var]], CubeScanOffset) {
+                inner_skip_value = *inner_skip;
+                break;
+            }
+
+            let mut inner_fetch_value = None;
+            for inner_fetch in var_iter!(egraph[subst[inner_fetch_var]], CubeScanLimit) {
+                inner_fetch_value = *inner_fetch;
+                break;
+            }
+
+            let new_skip = match (skip_value, inner_skip_value) {
+                (None, None) => None,
+                (Some(skip), None) | (None, Some(skip)) => Some(skip),
+                (Some(outer_skip), Some(inner_skip)) => Some(outer_skip + inner_skip),
+            };
+            // No need to set offset=0, it's same as no offset
+            let new_skip = if new_skip != Some(0) { new_skip } else { None };
+            let new_fetch = match (fetch_value, inner_fetch_value) {
+                (None, None) => None,
+                // Inner node have no limit, maybe just offset, result limit is same as for outer node
+                (Some(outer_fetch), None) => Some(outer_fetch),
+                // Outer node have no limit, but may have offset
+                // First, inner offset would apply
+                // Then inner node would limit rows
+                // Then outer offset would apply, which would yield no more than `inner_fetch - outer_skip` rows
+                (None, Some(inner_fetch)) => {
+                    Some(inner_fetch.saturating_sub(skip_value.unwrap_or(0)))
                 }
-            }
+                // Both nodes have a limit
+                // First, inner offset would apply
+                // Then inner node would limit rows
+                // Then outer offset would apply, which would yield no more than `in_limit - out_offset` rows
+                // Then outer limit would apply, which would yield no more than minimal of two
+                (Some(outer_fetch), Some(inner_fetch)) => Some(usize::min(
+                    inner_fetch.saturating_sub(skip_value.unwrap_or(0)),
+                    outer_fetch,
+                )),
+            };
 
-            if skip_value.is_some() || fetch_value.is_some() {
-                subst.insert(
-                    new_skip_var,
-                    egraph.add(LogicalPlanLanguage::CubeScanOffset(CubeScanOffset(
-                        skip_value,
-                    ))),
-                );
-                subst.insert(
-                    new_fetch_var,
-                    egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(
-                        fetch_value,
-                    ))),
-                );
+            subst.insert(
+                new_skip_var,
+                egraph.add(LogicalPlanLanguage::CubeScanOffset(CubeScanOffset(
+                    new_skip,
+                ))),
+            );
+            subst.insert(
+                new_fetch_var,
+                egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(new_fetch))),
+            );
 
-                return true;
-            }
-
-            false
+            true
         }
     }
 
