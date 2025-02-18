@@ -980,12 +980,12 @@ mod tests {
     #[test]
     fn test_filter_down_cross_join_right_one_row() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
-            LogicalPlanBuilder::from(make_sample_table("j1", vec!["c1"])?)
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["c1"], vec![])?)
                 .project(vec![col("c1")])?
                 .build()?,
         )
         .cross_join(
-            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["c2"])?)
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["c2"], vec![])?)
                 .project(vec![col("c2")])?
                 .aggregate(vec![] as Vec<Expr>, vec![count(lit(1u8))])?
                 .project_with_alias(
