@@ -68,13 +68,33 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
     for (const t of tests) {
       const jsonConfig = JSON.stringify(overridedConfig);
       const testNameWithHash = `${t.name}_${jsonConfig}`;
-      
+
       if (t.type === 'basic') {
         // eslint-disable-next-line no-loop-func
         const cbFn = async () => {
           const response = await client.load(t.query);
 
           expect(response.rawData()).toMatchSnapshot('query');
+
+          if (t.expectArray) {
+            for (const expectFn of t.expectArray) {
+              expectFn(response);
+            }
+          }
+        };
+
+        if (t.skip) {
+          test.skip(testNameWithHash, cbFn);
+        } else {
+          test(testNameWithHash, cbFn);
+        }
+      } else if (t.type === 'multi') {
+        // eslint-disable-next-line no-loop-func
+        const cbFn = async () => {
+          const response = await client.load(t.query);
+
+          const resultSets = response.decompose();
+          expect(resultSets).toMatchSnapshot('query');
 
           if (t.expectArray) {
             for (const expectFn of t.expectArray) {
