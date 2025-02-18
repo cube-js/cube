@@ -2,19 +2,13 @@
 
 [Microsoft Power BI][link-powerbi] is a popular business intelligence tool.
 
-{/*
-
-TODO: Replace video
-
-See how you can use [ksqlDB][ref-ksqldb] and Cube Cloud to power real-time
-analytics in Power BI:
+Cube Cloud works with both [Power BI Desktop and Power BI service][link-powerbi-desktop-vs-service].
+If you're using Power BI service, you need to set up an [on-premises data gateway][link-powerbi-gateway].
 
 <YouTubeVideo
-  url="https://www.youtube.com/embed/RD_HZ7xE8G0"
-  aspectRatio={4/3.55}
+  url="https://www.youtube.com/embed/vgrFPOMuJJs"
+  aspectRatio={8/5}
 />
-
-*/}
 
 ## Connect from Cube Cloud
 
@@ -44,28 +38,30 @@ connect to Power BI.
 
 ### DAX API
 
-{/*
+In Power BI, choose the <Btn>SQL Server Analysis Services database</Btn> option
+when connecting to a data source. The, enter the credentials.
 
-TODO: Add instructions
-
-*/}
-
-### SQL API
-
-Power BI connects to Cube as to a Postgres database.
+To find your DAX API credentials, go to the [Integrations][ref-integrations-apis] page,
+click <Btn>API credentials</Btn>, and choose the <Btn>DAX API</Btn> tab.
 
 <InfoBox>
 
-It's not recommended to import data into Power BI when connecting to Cube;
-choose [DirectQuery][link-powerbi-directquery] instead. Use [pre-aggregations][ref-pre-aggs]
-to improve querying performance and manage data freshness upstream of Power BI.
+It's not recommended to import data into Power BI when connecting to Cube.
+Use a _live connection_ whenever possible. [Read more][ref-powerbi-connection-methods]
+about pros and cons of these methods.
 
 </InfoBox>
 
+### SQL API
+
+Power BI can also connect to Cube as to a Postgres database.
+
 [link-powerbi]: https://www.microsoft.com/en-gb/power-platform/products/power-bi/
+[link-powerbi-desktop-vs-service]: https://learn.microsoft.com/en-us/power-bi/fundamentals/service-service-vs-desktop
+[link-powerbi-gateway]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
 [ref-dax-api]: /product/apis-integrations/dax-api
 [ref-integrations-tools]: /product/workspace/integrations#connect-specific-tools
+[ref-integrations-apis]: /product/workspace/integrations#view-api-credentials
 [ref-sql-api]: /product/apis-integrations/sql-api
-[ref-pre-aggs]: /product/caching/using-pre-aggregations
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
-[link-powerbi-directquery]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-use-directquery
+[ref-powerbi-connection-methods]: /product/apis-integrations/dax-api#connection-methods
