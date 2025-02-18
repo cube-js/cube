@@ -16,6 +16,7 @@ pub mod node_obj_serializer;
 pub mod python;
 pub mod stream;
 pub mod template;
+pub mod transpilers;
 pub mod transport;
 pub mod utils;
 

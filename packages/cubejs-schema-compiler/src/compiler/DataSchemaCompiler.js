@@ -9,8 +9,10 @@ import R from 'ramda';
 import workerpool from 'workerpool';
 
 import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
+import { transpileJs } from '@cubejs-backend/native';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
+import { CONTEXT_SYMBOLS } from './CubeSymbols';
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
@@ -91,7 +93,10 @@ export class DataSchemaCompiler {
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
     this.errorsReport = errorsReport;
 
-    if (getEnv('transpilationWorkerThreads')) {
+    const transpilationWorkerThreads = getEnv('transpilationWorkerThreads');
+    const transpilationNative = getEnv('transpilationNative');
+
+    if (!transpilationNative && transpilationWorkerThreads) {
       const wc = getEnv('transpilationWorkerThreadsCount');
       this.workerPool = workerpool.pool(
         path.join(__dirname, 'transpilers/transpiler_worker'),
@@ -101,9 +106,11 @@ export class DataSchemaCompiler {
 
     const transpile = async () => {
       let cubeNames;
-      let cubeSymbolsNames;
+      let cubeSymbols;
+      let transpilerNames;
+      let results;
 
-      if (getEnv('transpilationWorkerThreads')) {
+      if (transpilationNative || transpilationWorkerThreads) {
         cubeNames = Object.keys(this.cubeDictionary.byId);
         // We need only cubes and all its member names for transpiling.
         // Cubes doesn't change during transpiling, but are changed during compilation phase,
@@ -111,7 +118,7 @@ export class DataSchemaCompiler {
         // Communication between main and worker threads uses
         // The structured clone algorithm (@see https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)
         // which doesn't allow passing any function objects, so we need to sanitize the symbols.
-        cubeSymbolsNames = Object.fromEntries(
+        cubeSymbols = Object.fromEntries(
           Object.entries(this.cubeSymbols.symbols)
             .map(
               ([key, value]) => [key, Object.fromEntries(
@@ -119,8 +126,27 @@ export class DataSchemaCompiler {
               )],
             ),
         );
+
+        // Transpilers are the same for all files within phase.
+        transpilerNames = this.transpilers.map(t => t.constructor.name);
       }
-      const results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbolsNames })));
+
+      if (transpilationNative) {
+        // Warming up swc compiler cache
+        const dummyFile = {
+          fileName: 'dummy.js',
+          content: ';',
+        };
+
+        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS });
+
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames })));
+      } else if (transpilationWorkerThreads) {
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
+      } else {
+        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, {})));
+      }
+
       return results.filter(f => !!f);
     };
 
@@ -133,9 +159,19 @@ export class DataSchemaCompiler {
         contextCompilers: this.contextCompilers,
       }))
       .then(() => {
-        if (this.workerPool) {
+        if (transpilationNative) {
+          // Clean up cache
+          const dummyFile = {
+            fileName: 'terminate.js',
+            content: ';',
+          };
+
+          return this.transpileJsFile(dummyFile, errorsReport, { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {} });
+        } else if (transpilationWorkerThreads && this.workerPool) {
           this.workerPool.terminate();
         }
+
+        return Promise.resolve();
       });
   }
 
@@ -177,15 +213,35 @@ export class DataSchemaCompiler {
     }
   }
 
-  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbolsNames }) {
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames }) {
     try {
-      if (getEnv('transpilationWorkerThreads')) {
+      if (getEnv('transpilationNative')) {
+        const reqData = {
+          fileName: file.fileName,
+          transpilers: transpilerNames,
+          ...(cubeNames && {
+            metaData: {
+              cubeNames,
+              cubeSymbols,
+              contextSymbols,
+            },
+          }),
+        };
+
+        errorsReport.inFile(file);
+        const res = await transpileJs(file.content, reqData);
+        errorsReport.addErrors(res.errors);
+        errorsReport.addWarnings(res.warnings);
+        errorsReport.exitFile();
+
+        return Object.assign({}, file, { content: res.code });
+      } else if (getEnv('transpilationWorkerThreads')) {
         const data = {
           fileName: file.fileName,
           content: file.content,
-          transpilers: this.transpilers.map(t => t.constructor.name),
+          transpilers: transpilerNames,
           cubeNames,
-          cubeSymbolsNames,
+          cubeSymbols,
         };
 
         const res = await this.workerPool.exec('transpile', [data]);
@@ -203,11 +259,11 @@ export class DataSchemaCompiler {
           },
         );
 
+        errorsReport.inFile(file);
         this.transpilers.forEach((t) => {
-          errorsReport.inFile(file);
           babelTraverse(ast, t.traverseObject(errorsReport));
-          errorsReport.exitFile();
         });
+        errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
         return Object.assign({}, file, { content });

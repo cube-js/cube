@@ -98,6 +98,22 @@ export type SQLInterfaceOptions = {
   gatewayPort?: number,
 };
 
+export interface TransformConfig {
+  fileName: string;
+  transpilers: string[];
+  metaData?: {
+    cubeNames: string[];
+    cubeSymbols: Record<string, Record<string, boolean>>;
+    contextSymbols: Record<string, string>;
+  }
+}
+
+export interface TransformResponse {
+  code: string;
+  errors: string[];
+  warnings: string[];
+}
+
 export function loadNative() {
   // Development version
   if (fs.existsSync(path.join(__dirname, '/../../index.node'))) {
@@ -346,6 +362,12 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
   const native = loadNative();
 
   return native.buildSqlAndParams(cubeEvaluator);
+};
+
+export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+  const native = loadNative();
+
+  return native.transpileJs(content, metadata);
 };
 
 export interface PyConfiguration {

@@ -16,7 +16,7 @@ type TransferContent = {
   content: string;
   transpilers: string[];
   cubeNames: string[];
-  cubeSymbolsNames: Record<string, Record<string, boolean>>;
+  cubeSymbols: Record<string, Record<string, boolean>>;
 };
 
 const cubeDictionary = new LightweightNodeCubeDictionary();
@@ -32,7 +32,7 @@ const transpilers = {
 
 const transpile = (data: TransferContent) => {
   cubeDictionary.setCubeNames(data.cubeNames);
-  cubeSymbols.setSymbols(data.cubeSymbolsNames);
+  cubeSymbols.setSymbols(data.cubeSymbols);
 
   const ast = parse(
     data.content,

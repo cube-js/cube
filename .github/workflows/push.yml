@@ -9,6 +9,7 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
+      - 'rust/cubetranspilers/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -24,6 +25,7 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
+      - 'rust/cubetranspilers/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -43,10 +45,15 @@ jobs:
         # Current docker version + next LTS
         node-version: [20.x, 22.x]
         transpile-worker-threads: [false, true]
+        transpile-native: [false, true]
+        exclude:
+          - transpile-worker-threads: true
+            transpile-native: true
       fail-fast: false
 
     env:
       CUBEJS_TRANSPILATION_WORKER_THREADS: ${{ matrix.transpile-worker-threads }}
+      CUBEJS_TRANSPILATION_NATIVE: ${{ matrix.transpile-native }}
     steps:
       - id: get-tag-out
         run: echo "$OUT"
