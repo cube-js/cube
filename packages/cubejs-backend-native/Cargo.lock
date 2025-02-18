@@ -872,6 +872,7 @@ dependencies = [
 name = "cubejs-native"
 version = "0.28.0"
 dependencies = [
+ "anyhow",
  "async-channel",
  "async-trait",
  "axum",
