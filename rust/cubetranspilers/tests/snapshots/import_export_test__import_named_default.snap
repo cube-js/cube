@@ -1,0 +1,5 @@
+---
+source: tests/import_export_test.rs
+expression: output_code
+---
+const def = require("module"), foo = require("module").foo, baz = require("module").bar;
