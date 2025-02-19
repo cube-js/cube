@@ -1,8 +1,0 @@
----
-source: tests/import_export_test.rs
-expression: output_code
----
-addExport({
-    foo: foo,
-    baz: bar
-});

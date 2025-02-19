@@ -18,7 +18,6 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 cubesqlplanner = { path = "../../rust/cubesqlplanner/cubesqlplanner" }
 cubeorchestrator = { path = "../../rust/cubeorchestrator" }
-cubetranspilers = { path = "../../rust/cubetranspilers" }
 cubenativeutils = { path = "../../rust/cubenativeutils" }
 cubesql = { path = "../../rust/cubesql/cubesql" }
 anyhow = "1.0"
@@ -48,7 +47,6 @@ tokio = { version = "1", features = ["full", "rt"] }
 uuid = { version = "1", features = ["v4"] }
 bytes = "1.5.0"
 regex = "1.10.2"
-lru = "0.13.0"
 
 [dependencies.neon]
 version = "=1"
