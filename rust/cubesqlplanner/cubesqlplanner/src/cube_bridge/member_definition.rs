@@ -17,7 +17,6 @@ pub struct MemberDefinitionStatic {
 
 #[nativebridge::native_bridge(MemberDefinitionStatic)]
 pub trait MemberDefinition {
-    #[optional]
-    #[field]
+    #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

@@ -2,6 +2,7 @@ use super::{
     CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberExpressionSymbol,
     TimeDimensionSymbol,
 };
+use std::fmt::Debug;
 use std::rc::Rc;
 
 pub enum MemberSymbol {
@@ -11,6 +12,25 @@ pub enum MemberSymbol {
     CubeName(CubeNameSymbol),
     CubeTable(CubeTableSymbol),
     MemberExpression(MemberExpressionSymbol),
+}
+
+impl Debug for MemberSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dimension(_) => f.debug_tuple("Dimension").field(&self.full_name()).finish(),
+            Self::TimeDimension(_) => f
+                .debug_tuple("TimeDimension")
+                .field(&self.full_name())
+                .finish(),
+            Self::Measure(_) => f.debug_tuple("Measure").field(&self.full_name()).finish(),
+            Self::CubeName(_) => f.debug_tuple("CubeName").field(&self.full_name()).finish(),
+            Self::CubeTable(_) => f.debug_tuple("CubeTable").field(&self.full_name()).finish(),
+            Self::MemberExpression(_) => f
+                .debug_tuple("MemberExpression")
+                .field(&self.full_name())
+                .finish(),
+        }
+    }
 }
 
 impl MemberSymbol {

@@ -1,8 +1,8 @@
 use super::{
-    AutoPrefixSqlNode, EvaluateSqlNode, FinalMeasureSqlNode, GeoDimensionSqlNode,
-    MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode, RenderReferencesSqlNode,
-    RollingWindowNode, RootSqlNode, SqlNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
-    UngroupedQueryFinalMeasureSqlNode,
+    AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
+    GeoDimensionSqlNode, MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode,
+    RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeShiftSqlNode,
+    UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
 use std::collections::{HashMap, HashSet};
@@ -164,19 +164,23 @@ impl SqlNodesFactory {
             UngroupedMeasureSqlNode::new(input)
         } else if self.ungrouped {
             UngroupedQueryFinalMeasureSqlNode::new(input)
-        } else if self.rolling_window {
-            RollingWindowNode::new(input)
         } else {
-            FinalMeasureSqlNode::new(
-                input,
+            let final_processor = FinalMeasureSqlNode::new(
+                input.clone(),
                 self.rendered_as_multiplied_measures.clone(),
                 self.count_approx_as_state,
-            )
+            );
+            if self.rolling_window {
+                RollingWindowNode::new(input, final_processor)
+            } else {
+                final_processor
+            }
         }
     }
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
         let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
+        let input: Rc<dyn SqlNode> = CaseDimensionSqlNode::new(input);
 
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
