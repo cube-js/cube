@@ -18,10 +18,8 @@ pub struct CubeDefinitionStatic {
 
 #[nativebridge::native_bridge(CubeDefinitionStatic)]
 pub trait CubeDefinition {
-    #[field]
-    #[optional]
+    #[nbridge(field, optional)]
     fn sql_table(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
-    #[field]
-    #[optional]
+    #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

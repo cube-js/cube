@@ -89,6 +89,17 @@ impl MeasureSymbol {
         }
     }
 
+    pub fn is_addictive(&self) -> bool {
+        if self.is_multi_stage() {
+            false
+        } else {
+            match self.measure_type().as_str() {
+                "sum" | "count" | "countDistinctApprox" | "min" | "max" => true,
+                _ => false,
+            }
+        }
+    }
+
     pub fn evaluate_sql(
         &self,
         visitor: &SqlEvaluatorVisitor,

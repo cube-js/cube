@@ -20,7 +20,6 @@ pub struct JoinDefinitionStatic {
 
 #[nativebridge::native_bridge(JoinDefinitionStatic)]
 pub trait JoinDefinition {
-    #[field]
-    #[vec]
+    #[nbridge(field, vec)]
     fn joins(&self) -> Result<Vec<Rc<dyn JoinItem>>, CubeError>;
 }
