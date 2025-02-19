@@ -14,9 +14,19 @@ import { TypeId, TypeFormat } from 'pg-types';
 import * as moment from 'moment';
 import {
   BaseDriver,
-  DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn,
+  DownloadQueryResultsOptions,
+  DownloadTableMemoryData,
+  DriverInterface,
+  GenericDataBaseType,
+  IndexesSQL,
+  TableStructure,
+  StreamOptions,
+  StreamTableDataWithTypes,
+  QueryOptions,
+  DownloadQueryResultsResult,
+  DriverCapabilities,
+  TableColumn,
+  TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
@@ -289,6 +299,23 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         type: this.toGenericType(postgresType)
       });
     });
+  }
+
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    const columns = await this.query<TableColumnQueryResult>(
+      `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type  as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE table_name = '${this.param(0)}' AND table_schema = '${this.param(1)}'
+      ${getEnv('fetchColumnsByOrdinalPosition') ? 'ORDER BY columns.ordinal_position' : ''}`,
+      [name, schema]
+    );
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public async stream(
