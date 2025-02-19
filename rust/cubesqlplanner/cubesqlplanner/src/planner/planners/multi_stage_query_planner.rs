@@ -189,6 +189,7 @@ impl MultiStageQueryPlanner {
         &self,
         member: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
+        ungrouped: bool,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let alias = format!("cte_{}", descriptions.len());
@@ -196,7 +197,7 @@ impl MultiStageQueryPlanner {
             MultiStageMember::new(
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
                 member,
-                self.query_properties.ungrouped(),
+                self.query_properties.ungrouped() || ungrouped,
                 true,
             ),
             state,
@@ -301,10 +302,20 @@ impl MultiStageQueryPlanner {
                         granularity: None,
                     }
                 };
+                let ungrouped = match member.as_ref() {
+                    MemberSymbol::Measure(measure_symbol) => {
+                        measure_symbol.is_rolling_window() && !measure_symbol.is_addictive()
+                    }
+                    _ => false,
+                };
                 let time_dimensions = self.query_properties.time_dimensions();
                 if time_dimensions.len() == 0 {
-                    let rolling_base =
-                        self.add_rolling_window_base(member.clone(), state.clone(), descriptions)?;
+                    let rolling_base = self.add_rolling_window_base(
+                        member.clone(),
+                        state.clone(),
+                        ungrouped,
+                        descriptions,
+                    )?;
                     return Ok(Some(rolling_base));
                 }
                 if time_dimensions.len() != 1 {
@@ -323,6 +334,7 @@ impl MultiStageQueryPlanner {
                             &rolling_window,
                             state.clone(),
                         )?,
+                        ungrouped,
                         descriptions,
                     )?,
                 ];

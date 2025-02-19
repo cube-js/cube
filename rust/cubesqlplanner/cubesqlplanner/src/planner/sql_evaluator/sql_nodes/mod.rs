@@ -1,4 +1,5 @@
 pub mod auto_prefix;
+pub mod case_dimension;
 pub mod evaluate_sql;
 pub mod factory;
 pub mod final_measure;
@@ -15,6 +16,7 @@ pub mod ungroupped_measure;
 pub mod ungroupped_query_final_measure;
 
 pub use auto_prefix::AutoPrefixSqlNode;
+pub use case_dimension::CaseDimensionSqlNode;
 pub use evaluate_sql::EvaluateSqlNode;
 pub use factory::SqlNodesFactory;
 pub use final_measure::FinalMeasureSqlNode;

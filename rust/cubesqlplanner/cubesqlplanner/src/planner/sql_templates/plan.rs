@@ -39,6 +39,10 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn quote_string(&self, string: &str) -> Result<String, CubeError> {
+        Ok(format!("'{}'", string))
+    }
+
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
         let quote = self.render.get_template("quotes/identifiers")?;
         let escape = self.render.get_template("quotes/escape")?;
@@ -278,6 +282,18 @@ impl PlanSqlTemplates {
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render
             .render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn case(
+        &self,
+        expr: Option<String>,
+        when_then: Vec<(String, String)>,
+        else_expr: Option<String>,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/case",
+            context! { expr => expr, when_then => when_then, else_expr => else_expr },
+        )
     }
 
     pub fn scalar_function(
