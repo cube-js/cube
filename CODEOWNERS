@@ -30,7 +30,7 @@
 /packages/*-schema-extension/          @cube-js/schema-compiler
 
 # Doc reviewers
-/docs/      @cube-js/doc-reviewers
+/docs/      @igorlukanin
 
 # Developer Relations and Community
-/examples/  @cube-js/developer-relations-and-community
+/examples/  @igorlukanin
