@@ -13,7 +13,6 @@ on:
       - 'rust/cubeorchestrator/**'
       - 'rust/cubeshared/**'
       - 'rust/cubesqlplanner/**'
-      - 'rust/cubetranspilers/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -33,7 +32,6 @@ on:
       - 'rust/cubeorchestrator/**'
       - 'rust/cubeshared/**'
       - 'rust/cubesqlplanner/**'
-      - 'rust/cubetranspilers/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -57,15 +55,10 @@ jobs:
         node-version: [20.x, 22.x]
         python-version: [3.11]
         transpile-worker-threads: [false, true]
-        transpile-native: [false, true]
-        exclude:
-          - transpile-worker-threads: true
-            transpile-native: true
       fail-fast: false
 
     env:
       CUBEJS_TRANSPILATION_WORKER_THREADS: ${{ matrix.transpile-worker-threads }}
-      CUBEJS_TRANSPILATION_NATIVE: ${{ matrix.transpile-native }}
     steps:
       - id: get-tag-out
         run: echo "$OUT"
@@ -140,9 +133,6 @@ jobs:
       - name: Cargo test cubeshared
         run: |
           cargo test --manifest-path rust/cubeshared/Cargo.toml -j 1
-      - name: Cargo test cubetranspilers
-        run: |
-          cargo test --manifest-path rust/cubetranspilers/Cargo.toml -j 1
 #      - name: Cargo test cubesql
 #        run: |
 #          cargo test --manifest-path rust/cubesql/Cargo.toml -j 1
@@ -206,9 +196,6 @@ jobs:
       - name: Cargo fmt cubeshared
         run: |
           cargo fmt --manifest-path rust/cubeshared/Cargo.toml -- --check
-      - name: Cargo fmt cubetranspilers
-        run: |
-          cargo fmt --manifest-path rust/cubetranspilers/Cargo.toml -- --check
 #      - name: Cargo fmt cubesql
 #        run: |
 #          cargo fmt --manifest-path rust/cubesql/Cargo.toml -- --check
@@ -276,9 +263,6 @@ jobs:
       - name: Cargo build cubeshared
         run: |
           cargo build --manifest-path rust/cubeshared/Cargo.toml -j 4
-      - name: Cargo build cubetranspilers
-        run: |
-          cargo build --manifest-path rust/cubetranspilers/Cargo.toml -j 4
 #      - name: Cargo build cubesql
 #        run: |
 #          cargo build --manifest-path rust/cubesql/Cargo.toml -j 4
