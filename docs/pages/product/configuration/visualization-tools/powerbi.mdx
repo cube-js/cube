@@ -1,30 +1,34 @@
----
-redirect_from:
-  - /config/downstream/powerbi
----
+# Microsoft Power BI
 
-# Power BI
+[Microsoft Power BI][link-powerbi] is a popular business intelligence tool.
 
-[Power BI](https://www.microsoft.com/en-gb/power-platform/products/power-bi/)
-is an interactive data visualization software product developed by Microsoft.
+Cube Cloud works with both [Power BI Desktop and Power BI service][link-powerbi-desktop-vs-service].
+If you're using Power BI service, you need to set up an [on-premises data gateway][link-powerbi-gateway].
 
-See how you can use [ksqlDB][ref-ksqldb] and Cube Cloud to power real-time
-analytics in Power BI:
-
-<YouTubeVideo url="https://www.youtube.com/embed/RD_HZ7xE8G0" />
+<YouTubeVideo
+  url="https://www.youtube.com/embed/vgrFPOMuJJs"
+  aspectRatio={8/5}
+/>
 
 ## Connect from Cube Cloud
 
-It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube Cloud to
-Power BI. It automatically synchronizes the [data model][ref-data-model] with Power BI.
+Cube Cloud provides the [DAX API][ref-dax-api] to connect to Power BI.
 
-Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
-page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Microsoft Power BI</Btn> to get
-detailed instructions.
+Navigate to the [Integrations][ref-integrations-tools] page, click <Btn>Connect to Cube</Btn>,
+and choose <Btn>Microsoft Power BI</Btn> to get detailed instructions.
+
+<InfoBox>
+
+Previously, [Semantic Layer Sync][ref-sls] was recommended as a way to connect
+to Power BI. Since the introduction of the DAX API, it's now the preferred
+method.
+
+</InfoBox>
 
 ## Connect from Cube Core
 
 You can connect a Cube deployment to Power BI using the [SQL API][ref-sql-api].
+However, it would not provide the same experience as the DAX API.
 
 In Cube Core, the SQL API is disabled by default. Enable it and [configure
 the credentials](/product/apis-integrations/sql-api#configuration) to
@@ -32,26 +36,32 @@ connect to Power BI.
 
 ## Connecting from Power BI
 
-Power BI connects to Cube as to a Postgres database using the
-[DirectQuery][link-powerbi-directquery] connectivity mode.
+### DAX API
+
+In Power BI, choose the <Btn>SQL Server Analysis Services database</Btn> option
+when connecting to a data source. The, enter the credentials.
+
+To find your DAX API credentials, go to the [Integrations][ref-integrations-apis] page,
+click <Btn>API credentials</Btn>, and choose the <Btn>DAX API</Btn> tab.
 
 <InfoBox>
 
-It's not recommended to import data into Power BI when connecting to Cube;
-choose DirectQuery instead. Use [pre-aggregations][ref-pre-aggs] to improve
-querying performance and manage data freshness upstream of Power BI.
+It's not recommended to import data into Power BI when connecting to Cube.
+Use a _live connection_ whenever possible. [Read more][ref-powerbi-connection-methods]
+about pros and cons of these methods.
 
 </InfoBox>
 
-### Querying data
+### SQL API
 
-Your cubes will be exposed as tables, where both your measures and dimensions
-are columns.
+Power BI can also connect to Cube as to a Postgres database.
 
-[ref-getting-started]: /product/getting-started/cloud
+[link-powerbi]: https://www.microsoft.com/en-gb/power-platform/products/power-bi/
+[link-powerbi-desktop-vs-service]: https://learn.microsoft.com/en-us/power-bi/fundamentals/service-service-vs-desktop
+[link-powerbi-gateway]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-integrations-tools]: /product/workspace/integrations#connect-specific-tools
+[ref-integrations-apis]: /product/workspace/integrations#view-api-credentials
 [ref-sql-api]: /product/apis-integrations/sql-api
-[ref-pre-aggs]: /product/caching/using-pre-aggregations
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
-[ref-data-model]: /product/data-modeling/overview
-[ref-ksqldb]: /product/configuration/data-sources/ksqldb
-[link-powerbi-directquery]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-use-directquery
+[ref-powerbi-connection-methods]: /product/apis-integrations/dax-api#connection-methods

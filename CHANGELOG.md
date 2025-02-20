@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
+
+### Bug Fixes
+
+- **schema-compiler:** hierarchies to respect prefix value ([#9239](https://github.com/cube-js/cube/issues/9239)) ([19d1b33](https://github.com/cube-js/cube/commit/19d1b33b7df6a98198aadfa25e290fd33b89ad33))
+
+### Reverts
+
+- **schema-compiler:** Revert breaking changes in models transpilation ([#9240](https://github.com/cube-js/cube/issues/9240)) ([28bca42](https://github.com/cube-js/cube/commit/28bca42a1bb92fff5895ddfe4946601c0ebc2746))
+
+## [1.2.6](https://github.com/cube-js/cube/compare/v1.2.5...v1.2.6) (2025-02-18)
+
+### Bug Fixes
+
+- **api-gateway:** Fix CompareDateRange queries native transformations ([#9232](https://github.com/cube-js/cube/issues/9232)) ([9c6153d](https://github.com/cube-js/cube/commit/9c6153d1e958e42162acb5af5964e9792a7f0433))
+- **schema-compiler:** Correct models transpilation in native in multitenant environments ([#9234](https://github.com/cube-js/cube/issues/9234)) ([84f90c0](https://github.com/cube-js/cube/commit/84f90c07ee3827e6f3652dd6c9fab0993ecc8150))
+
+### Features
+
+- **schema-compiler:** Boost models transpilation 10-13x times (using SWC instead of Babel) ([#9225](https://github.com/cube-js/cube/issues/9225)) ([2dd9a4a](https://github.com/cube-js/cube/commit/2dd9a4a5ba0f178e304befc476609fc30ada8975))
+
+### Performance Improvements
+
+- **cubesql:** Avoid allocations in MetaContext methods ([#9228](https://github.com/cube-js/cube/issues/9228)) ([ba753d0](https://github.com/cube-js/cube/commit/ba753d0d43927b50d5cf8faf5f09de3e53bec3db))
+
+## [1.2.5](https://github.com/cube-js/cube/compare/v1.2.4...v1.2.5) (2025-02-13)
+
+### Bug Fixes
+
+- **cubesql:** Fix SELECT DISTINCT on pushdown ([#9144](https://github.com/cube-js/cube/issues/9144)) ([6483f66](https://github.com/cube-js/cube/commit/6483f66c826ad9a638af8770850219d923b3e7d9))
+
+### Features
+
+- Upgrade rust to 1.84.1 (stable) ([#9222](https://github.com/cube-js/cube/issues/9222)) ([cfc95b5](https://github.com/cube-js/cube/commit/cfc95b5e5601166d2a0aa388a211d4be66630cd8))
+
+## [1.2.4](https://github.com/cube-js/cube/compare/v1.2.3...v1.2.4) (2025-02-11)
+
+### Bug Fixes
+
+- **cubejs-playground:** update query builder ([#9201](https://github.com/cube-js/cube/issues/9201)) ([f8e523b](https://github.com/cube-js/cube/commit/f8e523bbf815b2fb3fb8eb036d04cc3bf4db206d))
+
+### Features
+
+- **cubesql:** Add projection flattening rule ([#9165](https://github.com/cube-js/cube/issues/9165)) ([8cfb253](https://github.com/cube-js/cube/commit/8cfb2530264b856bf128d391829b18566d8dc057))
+- **cubesql:** Allow providing API type when getting load request meta ([#9202](https://github.com/cube-js/cube/issues/9202)) ([ae5d977](https://github.com/cube-js/cube/commit/ae5d9770a1c00326c446e7ec40bd3f13ca0ce8f4))
+- **server-core:** Introduce CUBEJS_REFRESH_WORKER_CONCURRENCY env and update default concurrency settings for drivers ([#9168](https://github.com/cube-js/cube/issues/9168)) ([7ef6282](https://github.com/cube-js/cube/commit/7ef628273905d47996b108862a52dde89b9525e3))
+
 ## [1.2.3](https://github.com/cube-js/cube/compare/v1.2.2...v1.2.3) (2025-02-06)
 
 ### Bug Fixes

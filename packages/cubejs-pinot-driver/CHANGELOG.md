@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/pinot-driver
+
+## [1.2.6](https://github.com/cube-js/cube/compare/v1.2.5...v1.2.6) (2025-02-18)
+
+**Note:** Version bump only for package @cubejs-backend/pinot-driver
+
+## [1.2.5](https://github.com/cube-js/cube/compare/v1.2.4...v1.2.5) (2025-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/pinot-driver
+
+## [1.2.4](https://github.com/cube-js/cube/compare/v1.2.3...v1.2.4) (2025-02-11)
+
+### Features
+
+- **server-core:** Introduce CUBEJS_REFRESH_WORKER_CONCURRENCY env and update default concurrency settings for drivers ([#9168](https://github.com/cube-js/cube/issues/9168)) ([7ef6282](https://github.com/cube-js/cube/commit/7ef628273905d47996b108862a52dde89b9525e3))
+
 ## [1.2.3](https://github.com/cube-js/cube/compare/v1.2.2...v1.2.3) (2025-02-06)
 
 **Note:** Version bump only for package @cubejs-backend/pinot-driver

@@ -1,11 +1,11 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::{ConstantFolding, LogicalPlanData, MemberNamesToExpr, OriginalExpr},
+        analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
-        cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join, like_expr,
-        limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
+        cube_scan_order_empty_tail, dimension_expr, distinct, expr_column_name, fun_expr, join,
+        like_expr, limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
         literal_member, measure_expr, member_pushdown_replacer, member_replacer,
         merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
@@ -261,6 +261,39 @@ impl RewriteRules for MemberRules {
                     "?ungrouped",
                 ),
                 self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
+            ),
+            transforming_rewrite(
+                "select-distinct-dimensions",
+                distinct(cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?orders",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
+                    "?split",
+                    "?can_pushdown_join",
+                    "CubeScanWrapped:false",
+                    "?left_ungrouped",
+                )),
+                cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?orders",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
+                    "?split",
+                    "?can_pushdown_join",
+                    "CubeScanWrapped:false",
+                    "CubeScanUngrouped:false",
+                ),
+                self.select_distinct_dimensions(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?left_ungrouped",
+                ),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -1478,6 +1511,70 @@ impl MemberRules {
             )
     }
 
+    fn select_distinct_dimensions(
+        &self,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filters_var: &'static str,
+        left_ungrouped_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filters_var = var!(filters_var);
+        let left_ungrouped_var = var!(left_ungrouped_var);
+        let meta_context = self.meta_context.clone();
+
+        move |egraph, subst| {
+            let empty_filters = &egraph[subst[filters_var]]
+                .data
+                .is_empty_list
+                .unwrap_or(true);
+            let ungrouped =
+                var_iter!(egraph[subst[left_ungrouped_var]], CubeScanUngrouped).any(|v| *v);
+
+            if !empty_filters && ungrouped {
+                return false;
+            }
+
+            let res = match egraph
+                .index(subst[members_var])
+                .data
+                .member_name_to_expr
+                .as_ref()
+            {
+                Some(names_to_expr) => {
+                    names_to_expr.list.iter().all(|(_, member, _)| {
+                        // we should allow transform for queries with dimensions only,
+                        // as it doesn't make sense for measures
+                        match member {
+                            Member::Dimension { .. } => true,
+                            Member::VirtualField { .. } => true,
+                            Member::LiteralMember { .. } => true,
+                            _ => false,
+                        }
+                    })
+                }
+                None => {
+                    // this might be the case of `SELECT DISTINCT *`
+                    // we need to check that there are only dimensions defined in the referenced cube(s)
+                    var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube)
+                        .cloned()
+                        .all(|alias_to_cube| {
+                            alias_to_cube.iter().all(|(_, cube_name)| {
+                                if let Some(cube) = meta_context.find_cube_with_name(&cube_name) {
+                                    cube.measures.len() == 0 && cube.segments.len() == 0
+                                } else {
+                                    false
+                                }
+                            })
+                        })
+                }
+            };
+
+            res
+        }
+    }
+
     fn push_down_non_empty_aggregate(
         &self,
         alias_to_cube_var: &'static str,
@@ -2069,7 +2166,7 @@ impl MemberRules {
                             .cloned()
                             {
                                 if let Some(measure) =
-                                    meta_context.find_measure_with_name(measure_name.to_string())
+                                    meta_context.find_measure_with_name(&measure_name)
                                 {
                                     let measure_cube_name = measure_name.split(".").next().unwrap();
                                     if let Some(((_, cube_alias), _)) = alias_to_cube
@@ -2108,7 +2205,7 @@ impl MemberRules {
                                 }
 
                                 if let Some(dimension) =
-                                    meta_context.find_dimension_with_name(measure_name.to_string())
+                                    meta_context.find_dimension_with_name(&measure_name)
                                 {
                                     let alias_to_cube = alias_to_cube.clone();
                                     subst.insert(
@@ -2212,7 +2309,7 @@ impl MemberRules {
                                                 call_agg_type,
                                                 alias,
                                                 measure_out_var,
-                                                cube_alias,
+                                                cube_alias.to_string(),
                                                 subst[aggr_expr_var],
                                                 alias_to_cube,
                                                 disable_strict_agg_type_match,

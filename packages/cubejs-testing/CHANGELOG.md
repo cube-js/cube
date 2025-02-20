@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.2.6](https://github.com/cube-js/cube/compare/v1.2.5...v1.2.6) (2025-02-18)
+
+### Bug Fixes
+
+- **api-gateway:** Fix CompareDateRange queries native transformations ([#9232](https://github.com/cube-js/cube/issues/9232)) ([9c6153d](https://github.com/cube-js/cube/commit/9c6153d1e958e42162acb5af5964e9792a7f0433))
+
+## [1.2.5](https://github.com/cube-js/cube/compare/v1.2.4...v1.2.5) (2025-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.2.4](/compare/v1.2.3...v1.2.4) (2025-02-11)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
 ## [1.2.3](https://github.com/cube-js/cube/compare/v1.2.2...v1.2.3) (2025-02-06)
 
 **Note:** Version bump only for package @cubejs-backend/testing

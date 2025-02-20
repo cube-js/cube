@@ -1,0 +1,87 @@
+# DAX API
+
+The DAX API enables Cube to connect to [Microsoft Power BI][ref-powerbi].
+It derives its name from [data analysis expressions][link-dax], a query language
+for Power BI and SQL Server Analysis Services.
+
+Unlike the [SQL API][ref-sql-api], it provides a native experience and superior
+support for Power BI features.
+
+<SuccessBox>
+
+The DAX API is available in Cube Cloud on [Enterprise and above](https://cube.dev/pricing) product tiers.
+It also requires the M [deployment tier](/product/deployment/cloud/pricing#deployment-tiers).
+
+</SuccessBox>
+
+<WarningBox>
+
+The DAX API is currently in preview. Please [contact us](https://cube.dev/contact) to enable it for your account.
+
+</WarningBox>
+
+Read below about the DAX API [configuration](#configuration),
+[authentication](#authentication), and [using it](#using-dax-api-with-power-bi) with Power BI.
+
+See the [DAX API reference][ref-ref-dax-api] for the list of supported DAX functions.
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/vgrFPOMuJJs"
+  aspectRatio={8/5}
+/>
+
+## Configuration
+
+<WarningBox>
+
+Please contact the customer success team in Cube Cloud so we can guide you
+through the configuration.
+
+</WarningBox>
+
+To enable or disable the DAX API on a specific deployment, go to <Btn>Settings</Btn>
+in the Cube Cloud sidebar, then <Btn>Configuration</Btn>, and then toggle the
+<Btn>Enable DAX API</Btn> option.
+
+## Authentication
+
+The DAX API supports the user name and password authentication method.
+
+## Using DAX API with Power BI
+
+<InfoBox>
+
+The DAX API works only with [views][ref-views], not cubes.
+
+</InfoBox>
+
+{/*
+
+TODO
+
+*/}
+
+### Connection methods
+
+Power BI provides [three methods][link-powerbi-connection] to connect to data
+sources: _live connection_, _DirectQuery_, and _import mode_.
+
+| | Live connection | DirectQuery | <nobr>Import mode</nobr> |
+| --- | --- | --- | --- |
+| Data location | 🟢 Data source | 🟢 Data source | 🟡 Power BI |
+| Data freshness | 🟢 Real-time data | 🟢 Real-time data | 🟡 Stale copy |
+| Semantic model | <nobr>🟢 Up-to-date model</nobr> | 🟡 Stale copy | 🟡 Stale copy |
+| Queries | <nobr>🟢 Composed in UI</nobr><br/><nobr>🔴 No custom queries</nobr> | <nobr>🟢 Composed in UI</nobr><br/><nobr>🟢 Custom queries</nobr> | <nobr>🟢 Composed in UI</nobr><br/><nobr>🟢 Custom queries</nobr> |
+
+__It's recommended to use a _live connection_ whenever possible.__ Use _DirectQuery_
+if you need to write your own DAX queries, but be aware that you must manually
+synchronize semantic models as they evolve. _Import mode_ is not recommended, as
+it removes the benefits of using a semantic layer.
+
+
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[link-dax]: https://learn.microsoft.com/en-us/dax/
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-ref-dax-api]: /product/apis-integrations/dax-api/reference
+[ref-views]: /product/data-modeling/concepts#views
+[link-powerbi-connection]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-live-connect-dq-datasets

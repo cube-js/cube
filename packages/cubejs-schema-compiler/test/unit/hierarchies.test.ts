@@ -50,6 +50,10 @@ describe('Cube hierarchies', () => {
       (it) => it.config.name === 'all_hierarchy_view'
     );
     expect(allHierarchyView.config.hierarchies.length).toBe(3);
+
+    const prefixedHierarchy = allHierarchyView.config.hierarchies.find((it) => it.name === 'all_hierarchy_view.users_users_hierarchy');
+    expect(prefixedHierarchy).toBeTruthy();
+    expect(prefixedHierarchy?.levels).toEqual(['all_hierarchy_view.users_age', 'all_hierarchy_view.users_city']);
   });
 
   it(('hierarchy with measure'), async () => {

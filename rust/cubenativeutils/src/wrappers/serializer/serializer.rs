@@ -115,7 +115,7 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64)?.into_object(),
+            self.context.number(v)?.into_object(),
         ))
     }
 

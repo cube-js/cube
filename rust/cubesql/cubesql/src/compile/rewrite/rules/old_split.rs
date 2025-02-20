@@ -4922,7 +4922,7 @@ impl OldSplitRules {
                             // TODO unwrap
                             let name = expr.name(&DFSchema::empty()).unwrap();
                             let column1 = Column {
-                                relation: Some(alias),
+                                relation: Some(alias.to_string()),
                                 name: name.to_string(),
                             };
                             let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(

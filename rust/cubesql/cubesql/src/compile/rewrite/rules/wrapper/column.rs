@@ -214,7 +214,7 @@ impl WrapperRules {
                     .data
                     .find_member_by_alias(&column.name)
                 {
-                    if let Some(measure) = meta.find_measure_with_name(member.to_string()) {
+                    if let Some(measure) = meta.find_measure_with_name(member) {
                         if measure.agg_type != Some("number".to_string()) {
                             return true;
                         }
