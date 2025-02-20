@@ -2,7 +2,7 @@
 set -eo pipefail
 
 # Debug log for test containers
-export DEBUG=testcontainers
+export DEBUG=testcontainers*
 
 export TEST_VERTICA_VERSION=12.0.4-0
 
