@@ -292,7 +292,23 @@ function wrapNativeFunctionWithStream(
       if (!!response && !!response.stream) {
         response.stream.destroy(e);
       }
-      writerOrChannel.reject(errorString(e));
+
+      try {
+        writerOrChannel.reject(errorString(e));
+      } catch (rejectError) {
+        // This is async function, just for usability, it's return value is not expected anywhere
+        // Rust part does not care for returned promises, so we should take care here to avoid unhandled rejections
+        // `writerOrChannel.reject` can throw when channel is already dropped by Rust side
+        // This can happen directly, when drop happened between creating channel and calling `reject`,
+        // or indirectly, when drop happened between creating channel and calling `resolve`, resolve raised an exception
+        // that was caught here
+        // There's nothing we can do, or should do with this: there's nobody to respond to
+        if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+          console.debug('[js] writerOrChannel.reject exception', {
+            e: rejectError,
+          });
+        }
+      }
     }
   };
 }
