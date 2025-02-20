@@ -405,7 +405,10 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
         },
-        FilterSimplifyReplacer {
+        FilterSimplifyPushDownReplacer {
+            filters: Vec<LogicalPlan>,
+        },
+        FilterSimplifyPullUpReplacer {
             filters: Vec<LogicalPlan>,
         },
         OrderReplacer {
@@ -1901,8 +1904,12 @@ fn filter_replacer(
     )
 }
 
-fn filter_simplify_replacer(members: impl Display) -> String {
-    format!("(FilterSimplifyReplacer {})", members)
+fn filter_simplify_push_down_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPushDownReplacer {})", members)
+}
+
+fn filter_simplify_pull_up_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPullUpReplacer {})", members)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
