@@ -96,7 +96,7 @@ export type TempTable = {
  * definition (stored in the second element) link.
  */
 export type PreAggTableToTempTable = [
-  string, // common table name (without sufix)
+  string, // common table name (without suffix)
   TempTable,
 ];
 
@@ -187,7 +187,7 @@ export class QueryCache {
   /**
    * Generates from the `queryBody` the final `sql` query and push it to
    * the queue. Returns promise which will be resolved by the different
-   * objects, depend from the original `queryBody` object. For the
+   * objects, depend on the original `queryBody` object. For the
    * persistent queries returns the `stream.Writable` instance.
    *
    * @throw Error

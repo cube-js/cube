@@ -8,7 +8,9 @@ import {
   FROM_PARTITION_RANGE,
   getEnv,
   inDbTimeZone,
-  MAX_SOURCE_ROW_LIMIT, MaybeCancelablePromise, reformatInIsoLocal,
+  MAX_SOURCE_ROW_LIMIT,
+  MaybeCancelablePromise,
+  reformatInIsoLocal,
   timeSeries,
   TO_PARTITION_RANGE,
   utcToLocalTimeZone,
@@ -504,7 +506,7 @@ export class PreAggregationLoader {
   private preAggregationsTablesToTempTables: any;
 
   /**
-   * Determines whether current instance instantiated for a jobed build query
+   * Determines whether current instance instantiated for a jobbed build query
    * (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint) or
    * not.
    */
@@ -1505,7 +1507,7 @@ interface PreAggsPartitionRangeLoaderOpts {
 
 export class PreAggregationPartitionRangeLoader {
   /**
-   * Determines whether current instance instantiated for a jobed build query
+   * Determines whether current instance instantiated for a jobbed build query
    * (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint) or
    * not.
    */
@@ -2518,8 +2520,7 @@ export class PreAggregations {
 
   public async getQueueState(dataSource: string) {
     const queue = await this.getQueue(dataSource);
-    const queries = await queue.getQueries();
-    return queries;
+    return queue.getQueries();
   }
 
   public async cancelQueriesFromQueue(queryKeys: string[], dataSource: string) {
