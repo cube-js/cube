@@ -6,6 +6,7 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
     fn string(&self, v: String) -> Result<IT::String, CubeError>;
     fn number(&self, v: f64) -> Result<IT::Number, CubeError>;
     fn undefined(&self) -> Result<NativeObjectHandle<IT>, CubeError>;
+    fn null(&self) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn empty_array(&self) -> Result<IT::Array, CubeError>;
     fn empty_struct(&self) -> Result<IT::Struct, CubeError>;
     //fn boxed<T: 'static>(&self, value: T) -> impl NativeBox<IT, T>;
@@ -35,6 +36,9 @@ impl<IT: InnerTypes> NativeContextHolder<IT> {
     }
     pub fn undefined(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         self.context.undefined()
+    }
+    pub fn null(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
+        self.context.null()
     }
     pub fn empty_array(&self) -> Result<IT::Array, CubeError> {
         self.context.empty_array()
