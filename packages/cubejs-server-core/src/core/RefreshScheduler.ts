@@ -147,7 +147,7 @@ export class RefreshScheduler {
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregationsLoadCacheByDataSource = {};
 
-    // Return a empty array for cases with 2 same pre-aggregations but with different partitionGranularity
+    // Return an empty array for cases with 2 same pre-aggregations but with different partitionGranularity
     // Only the most detailed pre-aggregations will be use
     if (!preAggregationDescription) {
       return {
