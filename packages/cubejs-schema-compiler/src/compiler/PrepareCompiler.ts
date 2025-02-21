@@ -56,6 +56,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     transpilers.push(new CubeCheckDuplicatePropTranspiler());
   }
 
+  const compilerId = uuidv4();
+
   const compiler = new DataSchemaCompiler(repo, Object.assign({}, {
     cubeNameCompilers: [cubeDictionary],
     preTranspileCubeCompilers: [cubeSymbols, cubeValidator],
@@ -74,7 +76,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     compileContext: options.compileContext,
     standalone: options.standalone,
     nativeInstance,
-    yamlCompiler
+    yamlCompiler,
+    compilerId,
   }, options));
 
   return {
@@ -85,7 +88,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     joinGraph,
     compilerCache,
     headCommitId: options.headCommitId,
-    compilerId: uuidv4(),
+    compilerId,
   };
 };
 

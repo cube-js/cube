@@ -3,6 +3,12 @@ import { codeFrameColumns, SourceLocation } from '@babel/code-frame';
 import { UserError } from './UserError';
 import { CompileError } from './CompileError';
 
+export type ErrorLikeObject = {
+  message: string;
+};
+
+export type PossibleError = Error | UserError | string | ErrorLikeObject;
+
 export interface CompilerErrorInterface {
   message: string;
   plainMessage?: string
@@ -108,7 +114,7 @@ export class ErrorReporter {
   }
 
   public error(e: any, fileName?: any, lineNumber?: any, position?: any) {
-    const message = `${this.context.length ? `${this.context.join(' -> ')}: ` : ''}${e instanceof UserError ? e.message : (e.stack || e)}`;
+    const message = `${this.context.length ? `${this.context.join(' -> ')}: ` : ''}${e.message ? e.message : (e.stack || e)}`;
     if (this.rootReporter().errors.find(m => (m.message || m) === message)) {
       return;
     }
@@ -141,8 +147,8 @@ export class ErrorReporter {
     return this.rootReporter().errors;
   }
 
-  public addErrors(errors: CompilerErrorInterface[]) {
-    this.rootReporter().errors.push(...errors);
+  public addErrors(errors: PossibleError[]) {
+    errors.forEach((e: any) => { this.error(e); });
   }
 
   public getWarnings() {
@@ -150,7 +156,7 @@ export class ErrorReporter {
   }
 
   public addWarnings(warnings: SyntaxErrorInterface[]) {
-    this.rootReporter().warnings.push(...warnings);
+    warnings.forEach((w: any) => { this.warning(w); });
   }
 
   protected rootReporter(): ErrorReporter {

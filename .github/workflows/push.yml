@@ -103,7 +103,6 @@ jobs:
 #          files: ./packages/*/coverage/clover.xml
 #          flags: cube-backend
 #          verbose: true # optional (default = false)
-
   lint:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
