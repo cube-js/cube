@@ -368,7 +368,11 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
 export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
   const native = loadNative();
 
-  return native.transpileJs(content, metadata);
+  if (native.transpileJs) {
+    return native.transpileJs(content, metadata);
+  }
+
+  throw new Error('TranspileJs native implementation not found!');
 };
 
 export interface PyConfiguration {

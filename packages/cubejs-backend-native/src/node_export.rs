@@ -515,9 +515,6 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
 
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
 
-    //========= transpilers exports =================
-    crate::transpilers::register_module(&mut cx)?;
-
     crate::template::template_register_module(&mut cx)?;
 
     #[cfg(feature = "python")]

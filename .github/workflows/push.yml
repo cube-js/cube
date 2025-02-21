@@ -9,7 +9,6 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
-      - 'rust/cubetranspilers/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -25,7 +24,6 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
-      - 'rust/cubetranspilers/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -44,17 +42,11 @@ jobs:
       matrix:
         # Current docker version + next LTS
         node-version: [20.x, 22.x]
-        python-version: [3.11]
         transpile-worker-threads: [false, true]
-        transpile-native: [false, true]
-        exclude:
-          - transpile-worker-threads: true
-            transpile-native: true
       fail-fast: false
 
     env:
       CUBEJS_TRANSPILATION_WORKER_THREADS: ${{ matrix.transpile-worker-threads }}
-      CUBEJS_TRANSPILATION_NATIVE: ${{ matrix.transpile-native }}
     steps:
       - id: get-tag-out
         run: echo "$OUT"
@@ -76,10 +68,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -107,11 +95,6 @@ jobs:
         run: yarn tsc
       - name: Build client
         run: yarn build
-      - name: Build cubejs-backend-native (with Python)
-        run: yarn run native:build-release-python
-        working-directory: ./packages/cubejs-backend-native
-        env:
-          PYO3_PYTHON: python${{ matrix.python-version }}
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
 #      - uses: codecov/codecov-action@v1
@@ -120,9 +103,6 @@ jobs:
 #          files: ./packages/*/coverage/clover.xml
 #          flags: cube-backend
 #          verbose: true # optional (default = false)
-      - name: Cargo test cubetranspilers
-        run: |
-          cargo test --manifest-path rust/cubetranspilers/Cargo.toml -j 1
   lint:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
@@ -170,9 +150,6 @@ jobs:
         run: yarn lint:npm
       - name: Lerna lint
         run: yarn lerna run --concurrency 1 lint
-      - name: Cargo fmt cubetranspilers
-        run: |
-          cargo fmt --manifest-path rust/cubetranspilers/Cargo.toml -- --check
 
   build:
     runs-on: ubuntu-20.04
@@ -225,9 +202,6 @@ jobs:
         run: yarn lerna run --concurrency 1 build
         env:
           NODE_OPTIONS: --max_old_space_size=4096
-      - name: Cargo build cubetranspilers
-        run: |
-          cargo build --manifest-path rust/cubetranspilers/Cargo.toml -j 4
 
   build-cubestore:
     needs: [latest-tag-sha]
