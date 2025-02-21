@@ -17,8 +17,10 @@ import { HydrationStream, transformRow } from './HydrationStream';
 const { version } = require('../../package.json');
 
 export type DuckDBDriverConfiguration = {
+  databasePath?: string,
   dataSource?: string,
   initSql?: string,
+  motherDuckToken?: string,
   schema?: string,
 };
 
@@ -56,8 +58,8 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async init(): Promise<InitPromise> {
-    const token = getEnv('duckdbMotherDuckToken', this.config);
-    const dbPath = getEnv('duckdbDatabasePath', this.config);
+    const token = this.config.motherDuckToken || getEnv('duckdbMotherDuckToken', this.config);
+    const dbPath = this.config.databasePath || getEnv('duckdbDatabasePath', this.config);
     
     // Determine the database URL based on the provided db_path or token
     let dbUrl: string;
