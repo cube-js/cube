@@ -46,4 +46,16 @@ export function redshiftExternalSchemasSuite(
       expect(it.data_type).toEqual(expect.any(String));
     });
   });
+
+  execute('should load columns types for external table', async () => {
+    const columnsForTables = await driver().tableColumnTypes(`${EXTERNAL_SCHEMA}.${EXTERNAL_TABLE}`);
+
+    expect(columnsForTables).toBeInstanceOf(Array);
+    expect(columnsForTables.length).toBeGreaterThan(0);
+
+    columnsForTables.forEach((it) => {
+      expect(it.name).toEqual(expect.any(String));
+      expect(it.type).toEqual(expect.any(String));
+    });
+  });
 }
