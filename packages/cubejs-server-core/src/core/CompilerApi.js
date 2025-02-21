@@ -210,8 +210,8 @@ export class CompilerApi {
     return true;
   }
 
-  async getCubesFromQuery(query) {
-    const sql = await this.getSql(query, { requestId: query.requestId });
+  async getCubesFromQuery(query, context) {
+    const sql = await this.getSql(query, { requestId: context.requestId });
     return new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
   }
 
@@ -243,7 +243,6 @@ export class CompilerApi {
     const result = {
     };
     if (filter.memberReference) {
-      // TODO(maxim): will it work with different data types?
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
         filter.values,
@@ -273,14 +272,14 @@ export class CompilerApi {
    * - combining cube and view filters with AND
   */
   async applyRowLevelSecurity(query, context) {
-    const compilers = await this.getCompilers({ requestId: query.requestId });
+    const compilers = await this.getCompilers({ requestId: context.requestId });
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
       return query;
     }
 
-    const queryCubes = await this.getCubesFromQuery(query);
+    const queryCubes = await this.getCubesFromQuery(query, context);
 
     // We collect Cube and View filters separately because they have to be
     // applied in "two layers": first Cube filters, then View filters on top
