@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/actions/smoke.sh'
+      - '.github/actions/integration/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -23,6 +24,8 @@ on:
       - 'master'
   pull_request:
     paths:
+      - '.github/actions/smoke.sh'
+      - '.github/actions/integration/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
