@@ -236,7 +236,7 @@ export class QueryQueue {
         throw new Error('Priority should be between -10000 and 10000');
       }
 
-      // Result here won't be fetched for a forced build query and a jobed build
+      // Result here won't be fetched for a forced build query and a jobbed build
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
       let result = !query.forceBuild && await queueConnection.getResult(queryKey);
