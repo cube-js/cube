@@ -79,6 +79,19 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
+        countRollingUnbounded: {
+          type: 'count',
+          rollingWindow: {
+            trailing: 'unbounded'
+          }
+        },
+        countRollingWeekToDate: {
+          type: 'count',
+          rollingWindow: {
+            type: 'to_date',
+            granularity: 'week'
+          }
+        },
         revenue_qtd: {
           type: 'sum',
           sql: 'amount',
@@ -220,7 +233,14 @@ describe('SQL Generation', () => {
         },
         created_at: {
           type: 'time',
-          sql: 'created_at'
+          sql: 'created_at',
+          granularities: {
+            three_days: {
+              interval: '3 days',
+              title: '3 days',
+              origin: '2017-01-01'
+            }
+          }
         },
         updated_at: {
           type: 'time',
@@ -775,6 +795,163 @@ describe('SQL Generation', () => {
       visitors__created_at_day: '2017-01-06T00:00:00.000Z',
       visitors__revenue_rolling: '500',
       vc__visitor_checkins_count: '0'
+    }
+  ]));
+
+  it('rolling window with two time dimension granularities', async () => runQueryTest({
+    measures: [
+      'visitors.countRollingWeekToDate'
+    ],
+    timeDimensions: [
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'three_days',
+        dateRange: ['2017-01-01', '2017-01-10']
+      },
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }
+    ],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    {
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '2',
+      visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '3',
+      visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-10T00:00:00.000Z',
+    }
+  ]));
+
+  it('two rolling windows with two time dimension granularities', async () => runQueryTest({
+    measures: [
+      'visitors.countRollingUnbounded',
+      'visitors.countRollingWeekToDate'
+    ],
+    timeDimensions: [
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'three_days',
+        dateRange: ['2017-01-01', '2017-01-10']
+      },
+      {
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10']
+      }
+    ],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    {
+      visitors__count_rolling_unbounded: '1',
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '2',
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '2',
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '3',
+      visitors__count_rolling_week_to_date: '2',
+      visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '4',
+      visitors__count_rolling_week_to_date: '3',
+      visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '6',
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '6',
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '6',
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '6',
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-09T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '6',
+      visitors__count_rolling_week_to_date: null,
+      visitors__created_at_day: '2017-01-10T00:00:00.000Z',
+      visitors__created_at_three_days: '2017-01-10T00:00:00.000Z',
     }
   ]));
 
