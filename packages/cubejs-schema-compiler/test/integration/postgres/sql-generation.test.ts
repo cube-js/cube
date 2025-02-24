@@ -649,6 +649,60 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         }
       }
     });
+
+    cube('orders', {
+        sql: 'select 1 as order_id, 100 as total, 1 as user_id',
+        joins: {
+            users: {
+                relationship: 'hasMany',
+                sql: \`\${CUBE.user_id} = \${users.user_id}\`
+            }
+        },
+        measures: {
+            sum_total: {
+                type: 'sum',
+                sql: 'total'
+            }
+        },
+        dimensions: {
+            order_id: {
+                type: 'number',
+                sql: 'order_id',
+                primaryKey: true
+            },
+            user_id: {
+                type: 'number',
+                sql: 'user_id',
+            }
+        }
+    });
+    cube('users', {
+        sql: 'select 1 as user_id, false as internal',
+        dimensions: {
+            user_id: {
+                type: 'number',
+                sql: 'user_id',
+                primaryKey: true
+            },
+            internal: {
+                type: 'boolean',
+                sql: 'internal'
+            },
+        }
+    });
+    view('revenue_view', {
+        cubes: [
+            {
+                join_path: 'orders',
+                includes: ['sum_total', 'user_id']
+            },
+            {
+                join_path: 'orders.users',
+                includes: ['internal']
+            }
+        ]
+    });
+
     `);
 
   it('simple join', async () => {
@@ -3320,6 +3374,55 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         visitors_visitors_checkins_view__visitor_checkins_count: '5',
       },
     ]
+  ));
+
+  it('multiplied measures missing column', async () => runQueryTest(
+    {
+      measures: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.sum_total}`'
+          ),
+          name: 'revenue_total',
+          expressionName: 'revenue_total',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.sum_total}',
+          cubeName: 'revenue_view',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `COUNT(DISTINCT ${revenue_view.user_id})`'
+          ),
+          name: 'distinct_users',
+          expressionName: 'distinct_users',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'COUNT(DISTINCT ${revenue_view.user_id})',
+          cubeName: 'revenue_view',
+        },
+      ],
+      dimensions: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.internal}`'
+          ),
+          name: 'internal_user',
+          expressionName: 'internal_user',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.internal}',
+          cubeName: 'revenue_view',
+        },
+      ],
+    },
+    []
   ));
 
   // TODO not implemented
