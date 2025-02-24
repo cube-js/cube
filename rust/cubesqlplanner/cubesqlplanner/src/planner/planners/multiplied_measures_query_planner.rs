@@ -111,6 +111,8 @@ impl MultipliedMeasuresQueryPlanner {
     ) -> Result<Rc<Select>, CubeError> {
         let subquery_dimensions = collect_sub_query_dimensions_from_members(
             &BaseMemberHelper::iter_as_base_member(measures).collect_vec(),
+            &self.join_planner,
+            &key_join,
             self.query_tools.clone(),
         )?;
 
@@ -312,6 +314,8 @@ impl MultipliedMeasuresQueryPlanner {
     ) -> Result<Rc<Select>, CubeError> {
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
             &self.query_properties.all_member_symbols(false),
+            &self.join_planner,
+            &join,
             self.query_tools.clone(),
         )?;
 
@@ -378,6 +382,8 @@ impl MultipliedMeasuresQueryPlanner {
 
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
             &symbols_for_subquery_dimensions,
+            &self.join_planner,
+            &key_join,
             self.query_tools.clone(),
         )?;
 
