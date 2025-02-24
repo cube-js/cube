@@ -385,6 +385,7 @@ class ApiGateway {
         res.setHeader('Transfer-Encoding', 'chunked');
 
         try {
+          await this.assertApiScope('data', req.context?.securityContext);
           await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext);
         } catch (e: any) {
           this.handleError({
