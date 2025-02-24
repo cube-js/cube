@@ -1,9 +1,9 @@
-import { DateRange, extendMoment } from 'moment-range';
-import { unitOfTime } from 'moment-timezone';
+import type { unitOfTime } from 'moment-timezone';
+import type { DateRange } from 'moment-range';
+import Moment from 'moment-timezone';
+import { extendMoment } from 'moment-range';
 
-const Moment = require('moment-timezone');
-
-const moment = extendMoment(Moment);
+const moment = extendMoment(Moment as any);
 
 export type QueryDateRange = [string, string];
 type SqlInterval = string;
