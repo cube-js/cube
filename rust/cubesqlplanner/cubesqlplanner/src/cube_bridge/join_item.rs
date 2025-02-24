@@ -21,6 +21,6 @@ pub struct JoinItemStatic {
 
 #[nativebridge::native_bridge(JoinItemStatic)]
 pub trait JoinItem {
-    #[field]
+    #[nbridge(field)]
     fn join(&self) -> Result<Rc<dyn JoinItemDefinition>, CubeError>;
 }

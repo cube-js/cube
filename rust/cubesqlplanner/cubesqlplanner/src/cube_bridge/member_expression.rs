@@ -19,6 +19,6 @@ pub struct MemberExpressionDefinitionStatic {
 
 #[nativebridge::native_bridge(MemberExpressionDefinitionStatic)]
 pub trait MemberExpressionDefinition {
-    #[field]
+    #[nbridge(field)]
     fn expression(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
 }

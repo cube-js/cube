@@ -10,6 +10,6 @@ use std::rc::Rc;
 
 #[nativebridge::native_bridge]
 pub trait GeoItem {
-    #[field]
+    #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
 }

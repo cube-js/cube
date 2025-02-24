@@ -1,3 +1,4 @@
+use super::case_label::CaseLabel;
 use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -5,17 +6,13 @@ use cubenativeutils::wrappers::serializer::{
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
-use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct JoinItemDefinitionStatic {
-    pub relationship: String,
-}
-
-#[nativebridge::native_bridge(JoinItemDefinitionStatic)]
-pub trait JoinItemDefinition {
+#[nativebridge::native_bridge]
+pub trait CaseItem {
     #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
+    #[nbridge(field)]
+    fn label(&self) -> Result<CaseLabel, CubeError>;
 }

@@ -1,4 +1,4 @@
-use super::member_sql::{MemberSql, NativeMemberSql};
+use super::case_label::CaseLabel;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -9,7 +9,7 @@ use std::any::Any;
 use std::rc::Rc;
 
 #[nativebridge::native_bridge]
-pub trait MeasureFilter {
-    #[field]
-    fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
+pub trait CaseElseItem {
+    #[nbridge(field)]
+    fn label(&self) -> Result<CaseLabel, CubeError>;
 }
