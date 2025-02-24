@@ -85,7 +85,7 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.escapeColumnName(`${this.dimension}_series`);
   }
 
-  public dateSeriesSelectColumn(dateSeriesAliasName: string, dateSeriesGranularity: string) {
+  public dateSeriesSelectColumn(dateSeriesAliasName: string | null, dateSeriesGranularity?: string) {
     if (!this.granularityObj) {
       return null;
     }

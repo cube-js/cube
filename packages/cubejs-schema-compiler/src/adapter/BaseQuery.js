@@ -1485,7 +1485,7 @@ export class BaseQuery {
     }
 
     // We can't do meaningful query if few time dimensions with different ranges passed,
-    // it won't be possible to join them together without loosing some rows.
+    // it won't be possible to join them together without losing some rows.
     const rangedTimeDimensions = this.timeDimensions.filter(d => d.dateRange && d.granularity);
     const uniqTimeDimensionWithRanges = R.uniqBy(d => d.dateRange, rangedTimeDimensions);
     if (uniqTimeDimensionWithRanges.length > 1) {
@@ -1493,15 +1493,14 @@ export class BaseQuery {
     }
 
     // We need to generate time series table for the lowest granularity among all time dimensions
-    let dateSeriesDimension;
-    const dateSeriesGranularity = this.timeDimensions.filter(d => d.granularity)
-      .reduce((acc, d) => {
-        const mg = this.minGranularity(acc, d.resolvedGranularity());
+    const [dateSeriesDimension, dateSeriesGranularity] = this.timeDimensions.filter(d => d.granularity)
+      .reduce(([prevDim, prevGran], d) => {
+        const mg = this.minGranularity(prevGran, d.resolvedGranularity());
         if (mg === d.resolvedGranularity()) {
-          dateSeriesDimension = d;
+          return [d, mg];
         }
-        return mg;
-      }, undefined);
+        return [prevDim, mg];
+      }, [null, null]);
 
     const dateSeriesSql = this.dateSeriesSql(dateSeriesDimension);
 
