@@ -660,5 +660,40 @@ filter_subq AS (
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('query-view-deep-joins');
     });
+
+    test('wrapper with duplicated members', async () => {
+      const query = `
+        SELECT
+          "foo",
+          "bar",
+          CASE
+            WHEN "bar" = 'new'
+            THEN 1
+            ELSE 0
+            END
+            AS "bar_expr"
+        FROM (
+          SELECT
+            "rows"."foo" AS "foo",
+            "rows"."bar" AS "bar"
+          FROM (
+            SELECT
+              "status" AS "foo",
+              "status" AS "bar"
+            FROM Orders
+          ) "rows"
+          GROUP BY
+            "foo",
+            "bar"
+        ) "_"
+        ORDER BY
+          "bar_expr"
+          LIMIT 1
+        ;
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('wrapper-duplicated-members');
+    });
   });
 });
