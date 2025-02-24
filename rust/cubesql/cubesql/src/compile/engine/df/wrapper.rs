@@ -146,7 +146,7 @@ impl SqlQuery {
     }
 
     pub fn extend_values(&mut self, values: impl IntoIterator<Item = Option<String>>) {
-        self.values.extend(values.into_iter());
+        self.values.extend(values);
     }
 
     pub fn replace_sql(&mut self, sql: String) {
@@ -346,11 +346,8 @@ impl ColumnRemapping {
     /// Replace every column expression in `expr` according to this remapping. Column expressions
     /// not present in `self` will stay the same.
     pub fn remap(&self, expr: &Expr) -> result::Result<Expr, CubeError> {
-        replace_col(
-            expr.clone(),
-            &self.column_remapping.iter().map(|(k, v)| (k, v)).collect(),
-        )
-        .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
+        replace_col(expr.clone(), &self.column_remapping.iter().collect())
+            .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
     }
 
     pub fn extend(&mut self, other: ColumnRemapping) {
@@ -1078,7 +1075,7 @@ impl CubeScanWrapperNode {
                                     alias: subq_alias.unwrap_or_else(|| alias.clone()),
                                     sql: subq_sql_string,
                                     condition: cond.clone(),
-                                    join_type: join_type.clone(),
+                                    join_type: join_type,
                                 });
                                 known_join_subqueries.insert(alias.clone());
                             }
@@ -1325,13 +1322,13 @@ impl CubeScanWrapperNode {
                                                         let aliased_column = aggr_expr
                                                             .iter()
                                                             .find_position(|e| {
-                                                                expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                             })
                                                             .map(|(i, _)| aggregate[i].clone()).or_else(|| {
                                                             projection_expr
                                                                 .iter()
                                                                 .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                                 })
                                                                 .map(|(i, _)| {
                                                                     projection[i].clone()
@@ -1340,7 +1337,7 @@ impl CubeScanWrapperNode {
                                                             flat_group_expr
                                                                 .iter()
                                                                 .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                                 })
                                                                 .map(|(i, _)| group_by[i].clone())
                                                         }).ok_or_else(|| {
@@ -1368,7 +1365,7 @@ impl CubeScanWrapperNode {
                                         load_request.order.clone()
                                     },
                                     ungrouped: if let WrappedSelectType::Projection = select_type {
-                                        load_request.ungrouped.clone()
+                                        load_request.ungrouped
                                     } else {
                                         None
                                     },
@@ -1376,13 +1373,13 @@ impl CubeScanWrapperNode {
                                     limit: if let Some(limit) = limit {
                                         Some(limit as i32)
                                     } else {
-                                        load_request.limit.clone()
+                                        load_request.limit
                                     },
                                     // TODO is it okay to just override offset?
                                     offset: if let Some(offset) = offset {
                                         Some(offset as i32)
                                     } else {
-                                        load_request.offset.clone()
+                                        load_request.offset
                                     },
 
                                     // Original scan node can already have consumed filters from Logical plan

@@ -691,7 +691,7 @@ impl LogicalPlanData {
         {
             {
                 let column_name = expr_column_name(&expr, &None);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -702,7 +702,7 @@ impl LogicalPlanData {
             }
             {
                 let column_name = expr_column_name_with_relation(&expr, &mut relation);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -1722,8 +1722,7 @@ fn case_expr<D: Display>(
             "CaseExprWhenThenExpr",
             when_then
                 .into_iter()
-                .map(|(when, then)| vec![when, then])
-                .flatten()
+                .flat_map(|(when, then)| [when, then])
                 .collect(),
         ),
         case_expr_else_expr(else_expr),

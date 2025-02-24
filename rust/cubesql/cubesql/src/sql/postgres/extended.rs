@@ -87,9 +87,9 @@ impl PreparedStatement {
 
     pub fn get_from_sql(&self) -> bool {
         match self {
-            PreparedStatement::Empty { from_sql, .. } => from_sql.clone(),
-            PreparedStatement::Query { from_sql, .. } => from_sql.clone(),
-            PreparedStatement::Error { from_sql, .. } => from_sql.clone(),
+            PreparedStatement::Empty { from_sql, .. } => *from_sql,
+            PreparedStatement::Query { from_sql, .. } => *from_sql,
+            PreparedStatement::Error { from_sql, .. } => *from_sql,
         }
     }
 
@@ -299,7 +299,7 @@ impl Portal {
     }
 
     pub fn get_format(&self) -> protocol::Format {
-        self.format.clone()
+        self.format
     }
 
     fn hand_execution_frame_state<'a>(

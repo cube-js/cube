@@ -587,38 +587,38 @@ impl MemberRules {
                 "member-pushdown-replacer-aggregate-group",
                 ListType::AggregateGroupExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_flat_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-aggr",
                 ListType::AggregateAggrExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_flat_push_down_node_substitute_rules(
                 "member-pushdown-replacer-projection",
                 ListType::ProjectionExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
         } else {
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-group",
                 "AggregateGroupExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-aggr",
                 "AggregateAggrExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-projection",
                 "ProjectionExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
         }
         rules.extend(find_matching_old_member("column", column_expr("?column")));
@@ -1416,7 +1416,7 @@ impl MemberRules {
                     if !aliases_to_cube.is_empty() && !projection_aliases.is_empty() {
                         // TODO: We could, more generally, cache referenced_columns(referenced_expr), which calls expr_column_name.
                         let mut columns = HashSet::new();
-                        columns.extend(referenced_columns(referenced_expr).into_iter());
+                        columns.extend(referenced_columns(referenced_expr));
 
                         for alias_to_cube in aliases_to_cube {
                             for projection_alias in &projection_aliases {
@@ -1442,7 +1442,7 @@ impl MemberRules {
                                         egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
                                             CubeScanAliasToCube(replaced_alias_to_cube.clone()),
                                         ));
-                                    subst.insert(new_alias_to_cube_var, new_alias_to_cube.clone());
+                                    subst.insert(new_alias_to_cube_var, new_alias_to_cube);
 
                                     let member_pushdown_replacer_alias_to_cube = egraph.add(
                                         LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
@@ -1633,8 +1633,8 @@ impl MemberRules {
             }
 
             let mut columns = HashSet::new();
-            columns.extend(referenced_columns(referenced_group_expr).into_iter());
-            columns.extend(referenced_columns(referenced_aggr_expr).into_iter());
+            columns.extend(referenced_columns(referenced_group_expr));
+            columns.extend(referenced_columns(referenced_aggr_expr));
 
             let new_pushdown_join = referenced_aggr_expr.is_empty();
 
@@ -2013,7 +2013,7 @@ impl MemberRules {
             .cloned()
             {
                 // alias_to_cube at this point is already filtered to a single cube
-                let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                let cube_alias = alias_to_cube.first().unwrap().0 .1.to_string();
                 for cube in var_iter!(egraph[subst[cube_var]], AllMembersCube).cloned() {
                     let column_iter = if default_count {
                         vec![Column::from_name(Self::default_count_measure_name())]
@@ -2416,7 +2416,7 @@ impl MemberRules {
             {
                 for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                     // alias_to_cube at this point is already filtered to a single cube
-                    let alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                    let alias = alias_to_cube.first().unwrap().0 .1.to_string();
                     let alias_expr = Self::add_alias_column(
                         egraph,
                         column.name.to_string(),
@@ -2519,7 +2519,7 @@ impl MemberRules {
             {
                 for alias in var_iter!(egraph[subst[alias_var]], AliasExprAlias).cloned() {
                     // alias_to_cube at this point is already filtered to a single cube
-                    let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                    let cube_alias = alias_to_cube.first().unwrap().0 .1.to_string();
                     let alias_expr =
                         Self::add_alias_column(egraph, alias.to_string(), Some(cube_alias.clone()));
                     subst.insert(output_column_var, alias_expr);
@@ -2722,11 +2722,11 @@ impl MemberRules {
                                 continue;
                             }
 
-                            let is_left_order_empty = Some(true)
-                                == egraph[subst[left_order_var]].data.is_empty_list.clone();
+                            let is_left_order_empty =
+                                Some(true) == egraph[subst[left_order_var]].data.is_empty_list;
 
-                            let is_right_order_empty = Some(true)
-                                == egraph[subst[right_order_var]].data.is_empty_list.clone();
+                            let is_right_order_empty =
+                                Some(true) == egraph[subst[right_order_var]].data.is_empty_list;
 
                             if !is_left_order_empty && !is_right_order_empty {
                                 continue;

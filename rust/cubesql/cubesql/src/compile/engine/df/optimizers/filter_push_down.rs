@@ -120,7 +120,7 @@ fn filter_push_down(
             // let predicates = split_predicates(predicate)
             let predicates = vec![predicate.clone()]
                 .into_iter()
-                .chain(predicates.into_iter())
+                .chain(predicates)
                 .collect::<Vec<_>>();
             let mut pushable_predicates = vec![];
             let mut non_pushable_predicates = vec![];
@@ -326,10 +326,10 @@ fn filter_push_down(
                         optimizer_config,
                     )?),
                     on: on.clone(),
-                    join_type: join_type.clone(),
-                    join_constraint: join_constraint.clone(),
+                    join_type: *join_type,
+                    join_constraint: *join_constraint,
                     schema: schema.clone(),
-                    null_equals_null: null_equals_null.clone(),
+                    null_equals_null: *null_equals_null,
                 }),
             )
         }
@@ -483,8 +483,8 @@ fn filter_push_down(
             issue_filter(
                 predicates,
                 LogicalPlan::Limit(Limit {
-                    skip: skip.clone(),
-                    fetch: fetch.clone(),
+                    skip: *skip,
+                    fetch: *fetch,
                     input: Arc::new(filter_push_down(
                         optimizer,
                         input,

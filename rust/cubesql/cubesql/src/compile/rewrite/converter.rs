@@ -352,8 +352,7 @@ impl LogicalPlanToLanguageConverter {
                 let expr = add_expr_list_node!(graph, expr, query_params, CaseExprExpr, flat_list);
                 let when_then_expr = when_then_expr
                     .iter()
-                    .map(|(when, then)| vec![when, then])
-                    .flatten()
+                    .flat_map(|(when, then)| [when, then])
                     .collect::<Vec<_>>();
                 let when_then_expr = add_expr_list_node!(
                     graph,
@@ -932,7 +931,7 @@ macro_rules! match_expr_list_node {
                     }
                 }
                 _ => {
-                    result.push(to_expr(id.clone())?);
+                    result.push(to_expr(id)?);
                 }
             }
             Ok(())
@@ -988,7 +987,7 @@ pub fn node_to_expr(
 ) -> Result<Expr, CubeError> {
     Ok(match node {
         LogicalPlanLanguage::AliasExpr(params) => {
-            let expr = to_expr(params[0].clone())?;
+            let expr = to_expr(params[0])?;
             let alias = match_data_node!(node_by_id, params[1], AliasExprAlias);
             Expr::Alias(Box::new(expr), alias)
         }
@@ -1011,9 +1010,9 @@ pub fn node_to_expr(
             Expr::Literal(value)
         }
         LogicalPlanLanguage::AnyExpr(params) => {
-            let left = Box::new(to_expr(params[0].clone())?);
+            let left = Box::new(to_expr(params[0])?);
             let op = match_data_node!(node_by_id, params[1], AnyExprOp);
-            let right = Box::new(to_expr(params[2].clone())?);
+            let right = Box::new(to_expr(params[2])?);
             let all = match_data_node!(node_by_id, params[3], AnyExprAll);
             Expr::AnyExpr {
                 left,
@@ -1023,16 +1022,16 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::BinaryExpr(params) => {
-            let left = Box::new(to_expr(params[0].clone())?);
+            let left = Box::new(to_expr(params[0])?);
             let op = match_data_node!(node_by_id, params[1], BinaryExprOp);
-            let right = Box::new(to_expr(params[2].clone())?);
+            let right = Box::new(to_expr(params[2])?);
             Expr::BinaryExpr { left, op, right }
         }
         LogicalPlanLanguage::LikeExpr(params) => {
             let like_type = match_data_node!(node_by_id, params[0], LikeExprLikeType);
             let negated = match_data_node!(node_by_id, params[1], LikeExprNegated);
-            let expr = Box::new(to_expr(params[2].clone())?);
-            let pattern = Box::new(to_expr(params[3].clone())?);
+            let expr = Box::new(to_expr(params[2])?);
+            let pattern = Box::new(to_expr(params[3])?);
             let escape_char = match_data_node!(node_by_id, params[4], LikeExprEscapeChar);
             let like_expr = Like {
                 negated,
@@ -1047,26 +1046,26 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::NotExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::Not(expr)
         }
         LogicalPlanLanguage::IsNotNullExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::IsNotNull(expr)
         }
         LogicalPlanLanguage::IsNullExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::IsNull(expr)
         }
         LogicalPlanLanguage::NegativeExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::Negative(expr)
         }
         LogicalPlanLanguage::BetweenExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let negated = match_data_node!(node_by_id, params[1], BetweenExprNegated);
-            let low = Box::new(to_expr(params[2].clone())?);
-            let high = Box::new(to_expr(params[3].clone())?);
+            let low = Box::new(to_expr(params[2])?);
+            let high = Box::new(to_expr(params[3])?);
             Expr::Between {
                 expr,
                 negated,
@@ -1096,17 +1095,17 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::CastExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let data_type = match_data_node!(node_by_id, params[1], CastExprDataType);
             Expr::Cast { expr, data_type }
         }
         LogicalPlanLanguage::TryCastExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let data_type = match_data_node!(node_by_id, params[1], TryCastExprDataType);
             Expr::TryCast { expr, data_type }
         }
         LogicalPlanLanguage::SortExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let asc = match_data_node!(node_by_id, params[1], SortExprAsc);
             let nulls_first = match_data_node!(node_by_id, params[2], SortExprNullsFirst);
             Expr::Sort {
@@ -1188,7 +1187,7 @@ pub fn node_to_expr(
             Expr::TableUDF { fun, args }
         }
         LogicalPlanLanguage::InListExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let list = match_expr_list_node!(node_by_id, to_expr, params[1], InListExprList);
             let negated = match_data_node!(node_by_id, params[2], InListExprNegated);
             Expr::InList {
@@ -1209,8 +1208,8 @@ pub fn node_to_expr(
             ));
         }
         LogicalPlanLanguage::InSubqueryExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
-            let subquery = Box::new(to_expr(params[1].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
+            let subquery = Box::new(to_expr(params[1])?);
             let negated = match_data_node!(node_by_id, params[2], InSubqueryExprNegated);
             Expr::InSubquery {
                 expr,
@@ -1387,7 +1386,7 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlan::Join(Join {
                     left,
                     right,
-                    on: left_on.into_iter().zip_eq(right_on.into_iter()).collect(),
+                    on: left_on.into_iter().zip_eq(right_on).collect(),
                     join_type,
                     join_constraint,
                     schema,

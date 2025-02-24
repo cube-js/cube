@@ -712,7 +712,7 @@ where
         let mut ids = HashMap::<IdWithState<L, S>, Id>::default();
         let mut todo = node
             .children()
-            .into_iter()
+            .iter()
             .map(|id| IdWithState::new(*id, Arc::clone(&state)))
             .collect::<Vec<_>>();
 

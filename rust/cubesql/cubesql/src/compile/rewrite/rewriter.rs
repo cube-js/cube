@@ -370,7 +370,7 @@ impl Rewriter {
                     best
                 };
                 let qtrace_best_graph = if Qtrace::is_enabled() {
-                    best.as_ref().iter().cloned().collect()
+                    best.as_ref().to_vec()
                 } else {
                     vec![]
                 };
