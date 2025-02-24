@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+### Bug Fixes
+
+- **redshift-driver:** Fix empty tableColumnTypes for external (Spectrum) tables ([#9251](https://github.com/cube-js/cube/issues/9251)) ([fa318a1](https://github.com/cube-js/cube/commit/fa318a144ed6ef484e2ac101cd71ab6ab6ca7abf))
+
 ## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
 
 **Note:** Version bump only for package @cubejs-backend/redshift-driver
