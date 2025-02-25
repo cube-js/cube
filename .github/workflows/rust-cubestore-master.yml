@@ -84,12 +84,12 @@ jobs:
           - x86_64-unknown-linux-gnu
           - aarch64-unknown-linux-gnu
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             platforms: linux/amd64
             build-args: WITH_AVX2=1
             postfix: ""
-          - os: self-hosted
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             platforms: linux/arm64
             build-args: WITH_AVX2=0
