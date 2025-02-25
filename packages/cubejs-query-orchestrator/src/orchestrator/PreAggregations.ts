@@ -255,8 +255,6 @@ type VersionEntriesObj = {
 };
 
 class PreAggregationLoadCache {
-  private redisPrefix: string;
-
   private driverFactory: DriverFactory;
 
   private queryCache: QueryCache;
@@ -286,13 +284,11 @@ class PreAggregationLoadCache {
   private tablePrefixes: string[] | null;
 
   public constructor(
-    redisPrefix,
     clientFactory: DriverFactory,
     queryCache,
     preAggregations,
     options: PreAggregationLoadCacheOptions = { dataSource: 'default' }
   ) {
-    this.redisPrefix = `${redisPrefix}_${options.dataSource}`;
     this.dataSource = options.dataSource;
     this.driverFactory = clientFactory;
     this.queryCache = queryCache;
@@ -2116,7 +2112,6 @@ export class PreAggregations {
   ): Promise<[boolean, string]> {
     // fetching tables
     const loadCache = new PreAggregationLoadCache(
-      this.redisPrefix,
       () => this.driverFactory(dataSource),
       this.queryCache,
       this,
@@ -2189,7 +2184,6 @@ export class PreAggregations {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
-            this.redisPrefix,
             () => this.driverFactory(dataSource),
             this.queryCache,
             this,
@@ -2307,7 +2301,6 @@ export class PreAggregations {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
-            this.redisPrefix,
             () => this.driverFactory(dataSource),
             this.queryCache,
             this,
@@ -2375,7 +2368,6 @@ export class PreAggregations {
               preAggregation,
               preAggregationsTablesToTempTables,
               new PreAggregationLoadCache(
-                this.redisPrefix,
                 () => this.driverFactory(dataSource),
                 this.queryCache,
                 this,
@@ -2423,7 +2415,6 @@ export class PreAggregations {
             requestId
           } = q;
           const loadCache = new PreAggregationLoadCache(
-            this.redisPrefix,
             () => this.driverFactory(dataSource),
             this.queryCache,
             this,
@@ -2485,7 +2476,6 @@ export class PreAggregations {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
-            this.redisPrefix,
             () => this.driverFactory(dataSource),
             this.queryCache,
             this,
