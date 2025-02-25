@@ -679,7 +679,7 @@ impl WrapperRules {
     ) -> Option<Id> {
         let join_on_pairs = left_join_on
             .into_iter()
-            .zip(right_join_on.into_iter())
+            .zip(right_join_on)
             .collect::<Vec<_>>();
 
         let result_expr =

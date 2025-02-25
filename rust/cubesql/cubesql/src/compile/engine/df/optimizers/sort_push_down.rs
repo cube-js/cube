@@ -72,8 +72,8 @@ fn sort_push_down(
                             } => Ok(if is_column_expr(expr) {
                                 rewrite(expr, &rewrite_map)?.map(|expr| Expr::Sort {
                                     expr: Box::new(expr),
-                                    asc: asc.clone(),
-                                    nulls_first: nulls_first.clone(),
+                                    asc: *asc,
+                                    nulls_first: *nulls_first,
                                 })
                             } else {
                                 None
@@ -199,10 +199,10 @@ fn sort_push_down(
                         )?),
                         right: Arc::new(sort_push_down(optimizer, right, None, optimizer_config)?),
                         on: on.clone(),
-                        join_type: join_type.clone(),
-                        join_constraint: join_constraint.clone(),
+                        join_type: *join_type,
+                        join_constraint: *join_constraint,
                         schema: schema.clone(),
-                        null_equals_null: null_equals_null.clone(),
+                        null_equals_null: *null_equals_null,
                     }));
                 }
             }
@@ -213,10 +213,10 @@ fn sort_push_down(
                     left: Arc::new(sort_push_down(optimizer, left, None, optimizer_config)?),
                     right: Arc::new(sort_push_down(optimizer, right, None, optimizer_config)?),
                     on: on.clone(),
-                    join_type: join_type.clone(),
-                    join_constraint: join_constraint.clone(),
+                    join_type: *join_type,
+                    join_constraint: *join_constraint,
                     schema: schema.clone(),
-                    null_equals_null: null_equals_null.clone(),
+                    null_equals_null: *null_equals_null,
                 }),
             )
         }
@@ -285,8 +285,8 @@ fn sort_push_down(
             issue_sort(
                 sort_expr,
                 LogicalPlan::Limit(Limit {
-                    skip: skip.clone(),
-                    fetch: fetch.clone(),
+                    skip: *skip,
+                    fetch: *fetch,
                     input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
                 }),
             )

@@ -3221,8 +3221,7 @@ impl FilterRules {
             for year in years {
                 for aliases in aliases_es.iter() {
                     if let ScalarValue::Int64(Some(year)) = year {
-                        let year = year.clone();
-                        if year < 1000 || year > 9999 {
+                        if !(1000..=9999).contains(&year) {
                             continue;
                         }
 
@@ -3503,7 +3502,7 @@ impl FilterRules {
             for aliases in aliases_es {
                 if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
                     let values = list
-                        .into_iter()
+                        .iter()
                         .map(|literal| FilterRules::scalar_to_value(literal))
                         .collect::<Result<Vec<_>, _>>();
                     let Ok(values) = values else {
@@ -4168,7 +4167,7 @@ impl FilterRules {
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let filter_ops_var = var!(filter_ops_var);
         move |egraph, subst| {
-            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list.clone() {
+            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list {
                 return true;
             }
 
@@ -4234,19 +4233,17 @@ impl FilterRules {
                         for date_range_end_op in
                             var_iter!(egraph[subst[date_range_end_op_var]], FilterMemberOp)
                         {
-                            let valid_left_filters =
-                                vec!["afterDate".to_string(), "afterOrOnDate".to_string()];
-                            let valid_right_filters =
-                                vec!["beforeDate".to_string(), "beforeOrOnDate".to_string()];
+                            let valid_left_filters = ["afterDate", "afterOrOnDate"];
+                            let valid_right_filters = ["beforeDate", "beforeOrOnDate"];
 
                             let swap_left_and_right;
 
-                            if valid_left_filters.contains(date_range_start_op)
-                                && valid_right_filters.contains(date_range_end_op)
+                            if valid_left_filters.contains(&date_range_start_op.as_str())
+                                && valid_right_filters.contains(&date_range_end_op.as_str())
                             {
                                 swap_left_and_right = false;
-                            } else if valid_left_filters.contains(date_range_end_op)
-                                && valid_right_filters.contains(date_range_start_op)
+                            } else if valid_left_filters.contains(&date_range_end_op.as_str())
+                                && valid_right_filters.contains(&date_range_start_op.as_str())
                             {
                                 swap_left_and_right = true;
                             } else {
@@ -4507,8 +4504,8 @@ impl FilterRules {
             if literals.is_empty() {
                 return false;
             }
-            for escape_char in escape_chars {
-                if let Some('!') = escape_char {
+            for escape_char in escape_chars.into_iter().flatten() {
+                if escape_char == '!' {
                     for literal in literals.iter() {
                         let literal_value = match &literal {
                             ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
@@ -4717,7 +4714,7 @@ impl FilterRules {
 
                 for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
                     let Some(values) = list
-                        .into_iter()
+                        .iter()
                         .map(|literal| Self::scalar_dt_to_naive_datetime(literal))
                         .collect::<Option<HashSet<_>>>()
                         .map(|values| {
@@ -4907,7 +4904,7 @@ impl FilterRules {
             return None;
         }
 
-        let new_dt = dt.clone();
+        let new_dt = dt;
         let new_dt = match granularity.as_str() {
             "year" => new_dt.checked_add_months(Months::new(12)),
             "quarter" | "qtr" => new_dt.checked_add_months(Months::new(3)),

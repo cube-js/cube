@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+### Bug Fixes
+
+- **cubesql:** Break cost symmetry for (non)-push-to-Cube WrappedSelect ([#9155](https://github.com/cube-js/cube/issues/9155)) ([2c0e443](https://github.com/cube-js/cube/commit/2c0e443dc18379490e35a3d83b3888f66e12ade0))
+- **cubesql:** Generate proper projection wrapper for duplicated members in CubeScanNode ([#9233](https://github.com/cube-js/cube/issues/9233)) ([aba6430](https://github.com/cube-js/cube/commit/aba643082acc440cf5b3fe9828c2c38ac1a833c9))
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+### Bug Fixes
+
+- **redshift-driver:** Fix empty tableColumnTypes for external (Spectrum) tables ([#9251](https://github.com/cube-js/cube/issues/9251)) ([fa318a1](https://github.com/cube-js/cube/commit/fa318a144ed6ef484e2ac101cd71ab6ab6ca7abf))
+- **schema-compiler:** Fix sql generation for rolling_window queries with multiple time dimensions ([#9124](https://github.com/cube-js/cube/issues/9124)) ([52a664e](https://github.com/cube-js/cube/commit/52a664e4d0643d78464f75cc48c4a1f686455ebe))
+
+### Features
+
+- **cubejs-server-core:** support proxy in http agent transport ([#9263](https://github.com/cube-js/cube/issues/9263)) ([89c74ce](https://github.com/cube-js/cube/commit/89c74cec2be96f63f51990b5eec59096749e967b))
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix allowNonStrictDateRangeMatch pre-agg match for dateRange queries without granularities ([#9258](https://github.com/cube-js/cube/issues/9258)) ([00fe682](https://github.com/cube-js/cube/commit/00fe6825418e7ad6681b0856fee11175dfcc649e))
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+### Bug Fixes
+
+- **backend-native:** Handle closed channel on Rust side ([#9242](https://github.com/cube-js/cube/issues/9242)) ([1203291](https://github.com/cube-js/cube/commit/120329146046f2bffc0b8ff252dcee1cc285d1ef))
+
+### Features
+
+- **cubeclient:** Add `short_title` to dimensions and measures ([#9256](https://github.com/cube-js/cube/issues/9256)) ([584b3dc](https://github.com/cube-js/cube/commit/584b3dcefedb7c01b849e7f18a59445bd3542b7e))
+
 ## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
 
 ### Bug Fixes

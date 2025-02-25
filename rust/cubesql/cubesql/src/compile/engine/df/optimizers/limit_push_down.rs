@@ -203,10 +203,10 @@ fn limit_push_down(
                         optimizer_config,
                     )?),
                     on: on.clone(),
-                    join_type: join_type.clone(),
-                    join_constraint: join_constraint.clone(),
+                    join_type: *join_type,
+                    join_constraint: *join_constraint,
                     schema: schema.clone(),
-                    null_equals_null: null_equals_null.clone(),
+                    null_equals_null: *null_equals_null,
                 }),
             )
         }

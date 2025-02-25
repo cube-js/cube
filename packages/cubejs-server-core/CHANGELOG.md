@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+### Features
+
+- **cubejs-server-core:** support proxy in http agent transport ([#9263](https://github.com/cube-js/cube/issues/9263)) ([89c74ce](https://github.com/cube-js/cube/commit/89c74cec2be96f63f51990b5eec59096749e967b))
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
 ## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

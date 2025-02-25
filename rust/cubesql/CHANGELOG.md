@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+### Bug Fixes
+
+- **cubesql:** Break cost symmetry for (non)-push-to-Cube WrappedSelect ([#9155](https://github.com/cube-js/cube/issues/9155)) ([2c0e443](https://github.com/cube-js/cube/commit/2c0e443dc18379490e35a3d83b3888f66e12ade0))
+- **cubesql:** Generate proper projection wrapper for duplicated members in CubeScanNode ([#9233](https://github.com/cube-js/cube/issues/9233)) ([aba6430](https://github.com/cube-js/cube/commit/aba643082acc440cf5b3fe9828c2c38ac1a833c9))
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix sql generation for rolling_window queries with multiple time dimensions ([#9124](https://github.com/cube-js/cube/issues/9124)) ([52a664e](https://github.com/cube-js/cube/commit/52a664e4d0643d78464f75cc48c4a1f686455ebe))
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+### Features
+
+- **cubeclient:** Add `short_title` to dimensions and measures ([#9256](https://github.com/cube-js/cube/issues/9256)) ([584b3dc](https://github.com/cube-js/cube/commit/584b3dcefedb7c01b849e7f18a59445bd3542b7e))
+
 ## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

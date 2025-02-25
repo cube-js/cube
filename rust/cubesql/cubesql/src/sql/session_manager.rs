@@ -59,7 +59,7 @@ impl SessionManager {
             server: self.server.clone(),
             state: Arc::new(SessionState::new(
                 connection_id,
-                extra_id.clone(),
+                extra_id,
                 client_addr,
                 client_port,
                 protocol,
@@ -107,12 +107,12 @@ impl SessionManager {
     pub async fn get_session(&self, connection_id: u32) -> Option<Arc<Session>> {
         let guard = self.sessions.read().await;
 
-        guard.sessions.get(&connection_id).map(|s| s.clone())
+        guard.sessions.get(&connection_id).cloned()
     }
 
     pub async fn get_session_by_extra_id(&self, extra_id: SessionExtraId) -> Option<Arc<Session>> {
         let guard = self.sessions.read().await;
-        guard.uid_to_session.get(&extra_id).map(|s| s.clone())
+        guard.uid_to_session.get(&extra_id).cloned()
     }
 
     pub async fn drop_session(&self, connection_id: u32) {

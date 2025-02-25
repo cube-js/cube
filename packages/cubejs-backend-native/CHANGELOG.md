@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+### Bug Fixes
+
+- **backend-native:** Handle closed channel on Rust side ([#9242](https://github.com/cube-js/cube/issues/9242)) ([1203291](https://github.com/cube-js/cube/commit/120329146046f2bffc0b8ff252dcee1cc285d1ef))
+
 ## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
 
 ### Reverts

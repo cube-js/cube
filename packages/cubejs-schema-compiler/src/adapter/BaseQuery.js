@@ -945,8 +945,8 @@ export class BaseQuery {
           ).concat(multiStageMembers.map(m => `SELECT * FROM ${m.alias}`));
     }
 
-    // Move regular measures to multiplied ones if there're same
-    // cubes to calculate. Most of the times it'll be much faster to
+    // Move regular measures to multiplied ones if there are same
+    // cubes to calculate. Most of the time it'll be much faster to
     // calculate as there will be only single scan per cube.
     if (
       regularMeasures.length &&
@@ -1464,18 +1464,62 @@ export class BaseQuery {
 
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure, fromRollup) {
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
+    const uniqDateJoinCondition = R.uniqBy(djc => djc[0].dimension, dateJoinCondition);
     const cumulativeMeasures = [cumulativeMeasure];
     if (!this.timeDimensions.find(d => d.granularity)) {
-      const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, false));
+      const filters = this.segments
+        .concat(this.filters)
+        .concat(this.dateFromStartToEndConditionSql(
+          // If the same time dimension is passed more than once, no need to build the same
+          // filter condition again and again. Different granularities don't play role here,
+          // as rollingWindow.granularity is used for filtering.
+          uniqDateJoinCondition,
+          fromRollup,
+          false
+        ));
       return baseQueryFn(cumulativeMeasures, filters, false);
     }
-    const dateSeriesSql = this.timeDimensions.map(d => this.dateSeriesSql(d)).join(', ');
-    const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, true));
+
+    if (this.timeDimensions.filter(d => !d.dateRange && d.granularity).length > 0) {
+      throw new UserError('Time series queries without dateRange aren\'t supported');
+    }
+
+    // We can't do meaningful query if few time dimensions with different ranges passed,
+    // it won't be possible to join them together without losing some rows.
+    const rangedTimeDimensions = this.timeDimensions.filter(d => d.dateRange && d.granularity);
+    const uniqTimeDimensionWithRanges = R.uniqBy(d => d.dateRange, rangedTimeDimensions);
+    if (uniqTimeDimensionWithRanges.length > 1) {
+      throw new Error('Can\'t build query for time dimensions with different date ranges');
+    }
+
+    // We need to generate time series table for the lowest granularity among all time dimensions
+    const [dateSeriesDimension, dateSeriesGranularity] = this.timeDimensions.filter(d => d.granularity)
+      .reduce(([prevDim, prevGran], d) => {
+        const mg = this.minGranularity(prevGran, d.resolvedGranularity());
+        if (mg === d.resolvedGranularity()) {
+          return [d, mg];
+        }
+        return [prevDim, mg];
+      }, [null, null]);
+
+    const dateSeriesSql = this.dateSeriesSql(dateSeriesDimension);
+
+    // If the same time dimension is passed more than once, no need to build the same
+    // filter condition again and again. Different granularities don't play role here,
+    // as rollingWindow.granularity is used for filtering.
+    const filters = this.segments
+      .concat(this.filters)
+      .concat(this.dateFromStartToEndConditionSql(
+        uniqDateJoinCondition,
+        fromRollup,
+        true
+      ));
     const baseQuery = this.groupedUngroupedSelect(
       () => baseQueryFn(cumulativeMeasures, filters),
       cumulativeMeasure.shouldUngroupForCumulative(),
       !cumulativeMeasure.shouldUngroupForCumulative() && this.minGranularity(
-        cumulativeMeasure.windowGranularity(), this.timeDimensions.find(d => d.granularity).resolvedGranularity()
+        cumulativeMeasure.windowGranularity(),
+        dateSeriesGranularity
       ) || undefined
     );
     const baseQueryAlias = this.cubeAlias('base');
@@ -1495,8 +1539,25 @@ export class BaseQuery {
       dateSeriesSql,
       baseQuery,
       dateJoinConditionSql,
-      baseQueryAlias
+      baseQueryAlias,
+      dateSeriesDimension.granularity,
     );
+  }
+
+  overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias, dateSeriesGranularity) {
+    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures, dateSeriesGranularity);
+    return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
+      ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
+      this.groupByClause();
+  }
+
+  overTimeSeriesForSelect(cumulativeMeasures, dateSeriesGranularity) {
+    return this.dimensions
+      .map(s => s.cumulativeSelectColumns())
+      .concat(this.timeDimensions.map(d => d.dateSeriesSelectColumn(null, dateSeriesGranularity)))
+      .concat(cumulativeMeasures.map(s => s.cumulativeSelectColumns()))
+      .filter(c => !!c)
+      .join(', ');
   }
 
   dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
@@ -1521,24 +1582,6 @@ export class BaseQuery {
         }
       })
     );
-  }
-
-  overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
-    return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
-      ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
-      this.groupByClause();
-  }
-
-  overTimeSeriesForSelect(cumulativeMeasures) {
-    return this.dimensions.map(s => s.cumulativeSelectColumns()).concat(this.dateSeriesSelect()).concat(
-      cumulativeMeasures.map(s => s.cumulativeSelectColumns()),
-    ).filter(c => !!c)
-      .join(', ');
-  }
-
-  dateSeriesSelect() {
-    return this.timeDimensions.map(d => d.dateSeriesSelectColumn());
   }
 
   /**
