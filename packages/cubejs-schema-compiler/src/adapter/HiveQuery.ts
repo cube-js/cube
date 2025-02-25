@@ -55,7 +55,9 @@ export class HiveQuery extends BaseQuery {
   }
 
   public escapeColumnName(name) {
-    return `\`${name}\``;
+    // Within a backtick string, use double backticks (``) to represent a backtick character
+    // https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27362043#LanguageManualSelect-SelectSyntax
+    return `\`${name.replaceAll('`', '``')}\``;
   }
 
   public simpleQuery() {
@@ -71,7 +73,7 @@ export class HiveQuery extends BaseQuery {
         ungroupedAliases: R.fromPairs(this.forSelect().map((m: any) => [m.measure || m.dimension, m.aliasName()]))
       }
     );
-    return `SELECT ${select} FROM (${ungrouped}) AS ${this.escapeColumnName('hive_wrapper')} 
+    return `SELECT ${select} FROM (${ungrouped}) AS ${this.escapeColumnName('hive_wrapper')}
     ${this.groupByClause()}${this.baseHaving(this.measureFilters)}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
