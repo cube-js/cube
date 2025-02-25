@@ -525,7 +525,6 @@ export class PreAggregationLoader {
   private externalRefresh: boolean;
 
   public constructor(
-    private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactory,
     private readonly logger: any,
     private readonly queryCache: QueryCache,
@@ -588,7 +587,7 @@ export class PreAggregationLoader {
           : undefined,
       };
     } else {
-      // Case 3: pre-agg is exists
+      // Case 3: pre-agg exists
       const structureVersion = getStructureVersion(this.preAggregation);
       const getVersionsStarted = new Date();
       const { byStructure } = await this.loadCache.getVersionEntries(this.preAggregation);
@@ -619,7 +618,7 @@ export class PreAggregationLoader {
       }
 
       if (versionEntryByStructureVersion) {
-        // this triggers an asyncronous/background load of the pre-aggregation but immediately
+        // this triggers an asynchronous/background load of the pre-aggregation but immediately
         // returns the latest data it already has
         this.loadPreAggregationWithKeys().catch(e => {
           if (!(e instanceof ContinueWaitError)) {
@@ -1520,7 +1519,6 @@ export class PreAggregationPartitionRangeLoader {
   protected compilerCacheFn: <T>(subKey: string[], cacheFn: () => T) => T;
 
   public constructor(
-    private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactory,
     private readonly logger: any,
     private readonly queryCache: QueryCache,
@@ -1684,7 +1682,6 @@ export class PreAggregationPartitionRangeLoader {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
       const loadPreAggregationsByPartitionRanges = async ({ buildRange, partitionRanges }: PartitionRanges) => {
         const partitionLoaders = partitionRanges.map(range => new PreAggregationLoader(
-          this.redisPrefix,
           this.driverFactory,
           this.logger,
           this.queryCache,
@@ -1766,7 +1763,6 @@ export class PreAggregationPartitionRangeLoader {
       };
     } else {
       return new PreAggregationLoader(
-        this.redisPrefix,
         this.driverFactory,
         this.logger,
         this.queryCache,
@@ -2207,7 +2203,6 @@ export class PreAggregations {
     const preAggregationsTablesToTempTablesPromise =
       preAggregations.map((p: PreAggregationDescription, i) => (preAggregationsTablesToTempTables) => {
         const loader = new PreAggregationPartitionRangeLoader(
-          this.redisPrefix,
           () => this.driverFactory(p.dataSource || 'default'),
           this.logger,
           this.queryCache,
@@ -2316,7 +2311,6 @@ export class PreAggregations {
 
     const expandedPreAggregations: PreAggregationDescription[][] = await Promise.all(preAggregations.map(p => {
       const loader = new PreAggregationPartitionRangeLoader(
-        this.redisPrefix,
         () => this.driverFactory(p.dataSource || 'default'),
         this.logger,
         this.queryCache,
@@ -2360,7 +2354,6 @@ export class PreAggregations {
               preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
             } = q;
             const loader = new PreAggregationLoader(
-              this.redisPrefix,
               () => this.driverFactory(dataSource),
               this.logger,
               this.queryCache,
