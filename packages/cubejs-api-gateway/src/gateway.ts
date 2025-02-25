@@ -445,6 +445,7 @@ class ApiGateway {
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, systemAsyncHandler(async (req, res) => {
         await this.getPreAggregations({
           cacheOnly: !!req.query.cacheOnly,
+          metaOnly: !!req.query.metaOnly,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -624,7 +625,7 @@ class ApiGateway {
     }
   }
 
-  public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
+  public async getPreAggregations({ cacheOnly, metaOnly, context, res }: { cacheOnly?: boolean, metaOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
       const compilerApi = await this.getCompilerApi(context);
@@ -640,6 +641,7 @@ class ApiGateway {
               preAggregations: preAggregations.map(p => ({
                 id: p.id,
                 cacheOnly,
+                metaOnly
               }))
             },
           )
