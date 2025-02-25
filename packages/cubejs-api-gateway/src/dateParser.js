@@ -21,7 +21,30 @@ export function dateParser(dateString, timezone, now = new Date()) {
   let momentRange;
   dateString = dateString.toLowerCase();
 
-  if (dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
+  if (dateString.match(/^from (.*) to (.*)$/)) {
+    // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
+    const [all, from, to] = dateString.match(/^from (.*) to (.*)$/);
+
+    const current = moment(now).tz(timezone);
+    const fromResults = parse(from, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
+    const toResults = parse(to, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
+
+    if (!Array.isArray(fromResults) || !fromResults.length) {
+      throw new UserError(`Can't parse date: '${from}'`);
+    }
+
+    if (!Array.isArray(fromResults) || !fromResults.length) {
+      throw new UserError(`Can't parse date: '${to}'`);
+    }
+
+    const exactGranularity = ['second', 'minute', 'hour'].find(g => dateString.indexOf(g) !== -1) || 'day';
+    momentRange = [
+      momentFromResult(fromResults[0].start, timezone),
+      momentFromResult(toResults[0].start, timezone)
+    ];
+
+    momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
+  } else if (dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/)) {
     const match = dateString.match(/(this|last|next)\s+(day|week|month|year|quarter|hour|minute|second)/);
     let start = moment.tz(timezone);
     let end = moment.tz(timezone);
@@ -64,29 +87,6 @@ export function dateParser(dateString, timezone, now = new Date()) {
       moment.tz(timezone).startOf('day').add(1, 'day'),
       moment.tz(timezone).endOf('day').add(1, 'day')
     ];
-  } else if (dateString.match(/^from (.*) to (.*)$/)) {
-    // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
-    const [all, from, to] = dateString.match(/^from (.*) to (.*)$/);
-
-    const current = moment(now).tz(timezone);
-    const fromResults = parse(from, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
-    const toResults = parse(to, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
-
-    if (!Array.isArray(fromResults) || !fromResults.length) {
-      throw new UserError(`Can't parse date: '${from}'`);
-    }
-
-    if (!Array.isArray(fromResults) || !fromResults.length) {
-      throw new UserError(`Can't parse date: '${to}'`);
-    }
-
-    const exactGranularity = ['second', 'minute', 'hour'].find(g => dateString.indexOf(g) !== -1) || 'day';
-    momentRange = [
-      momentFromResult(fromResults[0].start, timezone),
-      momentFromResult(toResults[0].start, timezone)
-    ];
-
-    momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   } else {
     const results = parse(dateString, new Date(moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
     if (!results || !results.length) {
