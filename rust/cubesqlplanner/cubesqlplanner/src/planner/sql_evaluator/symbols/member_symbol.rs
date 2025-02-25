@@ -62,6 +62,15 @@ impl MemberSymbol {
         }
     }
 
+    pub fn is_multi_stage(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.is_multi_stage(),
+            Self::TimeDimension(d) => d.is_multi_stage(),
+            Self::Measure(m) => m.is_multi_stage(),
+            _ => false,
+        }
+    }
+
     pub fn is_measure(&self) -> bool {
         matches!(self, Self::Measure(_))
     }
