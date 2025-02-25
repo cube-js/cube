@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix sql generation for rolling_window queries with multiple time dimensions ([#9124](https://github.com/cube-js/cube/issues/9124)) ([52a664e](https://github.com/cube-js/cube/commit/52a664e4d0643d78464f75cc48c4a1f686455ebe))
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix allowNonStrictDateRangeMatch pre-agg match for dateRange queries without granularities ([#9258](https://github.com/cube-js/cube/issues/9258)) ([00fe682](https://github.com/cube-js/cube/commit/00fe6825418e7ad6681b0856fee11175dfcc649e))
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
 ## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
 
 ### Bug Fixes

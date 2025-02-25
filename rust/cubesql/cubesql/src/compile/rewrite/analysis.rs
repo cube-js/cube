@@ -350,7 +350,7 @@ impl LogicalPlanAnalysis {
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
     ) -> Option<usize> {
-        let trivial_push_down = |id| egraph.index(id).data.trivial_push_down.clone();
+        let trivial_push_down = |id| egraph.index(id).data.trivial_push_down;
         match enode {
             LogicalPlanLanguage::ColumnExpr(_) => Some(0),
             LogicalPlanLanguage::LiteralExpr(_) => Some(0),
@@ -714,12 +714,12 @@ impl LogicalPlanAnalysis {
             }
             LogicalPlanLanguage::CubeScanMembers(params) => {
                 for id in params.iter() {
-                    map.extend(id_to_column_name_to_expr(*id)?.into_iter());
+                    map.extend(id_to_column_name_to_expr(*id)?);
                 }
                 Some(map)
             }
             LogicalPlanLanguage::CubeScan(params) => {
-                map.extend(id_to_column_name_to_expr(params[1])?.into_iter());
+                map.extend(id_to_column_name_to_expr(params[1])?);
                 Some(map)
             }
             _ => None,
@@ -843,7 +843,7 @@ impl LogicalPlanAnalysis {
                 let expr = Expr::Column(col);
                 columns.push(expr);
             } else {
-                columns.extend(referenced_columns(id)?.into_iter());
+                columns.extend(referenced_columns(id)?);
             }
             Some(())
         };
@@ -1244,7 +1244,7 @@ impl LogicalPlanAnalysis {
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
     ) -> Option<bool> {
-        let is_empty_list = |id| egraph.index(id).data.is_empty_list.clone();
+        let is_empty_list = |id| egraph.index(id).data.is_empty_list;
         match enode {
             LogicalPlanLanguage::FilterOpFilters(params)
             | LogicalPlanLanguage::CubeScanFilters(params)

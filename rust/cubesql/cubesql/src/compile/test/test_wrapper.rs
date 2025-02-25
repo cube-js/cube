@@ -1456,3 +1456,145 @@ WHERE
     assert_eq!(request.measures.unwrap().len(), 1);
     assert_eq!(request.dimensions.unwrap().len(), 0);
 }
+
+#[tokio::test]
+async fn wrapper_duplicated_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        format!(
+            r#"
+SELECT
+    "foo",
+    "bar",
+    CASE
+        WHEN "bar" IS NOT NULL
+        THEN 1
+        ELSE 0
+        END
+    AS "bar_expr"
+FROM (
+    SELECT
+        "rows"."foo" AS "foo",
+        "rows"."bar" AS "bar"
+    FROM (
+        SELECT
+            "dim_str0" AS "foo",
+            "dim_str0" AS "bar"
+        FROM MultiTypeCube
+    ) "rows"
+    GROUP BY
+        "foo",
+        "bar"
+) "_"
+ORDER BY
+    "bar_expr"
+LIMIT 1
+;
+        "#
+        )
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    // Generated SQL should contain realiasing of one member to two columns
+    assert!(logical_plan
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains(r#""foo" "foo""#));
+    assert!(logical_plan
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains(r#""foo" "bar""#));
+}
+
+/// Simple wrapper with cast should have explicit members, not zero
+#[tokio::test]
+async fn wrapper_cast_limit_explicit_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            CAST(dim_date0 AS DATE) AS "dim_date0"
+        FROM
+            MultiTypeCube
+        LIMIT 10
+        ;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    // Query should mention just a single member
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures.unwrap().len(), 1);
+    assert_eq!(request.dimensions.unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn wrapper_typed_null() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            dim_str0,
+            AVG(avgPrice),
+            CASE
+                WHEN SUM((NULLIF(0.0, 0.0))) IS NOT NULL THEN SUM((NULLIF(0.0, 0.0)))
+                ELSE 0
+                END
+        FROM MultiTypeCube
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains("SUM(CAST(NULL AS DOUBLE))"));
+}
