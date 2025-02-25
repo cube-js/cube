@@ -105,17 +105,17 @@ The following resource types incur CCU consumption (measured in 5-minute interva
 
 | Resource type             | CCUs per hour                                        | CCUs per request                                       |
 | ------------------------- | :--------------------------------------------------: | :--------------------------------------------------: |
-| [Production Cluster][ref-production-cluster] | Depends on a [chosen tier](#deployment-tiers)           |
-| [Development Instance][ref-development-instance] | Depends on a [chosen tier](#deployment-tiers)           |
-| Cube API Instance         | Depends on a [chosen tier](#deployment-tiers)           |
-| Cube Store Worker         | Depends on a [chosen tier](#cube-store-worker-tiers) |
-| [Semantic Catalog][ref-semantic-catalog] | Depends on a [chosen tier](#semantic-catalog-tiers) |
-| [Dedicated infrastructure][ref-dedicated-infra] | 3 |
-| [Query History][ref-query-history] | Depends on a [chosen tier](#query-history-tiers)     |
-| [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) |
-| [Audit Log][ref-audit-log] | Depends on a [chosen tier](#audit-log-tiers) |
-| AI API | | Depends on a [chosen tier](#deployment-tiers) and config         |
-| AI Assistant | | Depends on a [chosen tier](#deployment-tiers) and config         |
+| [Production Cluster][ref-production-cluster] | Depends on a [chosen tier](#deployment-tiers)           | — |
+| [Development Instance][ref-development-instance] | Depends on a [chosen tier](#deployment-tiers)           | — |
+| Cube API Instance         | Depends on a [chosen tier](#deployment-tiers)           | — |
+| Cube Store Worker         | Depends on a [chosen tier](#cube-store-worker-tiers) | — |
+| [Semantic Catalog][ref-semantic-catalog] | Depends on a [chosen tier](#semantic-catalog-tiers) | — |
+| [Dedicated infrastructure][ref-dedicated-infra] | 3 | — |
+| [Query History][ref-query-history] | Depends on a [chosen tier](#query-history-tiers)     | — |
+| [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) | — |
+| [Audit Log][ref-audit-log] | Depends on a [chosen tier](#audit-log-tiers) | — |
+| [AI API][ref-ai-api] | — | Depends on [configuration](#ai-requests-consumption) |
+| [AI Assistant][ref-ai-assistant] | — | Depends on [configuration](#ai-requests-consumption) |
 
 
 ### Deployment tiers
@@ -198,9 +198,11 @@ under the following tiers:
 | S    | 4                          | —                  |
 | M    | 6                          | Audit Log data export |
 
-### AI CCU Consumption
+### AI requests consumption
 
-AI API and AI Assistant consume CCUs per request apart from [Enterprise and above][cube-pricing] product tiers where customers can provide their own suitable LLM if wanted and then will be exempt from this charge:
+[AI API][ref-ai-api] and [AI Assistant][ref-ai-assistant] consume CCUs per request apart from
+[Enterprise and above][cube-pricing] product tiers where customers can provide their own suitable
+LLM if wanted and then will be exempt from this charge:
 
 | <nobr>CCUs per request</nobr> |
 | :------------------------: |
@@ -352,3 +354,5 @@ product tier level. Payments are non-refundable.
 [ref-data-at-rest-encryption]: /product/caching/running-in-production#data-at-rest-encryption
 [ref-customer-managed-keys]: /product/workspace/encryption-keys
 [ref-semantic-catalog]: /product/workspace/semantic-catalog
+[ref-ai-api]: /product/apis-integrations/ai-api
+[ref-ai-assistant]: /product/workspace/ai-assistant
