@@ -17,10 +17,12 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
   getStructureVersion,
-  InvalidationKeys, LoadPreAggregationResult,
+  InvalidationKeys,
+  LoadPreAggregationResult,
   PreAggregations,
   tablesToVersionEntries,
-  version, VersionEntriesObj,
+  version,
+  VersionEntriesObj,
   VersionEntry
 } from './PreAggregations';
 import { PreAggregationLoadCache } from './PreAggregationLoadCache';
@@ -56,23 +58,23 @@ export class PreAggregationLoader {
    * (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint) or
    * not.
    */
-  private isJob: boolean;
+  private readonly isJob: boolean;
 
-  private waitForRenew: boolean;
+  private readonly waitForRenew: boolean;
 
-  private forceBuild: boolean;
+  private readonly forceBuild: boolean;
 
-  private orphanedTimeout: number;
+  private readonly orphanedTimeout: number;
 
-  private externalDriverFactory: DriverFactory;
+  private readonly externalDriverFactory: DriverFactory;
 
-  private requestId: string;
+  private readonly requestId: string;
 
-  private metadata: any;
+  private readonly metadata: any;
 
-  private structureVersionPersistTime: any;
+  private readonly structureVersionPersistTime: any;
 
-  private externalRefresh: boolean;
+  private readonly externalRefresh: boolean;
 
   public constructor(
     private readonly driverFactory: DriverFactory,
@@ -242,7 +244,7 @@ export class PreAggregationLoader {
       versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`] ||
       versionEntries.byTableName[this.preAggregation.tableName];
 
-    const newVersionEntry = {
+    const newVersionEntry: VersionEntry = {
       table_name: this.preAggregation.tableName,
       structure_version: structureVersion,
       content_version: contentVersion,
@@ -355,7 +357,7 @@ export class PreAggregationLoader {
     });
   }
 
-  protected contentVersion(invalidationKeys) {
+  protected contentVersion(invalidationKeys: InvalidationKeys) {
     const versionArray = [this.preAggregation.structureVersionLoadSql || this.preAggregation.loadSql];
     if (this.preAggregation.indexesSql && this.preAggregation.indexesSql.length) {
       versionArray.push(this.preAggregation.indexesSql);
@@ -394,7 +396,7 @@ export class PreAggregationLoader {
     }
   }
 
-  protected scheduleRefresh(invalidationKeys, newVersionEntry) {
+  protected scheduleRefresh(invalidationKeys: InvalidationKeys, newVersionEntry: VersionEntry) {
     this.logger('Refreshing pre-aggregation content', {
       preAggregation: this.preAggregation,
       requestId: this.requestId,
@@ -411,7 +413,7 @@ export class PreAggregationLoader {
       });
   }
 
-  protected async executeInQueue(invalidationKeys, priority, newVersionEntry) {
+  protected async executeInQueue(invalidationKeys: InvalidationKeys, priority: number, newVersionEntry: VersionEntry) {
     const queue = await this.preAggregations.getQueue(this.preAggregation.dataSource);
     return queue.executeInQueue(
       'query',
