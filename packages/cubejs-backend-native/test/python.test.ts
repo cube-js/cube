@@ -213,6 +213,7 @@ darwinSuite('Old Python Config', () => {
       schemaPath: 'models',
       telemetry: false,
       contextToApiScopes: expect.any(Function),
+      extendContext: expect.any(Function),
       logger: expect.any(Function),
       pgSqlPort: 5555,
       preAggregationsSchema: expect.any(Function),

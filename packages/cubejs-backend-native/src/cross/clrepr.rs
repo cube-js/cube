@@ -15,18 +15,24 @@ use std::collections::hash_map::{IntoIter, Iter, Keys};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[derive(Debug, Clone)]
+pub enum CLReprObjectKind {
+    Object,
+    KWargs,
+}
+
 #[derive(Clone)]
-pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>);
+pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>, CLReprObjectKind);
 
 impl Default for CLReprObject {
     fn default() -> Self {
-        Self::new()
+        Self::new(CLReprObjectKind::Object)
     }
 }
 
 impl CLReprObject {
-    pub fn new() -> Self {
-        Self(HashMap::new())
+    pub fn new(kind: CLReprObjectKind) -> Self {
+        Self(HashMap::new(), kind)
     }
 
     pub fn get(&self, key: &str) -> Option<&CLRepr> {
@@ -110,6 +116,15 @@ pub enum CLRepr {
     Null,
 }
 
+impl CLRepr {
+    pub fn is_kwarg(&self) -> bool {
+        match self {
+            CLRepr::Object(obj) => matches!(obj.1, CLReprObjectKind::KWargs),
+            _ => false,
+        }
+    }
+}
+
 impl std::fmt::Display for CLRepr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self, f)
@@ -179,7 +194,7 @@ impl CLRepr {
 
             Ok(CLRepr::Array(r))
         } else if from.is_a::<JsObject, _>(cx) {
-            let mut obj = CLReprObject::new();
+            let mut obj = CLReprObject::new(CLReprObjectKind::Object);
 
             let v = from.downcast_or_throw::<JsObject, _>(cx)?;
             let properties = v.get_own_property_names(cx)?;
