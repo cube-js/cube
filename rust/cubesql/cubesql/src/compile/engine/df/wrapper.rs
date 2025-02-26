@@ -553,6 +553,44 @@ macro_rules! generate_sql_for_timestamp {
 }
 
 impl CubeScanWrapperNode {
+    pub fn has_ungrouped_scan(&self) -> bool {
+        Self::has_ungrouped_wrapped_node(self.wrapped_plan.as_ref())
+    }
+
+    fn has_ungrouped_wrapped_node(node: &LogicalPlan) -> bool {
+        match node {
+            LogicalPlan::Extension(Extension { node }) => {
+                if let Some(cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
+                    cube_scan.request.ungrouped == Some(true)
+                } else if let Some(wrapped_select) =
+                    node.as_any().downcast_ref::<WrappedSelectNode>()
+                {
+                    // Don't really care if push-to-Cube or not, any aggregation should be ok here from execution perspective
+                    if wrapped_select.select_type == WrappedSelectType::Aggregate {
+                        false
+                    } else {
+                        Self::has_ungrouped_wrapped_node(wrapped_select.from.as_ref())
+                            || wrapped_select
+                                .joins
+                                .iter()
+                                .map(|(join, _, _)| join.as_ref())
+                                .any(Self::has_ungrouped_wrapped_node)
+                            || wrapped_select
+                                .subqueries
+                                .iter()
+                                .map(|subq| subq.as_ref())
+                                .any(Self::has_ungrouped_wrapped_node)
+                    }
+                } else {
+                    false
+                }
+            }
+            LogicalPlan::EmptyRelation(_) => false,
+            // Everything else is unexpected actually
+            _ => false,
+        }
+    }
+
     pub async fn generate_sql(
         &self,
         transport: Arc<dyn TransportService>,
