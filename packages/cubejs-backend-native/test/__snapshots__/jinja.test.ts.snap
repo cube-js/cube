@@ -186,7 +186,9 @@ exports[`Jinja (new api) render arguments-test.yml.jinja: arguments-test.yml.jin
   arg_seq_2: [5,4,3,2,1]
   arg_sum_tuple: 3
   arg_sum_map: 20
-  arg_kwargs: \\"arg1: first value, arg2: second value, kwarg:(3 arg4 arg)\\""
+  arg_kwargs1: \\"arg1: first value, arg2: second value, kwarg:(3 arg)\\"
+  arg_kwargs2: \\"arg1: first value, arg2: second value, kwarg:(3 arg,4 arg)\\"
+  arg_kwargs3: \\"arg1: first value, arg2: second value, kwarg:(3 arg,4 arg,4 arg)\\""
 `;
 
 exports[`Jinja (new api) render data-model.yml.jinja: data-model.yml.jinja 1`] = `
@@ -250,7 +252,7 @@ dump:
 exports[`Jinja (new api) render template_error_python.jinja: template_error_python.jinja 1`] = `
 [Error: could not render block: Call error: Python error: Exception: Random Exception
 Traceback (most recent call last):
-  File "jinja-instance.py", line 119, in throw_exception
+  File "jinja-instance.py", line 116, in throw_exception
 
 ------------------------- template_error_python.jinja -------------------------
    3 | 3
