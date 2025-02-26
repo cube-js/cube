@@ -227,7 +227,13 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
 };
 
-export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
+/**
+ * Takes timestamp in UTC, treat it as local time in provided timezone and returns the corresponding timestamp in UTC
+ */
+export const utcToLocalTimeZoneInUtc = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
+  if (!timestamp) {
+    return null;
+  }
   if (timestamp.length === 23) {
     const zone = moment.tz.zone(timezone);
     if (!zone) {

@@ -6,7 +6,7 @@ import {
   TO_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
   reformatInIsoLocal,
-  utcToLocalTimeZone,
+  utcToLocalTimeZoneInUtc,
   timeSeries,
   inDbTimeZone,
   extractDate
@@ -131,14 +131,17 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   public async replaceQueryBuildRangeParams(queryValues: string[]): Promise<string[] | null> {
-    if (queryValues?.find(p => p === BUILD_RANGE_START_LOCAL || p === BUILD_RANGE_END_LOCAL)) {
+    if (queryValues.find(p => p === BUILD_RANGE_START_LOCAL || p === BUILD_RANGE_END_LOCAL)) {
       const [buildRangeStart, buildRangeEnd] = await this.loadBuildRange();
       return queryValues?.map(
         param => {
           if (param === BUILD_RANGE_START_LOCAL) {
-            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeStart);
+            // buildRangeStart was already localized in loadBuildRange() but the preAggregation.timestampFormat
+            // might be different from 'YYYY-MM-DDTHH:mm:ss.SSS' so we need to convert.
+            // Same applies to buildRangeEnd 2 below.
+            return utcToLocalTimeZoneInUtc('UTC', this.preAggregation.timestampFormat, buildRangeStart);
           } else if (param === BUILD_RANGE_END_LOCAL) {
-            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeEnd);
+            return utcToLocalTimeZoneInUtc('UTC', this.preAggregation.timestampFormat, buildRangeEnd);
           } else {
             return param;
           }
@@ -370,25 +373,36 @@ export class PreAggregationPartitionRangeLoader {
     if (!buildRange[0] || !buildRange[1]) {
       return { buildRange, partitionRanges: [] };
     }
+
+    // buildRange is localized in loadBuildRange()
+    // preAggregation.matchedTimeDimensionDateRange is also localized
+    // in BaseFilter->formatToDate()/formatFromDate()
     let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
       buildRange,
       ignoreMatchedDateRange ? undefined : this.preAggregation.matchedTimeDimensionDateRange,
     );
+
     if (!dateRange) {
       // If there's no date range intersection between query data range and pre-aggregation build range
       // use last partition so outer query can receive expected table structure.
       dateRange = [buildRange[1], buildRange[1]];
     }
-    const partitionRanges = this.compilerCacheFn(['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`], () => PreAggregationPartitionRangeLoader.timeSeries(
-      this.preAggregation.partitionGranularity,
-      dateRange,
-      this.preAggregation.timestampPrecision
-    ));
+
+    const partitionRanges = this.compilerCacheFn(
+      ['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`],
+      () => PreAggregationPartitionRangeLoader.timeSeries(
+        this.preAggregation.partitionGranularity,
+        dateRange,
+        this.preAggregation.timestampPrecision
+      )
+    );
+
     if (partitionRanges.length > this.options.maxPartitions) {
       throw new Error(
         `Pre-aggregation '${this.preAggregation.tableName}' requested to build ${partitionRanges.length} partitions which exceeds the maximum number of partitions per pre-aggregation of ${this.options.maxPartitions}`
       );
     }
+
     return { buildRange: dateRange, partitionRanges };
   }
 
@@ -396,12 +410,19 @@ export class PreAggregationPartitionRangeLoader {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
+        async rangeQuery => utcToLocalTimeZoneInUtc(
+          this.preAggregation.timezone,
+          'YYYY-MM-DDTHH:mm:ss.SSS',
+          PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
+        )
       ),
     );
+
     if (!this.preAggregation.partitionGranularity) {
       return this.orNowIfEmpty([startDate, endDate]);
     }
+
+    // startDate & endDate are `localized` here
     const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       this.orNowIfEmpty([startDate, endDate]),
@@ -409,18 +430,22 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async (rangeQuery, i) => PreAggregationPartitionRangeLoader.extractDate(
-          await this.loadRangeQuery(
-            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
+        async (rangeQuery, i) => utcToLocalTimeZoneInUtc(
+          this.preAggregation.timezone,
+          'YYYY-MM-DDTHH:mm:ss.SSS',
+          PreAggregationPartitionRangeLoader.extractDate(
+            await this.loadRangeQuery(
+              rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
+            ),
           ),
-        ),
+        )
       ),
     );
     return this.orNowIfEmpty([rangeStart, rangeEnd]);
   }
 
   private now() {
-    return utcToLocalTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
+    return utcToLocalTimeZoneInUtc(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
   }
 
   private orNowIfEmpty(dateRange: QueryDateRange): QueryDateRange {
@@ -455,7 +480,7 @@ export class PreAggregationPartitionRangeLoader {
     }
   }
 
-  public static intersectDateRanges(rangeA: QueryDateRange | null, rangeB: QueryDateRange | null): QueryDateRange {
+  public static intersectDateRanges(rangeA: QueryDateRange | null, rangeB: QueryDateRange | null): QueryDateRange | null {
     PreAggregationPartitionRangeLoader.checkDataRangeType(rangeA);
     PreAggregationPartitionRangeLoader.checkDataRangeType(rangeB);
     if (!rangeB) {
@@ -475,7 +500,10 @@ export class PreAggregationPartitionRangeLoader {
     ];
   }
 
-  public static timeSeries(granularity: string, dateRange: QueryDateRange, timestampPrecision: number): QueryDateRange[] {
+  public static timeSeries(granularity: string, dateRange: QueryDateRange | null, timestampPrecision: number): QueryDateRange[] {
+    if (!dateRange) {
+      return [];
+    }
     return timeSeries(granularity, dateRange, {
       timestampPrecision
     });
