@@ -1,4 +1,4 @@
-use crate::cross::{CLRepr, CLReprPython};
+use crate::cross::CLRepr;
 use crate::python::neon_py::*;
 use crate::tokio_runtime_node;
 use cubesql::CubeError;
@@ -7,7 +7,7 @@ use neon::prelude::*;
 use neon::types::Deferred;
 use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
-use pyo3::types::{PyFunction, PyTuple};
+use pyo3::types::{PyDict, PyFunction, PyTuple};
 use std::fmt::Formatter;
 use std::future::Future;
 use std::pin::Pin;
@@ -95,14 +95,20 @@ impl PyRuntime {
         let (fun, args, callback) = task.split();
 
         let task_result = Python::with_gil(move |py| -> PyResult<PyScheduledFunResult> {
-            let mut args_tuple = Vec::with_capacity(args.len());
+            let mut prep_tuple = Vec::with_capacity(args.len());
+            let mut py_kwargs = None;
 
             for arg in args {
-                args_tuple.push(arg.into_py(py)?);
+                if arg.is_kwarg() {
+                    let as_py = arg.into_py_dict(py)?;
+                    py_kwargs = Some(as_py);
+                } else {
+                    prep_tuple.push(arg.into_py(py)?);
+                }
             }
 
-            let args = PyTuple::new(py, args_tuple);
-            let call_res = fun.call1(py, args)?;
+            let py_args = PyTuple::new(py, prep_tuple);
+            let call_res = fun.call(py, py_args, py_kwargs)?;
 
             let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
             if is_coroutine {

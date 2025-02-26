@@ -34,6 +34,15 @@ def arg_sum_map(obj):
   return obj['field_a'] + obj['field_b']
 
 @template.function
+def arg_kwargs(arg1, arg2, **kwargs):
+    kwargs_str = ""
+
+    for arg in kwargs.values():
+        kwargs_str += arg
+
+    return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
+
+@template.function
 def arg_seq(a):
   return a
 
