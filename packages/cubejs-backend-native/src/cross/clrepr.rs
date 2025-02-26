@@ -119,10 +119,7 @@ pub enum CLRepr {
 impl CLRepr {
     pub fn is_kwarg(&self) -> bool {
         match self {
-            CLRepr::Object(obj) => match obj.1 {
-                CLReprObjectKind::KWargs => true,
-                _ => false,
-            },
+            CLRepr::Object(obj) => matches!(obj.1, CLReprObjectKind::KWargs),
             _ => false,
         }
     }
