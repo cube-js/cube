@@ -40,6 +40,10 @@ def arg_kwargs(arg1, arg2, **kwargs):
     return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
 
 @template.function
+def arg_named_arguments(arg1, arg2):
+    return "arg1: " + arg1 + ", arg2: " + arg2
+
+@template.function
 def arg_seq(a):
   return a
 

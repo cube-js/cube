@@ -27,12 +27,13 @@ def arg_sum_map(obj):
 
 @context_func
 def arg_kwargs(**kwargs):
-    result = ""
+    kwargs_str = ",".join(kwargs.values())
 
-    for arg in kwargs.values():
-        result += arg
+    return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
 
-    return result
+@context_func
+def arg_named_arguments(arg1, arg2):
+    return "arg1: " + arg1 + ", arg2: " + arg2
 
 @context_func
 def arg_seq(a):
