@@ -188,7 +188,7 @@ exports[`Jinja (new api) render arguments-test.yml.jinja: arguments-test.yml.jin
   arg_sum_map: 20
   arg_kwargs1: \\"arg1: first value, arg2: second value, kwarg:(3 arg)\\"
   arg_kwargs2: \\"arg1: first value, arg2: second value, kwarg:(3 arg,4 arg)\\"
-  arg_kwargs3: \\"arg1: first value, arg2: second value, kwarg:(4 arg,4 arg,3 arg)\\"
+  arg_kwargs3: \\"arg1: first value, arg2: second value, kwarg:(4 arg,3 arg,5 arg)\\"
   arg_named_arguments1: \\"arg1: 1 arg, arg2: 2 arg\\"
   arg_named_arguments2: \\"arg1: 1 arg, arg2: 2 arg\\""
 `;
