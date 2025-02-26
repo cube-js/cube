@@ -63,7 +63,6 @@ export class PreAggregationPartitionRangeLoader {
     private readonly driverFactory: DriverFactory,
     private readonly logger: any,
     private readonly queryCache: QueryCache,
-    // eslint-disable-next-line no-use-before-define
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,
     private readonly preAggregationsTablesToTempTables: [string, LoadPreAggregationResult][],
@@ -246,7 +245,7 @@ export class PreAggregationPartitionRangeLoader {
       let loadResultAndLoaders = await loadPreAggregationsByPartitionRanges(await this.partitionRanges());
       if (this.options.externalRefresh && loadResultAndLoaders.loadResults.length === 0) {
         loadResultAndLoaders = await loadPreAggregationsByPartitionRanges(await this.partitionRanges(true));
-        // In case there're no partitions ready at matched time dimension intersection then no data can be retrieved.
+        // In case there are no partitions ready at matched time dimension intersection then no data can be retrieved.
         // We need to provide any table so query can just execute successfully.
         if (loadResultAndLoaders.loadResults.length > 0) {
           loadResultAndLoaders.loadResults = [loadResultAndLoaders.loadResults[loadResultAndLoaders.loadResults.length - 1]];
@@ -482,11 +481,25 @@ export class PreAggregationPartitionRangeLoader {
     });
   }
 
-  public static partitionTableName(tableName: string, partitionGranularity: string, dateRange: string[]) {
+  public static partitionTableName(tableName: string, partitionGranularity: string, dateRange: QueryDateRange) {
+    let dateLenCut: number;
+    switch (partitionGranularity) {
+      case 'hour':
+        dateLenCut = 13;
+        break;
+      case 'minute':
+        dateLenCut = 16;
+        break;
+      default:
+        dateLenCut = 10;
+        break;
+    }
+
     const partitionSuffix = dateRange[0].substring(
       0,
-      partitionGranularity === 'hour' ? 13 : 10
+      dateLenCut
     ).replace(/[-T:]/g, '');
+
     return `${tableName}${partitionSuffix}`;
   }
 
