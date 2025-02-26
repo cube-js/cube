@@ -27,7 +27,7 @@ def arg_sum_map(obj):
 
 @context_func
 def arg_kwargs(**kwargs):
-    kwargs_str = ",".join(kwargs.values())
+    kwargs_str = ",".join(f"{key}={value}" for key, value in sorted(kwargs.items()))
 
     return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
 
