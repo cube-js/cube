@@ -100,8 +100,7 @@ impl PyRuntime {
 
             for arg in args {
                 if arg.is_kwarg() {
-                    let as_py = arg.into_py_dict(py)?;
-                    py_kwargs = Some(as_py);
+                    py_kwargs = Some(arg.into_py_dict(py)?);
                 } else {
                     prep_tuple.push(arg.into_py(py)?);
                 }
