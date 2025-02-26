@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
+
+### Bug Fixes
+
+- **native:** Jinja - pass kwargs correctly into Python ([#9276](https://github.com/cube-js/cube/issues/9276)) ([9d1c3f8](https://github.com/cube-js/cube/commit/9d1c3f8cfef5fd9383ee5fa69e79328b5c739231))
+
 ## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
 
 **Note:** Version bump only for package @cubejs-backend/native
