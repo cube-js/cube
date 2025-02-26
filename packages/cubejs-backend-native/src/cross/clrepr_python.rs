@@ -193,9 +193,10 @@ impl CLRepr {
         Ok(match self {
             CLRepr::Object(obj) => Self::into_py_dict_impl(obj, py)?,
             other => {
-                return Err(PyErr::new::<PyNotImplementedError, _>(
-                    "Unable to represent JsFunction in Python",
-                ))
+                return Err(PyErr::new::<PyNotImplementedError, _>(format!(
+                    "Unable to convert {:?} into PyDict",
+                    other.kind()
+                )))
             }
         })
     }
