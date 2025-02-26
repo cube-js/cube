@@ -17,18 +17,17 @@ type PreAggregationLoadCacheOptions = {
 };
 
 export class PreAggregationLoadCache {
-  private driverFactory: DriverFactory;
+  private readonly driverFactory: DriverFactory;
 
   private queryCache: QueryCache;
 
-  // eslint-disable-next-line no-use-before-define
   private preAggregations: PreAggregations;
 
-  private queryResults: any;
+  private readonly queryResults: any;
 
-  private externalDriverFactory: any;
+  private readonly externalDriverFactory: any;
 
-  private requestId: any;
+  private readonly requestId: any;
 
   private versionEntries: { [redisKey: string]: Promise<VersionEntriesObj> };
 
@@ -41,9 +40,9 @@ export class PreAggregationLoadCache {
   // Make it per data source key in case load cache scope is broaden.
   private queryStageState: any;
 
-  private dataSource: string;
+  private readonly dataSource: string;
 
-  private tablePrefixes: string[] | null;
+  private readonly tablePrefixes: string[] | null;
 
   public constructor(
     clientFactory: DriverFactory,
@@ -64,7 +63,7 @@ export class PreAggregationLoadCache {
     this.tableColumnTypes = {};
   }
 
-  protected async tablesFromCache(preAggregation, forceRenew?) {
+  protected async tablesFromCache(preAggregation, forceRenew: boolean = false) {
     let tables = forceRenew ? null : await this.queryCache.getCacheDriver().get(this.tablesCachePrefixKey(preAggregation));
     if (!tables) {
       tables = await this.preAggregations.getLoadCacheQueue(this.dataSource).executeInQueue(
@@ -145,14 +144,11 @@ export class PreAggregationLoadCache {
     );
     // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
     if (!preAggregation.external) {
-      // eslint-disable-next-line
-      const [active, toProcess, queries] = await this.fetchQueryStageState();
+      const [,, queries] = await this.fetchQueryStageState();
       const targetTableNamesInQueue = (Object.keys(queries))
-        // eslint-disable-next-line no-use-before-define
         .map(q => PreAggregations.targetTableName(queries[q].query.newVersionEntry));
 
       versionEntries = versionEntries.filter(
-        // eslint-disable-next-line no-use-before-define
         e => targetTableNamesInQueue.indexOf(PreAggregations.targetTableName(e)) === -1
       );
     }
