@@ -503,12 +503,12 @@ mod tests {
     #[test]
     fn test_sort_down_join() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
-            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"])?)
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
                 .build()?,
         )
         .join(
-            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"])?)
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"], vec![])?)
                 .project(vec![col("key"), col("c2")])?
                 .build()?,
             JoinType::Inner,
@@ -534,12 +534,12 @@ mod tests {
         assert_optimized_plan_eq(plan, expected);
 
         let plan = LogicalPlanBuilder::from(
-            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"])?)
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
                 .build()?,
         )
         .join(
-            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"])?)
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"], vec![])?)
                 .project(vec![col("key"), col("c2")])?
                 .build()?,
             JoinType::Inner,
@@ -570,12 +570,12 @@ mod tests {
     #[test]
     fn test_sort_down_cross_join() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
-            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"])?)
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
                 .build()?,
         )
         .cross_join(
-            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"])?)
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"], vec![])?)
                 .project(vec![col("key"), col("c2")])?
                 .build()?,
         )?
@@ -596,12 +596,12 @@ mod tests {
         assert_optimized_plan_eq(plan, expected);
 
         let plan = LogicalPlanBuilder::from(
-            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"])?)
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
                 .build()?,
         )
         .cross_join(
-            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"])?)
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["key", "c2"], vec![])?)
                 .project(vec![col("key"), col("c2")])?
                 .build()?,
         )?
