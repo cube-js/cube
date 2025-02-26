@@ -236,11 +236,11 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
     const parsedTime = Date.parse(`${timestamp}Z`);
     // TODO parsedTime might be incorrect offset for conversion
     const offset = zone.utcOffset(parsedTime);
-    const inDbTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
+    const localTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
     if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
-      return inDbTimeZoneDate.toJSON();
+      return localTimeZoneDate.toJSON();
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
-      return inDbTimeZoneDate.toJSON().replace('Z', '');
+      return localTimeZoneDate.toJSON().replace('Z', '');
     }
   }
 
