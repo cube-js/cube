@@ -109,7 +109,7 @@ export class BaseDbRunner {
     desc,
     suffix,
     partitionGranularity: string | null = null,
-    dateRange: string[] | null = null
+    dateRange: [string, string] | null = null
   ) {
     const [toReplace, params] = query;
     const tableName = partitionGranularity && dateRange ? PreAggregationPartitionRangeLoader.partitionTableName(
