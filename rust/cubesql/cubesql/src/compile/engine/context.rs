@@ -140,7 +140,7 @@ impl TableProvider for CubeTableProvider {
                             ColumnType::Decimal(p, s) => DataType::Decimal(p, s),
                             ColumnType::List(field) => DataType::List(field.clone()),
                             ColumnType::Timestamp => {
-                                DataType::Timestamp(TimeUnit::Millisecond, None)
+                                DataType::Timestamp(TimeUnit::Nanosecond, None)
                             }
                         },
                         true,
