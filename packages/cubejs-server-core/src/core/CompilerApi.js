@@ -137,19 +137,26 @@ export class CompilerApi {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
 
+    // sqlGenerator.dataSource can return undefined for query without members
+    // Queries like this are used by api-gateway to initialize SQL API
+    // At the same time, those queries should use concrete dataSource, so we should be good to go with it
     dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    const _dbType = await this.getDbType(dataSource);
-    if (dataSource !== 'default' && dbType !== _dbType) {
-      // TODO consider more efficient way than instantiating query
-      sqlGenerator = await this.createQueryByDataSource(
-        compilers,
-        query,
-        dataSource,
-        _dbType
-      );
+    if (dataSource !== undefined) {
+      const _dbType = await this.getDbType(dataSource);
+      if (dataSource !== 'default' && dbType !== _dbType) {
+        // TODO consider more efficient way than instantiating query
+        sqlGenerator = await this.createQueryByDataSource(
+          compilers,
+          query,
+          dataSource,
+          _dbType
+        );
 
-      if (!sqlGenerator) {
-        throw new Error(`Can't find dialect for '${dataSource}' data source: ${_dbType}`);
+        if (!sqlGenerator) {
+          throw new Error(
+            `Can't find dialect for '${dataSource}' data source: ${_dbType}`
+          );
+        }
       }
     }
 
