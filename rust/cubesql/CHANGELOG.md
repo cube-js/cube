@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.13](https://github.com/cube-js/cube/compare/v1.2.12...v1.2.13) (2025-02-26)
+
+### Bug Fixes
+
+- **cubesql:** Split `__user` WHERE predicate into separate filter node ([#8812](https://github.com/cube-js/cube/issues/8812)) ([83baf7b](https://github.com/cube-js/cube/commit/83baf7bf5f83108fd6c3dd134a8739968e781f92))
+
 ## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
 
 ### Bug Fixes
