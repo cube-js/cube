@@ -637,7 +637,7 @@ pub async fn convert_statement_to_cube_query(
 }
 
 pub async fn convert_sql_to_cube_query(
-    query: &String,
+    query: &str,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {

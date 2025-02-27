@@ -184,7 +184,7 @@ async fn handle_sql_query(
     native_auth_ctx: Arc<NativeAuthContext>,
     channel: Arc<Channel>,
     stream_methods: WritableStreamMethods,
-    sql_query: &String,
+    sql_query: &str,
 ) -> Result<(), CubeError> {
     let start_time = SystemTime::now();
 
