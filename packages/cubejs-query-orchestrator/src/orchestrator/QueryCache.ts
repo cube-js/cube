@@ -100,11 +100,12 @@ export type PreAggTableToTempTable = [
   TempTable,
 ];
 
-export type CacheKey = Array<
-  | string
-  | string[]
-  | QueryTuple
->;
+export type CacheKeyItem = string | string[] | QueryTuple | QueryTuple[] | undefined;
+
+export type CacheKey =
+  [CacheKeyItem, CacheKeyItem] |
+  [CacheKeyItem, CacheKeyItem, CacheKeyItem] |
+  [CacheKeyItem, CacheKeyItem, CacheKeyItem, CacheKeyItem];
 
 type CacheEntry = {
   time: number;
@@ -373,7 +374,7 @@ export class QueryCache {
   }
 
   public static queryCacheKey(queryBody: QueryBody): CacheKey {
-    const key = [
+    const key: CacheKey = [
       queryBody.query,
       queryBody.values,
       (queryBody.preAggregations || []).map(p => p.loadSql)
@@ -383,7 +384,7 @@ export class QueryCache {
     }
     // @ts-ignore
     key.persistent = queryBody.persistent;
-    return <CacheKey>key;
+    return key;
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
