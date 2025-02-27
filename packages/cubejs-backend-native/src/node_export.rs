@@ -12,6 +12,7 @@ use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCube
 use crate::cross::CLRepr;
 use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
+use crate::sql4sql::sql4sql;
 use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
@@ -32,8 +33,8 @@ use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
 
-struct SQLInterface {
-    services: Arc<NodeCubeServices>,
+pub(crate) struct SQLInterface {
+    pub(crate) services: Arc<NodeCubeServices>,
 }
 
 impl Finalize for SQLInterface {}
@@ -546,6 +547,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("registerInterface", register_interface::<C>)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("execSql", exec_sql)?;
+    cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 

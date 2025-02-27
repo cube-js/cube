@@ -33,6 +33,7 @@ import {
   QueryType as QueryTypeEnum, ResultType
 } from './types/enums';
 import {
+  BaseRequest,
   RequestContext,
   ExtendedRequestContext,
   Request,
@@ -324,6 +325,17 @@ class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/sql`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      // TODO parse req.query with zod/joi/...
+
+      if (req.query.format === 'sql') {
+        await this.sql4sql({
+          query: req.query.query,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+        return;
+      }
+
       await this.sql({
         query: req.query.query,
         context: req.context,
@@ -332,6 +344,17 @@ class ApiGateway {
     }));
 
     app.post(`${this.basePath}/v1/sql`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      // TODO parse req.body with zod/joi/...
+
+      if (req.body.format === 'sql') {
+        await this.sql4sql({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+        return;
+      }
+
       await this.sql({
         query: req.body.query,
         context: req.context,
@@ -1279,6 +1302,26 @@ class ApiGateway {
     }
 
     return [queryType, normalizedQueries, queryNormalizationResult.map((it) => remapToQueryAdapterFormat(it.normalizedQuery))];
+  }
+
+  protected async sql4sql({
+    query,
+    context,
+    res,
+  }: {query: string} & BaseRequest) {
+    try {
+      await this.assertApiScope('data', context.securityContext);
+
+      const result = await this.sqlServer.sql4sql(query, context.securityContext);
+      res({ sql: result });
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query,
+        res,
+      });
+    }
   }
 
   public async sql({
