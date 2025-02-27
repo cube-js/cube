@@ -26,8 +26,10 @@ of the DAX documentation.
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
 | [`AVERAGE`](https://learn.microsoft.com/en-us/dax/average-function-dax) | — | — |
-| [`COUNT`](https://learn.microsoft.com/en-us/dax/count-function-dax) | — | Counts all rows instead of only non-blank ones |
+| [`COUNT`](https://learn.microsoft.com/en-us/dax/count-function-dax) | — | — |
+| [`COUNTA`](https://learn.microsoft.com/en-us/dax/counta-function-dax) | — | — |
 | [`COUNTROWS`](https://learn.microsoft.com/en-us/dax/countrows-function-dax) | — | Disregards input table expression and always returns 1 |
+| [`DISTINCTCOUNT`](https://learn.microsoft.com/en-us/dax/distinctcount-function-dax) | — | Blanks are ignored |
 | [`MAX`](https://learn.microsoft.com/en-us/dax/max-function-dax) | 2 arguments | Blanks are disregarded instead of being treated as 0 |
 | [`MIN`](https://learn.microsoft.com/en-us/dax/min-function-dax) | 2 arguments | Blanks are disregarded instead of being treated as 0 |
 | [`SUM`](https://learn.microsoft.com/en-us/dax/sum-function-dax) | — | — |
@@ -91,6 +93,7 @@ of the DAX documentation.
 | --- | --- | --- |
 | [`ISBLANK`](https://learn.microsoft.com/en-us/dax/isblank-function-dax) | — | Blanks are treated as equivalent to nulls and vice versa |
 | [`ISONORAFTER`](https://learn.microsoft.com/en-us/dax/isonorafter-function-dax) | — | — |
+| [`NONVISUAL`](https://learn.microsoft.com/en-us/dax/nonvisual-function-dax) | — | Doesn't modify behavior, silently ignored |
 
 ### Logical functions
 
@@ -189,7 +192,7 @@ of the DAX documentation.
 | <nobr>[`DISTINCT`](https://learn.microsoft.com/en-us/dax/distinct-table-function-dax) (table)</nobr> | Filter context for table expressions | — |
 | [`IGNORE`](https://learn.microsoft.com/en-us/dax/ignore-function-dax) | 2+ arguments | Doesn't modify filter context, silently ignored |
 | [`NATURALLEFTOUTERJOIN`](https://learn.microsoft.com/en-us/dax/naturalleftouterjoin-function-dax) | — | — |
-| [`ROLLUPADDISSUBTOTAL`](https://learn.microsoft.com/en-us/dax/rollupaddissubtotal-function-dax) | `grandtotalFilter`, `groupLevelFilter` | — |
+| [`ROLLUPADDISSUBTOTAL`](https://learn.microsoft.com/en-us/dax/rollupaddissubtotal-function-dax) | `grandtotalFilter` | — |
 | [`ROLLUPGROUP`](https://learn.microsoft.com/en-us/dax/rollupgroup-function-dax) | — | — |
 | [`ROW`](https://learn.microsoft.com/en-us/dax/row-function-dax) | — | — |
 | [`SELECTCOLUMNS`](https://learn.microsoft.com/en-us/dax/selectcolumns-function-dax) | Optional aliases (currently mandatory) | — |
