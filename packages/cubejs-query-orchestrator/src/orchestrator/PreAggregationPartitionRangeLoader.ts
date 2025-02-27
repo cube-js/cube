@@ -136,12 +136,9 @@ export class PreAggregationPartitionRangeLoader {
       return queryValues?.map(
         param => {
           if (param === BUILD_RANGE_START_LOCAL) {
-            // buildRangeStart was already localized in loadBuildRange() but the preAggregation.timestampFormat
-            // might be different from 'YYYY-MM-DDTHH:mm:ss.SSS' so we need to convert.
-            // Same applies to buildRangeEnd 2 below.
-            return utcToLocalTimeZoneInUtc('UTC', this.preAggregation.timestampFormat, buildRangeStart);
+            return PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, buildRangeStart);
           } else if (param === BUILD_RANGE_END_LOCAL) {
-            return utcToLocalTimeZoneInUtc('UTC', this.preAggregation.timestampFormat, buildRangeEnd);
+            return PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, buildRangeEnd);
           } else {
             return param;
           }
@@ -410,7 +407,7 @@ export class PreAggregationPartitionRangeLoader {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async rangeQuery => utcToLocalTimeZoneInUtc(
+        async rangeQuery => inDbTimeZone(
           this.preAggregation.timezone,
           'YYYY-MM-DDTHH:mm:ss.SSS',
           PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
@@ -430,7 +427,7 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async (rangeQuery, i) => utcToLocalTimeZoneInUtc(
+        async (rangeQuery, i) => inDbTimeZone(
           this.preAggregation.timezone,
           'YYYY-MM-DDTHH:mm:ss.SSS',
           PreAggregationPartitionRangeLoader.extractDate(
@@ -445,7 +442,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   private now() {
-    return utcToLocalTimeZoneInUtc(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
+    return inDbTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
   }
 
   private orNowIfEmpty(dateRange: QueryDateRange): QueryDateRange {

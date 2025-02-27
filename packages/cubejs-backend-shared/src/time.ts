@@ -192,7 +192,10 @@ export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
 
 export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
 
-export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
+export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
+  if (!timestamp) {
+    return null;
+  }
   if (timestamp.length === 23 || timestamp.length === 26) {
     const zone = moment.tz.zone(timezone);
     if (!zone) {
