@@ -2,6 +2,8 @@ use datafusion::scalar::ScalarValue;
 
 use crate::compile::{DatabaseVariable, DatabaseVariables};
 
+pub const CUBESQL_DISABLE_POST_PROCESSING_VAR: &str = "cubesql_disable_post_processing";
+
 pub fn defaults() -> DatabaseVariables {
     let variables = [
         DatabaseVariable::system(
@@ -57,6 +59,12 @@ pub fn defaults() -> DatabaseVariables {
         DatabaseVariable::system(
             "role".to_string(),
             ScalarValue::Utf8(Some("none".to_string())),
+            None,
+        ),
+        // Custom cubesql variables
+        DatabaseVariable::user_defined(
+            CUBESQL_DISABLE_POST_PROCESSING_VAR.to_string(),
+            ScalarValue::Boolean(Some(false)),
             None,
         ),
     ];
