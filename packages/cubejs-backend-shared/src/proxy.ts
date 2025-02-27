@@ -14,7 +14,10 @@ function getCommandOutput(command: string) {
   });
 }
 
-// deprecated, use ProxyAgent instead
+/**
+ * @deprecated
+ * use ProxyAgent instead
+ */
 export async function getProxySettings() {
   const [proxy] = (
     await Promise.all([getCommandOutput('npm config -g get https-proxy'), getCommandOutput('npm config -g get proxy')])
@@ -26,5 +29,12 @@ export async function getProxySettings() {
 }
 
 export async function getHttpAgentForProxySettings() {
+  const proxy = await getProxySettings();
+
+  if (proxy) {
+    console.warn('Npm proxy settings are deprecated. Please use HTTP_PROXY, HTTPS_PROXY environment variables instead.');
+    return proxy;
+  }
+
   return new ProxyAgent();
 }
