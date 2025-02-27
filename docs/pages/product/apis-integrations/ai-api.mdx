@@ -146,8 +146,7 @@ When using `"runQuery": true`, you might sometimes receive a query result contai
 ## Advanced Usage
 
 <InfoBox>
-  The advanced features discussed here are available on Cube version 1.1.7 and
-  above.
+  The advanced features discussed here are available on Cube version 1.1.7 and above.
 </InfoBox>
 
 ### Custom prompts
@@ -160,30 +159,28 @@ for example if it should usually prefer a particular view.
 To use a custom prompt, set the `CUBE_CLOUD_AI_API_PROMPT` environment variable in your deployment.
 
 <InfoBox>
-  Custom prompts add to, rather than overwrite, the AI API's existing prompting,
-  so you do not need to re-write instructions around how to generate the query
-  itself.
+  Custom prompts add to, rather than overwrite, the AI API's existing prompting, so you
+  do not need to re-write instructions around how to generate the query itself.
 </InfoBox>
 
 ### Meta tags
 
-The AI API can read [meta tags](/reference/data-model/view#meta) on your dimensions, measures,
+The AI API can read [meta tags](/reference/data-model/view#meta) on your dimensions, measures, 
 segments, and views.
 
-Use the `ai` meta tag to give context that is specific to AI and goes beyond what is
+Use the `ai` meta tag to give context that is specific to AI and goes beyond what is 
 included in the description. This can have any keys that you want. For example, you can use it
 to give the AI context on possible values in a categorical dimension:
-
 ```yaml
-- name: status
-  sql: status
-  type: string
-  meta:
-    ai:
-      values:
-        - shipped
-        - processing
-        - completed
+      - name: status
+        sql: status
+        type: string
+        meta:
+          ai:
+            values:
+              - shipped
+              - processing
+              - completed
 ```
 
 ### Value search
@@ -204,21 +201,21 @@ The LLM will select dimensions from among those you have based on the question a
 generate possible values dynamically.
 
 <InfoBox>
-  When running value search queries, the AI API passes through the security
-  context used for the AI API request, so security is maintained and only
-  dimensions the end user has access to are able to be searched.
+  When running value search queries, the AI API passes through the security context used
+  for the AI API request, so security is maintained and only dimensions the end user has
+  access to are able to be searched.
 </InfoBox>
 
 To enable value search on a dimension, set the `searchable` field to true under the `ai`
 meta tag, as shown below:
 
 ```yaml
-- name: order_status
-  sql: order_status
-  type: string
-  meta:
-    ai:
-      searchable: true
+    - name: order_status
+      sql: order_status
+      type: string
+      meta:
+        ai:
+          searchable: true
 ```
 
 Note that enabling Value Search may lead to slightly longer AI API response times when it
@@ -228,9 +225,8 @@ Search can only be used on string dimensions.
 ### Other LLM providers
 
 <InfoBox>
-  These environment variables also apply to the [AI
-  Assistant](/product/workspace/ai-assistant), if it is enabled on your
-  deployment.
+  These environment variables also apply to the [AI Assistant](/product/workspace/ai-assistant),
+  if it is enabled on your deployment.
 </InfoBox>
 
 If desired, you may "bring your own" LLM model by providing a model and API credentials
