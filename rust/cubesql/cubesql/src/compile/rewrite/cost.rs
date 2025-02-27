@@ -206,6 +206,8 @@ impl BestCubePlan {
 
         CubePlanCost {
             replacers: this_replacers,
+            // Will be filled in finalize
+            penalized_ast_size_outside_wrapper: 0,
             table_scans,
             filters,
             filter_members,
@@ -239,6 +241,7 @@ impl BestCubePlan {
 
 /// This cost struct maintains following structural relationships:
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
+/// - `penalized_ast_size_outside_wrapper` > other nodes - this is used to force "no post processing" mode, only CubeScan and CubeScanWrapped are expected as result
 /// - `table_scans` > other nodes - having table scan means not detected cube scan
 /// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
@@ -254,6 +257,7 @@ impl BestCubePlan {
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
     replacers: i64,
+    penalized_ast_size_outside_wrapper: usize,
     table_scans: i64,
     empty_wrappers: i64,
     non_detected_cube_scans: i64,
@@ -366,6 +370,8 @@ impl CubePlanCost {
     pub fn add_child(&self, other: &Self) -> Self {
         Self {
             replacers: self.replacers + other.replacers,
+            // Will be filled in finalize
+            penalized_ast_size_outside_wrapper: 0,
             table_scans: self.table_scans + other.table_scans,
             filters: self.filters + other.filters,
             non_detected_cube_scans: (if other.cube_members == 0 {
@@ -419,8 +425,23 @@ impl CubePlanCost {
         enode: &LogicalPlanLanguage,
         top_down: bool,
     ) -> Self {
+        let ast_size_outside_wrapper = match state {
+            CubePlanState::Wrapped => 0,
+            CubePlanState::Unwrapped(size) => *size,
+            CubePlanState::Wrapper => 0,
+        } + self.ast_size_outside_wrapper;
+        let penalize_post_processing = std::env::var_os("CUBESQL_DISABLE_POST_PROCESSING")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        let penalized_ast_size_outside_wrapper = if penalize_post_processing {
+            ast_size_outside_wrapper
+        } else {
+            0
+        };
+
         Self {
             replacers: self.replacers,
+            penalized_ast_size_outside_wrapper,
             table_scans: self.table_scans,
             filters: self.filters,
             non_detected_cube_scans: match state {
@@ -447,11 +468,7 @@ impl CubePlanCost {
             errors: self.errors,
             structure_points: self.structure_points,
             joins: self.joins,
-            ast_size_outside_wrapper: match state {
-                CubePlanState::Wrapped => 0,
-                CubePlanState::Unwrapped(size) => *size,
-                CubePlanState::Wrapper => 0,
-            } + self.ast_size_outside_wrapper,
+            ast_size_outside_wrapper,
             empty_wrappers: match state {
                 CubePlanState::Wrapped => 0,
                 CubePlanState::Unwrapped(_) => 0,

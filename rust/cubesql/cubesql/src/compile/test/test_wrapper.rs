@@ -1598,3 +1598,34 @@ async fn wrapper_typed_null() {
         .sql
         .contains("SUM(CAST(NULL AS DOUBLE))"));
 }
+
+#[tokio::test]
+async fn test_force_sql_pushdown() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "CUSTOMER_GENDER",
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:SUM_PRICE:ok"
+            FROM
+                "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    todo!()
+}

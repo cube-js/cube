@@ -349,6 +349,7 @@ impl Rewriter {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
+                // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
                 let best = if top_down_extractor {
                     let mut extractor = TopDownExtractor::new(
                         &runner.egraph,
@@ -376,6 +377,7 @@ impl Rewriter {
                 };
                 let new_root = Id::from(best.as_ref().len() - 1);
                 log::debug!("Best: {}", best.pretty(120));
+                // TODO maybe pass CUBESQL_DISABLE_POST_PROCESSING here as well, to break with sane error
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
