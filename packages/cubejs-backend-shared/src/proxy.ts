@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { ProxyAgent } from 'proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 function getCommandOutput(command: string) {
   return new Promise<string>((resolve, reject) => {
@@ -33,7 +34,7 @@ export async function getHttpAgentForProxySettings() {
 
   if (proxy) {
     console.warn('Npm proxy settings are deprecated. Please use HTTP_PROXY, HTTPS_PROXY environment variables instead.');
-    return proxy;
+    return new HttpsProxyAgent(proxy);
   }
 
   return new ProxyAgent();
