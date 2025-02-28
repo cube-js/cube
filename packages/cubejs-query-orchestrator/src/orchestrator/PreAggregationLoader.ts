@@ -12,7 +12,7 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryTuple } from './QueryCache';
+import { PreAggTableToTempTableNames, QueryCache, QueryTuple } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
@@ -20,6 +20,7 @@ import {
   InvalidationKeys,
   LoadPreAggregationResult,
   PreAggregations,
+  PreAggregationTableToTempTable,
   tablesToVersionEntries,
   version,
   VersionEntriesObj,
@@ -51,7 +52,7 @@ export class PreAggregationLoader {
 
   public preAggregation: any;
 
-  private preAggregationsTablesToTempTables: any;
+  private readonly preAggregationsTablesToTempTables: PreAggregationTableToTempTable[];
 
   /**
    * Determines whether current instance instantiated for a jobbed build query
@@ -82,7 +83,7 @@ export class PreAggregationLoader {
     private readonly queryCache: QueryCache,
     preAggregations: PreAggregations,
     preAggregation,
-    preAggregationsTablesToTempTables,
+    preAggregationsTablesToTempTables: PreAggregationTableToTempTable[],
     private readonly loadCache: PreAggregationLoadCache,
     options: any = {}
   ) {
@@ -922,7 +923,7 @@ export class PreAggregationLoader {
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
   }
 
-  protected async createIndexes(driver, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {
+  protected async createIndexes(driver: DriverInterface, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {
     const indexesSql = this.prepareIndexesSql(newVersionEntry, queryOptions);
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
@@ -941,9 +942,10 @@ export class PreAggregationLoader {
         table_name: indexName
       };
       this.logger('Creating pre-aggregation index', queryOptions);
+      const preAggTableToTempTableNames = this.preAggregationsTablesToTempTables as PreAggTableToTempTableNames[];
       const resultingSql = QueryCache.replacePreAggregationTableNames(
         query,
-        this.preAggregationsTablesToTempTables.concat([
+        preAggTableToTempTableNames.concat([
           [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],
           [indexName, { targetTableName: this.targetTableName(indexVersionEntry) }]
         ])

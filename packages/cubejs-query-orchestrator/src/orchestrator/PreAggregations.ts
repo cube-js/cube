@@ -144,6 +144,8 @@ export type LoadPreAggregationResult = {
   partitionRange?: QueryDateRange;
 };
 
+export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
+
 export type LambdaOptions = {
   maxSourceRows: number
 };

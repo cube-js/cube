@@ -22,6 +22,7 @@ import {
   PartitionRanges,
   PreAggregationDescription,
   PreAggregations,
+  PreAggregationTableToTempTable,
   QueryDateRange
 } from './PreAggregations';
 import { PreAggregationLoader } from './PreAggregationLoader';
@@ -65,7 +66,7 @@ export class PreAggregationPartitionRangeLoader {
     private readonly queryCache: QueryCache,
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,
-    private readonly preAggregationsTablesToTempTables: [string, LoadPreAggregationResult][],
+    private readonly preAggregationsTablesToTempTables: PreAggregationTableToTempTable[],
     private readonly loadCache: PreAggregationLoadCache,
     private readonly options: PreAggsPartitionRangeLoaderOpts = {
       maxPartitions: 10000,

@@ -16,7 +16,7 @@ import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { PreAggregationDescription } from './PreAggregations';
+import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
@@ -71,25 +71,7 @@ export type QueryBody = {
 /**
  * Temp (partition/lambda) table definition.
  */
-export type TempTable = {
-  type: string; // for ex.: "rollup"
-  buildRangeEnd: string;
-  lastUpdatedAt: number;
-  queryKey: unknown;
-  refreshKeyValues: [{
-    'refresh_key': string,
-  }][];
-  targetTableName: string; // full table name (with suffix)
-  lambdaTable?: {
-    name: string,
-    columns: {
-      name: string,
-      type: string,
-      attributes?: string[],
-    }[];
-    csvRows: string;
-  };
-};
+export type TempTable = LoadPreAggregationResult;
 
 /**
  * Pre-aggregation table (stored in the first element) to temp table
@@ -99,6 +81,8 @@ export type PreAggTableToTempTable = [
   string, // common table name (without suffix)
   TempTable,
 ];
+
+export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
 
 export type CacheKeyItem = string | string[] | QueryTuple | QueryTuple[] | undefined;
 
@@ -397,7 +381,7 @@ export class QueryCache {
 
   public static replacePreAggregationTableNames(
     queryAndParams: string | QueryWithParams,
-    preAggregationsTablesToTempTables: PreAggTableToTempTable[],
+    preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
   ): string | QueryTuple {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
