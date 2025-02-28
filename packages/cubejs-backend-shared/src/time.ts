@@ -195,7 +195,7 @@ export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
 /**
  * Takes timestamp, treat it as time in provided timezone and returns the corresponding timestamp in UTC
  */
-export const localTimestampToUtc = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
+export const localTimestampToUtc = (timezone: string, timestampFormat: string, timestamp?: string): string | null => {
   if (!timestamp) {
     return null;
   }
@@ -223,8 +223,14 @@ export const localTimestampToUtc = (timezone: string, timestampFormat: string, t
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
       return inDbTimeZoneDate.toJSON().replace('Z', '');
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSSSS') {
+      const value = inDbTimeZoneDate.toJSON();
+      if (value.endsWith('999Z')) {
+        // emulate microseconds
+        return value.replace('Z', '999');
+      }
+
       // emulate microseconds
-      return inDbTimeZoneDate.toJSON().replace('Z', '000');
+      return value.replace('Z', '000');
     }
   }
 
@@ -236,7 +242,7 @@ export const localTimestampToUtc = (timezone: string, timestampFormat: string, t
 /**
  * Takes timestamp in UTC, shift it into provided timezone and returns the corresponding timestamp in UTC
  */
-export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
+export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp?: string): string | null => {
   if (!timestamp) {
     return null;
   }
