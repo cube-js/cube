@@ -2,7 +2,7 @@ use convert_case::{Case, Casing};
 use neon::prelude::*;
 use pyo3::{PyAny, PyResult};
 
-use crate::cross::{CLRepr, CLReprObject, CLReprPython};
+use crate::cross::{CLRepr, CLReprObject, CLReprObjectKind};
 
 pub struct CubeConfigPy {
     properties: CLReprObject,
@@ -11,7 +11,7 @@ pub struct CubeConfigPy {
 impl CubeConfigPy {
     pub fn new() -> Self {
         Self {
-            properties: CLReprObject::new(),
+            properties: CLReprObject::new(CLReprObjectKind::Object),
         }
     }
 

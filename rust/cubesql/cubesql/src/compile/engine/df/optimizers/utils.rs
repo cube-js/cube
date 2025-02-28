@@ -552,11 +552,20 @@ pub fn plan_has_projections(plan: &LogicalPlan) -> bool {
 }
 
 #[cfg(test)]
-pub fn make_sample_table(name: &str, fields: Vec<&str>) -> Result<LogicalPlan> {
+pub fn make_sample_table(
+    name: &str,
+    int_fields: Vec<&str>,
+    str_fields: Vec<&str>,
+) -> Result<LogicalPlan> {
     let schema = Schema::new(
-        fields
+        int_fields
             .into_iter()
             .map(|field| Field::new(field, DataType::Int32, true))
+            .chain(
+                str_fields
+                    .into_iter()
+                    .map(|field| Field::new(field, DataType::Utf8, true)),
+            )
             .collect(),
     );
     LogicalPlanBuilder::scan_empty(Some(name), &schema, None)?.build()
@@ -564,5 +573,5 @@ pub fn make_sample_table(name: &str, fields: Vec<&str>) -> Result<LogicalPlan> {
 
 #[cfg(test)]
 pub fn sample_table() -> Result<LogicalPlan> {
-    make_sample_table("t1", vec!["c1", "c2", "c3"])
+    make_sample_table("t1", vec!["c1", "c2", "c3"], vec![])
 }
