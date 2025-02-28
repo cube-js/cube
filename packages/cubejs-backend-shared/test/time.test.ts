@@ -376,7 +376,7 @@ describe('addSecondsToLocalTimestamp', () => {
     const timestamp = '2025-02-28T12:00:00.000';
     const timezone = 'Europe/Kiev';
     const seconds = 10;
-    const expected = new Date('2025-02-28T12:00:10.000');
+    const expected = new Date('2025-02-28T12:00:10.000+0200');
 
     expect(addSecondsToLocalTimestamp(timestamp, timezone, seconds)).toEqual(expected);
   });
@@ -385,7 +385,7 @@ describe('addSecondsToLocalTimestamp', () => {
     const timestamp = '2025-02-28T12:00:00.000Z';
     const timezone = 'Europe/Kiev';
     const seconds = 60;
-    const expected = new Date('2025-02-28T14:01:00.000');
+    const expected = new Date('2025-02-28T14:01:00.000+0200');
 
     expect(addSecondsToLocalTimestamp(timestamp, timezone, seconds)).toEqual(expected);
   });
@@ -394,7 +394,7 @@ describe('addSecondsToLocalTimestamp', () => {
     const timestamp = '2025-02-28T12:00:00';
     const timezone = 'Europe/Kiev';
     const seconds = 30;
-    const expected = new Date('2025-02-28T12:00:30.000');
+    const expected = new Date('2025-02-28T12:00:30.000+0200');
 
     expect(addSecondsToLocalTimestamp(timestamp, timezone, seconds)).toEqual(expected);
   });
@@ -403,7 +403,7 @@ describe('addSecondsToLocalTimestamp', () => {
     const timestamp = '2025-02-28T12:00:00.123456Z';
     const timezone = 'Europe/Kiev';
     const seconds = 60;
-    const expected = new Date('2025-02-28T14:01:00.123456');
+    const expected = new Date('2025-02-28T14:01:00.123456+0200');
 
     expect(addSecondsToLocalTimestamp(timestamp, timezone, seconds)).toEqual(expected);
   });
@@ -412,7 +412,7 @@ describe('addSecondsToLocalTimestamp', () => {
     const timestamp = '2025-02-28T12:00:00.000';
     const timezone = 'Europe/Kiev';
     const seconds = 100;
-    const expected = new Date('2025-02-28T12:01:40.000');
+    const expected = new Date('2025-02-28T12:01:40.000+0200');
 
     expect(addSecondsToLocalTimestamp(timestamp, timezone, seconds)).toEqual(expected);
   });
@@ -421,7 +421,7 @@ describe('addSecondsToLocalTimestamp', () => {
     const timestamp = '2025-02-28T12:00:00.000';
     const timezone = 'Europe/Kiev';
     const seconds = 0;
-    const expected = new Date('2025-02-28T12:00:00.000');
+    const expected = new Date('2025-02-28T12:00:00.000+0200');
 
     expect(addSecondsToLocalTimestamp(timestamp, timezone, seconds)).toEqual(expected);
   });
