@@ -132,7 +132,7 @@ export class PreAggregationPartitionRangeLoader {
 
   public async replaceQueryBuildRangeParams(queryValues: string[]): Promise<string[] | null> {
     if (queryValues.find(p => p === BUILD_RANGE_START_LOCAL || p === BUILD_RANGE_END_LOCAL)) {
-      const [buildRangeStart, buildRangeEnd] = await this.loadBuildRange();
+      const [buildRangeStart, buildRangeEnd] = await this.loadBuildRange(this.preAggregation.timestampFormat);
       return queryValues?.map(
         param => {
           if (param === BUILD_RANGE_START_LOCAL) {
@@ -406,13 +406,13 @@ export class PreAggregationPartitionRangeLoader {
     return { buildRange: dateRange, partitionRanges };
   }
 
-  public async loadBuildRange(): Promise<QueryDateRange> {
+  public async loadBuildRange(timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): Promise<QueryDateRange> {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
         async rangeQuery => utcToLocalTimeZone(
           this.preAggregation.timezone,
-          'YYYY-MM-DDTHH:mm:ss.SSS',
+          timestampFormat,
           PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
         )
       ),
@@ -432,7 +432,7 @@ export class PreAggregationPartitionRangeLoader {
       preAggregationStartEndQueries.map(
         async (rangeQuery, i) => utcToLocalTimeZone(
           this.preAggregation.timezone,
-          'YYYY-MM-DDTHH:mm:ss.SSS',
+          timestampFormat,
           PreAggregationPartitionRangeLoader.extractDate(
             await this.loadRangeQuery(
               rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
