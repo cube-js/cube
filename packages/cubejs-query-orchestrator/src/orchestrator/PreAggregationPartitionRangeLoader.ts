@@ -10,6 +10,7 @@ import {
   timeSeries,
   localTimestampToUtc,
   parseLocalDate,
+  reformatUtcTimestamp,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -161,9 +162,10 @@ export class PreAggregationPartitionRangeLoader {
     return [sql.replace(this.preAggregation.tableName, partitionTableName), params?.map(
       param => {
         if (dateRange && param === FROM_PARTITION_RANGE) {
-          return dateRange[0];
+          // Timestamp is already in UTC, but different format might be expected so we need to convert (e.g. for Kafka)
+          return reformatUtcTimestamp(this.preAggregation.timestampFormat, dateRange[0]);
         } else if (dateRange && param === TO_PARTITION_RANGE) {
-          return dateRange[1];
+          return reformatUtcTimestamp(this.preAggregation.timestampFormat, dateRange[1]);
         } else {
           return param;
         }
