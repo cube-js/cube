@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.10](https://github.com/cube-js/cube/compare/v1.0.9...v1.0.10) (2025-02-28)
+
+
+### Features
+
+* **server-core:** add fastReloadEnabled option to CompilerApi ([#9290](https://github.com/cube-js/cube/issues/9290)) ([1b7dddf](https://github.com/cube-js/cube/commit/1b7dddf0466a5fe2e13013109da9d18d37e78671))
+
+
+
+
+
 ## [1.0.9](https://github.com/cube-js/cube/compare/v1.0.8...v1.0.9) (2025-02-21)
 
 **Note:** Version bump only for package @cubejs-backend/shared
