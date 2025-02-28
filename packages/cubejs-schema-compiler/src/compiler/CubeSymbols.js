@@ -243,10 +243,39 @@ export class CubeSymbols {
       allMembers: new Set(),
     };
 
-    const types = ['measures', 'dimensions', 'segments', 'hierarchies'];
-    for (const type of types) {
-      const cubeIncludes = cube.cubes && this.membersFromCubes(cube, cube.cubes, type, errorReporter, splitViews, memberSets) || [];
+    const autoIncludeMembers = new Set();
+    // `hierarchies` must be processed first
+    const types = ['hierarchies', 'measures', 'dimensions', 'segments'];
 
+    for (const type of types) {
+      let cubeIncludes = [];
+      if (cube.cubes) {
+        // If the hierarchy is included all members from it should be included as well
+        // Extend `includes` with members from hierarchies that should be auto-included
+        const cubes = type === 'dimensions' ? cube.cubes.map((it) => {
+          const fullPath = this.evaluateReferences(null, it.joinPath, { collectJoinHints: true });
+          const split = fullPath.split('.');
+          const cubeRef = split[split.length - 1];
+
+          if (it.includes === '*') {
+            return it;
+          }
+
+          const currentCubeAutoIncludeMembers = Array.from(autoIncludeMembers)
+            .filter((path) => path.startsWith(`${cubeRef}.`))
+            .map((path) => path.split('.')[1])
+            .filter(memberName => !it.includes.find((include) => (include.name || include) === memberName));
+
+          return {
+            ...it,
+            includes: (it.includes || []).concat(currentCubeAutoIncludeMembers),
+          };
+        }) : cube.cubes;
+
+        cubeIncludes = this.membersFromCubes(cube, cubes, type, errorReporter, splitViews, memberSets) || [];
+      }
+
+      // This is the deprecated approach
       const includes = cube.includes && this.membersFromIncludeExclude(cube.includes, cube.name, type) || [];
       const excludes = cube.excludes && this.membersFromIncludeExclude(cube.excludes, cube.name, type) || [];
 
@@ -255,6 +284,21 @@ export class CubeSymbols {
         this.diffByMember(includes, cubeIncludes).concat(cubeIncludes),
         excludes
       );
+
+      if (type === 'hierarchies') {
+        for (const member of finalIncludes) {
+          const path = member.member.split('.');
+          const cubeName = path[path.length - 2];
+          const hierarchyName = path[path.length - 1];
+          const hierarchy = this.getResolvedMember(type, cubeName, hierarchyName);
+
+          if (hierarchy) {
+            const levels = this.evaluateReferences(cubeName, this.getResolvedMember('hierarchies', cubeName, hierarchyName).levels, { originalSorting: true });
+
+            levels.forEach((level) => autoIncludeMembers.add(level));
+          }
+        }
+      }
 
       const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
@@ -278,7 +322,7 @@ export class CubeSymbols {
   applyIncludeMembers(includeMembers, cube, type, errorReporter) {
     for (const [memberName, memberDefinition] of includeMembers) {
       if (cube[type]?.[memberName]) {
-        errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member.`);
+        errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member or assigning it an alias.`);
       } else if (type !== 'hierarchies') {
         cube[type][memberName] = memberDefinition;
       }
@@ -300,11 +344,7 @@ export class CubeSymbols {
 
       if (cubeInclude.includes === '*') {
         const membersObj = this.symbols[cubeReference]?.cubeObj()?.[type] || {};
-        if (Array.isArray(membersObj)) {
-          includes = membersObj.map(it => ({ member: `${fullPath}.${it.name}`, name: fullMemberName(it.name) }));
-        } else {
-          includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
-        }
+        includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
       } else {
         includes = cubeInclude.includes.map(include => {
           const member = include.alias || include;
@@ -397,10 +437,6 @@ export class CubeSymbols {
    * @protected
    */
   getResolvedMember(type, cubeName, memberName) {
-    if (Array.isArray(this.symbols[cubeName]?.cubeObj()?.[type])) {
-      return this.symbols[cubeName]?.cubeObj()?.[type]?.find((it) => it.name === memberName);
-    }
-
     return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
   }
 
