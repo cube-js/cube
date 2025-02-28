@@ -4,7 +4,7 @@ import {
   timeSeries,
   isPredefinedGranularity,
   timeSeriesFromCustomInterval,
-  extractDate,
+  parseLocalDate,
   utcToLocalTimeZone,
   addSecondsToLocalTimestamp,
   reformatInIsoLocal,
@@ -196,33 +196,41 @@ describe('predefinedGranularity', () => {
 });
 
 describe('extractDate', () => {
+  const timezone = 'Europe/Kiev';
+
   it('should return null if data is empty', () => {
-    expect(extractDate(null)).toBeNull();
-    expect(extractDate(undefined)).toBeNull();
-    expect(extractDate([])).toBeNull();
-    expect(extractDate('')).toBeNull();
+    expect(parseLocalDate(null, timezone)).toBeNull();
+    expect(parseLocalDate(undefined, timezone)).toBeNull();
+    expect(parseLocalDate([], timezone)).toBeNull();
+    expect(parseLocalDate('', timezone)).toBeNull();
   });
 
   it('should return null if no valid date is found in data', () => {
-    expect(extractDate([{}])).toBeNull();
-    expect(extractDate([{ someKey: 'invalid date' }])).toBeNull();
+    expect(parseLocalDate([{}], timezone)).toBeNull();
+    expect(parseLocalDate([{ someKey: 'invalid date' }], timezone)).toBeNull();
+  });
+
+  it('should throw an error for unknown timezone', () => {
+    const input = [{ date: '2025-02-28T12:00:00+03:00' }];
+    expect(() => parseLocalDate(input, 'Invalid/Timezone'))
+      .toThrowError('Unknown timezone: Invalid/Timezone');
   });
 
   it('should parse a date with UTC timezone', () => {
     const input = [{ date: '2025-02-28T12:00:00Z' }];
-    const result = extractDate(input);
-    expect(result).toBe('2025-02-28T12:00:00.000');
+    const result = parseLocalDate(input, timezone);
+    expect(result).toBe('2025-02-28T14:00:00.000');
   });
 
   it('should parse a date with an offset timezone', () => {
     const input = [{ date: '2025-02-28T12:00:00+03:00' }];
-    const result = extractDate(input);
-    expect(result).toBe('2025-02-28T09:00:00.000');
+    const result = parseLocalDate(input, timezone);
+    expect(result).toBe('2025-02-28T11:00:00.000');
   });
 
   it('should parse a date without timezone as UTC', () => {
     const input = [{ date: '2025-02-28 12:00:00' }];
-    const result = extractDate(input);
+    const result = parseLocalDate(input, timezone);
     expect(result).toBe('2025-02-28T12:00:00.000');
   });
 
@@ -232,10 +240,10 @@ describe('extractDate', () => {
     const input3 = [{ date: '2025-02-28T12:00:00Z' }];
     const input4 = [{ date: '2025-02-28T12:00:00+03:00' }];
 
-    expect(extractDate(input1)).toBe('2025-02-28T12:00:00.000');
-    expect(extractDate(input2)).toBe('2025-02-28T12:00:00.000');
-    expect(extractDate(input3)).toBe('2025-02-28T12:00:00.000');
-    expect(extractDate(input4)).toBe('2025-02-28T09:00:00.000');
+    expect(parseLocalDate(input1, timezone)).toBe('2025-02-28T12:00:00.000');
+    expect(parseLocalDate(input2, timezone)).toBe('2025-02-28T12:00:00.000');
+    expect(parseLocalDate(input3, timezone)).toBe('2025-02-28T14:00:00.000');
+    expect(parseLocalDate(input4, timezone)).toBe('2025-02-28T11:00:00.000');
   });
 });
 
