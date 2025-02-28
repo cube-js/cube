@@ -161,9 +161,9 @@ export class PreAggregationPartitionRangeLoader {
     return [sql.replace(this.preAggregation.tableName, partitionTableName), params?.map(
       param => {
         if (dateRange && param === FROM_PARTITION_RANGE) {
-          return PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, dateRange[0]);
+          return dateRange[0];
         } else if (dateRange && param === TO_PARTITION_RANGE) {
-          return PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, dateRange[1]);
+          return dateRange[1];
         } else {
           return param;
         }
@@ -193,8 +193,9 @@ export class PreAggregationPartitionRangeLoader {
     if ((!partitionInvalidateKeyQueries || partitionInvalidateKeyQueries.length > 0) && buildRangeEnd < range[1]) {
       loadRange[1] = buildRangeEnd;
     }
+    // partitionRanges() returns range in UTC.
     const sealAt = addSecondsToLocalTimestamp(
-      loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
+      loadRange[1], 'UTC', this.preAggregation.updateWindowSeconds || 0
     ).toISOString();
     return {
       ...this.preAggregation,
