@@ -6,10 +6,10 @@ import {
   TO_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
   reformatInIsoLocal,
-  utcToLocalTimeZoneInUtc,
+  utcToLocalTimeZone,
   timeSeries,
   inDbTimeZone,
-  extractDate
+  extractDate,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -442,7 +442,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   private now() {
-    return inDbTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
+    return utcToLocalTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
   }
 
   private orNowIfEmpty(dateRange: QueryDateRange): QueryDateRange {

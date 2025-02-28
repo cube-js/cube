@@ -233,7 +233,7 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
 /**
  * Takes timestamp in UTC, treat it as local time in provided timezone and returns the corresponding timestamp in UTC
  */
-export const utcToLocalTimeZoneInUtc = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
+export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
   if (!timestamp) {
     return null;
   }
