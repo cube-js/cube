@@ -193,9 +193,8 @@ export class PreAggregationPartitionRangeLoader {
     if ((!partitionInvalidateKeyQueries || partitionInvalidateKeyQueries.length > 0) && buildRangeEnd < range[1]) {
       loadRange[1] = buildRangeEnd;
     }
-    // partitionRanges() returns range in UTC.
     const sealAt = addSecondsToLocalTimestamp(
-      loadRange[1], 'UTC', this.preAggregation.updateWindowSeconds || 0
+      loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
     ).toISOString();
     return {
       ...this.preAggregation,
