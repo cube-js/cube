@@ -9,7 +9,7 @@ import {
   utcToLocalTimeZone,
   timeSeries,
   localTimestampToUtc,
-  extractDate,
+  parseLocalDate,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
@@ -411,11 +411,7 @@ export class PreAggregationPartitionRangeLoader {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async rangeQuery => utcToLocalTimeZone(
-          this.preAggregation.timezone,
-          timestampFormat,
-          PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
-        )
+        async rangeQuery => PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery), this.preAggregation.timezone, timestampFormat),
       ),
     );
 
@@ -431,15 +427,13 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async (rangeQuery, i) => utcToLocalTimeZone(
+        async (rangeQuery, i) => PreAggregationPartitionRangeLoader.extractDate(
+          await this.loadRangeQuery(
+            rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
+          ),
           this.preAggregation.timezone,
           timestampFormat,
-          PreAggregationPartitionRangeLoader.extractDate(
-            await this.loadRangeQuery(
-              rangeQuery, i === 0 ? wholeSeriesRanges[0] : wholeSeriesRanges[wholeSeriesRanges.length - 1],
-            ),
-          ),
-        )
+        ),
       ),
     );
     return this.orNowIfEmpty([rangeStart, rangeEnd]);
@@ -536,8 +530,8 @@ export class PreAggregationPartitionRangeLoader {
     return localTimestampToUtc(preAggregationDescription.timezone, preAggregationDescription.timestampFormat, timestamp);
   }
 
-  public static extractDate(data: any): string {
-    return extractDate(data);
+  public static extractDate(data: any, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string {
+    return parseLocalDate(data, timezone, timestampFormat);
   }
 
   public static FROM_PARTITION_RANGE = FROM_PARTITION_RANGE;
