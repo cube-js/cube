@@ -282,12 +282,12 @@ export class CubeSymbols {
       allMembers: new Set<string>(),
     };
 
-    const autoIncludeMembers = new Set();
+    const autoIncludeMembers = new Set<string>();
     // `hierarchies` must be processed first
     const types = ['hierarchies', 'measures', 'dimensions', 'segments'];
 
     for (const type of types) {
-      let cubeIncludes = [];
+      let cubeIncludes: any[] = [];
       if (cube.cubes) {
         // If the hierarchy is included all members from it should be included as well
         // Extend `includes` with members from hierarchies that should be auto-included
