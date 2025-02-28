@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { inDbTimeZone, timeSeries, isPredefinedGranularity, timeSeriesFromCustomInterval } from '../src';
+import { localTimestampToUtc, timeSeries, isPredefinedGranularity, timeSeriesFromCustomInterval } from '../src';
 
 describe('time', () => {
   it('time series - day', () => {
@@ -179,11 +179,11 @@ describe('time', () => {
   });
 
   it('inDbTimeZone', () => {
-    expect(inDbTimeZone('UTC', 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', '2020-01-01T00:00:00.000000')).toEqual(
+    expect(localTimestampToUtc('UTC', 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', '2020-01-01T00:00:00.000000')).toEqual(
       '2020-01-01T00:00:00.000000Z'
     );
 
-    expect(inDbTimeZone('UTC', 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', '2020-01-31T23:59:59.999999')).toEqual(
+    expect(localTimestampToUtc('UTC', 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', '2020-01-31T23:59:59.999999')).toEqual(
       '2020-01-31T23:59:59.999999Z'
     );
   });

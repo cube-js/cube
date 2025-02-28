@@ -192,7 +192,10 @@ export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
 
 export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
 
-export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
+/**
+ * Takes timestamp, treat it as time in provided timezone and returns the corresponding timestamp in UTC
+ */
+export const localTimestampToUtc = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
   if (!timestamp) {
     return null;
   }
@@ -231,7 +234,7 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
 };
 
 /**
- * Takes timestamp in UTC, treat it as local time in provided timezone and returns the corresponding timestamp in UTC
+ * Takes timestamp in UTC, shift it into provided timezone and returns the corresponding timestamp in UTC
  */
 export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string | null => {
   if (!timestamp) {

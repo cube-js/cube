@@ -8,7 +8,7 @@ import {
   reformatInIsoLocal,
   utcToLocalTimeZone,
   timeSeries,
-  inDbTimeZone,
+  localTimestampToUtc,
   extractDate,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
@@ -407,7 +407,7 @@ export class PreAggregationPartitionRangeLoader {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async rangeQuery => inDbTimeZone(
+        async rangeQuery => localTimestampToUtc(
           this.preAggregation.timezone,
           'YYYY-MM-DDTHH:mm:ss.SSS',
           PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
@@ -427,7 +427,7 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async (rangeQuery, i) => inDbTimeZone(
+        async (rangeQuery, i) => localTimestampToUtc(
           this.preAggregation.timezone,
           'YYYY-MM-DDTHH:mm:ss.SSS',
           PreAggregationPartitionRangeLoader.extractDate(
@@ -529,7 +529,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   public static inDbTimeZone(preAggregationDescription: any, timestamp: string): string {
-    return inDbTimeZone(preAggregationDescription.timezone, preAggregationDescription.timestampFormat, timestamp);
+    return localTimestampToUtc(preAggregationDescription.timezone, preAggregationDescription.timestampFormat, timestamp);
   }
 
   public static extractDate(data: any): string {
