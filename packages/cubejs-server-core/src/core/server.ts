@@ -712,6 +712,7 @@ export class CubejsServerCore {
         sqlCache: this.options.sqlCache,
         standalone: this.standalone,
         allowNodeRequire: options.allowNodeRequire,
+        fastReloadEnabled: getEnv('fastReloadEnabled'),
       },
     );
   }
