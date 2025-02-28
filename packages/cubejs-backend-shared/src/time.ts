@@ -268,7 +268,7 @@ export const extractDate = (data: any): string | null => {
   if (!value) {
     return value;
   }
-  return moment.tz(value, 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  return moment.tz(value, 'UTC').format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {
