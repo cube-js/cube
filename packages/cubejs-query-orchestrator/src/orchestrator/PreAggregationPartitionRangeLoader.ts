@@ -136,9 +136,9 @@ export class PreAggregationPartitionRangeLoader {
       return queryValues?.map(
         param => {
           if (param === BUILD_RANGE_START_LOCAL) {
-            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeStart);
+            return buildRangeStart;
           } else if (param === BUILD_RANGE_END_LOCAL) {
-            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeEnd);
+            return buildRangeEnd;
           } else {
             return param;
           }
@@ -367,11 +367,8 @@ export class PreAggregationPartitionRangeLoader {
 
   private async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
     const buildRange = await this.loadBuildRange();
-    if (!buildRange[0] || !buildRange[1]) {
-      return { buildRange, partitionRanges: [] };
-    }
 
-    // buildRange is localized in loadBuildRange()
+    // buildRange was localized in loadBuildRange()
     // preAggregation.matchedTimeDimensionDateRange is also localized
     // in BaseFilter->formatToDate()/formatFromDate()
     let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
@@ -384,6 +381,12 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [buildRange[1], buildRange[1]];
     }
+
+    // Partitions are built and named in UTC
+    dateRange = [
+      localTimestampToUtc(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', dateRange[0]),
+      localTimestampToUtc(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', dateRange[1]),
+    ];
 
     const partitionRanges = this.compilerCacheFn(
       ['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`],
@@ -407,7 +410,7 @@ export class PreAggregationPartitionRangeLoader {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async rangeQuery => localTimestampToUtc(
+        async rangeQuery => utcToLocalTimeZone(
           this.preAggregation.timezone,
           'YYYY-MM-DDTHH:mm:ss.SSS',
           PreAggregationPartitionRangeLoader.extractDate(await this.loadRangeQuery(rangeQuery)),
@@ -427,7 +430,7 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
-        async (rangeQuery, i) => localTimestampToUtc(
+        async (rangeQuery, i) => utcToLocalTimeZone(
           this.preAggregation.timezone,
           'YYYY-MM-DDTHH:mm:ss.SSS',
           PreAggregationPartitionRangeLoader.extractDate(
