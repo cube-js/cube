@@ -136,9 +136,9 @@ export class PreAggregationPartitionRangeLoader {
       return queryValues?.map(
         param => {
           if (param === BUILD_RANGE_START_LOCAL) {
-            return PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, buildRangeStart);
+            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeStart);
           } else if (param === BUILD_RANGE_END_LOCAL) {
-            return PreAggregationPartitionRangeLoader.inDbTimeZone(this.preAggregation, buildRangeEnd);
+            return utcToLocalTimeZone(this.preAggregation.timezone, this.preAggregation.timestampFormat, buildRangeEnd);
           } else {
             return param;
           }
