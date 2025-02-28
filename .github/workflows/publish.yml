@@ -483,7 +483,7 @@ jobs:
             build-args: WITH_AVX2=1
             postfix: ""
             tag: "latest"
-          - os: self-hosted
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             platforms: linux/arm64
             build-args: WITH_AVX2=0

@@ -101,22 +101,34 @@ terms][ref-enterprise-premier-tier-support], and [limits][ref-cloud-limits].
 
 ## Resources
 
-The following resource types incur CCU consumption (measured in 5-minute intervals):
+The following resource types incur CCU consumption and apply to _individual resources_
+of deployments within a Cube Cloud account. The consumption is measured in 5-minute intervals.
 
-| Resource type             | CCUs per hour                                        | CCUs per request                                       |
-| ------------------------- | :--------------------------------------------------: | :--------------------------------------------------: |
-| [Production Cluster][ref-production-cluster] | Depends on a [chosen tier](#deployment-tiers)           | — |
-| [Development Instance][ref-development-instance] | Depends on a [chosen tier](#deployment-tiers)           | — |
-| Cube API Instance         | Depends on a [chosen tier](#deployment-tiers)           | — |
-| Cube Store Worker         | Depends on a [chosen tier](#cube-store-worker-tiers) | — |
-| [Semantic Catalog][ref-semantic-catalog] | Depends on a [chosen tier](#semantic-catalog-tiers) | — |
+| Resource type | CCUs per hour | Notes |
+| --- | :---: | --- |
+| [Production Cluster][ref-production-cluster] | <nobr>4..8</nobr> | Depends on a [chosen tier](#deployment-tiers) |
+| [Development Instance][ref-development-instance] | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
+| Cube API Instance | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
+| Cube Store Worker | <nobr>1..2</nobr> | Depends on a [chosen tier](#cube-store-worker-tiers) |
+| [Semantic Catalog][ref-semantic-catalog] | <nobr>2..4</nobr> | Depends on a [chosen tier](#semantic-catalog-tiers) |
+| [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
+| [Monitoring Integrations][ref-monitoring-integrations] | <nobr>1..4</nobr> | Depends on a [chosen tier](#monitoring-integrations-tiers) |
+
+The following resource types incur CCU consumption and apply to _individual requests_
+to deployments within a Cube Cloud account:
+
+| Resource type | CCUs per request | Notes |
+| --- | :---: | --- |
+| [AI API][ref-ai-api] | <nobr>0..1</nobr> | Depends on [configuration](#ai-requests-consumption) |
+| [AI Assistant][ref-ai-assistant] | <nobr>0..1</nobr> | Depends on [configuration](#ai-requests-consumption) |
+
+The following resource types incur CCU consumption and apply to the _whole Cube Cloud
+account_:
+
+| Resource type | CCUs per hour | Notes |
+| --- | :---: | --- |
 | [Dedicated infrastructure][ref-dedicated-infra] | 3 | — |
-| [Query History][ref-query-history] | Depends on a [chosen tier](#query-history-tiers)     | — |
-| [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) | — |
-| [Audit Log][ref-audit-log] | Depends on a [chosen tier](#audit-log-tiers) | — |
-| [AI API][ref-ai-api] | — | Depends on [configuration](#ai-requests-consumption) |
-| [AI Assistant][ref-ai-assistant] | — | Depends on [configuration](#ai-requests-consumption) |
-
+| [Audit Log][ref-audit-log] | <nobr>4..6</nobr> | Depends on the [chosen tier](#audit-log-tiers) |
 
 ### Deployment tiers
 
@@ -188,16 +200,6 @@ You can upgrade to a chosen tier in the
 You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
 
-### Audit Log tiers
-
-[Audit Log][ref-audit-log] collects, stores, and displays security-related events
-under the following tiers:
-
-| Tier | <nobr>CCUs per hour</nobr> | Dependent features |
-| ---- | :------------------------: | ------------------ |
-| S    | 4                          | —                  |
-| M    | 6                          | Audit Log data export |
-
 ### AI requests consumption
 
 [AI API][ref-ai-api] and [AI Assistant][ref-ai-assistant] consume CCUs per request apart from
@@ -207,6 +209,16 @@ LLM if wanted and then will be exempt from this charge:
 | <nobr>CCUs per request</nobr> |
 | :------------------------: |
 | 1                          |
+
+### Audit Log tiers
+
+[Audit Log][ref-audit-log] collects, stores, and displays security-related events
+under the following tiers:
+
+| Tier | <nobr>CCUs per hour</nobr> | Dependent features |
+| ---- | :------------------------: | ------------------ |
+| S    | 4                          | —                  |
+| M    | 6                          | Audit Log data export |
 
 ## Total cost examples
 

@@ -19,15 +19,20 @@ Cube Cloud for Excel is currently in preview. Please [contact us](https://cube.d
 
 </WarningBox>
 
-After [installing](#installation) and [authenticating](#authentication) this
-add-in, you will be able to [create reports via pivot
-table](#create-reports-via-pivot-table) and work with [saved
-reports](#work-with-saved-reports).
+After [configuring](#configuration), [installing](#installation), and
+[authenticating](#authentication) this add-in, you will be able to [create
+reports via pivot table](#create-reports-via-pivot-table) and work with
+[saved reports](#work-with-saved-reports).
 
 <YouTubeVideo
   url="https://www.youtube.com/embed/vG7iEdYTvIQ"
   aspectRatio={5/4}
 />
+
+## Configuration
+
+Cube Cloud for Excel uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
 
 ## Installation
 
@@ -117,3 +122,4 @@ Click <Btn>Edit</Btn> to chnage the query or the location.
 [ref-playground]: /product/workspace/playground
 [ref-views]: /product/data-modeling/concepts#views
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-sql-api-enabled]: /product/apis-integrations/sql-api#cube-cloud
