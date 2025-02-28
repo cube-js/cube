@@ -178,10 +178,12 @@ export class BaseDbRunner {
         if (desc.partitionGranularity) {
           desc.dateRange = [
             PreAggregationPartitionRangeLoader.extractDate(
-              await this.testQueries([desc.preAggregationStartEndQueries[0]])
+              await this.testQueries([desc.preAggregationStartEndQueries[0]]),
+              desc.timezone,
             ),
             PreAggregationPartitionRangeLoader.extractDate(
-              await this.testQueries([desc.preAggregationStartEndQueries[1]])
+              await this.testQueries([desc.preAggregationStartEndQueries[1]]),
+              desc.timezone,
             )
           ];
           // console.log(desc);
