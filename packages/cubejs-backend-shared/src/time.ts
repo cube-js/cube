@@ -265,7 +265,7 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
   return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
 };
 
-export const extractDate = (data: any): string | null => {
+export const parseLocalDate = (data: any, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string | null => {
   if (!data) {
     return null;
   }
@@ -273,6 +273,11 @@ export const extractDate = (data: any): string | null => {
   const value = data[0] && data[0][Object.keys(data[0])[0]];
   if (!value) {
     return null;
+  }
+
+  const zone = moment.tz.zone(timezone);
+  if (!zone) {
+    throw new Error(`Unknown timezone: ${timezone}`);
   }
 
   // Most common formats
@@ -290,15 +295,15 @@ export const extractDate = (data: any): string | null => {
     // We have timezone info
     parsedMoment = moment(value, formats, true);
   } else {
-    // If no tz info - treat as in UTC
-    parsedMoment = moment.utc(value, formats, true);
+    // If no tz info - use provided timezone
+    parsedMoment = moment.tz(value, formats, true, timezone);
   }
 
   if (!parsedMoment.isValid()) {
     return null;
   }
 
-  return parsedMoment.utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  return parsedMoment.tz(timezone).format(timestampFormat);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {
