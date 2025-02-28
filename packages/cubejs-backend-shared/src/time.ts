@@ -266,9 +266,33 @@ export const extractDate = (data: any): string | null => {
   data = JSON.parse(JSON.stringify(data));
   const value = data[0] && data[0][Object.keys(data[0])[0]];
   if (!value) {
-    return value;
+    return null;
   }
-  return moment.tz(value, 'UTC').format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+
+  // Most common formats
+  const formats = [
+    moment.ISO_8601,
+    'YYYY-MM-DD HH:mm:ss',
+    'YYYY-MM-DD HH:mm:ss.SSS',
+    'YYYY-MM-DDTHH:mm:ss.SSS',
+    'YYYY-MM-DDTHH:mm:ss'
+  ];
+
+  let parsedMoment;
+
+  if (value.includes('Z') || /([+-]\d{2}:?\d{2})$/.test(value.trim())) {
+    // We have timezone info
+    parsedMoment = moment(value, formats, true);
+  } else {
+    // If no tz info - treat as in UTC
+    parsedMoment = moment.utc(value, formats, true);
+  }
+
+  if (!parsedMoment.isValid()) {
+    return null;
+  }
+
+  return parsedMoment.utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {
