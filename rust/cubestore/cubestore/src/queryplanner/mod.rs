@@ -245,8 +245,7 @@ impl QueryPlannerImpl {
 }
 
 impl QueryPlannerImpl {
-    pub fn make_execution_context() -> SessionContext {
-        let config = SessionConfig::new();
+    pub fn execution_context_helper(config: SessionConfig) -> SessionContext {
         let context = SessionContext::new_with_config(config);
         // TODO upgrade DF: build SessionContexts consistently -- that now means check all appropriate SessionContext constructors use this make_execution_context or execution_context function.
         for udaf in registerable_aggregate_udfs() {
@@ -267,8 +266,12 @@ impl QueryPlannerImpl {
         context
     }
 
+    pub fn make_execution_context() -> SessionContext {
+        Self::execution_context_helper(SessionConfig::new())
+    }
+
     async fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
-        Ok(Arc::new(Self::make_execution_context()))
+        Ok(Arc::new(Self::execution_context_helper(self.metadata_cache_factory.make_session_config())))
     }
 }
 

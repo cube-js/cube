@@ -5,6 +5,7 @@ use datafusion::parquet::arrow::async_reader::AsyncFileReader;
 use datafusion::parquet::file::encryption::ParquetEncryptionConfig;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
+use datafusion::prelude::SessionConfig;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use std::fmt;
@@ -23,6 +24,9 @@ pub trait MetadataCacheFactory: Sync + Send {
         max_capacity: u64,
         time_to_idle: Duration,
     ) -> Arc<dyn ParquetFileReaderFactory>;
+    fn make_session_config(&self) -> SessionConfig {
+        SessionConfig::new()
+    }
 }
 /// Default MetadataCache, does not cache anything
 #[derive(Debug)]
