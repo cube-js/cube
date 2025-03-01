@@ -2103,6 +2103,10 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory()
+                        .clone()
                 )
             })
             .await;

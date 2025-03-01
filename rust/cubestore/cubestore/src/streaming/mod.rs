@@ -11,6 +11,7 @@ use crate::metastore::replay_handle::{ReplayHandle, SeqPointer, SeqPointerForLoc
 use crate::metastore::source::SourceCredentials;
 use crate::metastore::table::{StreamOffset, Table};
 use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
@@ -57,6 +58,7 @@ pub struct StreamingServiceImpl {
     chunk_store: Arc<dyn ChunkDataStore>,
     ksql_client: Arc<dyn KsqlClient>,
     kafka_client: Arc<dyn KafkaClientService>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
 }
 
 crate::di_service!(StreamingServiceImpl, [StreamingService]);
@@ -68,6 +70,7 @@ impl StreamingServiceImpl {
         chunk_store: Arc<dyn ChunkDataStore>,
         ksql_client: Arc<dyn KsqlClient>,
         kafka_client: Arc<dyn KafkaClientService>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<Self> {
         Arc::new(Self {
             config_obj,
@@ -75,6 +78,7 @@ impl StreamingServiceImpl {
             chunk_store,
             ksql_client,
             kafka_client,
+            metadata_cache_factory,
         })
     }
 
@@ -165,6 +169,7 @@ impl StreamingServiceImpl {
                 self.kafka_client.clone(),
                 *use_ssl,
                 trace_obj,
+                self.metadata_cache_factory.clone(),
             ).await?)),
         }
     }

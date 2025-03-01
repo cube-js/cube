@@ -2,6 +2,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::Column;
+use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::streaming::kafka_post_processing::{KafkaPostProcessPlan, KafkaPostProcessPlanner};
 use crate::streaming::traffic_sender::TrafficSender;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
@@ -59,6 +60,7 @@ impl KafkaStreamingSource {
         kafka_client: Arc<dyn KafkaClientService>,
         use_ssl: bool,
         trace_obj: Option<String>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Result<Self, CubeError> {
         let (post_processing_plan, columns, unique_key_columns, seq_column_index) =
             if let Some(select_statement) = select_statement {
@@ -70,7 +72,7 @@ impl KafkaStreamingSource {
                     source_columns,
                 );
                 let plan = planner
-                    .build(select_statement.clone())
+                    .build(select_statement.clone(), metadata_cache_factory)
                     .await?;
                 let columns = plan.source_columns().clone();
                 let seq_column_index = plan.source_seq_column_index();
@@ -448,7 +450,7 @@ mod tests {
             .await
             .unwrap();
 
-        let batches = collect(phys_plan, Arc::new(TaskContext::default()))
+        let batches = collect(phys_plan, plan_ctx.task_ctx())
             .await
             .unwrap();
         let res = batches_to_dataframe(batches).unwrap();
@@ -487,7 +489,7 @@ mod tests {
             .unwrap();
         let phys_plan = phys_plan.with_new_children(vec![inp]).unwrap();
 
-        let batches = collect(phys_plan, Arc::new(TaskContext::default()))
+        let batches = collect(phys_plan, plan_ctx.task_ctx())
             .await
             .unwrap();
         let res = batches_to_dataframe(batches).unwrap();
