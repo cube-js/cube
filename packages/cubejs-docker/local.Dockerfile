@@ -11,7 +11,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     # python3 package is necessary to install `python3` executable for node-gyp
-    && apt-get install -y --no-install-recommends libssl3 python3 python3.11 libpython3.11-dev \
+    && apt-get install -y --no-install-recommends libssl3 python3 python3.11 libpython3.11-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
