@@ -87,7 +87,7 @@ use datafusion::physical_plan::{
     collect, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning,
     PlanProperties, SendableRecordBatchStream,
 };
-use datafusion::prelude::SessionContext;
+use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion::sql::parser::Statement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use datafusion::{cube_ext, datasource::TableProvider};
@@ -246,7 +246,8 @@ impl QueryPlannerImpl {
 
 impl QueryPlannerImpl {
     pub fn make_execution_context() -> SessionContext {
-        let context = SessionContext::new();
+        let config = SessionConfig::new();
+        let context = SessionContext::new_with_config(config);
         // TODO upgrade DF: build SessionContexts consistently -- that now means check all appropriate SessionContext constructors use this make_execution_context or execution_context function.
         for udaf in registerable_aggregate_udfs() {
             context.register_udaf(udaf);
