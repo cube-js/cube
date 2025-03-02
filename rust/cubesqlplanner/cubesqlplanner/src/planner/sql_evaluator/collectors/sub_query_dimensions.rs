@@ -20,6 +20,9 @@ impl SubQueryDimensionsCollector {
 
     pub fn extract_result(self) -> Vec<Rc<MemberSymbol>> {
         self.sub_query_dimensions
+            .into_iter()
+            .unique_by(|m| m.full_name())
+            .collect()
     }
 
     fn check_dim_has_measures(&self, dim: &DimensionSymbol) -> bool {
