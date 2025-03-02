@@ -136,6 +136,16 @@ pub struct LruCachingFileReader {
     cache: Arc<moka::sync::Cache<object_store::path::Path, Arc<ParquetMetaData>>>,
 }
 
+impl LruCachingFileReader {
+    pub fn new(path: object_store::path::Path, reader: Box<dyn AsyncFileReader>, cache: Arc<moka::sync::Cache<object_store::path::Path, Arc<ParquetMetaData>>>) -> LruCachingFileReader {
+        LruCachingFileReader {
+            path,
+            reader,
+            cache,
+        }
+    }
+}
+
 impl AsyncFileReader for LruCachingFileReader {
     fn get_bytes(
         &mut self,

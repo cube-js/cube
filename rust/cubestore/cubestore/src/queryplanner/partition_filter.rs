@@ -19,7 +19,6 @@ impl PartitionFilter {
     const SIZE_LIMIT: usize = 50;
 
     pub fn extract(s: &Schema, filters: &[Expr]) -> PartitionFilter {
-        println!("Calling extract on filters {:?}", filters);
         let builder = Builder { schema: s };
 
         let mut r = vec![];
