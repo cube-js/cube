@@ -23,7 +23,7 @@ pub struct TimeDimension {
 pub struct FilterItem {
     pub or: Option<Vec<FilterItem>>,
     pub and: Option<Vec<FilterItem>>,
-    member: Option<String>,
+    pub member: Option<String>,
     pub dimension: Option<String>,
     pub operator: Option<String>,
     pub values: Option<Vec<Option<String>>>,
