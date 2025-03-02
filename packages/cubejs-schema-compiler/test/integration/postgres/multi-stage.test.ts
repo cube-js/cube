@@ -12,7 +12,15 @@ describe('Multi-Stage', () => {
 cubes:
   - name: orders
     sql: >
-      SELECT 10 as ID, 'complited' as STATUS, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
+      SELECT 9 as ID, 'completed' as STATUS, '2022-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
+      union all
+      SELECT 10 as ID, 'completed' as STATUS, '2023-01-12T20:00:00.000Z'::timestamptz as CREATED_AT
+      union all
+      SELECT 11 as ID, 'completed' as STATUS, '2024-01-14T20:00:00.000Z'::timestamptz as CREATED_AT
+      union all
+      SELECT 12 as ID, 'completed' as STATUS, '2024-02-14T20:00:00.000Z'::timestamptz as CREATED_AT
+      union all
+      SELECT 13 as ID, 'completed' as STATUS, '2025-03-14T20:00:00.000Z'::timestamptz as CREATED_AT
     joins:
       - name: line_items
         sql: "{CUBE}.ID = {line_items}.order_id"
@@ -91,7 +99,19 @@ cubes:
 
   - name: line_items
     sql: >
+      SELECT 9 as ID, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT, 9 as ORDER_ID, 11 as PRODUCT_ID
+      union all
       SELECT 10 as ID, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT, 10 as ORDER_ID, 10 as PRODUCT_ID
+      union all
+      SELECT 11 as ID, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT, 10 as ORDER_ID, 11 as PRODUCT_ID
+      union all
+      SELECT 12 as ID, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT, 11 as ORDER_ID, 10 as PRODUCT_ID
+      union all
+      SELECT 13 as ID, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT, 11 as ORDER_ID, 10 as PRODUCT_ID
+      union all
+      SELECT 14 as ID, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT, 12 as ORDER_ID, 10 as PRODUCT_ID
+      union all
+      SELECT 15 as ID, '2024-01-12T20:00:00.000Z'::timestamptz as CREATED_AT, 13 as ORDER_ID, 11 as PRODUCT_ID
     public: false
 
     joins:
@@ -124,6 +144,8 @@ cubes:
   - name: products
     sql: >
       SELECT 10 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 10 as PRICE
+      union all
+      SELECT 11 as ID, 'some category' as PRODUCT_CATEGORY, 'some name' as NAME, 5 as PRICE
     public: false
     description: >
       Products and categories in our e-commerce store.
@@ -185,17 +207,20 @@ views:
   }
 
   it('multi stage over sub query', async () => runQueryTest({
-    measures: ['orders.revenue', 'orders.revenue_1_y_ago'],
+    measures: ['orders.revenue', 'orders.revenue_1_y_ago', 'orders.cagr_1_y'],
     timeDimensions: [
       {
         dimension: 'orders.date',
         granularity: 'year'
       }
     ],
-    dimensions: [
-      'orders.status',
-      'orders.amount'
-    ],
     timezone: 'UTC'
-  }, []));
+  }, [
+
+    { orders__date_year: '2023-01-01T00:00:00.000Z',
+      orders__revenue: '15',
+      orders__revenue_1_y_ago: '5',
+      orders__cagr_1_y: '2.0000000000000000' },
+    { orders__date_year: '2024-01-01T00:00:00.000Z', orders__revenue: '30', orders__revenue_1_y_ago: '15', orders__cagr_1_y: '1.0000000000000000' },
+    { orders__date_year: '2025-01-01T00:00:00.000Z', orders__revenue: '5', orders__revenue_1_y_ago: '30', orders__cagr_1_y: '-0.83333333333333333333' }]));
 });
