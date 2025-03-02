@@ -617,7 +617,7 @@ export class BaseQuery {
     return false;
   }
 
-  newQueryNotUseNative() {
+  newQueryWithoutNative() {
     const QueryClass = this.constructor;
     return new QueryClass(this.compilers, { ...this.options, useNativeSqlPlanner: false });
   }
@@ -654,7 +654,7 @@ export class BaseQuery {
       }
 
       if (isRelatedToPreAggregation) {
-        return this.newQueryNotUseNative().buildSqlAndParams(exportAnnotatedSql);
+        return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
       }
 
       return this.buildSqlAndParamsRust(exportAnnotatedSql);
@@ -3086,7 +3086,7 @@ export class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    options = { ...options, useNativeSqlPlanner: false }; // We not use tesseract for pre-aggregations generation yet
+    options = { ...options, useNativeSqlPlanner: false }; // We don't use tesseract for pre-aggregations generation yet
     if (this.options.queryFactory) {
       // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
       // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
