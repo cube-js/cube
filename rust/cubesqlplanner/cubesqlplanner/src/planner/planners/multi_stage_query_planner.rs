@@ -251,13 +251,13 @@ impl MultiStageQueryPlanner {
         if time_dimension.get_date_range().is_some() && result_granularity.is_some() {
             let granularity = time_dimension.get_granularity().unwrap(); //FIXME remove this unwrap
             let date_range = time_dimension.get_date_range().unwrap(); //FIXME remove this unwrap
-            let seria = self
+            let series = self
                 .query_tools
                 .base_tools()
                 .generate_time_series(granularity, date_range.clone())?;
-            if !seria.is_empty() {
-                let new_from_date = seria.first().unwrap()[0].clone();
-                let new_to_date = seria.last().unwrap()[1].clone();
+            if !series.is_empty() {
+                let new_from_date = series.first().unwrap()[0].clone();
+                let new_to_date = series.last().unwrap()[1].clone();
                 new_state.replace_range_in_date_filter(
                     &time_dimension_name,
                     new_from_date,
@@ -394,9 +394,9 @@ impl MultiStageQueryPlanner {
         }
 
         let childs = member_childs(&member)?;
-
-        let description = if childs.is_empty() || !has_multi_stage_members(&member, false)? {
-            if has_multi_stage_members(&member, false)? {
+        let has_multi_stage_members = has_multi_stage_members(&member, false)?;
+        let description = if childs.is_empty() || !has_multi_stage_members {
+            if has_multi_stage_members {
                 return Err(CubeError::internal(format!(
                     "Leaf multi stage query cannot contain multi stage member"
                 )));
