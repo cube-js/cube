@@ -263,7 +263,8 @@ export class CubeEvaluator extends CubeSymbols {
                 }
 
                 return null;
-              }).filter(Boolean);
+              })
+                .filter(Boolean);
 
               const name = hierarchyPathToName[[cubeName, it.name].join('.')];
               if (!name) {
