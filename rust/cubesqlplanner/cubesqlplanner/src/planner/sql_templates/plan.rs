@@ -10,6 +10,18 @@ use std::rc::Rc;
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
 }
+pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
+    name: "LowerUpper",
+    condition: |s, _| {
+        s.get(0) == Some(&"_")
+            && s.get(1)
+                .map(|c| c.to_uppercase() != c.to_lowercase() && *c == c.to_uppercase())
+                == Some(true)
+    },
+    arg: None,
+    start: 0,
+    len: 0,
+};
 
 impl PlanSqlTemplates {
     pub fn new(render: Rc<dyn SqlTemplatesRender>) -> Self {
@@ -18,8 +30,12 @@ impl PlanSqlTemplates {
 
     pub fn alias_name(name: &str) -> String {
         let res = name
-            .from_case(Case::Camel)
-            .without_boundaries(&[Boundary::LOWER_DIGIT, Boundary::UPPER_DIGIT])
+            .with_boundaries(&[
+                UNDERSCORE_UPPER_BOUND,
+                Boundary::LOWER_UPPER,
+                Boundary::DIGIT_LOWER,
+                Boundary::ACRONYM,
+            ])
             .to_case(Case::Snake)
             .replace(".", "__");
         res

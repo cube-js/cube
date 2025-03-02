@@ -207,31 +207,16 @@ view(\`Product_Stock\`, {
     );
   }
 
-  if (getEnv('nativeSqlPlanner')) {
-    it('join order', async () => runQueryTest({
-      measures: ['Product_Stock.quantity'],
-      dimensions: [
-        'Product_Stock.sub_category',
-        'Product_Stock.brand'
-      ],
-      order: [{ id: 'Product_Stock.quantity' }]
-    }, [{
-      product_stock__sub_category: 'Sub Category',
-      product_stock__brand: 'Brand',
-      product_stock__quantity: '10',
-    }]));
-  } else {
-    it('join order', async () => runQueryTest({
-      measures: ['Product_Stock.quantity'],
-      dimensions: [
-        'Product_Stock.sub_category',
-        'Product_Stock.brand'
-      ],
-      order: [{ id: 'Product_Stock.quantity' }]
-    }, [{
-      product__stock__sub_category: 'Sub Category',
-      product__stock__brand: 'Brand',
-      product__stock__quantity: '10',
-    }]));
-  }
+  it('join order', async () => runQueryTest({
+    measures: ['Product_Stock.quantity'],
+    dimensions: [
+      'Product_Stock.sub_category',
+      'Product_Stock.brand'
+    ],
+    order: [{ id: 'Product_Stock.quantity' }]
+  }, [{
+    product__stock__sub_category: 'Sub Category',
+    product__stock__brand: 'Brand',
+    product__stock__quantity: '10',
+  }]));
 });

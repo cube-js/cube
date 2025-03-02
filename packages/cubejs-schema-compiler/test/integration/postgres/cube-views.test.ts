@@ -413,23 +413,12 @@ view(\`OrdersView3\`, {
     expect(cube.config.measures.filter((({ isVisible }) => isVisible)).length).toBe(0);
   });
 
-  if (getEnv('nativeSqlPlanner')) {
-    it('split views', async () => runQueryTest({
-      measures: ['OrdersView3.count'],
-      dimensions: ['OrdersView3_ProductCategories.name'],
-      order: [{ id: 'OrdersView3_ProductCategories.name' }],
-    }, [{
-      orders_view3__count: '2',
-      orders_view3_product_categories__name: 'Groceries',
-    }]));
-  } else {
-    it('split views', async () => runQueryTest({
-      measures: ['OrdersView3.count'],
-      dimensions: ['OrdersView3_ProductCategories.name'],
-      order: [{ id: 'OrdersView3_ProductCategories.name' }],
-    }, [{
-      orders_view3__count: '2',
-      orders_view3__product_categories__name: 'Groceries',
-    }]));
-  }
+  it('split views', async () => runQueryTest({
+    measures: ['OrdersView3.count'],
+    dimensions: ['OrdersView3_ProductCategories.name'],
+    order: [{ id: 'OrdersView3_ProductCategories.name' }],
+  }, [{
+    orders_view3__count: '2',
+    orders_view3__product_categories__name: 'Groceries',
+  }]));
 });
