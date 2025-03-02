@@ -57,10 +57,6 @@ export class PreAggregations {
   }
 
   preAggregationCubes() {
-    if (getEnv('nativeSqlPlanner')) {
-      // No join defined in Tesseract
-      return [];
-    }
     const { join } = this.query;
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }

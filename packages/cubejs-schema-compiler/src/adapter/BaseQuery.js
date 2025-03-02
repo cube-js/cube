@@ -286,11 +286,9 @@ export class BaseQuery {
       return dimension;
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
+    this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
+    this.prebuildJoin();
 
-    if (!getEnv('nativeSqlPlanner')) {
-      // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
-      this.join = this.joinGraph.buildJoin(this.allJoinHints);
-    }
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
@@ -305,6 +303,15 @@ export class BaseQuery {
     this.order = this.options.order ?? this.defaultOrder();
 
     this.initUngrouped();
+  }
+
+  prebuildJoin() {
+    /* if (!this.useNativeSqlPlanner) { We still need this join for the follback to preaggregation to work properly. This condition should be returned after the tesseract starts working with pre-aggregations
+      // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
+      this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    } */
+
+    this.join = this.joinGraph.buildJoin(this.allJoinHints);
   }
 
   cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
@@ -383,8 +390,7 @@ export class BaseQuery {
   initUngrouped() {
     this.ungrouped = this.options.ungrouped;
     if (this.ungrouped) {
-      // this.join is not defined for Tesseract
-      if (!this.options.allowUngroupedWithoutPrimaryKey && !getEnv('nativeSqlPlanner')) {
+      if (!this.options.allowUngroupedWithoutPrimaryKey) {
         const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
         const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
         const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
@@ -611,33 +617,61 @@ export class BaseQuery {
     return false;
   }
 
+  newQueryWithoutNative() {
+    const QueryClass = this.constructor;
+    return new QueryClass(this.compilers, { ...this.options, useNativeSqlPlanner: false });
+  }
+
   /**
    * Returns a pair of SQL query string and parameter values for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
    * @returns {[string, Array<unknown>]}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (getEnv('nativeSqlPlanner')) {
-      return this.buildSqlAndParamsRust(exportAnnotatedSql);
-    } else {
-      if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-        if (this.externalPreAggregationQuery()) { // TODO performance
-          return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      if (this.externalPreAggregationQuery()) { // TODO performance
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+      }
+    }
+
+    if (this.useNativeSqlPlanner) {
+      let isRelatedToPreAggregation = false;
+      if (this.options.preAggregationQuery) {
+        isRelatedToPreAggregation = true;
+      } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
+        if (this.externalPreAggregationQuery()) {
+          isRelatedToPreAggregation = true;
+        }
+      } else {
+        let preAggForQuery =
+          this.preAggregations.findPreAggregationForQuery();
+        if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
+          preAggForQuery = undefined;
+        }
+        if (preAggForQuery) {
+          isRelatedToPreAggregation = true;
         }
       }
-      return this.compilers.compiler.withQuery(
-        this,
-        () => this.cacheValue(
-          ['buildSqlAndParams', exportAnnotatedSql],
-          () => this.paramAllocator.buildSqlAndParams(
-            this.buildParamAnnotatedSql(),
-            exportAnnotatedSql,
-            this.shouldReuseParams
-          ),
-          { cache: this.queryCache }
-        )
-      );
+
+      if (isRelatedToPreAggregation) {
+        return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
+      }
+
+      return this.buildSqlAndParamsRust(exportAnnotatedSql);
     }
+
+    return this.compilers.compiler.withQuery(
+      this,
+      () => this.cacheValue(
+        ['buildSqlAndParams', exportAnnotatedSql],
+        () => this.paramAllocator.buildSqlAndParams(
+          this.buildParamAnnotatedSql(),
+          exportAnnotatedSql,
+          this.shouldReuseParams
+        ),
+        { cache: this.queryCache }
+      )
+    );
   }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
@@ -3052,6 +3086,7 @@ export class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
+    options = { ...options, useNativeSqlPlanner: false }; // We don't use tesseract for pre-aggregations generation yet
     if (this.options.queryFactory) {
       // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
       // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
@@ -3075,6 +3110,7 @@ export class BaseQuery {
       historyQueries: this.options.historyQueries,
       externalQueryClass: this.options.externalQueryClass,
       queryFactory: this.options.queryFactory,
+      useNativeSqlPlanner: this.options.useNativeSqlPlanner,
       ...options,
     };
   }
