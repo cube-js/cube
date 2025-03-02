@@ -12902,38 +12902,68 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let end_date = chrono::Utc::now().date_naive();
+        let end_date = chrono::Utc::now();
         let start_date = end_date - chrono::Duration::days(30);
+        let start_date = start_date.with_time(chrono::NaiveTime::default()).unwrap();
+        let end_date = end_date.with_time(chrono::NaiveTime::default()).unwrap();
+        let end_date = end_date - chrono::Duration::milliseconds(1);
         assert_eq!(
             logical_plan.find_cube_scan_wrapped_sql().request,
             V1LoadRequestQuery {
-                measures: Some(vec![
-                    json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
-                        "alias": "avg_kibanasample",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "${KibanaSampleDataEcommerce.avgPrice}",
-                        "grouping_set": null,
-                    }).to_string(),
-                ]),
-                dimensions: Some(vec![
-                    json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
-                        "alias": "cast_kibanasampl",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "CAST(${KibanaSampleDataEcommerce.order_date} AS DATE)",
-                        "grouping_set": null,
-                    }).to_string(),
-                ]),
-                segments: Some(vec![
-                    json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
-                        "alias": "kibanasampledata",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= DATE('{start_date}')) AND (${{KibanaSampleDataEcommerce.order_date}} < DATE('{end_date}'))) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))"),
-                        "grouping_set": null,
-                    }).to_string(),
-                ]),
+                measures: Some(vec![json!({
+                    "cube_name": "KibanaSampleDataEcommerce",
+                    "alias": "avg_kibanasample",
+                    "cube_params": ["KibanaSampleDataEcommerce"],
+                    "expr": "${KibanaSampleDataEcommerce.avgPrice}",
+                    "grouping_set": null,
+                })
+                .to_string(),]),
+                dimensions: Some(vec![json!({
+                    "cube_name": "KibanaSampleDataEcommerce",
+                    "alias": "cast_kibanasampl",
+                    "cube_params": ["KibanaSampleDataEcommerce"],
+                    "expr": "CAST(${KibanaSampleDataEcommerce.order_date} AS DATE)",
+                    "grouping_set": null,
+                })
+                .to_string(),]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        start_date.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                        end_date.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                    ]))
+                }]),
+                segments: Some(vec![]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["note1".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["note2".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["note3".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                    ]),
+                    and: None,
+                }]),
                 order: Some(vec![]),
                 ..Default::default()
             }
