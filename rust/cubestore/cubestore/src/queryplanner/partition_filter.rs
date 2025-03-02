@@ -24,7 +24,6 @@ impl PartitionFilter {
         let mut r = vec![];
         for f in filters {
             r = builder.extract_filter(f, r);
-            println!("Extracted.  r = {:?}", r);
         }
 
         PartitionFilter { min_max: r }
