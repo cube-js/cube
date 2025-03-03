@@ -145,7 +145,7 @@ const schemaOptions = Joi.object().keys({
   // Additional system flags
   serverless: Joi.boolean(),
   allowNodeRequire: Joi.boolean(),
-  fastReloadEnabled: Joi.boolean(),
+  fastReload: Joi.boolean(),
 });
 
 export default (options: any) => {

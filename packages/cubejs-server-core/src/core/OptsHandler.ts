@@ -489,7 +489,7 @@ export class OptsHandler {
         claimsNamespace: getEnv('jwtClaimsNamespace'),
         ...opts.jwt,
       },
-      fastReloadEnabled: getEnv('fastReloadEnabled'),
+      fastReload: getEnv('fastReload'),
     };
 
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {

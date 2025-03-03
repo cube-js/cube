@@ -53,7 +53,7 @@ export class CompilerApi {
       compilerVersion = JSON.stringify(compilerVersion);
     }
 
-    if (this.options.devServer || this.options.fastReloadEnabled) {
+    if (this.options.devServer || this.options.fastReload) {
       const files = await this.repository.dataSchemaFiles();
       compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
     }

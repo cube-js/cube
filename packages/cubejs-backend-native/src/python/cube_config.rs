@@ -64,6 +64,7 @@ impl CubeConfigPy {
             "scheduled_refresh_contexts",
             "schema_version",
             "semantic_layer_sync",
+            "fast_reload",
         ]
     }
 
