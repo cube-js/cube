@@ -1963,7 +1963,7 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  fastReloadEnabled: () => get('CUBEJS_FAST_RELOAD_ENABLED')
+  fastReload: () => get('CUBEJS_FAST_RELOAD_ENABLED')
     .default('false')
     .asBoolStrict(),
 };
