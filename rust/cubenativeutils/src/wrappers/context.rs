@@ -9,7 +9,6 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
     fn null(&self) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn empty_array(&self) -> Result<IT::Array, CubeError>;
     fn empty_struct(&self) -> Result<IT::Struct, CubeError>;
-    //fn boxed<T: 'static>(&self, value: T) -> impl NativeBox<IT, T>;
     fn to_string_fn(&self, result: String) -> Result<IT::Function, CubeError>;
 }
 

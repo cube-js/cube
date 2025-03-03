@@ -65,6 +65,12 @@ impl SimpleQueryPlanner {
         }
         let render_references = dimension_subquery_planner.dimensions_refs().clone();
         context_factory.set_render_references(render_references);
+        context_factory.set_rendered_as_multiplied_measures(
+            self.query_properties
+                .full_key_aggregate_measures()?
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
         select_builder.set_filter(filter);
         select_builder.set_group_by(self.query_properties.group_by());
         select_builder.set_order_by(self.order_planner.default_order());

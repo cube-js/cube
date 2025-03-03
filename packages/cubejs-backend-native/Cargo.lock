@@ -617,6 +617,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb402b8d4c85569410425650ce3eddc7d698ed96d39a73f941b08fb63082f1e7"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -739,7 +748,7 @@ dependencies = [
  "async-trait",
  "axum",
  "bytes",
- "convert_case",
+ "convert_case 0.6.0",
  "cubenativeutils",
  "cubeorchestrator",
  "cubesql",
@@ -770,7 +779,7 @@ version = "0.1.0"
 dependencies = [
  "async-channel",
  "async-trait",
- "convert_case",
+ "convert_case 0.6.0",
  "cubesql",
  "lazy_static",
  "log",
@@ -857,7 +866,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "chrono-tz 0.8.6",
- "convert_case",
+ "convert_case 0.7.1",
  "cubeclient",
  "cubenativeutils",
  "datafusion",
