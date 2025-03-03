@@ -248,7 +248,26 @@ impl MultiStageQueryPlanner {
             &time_dimension.get_granularity(),
         )?;
 
-        new_state.change_time_dimension_granularity(&time_dimension_name, result_granularity);
+        if time_dimension.get_date_range().is_some() && result_granularity.is_some() {
+            let granularity = time_dimension.get_granularity().unwrap(); //FIXME remove this unwrap
+            let date_range = time_dimension.get_date_range().unwrap(); //FIXME remove this unwrap
+            let series = self
+                .query_tools
+                .base_tools()
+                .generate_time_series(granularity, date_range.clone())?;
+            if !series.is_empty() {
+                let new_from_date = series.first().unwrap()[0].clone();
+                let new_to_date = series.last().unwrap()[1].clone();
+                new_state.replace_range_in_date_filter(
+                    &time_dimension_name,
+                    new_from_date,
+                    new_to_date,
+                );
+            }
+        }
+
+        new_state
+            .change_time_dimension_granularity(&time_dimension_name, result_granularity.clone());
 
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
             new_state.replace_to_date_date_range_filter(&time_dimension_name, &granularity);
@@ -375,9 +394,9 @@ impl MultiStageQueryPlanner {
         }
 
         let childs = member_childs(&member)?;
-
-        let description = if childs.is_empty() {
-            if has_multi_stage_members(&member, false)? {
+        let has_multi_stage_members = has_multi_stage_members(&member, false)?;
+        let description = if childs.is_empty() || !has_multi_stage_members {
+            if has_multi_stage_members {
                 return Err(CubeError::internal(format!(
                     "Leaf multi stage query cannot contain multi stage member"
                 )));
