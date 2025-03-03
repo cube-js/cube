@@ -539,6 +539,7 @@ export class CubejsServerCore {
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
+          fastReloadEnabled: this.options.fastReloadEnabled,
         },
       );
 
