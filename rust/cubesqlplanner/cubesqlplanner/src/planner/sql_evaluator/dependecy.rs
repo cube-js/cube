@@ -108,7 +108,7 @@ impl<'a> DependenciesBuilder<'a> {
         let mut deduplicate_index_map = HashMap::<usize, usize>::new();
         let mut deduplicate_map = HashMap::<CallDep, usize>::new();
         for (i, dep) in call_deps.iter().enumerate() {
-            //If subcube used twice in function, then call_deps can hold duplicated dependencies
+            //If subcube is used twice in function, then call_deps can hold duplicated dependencies
             //(for exampls in function ${Orders.ProductsAlt.name} || '_' || ${Orders.ProductsAlt.ProductCategories.name} ProductsAlt appeared twice in call_deps))
             let self_index = if let Some(exists_index) = deduplicate_map.get(&dep) {
                 deduplicate_index_map.insert(i, *exists_index);

@@ -1,4 +1,3 @@
-import { getEnv } from '@cubejs-backend/shared';
 import { BaseQuery, PostgresQuery } from '../../../src/adapter';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
