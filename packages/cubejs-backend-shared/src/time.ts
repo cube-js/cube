@@ -78,31 +78,17 @@ export function subtractInterval(date: moment.Moment, interval: ParsedInterval):
  */
 export const alignToOrigin = (startDate: moment.Moment, interval: ParsedInterval, origin: moment.Moment): moment.Moment => {
   let alignedDate = startDate.clone();
-  let intervalOp;
-  let isIntervalNegative = false;
-
-  let offsetDate = addInterval(origin, interval);
-
-  // The easiest way to check the interval sign
-  if (offsetDate.isBefore(origin)) {
-    isIntervalNegative = true;
-  }
-
-  offsetDate = origin.clone();
+  let offsetDate = origin.clone();
 
   if (startDate.isBefore(origin)) {
-    intervalOp = isIntervalNegative ? addInterval : subtractInterval;
-
     while (offsetDate.isAfter(startDate)) {
-      offsetDate = intervalOp(offsetDate, interval);
+      offsetDate = subtractInterval(offsetDate, interval);
     }
     alignedDate = offsetDate;
   } else {
-    intervalOp = isIntervalNegative ? subtractInterval : addInterval;
-
     while (offsetDate.isBefore(startDate)) {
       alignedDate = offsetDate.clone();
-      offsetDate = intervalOp(offsetDate, interval);
+      offsetDate = addInterval(offsetDate, interval);
     }
 
     if (offsetDate.isSame(startDate)) {
