@@ -3499,6 +3499,7 @@ export class BaseQuery {
         in: '{{ column }} IN ({{ values_concat }}){{ is_null_check }}',
         not_in: '{{ column }} NOT IN ({{ values_concat }}){{ is_null_check }}',
         time_range_filter: '{{ column }} >= {{ from_timestamp }} AND {{ column }} <= {{ to_timestamp }}',
+        time_not_in_range_filter: '{{ column }} < {{ from_timestamp }} OR {{ column }} > {{ to_timestamp }}',
         gt: '{{ column }} > {{ param }}',
         gte: '{{ column }} >= {{ param }}',
         lt: '{{ column }} < {{ param }}',

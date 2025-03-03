@@ -387,6 +387,7 @@ impl MultiStageMemberQueryPlanner {
         if self.description.member().has_aggregates_on_top() {
             node_factory.set_count_approx_as_state(true);
         }
+        node_factory.set_ungrouped_measure(self.description.member().is_ungrupped());
 
         if cte_query_properties
             .full_key_aggregate_measures()?

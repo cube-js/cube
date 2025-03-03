@@ -10,6 +10,18 @@ use std::rc::Rc;
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
 }
+pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
+    name: "LowerUpper",
+    condition: |s, _| {
+        s.get(0) == Some(&"_")
+            && s.get(1)
+                .map(|c| c.to_uppercase() != c.to_lowercase() && *c == c.to_uppercase())
+                == Some(true)
+    },
+    arg: None,
+    start: 0,
+    len: 0,
+};
 
 impl PlanSqlTemplates {
     pub fn new(render: Rc<dyn SqlTemplatesRender>) -> Self {
@@ -18,8 +30,12 @@ impl PlanSqlTemplates {
 
     pub fn alias_name(name: &str) -> String {
         let res = name
-            .from_case(Case::Camel)
-            .without_boundaries(&[Boundary::LOWER_DIGIT, Boundary::UPPER_DIGIT])
+            .with_boundaries(&[
+                UNDERSCORE_UPPER_BOUND,
+                Boundary::LOWER_UPPER,
+                Boundary::DIGIT_LOWER,
+                Boundary::ACRONYM,
+            ])
             .to_case(Case::Snake)
             .replace(".", "__");
         res
@@ -37,6 +53,10 @@ impl PlanSqlTemplates {
             Self::alias_name(name),
             suffix
         )
+    }
+
+    pub fn quote_string(&self, string: &str) -> Result<String, CubeError> {
+        Ok(format!("'{}'", string))
     }
 
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
@@ -278,6 +298,18 @@ impl PlanSqlTemplates {
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render
             .render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn case(
+        &self,
+        expr: Option<String>,
+        when_then: Vec<(String, String)>,
+        else_expr: Option<String>,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/case",
+            context! { expr => expr, when_then => when_then, else_expr => else_expr },
+        )
     }
 
     pub fn scalar_function(

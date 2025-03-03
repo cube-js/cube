@@ -4,10 +4,11 @@ use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::token::Colon2;
+use syn::token::PathSep;
+use syn::LitStr;
 use syn::{
     parse_macro_input, punctuated::Punctuated, FnArg, Item, Meta, Pat, Path, PathArguments,
-    PathSegment, ReturnType, TraitItem, TraitItemMethod, Type,
+    PathSegment, ReturnType, TraitItem, TraitItemFn, Type,
 };
 #[proc_macro_attribute]
 pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
@@ -39,6 +40,7 @@ struct NativeMethodParams {
     pub method_type: NativeMethodType,
     pub is_optional: bool,
     pub is_vec: bool,
+    pub custom_name: Option<String>,
 }
 
 impl Default for NativeMethodParams {
@@ -47,6 +49,7 @@ impl Default for NativeMethodParams {
             method_type: NativeMethodType::Call,
             is_optional: false,
             is_vec: false,
+            custom_name: None,
         }
     }
 }
@@ -74,6 +77,7 @@ struct NativeArgumentTyped {
 
 struct NativeMethod {
     ident: Ident,
+    //custom_js_name: Option<String>
     args: Vec<FnArg>,
     typed_args: Vec<NativeArgumentTyped>,
     output: ReturnType,
@@ -90,8 +94,8 @@ impl Parse for NativeService {
                     .items
                     .iter()
                     .filter_map(|item| match item {
-                        TraitItem::Method(method_item) => {
-                            let method_params = Self::parse_method_params(method_item);
+                        TraitItem::Fn(method_item) => {
+                            let method_params = Self::parse_method_params(method_item).unwrap();
                             let args = method_item.sig.inputs.iter().cloned().collect::<Vec<_>>();
                             let typed_args = Self::parse_method_typed_args(&args).unwrap();
                             Some(NativeMethod {
@@ -150,27 +154,36 @@ impl NativeService {
             .collect::<Result<Vec<_>, _>>()
     }
 
-    fn parse_method_params(method_item: &TraitItemMethod) -> NativeMethodParams {
+    fn parse_method_params(method_item: &TraitItemFn) -> syn::Result<NativeMethodParams> {
         let mut method_params = NativeMethodParams::default();
 
         if method_item.attrs.len() > 0 {
             for attr in method_item.attrs.iter() {
-                let seg = attr.path.segments.last().unwrap();
-                match seg.ident.to_string().as_str() {
-                    "optional" => {
-                        method_params.is_optional = true;
-                    }
-                    "field" => {
-                        method_params.method_type = NativeMethodType::Getter;
-                    }
-                    "vec" => {
-                        method_params.is_vec = true;
-                    }
-                    _ => {}
+                if attr.path().is_ident("nbridge") {
+                    attr.parse_nested_meta(|meta| {
+                        if meta.path.is_ident("optional") {
+                            method_params.is_optional = true;
+                            return Ok(());
+                        }
+                        if meta.path.is_ident("field") {
+                            method_params.method_type = NativeMethodType::Getter;
+                            return Ok(());
+                        }
+                        if meta.path.is_ident("vec") {
+                            method_params.is_vec = true;
+                            return Ok(());
+                        }
+                        if meta.path.is_ident("rename") {
+                            method_params.custom_name =
+                                Some(meta.value()?.parse::<LitStr>()?.value());
+                        }
+
+                        Ok(())
+                    })?;
                 }
             }
         }
-        method_params
+        Ok(method_params)
     }
     fn get_output_for_deserializer(
         tp: &ReturnType,
@@ -204,7 +217,7 @@ impl NativeService {
     }
 
     fn get_deserializer_output_for_result(
-        segs: &Punctuated<PathSegment, Colon2>,
+        segs: &Punctuated<PathSegment, PathSep>,
         optional: bool,
         vec: bool,
         expected_type: &str,
@@ -529,7 +542,10 @@ impl NativeMethod {
             .iter()
             .map(|arg| Self::js_agr_set(&arg.ident, &arg.downcast_type_path))
             .collect::<Vec<_>>();
-        let js_method_name = self.camel_case_name();
+        let js_method_name = method_params
+            .custom_name
+            .clone()
+            .unwrap_or_else(|| self.camel_case_name());
 
         let deseralization = Self::deserialization_impl(&output_params, method_params.is_vec);
 
