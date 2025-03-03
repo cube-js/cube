@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+### Bug Fixes
+
+- **cubejs-client-ngx:** Configure package-level Lerna publish directory for Angular ([#9189](https://github.com/cube-js/cube/issues/9189)) ([ef799f5](https://github.com/cube-js/cube/commit/ef799f58c21a760a7c51e03803343568634620ee))
+
 ## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
 
 **Note:** Version bump only for package @cubejs-client/ngx

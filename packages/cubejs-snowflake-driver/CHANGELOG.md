@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/snowflake-driver
+
 ## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

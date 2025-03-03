@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+### Bug Fixes
+
+- **cubejs-client-ngx:** Configure package-level Lerna publish directory for Angular ([#9189](https://github.com/cube-js/cube/issues/9189)) ([ef799f5](https://github.com/cube-js/cube/commit/ef799f58c21a760a7c51e03803343568634620ee))
+
+### Features
+
+- **schema-compiler:** auto include hierarchy dimensions ([#9288](https://github.com/cube-js/cube/issues/9288)) ([162c5b4](https://github.com/cube-js/cube/commit/162c5b48f6ef489bf9f4bb95a1d4bca168b836c9))
+- **tesseract:** Pre-aggregation planning fallback ([#9230](https://github.com/cube-js/cube/issues/9230)) ([08650e2](https://github.com/cube-js/cube/commit/08650e241e2aa85705e3c68e4993098267f89c82))
+
 ## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
 
 ### Features
