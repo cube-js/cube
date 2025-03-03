@@ -217,7 +217,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let physical_plan = plan_ctx.state().create_physical_plan(&plan_to_move).await?;
 
         let execution_time = SystemTime::now();
-        let results = collect(physical_plan, Arc::new(TaskContext::default())).await?;
+        let results = collect(physical_plan, ctx.task_ctx()).await?;
         let execution_time = execution_time.elapsed()?;
         app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         debug!("Meta query data processing time: {:?}", execution_time,);
