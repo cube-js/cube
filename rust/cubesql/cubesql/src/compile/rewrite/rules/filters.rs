@@ -6,10 +6,11 @@ use crate::{
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
-        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
-        fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
-        is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
-        literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
+        filter_op_filters_empty_tail, filter_replacer, filter_simplify_pull_up_replacer,
+        filter_simplify_push_down_replacer, fun_expr, fun_expr_args_legacy, fun_expr_var_arg,
+        inlist_expr, inlist_expr_list, is_not_null_expr, is_null_expr, like_expr, limit,
+        list_rewrite, literal_bool, literal_expr, literal_int, literal_string, measure_expr,
+        negative_expr, not_expr, projection, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
@@ -24,6 +25,7 @@ use crate::{
         TimeDimensionGranularity, TimeDimensionName,
     },
     config::ConfigObj,
+    copy_value,
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
     var, var_iter,
 };
@@ -69,7 +71,7 @@ impl RewriteRules for FilterRules {
     fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
             transforming_rewrite(
-                "push-down-filter",
+                "push-down-filter-simplify",
                 filter(
                     "?expr",
                     cube_scan(
@@ -88,15 +90,7 @@ impl RewriteRules for FilterRules {
                 cube_scan(
                     "?alias_to_cube",
                     "?members",
-                    cube_scan_filters(
-                        "?filters",
-                        filter_replacer(
-                            filter_simplify_replacer("?expr"),
-                            "?filter_alias_to_cube",
-                            "?members",
-                            "?filter_aliases",
-                        ),
-                    ),
+                    cube_scan_filters("?filters", filter_simplify_push_down_replacer("?expr")),
                     "?order",
                     "?limit",
                     "?offset",
@@ -105,12 +99,7 @@ impl RewriteRules for FilterRules {
                     "?wrapped",
                     "?ungrouped",
                 ),
-                self.push_down_filter(
-                    "?alias_to_cube",
-                    "?expr",
-                    "?filter_alias_to_cube",
-                    "?filter_aliases",
-                ),
+                self.push_down_filter_simplify("?expr"),
             ),
             // Transform Filter: Boolean(False)
             transforming_rewrite(
@@ -271,6 +260,42 @@ impl RewriteRules for FilterRules {
                         "?projection_split",
                     ),
                 ),
+            ),
+            transforming_rewrite(
+                "push-down-filter-pickup-simplified",
+                cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    cube_scan_filters("?filters", filter_simplify_pull_up_replacer("?filter")),
+                    "?order",
+                    "?limit",
+                    "?offset",
+                    "?split",
+                    "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
+                ),
+                cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    cube_scan_filters(
+                        "?filters",
+                        filter_replacer(
+                            "?filter",
+                            "?filter_alias_to_cube",
+                            "?members",
+                            "?filter_aliases",
+                        ),
+                    ),
+                    "?order",
+                    "?limit",
+                    "?offset",
+                    "?split",
+                    "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
+                ),
+                self.push_down_filter("?alias_to_cube", "?filter_alias_to_cube", "?filter_aliases"),
             ),
             // Transform Filter: Boolean(True) same as TRUE = TRUE, which is useless
             transforming_rewrite(
@@ -1867,36 +1892,55 @@ impl RewriteRules for FilterRules {
             // Simplify rules
             transforming_rewrite(
                 "filter-simplify-cast-unwrap",
-                filter_simplify_replacer(cast_expr("?expr", "?data_type")),
-                // TODO alias to make it equivalent transformation
-                filter_simplify_replacer("?expr"),
+                filter_simplify_push_down_replacer(cast_expr("?expr", "?data_type")),
+                filter_simplify_push_down_replacer("?expr"),
                 self.transform_filter_cast_unwrap("?expr", "?data_type", false),
             ),
             transforming_rewrite(
                 "filter-simplify-cast-push-down",
-                filter_simplify_replacer(cast_expr("?expr", "?data_type")),
-                cast_expr(filter_simplify_replacer("?expr"), "?data_type"),
+                filter_simplify_push_down_replacer(cast_expr("?expr", "?data_type")),
+                cast_expr(filter_simplify_push_down_replacer("?expr"), "?data_type"),
                 self.transform_filter_cast_unwrap("?expr", "?data_type", true),
             ),
+            rewrite(
+                "filter-simplify-cast-pull-up",
+                cast_expr(filter_simplify_pull_up_replacer("?expr"), "?data_type"),
+                filter_simplify_pull_up_replacer(cast_expr("?expr", "?data_type")),
+            ),
             // Alias
+            // TODO remove alias completely during simplification, they should be irrelevant in filters
             rewrite(
                 "filter-simplify-alias-push-down",
-                filter_simplify_replacer(alias_expr("?expr", "?alias")),
-                alias_expr(filter_simplify_replacer("?expr"), "?alias"),
+                filter_simplify_push_down_replacer(alias_expr("?expr", "?alias")),
+                alias_expr(filter_simplify_push_down_replacer("?expr"), "?alias"),
+            ),
+            rewrite(
+                "filter-simplify-alias-pull-up",
+                alias_expr(filter_simplify_pull_up_replacer("?expr"), "?alias"),
+                filter_simplify_pull_up_replacer(alias_expr("?expr", "?alias")),
             ),
             // Binary expr
             rewrite(
                 "filter-simplify-binary-push-down",
-                filter_simplify_replacer(binary_expr("?left", "?op", "?right")),
+                filter_simplify_push_down_replacer(binary_expr("?left", "?op", "?right")),
                 binary_expr(
-                    filter_simplify_replacer("?left"),
+                    filter_simplify_push_down_replacer("?left"),
                     "?op",
-                    filter_simplify_replacer("?right"),
+                    filter_simplify_push_down_replacer("?right"),
                 ),
             ),
             rewrite(
+                "filter-simplify-binary-pull-up",
+                binary_expr(
+                    filter_simplify_pull_up_replacer("?left"),
+                    "?op",
+                    filter_simplify_pull_up_replacer("?right"),
+                ),
+                filter_simplify_pull_up_replacer(binary_expr("?left", "?op", "?right")),
+            ),
+            rewrite(
                 "filter-simplify-like-push-down",
-                filter_simplify_replacer(like_expr(
+                filter_simplify_push_down_replacer(like_expr(
                     "?like_type",
                     "?negated",
                     "?expr",
@@ -1906,98 +1950,194 @@ impl RewriteRules for FilterRules {
                 like_expr(
                     "?like_type",
                     "?negated",
-                    filter_simplify_replacer("?expr"),
-                    filter_simplify_replacer("?pattern"),
+                    filter_simplify_push_down_replacer("?expr"),
+                    filter_simplify_push_down_replacer("?pattern"),
                     "?escape_char",
                 ),
             ),
             rewrite(
+                "filter-simplify-like-pull-up",
+                like_expr(
+                    "?like_type",
+                    "?negated",
+                    filter_simplify_pull_up_replacer("?expr"),
+                    filter_simplify_pull_up_replacer("?pattern"),
+                    "?escape_char",
+                ),
+                filter_simplify_pull_up_replacer(like_expr(
+                    "?like_type",
+                    "?negated",
+                    "?expr",
+                    "?pattern",
+                    "?escape_char",
+                )),
+            ),
+            rewrite(
                 "filter-simplify-not-push-down",
-                filter_simplify_replacer(not_expr("?expr")),
-                not_expr(filter_simplify_replacer("?expr")),
+                filter_simplify_push_down_replacer(not_expr("?expr")),
+                not_expr(filter_simplify_push_down_replacer("?expr")),
+            ),
+            rewrite(
+                "filter-simplify-not-pull-up",
+                not_expr(filter_simplify_pull_up_replacer("?expr")),
+                filter_simplify_pull_up_replacer(not_expr("?expr")),
             ),
             rewrite(
                 "filter-simplify-inlist-push-down",
-                filter_simplify_replacer(inlist_expr("?expr", "?list", "?negated")),
+                filter_simplify_push_down_replacer(inlist_expr("?expr", "?list", "?negated")),
                 // TODO unwrap list as well
-                inlist_expr(filter_simplify_replacer("?expr"), "?list", "?negated"),
+                inlist_expr(
+                    filter_simplify_push_down_replacer("?expr"),
+                    "?list",
+                    "?negated",
+                ),
+            ),
+            rewrite(
+                "filter-simplify-inlist-pull-up",
+                // TODO unwrap list as well
+                inlist_expr(
+                    filter_simplify_pull_up_replacer("?expr"),
+                    "?list",
+                    "?negated",
+                ),
+                filter_simplify_pull_up_replacer(inlist_expr("?expr", "?list", "?negated")),
             ),
             rewrite(
                 "filter-simplify-is-null-push-down",
-                filter_simplify_replacer(is_null_expr("?expr")),
-                is_null_expr(filter_simplify_replacer("?expr")),
+                filter_simplify_push_down_replacer(is_null_expr("?expr")),
+                is_null_expr(filter_simplify_push_down_replacer("?expr")),
+            ),
+            rewrite(
+                "filter-simplify-is-null-pull-up",
+                is_null_expr(filter_simplify_pull_up_replacer("?expr")),
+                filter_simplify_pull_up_replacer(is_null_expr("?expr")),
             ),
             rewrite(
                 "filter-simplify-is-not-null-push-down",
-                filter_simplify_replacer(is_not_null_expr("?expr")),
-                is_not_null_expr(filter_simplify_replacer("?expr")),
+                filter_simplify_push_down_replacer(is_not_null_expr("?expr")),
+                is_not_null_expr(filter_simplify_push_down_replacer("?expr")),
             ),
             rewrite(
-                "filter-simplify-literal-push-down",
-                filter_simplify_replacer(literal_expr("?literal")),
-                literal_expr("?literal"),
+                "filter-simplify-is-not-null-pull-up",
+                is_not_null_expr(filter_simplify_pull_up_replacer("?expr")),
+                filter_simplify_pull_up_replacer(is_not_null_expr("?expr")),
             ),
             rewrite(
-                "filter-simplify-column-push-down",
-                filter_simplify_replacer(column_expr("?column")),
-                column_expr("?column"),
+                "filter-simplify-literal",
+                filter_simplify_push_down_replacer(literal_expr("?literal")),
+                filter_simplify_pull_up_replacer(literal_expr("?literal")),
+            ),
+            rewrite(
+                "filter-simplify-column",
+                filter_simplify_push_down_replacer(column_expr("?column")),
+                filter_simplify_pull_up_replacer(column_expr("?column")),
             ),
             // scalar
             rewrite(
                 "filter-simplify-scalar-fun-push-down",
-                filter_simplify_replacer(fun_expr_var_arg("?fun", "?args")),
-                fun_expr_var_arg("?fun", filter_simplify_replacer("?args")),
+                filter_simplify_push_down_replacer(fun_expr_var_arg("?fun", "?args")),
+                fun_expr_var_arg("?fun", filter_simplify_push_down_replacer("?args")),
             ),
             rewrite(
-                "filter-simplify-scalar-args-empty-tail-push-down",
-                filter_simplify_replacer(scalar_fun_expr_args_empty_tail()),
-                scalar_fun_expr_args_empty_tail(),
+                "filter-simplify-scalar-fun-pull-up",
+                fun_expr_var_arg("?fun", filter_simplify_pull_up_replacer("?args")),
+                filter_simplify_pull_up_replacer(fun_expr_var_arg("?fun", "?args")),
+            ),
+            rewrite(
+                "filter-simplify-scalar-args-empty-tail",
+                filter_simplify_push_down_replacer(scalar_fun_expr_args_empty_tail()),
+                filter_simplify_pull_up_replacer(scalar_fun_expr_args_empty_tail()),
             ),
             // udf
             rewrite(
                 "filter-simplify-udf-fun-push-down",
-                filter_simplify_replacer(udf_expr_var_arg("?fun", "?args")),
-                udf_expr_var_arg("?fun", filter_simplify_replacer("?args")),
+                filter_simplify_push_down_replacer(udf_expr_var_arg("?fun", "?args")),
+                udf_expr_var_arg("?fun", filter_simplify_push_down_replacer("?args")),
+            ),
+            rewrite(
+                "filter-simplify-udf-fun-pull-up",
+                udf_expr_var_arg("?fun", filter_simplify_pull_up_replacer("?args")),
+                filter_simplify_pull_up_replacer(udf_expr_var_arg("?fun", "?args")),
             ),
             rewrite(
                 "filter-simplify-udf-args-push-down",
-                filter_simplify_replacer(udf_fun_expr_args("?left", "?right")),
+                filter_simplify_push_down_replacer(udf_fun_expr_args("?left", "?right")),
                 udf_fun_expr_args(
-                    filter_simplify_replacer("?left"),
-                    filter_simplify_replacer("?right"),
+                    filter_simplify_push_down_replacer("?left"),
+                    filter_simplify_push_down_replacer("?right"),
                 ),
             ),
             rewrite(
-                "filter-simplify-udf-args-empty-tail-push-down",
-                filter_simplify_replacer(udf_fun_expr_args_empty_tail()),
-                udf_fun_expr_args_empty_tail(),
+                "filter-simplify-udf-args-pull-up",
+                udf_fun_expr_args(
+                    filter_simplify_pull_up_replacer("?left"),
+                    filter_simplify_pull_up_replacer("?right"),
+                ),
+                filter_simplify_pull_up_replacer(udf_fun_expr_args("?left", "?right")),
+            ),
+            rewrite(
+                "filter-simplify-udf-args-empty-tail",
+                filter_simplify_push_down_replacer(udf_fun_expr_args_empty_tail()),
+                filter_simplify_pull_up_replacer(udf_fun_expr_args_empty_tail()),
             ),
             // case
             rewrite(
                 "filter-simplify-case-push-down",
-                filter_simplify_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
+                filter_simplify_push_down_replacer(case_expr_var_arg(
+                    "?expr",
+                    "?when_then",
+                    "?else",
+                )),
                 case_expr_var_arg(
-                    filter_simplify_replacer("?expr"),
-                    filter_simplify_replacer("?when_then"),
-                    filter_simplify_replacer("?else"),
+                    filter_simplify_push_down_replacer("?expr"),
+                    filter_simplify_push_down_replacer("?when_then"),
+                    filter_simplify_push_down_replacer("?else"),
                 ),
             ),
             rewrite(
+                "filter-simplify-case-pull-up",
+                case_expr_var_arg(
+                    filter_simplify_pull_up_replacer("?expr"),
+                    filter_simplify_pull_up_replacer("?when_then"),
+                    filter_simplify_pull_up_replacer("?else"),
+                ),
+                filter_simplify_pull_up_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
+            ),
+            rewrite(
                 "filter-simplify-between-push-down",
-                filter_simplify_replacer(between_expr("?expr", "?negated", "?low", "?high")),
+                filter_simplify_push_down_replacer(between_expr(
+                    "?expr", "?negated", "?low", "?high",
+                )),
                 between_expr(
+                    // TODO why expr is not simplified?
                     "?expr",
                     "?negated",
-                    filter_simplify_replacer("?low"),
-                    filter_simplify_replacer("?high"),
+                    filter_simplify_push_down_replacer("?low"),
+                    filter_simplify_push_down_replacer("?high"),
                 ),
             ),
+            rewrite(
+                "filter-simplify-between-pull-up",
+                between_expr(
+                    // TODO why expr is not simplified?
+                    "?expr",
+                    "?negated",
+                    filter_simplify_pull_up_replacer("?low"),
+                    filter_simplify_pull_up_replacer("?high"),
+                ),
+                filter_simplify_pull_up_replacer(between_expr(
+                    "?expr", "?negated", "?low", "?high",
+                )),
+            ),
             filter_simplify_push_down("CaseExprExpr"),
-            filter_simplify_push_down_tail("CaseExprExpr"),
+            filter_simplify_pull_up("CaseExprExpr"),
+            filter_simplify_tail("CaseExprExpr"),
             filter_simplify_push_down("CaseExprWhenThenExpr"),
-            filter_simplify_push_down_tail("CaseExprWhenThenExpr"),
+            filter_simplify_pull_up("CaseExprWhenThenExpr"),
+            filter_simplify_tail("CaseExprWhenThenExpr"),
             filter_simplify_push_down("CaseExprElseExpr"),
-            filter_simplify_push_down_tail("CaseExprElseExpr"),
+            filter_simplify_pull_up("CaseExprElseExpr"),
+            filter_simplify_tail("CaseExprElseExpr"),
             rewrite(
                 "filter-flatten-upper-and-left",
                 cube_scan_filters(
@@ -2450,45 +2590,74 @@ impl RewriteRules for FilterRules {
                 "filter-simplify-scalar-args-push-down",
                 ListType::ScalarFunctionExprArgs,
                 ListPattern {
-                    pattern: filter_simplify_replacer("?args"),
+                    pattern: filter_simplify_push_down_replacer("?args"),
                     list_var: "?args".to_string(),
                     elem: "?arg".to_string(),
                 },
                 ListPattern {
                     pattern: "?new_args".to_string(),
                     list_var: "?new_args".to_string(),
-                    elem: filter_simplify_replacer("?arg"),
+                    elem: filter_simplify_push_down_replacer("?arg"),
+                },
+            ));
+            rules.push(list_rewrite(
+                "filter-simplify-scalar-args-pull-up",
+                ListType::ScalarFunctionExprArgs,
+                ListPattern {
+                    pattern: "?args".to_string(),
+                    list_var: "?args".to_string(),
+                    elem: filter_simplify_pull_up_replacer("?arg"),
+                },
+                ListPattern {
+                    pattern: filter_simplify_pull_up_replacer("?new_args"),
+                    list_var: "?new_args".to_string(),
+                    elem: "?arg".to_string(),
                 },
             ));
         } else {
             rules.push(rewrite(
                 "filter-simplify-scalar-args-push-down",
-                filter_simplify_replacer(fun_expr_args_legacy("?left", "?right")),
+                filter_simplify_push_down_replacer(fun_expr_args_legacy("?left", "?right")),
                 fun_expr_args_legacy(
-                    filter_simplify_replacer("?left"),
-                    filter_simplify_replacer("?right"),
+                    filter_simplify_push_down_replacer("?left"),
+                    filter_simplify_push_down_replacer("?right"),
                 ),
+            ));
+            rules.push(rewrite(
+                "filter-simplify-scalar-args-pull-up",
+                fun_expr_args_legacy(
+                    filter_simplify_pull_up_replacer("?left"),
+                    filter_simplify_pull_up_replacer("?right"),
+                ),
+                filter_simplify_pull_up_replacer(fun_expr_args_legacy("?left", "?right")),
             ));
         }
         if self.eval_stable_functions {
             rules.extend(vec![
                 rewrite(
                     "filter-simplify-now",
-                    filter_simplify_replacer(self.fun_expr("Now", Vec::<String>::new())),
-                    // TODO alias to make it equivalent transformation
-                    udf_expr("eval_now", Vec::<String>::new()),
+                    filter_simplify_push_down_replacer(self.fun_expr("Now", Vec::<String>::new())),
+                    filter_simplify_pull_up_replacer(udf_expr("eval_now", Vec::<String>::new())),
                 ),
                 rewrite(
                     "filter-simplify-utc-timestamp",
-                    filter_simplify_replacer(self.fun_expr("UtcTimestamp", Vec::<String>::new())),
-                    // TODO alias to make it equivalent transformation
-                    udf_expr("eval_utc_timestamp", Vec::<String>::new()),
+                    filter_simplify_push_down_replacer(
+                        self.fun_expr("UtcTimestamp", Vec::<String>::new()),
+                    ),
+                    filter_simplify_pull_up_replacer(udf_expr(
+                        "eval_utc_timestamp",
+                        Vec::<String>::new(),
+                    )),
                 ),
                 rewrite(
                     "filter-simplify-current-date",
-                    filter_simplify_replacer(self.fun_expr("CurrentDate", Vec::<String>::new())),
-                    // TODO alias to make it equivalent transformation
-                    udf_expr("eval_current_date", Vec::<String>::new()),
+                    filter_simplify_push_down_replacer(
+                        self.fun_expr("CurrentDate", Vec::<String>::new()),
+                    ),
+                    filter_simplify_pull_up_replacer(udf_expr(
+                        "eval_current_date",
+                        Vec::<String>::new(),
+                    )),
                 ),
             ]);
         }
@@ -2513,40 +2682,45 @@ impl FilterRules {
         fun_expr(fun_name, args, self.config_obj.push_down_pull_up_split())
     }
 
+    fn push_down_filter_simplify(
+        &self,
+        exp_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let exp_var = var!(exp_var);
+        move |egraph, subst| {
+            // TODO check referenced_expr
+            egraph.index(subst[exp_var]).data.referenced_expr.is_some()
+        }
+    }
+
     fn push_down_filter(
         &self,
         alias_to_cube_var: &'static str,
-        exp_var: &'static str,
         filter_alias_to_cube_var: &'static str,
         filter_aliases_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let exp_var = var!(exp_var);
         let filter_aliases_var = var!(filter_aliases_var);
         let filter_alias_to_cube_var = var!(filter_alias_to_cube_var);
         move |egraph, subst| {
-            for alias_to_cube in
-                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
-            {
-                if let Some(_referenced_expr) = &egraph.index(subst[exp_var]).data.referenced_expr {
-                    // TODO check referenced_expr
-                    subst.insert(
-                        filter_alias_to_cube_var,
-                        egraph.add(LogicalPlanLanguage::FilterReplacerAliasToCube(
-                            FilterReplacerAliasToCube(alias_to_cube),
-                        )),
-                    );
-
-                    let filter_replacer_aliases = egraph.add(
-                        LogicalPlanLanguage::FilterReplacerAliases(FilterReplacerAliases(vec![])),
-                    );
-                    subst.insert(filter_aliases_var, filter_replacer_aliases);
-
-                    return true;
-                }
+            if !copy_value!(
+                egraph,
+                subst,
+                Vec<(String, String)>,
+                alias_to_cube_var,
+                CubeScanAliasToCube,
+                filter_alias_to_cube_var,
+                FilterReplacerAliasToCube
+            ) {
+                return false;
             }
 
-            false
+            let filter_replacer_aliases = egraph.add(LogicalPlanLanguage::FilterReplacerAliases(
+                FilterReplacerAliases(vec![]),
+            ));
+            subst.insert(filter_aliases_var, filter_replacer_aliases);
+
+            true
         }
     }
 
@@ -5015,21 +5189,34 @@ impl FilterRules {
 fn filter_simplify_push_down(node_type: impl Display) -> CubeRewrite {
     rewrite(
         &format!("filter-simplify-{}-push-down", node_type),
-        filter_simplify_replacer(format!("({} ?left ?right)", node_type)),
+        filter_simplify_push_down_replacer(format!("({} ?left ?right)", node_type)),
         format!(
             "({} {} {})",
             node_type,
-            filter_simplify_replacer("?left"),
-            filter_simplify_replacer("?right")
+            filter_simplify_push_down_replacer("?left"),
+            filter_simplify_push_down_replacer("?right")
         ),
     )
 }
 
-fn filter_simplify_push_down_tail(node_type: impl Display) -> CubeRewrite {
+fn filter_simplify_pull_up(node_type: impl Display) -> CubeRewrite {
     rewrite(
-        &format!("filter-simplify-{}-empty-tail-push-down", node_type),
-        filter_simplify_replacer(node_type.to_string()),
-        node_type.to_string(),
+        &format!("filter-simplify-{}-pull-up", node_type),
+        format!(
+            "({} {} {})",
+            node_type,
+            filter_simplify_pull_up_replacer("?left"),
+            filter_simplify_pull_up_replacer("?right")
+        ),
+        filter_simplify_pull_up_replacer(format!("({} ?left ?right)", node_type)),
+    )
+}
+
+fn filter_simplify_tail(node_type: impl Display) -> CubeRewrite {
+    rewrite(
+        &format!("filter-simplify-{}-empty-tail", node_type),
+        filter_simplify_push_down_replacer(node_type.to_string()),
+        filter_simplify_pull_up_replacer(node_type.to_string()),
     )
 }
 
