@@ -2191,9 +2191,13 @@ export class BaseQuery {
 
     let index;
 
-    index = this.dimensionsForSelect().findIndex(
-      d => equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)
-    );
+    index = this.dimensionsForSelect()
+      // Not all time dimensions are used in select list, some are just filters,
+      // but they exist in this.timeDimensions, so need to filter them out
+      .filter(d => d.selectColumns())
+      .findIndex(
+        d => equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)
+      );
 
     if (index > -1) {
       return index + 1;
