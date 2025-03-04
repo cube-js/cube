@@ -572,7 +572,7 @@ WHERE
         ));
 }
 
-/// Using NOW() in wrapper should render proper timestamptz in SQL
+/// Using NOW() in wrapper should render NOW() in SQL
 #[tokio::test]
 async fn test_wrapper_now() {
     if !Rewriter::sql_push_down_enabled() {
@@ -611,10 +611,10 @@ GROUP BY
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
+        .contains("${KibanaSampleDataEcommerce.order_date} >= NOW()"));
 }
 
-/// Using NOW() in ungrouped wrapper should render proper timestamptz in SQL
+/// Using NOW() in ungrouped wrapper should render NOW() in SQL
 #[tokio::test]
 async fn test_wrapper_now_ungrouped() {
     if !Rewriter::sql_push_down_enabled() {
@@ -651,7 +651,7 @@ WHERE
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
+        .contains("${KibanaSampleDataEcommerce.order_date} >= NOW()"));
 }
 
 #[tokio::test]
@@ -1597,4 +1597,50 @@ async fn wrapper_typed_null() {
         .wrapped_sql
         .sql
         .contains("SUM(CAST(NULL AS DOUBLE))"));
+}
+
+/// Tests that exactly same expression in projection and filter have correct alias after rewriting
+#[tokio::test]
+async fn test_same_expression_in_projection_and_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    DATE_TRUNC('day', CAST(dim_date0 AS TIMESTAMP))
+FROM MultiTypeCube
+WHERE
+    DATE_TRUNC('day', CAST(dim_date0 AS TIMESTAMP)) >=
+     '2025-01-01'
+GROUP BY
+    1
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let dimensions = request.dimensions.unwrap();
+    assert_eq!(dimensions.len(), 1);
+    let dimension = &dimensions[0];
+    assert!(dimension.contains("DATE_TRUNC"));
+    let segments = request.segments.unwrap();
+    assert_eq!(segments.len(), 1);
+    let segment = &segments[0];
+    assert!(segment.contains("DATE_TRUNC"));
 }

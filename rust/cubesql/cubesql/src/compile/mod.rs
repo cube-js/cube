@@ -12878,7 +12878,7 @@ ORDER BY "source"."str0" ASC
         }
         init_testing_logger();
 
-        let logical_plan = convert_select_to_query_plan(
+        let query_plan = convert_select_to_query_plan(
             r#"
             SELECT
                 CAST("public"."KibanaSampleDataEcommerce"."order_date" AS DATE) AS "order_date",
@@ -12899,11 +12899,16 @@ ORDER BY "source"."str0" ASC
             .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-        .await
-        .as_logical_plan();
+        .await;
 
-        let end_date = chrono::Utc::now().date_naive();
-        let start_date = end_date - chrono::Duration::days(30);
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+
         assert_eq!(
             logical_plan.find_cube_scan_wrapped_sql().request,
             V1LoadRequestQuery {
@@ -12930,7 +12935,7 @@ ORDER BY "source"."str0" ASC
                         "cube_name": "KibanaSampleDataEcommerce",
                         "alias": "kibanasampledata",
                         "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= DATE('{start_date}')) AND (${{KibanaSampleDataEcommerce.order_date}} < DATE('{end_date}'))) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))"),
+                        "expr": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= CAST((NOW() + INTERVAL '-30 DAY') AS DATE)) AND (${{KibanaSampleDataEcommerce.order_date}} < CAST(NOW() AS DATE))) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))"),
                         "grouping_set": null,
                     }).to_string(),
                 ]),

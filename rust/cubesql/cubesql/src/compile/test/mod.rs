@@ -581,6 +581,7 @@ pub fn sql_generator(
                     ("functions/LEAST".to_string(), "LEAST({{ args_concat }})".to_string()),
                     ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
                     ("functions/CURRENTDATE".to_string(), "CURRENT_DATE({{ args_concat }})".to_string()),
+                    ("functions/NOW".to_string(), "NOW({{ args_concat }})".to_string()),
                     ("functions/DATE_ADD".to_string(), "DATE_ADD({{ args_concat }})".to_string()),
                     ("functions/CONCAT".to_string(), "CONCAT({{ args_concat }})".to_string()),
                     ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
