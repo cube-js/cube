@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -48,4 +49,28 @@ pub async fn create_session(
         .set_auth_context(Some(native_auth_ctx.clone()));
 
     Ok(session)
+}
+
+pub async fn with_session<T, F, Fut>(
+    services: &NodeCubeServices,
+    native_auth_ctx: Arc<NativeAuthContext>,
+    f: F,
+) -> Result<T, CubeError>
+where
+    F: FnOnce(Arc<Session>) -> Fut,
+    Fut: Future<Output = Result<T, CubeError>>,
+{
+    let session_manager = services
+        .injector()
+        .get_service_typed::<SessionManager>()
+        .await;
+    let session = create_session(services, native_auth_ctx).await?;
+    let connection_id = session.state.connection_id;
+
+    // From now there's a session we should close before returning, as in `finally`
+    let result = { f(session).await };
+
+    session_manager.drop_session(connection_id).await;
+
+    result
 }
