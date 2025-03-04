@@ -2,7 +2,7 @@ use cubesql::compile::DatabaseProtocol;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::config::ConfigObj;
-use cubesql::sql::SessionManager;
+use cubesql::sql::{Session, SessionManager};
 use cubesql::transport::TransportService;
 use futures::StreamExt;
 
@@ -178,32 +178,25 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 const CHUNK_DELIM: &str = "\n";
 
-async fn handle_sql_query(
-    services: Arc<NodeCubeServices>,
+async fn create_session(
+    services: &NodeCubeServices,
     native_auth_ctx: Arc<NativeAuthContext>,
-    channel: Arc<Channel>,
-    stream_methods: WritableStreamMethods,
-    sql_query: &str,
-) -> Result<(), CubeError> {
+) -> Result<Arc<Session>, CubeError> {
     let config = services
         .injector()
         .get_service_typed::<dyn ConfigObj>()
         .await;
 
-    let transport_service = services
-        .injector()
-        .get_service_typed::<dyn TransportService>()
-        .await;
     let session_manager = services
         .injector()
         .get_service_typed::<SessionManager>()
         .await;
 
     let (host, port) = match SocketAddr::from_str(
-        &config
+        config
             .postgres_bind_address()
-            .clone()
-            .unwrap_or("127.0.0.1:15432".into()),
+            .as_deref()
+            .unwrap_or("127.0.0.1:15432"),
     ) {
         Ok(addr) => (addr.ip().to_string(), addr.port()),
         Err(e) => {
@@ -221,6 +214,27 @@ async fn handle_sql_query(
     session
         .state
         .set_auth_context(Some(native_auth_ctx.clone()));
+
+    Ok(session)
+}
+
+async fn handle_sql_query(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeAuthContext>,
+    channel: Arc<Channel>,
+    stream_methods: WritableStreamMethods,
+    sql_query: &str,
+) -> Result<(), CubeError> {
+    let session = create_session(&services, native_auth_ctx.clone()).await?;
+
+    let transport_service = services
+        .injector()
+        .get_service_typed::<dyn TransportService>()
+        .await;
+    let session_manager = services
+        .injector()
+        .get_service_typed::<SessionManager>()
+        .await;
 
     let connection_id = session.state.connection_id;
 
