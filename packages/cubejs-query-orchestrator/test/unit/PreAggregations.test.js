@@ -1,7 +1,7 @@
 /* eslint-disable global-require */
 /* globals describe, jest, beforeEach, test, expect */
 import R from 'ramda';
-import { PreAggregationPartitionRangeLoader } from '../../src';
+import { PreAggregationPartitionRangeLoader, PreAggregations } from '../../src';
 
 class MockDriver {
   constructor() {
@@ -139,7 +139,6 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
@@ -167,7 +166,6 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
@@ -195,7 +193,6 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverReadOnlyFactory,
@@ -223,7 +220,6 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
@@ -255,7 +251,6 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         () => { throw new Error('The source database factory should never be called when externalRefresh is true, as it will trigger testConnection'); },
@@ -289,7 +284,6 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
@@ -312,7 +306,6 @@ describe('PreAggregations', () => {
     });
 
     test('test for function targetTableName', () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       let result = PreAggregations.targetTableName({
         table_name: 'orders_number_and_count20191101',
         content_version: 'kjypcoio',
@@ -342,7 +335,6 @@ describe('PreAggregations', () => {
     let preAggregations = null;
 
     beforeEach(async () => {
-      const { PreAggregations } = require('../../src/orchestrator/PreAggregations');
       preAggregations = new PreAggregations(
         'TEST',
         mockDriverFactory,
