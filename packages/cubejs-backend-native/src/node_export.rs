@@ -221,45 +221,72 @@ async fn handle_sql_query(
     session
         .state
         .set_auth_context(Some(native_auth_ctx.clone()));
+    
+    let connection_id = session.state.connection_id;
 
-    // todo: can we use compiler_cache?
-    let meta_context = transport_service
-        .meta(native_auth_ctx)
-        .await
-        .map_err(|err| CubeError::internal(format!("Failed to get meta context: {}", err)))?;
-    let query_plan = convert_sql_to_cube_query(sql_query, meta_context, session).await?;
+    let execute = || async move {
+        // todo: can we use compiler_cache?
+        let meta_context = transport_service
+            .meta(native_auth_ctx)
+            .await
+            .map_err(|err| CubeError::internal(format!("Failed to get meta context: {}", err)))?;
+        let query_plan = convert_sql_to_cube_query(sql_query, meta_context, session).await?;
 
-    let mut stream = get_df_batches(&query_plan).await?;
+        let mut stream = get_df_batches(&query_plan).await?;
 
-    let semaphore = Arc::new(Semaphore::new(0));
+        let semaphore = Arc::new(Semaphore::new(0));
 
-    let drain_handler = OnDrainHandler::new(
-        channel.clone(),
-        stream_methods.stream.clone(),
-        semaphore.clone(),
-    );
+        let drain_handler = OnDrainHandler::new(
+            channel.clone(),
+            stream_methods.stream.clone(),
+            semaphore.clone(),
+        );
 
-    drain_handler.handle(stream_methods.on.clone()).await?;
+        drain_handler.handle(stream_methods.on.clone()).await?;
 
-    let mut is_first_batch = true;
-    while let Some(batch) = stream.next().await {
-        let (columns, data) = batch_to_rows(batch?)?;
+        let mut is_first_batch = true;
+        while let Some(batch) = stream.next().await {
+            let (columns, data) = batch_to_rows(batch?)?;
 
-        if is_first_batch {
-            let mut schema = Map::new();
-            schema.insert("schema".into(), columns);
-            let columns = format!(
-                "{}{}",
-                serde_json::to_string(&serde_json::Value::Object(schema))?,
-                CHUNK_DELIM
-            );
-            is_first_batch = false;
+            if is_first_batch {
+                let mut schema = Map::new();
+                schema.insert("schema".into(), columns);
+                let columns = format!(
+                    "{}{}",
+                    serde_json::to_string(&serde_json::Value::Object(schema))?,
+                    CHUNK_DELIM
+                );
+                is_first_batch = false;
 
-            call_js_fn(
+                call_js_fn(
+                    channel.clone(),
+                    stream_methods.write.clone(),
+                    Box::new(|cx| {
+                        let arg = cx.string(columns).upcast::<JsValue>();
+
+                        Ok(vec![arg.upcast::<JsValue>()])
+                    }),
+                    Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                        Ok(v) => Ok(v.value(cx)),
+                        Err(_) => Err(CubeError::internal(
+                            "Failed to downcast write response".to_string(),
+                        )),
+                    }),
+                    stream_methods.stream.clone(),
+                )
+                    .await?;
+            }
+
+            let mut rows = Map::new();
+            rows.insert("data".into(), serde_json::Value::Array(data));
+            let data = format!("{}{}", serde_json::to_string(&rows)?, CHUNK_DELIM);
+            let js_stream_write_fn = stream_methods.write.clone();
+
+            let should_pause = !call_js_fn(
                 channel.clone(),
-                stream_methods.write.clone(),
+                js_stream_write_fn,
                 Box::new(|cx| {
-                    let arg = cx.string(columns).upcast::<JsValue>();
+                    let arg = cx.string(data).upcast::<JsValue>();
 
                     Ok(vec![arg.upcast::<JsValue>()])
                 }),
@@ -271,39 +298,22 @@ async fn handle_sql_query(
                 }),
                 stream_methods.stream.clone(),
             )
-            .await?;
+                .await?;
+
+            if should_pause {
+                let permit = semaphore.acquire().await?;
+                permit.forget();
+            }
         }
 
-        let mut rows = Map::new();
-        rows.insert("data".into(), serde_json::Value::Array(data));
-        let data = format!("{}{}", serde_json::to_string(&rows)?, CHUNK_DELIM);
-        let js_stream_write_fn = stream_methods.write.clone();
+        Ok::<(), CubeError>(())
+    };
 
-        let should_pause = !call_js_fn(
-            channel.clone(),
-            js_stream_write_fn,
-            Box::new(|cx| {
-                let arg = cx.string(data).upcast::<JsValue>();
-
-                Ok(vec![arg.upcast::<JsValue>()])
-            }),
-            Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
-                Ok(v) => Ok(v.value(cx)),
-                Err(_) => Err(CubeError::internal(
-                    "Failed to downcast write response".to_string(),
-                )),
-            }),
-            stream_methods.stream.clone(),
-        )
-        .await?;
-
-        if should_pause {
-            let permit = semaphore.acquire().await.unwrap();
-            permit.forget();
-        }
-    }
-
-    Ok(())
+    let result = execute().await;
+    
+    session_manager.drop_session(connection_id).await;
+    
+    result
 }
 
 struct WritableStreamMethods {
@@ -375,7 +385,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             stream_methods,
             &sql_query,
         )
-        .await;
+            .await;
 
         let _ = channel.try_send(move |mut cx| {
             let method = match Arc::try_unwrap(js_stream_end_fn) {
@@ -454,7 +464,7 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Box::new(NodeBridgeLogger::new(cx.channel(), cube_logger)),
         log_level.to_level_filter(),
     )
-    .unwrap();
+        .unwrap();
 
     Ok(cx.undefined())
 }
