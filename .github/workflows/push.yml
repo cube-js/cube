@@ -389,7 +389,7 @@ jobs:
 
   integration:
     needs: [unit, lint, latest-tag-sha]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04 # Can't switch to 24.04 because there is no mongodb-bi-linux-x86_64-ubuntu2404 released yet (as of Feb 2025)
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     env:
