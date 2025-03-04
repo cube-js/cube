@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cloud",
-  "version": "1.2.15",
+  "version": "1.2.16",
   "description": "Cube Cloud package",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -25,7 +25,7 @@
   "devDependencies": {
     "@babel/core": "^7.24.5",
     "@babel/preset-env": "^7.24.5",
-    "@cubejs-backend/linter": "1.2.15",
+    "@cubejs-backend/linter": "1.2.16",
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
     "jest": "^27",
@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/shared": "1.2.15",
+    "@cubejs-backend/shared": "1.2.16",
     "chokidar": "^3.5.1",
     "env-var": "^6.3.0",
     "form-data": "^4.0.0",

@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
-  "version": "1.2.15",
+  "version": "1.2.16",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -30,10 +30,10 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@cubejs-backend/cloud": "1.2.15",
+    "@cubejs-backend/cloud": "1.2.16",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/schema-compiler": "1.2.15",
-    "@cubejs-backend/shared": "1.2.15",
+    "@cubejs-backend/schema-compiler": "1.2.16",
+    "@cubejs-backend/shared": "1.2.16",
     "chalk": "^2.4.2",
     "cli-progress": "^3.10",
     "commander": "^2.19.0",
@@ -50,8 +50,8 @@
     "colors": "1.4.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.2.15",
-    "@cubejs-backend/server": "1.2.15",
+    "@cubejs-backend/linter": "1.2.16",
+    "@cubejs-backend/server": "1.2.16",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
