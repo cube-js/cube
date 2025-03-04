@@ -84,7 +84,7 @@ const mockPreAggregation = (overrides = {}) => ({
     ['SELECT MIN(ts)', [], {}],
     ['SELECT MAX(ts)', [], {}]
   ],
-  loadSql: ['SELECT * FROM test_table WHERE ts >= ? and ts < ?', [FROM_PARTITION_RANGE, TO_PARTITION_RANGE]],
+  loadSql: ['CREATE TABLE test_table AS SELECT * FROM source_table WHERE ts >= $1 and ts <= $2', [FROM_PARTITION_RANGE, TO_PARTITION_RANGE]],
   ...overrides,
 });
 
