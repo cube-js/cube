@@ -28,6 +28,8 @@ import {
 import { PreAggregationLoader } from './PreAggregationLoader';
 import { PreAggregationLoadCache } from './PreAggregationLoadCache';
 
+const DEFAULT_TS_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSS';
+
 interface PreAggsPartitionRangeLoaderOpts {
   maxPartitions: number;
   maxSourceRowLimit: number;
@@ -400,7 +402,7 @@ export class PreAggregationPartitionRangeLoader {
     return { buildRange: dateRange, partitionRanges };
   }
 
-  public async loadBuildRange(timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): Promise<QueryDateRange> {
+  public async loadBuildRange(timestampFormat: string = DEFAULT_TS_FORMAT): Promise<QueryDateRange> {
     const { preAggregationStartEndQueries } = this.preAggregation;
     const [startDate, endDate] = await Promise.all(
       preAggregationStartEndQueries.map(
@@ -433,7 +435,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   private now() {
-    return utcToLocalTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
+    return utcToLocalTimeZone(this.preAggregation.timezone, DEFAULT_TS_FORMAT, new Date().toJSON().substring(0, 23));
   }
 
   private orNowIfEmpty(dateRange: QueryDateRange): QueryDateRange {
@@ -464,7 +466,7 @@ export class PreAggregationPartitionRangeLoader {
     }
 
     if ((range[0].length !== 23 && range[0].length !== 26) || (range[1].length !== 23 && range[0].length !== 26)) {
-      throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
+      throw new Error(`Date range expected to be in ${DEFAULT_TS_FORMAT} format but ${range} found`);
     }
   }
 
@@ -523,7 +525,7 @@ export class PreAggregationPartitionRangeLoader {
     return localTimestampToUtc(preAggregationDescription.timezone, preAggregationDescription.timestampFormat, timestamp);
   }
 
-  public static extractDate(data: any, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string {
+  public static extractDate(data: any, timezone: string, timestampFormat: string = DEFAULT_TS_FORMAT): string {
     return parseLocalDate(data, timezone, timestampFormat);
   }
 
