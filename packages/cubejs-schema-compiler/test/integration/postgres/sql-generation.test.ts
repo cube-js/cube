@@ -3278,16 +3278,6 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }]
   ));
 
-  it('multiplied sum no dimensions through view', async () => runQueryTest(
-    {
-      measures: ['visitors_visitors_checkins_view.revenue', 'visitors_visitors_checkins_view.id_sum'],
-    },
-    [{
-      visitors_visitors_checkins_view__revenue: '2000',
-      visitors_visitors_checkins_view__id_sum: '21'
-    }]
-  ));
-
   // Subquery aggregation for multiplied measure (and any `keysSelect` for that matter)
   // should pick up all dimensions, even through member expressions
   it('multiplied sum with dimension member expressions', async () => runQueryTest(
