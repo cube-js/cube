@@ -26,6 +26,7 @@ use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -178,6 +179,30 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 const CHUNK_DELIM: &str = "\n";
 
+async fn with_session<T, F, Fut>(
+    services: &NodeCubeServices,
+    native_auth_ctx: Arc<NativeAuthContext>,
+    f: F,
+) -> Result<T, CubeError>
+where
+    F: FnOnce(Arc<Session>) -> Fut,
+    Fut: Future<Output = Result<T, CubeError>>,
+{
+    let session_manager = services
+        .injector()
+        .get_service_typed::<SessionManager>()
+        .await;
+    let session = create_session(services, native_auth_ctx).await?;
+    let connection_id = session.state.connection_id;
+
+    // From now there's a session we should close before returning, as in `finally`
+    let result = { f(session).await };
+
+    session_manager.drop_session(connection_id).await;
+
+    result
+}
+
 async fn create_session(
     services: &NodeCubeServices,
     native_auth_ctx: Arc<NativeAuthContext>,
@@ -225,20 +250,12 @@ async fn handle_sql_query(
     stream_methods: WritableStreamMethods,
     sql_query: &str,
 ) -> Result<(), CubeError> {
-    let session = create_session(&services, native_auth_ctx.clone()).await?;
-
     let transport_service = services
         .injector()
         .get_service_typed::<dyn TransportService>()
         .await;
-    let session_manager = services
-        .injector()
-        .get_service_typed::<SessionManager>()
-        .await;
 
-    let connection_id = session.state.connection_id;
-
-    let execute = || async move {
+    with_session(&services, native_auth_ctx.clone(), |session| async move {
         // todo: can we use compiler_cache?
         let meta_context = transport_service
             .meta(native_auth_ctx)
@@ -321,13 +338,8 @@ async fn handle_sql_query(
         }
 
         Ok::<(), CubeError>(())
-    };
-
-    let result = execute().await;
-
-    session_manager.drop_session(connection_id).await;
-
-    result
+    })
+    .await
 }
 
 struct WritableStreamMethods {
