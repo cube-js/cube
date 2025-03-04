@@ -83,7 +83,7 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.7.3",
     "ramda": "^0.28.0",
-    "testcontainers": "^10.10.4",
+    "testcontainers": "^10.13.0",
     "typescript": "~5.2.2",
     "yaml": "^1.10.2",
     "yargs": "^17.7.1"
