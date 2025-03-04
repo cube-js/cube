@@ -138,12 +138,10 @@ pub async fn get_df_batches(
                         Ok(stream) => {
                             return Ok(stream);
                         }
-                        Err(err) => return Err(err.into())
+                        Err(err) => return Err(err.into()),
                     };
                 }
-                Err(err) => {
-                    return Err(CubeError::panic(err))
-                },
+                Err(err) => return Err(CubeError::panic(err)),
             }
         }
         _ => Err(CubeError::user(
