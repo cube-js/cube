@@ -78,15 +78,20 @@ impl fmt::Debug for QueryPlan {
 }
 
 impl QueryPlan {
-    pub fn as_logical_plan(&self) -> LogicalPlan {
+    pub fn try_as_logical_plan(&self) -> Result<&LogicalPlan, CubeError> {
         match self {
             QueryPlan::DataFusionSelect(plan, _) | QueryPlan::CreateTempTable(plan, _, _, _) => {
-                plan.clone()
+                Ok(plan)
             }
-            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
-                panic!("This query doesnt have a plan, because it already has values for response")
-            }
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Err(CubeError::internal(
+                "This query doesnt have a plan, because it already has values for response"
+                    .to_string(),
+            )),
         }
+    }
+
+    pub fn as_logical_plan(&self) -> LogicalPlan {
+        self.try_as_logical_plan().cloned().unwrap()
     }
 
     pub async fn as_physical_plan(&self) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
