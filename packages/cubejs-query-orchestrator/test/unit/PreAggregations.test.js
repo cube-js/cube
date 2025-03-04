@@ -396,5 +396,50 @@ describe('PreAggregations', () => {
         ['2024-01-05T00:00:00.000', '2024-01-05T23:59:59.999']
       );
     });
+
+    test('returns null if ranges do not overlap', () => {
+      expect(
+        PreAggregationPartitionRangeLoader.intersectDateRanges(
+          ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'],
+          ['2024-02-01T00:00:00.000', '2024-02-28T23:59:59.999']
+        )
+      ).toBeNull();
+    });
+
+    test('returns rangeA if rangeB is null', () => {
+      expect(
+        PreAggregationPartitionRangeLoader.intersectDateRanges(
+          ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'],
+          null
+        )
+      ).toEqual(['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']);
+    });
+
+    test('returns rangeB if rangeA is null', () => {
+      expect(
+        PreAggregationPartitionRangeLoader.intersectDateRanges(
+          null,
+          ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
+        )
+      ).toEqual(['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']);
+    });
+
+    test('throws error if range is not a tuple of two strings', () => {
+      expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
+        ['2024-01-01T00:00:00.000'],
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
+      )).toThrow('Date range expected to be an array with 2 elements');
+
+      expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999', '2024-01-01T00:00:00.000'],
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
+      ))
+        .toThrow('Date range expected to be an array with 2 elements');
+
+      expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
+        ['2024-01-01T00:00:00', '2024-01-31T23:59:59.999'], // incorrect format
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
+      )).toThrow('Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format');
+    });
   });
 });
