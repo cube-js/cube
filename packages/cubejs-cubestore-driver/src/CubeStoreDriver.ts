@@ -199,7 +199,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
   public toColumnValue(value: any, genericType: any) {
     if (genericType === 'timestamp' && typeof value === 'string') {
-      return value && value.replace('Z', '');
+      return value?.replace('Z', '');
     }
     if (genericType === 'boolean' && typeof value === 'string') {
       if (value.toLowerCase() === 'true') {
@@ -216,14 +216,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     const createTableIndexes = externalOptions?.createTableIndexes;
     const aggregationsColumns = externalOptions?.aggregationsColumns;
 
-    const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
+    const indexes = createTableIndexes?.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
 
     let hasAggregatingIndexes = false;
-    if (createTableIndexes && createTableIndexes.length) {
+    if (createTableIndexes?.length) {
       hasAggregatingIndexes = createTableIndexes.some((index) => index.type === 'aggregate');
     }
 
-    const aggregations = hasAggregatingIndexes && aggregationsColumns && aggregationsColumns.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
+    const aggregations = hasAggregatingIndexes && aggregationsColumns?.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
 
     if (tableData.rowStream) {
       await this.importStream(columns, tableData, table, indexes, aggregations, queryTracingObj);
@@ -428,7 +428,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
       }
     }
-    
+
     const options: CreateTableOptions = {
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
       uniqueKey: uniqueKeyColumns.join(','),

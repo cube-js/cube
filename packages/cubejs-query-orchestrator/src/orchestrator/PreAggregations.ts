@@ -6,7 +6,7 @@ import { BaseDriver, InlineTable, } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import LRUCache from 'lru-cache';
 
-import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
+import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryWithParams } from './QueryCache';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
@@ -67,7 +67,7 @@ export function getLastUpdatedAtTimestamp(
 
 export function getStructureVersion(preAggregation) {
   const versionArray = [preAggregation.structureVersionLoadSql || preAggregation.loadSql];
-  if (preAggregation.indexesSql && preAggregation.indexesSql.length) {
+  if (preAggregation.indexesSql?.length) {
     versionArray.push(preAggregation.indexesSql);
   }
   if (preAggregation.streamOffset) {
@@ -143,6 +143,8 @@ export type LoadPreAggregationResult = {
   rollupLambdaId?: string;
   partitionRange?: QueryDateRange;
 };
+
+export type PreAggregationTableToTempTable = [string, LoadPreAggregationResult];
 
 export type LambdaOptions = {
   maxSourceRows: number
@@ -387,7 +389,7 @@ export class PreAggregations {
     if (tables.length === 1) {
       status = 'done';
     } else {
-      status = result && result.error
+      status = result?.error
         ? `failure: ${result.error}`
         : 'missing_partition';
     }
@@ -416,12 +418,12 @@ export class PreAggregations {
     return [true, status];
   }
 
-  public loadAllPreAggregationsIfNeeded(
+  public async loadAllPreAggregationsIfNeeded(
     queryBody: PreAggregationQueryBody,
   ): Promise<{
     preAggregationsTablesToTempTables: PreAggTableToTempTable[],
     values: null | string[],
-   }> {
+  }> {
     const preAggregations = queryBody.preAggregations || [];
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
@@ -488,7 +490,7 @@ export class PreAggregations {
 
           if (i === preAggregations.length - 1 && queryBody.values) {
             queryParamsReplacement = await loader.replaceQueryBuildRangeParams(
-              <string[]>queryBody.values,
+              queryBody.values,
             );
           }
 
@@ -514,8 +516,7 @@ export class PreAggregations {
       preAggregations.map(async (preAggregation) => {
         const { preAggregationStartEndQueries } = preAggregation;
         const invalidate =
-          preAggregation.invalidateKeyQueries &&
-          preAggregation.invalidateKeyQueries[0]
+          preAggregation?.invalidateKeyQueries[0]
             ? preAggregation.invalidateKeyQueries[0].slice(0, 2)
             : false;
         const isCached = preAggregation.partitionGranularity
