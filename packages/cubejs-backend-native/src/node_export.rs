@@ -222,44 +222,71 @@ async fn handle_sql_query(
         .state
         .set_auth_context(Some(native_auth_ctx.clone()));
 
-    // todo: can we use compiler_cache?
-    let meta_context = transport_service
-        .meta(native_auth_ctx)
-        .await
-        .map_err(|err| CubeError::internal(format!("Failed to get meta context: {}", err)))?;
-    let query_plan = convert_sql_to_cube_query(sql_query, meta_context, session).await?;
+    let connection_id = session.state.connection_id;
 
-    let mut stream = get_df_batches(&query_plan).await?;
+    let execute = || async move {
+        // todo: can we use compiler_cache?
+        let meta_context = transport_service
+            .meta(native_auth_ctx)
+            .await
+            .map_err(|err| CubeError::internal(format!("Failed to get meta context: {}", err)))?;
+        let query_plan = convert_sql_to_cube_query(sql_query, meta_context, session).await?;
 
-    let semaphore = Arc::new(Semaphore::new(0));
+        let mut stream = get_df_batches(&query_plan).await?;
 
-    let drain_handler = OnDrainHandler::new(
-        channel.clone(),
-        stream_methods.stream.clone(),
-        semaphore.clone(),
-    );
+        let semaphore = Arc::new(Semaphore::new(0));
 
-    drain_handler.handle(stream_methods.on.clone()).await?;
+        let drain_handler = OnDrainHandler::new(
+            channel.clone(),
+            stream_methods.stream.clone(),
+            semaphore.clone(),
+        );
 
-    let mut is_first_batch = true;
-    while let Some(batch) = stream.next().await {
-        let (columns, data) = batch_to_rows(batch?)?;
+        drain_handler.handle(stream_methods.on.clone()).await?;
 
-        if is_first_batch {
-            let mut schema = Map::new();
-            schema.insert("schema".into(), columns);
-            let columns = format!(
-                "{}{}",
-                serde_json::to_string(&serde_json::Value::Object(schema))?,
-                CHUNK_DELIM
-            );
-            is_first_batch = false;
+        let mut is_first_batch = true;
+        while let Some(batch) = stream.next().await {
+            let (columns, data) = batch_to_rows(batch?)?;
 
-            call_js_fn(
+            if is_first_batch {
+                let mut schema = Map::new();
+                schema.insert("schema".into(), columns);
+                let columns = format!(
+                    "{}{}",
+                    serde_json::to_string(&serde_json::Value::Object(schema))?,
+                    CHUNK_DELIM
+                );
+                is_first_batch = false;
+
+                call_js_fn(
+                    channel.clone(),
+                    stream_methods.write.clone(),
+                    Box::new(|cx| {
+                        let arg = cx.string(columns).upcast::<JsValue>();
+
+                        Ok(vec![arg.upcast::<JsValue>()])
+                    }),
+                    Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                        Ok(v) => Ok(v.value(cx)),
+                        Err(_) => Err(CubeError::internal(
+                            "Failed to downcast write response".to_string(),
+                        )),
+                    }),
+                    stream_methods.stream.clone(),
+                )
+                .await?;
+            }
+
+            let mut rows = Map::new();
+            rows.insert("data".into(), serde_json::Value::Array(data));
+            let data = format!("{}{}", serde_json::to_string(&rows)?, CHUNK_DELIM);
+            let js_stream_write_fn = stream_methods.write.clone();
+
+            let should_pause = !call_js_fn(
                 channel.clone(),
-                stream_methods.write.clone(),
+                js_stream_write_fn,
                 Box::new(|cx| {
-                    let arg = cx.string(columns).upcast::<JsValue>();
+                    let arg = cx.string(data).upcast::<JsValue>();
 
                     Ok(vec![arg.upcast::<JsValue>()])
                 }),
@@ -272,38 +299,21 @@ async fn handle_sql_query(
                 stream_methods.stream.clone(),
             )
             .await?;
+
+            if should_pause {
+                let permit = semaphore.acquire().await?;
+                permit.forget();
+            }
         }
 
-        let mut rows = Map::new();
-        rows.insert("data".into(), serde_json::Value::Array(data));
-        let data = format!("{}{}", serde_json::to_string(&rows)?, CHUNK_DELIM);
-        let js_stream_write_fn = stream_methods.write.clone();
+        Ok::<(), CubeError>(())
+    };
 
-        let should_pause = !call_js_fn(
-            channel.clone(),
-            js_stream_write_fn,
-            Box::new(|cx| {
-                let arg = cx.string(data).upcast::<JsValue>();
+    let result = execute().await;
 
-                Ok(vec![arg.upcast::<JsValue>()])
-            }),
-            Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
-                Ok(v) => Ok(v.value(cx)),
-                Err(_) => Err(CubeError::internal(
-                    "Failed to downcast write response".to_string(),
-                )),
-            }),
-            stream_methods.stream.clone(),
-        )
-        .await?;
+    session_manager.drop_session(connection_id).await;
 
-        if should_pause {
-            let permit = semaphore.acquire().await.unwrap();
-            permit.forget();
-        }
-    }
-
-    Ok(())
+    result
 }
 
 struct WritableStreamMethods {
