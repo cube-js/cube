@@ -10,7 +10,6 @@ import {
   timeSeries,
   localTimestampToUtc,
   parseLocalDate,
-  reformatUtcTimestamp,
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';

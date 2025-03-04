@@ -225,8 +225,6 @@ export const localTimestampToUtc = (timezone: string, timestampFormat: string, t
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
 };
 
-export const reformatUtcTimestamp = (timestampFormat: string, timestamp: string): string => moment.utc(timestamp).format(timestampFormat);
-
 /**
  * Takes timestamp in UTC, shift it into provided timezone and returns the corresponding timestamp in UTC
  */

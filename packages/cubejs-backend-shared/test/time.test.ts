@@ -8,7 +8,6 @@ import {
   utcToLocalTimeZone,
   addSecondsToLocalTimestamp,
   reformatInIsoLocal,
-  reformatUtcTimestamp,
 } from '../src';
 
 describe('timeSeries', () => {
@@ -528,37 +527,5 @@ describe('reformatInIsoLocal', () => {
     const expected = '';
 
     expect(reformatInIsoLocal(timestamp)).toBe(expected);
-  });
-});
-
-describe('reformatUtcTimestamp', () => {
-  it('should format timestamp to YYYY-MM-DDTHH:mm:ss.SSS', () => {
-    expect(reformatUtcTimestamp('YYYY-MM-DDTHH:mm:ss.SSS', '2025-02-28T12:34:56Z'))
-      .toBe('2025-02-28T12:34:56.000');
-  });
-
-  it('should format timestamp to YYYY-MM-DDTHH:mm:ss', () => {
-    expect(reformatUtcTimestamp('YYYY-MM-DDTHH:mm:ss', '2025-02-28T12:34:56Z'))
-      .toBe('2025-02-28T12:34:56');
-  });
-
-  it('should format timestamp to YYYY-MM-DD HH:mm:ss.SSS', () => {
-    expect(reformatUtcTimestamp('YYYY-MM-DD HH:mm:ss.SSS', '2025-02-28T12:34:56Z'))
-      .toBe('2025-02-28 12:34:56.000');
-  });
-
-  it('should format timestamp to YYYY-MM-DD HH:mm:ss', () => {
-    expect(reformatUtcTimestamp('YYYY-MM-DD HH:mm:ss', '2025-02-28T12:34:56Z'))
-      .toBe('2025-02-28 12:34:56');
-  });
-
-  it('should handle timestamps with milliseconds', () => {
-    expect(reformatUtcTimestamp('YYYY-MM-DDTHH:mm:ss.SSS', '2025-02-28T12:34:56.789Z'))
-      .toBe('2025-02-28T12:34:56.789');
-  });
-
-  it('should handle timestamps without timezone info', () => {
-    expect(reformatUtcTimestamp('YYYY-MM-DDTHH:mm:ss.SSS', '2025-02-28 12:34:56'))
-      .toBe('2025-02-28T12:34:56.000');
   });
 });
