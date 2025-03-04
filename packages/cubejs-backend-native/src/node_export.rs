@@ -1,9 +1,12 @@
+use cubesql::compile::datafusion::logical_plan::LogicalPlan;
+use cubesql::compile::engine::df::scan::CubeScanNode;
+use cubesql::compile::engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode};
 use cubesql::compile::DatabaseProtocol;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::config::ConfigObj;
-use cubesql::sql::SessionManager;
-use cubesql::transport::TransportService;
+use cubesql::sql::{Session, SessionManager};
+use cubesql::transport::{MetaContext, TransportService};
 use futures::StreamExt;
 
 use serde_json::Map;
@@ -26,6 +29,7 @@ use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -178,32 +182,49 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 const CHUNK_DELIM: &str = "\n";
 
-async fn handle_sql_query(
-    services: Arc<NodeCubeServices>,
+async fn with_session<T, F, Fut>(
+    services: &NodeCubeServices,
     native_auth_ctx: Arc<NativeAuthContext>,
-    channel: Arc<Channel>,
-    stream_methods: WritableStreamMethods,
-    sql_query: &String,
-) -> Result<(), CubeError> {
+    f: F,
+) -> Result<T, CubeError>
+where
+    F: FnOnce(Arc<Session>) -> Fut,
+    Fut: Future<Output = Result<T, CubeError>>,
+{
+    let session_manager = services
+        .injector()
+        .get_service_typed::<SessionManager>()
+        .await;
+    let session = create_session(services, native_auth_ctx).await?;
+    let connection_id = session.state.connection_id;
+
+    // From now there's a session we should close before returning, as in `finally`
+    let result = { f(session).await };
+
+    session_manager.drop_session(connection_id).await;
+
+    result
+}
+
+async fn create_session(
+    services: &NodeCubeServices,
+    native_auth_ctx: Arc<NativeAuthContext>,
+) -> Result<Arc<Session>, CubeError> {
     let config = services
         .injector()
         .get_service_typed::<dyn ConfigObj>()
         .await;
 
-    let transport_service = services
-        .injector()
-        .get_service_typed::<dyn TransportService>()
-        .await;
     let session_manager = services
         .injector()
         .get_service_typed::<SessionManager>()
         .await;
 
     let (host, port) = match SocketAddr::from_str(
-        &config
+        config
             .postgres_bind_address()
-            .clone()
-            .unwrap_or("127.0.0.1:15432".into()),
+            .as_deref()
+            .unwrap_or("127.0.0.1:15432"),
     ) {
         Ok(addr) => (addr.ip().to_string(), addr.port()),
         Err(e) => {
@@ -222,9 +243,22 @@ async fn handle_sql_query(
         .state
         .set_auth_context(Some(native_auth_ctx.clone()));
 
-    let connection_id = session.state.connection_id;
+    Ok(session)
+}
 
-    let execute = || async move {
+async fn handle_sql_query(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeAuthContext>,
+    channel: Arc<Channel>,
+    stream_methods: WritableStreamMethods,
+    sql_query: &str,
+) -> Result<(), CubeError> {
+    let transport_service = services
+        .injector()
+        .get_service_typed::<dyn TransportService>()
+        .await;
+
+    with_session(&services, native_auth_ctx.clone(), |session| async move {
         // todo: can we use compiler_cache?
         let meta_context = transport_service
             .meta(native_auth_ctx)
@@ -307,13 +341,185 @@ async fn handle_sql_query(
         }
 
         Ok::<(), CubeError>(())
-    };
+    })
+    .await
+}
 
-    let result = execute().await;
+struct Sql4SqlQueryType {
+    regular: bool,
+    post_processing: bool,
+    pushdown: bool,
+}
 
-    session_manager.drop_session(connection_id).await;
+impl Sql4SqlQueryType {
+    fn regular() -> Self {
+        Self {
+            regular: true,
+            post_processing: false,
+            pushdown: false,
+        }
+    }
 
-    result
+    fn post_processing() -> Self {
+        Self {
+            regular: false,
+            post_processing: true,
+            pushdown: false,
+        }
+    }
+
+    fn pushdown() -> Self {
+        Self {
+            regular: false,
+            post_processing: false,
+            pushdown: true,
+        }
+    }
+
+    pub fn to_js<'ctx>(&self, cx: &mut impl Context<'ctx>) -> JsResult<'ctx, JsObject> {
+        let obj = cx.empty_object();
+
+        let regular = cx.boolean(self.regular);
+        obj.set(cx, "regular", regular)?;
+        let post_processing = cx.boolean(self.post_processing);
+        obj.set(cx, "post_processing", post_processing)?;
+        let pushdown = cx.boolean(self.pushdown);
+        obj.set(cx, "pushdown", pushdown)?;
+
+        Ok(obj)
+    }
+}
+
+enum Sql4SqlResponseResult {
+    Ok {
+        sql: String,
+        values: Vec<Option<String>>,
+    },
+    Error {
+        error: String,
+    },
+}
+
+struct Sql4SqlResponse {
+    result: Sql4SqlResponseResult,
+    query_type: Sql4SqlQueryType,
+}
+
+impl Sql4SqlResponse {
+    pub fn to_js<'ctx>(&self, cx: &mut impl Context<'ctx>) -> JsResult<'ctx, JsObject> {
+        let obj = cx.empty_object();
+
+        match &self.result {
+            Sql4SqlResponseResult::Ok { sql, values } => {
+                let sql = cx.string(sql);
+                obj.set(cx, "sql", sql)?;
+                let js_values = cx.empty_array();
+                for (i, v) in values.iter().enumerate() {
+                    use std::convert::TryFrom;
+                    let i = u32::try_from(i).unwrap();
+                    let v: Handle<JsValue> = v
+                        .as_ref()
+                        .map(|v| cx.string(v).upcast())
+                        .unwrap_or_else(|| cx.null().upcast());
+                    js_values.set(cx, i, v)?;
+                }
+                obj.set(cx, "values", js_values)?;
+            }
+            Sql4SqlResponseResult::Error { error } => {
+                let error = cx.string(error);
+                obj.set(cx, "error", error)?;
+            }
+        }
+
+        let query_type = self.query_type.to_js(cx)?;
+        obj.set(cx, "query_type", query_type)?;
+
+        Ok(obj)
+    }
+}
+
+async fn get_sql(
+    session: &Session,
+    meta_context: Arc<MetaContext>,
+    plan: Arc<LogicalPlan>,
+) -> Result<Sql4SqlResponse, CubeError> {
+    let auth_context = session
+        .state
+        .auth_context()
+        .ok_or_else(|| CubeError::internal("Unexpected missing auth context".to_string()))?;
+
+    match plan.as_ref() {
+        LogicalPlan::Extension(extension) => {
+            let cube_scan_wrapped_sql = extension
+                .node
+                .as_any()
+                .downcast_ref::<CubeScanWrappedSqlNode>();
+
+            if let Some(cube_scan_wrapped_sql) = cube_scan_wrapped_sql {
+                return Ok(Sql4SqlResponse {
+                    result: Sql4SqlResponseResult::Ok {
+                        sql: cube_scan_wrapped_sql.wrapped_sql.sql.clone(),
+                        values: cube_scan_wrapped_sql.wrapped_sql.values.clone(),
+                    },
+                    query_type: Sql4SqlQueryType::pushdown(),
+                });
+            }
+
+            if extension.node.as_any().is::<CubeScanNode>() {
+                let cube_scan_wrapper = CubeScanWrapperNode::new(
+                    plan,
+                    meta_context,
+                    auth_context,
+                    None,
+                    session.server.config_obj.clone(),
+                );
+                let wrapped_sql = cube_scan_wrapper
+                    .generate_sql(
+                        session.server.transport.clone(),
+                        Arc::new(session.state.get_load_request_meta("sql")),
+                    )
+                    .await?;
+
+                return Ok(Sql4SqlResponse {
+                    result: Sql4SqlResponseResult::Ok {
+                        sql: wrapped_sql.wrapped_sql.sql.clone(),
+                        values: wrapped_sql.wrapped_sql.values.clone(),
+                    },
+                    query_type: Sql4SqlQueryType::regular(),
+                });
+            }
+
+            Err(CubeError::internal(
+                "Unexpected extension in logical plan root".to_string(),
+            ))
+        }
+        _ => Ok(Sql4SqlResponse {
+            result: Sql4SqlResponseResult::Error {
+                error: "Provided query can not be executed without post-processing.".to_string(),
+            },
+            query_type: Sql4SqlQueryType::post_processing(),
+        }),
+    }
+}
+
+async fn handle_sql4sql_query(
+    services: Arc<NodeCubeServices>,
+    native_auth_ctx: Arc<NativeAuthContext>,
+    sql_query: &str,
+) -> Result<Sql4SqlResponse, CubeError> {
+    with_session(&services, native_auth_ctx.clone(), |session| async move {
+        let transport = session.server.transport.clone();
+        // todo: can we use compiler_cache?
+        let meta_context = transport
+            .meta(native_auth_ctx)
+            .await
+            .map_err(|err| CubeError::internal(format!("Failed to get meta context: {err}")))?;
+        let query_plan =
+            convert_sql_to_cube_query(sql_query, meta_context.clone(), session.clone()).await?;
+        let logical_plan = query_plan.try_as_logical_plan()?;
+        get_sql(&session, meta_context, Arc::new(logical_plan.clone())).await
+    })
+    .await
 }
 
 struct WritableStreamMethods {
@@ -425,6 +631,60 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     Ok(promise.upcast::<JsValue>())
 }
 
+fn sql4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
+    let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
+
+    let security_context: Option<serde_json::Value> = match cx.argument::<JsValue>(2) {
+        Ok(string) => match string.downcast::<JsString, _>(&mut cx) {
+            Ok(v) => v.value(&mut cx).parse::<serde_json::Value>().ok(),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    let services = interface.services.clone();
+    let runtime = tokio_runtime_node(&mut cx)?;
+
+    let channel = cx.channel();
+
+    let native_auth_ctx = Arc::new(NativeAuthContext {
+        user: Some(String::from("unknown")),
+        superuser: false,
+        security_context,
+    });
+
+    let (deferred, promise) = cx.promise();
+
+    // In case spawned task panics or gets aborted before settle call it will leave permanently pending Promise in JS land
+    // We don't want to just waste whole thread (doesn't really matter main or worker or libuv thread pool)
+    // just busy waiting that JoinHandle
+    // TODO handle JoinError
+    //  keep JoinHandle alive in JS thread
+    //  check join handle from JS thread periodically, reject promise on JoinError
+    //  maybe register something like uv_check handle (libuv itself does not have ABI stability of N-API)
+    //  can do it relatively rare, and in a single loop for all JoinHandles
+    //  this is just a watchdog for a Very Bad case, so latency requirement can be quite relaxed
+    runtime.spawn(async move {
+        let result = handle_sql4sql_query(services, native_auth_ctx, &sql_query).await;
+
+        if let Err(err) = deferred.try_settle_with(&channel, move |mut cx| {
+            // `neon::result::ResultExt` is implemented only for Result<Handle, Handle>, even though Ok variant is not touched
+            let response = result.or_else(|err| cx.throw_error(err.to_string()))?;
+            let response = response.to_js(&mut cx)?;
+            Ok(response)
+        }) {
+            // There is not much we can do at this point
+            // TODO lift this error to task => JoinHandle => JS watchdog
+            log::error!(
+                "Unable to settle JS promise from tokio task, try_settle_with failed, err: {err}"
+            );
+        }
+    });
+
+    Ok(promise.upcast::<JsValue>())
+}
+
 fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     #[cfg(feature = "python")]
     {
@@ -511,6 +771,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("registerInterface", register_interface::<C>)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("execSql", exec_sql)?;
+    cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
