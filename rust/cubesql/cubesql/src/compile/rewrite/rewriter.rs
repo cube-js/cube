@@ -208,7 +208,7 @@ impl Rewriter {
         .with_iter_limit(
             env::var("CUBESQL_REWRITE_MAX_ITERATIONS")
                 .map(|v| v.parse::<usize>().unwrap())
-                .unwrap_or(300),
+                .unwrap_or(500),
         )
         .with_node_limit(
             env::var("CUBESQL_REWRITE_MAX_NODES")
