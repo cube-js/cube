@@ -2,7 +2,7 @@
 set -eo pipefail
 
 # Debug log for test containers
-export DEBUG=testcontainers
+export DEBUG=testcontainers*
 
 export TEST_MONGO_TAG=6.0
 export TEST_MONGOBI_VERSION=mongodb-bi-linux-x86_64-ubuntu2204-v2.14.21
