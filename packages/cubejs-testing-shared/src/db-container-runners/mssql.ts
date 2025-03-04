@@ -4,7 +4,7 @@ import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract
 
 export class MssqlDbRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
-    const version = process.env.TEST_MSSQL_VERSION || options.version || '2017-latest';
+    const version = process.env.TEST_MSSQL_VERSION || options.version || '2019-latest';
 
     const container = new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
       .withEnvironment({
