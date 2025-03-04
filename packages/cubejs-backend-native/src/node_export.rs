@@ -221,7 +221,7 @@ async fn handle_sql_query(
     session
         .state
         .set_auth_context(Some(native_auth_ctx.clone()));
-    
+
     let connection_id = session.state.connection_id;
 
     let execute = || async move {
@@ -274,7 +274,7 @@ async fn handle_sql_query(
                     }),
                     stream_methods.stream.clone(),
                 )
-                    .await?;
+                .await?;
             }
 
             let mut rows = Map::new();
@@ -298,7 +298,7 @@ async fn handle_sql_query(
                 }),
                 stream_methods.stream.clone(),
             )
-                .await?;
+            .await?;
 
             if should_pause {
                 let permit = semaphore.acquire().await?;
@@ -310,9 +310,9 @@ async fn handle_sql_query(
     };
 
     let result = execute().await;
-    
+
     session_manager.drop_session(connection_id).await;
-    
+
     result
 }
 
@@ -385,7 +385,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             stream_methods,
             &sql_query,
         )
-            .await;
+        .await;
 
         let _ = channel.try_send(move |mut cx| {
             let method = match Arc::try_unwrap(js_stream_end_fn) {
@@ -464,7 +464,7 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Box::new(NodeBridgeLogger::new(cx.channel(), cube_logger)),
         log_level.to_level_filter(),
     )
-        .unwrap();
+    .unwrap();
 
     Ok(cx.undefined())
 }
