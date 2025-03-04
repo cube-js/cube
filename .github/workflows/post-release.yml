@@ -19,7 +19,7 @@ on:
 # touch to trigger
 jobs:
   cli:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     name: 'E2E tests via CLI'
     timeout-minutes: 60
     strategy:
@@ -93,7 +93,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
   docker:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     name: 'E2E tests via Docker'
     timeout-minutes: 60
     strategy:
@@ -162,7 +162,7 @@ jobs:
         browser: [chrome]
         include:
           - browser: chrome
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             container: cypress/browsers:node18.12.0-chrome107
     steps:
       - name: Checkout
