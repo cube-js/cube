@@ -84,8 +84,7 @@ export class PreAggregationPartitionRangeLoader {
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryTuple = rangeQuery;
     const invalidate =
-      this.preAggregation.invalidateKeyQueries &&
-      this.preAggregation.invalidateKeyQueries[0]
+      this.preAggregation.invalidateKeyQueries?.[0]
         ? this.preAggregation.invalidateKeyQueries[0].slice(0, 2)
         : false;
 
@@ -128,7 +127,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   protected priority(defaultValue) {
-    return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
+    return this.preAggregation.priority ?? defaultValue;
   }
 
   public async replaceQueryBuildRangeParams(queryValues: string[]): Promise<string[] | null> {
@@ -208,8 +207,7 @@ export class PreAggregationPartitionRangeLoader {
         this.replacePartitionSqlAndParams(this.preAggregation.sql, loadRange, partitionTableName),
       invalidateKeyQueries: (this.preAggregation.invalidateKeyQueries || [])
         .map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
-      partitionInvalidateKeyQueries: this.preAggregation.partitionInvalidateKeyQueries &&
-        this.preAggregation.partitionInvalidateKeyQueries.map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
+      partitionInvalidateKeyQueries: this.preAggregation.partitionInvalidateKeyQueries?.map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
       indexesSql: (this.preAggregation.indexesSql || [])
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
@@ -529,7 +527,7 @@ export class PreAggregationPartitionRangeLoader {
     return parseLocalDate(data, timezone, timestampFormat);
   }
 
-  public static FROM_PARTITION_RANGE = FROM_PARTITION_RANGE;
+  public static readonly FROM_PARTITION_RANGE = FROM_PARTITION_RANGE;
 
-  public static TO_PARTITION_RANGE = TO_PARTITION_RANGE;
+  public static readonly TO_PARTITION_RANGE = TO_PARTITION_RANGE;
 }

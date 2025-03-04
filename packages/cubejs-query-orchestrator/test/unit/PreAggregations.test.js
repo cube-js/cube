@@ -155,7 +155,7 @@ describe('PreAggregations', () => {
       );
     });
 
-    test('syncronously create rollup from scratch', async () => {
+    test('synchronously create rollup from scratch', async () => {
       mockDriver.now = 12345000;
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
