@@ -1,7 +1,5 @@
-use cubesql::compile::DatabaseProtocol;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
-use cubesql::config::ConfigObj;
 use cubesql::sql::SessionManager;
 use cubesql::transport::TransportService;
 use futures::StreamExt;
@@ -13,6 +11,7 @@ use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
+use crate::cubesql_utils::create_session;
 use crate::logger::NodeBridgeLogger;
 use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
@@ -26,9 +25,7 @@ use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
-use std::net::SocketAddr;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -188,42 +185,7 @@ async fn handle_sql_query(
 ) -> Result<(), CubeError> {
     let start_time = SystemTime::now();
 
-    let config = services
-        .injector()
-        .get_service_typed::<dyn ConfigObj>()
-        .await;
-
-    let transport_service = services
-        .injector()
-        .get_service_typed::<dyn TransportService>()
-        .await;
-    let session_manager = services
-        .injector()
-        .get_service_typed::<SessionManager>()
-        .await;
-
-    let (host, port) = match SocketAddr::from_str(
-        &config
-            .postgres_bind_address()
-            .clone()
-            .unwrap_or("127.0.0.1:15432".into()),
-    ) {
-        Ok(addr) => (addr.ip().to_string(), addr.port()),
-        Err(e) => {
-            return Err(CubeError::internal(format!(
-                "Failed to parse postgres_bind_address: {}",
-                e
-            )))
-        }
-    };
-
-    let session = session_manager
-        .create_session(DatabaseProtocol::PostgreSQL, host, port, None)
-        .await?;
-
-    session
-        .state
-        .set_auth_context(Some(native_auth_ctx.clone()));
+    let session = create_session(&services, native_auth_ctx.clone()).await?;
 
     if let Some(auth_context) = session.state.auth_context() {
         session
@@ -243,6 +205,15 @@ async fn handle_sql_query(
             )
             .await?;
     }
+
+    let transport_service = services
+        .injector()
+        .get_service_typed::<dyn TransportService>()
+        .await;
+    let session_manager = services
+        .injector()
+        .get_service_typed::<SessionManager>()
+        .await;
 
     let session_clone = Arc::clone(&session);
 

@@ -7,6 +7,7 @@ pub mod auth;
 pub mod channel;
 pub mod config;
 pub mod cross;
+pub mod cubesql_utils;
 pub mod gateway;
 pub mod logger;
 pub mod node_export;
