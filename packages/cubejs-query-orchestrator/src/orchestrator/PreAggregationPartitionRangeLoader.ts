@@ -162,10 +162,10 @@ export class PreAggregationPartitionRangeLoader {
     return [sql.replace(this.preAggregation.tableName, partitionTableName), params?.map(
       param => {
         if (dateRange && param === FROM_PARTITION_RANGE) {
-          // Timestamp is already in UTC, but different format might be expected so we need to convert (e.g. for Kafka)
-          return reformatUtcTimestamp(this.preAggregation.timestampFormat, dateRange[0]);
+          // Timestamp is in local timezone, so we need to convert to utc with desired format
+          return localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, dateRange[0]);
         } else if (dateRange && param === TO_PARTITION_RANGE) {
-          return reformatUtcTimestamp(this.preAggregation.timestampFormat, dateRange[1]);
+          return localTimestampToUtc(this.preAggregation.timezone, this.preAggregation.timestampFormat, dateRange[1]);
         } else {
           return param;
         }
@@ -384,12 +384,6 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [buildRange[1], buildRange[1]];
     }
-
-    // Partitions are built and named in UTC
-    dateRange = [
-      localTimestampToUtc(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', dateRange[0]),
-      localTimestampToUtc(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', dateRange[1]),
-    ];
 
     const partitionRanges = this.compilerCacheFn(
       ['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`],
