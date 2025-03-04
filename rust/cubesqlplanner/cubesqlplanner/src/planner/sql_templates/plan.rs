@@ -33,7 +33,7 @@ impl PlanSqlTemplates {
             .with_boundaries(&[
                 UNDERSCORE_UPPER_BOUND,
                 Boundary::LOWER_UPPER,
-                Boundary::DIGIT_LOWER,
+                Boundary::DIGIT_UPPER,
                 Boundary::ACRONYM,
             ])
             .to_case(Case::Snake)
