@@ -340,6 +340,13 @@ describe('ClickHouse JoinGraph', () => {
               visitors__visitor_count: '2',
               visitor_checkins__visitor_checkins_count: '0',
               visitors__per_visitor_revenue: null
+            },
+            {
+              visitors__created_at_day: '2017-01-07T00:00:00.000',
+              visitors__visitor_revenue: null,
+              visitors__visitor_count: '1',
+              visitor_checkins__visitor_checkins_count: '0',
+              visitors__per_visitor_revenue: null
             }
           ]
         );
@@ -380,9 +387,9 @@ describe('ClickHouse JoinGraph', () => {
     order: []
   }, [{
     visitors__visitor_revenue: '300',
-    visitors__visitor_count: '5',
+    visitors__visitor_count: '6',
     visitor_checkins__visitor_checkins_count: '6',
-    visitors__per_visitor_revenue: '60'
+    visitors__per_visitor_revenue: '50'
   }]));
 
   // FAILS - need to finish query to override ::timestamptz
@@ -574,7 +581,8 @@ describe('ClickHouse JoinGraph', () => {
     { visitors__created_at_sql_utils_day: '2017-01-02T00:00:00.000', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-04T00:00:00.000', visitors__visitor_count: '1' },
     { visitors__created_at_sql_utils_day: '2017-01-05T00:00:00.000', visitors__visitor_count: '1' },
-    { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000', visitors__visitor_count: '2' }
+    { visitors__created_at_sql_utils_day: '2017-01-06T00:00:00.000', visitors__visitor_count: '2' },
+    { visitors__created_at_sql_utils_day: '2017-01-07T00:00:00.000', visitors__visitor_count: '1' }
   ]));
 
   it('running total total', () => runQueryTest({
@@ -591,7 +599,7 @@ describe('ClickHouse JoinGraph', () => {
     timezone: 'America/Los_Angeles'
   }, [
     {
-      visitors__revenue_running: '1500'
+      visitors__revenue_running: '1800'
     }
   ]));
 
@@ -885,6 +893,10 @@ describe('ClickHouse JoinGraph', () => {
         debugLog(JSON.stringify(res));
         expect(res).toEqual(
           [{
+            visitors__checkins: '0',
+            visitors__created_at_day: '2017-01-07T00:00:00.000',
+            visitors__visitor_count: '1'
+          }, {
             visitors__checkins: '0',
             visitors__created_at_day: '2017-01-06T00:00:00.000',
             visitors__visitor_count: '2'
@@ -1222,6 +1234,7 @@ describe('ClickHouse JoinGraph', () => {
     { visitors__location: '120.12,40.6' },
     { visitors__location: '120.12,58.1' },
     { visitors__location: '120.12,58.6' },
+    { visitors__location: '120.12,59.6' },
     { visitors__location: '120.12,70.6' }
   ]));
 
@@ -1282,7 +1295,7 @@ describe('ClickHouse JoinGraph', () => {
     },
     {
       visitors__created_at_year: '2017-01-01T00:00:00.000',
-      visitors__visitor_count: '5'
+      visitors__visitor_count: '6'
     }
   ]));
 });
