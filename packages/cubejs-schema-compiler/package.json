@@ -80,7 +80,7 @@
     "pg-promise": "^10.5.2",
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
-    "testcontainers": "^10.10.4",
+    "testcontainers": "^10.13.0",
     "typescript": "~5.2.2",
     "uuid": "^8.3.2"
   },

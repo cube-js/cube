@@ -63,7 +63,7 @@ env:
 
 jobs:
   latest-tag-sha:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
@@ -86,7 +86,7 @@ jobs:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
   native_linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
@@ -149,7 +149,7 @@ jobs:
   build:
     needs: [latest-tag-sha, native_linux]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -196,7 +196,7 @@ jobs:
           path: image.tar.gz
 
   tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)

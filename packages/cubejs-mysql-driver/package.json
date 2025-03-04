@@ -40,7 +40,7 @@
     "@types/jest": "^27",
     "jest": "^27",
     "stream-to-array": "^2.3.0",
-    "testcontainers": "^10.10.4",
+    "testcontainers": "^10.13.0",
     "typescript": "~5.2.2"
   },
   "eslintConfig": {
