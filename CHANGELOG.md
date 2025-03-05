@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.17](https://github.com/cube-js/cube/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+### Bug Fixes
+
+- **api-gateway:** Support proxy when fetching jwk for token validation ([#9286](https://github.com/cube-js/cube/issues/9286)) ([60870c8](https://github.com/cube-js/cube/commit/60870c83d704fdbdb496300023daf188a53990f9))
+- **cubesql:** Use pushdown-pullup scheme for FilterSimplifyReplacer ([#9278](https://github.com/cube-js/cube/issues/9278)) ([ab5a64e](https://github.com/cube-js/cube/commit/ab5a64e9cc1b0db5223720f35a26a57d23877332))
+- **docker:** apt-get install ca-certificates in latest and local Dockerfiles ([1fca9ee](https://github.com/cube-js/cube/commit/1fca9ee3e9fdac4a6f0dcfad832afc7a5b398080))
+- **query-orchestrator:** Fix dropping temp tables during pre-agg creation ([#9295](https://github.com/cube-js/cube/issues/9295)) ([eb3d980](https://github.com/cube-js/cube/commit/eb3d980aee42b3077148cc93c56034b0471d2a33))
+- **schema-compiler:** Fix ORDER BY clause generation for queries with td with filters ([#9296](https://github.com/cube-js/cube/issues/9296)) ([1c8ce4f](https://github.com/cube-js/cube/commit/1c8ce4f475a0327fd4dc8fedf24ac9979aa2bffd))
+
+### Features
+
+- **duckdb-driver:** Add `databasePath` and `motherDuckToken` config options ([6f43138](https://github.com/cube-js/cube/commit/6f431388d0c207923ea990bab55c22c79d217e5b))
+
 ## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
 
 ### Bug Fixes

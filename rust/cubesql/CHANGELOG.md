@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.17](/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+### Bug Fixes
+
+- **cubesql:** Use pushdown-pullup scheme for FilterSimplifyReplacer (#9278) ab5a64e, closes #9278
+
 ## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
 
 ### Bug Fixes
