@@ -5,6 +5,7 @@ import {
   createCubeSchema,
   createCubeSchemaWithCustomGranularities,
   createCubeSchemaYaml,
+  createECommerceSchema,
   createJoinedCubesSchema,
   createSchemaYaml,
   createSchemaYamlForGroupFilterParamsTests
@@ -359,6 +360,62 @@ describe('SQL Generation', () => {
       expect(queryAndParams[0]).toEqual(expected);
       const expectedParams = ['type_value', 'not_type_value', '3'];
       expect(queryAndParams[1]).toEqual(expectedParams);
+    });
+
+    it('Simple query - order by for query with filtered timeDimension', async () => {
+      const compilersLocal = prepareYamlCompiler(
+        createSchemaYaml(createECommerceSchema())
+      );
+
+      await compilersLocal.compiler.compile();
+
+      let query = new PostgresQuery(compilersLocal, {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.updated_at',
+            granularity: 'week'
+          },
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2016-01-01',
+              '2018-01-01'
+            ]
+          },
+        ],
+        order: [{ id: 'orders.updated_at', desc: false }],
+      });
+
+      let queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0].includes('ORDER BY 1')).toBeTruthy();
+
+      // The order of time dimensions should have no effect on the `ORDER BY` clause
+
+      query = new PostgresQuery(compilersLocal, {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2016-01-01',
+              '2018-01-01'
+            ]
+          },
+          {
+            dimension: 'orders.updated_at',
+            granularity: 'week'
+          }
+        ],
+        order: [{ id: 'orders.updated_at', desc: false }],
+      });
+
+      queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0].includes('ORDER BY 1')).toBeTruthy();
     });
   });
 
