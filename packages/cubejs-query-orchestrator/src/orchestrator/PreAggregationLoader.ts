@@ -618,7 +618,7 @@ export class PreAggregationLoader {
     dropSourceTempTable: boolean,
   ) {
     if (withTempTable && dropSourceTempTable) {
-      await this.withDropLock(false, async () => {
+      await this.withDropLock(`drop-temp-table:${this.preAggregation.dataSource}:${targetTableName}`, async () => {
         this.logger('Dropping source temp table', queryOptions);
 
         const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
@@ -965,8 +965,7 @@ export class PreAggregationLoader {
     });
   }
 
-  private async withDropLock<T>(external: boolean, lockFn: () => MaybeCancelablePromise<T>): Promise<boolean> {
-    const lockKey = this.dropLockKey(external);
+  private async withDropLock<T>(lockKey: string, lockFn: () => MaybeCancelablePromise<T>): Promise<boolean> {
     return this.queryCache.withLock(lockKey, 60 * 5, lockFn);
   }
 
@@ -979,7 +978,7 @@ export class PreAggregationLoader {
   ) {
     await this.preAggregations.addTableUsed(justCreatedTable);
 
-    return this.withDropLock(external, async () => {
+    return this.withDropLock(this.dropOrphanedLockKey(external), async () => {
       this.logger('Dropping orphaned tables', { ...queryOptions, external });
       const actualTables = await client.getTablesQuery(
         this.preAggregation.preAggregationsSchema,
@@ -1039,7 +1038,7 @@ export class PreAggregationLoader {
     });
   }
 
-  private dropLockKey(external: boolean) {
+  private dropOrphanedLockKey(external: boolean) {
     return external
       ? 'drop-orphaned-tables-external'
       : `drop-orphaned-tables:${this.preAggregation.dataSource}`;
