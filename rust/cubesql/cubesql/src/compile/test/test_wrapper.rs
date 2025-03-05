@@ -1644,3 +1644,98 @@ GROUP BY
     let segment = &segments[0];
     assert!(segment.contains("DATE_TRUNC"));
 }
+
+/// Aggregation with falsy filter should NOT get pushed to CubeScan with limit=0
+/// This test currently produces WrappedSelect with WHERE FALSE, which is OK for our purposes
+#[tokio::test]
+async fn select_agg_where_false() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE 1 = 0".to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            order: Some(vec![]),
+            limit: None,
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+
+    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    assert!(!sql.contains("\"ungrouped\":"));
+    assert!(sql.contains(r#"\"expr\":\"FALSE\""#));
+    assert!(sql.contains(r#""limit": 50000"#));
+}
+
+/// Aggregation(dimension) with falsy filter should NOT get pushed to CubeScan with limit=0
+/// This test currently produces WrappedSelect with WHERE FALSE, which is OK for our purposes
+#[tokio::test]
+async fn wrapper_dimension_agg_where_false() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            MAX(customer_gender)
+        FROM
+            KibanaSampleDataEcommerce
+        WHERE 1 = 0
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: None,
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+
+    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    assert!(!sql.contains("\"ungrouped\":"));
+    assert!(sql.contains(r#"\"expr\":\"FALSE\""#));
+    assert!(!sql.contains(r#""limit""#));
+    assert!(sql.contains("LIMIT 50000"));
+}
