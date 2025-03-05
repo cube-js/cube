@@ -1127,9 +1127,22 @@ export class BaseQuery {
       return allMemberChildren[m]?.some(c => hasMultiStageMembers(c)) || false;
     };
 
+    // This is a bit of a hack
+    // For now object can only come from dimension-only measure branch inside collectRootMeasureToHieararchy
+    // So just filters those out, and treat them as regular measures
+    // TODO teach rest of code here to work with member expressions
+    const dimensionOnlyMeasures = Object.values(measureToHierarchy)
+      .flat()
+      .map((m) => m.measure)
+      .filter((m) => typeof m === 'object');
+
     const measuresToRender = (multiplied, cumulative) => R.pipe(
       R.values,
       R.flatten,
+      R.filter(
+        // To filter out member expressions
+        m => typeof m.measure === 'string'
+      ),
       R.filter(
         m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative && !hasMultiStageMembers(m.measure)
       ),
@@ -1139,7 +1152,8 @@ export class BaseQuery {
     );
 
     const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
-    const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
+    const regularMeasures = measuresToRender(false, false)(measureToHierarchy)
+      .concat(dimensionOnlyMeasures);
 
     const cumulativeMeasures =
       R.pipe(
@@ -1715,6 +1729,19 @@ export class BaseQuery {
       if (!collectedMeasures.length && m.isMemberExpression && m.query.allCubeNames.length > 1 && m.measureSql() === 'COUNT(*)') {
         const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
         throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
+      }
+      if (collectedMeasures.length === 0 && m.isMemberExpression) {
+        // `m` is member expression measure, but does not reference any other measure
+        // Consider this dimensions-only measure. This can happen at least in 2 cases:
+        // 1. Ad-hoc aggregation over dimension: SELECT MAX(dim) FROM cube
+        // 2. Ungrouped query with SQL pushdown will render every column as measure: SELECT dim1 FROM cube WHERE LOWER(dim2) = 'foo';
+        // Measures like this considered regular: they depend only on dimensions and join tree
+        // This would return measure object in `measure`, not path
+        // TODO return measure object for every measure
+        return [`${m.measure.cubeName}.${m.measure.name}`, [{
+          multiplied: false,
+          measure: m,
+        }]];
       }
       return [typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`, collectedMeasures];
     }));
