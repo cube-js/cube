@@ -67,7 +67,8 @@ jobs:
         run: ./node_modules/.bin/lerna publish from-package --yes
 
   native_linux:
-    runs-on: ubuntu-24.04
+    # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
