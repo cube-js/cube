@@ -950,6 +950,7 @@ export class BaseQuery {
         ] : [])
           .concat(
             R.pipe(
+              // TODO for member expressions this can be misleading: it can be a name of view, which does not have PK
               R.groupBy(m => m.cube().name),
               R.toPairs,
               R.map(
@@ -1068,11 +1069,15 @@ export class BaseQuery {
     };
 
     const join = R.drop(1, toJoin)
-      .map(
-        (q, i) => (this.dimensionAliasNames().length ?
-          `INNER JOIN ${this.wrapInParenthesis((q))} as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
-          `, ${this.wrapInParenthesis(q)} as q_${i + 1}`),
-      ).join('\n');
+      .map((q, i) => {
+        console.log("outerMeasuresJoinFullKeyQueryAggregate generating join, this.dimensionAliasNames()", this.dimensionAliasNames());
+        return this.dimensionAliasNames().length
+          ? `INNER JOIN ${this.wrapInParenthesis(q)} as q_${
+              i + 1
+            } ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}`
+          : `, ${this.wrapInParenthesis(q)} as q_${i + 1}`;
+      })
+      .join("\n");
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
       () => this.dimensionColumns('q_0').concat(outerMembers.map(m => m.selectColumns())).join(', '),
@@ -1151,9 +1156,10 @@ export class BaseQuery {
       R.map(m => this.newMeasure(m))
     );
 
-    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
-    const regularMeasures = measuresToRender(false, false)(measureToHierarchy)
+    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy)
       .concat(dimensionOnlyMeasures);
+    const regularMeasures = measuresToRender(false, false)(measureToHierarchy)
+      // .concat(dimensionOnlyMeasures);
 
     const cumulativeMeasures =
       R.pipe(
