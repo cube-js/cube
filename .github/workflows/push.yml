@@ -33,7 +33,7 @@ on:
 
 jobs:
   unit:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: latest-tag-sha
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -104,7 +104,7 @@ jobs:
 #          flags: cube-backend
 #          verbose: true # optional (default = false)
   lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: latest-tag-sha
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -152,7 +152,7 @@ jobs:
         run: yarn lerna run --concurrency 1 lint
 
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: latest-tag-sha
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -205,7 +205,7 @@ jobs:
 
   build-cubestore:
     needs: [latest-tag-sha]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     container:
@@ -225,7 +225,7 @@ jobs:
           workspaces: ./rust/cubestore -> target
           # Separate path for release key to protect cache bloating
           shared-key: cubestore-release
-          key: ubuntu-20.04
+          key: ubuntu-24.04
       - name: Build Cube Store
         run: |
           cd rust/cubestore
@@ -239,7 +239,7 @@ jobs:
 
   integration-cubestore:
     needs: [latest-tag-sha, build-cubestore]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
@@ -312,7 +312,7 @@ jobs:
 
   integration:
     needs: [unit, lint, latest-tag-sha]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
@@ -375,7 +375,7 @@ jobs:
 
   integration-smoke:
     needs: [ latest-tag-sha, build-cubestore ]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
@@ -452,7 +452,7 @@ jobs:
     # At least git should be completed pushed up until this moment
     needs: [lint, latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
     steps:
@@ -464,7 +464,7 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
 
   latest-tag-sha:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:

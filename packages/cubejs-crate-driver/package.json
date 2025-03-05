@@ -36,7 +36,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "1.0.12",
     "@cubejs-backend/testing-shared": "1.0.12",
-    "testcontainers": "^10.10.4",
+    "testcontainers": "^10.13.0",
     "typescript": "~5.2.2"
   },
   "publishConfig": {
