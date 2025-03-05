@@ -1,25 +1,60 @@
 import { Key, useCallback, useState } from 'react';
-import { Item, Select, Space, Text, TooltipProvider } from '@cube-dev/ui-kit';
+import { Item, Select, Space, tasty, Text } from '@cube-dev/ui-kit';
 import { DateRange, TimeDimension } from '@cubejs-client/core';
 import formatDate from 'date-fns/format';
 
 import { capitalize } from '../utils/capitalize';
 import { DATA_RANGES } from '../values';
+import { useEvent } from '../hooks';
+import { MemberViewType } from '../types';
 
 import { FilterLabel } from './FilterLabel';
 import { TimeDateRangeSelector } from './TimeDateRangeSelector';
-import { DeleteFilterButton } from './DeleteFilterButton';
+import { FilterOptionsAction, FilterOptionsButton } from './FilterOptionsButton';
 
 interface TimeDimensionFilterProps {
+  name: string;
   member: TimeDimension;
+  memberName?: string;
+  memberTitle?: string;
+  cubeName?: string;
+  cubeTitle?: string;
+  memberViewType?: MemberViewType;
   isCompact?: boolean;
   isMissing?: boolean;
   onChange: (dateRange?: DateRange) => void;
   onRemove: () => void;
 }
 
+const DateRangeFilterWrapper = tasty(Space, {
+  qa: 'DateRangeFilter',
+  styles: {
+    gap: '1x',
+    flow: 'row wrap',
+    radius: true,
+    fill: {
+      '': '#clear',
+      ':has(>[data-qa="FilterOptionsButton"][data-is-hovered])': '#light',
+    },
+    margin: '-.5x',
+    padding: '.5x',
+    width: 'max-content',
+  },
+});
+
 export function DateRangeFilter(props: TimeDimensionFilterProps) {
-  const { member, isCompact, isMissing, onRemove, onChange } = props;
+  const {
+    member,
+    isCompact,
+    isMissing,
+    name,
+    cubeName,
+    cubeTitle,
+    memberName,
+    memberTitle,
+    onRemove,
+    onChange,
+  } = props;
   const [open, setOpen] = useState(false);
 
   // const onGranularityChange = useCallback(
@@ -61,16 +96,26 @@ export function DateRangeFilter(props: TimeDimensionFilterProps) {
     setOpen(open);
   };
 
+  const onAction = useEvent((key: FilterOptionsAction) => {
+    if (key === 'remove') {
+      onRemove();
+    }
+  });
+
   return (
-    <Space gap="1x">
-      <TooltipProvider title="Delete this date range">
-        <DeleteFilterButton onPress={onRemove} />
-      </TooltipProvider>
+    <DateRangeFilterWrapper>
+      <FilterOptionsButton type="dateRange" onAction={onAction} />
+
       <FilterLabel
         isCompact={isCompact}
         isMissing={isMissing}
         type="time"
         member="timeDimension"
+        memberName={memberName}
+        memberTitle={memberTitle}
+        cubeName={cubeName}
+        cubeTitle={cubeTitle}
+        memberViewType={props.memberViewType}
         name={member.dimension}
       />
       <Text>for</Text>
@@ -112,6 +157,6 @@ export function DateRangeFilter(props: TimeDimensionFilterProps) {
       {/*    );*/}
       {/*  })}*/}
       {/*</Select>*/}
-    </Space>
+    </DateRangeFilterWrapper>
   );
 }

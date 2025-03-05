@@ -25,7 +25,7 @@ export const nonStringFields = new Set([
   'external',
   'useOriginalSqlPreAggregations',
   'readOnly',
-  'prefix'
+  'prefix',
 ]);
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
@@ -556,17 +556,17 @@ const measureTypeWithCount = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
 );
 
-const postAggregateMeasureType = Joi.string().valid(
+const multiStageMeasureType = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
   'rank'
 );
 
-const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.postAggregate'), [
+const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
   {
     is: true,
     then: inherit(BaseMeasure, {
-      postAggregate: Joi.boolean().strict(),
-      type: postAggregateMeasureType.required(),
+      multiStage: Joi.boolean().strict(),
+      type: multiStageMeasureType.required(),
       sql: Joi.func(), // TODO .required(),
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
@@ -614,6 +614,64 @@ const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
   shown: Joi.boolean().strict(),
   public: Joi.boolean().strict(),
 }));
+
+const PolicyFilterSchema = Joi.object().keys({
+  member: Joi.func().required(),
+  memberReference: Joi.string(),
+  operator: Joi.any().valid(
+    'equals',
+    'notEquals',
+    'contains',
+    'notContains',
+    'startsWith',
+    'notStartsWith',
+    'endsWith',
+    'notEndsWith',
+    'gt',
+    'gte',
+    'lt',
+    'lte',
+    'inDateRange',
+    'notInDateRange',
+    'beforeDate',
+    'beforeOrOnDate',
+    'afterDate',
+    'afterOrOnDate',
+  ).required(),
+  values: Joi.func().required(),
+});
+
+const PolicyFilterConditionSchema = Joi.object().keys({
+  or: Joi.array().items(PolicyFilterSchema, Joi.link('...').description('Filter Condition schema')),
+  and: Joi.array().items(PolicyFilterSchema, Joi.link('...').description('Filter Condition schema')),
+}).xor('or', 'and');
+
+const MemberLevelPolicySchema = Joi.object().keys({
+  includes: Joi.alternatives([
+    Joi.string().valid('*'),
+    Joi.array().items(Joi.string())
+  ]),
+  excludes: Joi.alternatives([
+    Joi.string().valid('*'),
+    Joi.array().items(Joi.string().required())
+  ]),
+  includesMembers: Joi.array().items(Joi.string().required()),
+  excludesMembers: Joi.array().items(Joi.string().required()),
+});
+
+const RowLevelPolicySchema = Joi.object().keys({
+  filters: Joi.array().items(PolicyFilterSchema, PolicyFilterConditionSchema),
+  allowAll: Joi.boolean().valid(true).strict(),
+}).xor('filters', 'allowAll');
+
+const RolePolicySchema = Joi.object().keys({
+  role: Joi.string().required(),
+  memberLevel: MemberLevelPolicySchema,
+  rowLevel: RowLevelPolicySchema,
+  conditions: Joi.array().items(Joi.object().keys({
+    if: Joi.func().required(),
+  })),
+});
 
 /* *****************************
  * ATTENTION:
@@ -679,7 +737,7 @@ const baseSchema = {
       sql: Joi.func().required()
     }),
     inherit(BaseDimension, {
-      postAggregate: Joi.boolean().valid(true),
+      multiStage: Joi.boolean().valid(true),
       type: Joi.any().valid('number').required(),
       sql: Joi.func().required(),
       addGroupBy: Joi.func(),
@@ -687,16 +745,24 @@ const baseSchema = {
   )),
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
-  hierarchies: Joi.array().items(Joi.object().keys({
+  folders: Joi.array().items(Joi.object().keys({
     name: Joi.string().required(),
-    title: Joi.string(),
-    levels: Joi.func()
+    includes: Joi.alternatives([
+      Joi.string().valid('*'),
+      Joi.array().items(Joi.string().required())
+    ]).required(),
   })),
+  accessPolicy: Joi.array().items(RolePolicySchema.required()),
 };
 
 const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
+  hierarchies: Joi.object().pattern(identifierRegex, Joi.object().keys({
+    title: Joi.string(),
+    public: Joi.boolean().strict(),
+    levels: Joi.func()
+  }))
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
@@ -726,6 +792,8 @@ const viewSchema = inherit(baseSchema, {
       'object.oxor': 'Using split together with prefix is not supported'
     })
   ),
+  accessPolicy: Joi.array().items(RolePolicySchema.required()),
+  hierarchies: Joi.any()
 });
 
 function formatErrorMessageFromDetails(explain, d) {

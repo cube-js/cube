@@ -1,6 +1,6 @@
 # Deploying Cube Cloud BYOC on AWS
 
-With Bring Your Own Cloud (BYOC) on AWS, all the components interacting with private data are deployed on 
+With Bring Your Own Cloud (BYOC) on AWS, all the components interacting with private data are deployed on
 the customer infrastructure on AWS and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
 This document provides step-by-step instructions for deploying Cube Cloud BYOC on AWS.
 
@@ -10,7 +10,7 @@ The bulk of provisioning work will be done remotely by Cube Cloud automation.
 However, to get started, you'll need to provide Cube with the necessary access
 along with some additional information that includes:
 
-- **AWS Account ID:** The AWS account ID of the target deployment account 
+- **AWS Account ID:** The AWS account ID of the target deployment account
   [the AWS Console][aws-console].
 - **AWS Region:** [The AWS region][aws-docs-regions] where Cube Cloud resources
   should be deployed.
@@ -54,6 +54,7 @@ actual account ID.
                 "ec2:DescribeNatGateways",
                 "ec2:DescribeNetworkInterfaces",
                 "ec2:DescribePrefixLists",
+                "ec2:DescribeRegions",
                 "ec2:DescribeRouteTables",
                 "ec2:DescribeSecurityGroupRules",
                 "ec2:DescribeSecurityGroups",
@@ -61,10 +62,10 @@ actual account ID.
                 "ec2:DescribeVpcAttribute",
                 "ec2:DescribeVpcClassicLink",
                 "ec2:DescribeVpcClassicLinkDnsSupport",
+                "ec2:DescribeVpcEndpointServiceConfigurations",
                 "ec2:DescribeVpcEndpoints",
                 "ec2:DescribeVpcPeeringConnections",
                 "ec2:DescribeVpcs",
-                "ec2:DescribeRegions",
                 "ec2:RunInstances",
                 "eks:DescribeCluster",
                 "eks:DescribeNodegroup",
@@ -93,13 +94,16 @@ actual account ID.
                 "ec2:CreateTags",
                 "ec2:CreateVpc",
                 "ec2:CreateVpcEndpoint",
+                "ec2:CreateVpcEndpointServiceConfiguration",
                 "ec2:CreateVpcPeeringConnection",
                 "eks:CreateCluster",
                 "eks:CreateNodegroup",
                 "iam:CreateOpenIDConnectProvider",
                 "iam:PassRole",
                 "iam:TagOpenIDConnectProvider",
-                "logs:CreateLogDelivery"
+                "logs:CreateLogDelivery",
+                "kms:TagResource",
+                "kms:CreateKey"
             ],
             "Resource": "*",
             "Condition": {
@@ -161,19 +165,19 @@ actual account ID.
                 }
             }
         },
-        { 
-            "Effect": "Allow", 
-            "Action": "iam:CreateServiceLinkedRole", 
-            "Resource": "*", 
-            "Condition": { 
-                "StringEquals": { 
-                    "iam:AWSServiceName": [ 
+        {
+            "Effect": "Allow",
+            "Action": "iam:CreateServiceLinkedRole",
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "iam:AWSServiceName": [
                         "eks.amazonaws.com",
                         "eks-nodegroup.amazonaws.com",
                         "eks-fargate.amazonaws.com"
-                    ] 
-                } 
-            } 
+                    ]
+                }
+            }
         },
         {
             "Effect": "Allow",
@@ -190,7 +194,7 @@ actual account ID.
         },
         {
             "Effect": "Allow",
-            "Action": ["eks:*"],
+            "Action": ["eks:*", "kms:*"],
             "Resource": ["*"],
             "Condition": {
                 "StringEquals": {

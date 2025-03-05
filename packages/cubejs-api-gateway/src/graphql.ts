@@ -270,11 +270,11 @@ function whereArgToQueryFilters(
   metaConfig: any[] = []
 ) {
   const queryFilters: any[] = [];
-  
+
   Object.keys(whereArg).forEach((key) => {
     const cubeExists = metaConfig.find((cube) => cube.config.name === key);
     const normalizedKey = cubeExists ? key : capitalize(key);
-    
+
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
         [key.toLowerCase()]: whereArg[key].reduce(
@@ -385,7 +385,7 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
 
   getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
     const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
-      
+
     const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
     const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
     // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
@@ -471,7 +471,7 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
   const operation: any = ast.definitions.find(
     ({ kind }) => kind === 'OperationDefinition'
   );
-  
+
   const fieldNodes = operation?.selectionSet.selections;
 
   let args = {};
@@ -487,7 +487,7 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
     variableValues,
     fragments: {},
   };
-  
+
   return getJsonQuery(metaConfig, args, resolveInfo);
 }
 
@@ -505,7 +505,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
     if (cube.public === false) {
       return false;
     }
-    
+
     return ([...cube.config.measures, ...cube.config.dimensions].filter((member) => member.isVisible)).length > 0;
   }
 
@@ -652,16 +652,23 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
               query,
               queryType: QueryType.REGULAR_QUERY,
               context: req.context,
-              res: (message) => {
+              res: async (message) => {
                 if (message.error) {
                   reject(new Error(message.error));
                 }
-                resolve(message);
+                if (message.isWrapper) {
+                  // TODO: Avoid JSON-encode-decode here
+                  const resMsg = new TextDecoder().decode(await message.getFinalResult());
+                  resolve(JSON.parse(resMsg));
+                } else {
+                  resolve(message);
+                }
               },
               apiType: 'graphql',
             }).catch(reject);
           });
 
+          // TODO: Move postprocessing to native?
           parseDates(results);
 
           return results.data.map(entry => R.toPairs(entry)

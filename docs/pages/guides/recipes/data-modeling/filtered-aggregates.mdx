@@ -1,0 +1,198 @@
+# Calculating filtered aggregates
+
+## Use case
+
+Sometimes, there's a need to calculate an aggregation over facts in a joined cube that
+is filtered by a dimension from another cube. For example, you might want to calculate
+the total sales for a retailer. Each retailer has multiple stores, and each store does
+its own sales.
+
+If you set sales goals at the retailer level and are only interested in
+the sales that happened after a certain date, you would need to calculate the total sales
+in a way that only includes sales that happened after that date.
+
+## Data modeling
+
+We can model this scenario by creating a cube for each entity: `retailer`, `store`,
+and `sales`. The `retailer` cube has a one-to-many relationship with the `store` cube,
+and the `store` cube has a one-to-many relationship with the `sales` cube:
+
+```yml
+cubes:
+  - name: retailer
+    sql: >
+      SELECT 101 AS id, 'Retailer 1' AS name, 10 AS sales_goal, '2025-02-01Z'::TIMESTAMP AS goal_start UNION ALL
+      SELECT 102 AS id, 'Retailer 2' AS name, 10 AS sales_goal, '2025-02-01Z'::TIMESTAMP AS goal_start UNION ALL
+      SELECT 103 AS id, 'Retailer 3' AS name, 10 AS sales_goal, '2025-02-01Z'::TIMESTAMP AS goal_start
+
+    joins:
+      - name: store
+        sql: '{CUBE.id} = {store.retailer_id}'
+        relationship: one_to_many
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+      
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+      
+      - name: goal_start
+        sql: "{CUBE}.goal_start"
+        type: time
+
+      - name: sales
+        sql: "{store.total_sales}"
+        type: number
+        sub_query: true
+
+      - name: sales_for_goal
+        sql: "{store.total_sales_for_goal}"
+        type: number
+        sub_query: true
+    
+    measures:
+      - name: sales_goal
+        sql: "{CUBE}.sales_goal"
+        type: sum
+
+      - name: sales_goal_achieved
+        type: number
+        sql: "({CUBE.sales_for_goal} / NULLIF({CUBE.sales_goal}, 0))"
+
+  - name: store
+    sql: >
+      SELECT 201 AS id, 'Store 1' AS name, 101 AS retailer_id UNION ALL
+      SELECT 202 AS id, 'Store 2' AS name, 101 AS retailer_id UNION ALL
+      SELECT 203 AS id, 'Store 3' AS name, 101 AS retailer_id UNION ALL
+      SELECT 204 AS id, 'Store 4' AS name, 102 AS retailer_id UNION ALL
+      SELECT 205 AS id, 'Store 5' AS name, 102 AS retailer_id UNION ALL
+      SELECT 206 AS id, 'Store 6' AS name, 102 AS retailer_id UNION ALL
+      SELECT 207 AS id, 'Store 7' AS name, 103 AS retailer_id UNION ALL
+      SELECT 208 AS id, 'Store 8' AS name, 103 AS retailer_id UNION ALL
+      SELECT 209 AS id, 'Store 9' AS name, 103 AS retailer_id
+
+    joins:
+      - name: sales
+        sql: '{CUBE.id} = {sales.store_id}'
+        relationship: one_to_many
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+      
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+      
+      - name: retailer_id
+        sql: "{CUBE}.retailer_id"
+        type: number
+
+      - name: goal_start
+        sql: "{retailer.goal_start}"
+        type: time
+
+      - name: sales
+        sql: "{sales.total_sales}"
+        type: number
+        sub_query: true
+
+      - name: sales_for_goal
+        sql: "{sales.total_sales_for_goal}"
+        type: number
+        sub_query: true
+
+    measures:
+      - name: total_sales
+        sql: "{CUBE.sales}"
+        type: sum
+
+      - name: total_sales_for_goal
+        sql: "{CUBE.sales_for_goal}"
+        type: sum
+
+  - name: sales
+    sql: >
+      SELECT 301 AS id, 201 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
+      SELECT 302 AS id, 202 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
+      SELECT 303 AS id, 203 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
+      SELECT 304 AS id, 204 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 3 AS sales UNION ALL
+      SELECT 305 AS id, 205 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 3 AS sales UNION ALL
+      SELECT 306 AS id, 206 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 3 AS sales UNION ALL
+      SELECT 307 AS id, 207 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 5 AS sales UNION ALL
+      SELECT 308 AS id, 208 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 5 AS sales UNION ALL
+      SELECT 309 AS id, 209 AS store_id, '2025-01-01Z'::TIMESTAMP AS order_date, 5 AS sales UNION ALL
+      SELECT 310 AS id, 201 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
+      SELECT 311 AS id, 202 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
+      SELECT 312 AS id, 203 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 1 AS sales UNION ALL
+      SELECT 313 AS id, 204 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 3 AS sales UNION ALL
+      SELECT 314 AS id, 205 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 3 AS sales UNION ALL
+      SELECT 315 AS id, 206 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 3 AS sales UNION ALL
+      SELECT 316 AS id, 207 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 5 AS sales UNION ALL
+      SELECT 317 AS id, 208 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 5 AS sales UNION ALL
+      SELECT 318 AS id, 209 AS store_id, '2025-02-01Z'::TIMESTAMP AS order_date, 5 AS sales
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true 
+
+      - name: store_id
+        sql: "{CUBE}.store_id"
+        type: number
+      
+      - name: order_date
+        sql: "{CUBE}.order_date"
+        type: time
+
+      - name: goal_start
+        sql: "{store.goal_start}"
+        type: time
+      
+      - name: sales
+        sql: "{CUBE}.sales"
+        type: number
+      
+    measures:
+      - name: total_sales
+        sql: "{CUBE.sales}"
+        type: sum
+
+      - name: total_sales_for_goal
+        sql: "{CUBE.sales}"
+        type: sum
+        filters:
+          - sql: "{CUBE.order_date} >= {CUBE.goal_start}"
+```
+
+The total sales for a store and total sales for a retailer are calculated via [subquery
+dimensions][ref-subquery-dimension]. If you look at the join path (`retailer.store.sales`),
+you would see the _upstream flow_ of data: the aggregation over sales is passed from the
+`sales` cube to the `store` cube and then to the `retailer` cube.
+
+At the same time, the `goal_start` date is passed from the `retailer` cube to the `store`
+cube and then to the `sales` cube, creating the _downstream flow_ of data. This way, the
+`total_sales_for_goal` measure in the `sales` cube can be filtered by the `goal_start` date.
+
+This pattern of passing measures (aggregates) _upstream_ by the join path and passing
+dimensions _downstream_ is an effective way to solve many data modeling tasks, including
+calculating filtered aggregates.
+
+
+## Result
+
+Querying the `retailer` cube will return the total sales for each retailer and the total
+sales for each retailer after the `goal_start` date. The `sales_goal_achieved` measure
+will show the ratio of the sales goal that has been achieved:
+
+<Screenshot src="https://ucarecdn.com/80b74f38-a1ef-4b94-a3ff-146f06dc539f/"/>
+
+
+[ref-subquery-dimension]: /product/data-modeling/concepts/calculated-members#subquery-dimensions

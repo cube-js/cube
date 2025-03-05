@@ -4,9 +4,21 @@
  * @fileoverview The `RedshiftDriver` and related types declaration.
  */
 
-import { getEnv } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableCSVData, DriverCapabilities, UnloadOptions } from '@cubejs-backend/base-driver';
+import {
+  DatabaseStructure,
+  DownloadTableCSVData,
+  DriverCapabilities,
+  QueryColumnsResult,
+  QuerySchemasResult,
+  QueryTablesResult,
+  StreamOptions,
+  StreamTableDataWithTypes,
+  TableColumn,
+  TableStructure,
+  UnloadOptions
+} from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
 
 interface RedshiftDriverExportRequiredAWS {
@@ -34,22 +46,26 @@ export interface RedshiftDriverConfiguration extends PostgresDriverConfiguration
   exportBucket?: RedshiftDriverExportAWS;
 }
 
+const IGNORED_SCHEMAS = ['pg_catalog', 'pg_internal', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA'];
+
 /**
  * Redshift driver class.
  */
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
+  private readonly dbName: string;
+
   /**
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 4;
+    return 5;
   }
 
   /**
    * Class constructor.
    */
   public constructor(
-    options: RedshiftDriverConfiguration & {
+    config: RedshiftDriverConfiguration & {
       /**
        * Data source name.
        */
@@ -67,7 +83,15 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       testConnectionTimeout?: number,
     } = {}
   ) {
-    super(options);
+    super(config);
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
+    // We need a DB name for querying external tables.
+    // It's not possible to get it later from the pool
+    this.dbName = getEnv('dbName', { dataSource });
   }
 
   protected primaryKeysQuery() {
@@ -81,6 +105,123 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   /**
    * @override
    */
+  protected override informationSchemaQuery() {
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE columns.table_schema NOT IN (${IGNORED_SCHEMAS.map(s => `'${s}'`).join(',')})
+   `;
+  }
+
+  /**
+   * In Redshift external tables are not shown in regular Postgres information_schema,
+   * so it needs to be queried separately.
+   * @override
+   */
+  public override async tablesSchema(): Promise<DatabaseStructure> {
+    const query = this.informationSchemaQuery();
+    const tablesSchema = await this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
+
+    const allSchemas = await this.getSchemas();
+    const externalSchemas = allSchemas.filter(s => !tablesSchema[s.schema_name]).map(s => s.schema_name);
+
+    for (const externalSchema of externalSchemas) {
+      tablesSchema[externalSchema] = {};
+      const tablesRes = await this.tablesForExternalSchema(externalSchema);
+      const tables = tablesRes.map(t => t.table_name);
+      for (const tableName of tables) {
+        const columnRes = await this.columnsForExternalTable(externalSchema, tableName);
+        tablesSchema[externalSchema][tableName] = columnRes.map(def => ({
+          name: def.column_name,
+          type: def.data_type,
+          attributes: []
+        }));
+      }
+    }
+
+    return tablesSchema;
+  }
+
+  // eslint-disable-next-line camelcase
+  private async tablesForExternalSchema(schemaName: string): Promise<{ table_name: string }[]> {
+    return this.query(`SHOW TABLES FROM SCHEMA ${this.dbName}.${schemaName}`, []);
+  }
+
+  private async columnsForExternalTable(schemaName: string, tableName: string): Promise<QueryColumnsResult[]> {
+    return this.query(`SHOW COLUMNS FROM TABLE ${this.dbName}.${schemaName}.${tableName}`, []);
+  }
+
+  /**
+   * @override
+   */
+  protected override getSchemasQuery() {
+    return `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM information_schema.tables
+      WHERE table_schema NOT IN (${IGNORED_SCHEMAS.map(s => `'${s}'`).join(',')})
+      GROUP BY table_schema
+    `;
+  }
+
+  /**
+   * From the Redshift docs:
+   * SHOW SCHEMAS FROM DATABASE database_name [LIKE 'filter_pattern'] [LIMIT row_limit ]
+   * It returns regular schemas (queryable from information_schema) and external ones.
+   * @override
+   */
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    const schemas = await this.query<QuerySchemasResult>(`SHOW SCHEMAS FROM DATABASE ${this.dbName}`, []);
+
+    return schemas
+      .filter(s => !IGNORED_SCHEMAS.includes(s.schema_name))
+      .map(s => ({ schema_name: s.schema_name }));
+  }
+
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+    const tables = await super.getTablesForSpecificSchemas(schemas);
+
+    // We might request the external schemas and tables, their descriptions won't be returned
+    // by the super.getTablesForSpecificSchemas(). Need to request them separately.
+    const missedSchemas = schemas.filter(s => !tables.some(t => t.schema_name === s.schema_name));
+
+    for (const externalSchema of missedSchemas) {
+      const tablesRes = await this.tablesForExternalSchema(externalSchema.schema_name);
+      tablesRes.forEach(t => {
+        tables.push({ schema_name: externalSchema.schema_name, table_name: t.table_name });
+      });
+    }
+
+    return tables;
+  }
+
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+    const columns = await super.getColumnsForSpecificTables(tables);
+
+    // We might request the external tables, their descriptions won't be returned
+    // by the super.getColumnsForSpecificTables(). Need to request them separately.
+    const missedTables = tables.filter(table => !columns.some(column => column.schema_name === table.schema_name && column.table_name === table.table_name));
+
+    for (const table of missedTables) {
+      const columnRes = await this.columnsForExternalTable(table.schema_name, table.table_name);
+      columnRes.forEach(c => {
+        columns.push({
+          schema_name: c.schema_name,
+          table_name: c.table_name,
+          column_name: c.column_name,
+          data_type: c.data_type,
+        });
+      });
+    }
+
+    return columns;
+  }
+
+  /**
+   * @override
+   */
   protected getInitialConfiguration(
     dataSource: string,
   ): Partial<RedshiftDriverConfiguration> {
@@ -89,6 +230,57 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       readOnly: false,
       exportBucket: this.getExportBucket(dataSource),
     };
+  }
+
+  protected static checkValuesLimit(values?: unknown[]) {
+    // Redshift server is not exactly compatible with PostgreSQL protocol
+    // And breaks after 32767 parameter values with `there is no parameter $-32768`
+    // This is a bug/misbehaviour on server side, nothing we can do besides generate a more meaningful error
+    const length = (values?.length ?? 0);
+    if (length >= 32768) {
+      throw new Error(`Redshift server does not support more than 32767 parameters, but ${length} passed`);
+    }
+  }
+
+  public override async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
+    if (quotedTableName.length > 127) {
+      throw new Error('Redshift can not work with table names longer than 127 symbols. ' +
+        `Consider using the 'sqlAlias' attribute in your cube definition for ${quotedTableName}.`);
+    }
+
+    // we can not call super.createTable(quotedTableName, columns)
+    // because Postgres has 63 length check. So pasting the code from the base driver
+    const createTableSql = this.createTableSql(quotedTableName, columns);
+    await this.query(createTableSql, []).catch(e => {
+      e.message = `Error during create table: ${createTableSql}: ${e.message}`;
+      throw e;
+    });
+  }
+
+  /**
+   * AWS Redshift doesn't have any special connection check.
+   * And querying even system tables is billed.
+   * @override
+   */
+  public override async testConnection() {
+    const conn = await this.pool.connect();
+    conn.release();
+  }
+
+  public override async stream(
+    query: string,
+    values: unknown[],
+    options: StreamOptions
+  ): Promise<StreamTableDataWithTypes> {
+    RedshiftDriver.checkValuesLimit(values);
+
+    return super.stream(query, values, options);
+  }
+
+  protected override async queryResponse(query: string, values: unknown[]) {
+    RedshiftDriver.checkValuesLimit(values);
+
+    return super.queryResponse(query, values);
   }
 
   protected getExportBucket(
@@ -148,6 +340,19 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
   public async loadUserDefinedTypes(): Promise<void> {
     // @todo Implement for Redshift, column \"typcategory\" does not exist in pg_type
+  }
+
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    // We might get table from Spectrum schema, so common request via `information_schema.columns`
+    // won't return anything. `getColumnsForSpecificTables` is aware of Spectrum tables.
+    const columns = await this.getColumnsForSpecificTables([{
+      schema_name: schema,
+      table_name: name,
+    }]);
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public async isUnloadSupported() {
@@ -255,8 +460,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       };
     } finally {
       conn.removeAllListeners('notice');
-
-      await conn.release();
+      conn.release();
     }
   }
 

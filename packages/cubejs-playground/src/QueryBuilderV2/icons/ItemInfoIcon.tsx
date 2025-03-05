@@ -1,32 +1,28 @@
-import { memo } from 'react';
+import { memo, ReactNode } from 'react';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { TooltipProvider } from '@cube-dev/ui-kit';
+import { Text, TooltipProvider } from '@cube-dev/ui-kit';
+
+interface ItemInfoIconProps {
+  color?: string;
+  description?: ReactNode;
+}
 
 export const ItemInfoIcon = memo(function InfoIcon({
   color = 'dark-02',
-  title,
   description,
-}: {
-  color?: string;
-  title?: string;
-  description?: string;
-}) {
+}: ItemInfoIconProps) {
   const icon = <InfoCircleOutlined style={{ color: `var(--${color}-color)` }} />;
+
+  if (typeof description === 'string') {
+    description = description?.trim();
+  }
 
   if (!description) {
     return icon;
   }
 
   return (
-    <TooltipProvider
-      activeWrap
-      title={
-        <>
-          <b>{title?.trim() ?? ''}</b>
-          <div>{description?.trim() ?? ''}</div>
-        </>
-      }
-    >
+    <TooltipProvider activeWrap title={<Text preset="p3">{description}</Text>}>
       {icon}
     </TooltipProvider>
   );

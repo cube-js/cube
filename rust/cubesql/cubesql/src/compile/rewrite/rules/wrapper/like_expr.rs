@@ -1,19 +1,18 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, like_expr, rewrite, rules::wrapper::WrapperRules,
+        like_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LikeExprEscapeChar, LikeExprLikeType, LikeType, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, LikeExprEscapeChar, LikeExprLikeType, LikeType,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn like_expr_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn like_expr_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-like-expr",
@@ -25,28 +24,13 @@ impl WrapperRules {
                         "?pattern",
                         "?escape_char",
                     ),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    "?context",
                 ),
                 like_expr(
                     "?like_type",
                     "?negated",
-                    wrapper_pushdown_replacer(
-                        "?expr",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?pattern",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?expr", "?context"),
+                    wrapper_pushdown_replacer("?pattern", "?context"),
                     "?escape_char",
                 ),
             ),
@@ -57,17 +41,25 @@ impl WrapperRules {
                     "?negated",
                     wrapper_pullup_replacer(
                         "?expr",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?pattern",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     "?escape_char",
                 ),
@@ -79,10 +71,14 @@ impl WrapperRules {
                         "?pattern",
                         "?escape_char",
                     ),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_like_expr("?alias_to_cube", "?like_type", "?escape_char"),
             ),
@@ -94,7 +90,7 @@ impl WrapperRules {
         alias_to_cube_var: &'static str,
         like_type_var: &'static str,
         escape_char_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let like_type_var = var!(like_type_var);
         let escape_char_var = var!(escape_char_var);
@@ -102,7 +98,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube)
                 else {

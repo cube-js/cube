@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use chrono::{Datelike, NaiveDateTime, Timelike};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use datafusion::{
     arrow::datatypes::{ArrowPrimitiveType, IntervalDayTimeType, IntervalMonthDayNanoType},
     error::DataFusionError,
@@ -12,12 +12,10 @@ use datafusion::{
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Id};
+use egg::Id;
 
 use crate::{
-    compile::rewrite::{
-        analysis::LogicalPlanAnalysis, BinaryExprOp, LiteralExprValue, LogicalPlanLanguage,
-    },
+    compile::rewrite::{rewriter::CubeEGraph, BinaryExprOp, LiteralExprValue, LogicalPlanLanguage},
     transport::SqlTemplates,
     CubeError,
 };
@@ -459,9 +457,9 @@ pub fn is_literal_date_trunced(ns: i64, granularity: &str) -> Option<bool> {
         return Some(false);
     }
     let seconds = ns / ns_in_seconds;
-    let dt = NaiveDateTime::from_timestamp_opt(seconds, 0)?;
+    let dt = DateTime::from_timestamp(seconds, 0)?;
 
-    let is_minute_trunced = |dt: NaiveDateTime| dt.second() == 0;
+    let is_minute_trunced = |dt: DateTime<Utc>| dt.second() == 0;
     let is_hour_trunced = |dt| is_minute_trunced(dt) && dt.minute() == 0;
     let is_day_trunced = |dt| is_hour_trunced(dt) && dt.hour() == 0;
     let is_week_trunced = |dt| is_day_trunced(dt) && dt.weekday().num_days_from_monday() == 0;
@@ -524,11 +522,8 @@ impl DecomposedDayTime {
         }
     }
 
-    pub fn add_decomposed_to_egraph(
-        self,
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> Id {
-        let add_literal = |egraph: &mut EGraph<_, _>, scalar| {
+    pub fn add_decomposed_to_egraph(self, egraph: &mut CubeEGraph) -> Id {
+        let add_literal = |egraph: &mut CubeEGraph, scalar| {
             let id = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
                 scalar,
             )));
@@ -662,17 +657,14 @@ impl DecomposedMonthDayNano {
         }
     }
 
-    pub fn add_decomposed_to_egraph(
-        self,
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> Id {
-        let add_literal = |egraph: &mut EGraph<_, _>, scalar| {
+    pub fn add_decomposed_to_egraph(self, egraph: &mut CubeEGraph) -> Id {
+        let add_literal = |egraph: &mut CubeEGraph, scalar| {
             let id = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
                 scalar,
             )));
             egraph.add(LogicalPlanLanguage::LiteralExpr([id]))
         };
-        let add_binary = |egraph: &mut EGraph<_, _>, l, r| {
+        let add_binary = |egraph: &mut CubeEGraph, l, r| {
             let op = Operator::Plus;
             let op = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(op)));
             let left = add_literal(egraph, l);

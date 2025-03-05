@@ -81,11 +81,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             platforms: linux/amd64
             build-args: WITH_AVX2=1
-          - os: self-hosted
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             platforms: linux/arm64
             build-args: WITH_AVX2=0
@@ -97,9 +97,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build only
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
-          context: ./rust/cubestore/
+          context: ./rust/
           file: ./rust/cubestore/Dockerfile
           platforms: ${{ matrix.platforms }}
           build-args: ${{ matrix.build-args }}
@@ -118,6 +118,7 @@ jobs:
         target:
           - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
+          - aarch64-apple-darwin
         include:
           - os: windows-2019
             target: x86_64-pc-windows-msvc
@@ -126,8 +127,14 @@ jobs:
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
             # Please use minimal possible version of macOS, because it produces constraint on libstdc++
-          - os: macos-12
+          - os: macos-13
             target: x86_64-apple-darwin
+            executable_name: cubestored
+            # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
+            strip: false
+            compress: false
+          - os: macos-14
+            target: aarch64-apple-darwin
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false

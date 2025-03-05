@@ -65,6 +65,7 @@
     {
       "name": "ECommerce",
       "extends": "Products",
+      "sqlAlias": "ec",
       "joins": [
         {
           "name": "Customers",
@@ -92,12 +93,13 @@
           "granularities": [
             {
               "name": "half_year",
-              "interval": "6 months"
+              "interval": "6 months",
+              "origin": "2024-01-01"
             },
             {
               "name": "half_year_by_1st_april",
               "interval": "6 months",
-              "offset": "3 months"
+              "origin": "2024-04-01"
             },
             {
               "name": "two_mo_by_feb",
@@ -118,12 +120,13 @@
           "granularities": [
             {
               "name": "half_year",
-              "interval": "6 months"
+              "interval": "6 months",
+              "origin": "2024-01-01"
             },
             {
               "name": "half_year_by_1st_april",
               "interval": "6 months",
-              "offset": "3 months"
+              "origin": "2024-04-01"
             },
             {
               "name": "two_mo_by_feb",
@@ -361,7 +364,7 @@
           "name": "totalProfitYearAgo",
           "type": "number",
           "sql": "{totalProfit}",
-          "post_aggregate": true,
+          "multi_stage": true,
           "time_shift": [{
             "time_dimension": "orderDate",
             "interval": "366 day",
@@ -372,14 +375,14 @@
           "name": "totalProfitForStatus",
           "type": "sum",
           "sql": "{totalProfit}",
-          "post_aggregate": true,
+          "multi_stage": true,
           "reduce_by": ["category"]
         },
         {
           "name": "percentageOfTotalForStatus",
           "type": "number",
           "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0))",
-          "post_aggregate": true
+          "multi_stage": true
         },
         {
           "name": "hiddenSum",

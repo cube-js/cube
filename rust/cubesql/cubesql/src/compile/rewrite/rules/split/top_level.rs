@@ -1,22 +1,20 @@
 use crate::{
     compile::rewrite::{
         aggr_aggr_expr_empty_tail, aggr_group_expr_empty_tail, aggregate,
-        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
-        analysis::LogicalPlanAnalysis, cube_scan, projection, projection_expr_empty_tail,
-        projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
-        rules::split::SplitRules, transforming_rewrite, AggregateSplitPushDownReplacerAliasToCube,
-        CubeScanAliasToCube, ListType, LogicalPlanLanguage, ProjectionAlias,
-        ProjectionSplitPushDownReplacerAliasToCube,
+        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, cube_scan, projection,
+        projection_expr_empty_tail, projection_split_pullup_replacer,
+        projection_split_pushdown_replacer, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::split::SplitRules,
+        transforming_rewrite, AggregateSplitPushDownReplacerAliasToCube, CubeScanAliasToCube,
+        ListType, LogicalPlanLanguage, ProjectionAlias, ProjectionSplitPushDownReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl SplitRules {
-    pub fn top_level_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn top_level_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.push(transforming_rewrite(
             "split-projection-aggregate",
             aggregate(
@@ -348,7 +346,7 @@ impl SplitRules {
         group_expr_var: Option<&str>,
         aggr_expr_var: Option<&str>,
         projection_expr_var: Option<&str>,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let split_alias_to_cube_var = var!(split_alias_to_cube_var);
         let group_expr_var = group_expr_var.map(|group_expr_var| var!(group_expr_var));
@@ -361,7 +359,8 @@ impl SplitRules {
                 Some(0) | Some(1)
             ) {
                 return false;
-            } else if matches!(
+            }
+            if matches!(
                 aggr_expr_var
                     .and_then(|v| egraph[subst[v]].data.trivial_push_down)
                     .zip(group_expr_var.and_then(|v| egraph[subst[v]].data.trivial_push_down))
@@ -411,7 +410,7 @@ impl SplitRules {
         split_alias_to_cube_var: &str,
         group_expr_var: &str,
         aggr_expr_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let split_alias_to_cube_var = var!(split_alias_to_cube_var);
         let group_expr_var = var!(group_expr_var);
@@ -452,7 +451,7 @@ impl SplitRules {
     fn transform_projection_projection_ungrouped_pull_up(
         &self,
         projection_alias_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let projection_alias_var = var!(projection_alias_var);
         move |egraph, subst| {
             subst.insert(
@@ -470,7 +469,7 @@ impl SplitRules {
         outer_group_expr_var: &str,
         outer_aggr_expr_var: &str,
         projection_expr_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let projection_alias_var = var!(projection_alias_var);
         let outer_group_expr_var = var!(outer_group_expr_var);
         let outer_aggr_expr_var = var!(outer_aggr_expr_var);
@@ -493,7 +492,7 @@ impl SplitRules {
             let projection_expr = group_expr_node
                 .iter()
                 .chain(aggr_expr_node.iter())
-                .map(|id| *id)
+                .copied()
                 .collect::<Vec<_>>();
             subst.insert(
                 projection_expr_var,

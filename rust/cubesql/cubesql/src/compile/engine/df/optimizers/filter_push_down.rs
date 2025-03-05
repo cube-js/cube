@@ -120,7 +120,7 @@ fn filter_push_down(
             // let predicates = split_predicates(predicate)
             let predicates = vec![predicate.clone()]
                 .into_iter()
-                .chain(predicates.into_iter())
+                .chain(predicates)
                 .collect::<Vec<_>>();
             let mut pushable_predicates = vec![];
             let mut non_pushable_predicates = vec![];
@@ -326,10 +326,10 @@ fn filter_push_down(
                         optimizer_config,
                     )?),
                     on: on.clone(),
-                    join_type: join_type.clone(),
-                    join_constraint: join_constraint.clone(),
+                    join_type: *join_type,
+                    join_constraint: *join_constraint,
                     schema: schema.clone(),
-                    null_equals_null: null_equals_null.clone(),
+                    null_equals_null: *null_equals_null,
                 }),
             )
         }
@@ -483,8 +483,8 @@ fn filter_push_down(
             issue_filter(
                 predicates,
                 LogicalPlan::Limit(Limit {
-                    skip: skip.clone(),
-                    fetch: fetch.clone(),
+                    skip: *skip,
+                    fetch: *fetch,
                     input: Arc::new(filter_push_down(
                         optimizer,
                         input,
@@ -576,34 +576,32 @@ fn rewrite_map_for_projection(
         .collect()
 }
 
-/// Generates a rewrite map for union inputs, taking UNION's schema and one of the input's schema.
-/// These expressions can't be more complex than simple column references by definition.
-///
-/// TODO: see `LogicalPlan::Union` above
-/*
-fn rewrite_map_for_union_input(
-    union_schema: &DFSchema,
-    input_schema: &DFSchema,
-) -> HashMap<Column, Option<Expr>> {
-    union_schema
-        .fields()
-        .iter()
-        .zip(input_schema.fields().iter())
-        .flat_map(|(union_field, input_field)| {
-            vec![
-                (
-                    union_field.qualified_column(),
-                    Some(Expr::Column(input_field.unqualified_column())),
-                ),
-                (
-                    union_field.unqualified_column(),
-                    Some(Expr::Column(input_field.unqualified_column())),
-                ),
-            ]
-        })
-        .collect()
-}
-*/
+// /// Generates a rewrite map for union inputs, taking UNION's schema and one of the input's schema.
+// /// These expressions can't be more complex than simple column references by definition.
+// ///
+// /// TODO: see `LogicalPlan::Union` above
+// fn rewrite_map_for_union_input(
+//     union_schema: &DFSchema,
+//     input_schema: &DFSchema,
+// ) -> HashMap<Column, Option<Expr>> {
+//     union_schema
+//         .fields()
+//         .iter()
+//         .zip(input_schema.fields().iter())
+//         .flat_map(|(union_field, input_field)| {
+//             vec![
+//                 (
+//                     union_field.qualified_column(),
+//                     Some(Expr::Column(input_field.unqualified_column())),
+//                 ),
+//                 (
+//                     union_field.unqualified_column(),
+//                     Some(Expr::Column(input_field.unqualified_column())),
+//                 ),
+//             ]
+//         })
+//         .collect()
+// }
 
 /// Recursively concatenates several filter predicates into one binary AND expression.
 /// `predicates` must contain at least one expression.
@@ -621,24 +619,22 @@ fn concatenate_predicates(predicates: Vec<Expr>) -> Result<Expr> {
         ))
 }
 
-/// Recursively splits filter predicate from binary AND expressions into a flat vec of predicates.
-///
-/// TODO: see `LogicalPlan::Filter` above
-/*
-fn split_predicates(predicate: &Expr) -> Vec<Expr> {
-    match predicate {
-        Expr::BinaryExpr {
-            left,
-            op: Operator::And,
-            right,
-        } => split_predicates(left)
-            .into_iter()
-            .chain(split_predicates(right).into_iter())
-            .collect(),
-        expr => vec![expr.clone()],
-    }
-}
-*/
+// /// Recursively splits filter predicate from binary AND expressions into a flat vec of predicates.
+// ///
+// /// TODO: see `LogicalPlan::Filter` above
+// fn split_predicates(predicate: &Expr) -> Vec<Expr> {
+//     match predicate {
+//         Expr::BinaryExpr {
+//             left,
+//             op: Operator::And,
+//             right,
+//         } => split_predicates(left)
+//             .into_iter()
+//             .chain(split_predicates(right).into_iter())
+//             .collect(),
+//         expr => vec![expr.clone()],
+//     }
+// }
 
 /// Recursively checks if the passed expr is a filter predicate that can be pushed down.
 /// The predicate should be pushed down the plan if it can ultimately be pushed down to CubeScan.
@@ -984,12 +980,12 @@ mod tests {
     #[test]
     fn test_filter_down_cross_join_right_one_row() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
-            LogicalPlanBuilder::from(make_sample_table("j1", vec!["c1"])?)
+            LogicalPlanBuilder::from(make_sample_table("j1", vec!["c1"], vec![])?)
                 .project(vec![col("c1")])?
                 .build()?,
         )
         .cross_join(
-            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["c2"])?)
+            &LogicalPlanBuilder::from(make_sample_table("j2", vec!["c2"], vec![])?)
                 .project(vec![col("c2")])?
                 .aggregate(vec![] as Vec<Expr>, vec![count(lit(1u8))])?
                 .project_with_alias(

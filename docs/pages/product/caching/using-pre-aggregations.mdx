@@ -286,11 +286,11 @@ monitor Cube Store workers load, and iterate as needed.
 
 **When you define a pre-aggregation without any explicit indexes, the default
 index is created.** In this index, dimensions come first, time dimensions come
-second, and measures come last.
+second.
 
 When you define additional indexes, you don't incur any additional costs on
 the data warehouse side. However, the pre-aggregation build time for a
-particular pre-aggregation increases with each index.
+particular pre-aggregation increases with each index because all indexes for pre-aggregation are built during ingestion time.
 
 ### When to use indexes?
 
@@ -524,8 +524,12 @@ The data within `category_productname_zipcode_index` would look as follows:
 
 ### Aggregating indexes
 
-Aggregating indexes can be defined as well. Such indexes contain **only**
-dimensions and pre-aggregated measures from the pre-aggregation definition.
+Aggregating indexes should be used when there is a wide rollup pre-aggregation, however, only a subset of its dimensions is queried. 
+For example, you have rollup pre-aggregation with 50 dimensions, but any query is just using only 5 of those dimensions.
+Such a use case would be a sweet spot for the aggregating index.
+Such indexes would persist **only** dimensions from the index definition and pre-aggregated measures from the pre-aggregation definition.
+Cube Store would aggregate over missing dimensions to calculate stored measure values when preparing the aggregating index.
+During querying time, Cube Store will save time on this aggregation over missing dimensions, as it was done during the preparation step.
 
 Queries with the following characteristics can target aggregating indexes:
 
@@ -596,6 +600,12 @@ The data for `zip_code_index` would look as follows:
 | -------- | ----------- |
 | 88523    | 3800        |
 | 88524    | 5000        |
+
+### Compaction
+
+Whenever a newer version of pre-aggregation is just built and becomes available its performance would be suboptimal as it's pending compaction.
+Most of the essential compaction process usually takes several seconds to several minutes for bigger partitions after pre-aggregation creation, depending on the size of the partition and the Cube Store workers' processing power available.
+This compaction process is usually unnoticeable for queries that are optimal in terms of index usage, so it's always best practice to make sure all of your queries match an index.
 
 ## Inspecting pre-aggregations
 

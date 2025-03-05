@@ -122,7 +122,7 @@ export interface CancelableIntervalOptions {
 }
 
 /**
- * It's helps to create an interval that can be canceled with awaiting latest execution
+ * It helps to create an interval that can be canceled with awaiting latest execution
  */
 export function createCancelableInterval<T>(
   fn: (token: CancelToken) => Promise<T>,

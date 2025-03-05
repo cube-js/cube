@@ -2,10 +2,10 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, original_expr_name, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::utils::DeltaTimeUnitToken,
         to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
         transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
@@ -19,7 +19,7 @@ use datafusion::{
     logical_plan::DFSchema,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Id, Rewrite, Subst};
+use egg::{Id, Subst};
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 pub struct DateRules {
@@ -27,7 +27,7 @@ pub struct DateRules {
 }
 
 impl RewriteRules for DateRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         vec![
             // TODO ?interval
             rewrite(
@@ -432,8 +432,7 @@ impl DateRules {
         interval_int_var: &'static str,
         interval_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let datepart_var = var!(datepart_var);
         let interval_int_var = var!(interval_int_var);
         let interval_var = var!(interval_var);
@@ -501,7 +500,7 @@ impl DateRules {
     fn transform_to_date_to_timestamp(
         &self,
         format_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let format_var = var!(format_var);
         move |egraph, subst| {
             for format in var_iter!(egraph[subst[format_var]], LiteralExprValue) {
@@ -523,7 +522,7 @@ impl DateRules {
         outer_granularity_var: &'static str,
         inner_granularity_var: &'static str,
         new_granularity_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let outer_granularity_var = var!(outer_granularity_var);
         let inner_granularity_var = var!(inner_granularity_var);
         let new_granularity_var = var!(new_granularity_var);
@@ -576,8 +575,7 @@ impl DateRules {
         data_type_var: &'static str,
         granularity_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let data_type_var = var!(data_type_var);
         let granularity_var = var!(granularity_var);
         let alias_var = var!(alias_var);
@@ -633,8 +631,7 @@ impl DateRules {
     pub fn transform_root_alias(
         &self,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
             if let Some(OriginalExpr::Expr(original_expr)) =

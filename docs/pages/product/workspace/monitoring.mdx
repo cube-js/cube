@@ -12,8 +12,9 @@ long term.
 
 <SuccessBox>
 
-Monitoring integrations are available in Cube Cloud on [Enterprise](https://cube.dev/pricing) plan.
-Users can choose a [Monitoring Integrations tier](/product/deployment/cloud/pricing#monitoring-integrations-tiers).
+Monitoring integrations are available in Cube Cloud on
+[Enterprise and above](https://cube.dev/pricing) product tiers.
+You can also choose a [Monitoring Integrations tier](/product/deployment/cloud/pricing#monitoring-integrations-tiers).
 
 </SuccessBox>
 
@@ -23,13 +24,18 @@ Monitoring integrations suspend their work when a deployment goes to [auto-suspe
 
 </WarningBox>
 
+Monitoring integrations are only available for [production environments][ref-prod-env].
+
 Under the hood, Cube Cloud uses [Vector][vector], an open-source tool for
 collecting and delivering monitoring data. It supports a [wide range of
 destinations][vector-docs-sinks], also known as _sinks_.
 
 <Diagram src="https://ucarecdn.com/17dbc263-2be4-4b7d-9f34-270cd66e878b/" />
 
-<YouTubeVideo url="https://www.youtube.com/embed/iPD0axEYU6k" />
+<YouTubeVideo
+  url="https://www.youtube.com/embed/iPD0axEYU6k"
+  aspectRatio={4/2.87}
+/>
 
 ## Guides
 
@@ -294,3 +300,4 @@ setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 [prometheus]: https://prometheus.io
 [mimir]: https://grafana.com/oss/mimir/
 [grafana-cloud]: https://grafana.com/products/cloud/
+[ref-prod-env]: /product/workspace/environments#production-environment

@@ -48,7 +48,8 @@ const annotation = (
 ) => (member: string | MemberExpression): undefined | [string, ConfigItem] => {
   const [cubeName, fieldName] = (<MemberExpression>member).expression ? [(<MemberExpression>member).cubeName, (<MemberExpression>member).name] : (<string>member).split('.');
   const memberWithoutGranularity = [cubeName, fieldName].join('.');
-  const config: ConfigItem = configMap[cubeName][memberType]
+  const cubeConfig = configMap[cubeName];
+  const config: ConfigItem = cubeConfig && cubeConfig[memberType]
     .find(m => m.name === memberWithoutGranularity);
 
   if (!config) {
@@ -153,6 +154,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
 export default prepareAnnotation;
 export {
   ConfigItem,
+  GranularityMeta,
   annotation,
   prepareAnnotation,
 };

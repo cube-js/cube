@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { BaseQuery, PostgresQuery } from '../../../src/adapter';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
@@ -12,9 +13,9 @@ cube(\`Orders\`, {
   UNION ALL
   SELECT 2 as id, 2 as product_id, 'completed' as status, '2022-01-02T00:00:00.000Z'::timestamptz as created_at
   \`,
-  
+
   shown: false,
-  
+
   refreshKey: {
     sql: \`SELECT MAX(created_at) FROM \${Orders.sql()} orders WHERE \${FILTER_PARAMS.Orders.createdAt.filter('created_at')}\`
   },
@@ -47,7 +48,7 @@ cube(\`Orders\`, {
       type: \`count\`,
       //drillMembers: [id, createdAt]
     },
-    
+
     runningTotal: {
       type: \`count\`,
       rollingWindow: {
@@ -67,28 +68,28 @@ cube(\`Orders\`, {
       sql: \`status\`,
       type: \`string\`
     },
-    
+
     statusProduct: {
       sql: \`\${CUBE}.status || '_' || \${Products.name}\`,
       type: \`string\`
     },
-    
+
     createdAt: {
       sql: \`created_at\`,
       type: \`time\`
     },
-    
+
     productId: {
       sql: \`product_id\`,
       type: \`number\`,
     },
-    
+
     productAndCategory: {
       sql: \`\${Products.name} || '_' || \${Products.ProductCategories.name}\`,
       type: \`string\`
     },
   },
-  
+
   segments: {
     potatoOnly: {
       sql: \`\${CUBE}.product_id = 2 AND \${FILTER_PARAMS.Orders.productId.filter(\`\${CUBE.productId}\`)}\`,
@@ -104,7 +105,7 @@ cube(\`Products\`, {
   UNION ALL
   SELECT 2 as id, 1 as product_category_id, 'Potato' as name
   \`,
-  
+
   joins: {
     ProductCategories: {
       sql: \`\${CUBE}.product_category_id = \${ProductCategories}.id\`,
@@ -129,7 +130,7 @@ cube(\`Products\`, {
       sql: \`name\`,
       type: \`string\`
     },
-    
+
     proxyName: {
       sql: \`\${name}\`,
       type: \`string\`,
@@ -201,7 +202,7 @@ cube(\`ProductCategories\`, {
 view(\`OrdersView\`, {
   includes: [Orders],
   excludes: [Orders.createdAt],
-  
+
   measures: {
     productCategoryCount: {
       sql: \`\${Orders.ProductsAlt.ProductCategories.count}\`,
@@ -224,7 +225,7 @@ view(\`OrdersView\`, {
       sql: \`\${Orders.ProductsAlt.ProductCategories.name}\`,
       type: \`string\`
     },
-    
+
     productCategory: {
       sql: \`\${Orders.ProductsAlt.name} || '_' || \${Orders.ProductsAlt.ProductCategories.name} || '_' || \${categoryName}\`,
       type: \`string\`

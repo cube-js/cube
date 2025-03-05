@@ -81,6 +81,7 @@ export class PostgresQuery extends BaseQuery {
     templates.types.float = 'REAL';
     templates.types.double = 'DOUBLE PRECISION';
     templates.types.binary = 'BYTEA';
+    templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     return templates;
   }
 

@@ -9,7 +9,7 @@ export class InvalidConfiguration extends Error {
   }
 }
 
-export function convertTimeStrToMs(
+export function convertTimeStrToSeconds(
   input: string,
   envName: string,
   description: string = 'Must be a number in seconds or duration string (1s, 1m, 1h).',
@@ -126,7 +126,7 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
     return false;
   }
 
-  return convertTimeStrToMs(
+  return convertTimeStrToSeconds(
     input,
     envName,
     'Should be boolean or number (in seconds) or string in time format (1s, 1m, 1h)'
@@ -170,6 +170,33 @@ const variables: Record<string, (...args: any) => any> = {
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
+  scheduledRefreshQueriesPerAppId: () => {
+    const refreshQueries = get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive();
+
+    if (refreshQueries) {
+      return refreshQueries;
+    }
+
+    const refreshConcurrency = get('CUBEJS_SCHEDULED_REFRESH_CONCURRENCY').asIntPositive();
+
+    if (refreshConcurrency) {
+      console.warn(
+        'The CUBEJS_SCHEDULED_REFRESH_CONCURRENCY is deprecated. Please, use the CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID instead.'
+      );
+    }
+
+    return refreshConcurrency;
+  },
+  refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
+    .asIntPositive(),
+  // eslint-disable-next-line consistent-return
+  scheduledRefreshTimezones: () => {
+    const timezones = get('CUBEJS_SCHEDULED_REFRESH_TIMEZONES').asString();
+
+    if (timezones) {
+      return timezones.split(',').map(t => t.trim());
+    }
+  },
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
@@ -192,7 +219,20 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
-  nativeSqlPlanner: () => get('CUBEJS_NATIVE_SQL_PLANNER').asBool(),
+  nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
+  nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
+    .default('false')
+    .asBoolStrict(),
+  transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
+    .default('false')
+    .asBoolStrict(),
+  transpilationWorkerThreadsCount: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
+    .default('0')
+    .asInt(),
+  // This one takes precedence over CUBEJS_TRANSPILATION_WORKER_THREADS
+  transpilationNative: () => get('CUBEJS_TRANSPILATION_NATIVE')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -500,7 +540,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Max polling interval. Currenly used in BigQuery and Databricks.
+   * Max polling interval. Currently used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
   dbPollMaxInterval: ({
@@ -510,11 +550,11 @@ const variables: Record<string, (...args: any) => any> = {
   }) => {
     const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
     const value = process.env[key] || '5s';
-    return convertTimeStrToMs(value, key);
+    return convertTimeStrToSeconds(value, key);
   },
 
   /**
-   * Polling timeout. Currenly used in BigQuery, Dremio and Athena.
+   * Polling timeout. Currently used in BigQuery, Dremio and Athena.
    * TODO: clarify this env.
    */
   dbPollTimeout: ({
@@ -525,14 +565,14 @@ const variables: Record<string, (...args: any) => any> = {
     const key = keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource);
     const value = process.env[key];
     if (value) {
-      return convertTimeStrToMs(value, key);
+      return convertTimeStrToSeconds(value, key);
     } else {
       return null;
     }
   },
 
   /**
-   * Query timeout. Currenly used in BigQuery, Dremio, Postgres, Snowflake
+   * Query timeout. Currently used in BigQuery, ClickHouse, Dremio, Postgres, Snowflake
    * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *
@@ -546,7 +586,7 @@ const variables: Record<string, (...args: any) => any> = {
   } = {}) => {
     const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
     const value = process.env[key] || '10m';
-    return convertTimeStrToMs(value, key);
+    return convertTimeStrToSeconds(value, key);
   },
 
   /**
@@ -783,6 +823,58 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Azure Client ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureClientId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID', dataSource)
+    ]
+  ),
+
+  /**
+    * Client Secret for the Azure based export bucket storage.
+    */
+  dbExportBucketAzureClientSecret: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Federated Token File Path for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTokenFilePAth: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_FEDERATED_TOKEN_FILE', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Tenant ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTenantId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID', dataSource)
+    ]
+  ),
+
+  /**
    * Export bucket options for Integration based.
    */
   dbExportIntegration: ({
@@ -812,6 +904,44 @@ const variables: Record<string, (...args: any) => any> = {
       );
     }
     return undefined;
+  },
+
+  /** ****************************************************************
+   * MySQL Driver                                                    *
+   ***************************************************************** */
+
+  /**
+   * Use timezone names for date/time conversions.
+   * Defaults to FALSE, meaning that numeric offsets for timezone will be used.
+   * @see https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_convert-tz
+   * @see https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
+   */
+  mysqlUseNamedTimezones: ({ dataSource }: { dataSource: string }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
+        dataSource,
+      )
+    ];
+
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
   },
 
   /** ****************************************************************
@@ -1375,6 +1505,32 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake OAuth token path.
+   */
+  snowflakeOAuthTokenPath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake host.
+   */
+  snowflakeHost: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_HOST', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake private key.
    */
   snowflakePrivateKey: ({
@@ -1413,6 +1569,39 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Snowflake case sensitivity for identifiers (like database columns).
+   */
+  snowflakeQuotedIdentIgnoreCase: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
+        dataSource,
+      )
+    ];
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
+  },
   /** ****************************************************************
    * Presto Driver                                                   *
    ***************************************************************** */
@@ -1548,6 +1737,23 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbExtensions: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const extensions = process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_EXTENSIONS', dataSource)
+    ];
+    if (extensions) {
+      return extensions.split(',').map(e => e.trim());
+    }
+    return [];
+  },
+  /** ***************************************************************
+   * Presto Driver                                                  *
+   **************************************************************** */
+
   /**
    * Presto catalog.
    */
@@ -1558,6 +1764,40 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
+    ]
+  ),
+
+  /** ***************************************************************
+   * Pinot Driver                                                  *
+   **************************************************************** */
+
+  /**
+   * Pinot / Startree Auth Token
+   */
+  pinotAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PINOT_AUTH_TOKEN', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Dremio Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Dremio Auth Token
+   */
+  dremioAuthToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DREMIO_AUTH_TOKEN', dataSource)
     ]
   ),
 
@@ -1581,7 +1821,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
   nodeEnv: () => get('NODE_ENV')
     .asString(),
@@ -1698,7 +1938,7 @@ const variables: Record<string, (...args: any) => any> = {
   maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
     .default(200000)
     .asInt(),
-  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('false').asBoolStrict(),
+  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
   // Deprecated section
 
   // Support for Redis as queue & cache driver was removed in 0.36
@@ -1723,6 +1963,9 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
+  fastReload: () => get('CUBEJS_FAST_RELOAD_ENABLED')
+    .default('false')
+    .asBoolStrict(),
 };
 
 type Vars = typeof variables;

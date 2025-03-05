@@ -6,11 +6,13 @@ redirect_from:
 
 # Dimensions
 
-The `dimensions` property contains a set of dimensions. You can think about a
-dimension as an attribute related to a measure, e.g. the measure `user_count`
+You can use the `dimensions` parameter within [cubes][ref-ref-cubes] to define dimensions.
+You can think about a dimension as an attribute related to a measure, e.g. the measure `user_count`
 can have dimensions like `country`, `age`, `occupation`, etc.
 
-Any dimension should have the following properties: `name`, `sql` and `type`.
+Any dimension should have the following parameters: [`name`](#name), [`sql`](#sql), and [`type`](#type).
+
+Dimensions can be also organized into [hierarchies][ref-ref-hierarchies].
 
 ## Parameters
 
@@ -264,17 +266,18 @@ cubes:
 
 ### `primary_key`
 
-Specify which dimension is a primary key for a cube. The default value is
+Specify if a dimension is a primary key for a cube. The default value is
 `false`.
 
 A primary key is used to make [joins][ref-schema-ref-joins] work properly.
 
-<WarningBox>
+<InfoBox>
 
-Setting `primary_key` to `true` will change the default value of `public`
-parameter to `false`. If you still want `public` to be `true`, set it manually.
+Setting `primary_key` to `true` will change the default value of the [`public`
+parameter](#public) to `false`. If you still want `public` to be `true`, set it
+explicitly.
 
-</WarningBox>
+</InfoBox>
 
 <CodeTabs>
 
@@ -305,6 +308,85 @@ cubes:
 ```
 
 </CodeTabs>
+
+It is possible to have more than one primary key dimension in a cube if you'd
+like them all to be parts of a composite key:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  sql: `
+    SELECT 1 AS column_a, 1 AS column_b UNION ALL
+    SELECT 2 AS column_a, 1 AS column_b UNION ALL
+    SELECT 1 AS column_a, 2 AS column_b UNION ALL
+    SELECT 2 AS column_a, 2 AS column_b
+  `,
+
+  dimensions: {
+    composite_key_a: {
+      sql: `column_a`,
+      type: `number`,
+      primary_key: true
+    },
+
+    composite_key_b: {
+      sql: `column_b`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: products
+    sql: >
+      SELECT 1 AS column_a, 1 AS column_b UNION ALL
+      SELECT 2 AS column_a, 1 AS column_b UNION ALL
+      SELECT 1 AS column_a, 2 AS column_b UNION ALL
+      SELECT 2 AS column_a, 2 AS column_b
+
+    dimensions:
+      - name: composite_key_a
+        sql: column_a
+        type: number
+        primary_key: true
+
+      - name: composite_key_b
+        sql: column_b
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
+
+Querying the `count` measure of the cube shown above will generate the following
+SQL to the upstream data source:
+
+```sql
+SELECT
+  count(
+    CAST("product".column_a as TEXT) || CAST("product".column_b as TEXT)
+  ) "product__count"
+FROM (
+  SELECT 1 AS column_a, 1 AS column_b UNION ALL
+  SELECT 2 AS column_a, 1 AS column_b UNION ALL
+  SELECT 1 AS column_a, 2 AS column_b UNION ALL
+  SELECT 2 AS column_a, 2 AS column_b
+) AS "product"
+```
 
 ### `propagate_filters_to_sub_query`
 
@@ -345,13 +427,7 @@ cubes:
 
 ### `public`
 
-<InfoBox>
-
-Prior to v0.33, this property was called `shown`.
-
-</InfoBox>
-
-The `public` property is used to manage the visibility of a dimension. Valid
+The `public` parameter is used to manage the visibility of a dimension. Valid
 values for `public` are `true` and `false`. When set to `false`, this dimension
 **cannot** be queried through the API. Defaults to `true`.
 
@@ -623,6 +699,7 @@ cube(`orders`, {
 </CodeTabs>
 
 
+[ref-ref-cubes]: /reference/data-model/cube
 [ref-schema-ref-joins]: /reference/data-model/joins
 [ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [self-subquery]: #sub-query
@@ -636,3 +713,4 @@ cube(`orders`, {
 [ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
 [link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format
 [ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
+[ref-ref-hierarchies]: /reference/data-model/hierarchies

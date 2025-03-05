@@ -7,7 +7,7 @@ export type TestType = 'basic' | 'withError' | 'testFn';
 
 type DriverTestArg = {
   name: string;
-  query: Query;
+  query: Query | Query[];
   expectArray?: ((response: ResultSet<QueryRecordType<Query>>) => any)[];
   schemas: Schemas;
   skip?: boolean;
@@ -23,7 +23,7 @@ type DriverTestWithErrorArg = {
 
 export type DriverTestBasic = {
   name: string,
-  query: Query,
+  query: Query | Query[],
   expectArray?: ((response: ResultSet<QueryRecordType<Query>>) => any)[]
   schemas: Schemas,
   skip?: boolean;
@@ -32,11 +32,20 @@ export type DriverTestBasic = {
 
 export type DriverTestWithError = {
   name: string;
-  query: Query;
+  query: Query | Query[];
   expectArray?: ((e: Error) => any)[];
   schemas: Schemas;
   skip?: boolean;
   type: 'withError';
+};
+
+export type DriverTestMulti = {
+  name: string,
+  query: Query | Query[],
+  expectArray?: ((response: ResultSet<QueryRecordType<Query>>) => any)[]
+  schemas: Schemas,
+  skip?: boolean;
+  type: 'multi';
 };
 
 type DriverTestFnArg = {
@@ -50,7 +59,7 @@ export type DriverTestFn = DriverTestFnArg & {
   type: 'testFn';
 };
 
-export type DriverTest = DriverTestBasic | DriverTestWithError | DriverTestFn;
+export type DriverTest = DriverTestBasic | DriverTestWithError | DriverTestFn | DriverTestMulti;
 
 export function driverTest(
   { name, query, expectArray = [], skip, schemas }: DriverTestArg
@@ -68,6 +77,12 @@ export function driverTestFn(
   { name, skip, schemas, testFn }: DriverTestFnArg
 ): DriverTestFn {
   return { name, testFn, schemas, skip, type: 'testFn' };
+}
+
+export function driverTestMulti(
+  { name, query, expectArray = [], skip, schemas }: DriverTestArg
+): DriverTestMulti {
+  return { name, query, expectArray, schemas, skip, type: 'multi' };
 }
 
 export function testSet(tests: DriverTest[]) {

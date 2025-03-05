@@ -173,7 +173,7 @@ describe('MSSqlUngrouped', () => {
           longitude: { sql: \`longitude\` }
         },
         questionMark: {
-          sql: \`replace('some string question string???', 'string', 'with some ???')\`,
+          sql: \`replace('some string question string ? ?? ???', 'string', 'with some ? ?? ???')\`,
           type: \`string\`
         }
       }

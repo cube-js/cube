@@ -1,4 +1,4 @@
-use super::memeber_sql::{MemberSql, NativeMemberSql};
+use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -12,14 +12,14 @@ use std::rc::Rc;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CubeDefinitionStatic {
     pub name: String,
+    #[serde(rename = "sqlAlias")]
+    pub sql_alias: Option<String>,
 }
 
 #[nativebridge::native_bridge(CubeDefinitionStatic)]
 pub trait CubeDefinition {
-    #[field]
-    #[optional]
+    #[nbridge(field, optional)]
     fn sql_table(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
-    #[field]
-    #[optional]
+    #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

@@ -1,9 +1,9 @@
-import { DateRange, extendMoment } from 'moment-range';
-import { unitOfTime } from 'moment-timezone';
+import type { unitOfTime } from 'moment-timezone';
+import type { DateRange } from 'moment-range';
+import Moment from 'moment-timezone';
+import { extendMoment } from 'moment-range';
 
-const Moment = require('moment-timezone');
-
-const moment = extendMoment(Moment);
+const moment = extendMoment(Moment as any);
 
 export type QueryDateRange = [string, string];
 type SqlInterval = string;
@@ -76,7 +76,7 @@ export function subtractInterval(date: moment.Moment, interval: ParsedInterval):
 /**
  * Returns the closest date prior to date parameter aligned with the origin point
  */
-function alignToOrigin(startDate: moment.Moment, interval: ParsedInterval, origin: moment.Moment): moment.Moment {
+export const alignToOrigin = (startDate: moment.Moment, interval: ParsedInterval, origin: moment.Moment): moment.Moment => {
   let alignedDate = startDate.clone();
   let intervalOp;
   let isIntervalNegative = false;
@@ -111,9 +111,9 @@ function alignToOrigin(startDate: moment.Moment, interval: ParsedInterval, origi
   }
 
   return alignedDate;
-}
+};
 
-function parsedSqlIntervalToDuration(parsedInterval: ParsedInterval): moment.Duration {
+export const parsedSqlIntervalToDuration = (parsedInterval: ParsedInterval): moment.Duration => {
   const duration = moment.duration();
 
   Object.entries(parsedInterval).forEach(([key, value]) => {
@@ -121,7 +121,7 @@ function parsedSqlIntervalToDuration(parsedInterval: ParsedInterval): moment.Dur
   });
 
   return duration;
-}
+};
 
 function checkSeriesForDateRange(intervalStr: string, [startStr, endStr]: QueryDateRange): void {
   const intervalParsed = parseSqlInterval(intervalStr);
@@ -236,11 +236,11 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
     const parsedTime = Date.parse(`${timestamp}Z`);
     // TODO parsedTime might be incorrect offset for conversion
     const offset = zone.utcOffset(parsedTime);
-    const inDbTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
+    const localTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
     if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
-      return inDbTimeZoneDate.toJSON();
+      return localTimeZoneDate.toJSON();
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
-      return inDbTimeZoneDate.toJSON().replace('Z', '');
+      return localTimeZoneDate.toJSON().replace('Z', '');
     }
   }
 

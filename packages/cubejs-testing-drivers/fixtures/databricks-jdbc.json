@@ -15,7 +15,7 @@
       "cube": {
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
-          "CUBEJS_DB_EXPORT_BUCKET": "wasbs://databricks-drivers-tests-preaggs@coreteamdevtest.blob.core.windows.net",
+          "CUBEJS_DB_EXPORT_BUCKET": "abfss://databricks-drivers-tests-preaggs@coreteamdevtest.dfs.core.windows.net",
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
         }
       }
@@ -160,7 +160,7 @@
     "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
-    "SKIPPED FOR ALL                         ",
+    "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
@@ -173,6 +173,7 @@
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
     "querying custom granularities ECommerce: count by three_months_by_march + dimension",
 
+    "---------------------------------------",
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
     "SQL API: Nested Rollup",

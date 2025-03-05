@@ -9,7 +9,7 @@ export function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
   const isMounted = useIsMounted();
   const [currentQuery, setCurrentQuery] = useState(null);
-  const [isLoading, setLoading] = useState(false);
+  const [isLoading, setLoading] = useState(!options.skip);
   const [resultSet, setResultSet] = useState(null);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
@@ -33,7 +33,7 @@ export function useCubeQuery(query, options = {}) {
 
     setError(null);
     setLoading(true);
-    
+
     try {
       const response = await cubeApi.load(query, {
         mutexObj: mutexRef.current,

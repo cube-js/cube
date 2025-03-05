@@ -9,6 +9,10 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubeorchestrator/**'
+      - 'rust/cubeshared/**'
+      - 'rust/cubesqlplanner/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
@@ -24,12 +28,19 @@ on:
       - 'packages/**'
       - 'rust/cubestore/**'
       - 'rust/cubesql/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubeorchestrator/**'
+      - 'rust/cubeshared/**'
+      - 'rust/cubesqlplanner/**'
       - '.eslintrc.js'
       - '.prettierrc'
       - 'package.json'
       - 'lerna.json'
       - 'rollup.config.js'
       - 'yarn.lock'
+
+env:
+  CUBEJS_TESSERACT_ORCHESTRATOR: true
 
 jobs:
   unit:
@@ -42,8 +53,12 @@ jobs:
       matrix:
         # Current docker version + next LTS
         node-version: [20.x, 22.x]
+        python-version: [3.11]
+        transpile-worker-threads: [false, true]
       fail-fast: false
 
+    env:
+      CUBEJS_TRANSPILATION_WORKER_THREADS: ${{ matrix.transpile-worker-threads }}
     steps:
       - id: get-tag-out
         run: echo "$OUT"
@@ -57,7 +72,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -65,6 +80,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -92,6 +111,11 @@ jobs:
         run: yarn tsc
       - name: Build client
         run: yarn build
+      - name: Build cubejs-backend-native (with Python)
+        run: yarn run native:build-release-python
+        working-directory: ./packages/cubejs-backend-native
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
 #      - uses: codecov/codecov-action@v1
@@ -100,6 +124,21 @@ jobs:
 #          files: ./packages/*/coverage/clover.xml
 #          flags: cube-backend
 #          verbose: true # optional (default = false)
+      - name: Cargo test cubeorchestrator
+        run: |
+          cargo test --manifest-path rust/cubeorchestrator/Cargo.toml -j 1
+      - name: Cargo test cubenativeutils
+        run: |
+          cargo test --manifest-path rust/cubenativeutils/Cargo.toml -j 1
+      - name: Cargo test cubeshared
+        run: |
+          cargo test --manifest-path rust/cubeshared/Cargo.toml -j 1
+#      - name: Cargo test cubesql
+#        run: |
+#          cargo test --manifest-path rust/cubesql/Cargo.toml -j 1
+#      - name: Cargo test cubesqlplanner
+#        run: |
+#          cargo test --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 1
 
   lint:
     runs-on: ubuntu-20.04
@@ -113,7 +152,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -148,6 +187,21 @@ jobs:
         run: yarn lint:npm
       - name: Lerna lint
         run: yarn lerna run --concurrency 1 lint
+      - name: Cargo fmt cubeorchestrator
+        run: |
+          cargo fmt --manifest-path rust/cubeorchestrator/Cargo.toml -- --check
+      - name: Cargo fmt cubenativeutils
+        run: |
+          cargo fmt --manifest-path rust/cubenativeutils/Cargo.toml -- --check
+      - name: Cargo fmt cubeshared
+        run: |
+          cargo fmt --manifest-path rust/cubeshared/Cargo.toml -- --check
+#      - name: Cargo fmt cubesql
+#        run: |
+#          cargo fmt --manifest-path rust/cubesql/Cargo.toml -- --check
+#      - name: Cargo fmt cubesqlplanner
+#        run: |
+#          cargo fmt --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -- --check
 
   build:
     runs-on: ubuntu-20.04
@@ -161,7 +215,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -200,6 +254,21 @@ jobs:
         run: yarn lerna run --concurrency 1 build
         env:
           NODE_OPTIONS: --max_old_space_size=4096
+      - name: Cargo build cubeorchestrator
+        run: |
+          cargo build --manifest-path rust/cubeorchestrator/Cargo.toml -j 4
+      - name: Cargo build cubenativeutils
+        run: |
+          cargo build --manifest-path rust/cubenativeutils/Cargo.toml -j 4
+      - name: Cargo build cubeshared
+        run: |
+          cargo build --manifest-path rust/cubeshared/Cargo.toml -j 4
+#      - name: Cargo build cubesql
+#        run: |
+#          cargo build --manifest-path rust/cubesql/Cargo.toml -j 4
+#      - name: Cargo build cubesqlplanner
+#        run: |
+#          cargo build --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 4
 
   build-cubestore:
     needs: [latest-tag-sha]
@@ -265,71 +334,10 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
-        shell: bash
-      - name: Restore yarn cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
-      - name: Yarn install
-        uses: nick-fields/retry@v3
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
-      - name: Lerna tsc
-        run: yarn tsc
-      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
-        uses: actions/download-artifact@v4
-        with:
-          path: ./rust/cubestore/target/release/
-          name: cubestored-x86_64-unknown-linux-gnu-release
-      - name: Run Cube Store in background
-        run: |
-          chmod +x ./rust/cubestore/target/release/cubestored
-          ./rust/cubestore/target/release/cubestored &
-      - name: Run Cubestore Integration
-        timeout-minutes: 10
-        run: |
-          yarn lerna run --concurrency 1 --stream --no-prefix integration:cubestore
-
-  integration:
-    needs: [unit, lint, latest-tag-sha]
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
-    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-
-    strategy:
-      matrix:
-        node-version: [20.x]
-        db: [
-            'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate', 'mongobi'
-        ]
-      fail-fast: false
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -362,45 +370,54 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - name: Run Integration tests for ${{ matrix.db }} matrix
-        uses: nick-fields/retry@v3
+      - name: Build cubejs-backend-native (without Python)
+        run: yarn run native:build-release
+        working-directory: ./packages/cubejs-backend-native
+      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
+        uses: actions/download-artifact@v4
         with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 30
-          command: ./.github/actions/integration/${{ matrix.db }}.sh
+          path: ./rust/cubestore/target/release/
+          name: cubestored-x86_64-unknown-linux-gnu-release
+      - name: Run Cube Store in background
+        run: |
+          chmod +x ./rust/cubestore/target/release/cubestored
+          ./rust/cubestore/target/release/cubestored &
+      - name: Run Cubestore Integration
+        timeout-minutes: 10
+        run: |
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:cubestore
 
-  integration-smoke:
-    needs: [ latest-tag-sha, build-cubestore ]
+  integration:
+    needs: [unit, lint, latest-tag-sha]
     runs-on: ubuntu-20.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    env:
+      CLOUD_DATABASES: >
+        firebolt
+        dremio
+      # Athena (just to check for secrets availability)
+      DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
 
     strategy:
       matrix:
-        node-version: [ 20.x ]
+        node-version: [20.x]
+        db: [
+            'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
+            'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
+        ]
       fail-fast: false
 
     steps:
-      - name: Maximize build space (disk space limitations)
-        run: |
-          echo "Before"
-          df -h
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^mongodb-.*'
-          sudo apt-get remove -y '^mysql-.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          echo "After"
-          df -h
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.84.1
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -428,10 +445,106 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Build cubejs-backend-native (without Python)
+        run: yarn run native:build-release
+        working-directory: ./packages/cubejs-backend-native
+      - name: Run Integration tests for ${{ matrix.db }} matrix
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 30
+          command: ./.github/actions/integration/${{ matrix.db }}.sh
+        # It's enough to test for any one secret because they are set all at once or not set all
+        if: |
+          (contains(env.CLOUD_DATABASES, matrix.db) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
+          (!contains(env.CLOUD_DATABASES, matrix.db))
+        env:
+          # Firebolt Integration
+          DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ENGINE_NAME }}
+          DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_NAME: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_NAME }}
+          DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ACCOUNT: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_FIREBOLT_ACCOUNT }}
+          DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_USER }}
+          DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_FIREBOLT_CUBEJS_DB_PASS }}
+          # Dremio Integration
+          DRIVERS_TESTS_DREMIO_CUBEJS_DB_URL: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_URL }}
+          DRIVERS_TESTS_DREMIO_CUBEJS_DB_NAME: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_NAME }}
+          DRIVERS_TESTS_DREMIO_CUBEJS_DB_DREMIO_AUTH_TOKEN: ${{ secrets.DRIVERS_TESTS_DREMIO_CUBEJS_DB_DREMIO_AUTH_TOKEN }}
+
+  integration-smoke:
+    needs: [ latest-tag-sha, build-cubestore ]
+    runs-on: ubuntu-20.04
+    timeout-minutes: 90
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+
+    strategy:
+      matrix:
+        node-version: [ 20.x ]
+        python-version: [ 3.11 ]
+      fail-fast: false
+
+    steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - name: Restore yarn cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.22
+      - name: Yarn install
+        uses: nick-fields/retry@v3
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Install instant client for Oracle
         uses: GoodManWEN/oracle-client-action@main
       - name: Build client
         run: yarn build
+      - name: Build cubejs-backend-native (with Python)
+        run: yarn run native:build-release-python
+        working-directory: ./packages/cubejs-backend-native
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
       - name: Lerna tsc
         run: yarn tsc
       - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
@@ -497,6 +610,8 @@ jobs:
           - 5000:5000
     strategy:
       matrix:
+        node-version: [ 20 ]
+        target: [ "x86_64-unknown-linux-gnu" ]
         dockerfile:
           - dev.Dockerfile
         include:
@@ -523,21 +638,29 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Build image
-        uses: docker/build-push-action@v6
-        timeout-minutes: 30
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          context: .
-          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
-          platforms: linux/amd64
-          push: true
-          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 20.x
+          toolchain: 1.84.1
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
+          target: ${{ matrix.target }}
+      - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: ${{ matrix.node-version }}
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.22
+      - name: Install cargo-cp-artifact
+        run: npm install -g cargo-cp-artifact@0.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./packages/cubejs-backend-native
+          key: native-${{ runner.OS }}-${{ matrix.target }}
+          shared-key: native-${{ runner.OS }}-${{ matrix.target }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -549,8 +672,6 @@ jobs:
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.22
       - name: Yarn install
         uses: nick-fields/retry@v3
         env:
@@ -565,6 +686,25 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
+      - name: Build cubejs-backend-native (without Python)
+        run: yarn run native:build-release
+        working-directory: ./packages/cubejs-backend-native
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      # current .dockerignore prevents use of native build
+      - name: Unignore native from .dockerignore
+        run: |
+          grep -v -E "packages/cubejs-backend-native/((native)|(index.node))" .dockerignore > .dockerignore.tmp
+          mv .dockerignore.tmp .dockerignore
+      - name: Build image
+        uses: docker/build-push-action@v6
+        timeout-minutes: 30
+        with:
+          context: .
+          file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/

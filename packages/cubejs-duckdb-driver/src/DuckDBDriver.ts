@@ -17,8 +17,10 @@ import { HydrationStream, transformRow } from './HydrationStream';
 const { version } = require('../../package.json');
 
 export type DuckDBDriverConfiguration = {
+  databasePath?: string,
   dataSource?: string,
   initSql?: string,
+  motherDuckToken?: string,
   schema?: string,
 };
 
@@ -56,8 +58,8 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async init(): Promise<InitPromise> {
-    const token = getEnv('duckdbMotherDuckToken', this.config);
-    const dbPath = getEnv('duckdbDatabasePath', this.config);
+    const token = this.config.motherDuckToken || getEnv('duckdbMotherDuckToken', this.config);
+    const dbPath = this.config.databasePath || getEnv('duckdbDatabasePath', this.config);
     
     // Determine the database URL based on the provided db_path or token
     let dbUrl: string;
@@ -80,32 +82,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
     const defaultConnection = db.connect();
     const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
-
-    try {
-      await execAsync('INSTALL httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on httpfs installation', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
-
-    try {
-      await execAsync('LOAD httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on loading httpfs', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
 
     const configuration = [
       {
@@ -157,6 +133,36 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
             });
           }
         }
+      }
+    }
+
+    // Install & load extensions if configured in env variable.
+    const extensions = getEnv('duckdbExtensions', this.config);
+    for (const extension of extensions) {
+      try {
+        await execAsync(`INSTALL ${extension}`);
+      } catch (e) {
+        if (this.logger) {
+          console.error(`DuckDB - error on installing ${extension}`, {
+            e
+          });
+        }
+
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
+      }
+
+      try {
+        await execAsync(`LOAD ${extension}`);
+      } catch (e) {
+        if (this.logger) {
+          console.error(`DuckDB - error on loading ${extension}`, {
+            e
+          });
+        }
+
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
       }
     }
 

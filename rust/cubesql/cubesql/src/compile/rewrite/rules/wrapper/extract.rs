@@ -1,18 +1,17 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, literal_expr, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        literal_expr,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_replacer_context,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn extract_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn extract_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-pull-up-extract",
             self.fun_expr(
@@ -20,17 +19,25 @@ impl WrapperRules {
                 vec![
                     wrapper_pullup_replacer(
                         literal_expr("?date_part"),
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     wrapper_pullup_replacer(
                         "?date",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                 ],
             ),
@@ -39,10 +46,14 @@ impl WrapperRules {
                     "DatePart",
                     vec![literal_expr("?date_part"), "?date".to_string()],
                 ),
-                "?alias_to_cube",
-                "?ungrouped",
-                "?in_projection",
-                "?cube_members",
+                wrapper_replacer_context(
+                    "?alias_to_cube",
+                    "?push_to_cube",
+                    "?in_projection",
+                    "?cube_members",
+                    "?grouped_subqueries",
+                    "?ungrouped_scan",
+                ),
             ),
             self.transform_date_part_expr("?alias_to_cube"),
         )]);
@@ -51,13 +62,13 @@ impl WrapperRules {
     fn transform_date_part_expr(
         &self,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

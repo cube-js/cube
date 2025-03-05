@@ -1,14 +1,10 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, cube_scan_wrapper, distinct, rewrite,
-    rules::wrapper::WrapperRules, wrapped_select, wrapper_pullup_replacer, LogicalPlanLanguage,
+    cube_scan_wrapper, distinct, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules,
+    wrapped_select, wrapper_pullup_replacer,
 };
-use egg::Rewrite;
 
 impl WrapperRules {
-    pub fn distinct_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn distinct_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![rewrite(
             "wrapper-push-down-distinct-to-cube-scan",
             distinct(cube_scan_wrapper(
@@ -29,13 +25,10 @@ impl WrapperRules {
                         "?order_expr",
                         "?select_alias",
                         "?select_distinct",
-                        "WrappedSelectUngrouped:false",
+                        "WrappedSelectPushToCube:false",
                         "?select_ungrouped_scan",
                     ),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    "?context",
                 ),
                 "CubeScanWrapperFinalized:false".to_string(),
             )),
@@ -57,13 +50,10 @@ impl WrapperRules {
                         "?order_expr",
                         "?select_alias",
                         "WrappedSelectDistinct:true",
-                        "WrappedSelectUngrouped:false",
-                        "?select_ungrouped_scan",
+                        "WrappedSelectPushToCube:false",
+                        "WrappedSelectUngroupedScan:false",
                     ),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    "?context",
                 ),
                 "CubeScanWrapperFinalized:false",
             ),

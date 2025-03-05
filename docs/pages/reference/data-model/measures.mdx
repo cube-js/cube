@@ -6,10 +6,10 @@ redirect_from:
 
 # Measures
 
-The `measures` parameter contains a set of measures and each measure is an
-aggregation over a certain column in your database table.
+You can use the `measures` parameter within [cubes][ref-ref-cubes] to define measures.
+Each measure is an aggregation over a certain column in your database table.
 
-Any measure should have the following properties: `name`, `sql` and `type`.
+Any measure should have the following parameters: [`name`](#name), [`sql`](#sql), and [`type`](#type).
 
 ## Parameters
 
@@ -339,13 +339,7 @@ cubes:
 
 ### `public`
 
-<InfoBox>
-
-Prior to v0.33, this property was called `shown`.
-
-</InfoBox>
-
-The `public` property is used to manage the visibility of a measure. Valid
+The `public` parameter is used to manage the visibility of a measure. Valid
 values for `public` are `true` and `false`. When set to `false`, this measure
 **cannot** be queried through the API. Defaults to `true`.
 
@@ -533,6 +527,7 @@ You can create calculated measures from several joined cubes. In this case, a
 join will be created automatically.
 
 
+[ref-ref-cubes]: /reference/data-model/cube
 [ref-schema-ref-types-formats-measures-types]:
   /reference/data-model/types-and-formats#measure-types
 [ref-schema-ref-types-formats-measures-formats]:

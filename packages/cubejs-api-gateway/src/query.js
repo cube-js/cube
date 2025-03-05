@@ -40,7 +40,7 @@ const getPivotQuery = (queryType, queries) => {
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
+const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
 const parsedMemberExpression = Joi.object().keys({
   expression: Joi.array().items(Joi.string()).min(1).required(),
   cubeName: Joi.string().required(),
@@ -96,6 +96,15 @@ const oneCondition = Joi.object().keys({
   and: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
 }).xor('or', 'and');
 
+const subqueryJoin = Joi.object().keys({
+  sql: Joi.string(),
+  // TODO This is _always_ a member expression, maybe pass as parsed, without intermediate string?
+  // TODO there are three different types instead of alternatives for this actually
+  on: Joi.alternatives(Joi.string(), memberExpression, parsedMemberExpression),
+  joinType: Joi.string().valid('LEFT', 'INNER'),
+  alias: Joi.string(),
+});
+
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
   measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
@@ -122,6 +131,7 @@ const querySchema = Joi.object().keys({
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
+  subqueryJoins: Joi.array().items(subqueryJoin),
 });
 
 const normalizeQueryOrder = order => {

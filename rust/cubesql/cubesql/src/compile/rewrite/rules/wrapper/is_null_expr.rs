@@ -1,86 +1,77 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, is_not_null_expr, is_null_expr, rewrite,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        is_not_null_expr, is_null_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        wrapper_replacer_context, WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn is_null_expr_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn is_null_expr_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-is-null-expr",
-                wrapper_pushdown_replacer(
-                    is_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                is_null_expr(wrapper_pushdown_replacer(
-                    "?expr",
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                )),
+                wrapper_pushdown_replacer(is_null_expr("?expr"), "?context"),
+                is_null_expr(wrapper_pushdown_replacer("?expr", "?context")),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-is-null-expr",
                 is_null_expr(wrapper_pullup_replacer(
                     "?expr",
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 )),
                 wrapper_pullup_replacer(
                     is_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_is_null_expr("?alias_to_cube"),
             ),
             rewrite(
                 "wrapper-push-down-is-not-null-expr",
-                wrapper_pushdown_replacer(
-                    is_not_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                is_not_null_expr(wrapper_pushdown_replacer(
-                    "?expr",
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                )),
+                wrapper_pushdown_replacer(is_not_null_expr("?expr"), "?context"),
+                is_not_null_expr(wrapper_pushdown_replacer("?expr", "?context")),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-is-not-null-expr",
                 is_not_null_expr(wrapper_pullup_replacer(
                     "?expr",
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 )),
                 wrapper_pullup_replacer(
                     is_not_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_is_null_expr("?alias_to_cube"),
             ),
@@ -90,13 +81,13 @@ impl WrapperRules {
     fn transform_is_null_expr(
         &self,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

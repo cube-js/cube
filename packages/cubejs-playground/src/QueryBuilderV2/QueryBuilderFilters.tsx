@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Block, Button, Divider, Flow, Menu, MenuTrigger, Space, tasty } from '@cube-dev/ui-kit';
-import { PlusOutlined } from '@ant-design/icons';
+import { Button, ClearIcon, Flex, Flow, Space, tasty } from '@cube-dev/ui-kit';
 import { TCubeDimension, TCubeMeasure } from '@cubejs-client/core';
 
 import { useQueryBuilderContext } from './context';
-import { getTypeIcon } from './utils';
-import { useListMode } from './hooks/list-mode';
+import { useEvent } from './hooks';
 import { AccordionCard } from './components/AccordionCard';
-import { ScrollableArea } from './components/ScrollableArea';
 import { DateRangeFilter } from './components/DateRangeFilter';
 import { MemberBadge } from './components/Badge';
-import { MemberFilter } from './components/MemberFilter';
+import { FilterMember } from './components/FilterMember';
 import { SegmentFilter } from './components/SegmentFilter';
+import { LogicalFilter } from './components/LogicalFilter';
+import { AddFilterInput } from './components/AddFilterInput';
 
 const BadgeContainer = tasty(Space, {
   styles: {
@@ -25,47 +24,33 @@ const BadgeContainer = tasty(Space, {
 });
 
 export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: boolean) => void }) {
-  const [listMode] = useListMode();
   const filtersRef = useRef<HTMLElement>(null);
   const {
-    selectedCube,
     segments: segmentsUpdater,
     dateRanges,
     members,
     filters: filtersUpdater,
     query,
-    queryStats,
+    joinableCubes,
+    usedCubes,
+    cubes,
+    memberViewType,
+    usedMembersInFilters,
   } = useQueryBuilderContext();
 
-  const isCompact =
-    Object.keys(queryStats).length === 1 &&
-    ((selectedCube && selectedCube === queryStats[selectedCube?.name]?.instance) || !selectedCube);
+  const isCompact = usedCubes.length === 1;
+  const isAddingCompact = joinableCubes.length === 1;
   const timeDimensions = query.timeDimensions || [];
   const filters = query.filters || [];
   const segments = query.segments || [];
   const timeCounter = dateRanges.list.length;
   const segmentsCounter = segments.length;
-
-  const measureCounter = filters.filter((filter) => {
-    if (!('member' in filter) || !filter.member) {
-      return false;
-    }
-
-    return !!members.measures[filter.member];
-  }).length;
-
-  const dimensionCounter = filters.filter((filter) => {
-    if (!('member' in filter) || !filter.member) {
-      return false;
-    }
-
-    return !!members.dimensions[filter.member];
-  }).length;
-
-  const availableTimeDimensions =
-    selectedCube?.dimensions.filter((member) => {
-      return member.type === 'time' && !dateRanges.list.includes(member.name);
-    }) || [];
+  const measureCounter = usedMembersInFilters.filter(
+    (memberName) => members.measures[memberName]
+  ).length;
+  const dimensionCounter = usedMembersInFilters.filter(
+    (memberName) => members.dimensions[memberName]
+  ).length;
 
   const isFiltered = filters.length > 0 || segments.length > 0 || dateRanges.list.length > 0;
 
@@ -74,17 +59,6 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
   useEffect(() => {
     setIsExpanded(isFiltered);
   }, [isFiltered]);
-
-  const availableMeasuresAndDimensions = [
-    ...(selectedCube?.dimensions || []),
-    ...(selectedCube?.measures || []),
-    // ...(selectedCube?.timeDimensions || []),
-  ];
-
-  const availableSegments =
-    selectedCube?.segments.filter((member) => {
-      return !segments.includes(member.name);
-    }) || [];
 
   function getMemberType(member: TCubeMeasure | TCubeDimension) {
     if (!member?.name) {
@@ -101,41 +75,17 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
     return undefined;
   }
 
-  function addDateRange(name: string) {
-    dateRanges.set(name);
-  }
-
-  function addSegment(name: string) {
-    segmentsUpdater?.add(name);
-  }
-
-  function addFilter(name: string) {
-    filtersUpdater.add({ member: name, operator: 'set' });
-  }
-
   useEffect(() => {
     (
       filtersRef?.current?.querySelector('button[data-is-invalid]') as HTMLButtonElement | undefined
     )?.click();
   }, [dateRanges.list.length]);
 
-  useEffect(() => {
-    const invalidTime = filtersRef?.current?.querySelector('button[data-is-invalid]') as
-      | HTMLButtonElement
-      | undefined;
-
-    if (invalidTime) {
-      return;
-    }
-
-    const buttons = filtersRef?.current?.querySelectorAll('button');
-    const lastButton = buttons && buttons.length > 0 ? buttons[buttons.length - 1] : undefined;
-
-    (lastButton as HTMLButtonElement | undefined)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }, [query?.filters?.length, dateRanges.list.length, segments?.length]);
+  const onClearAction = useEvent(() => {
+    dateRanges.clear();
+    filtersUpdater.clear();
+    segmentsUpdater?.clear();
+  });
 
   return (
     <AccordionCard
@@ -160,6 +110,13 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
           </BadgeContainer>
         ) : undefined
       }
+      extra={
+        timeCounter || dimensionCounter || measureCounter || segmentsCounter ? (
+          <Button icon={<ClearIcon />} size="small" theme="danger" onPress={onClearAction}>
+            Remove All
+          </Button>
+        ) : null
+      }
       contentStyles={{ border: 'top' }}
       onToggle={(isExpanded) => {
         setIsExpanded(isExpanded);
@@ -167,21 +124,30 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
       }}
     >
       <Flow ref={filtersRef}>
-        <ScrollableArea gap="1x" padding="1x" height="max 18x">
-          {!isFiltered ? <Block preset="t3m">No filters set</Block> : null}
+        <Flex flow="column" gap=".75x" padding="1x">
           {dateRanges.list.map((dimensionName, i) => {
             const timeDimension = timeDimensions.find(
               (timeDimension) => timeDimension.dimension === dimensionName
             );
 
             const dimension = members.dimensions[dimensionName];
+            const cubeName = dimensionName.split('.')[0];
+            const cube = cubes.find((cube) => cube.name === cubeName);
+            const memberName = dimensionName.split('.')[1];
+            const member = members.measures[dimensionName] || members.dimensions[dimensionName];
 
             return (
               <DateRangeFilter
                 key={i}
-                isCompact={isCompact}
                 isMissing={!dimension}
+                isCompact={isCompact}
+                name={dimensionName}
                 member={timeDimension || { dimension: dimensionName }}
+                memberName={memberName}
+                memberTitle={member?.shortTitle}
+                cubeName={cubeName}
+                cubeTitle={cube?.title}
+                memberViewType={memberViewType}
                 onRemove={() => {
                   dateRanges.remove(dimensionName);
                 }}
@@ -192,20 +158,89 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
             );
           })}
           {filters.map((filter, index) => {
+            if ('and' in filter) {
+              return (
+                <LogicalFilter
+                  key={index}
+                  type="and"
+                  values={filter.and}
+                  isCompact={isCompact}
+                  isAddingCompact={isAddingCompact}
+                  onRemove={() => {
+                    filtersUpdater.remove(index);
+                  }}
+                  onChange={(filter) => {
+                    filtersUpdater.update(index, filter);
+                  }}
+                  onUnwrap={() => {
+                    if (filter.and.length === 1) {
+                      filtersUpdater.update(index, filter.and[0]);
+
+                      return;
+                    }
+
+                    filtersUpdater.remove(index);
+                    filter.and.forEach((filter) => {
+                      filtersUpdater.add(filter);
+                    });
+                  }}
+                />
+              );
+            }
+
+            if ('or' in filter) {
+              return (
+                <LogicalFilter
+                  key={index}
+                  type="or"
+                  values={filter.or}
+                  isCompact={isCompact}
+                  isAddingCompact={isAddingCompact}
+                  onRemove={() => {
+                    filtersUpdater.remove(index);
+                  }}
+                  onChange={(filter) => {
+                    filtersUpdater.update(index, filter);
+                  }}
+                  onUnwrap={() => {
+                    if (filter.or.length === 1) {
+                      filtersUpdater.update(index, filter.or[0]);
+
+                      return;
+                    }
+
+                    filtersUpdater.remove(index);
+                    filter.or.forEach((filter) => {
+                      filtersUpdater.add(filter);
+                    });
+                  }}
+                />
+              );
+            }
+
             if (!('member' in filter) || !filter.member) {
               return null;
             }
 
-            const member = members.measures[filter.member] || members.dimensions[filter.member];
+            const memberFullName = filter.member;
+            const cubeName = memberFullName.split('.')[0];
+            const cube = cubes.find((cube) => cube.name === cubeName);
+            const memberName = memberFullName.split('.')[1];
+            const member = members.measures[memberFullName] || members.dimensions[memberFullName];
 
             return (
-              <MemberFilter
+              <FilterMember
                 key={index}
+                isMissing={!member}
                 isCompact={isCompact}
-                member={filter}
+                filter={filter}
+                memberName={memberName}
+                memberTitle={member?.shortTitle}
+                cubeName={cubeName}
+                cubeTitle={cube?.title}
+                memberViewType={memberViewType}
                 memberType={getMemberType(member)}
                 type={member?.type}
-                isMissing={!member}
                 onRemove={() => {
                   filtersUpdater.remove(index);
                 }}
@@ -217,92 +252,42 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
           })}
           {segments.map((segment, i) => {
             const member = members.segments[segment];
+            const cubeName = segment.split('.')[0];
+            const cube = cubes.find((cube) => cube.name === cubeName);
+            const memberName = segment.split('.')[1];
 
             return (
               <SegmentFilter
                 key={member?.name || i}
+                isMissing={!member}
                 isCompact={isCompact}
                 member={member}
+                memberName={memberName}
+                memberTitle={member?.shortTitle}
+                cubeName={cubeName}
+                cubeTitle={cube?.title}
+                memberViewType={memberViewType}
                 name={segment}
                 onRemove={() => {
-                  segmentsUpdater?.remove(segment);
+                  segmentsUpdater.remove(segment);
                 }}
               />
             );
           })}
-        </ScrollableArea>
-        {listMode === 'dev' ? (
-          <>
-            {isFiltered ? <Divider /> : undefined}
-            <Space padding="1x 1x 1x 1x">
-              <MenuTrigger>
-                <Button
-                  isDisabled={!selectedCube}
-                  icon={<PlusOutlined />}
-                  type="clear"
-                  size="small"
-                >
-                  Filter
-                </Button>
-                <Menu height="max 44x" onAction={(name) => addFilter(name as string)}>
-                  {availableMeasuresAndDimensions.map((dimension) => {
-                    return (
-                      <Menu.Item key={dimension.name} textValue={dimension.name}>
-                        <Space
-                          gap="1x"
-                          color={`#${
-                            members.dimensions[dimension.name] ? 'dimension' : 'measure'
-                          }-text`}
-                        >
-                          {getTypeIcon(dimension.type)}
-                          {dimension.name.split('.')[1]}
-                        </Space>
-                      </Menu.Item>
-                    );
-                  })}
-                </Menu>
-              </MenuTrigger>
-              <MenuTrigger>
-                <Button
-                  isDisabled={!selectedCube || !availableTimeDimensions.length}
-                  icon={<PlusOutlined />}
-                  type="clear"
-                  size="small"
-                >
-                  Date Range
-                </Button>
-                <Menu height="max 44x" onAction={(name) => addDateRange(name as string)}>
-                  {availableTimeDimensions.map((dimension) => {
-                    return (
-                      <Menu.Item key={dimension.name} textValue={dimension.name}>
-                        <Space color="#time-dimension-text">
-                          {getTypeIcon('time')}
-                          {dimension.name.split('.')[1]}
-                        </Space>
-                      </Menu.Item>
-                    );
-                  })}
-                </Menu>
-              </MenuTrigger>
-              <MenuTrigger>
-                <Button
-                  isDisabled={!selectedCube || !availableSegments.length}
-                  icon={<PlusOutlined />}
-                  type="clear"
-                  size="small"
-                >
-                  Segment
-                </Button>
-                <Menu onAction={(name) => addSegment(name as string)}>
-                  {availableSegments.map((segment) => {
-                    return <Menu.Item key={segment.name}>{segment.name.split('.')[1]}</Menu.Item>;
-                  })}
-                </Menu>
-              </MenuTrigger>
-              {!selectedCube && <Block preset="t3m">Select a cube or a view to add filters</Block>}
-            </Space>
-          </>
-        ) : null}
+          <AddFilterInput
+            hasLabel
+            isCompact={isAddingCompact}
+            onAdd={(filter) => {
+              filtersUpdater.add(filter);
+            }}
+            onSegmentAdd={(name) => {
+              segmentsUpdater.add(name);
+            }}
+            onDateRangeAdd={(name) => {
+              dateRanges.set(name);
+            }}
+          />
+        </Flex>
       </Flow>
     </AccordionCard>
   );

@@ -1,20 +1,22 @@
 use super::Expr;
 
+#[derive(Clone)]
 pub struct OrderBy {
     pub expr: Expr,
-    pub asc: bool,
+    pub pos: usize,
+    pub desc: bool,
 }
 
 impl OrderBy {
-    pub fn new(expr: Expr, asc: bool) -> OrderBy {
-        OrderBy { expr, asc }
+    pub fn new(expr: Expr, pos: usize, desc: bool) -> OrderBy {
+        OrderBy { expr, pos, desc }
     }
 
     pub fn asc_str(&self) -> &str {
-        if self.asc {
-            "ASC"
-        } else {
+        if self.desc {
             "DESC"
+        } else {
+            "ASC"
         }
     }
 }

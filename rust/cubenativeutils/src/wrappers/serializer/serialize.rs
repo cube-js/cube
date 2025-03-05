@@ -1,7 +1,8 @@
 use super::serializer::NativeSerdeSerializer;
-use crate::wrappers::inner_types::InnerTypes;
-use crate::wrappers::{NativeContextHolder, NativeObjectHandle};
-use crate::CubeError;
+use crate::{
+    wrappers::{inner_types::InnerTypes, NativeContextHolder, NativeObjectHandle},
+    CubeError,
+};
 use serde::Serialize;
 
 pub trait NativeSerialize<IT: InnerTypes> {

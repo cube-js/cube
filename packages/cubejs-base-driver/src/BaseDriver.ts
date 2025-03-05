@@ -14,7 +14,6 @@ import {
   isSslKey,
   isSslCert,
 } from '@cubejs-backend/shared';
-import { reduce } from 'ramda';
 import fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
@@ -26,6 +25,10 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
+import {
+  DefaultAzureCredential,
+  ClientSecretCredential,
+} from '@azure/identity';
 
 import { cancelCombinator } from './utils';
 import {
@@ -50,11 +53,42 @@ import {
   TableMemoryData,
   PrimaryKeysQueryResult,
   ForeignKeysQueryResult,
+  DatabaseStructure,
 } from './driver.interface';
 
+/**
+ * @see {@link DefaultAzureCredential} constructor options
+ */
 export type AzureStorageClientConfig = {
-  azureKey: string,
+  azureKey?: string,
   sasToken?: string,
+  /**
+   * The client ID of a Microsoft Entra app registration.
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_CLIENT_ID env
+   */
+  clientId?: string,
+  /**
+   * ID of the application's Microsoft Entra tenant. Also called its directory ID.
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_TENANT_ID env
+   */
+  tenantId?: string,
+  /**
+   * Azure service principal client secret.
+   * Enables authentication to Microsoft Entra ID using a client secret that was generated
+   * for an App Registration. More information on how to configure a client secret can be found here:
+   * https://learn.microsoft.com/entra/identity-platform/quickstart-configure-app-access-web-apis#add-credentials-to-your-web-application
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_CLIENT_SECRET env
+   */
+  clientSecret?: string,
+  /**
+   * The path to a file containing a Kubernetes service account token that authenticates the identity.
+   * In case of DefaultAzureCredential flow if it is omitted
+   * the Azure library will try to use the AZURE_FEDERATED_TOKEN_FILE env
+   */
+  tokenFilePath?: string,
 };
 
 export type GoogleStorageClientConfig = {
@@ -147,7 +181,7 @@ const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
  * Base driver class.
  */
 export abstract class BaseDriver implements DriverInterface {
-  private testConnectionTimeoutValue = 10000;
+  private readonly testConnectionTimeoutValue: number = 10000;
 
   protected logger: any;
 
@@ -378,28 +412,28 @@ export abstract class BaseDriver implements DriverInterface {
     return false;
   }
 
-  protected informationColumnsSchemaReducer(result: any, i: any) {
+  protected informationColumnsSchemaReducer(result: any, i: any): DatabaseStructure {
     let schema = (result[i.table_schema] || {});
-    const tables = (schema[i.table_name] || []);
+    const columns = (schema[i.table_name] || []);
 
-    tables.push({
+    columns.push({
       name: i.column_name,
       type: i.data_type,
       attributes: i.key_type ? ['primaryKey'] : []
     });
 
-    tables.sort();
-    schema[i.table_name] = tables;
+    columns.sort();
+    schema[i.table_name] = columns;
     schema = sortByKeys(schema);
     result[i.table_schema] = schema;
 
     return sortByKeys(result);
   }
 
-  public tablesSchema() {
+  public tablesSchema(): Promise<DatabaseStructure> {
     const query = this.informationSchemaQuery();
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    return this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
   }
 
   // Extended version of tablesSchema containing primary and foreign keys
@@ -446,12 +480,12 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  public getSchemas() {
+  public getSchemas(): Promise<QuerySchemasResult[]> {
     const query = this.getSchemasQuery();
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]) {
+  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
     const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
     const schemaNames = schemas.map(s => s.schema_name);
 
@@ -459,7 +493,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public async getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     const groupedBySchema: Record<string, string[]> = {};
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {
@@ -590,9 +624,14 @@ export abstract class BaseDriver implements DriverInterface {
     return [];
   }
 
-  public createTable(quotedTableName: string, columns: TableColumn[]) {
+  // This is only for use in tests
+  public async createTableRaw(query: string): Promise<void> {
+    await this.query(query);
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
     const createTableSql = this.createTableSql(quotedTableName, columns);
-    return this.query(createTableSql, []).catch(e => {
+    await this.query(createTableSql, []).catch(e => {
       e.message = `Error during create table: ${createTableSql}: ${e.message}`;
       throw e;
     });
@@ -727,33 +766,89 @@ export abstract class BaseDriver implements DriverInterface {
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
-    const parts = bucketName.split('.blob.core.windows.net/');
+    const splitter = bucketName.includes('blob.core') ? '.blob.core.windows.net/' : '.dfs.core.windows.net/';
+    const parts = bucketName.split(splitter);
     const account = parts[0];
     const container = parts[1].split('/')[0];
-    const credential = new StorageSharedKeyCredential(account, azureConfig.azureKey);
+    let credential: StorageSharedKeyCredential | ClientSecretCredential | DefaultAzureCredential;
+    let blobServiceClient: BlobServiceClient;
+    let getSas;
+
+    if (azureConfig.azureKey) {
+      credential = new StorageSharedKeyCredential(account, azureConfig.azureKey);
+      getSas = async (name: string, startsOn: Date, expiresOn: Date) => generateBlobSASQueryParameters(
+        {
+          containerName: container,
+          blobName: name,
+          permissions: ContainerSASPermissions.parse('r'),
+          startsOn,
+          expiresOn,
+          protocol: SASProtocol.Https,
+          version: '2020-08-04',
+        },
+        credential as StorageSharedKeyCredential
+      ).toString();
+    } else if (azureConfig.clientSecret && azureConfig.tenantId && azureConfig.clientId) {
+      credential = new ClientSecretCredential(
+        azureConfig.tenantId,
+        azureConfig.clientId,
+        azureConfig.clientSecret,
+      );
+      getSas = async (name: string, startsOn: Date, expiresOn: Date) => {
+        const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
+        return generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn,
+            expiresOn,
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          userDelegationKey,
+          account
+        ).toString();
+      };
+    } else {
+      const opts = {
+        tenantId: azureConfig.tenantId,
+        clientId: azureConfig.clientId,
+        tokenFilePath: azureConfig.tokenFilePath,
+      };
+      credential = new DefaultAzureCredential(opts);
+      getSas = async (name: string, startsOn: Date, expiresOn: Date) => {
+        // getUserDelegationKey works only for authorization with Microsoft Entra ID
+        const userDelegationKey = await blobServiceClient.getUserDelegationKey(startsOn, expiresOn);
+        return generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn,
+            expiresOn,
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          userDelegationKey,
+          account,
+        ).toString();
+      };
+    }
+
     const url = `https://${account}.blob.core.windows.net`;
-    const blobServiceClient = azureConfig.sasToken ?
+    blobServiceClient = azureConfig.sasToken ?
       new BlobServiceClient(`${url}?${azureConfig.sasToken}`) :
       new BlobServiceClient(url, credential);
 
     const csvFiles: string[] = [];
     const containerClient = blobServiceClient.getContainerClient(container);
-    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}/` });
+    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}` });
     for await (const blob of blobsList) {
       if (blob.name && (blob.name.endsWith('.csv.gz') || blob.name.endsWith('.csv'))) {
-        const sas = generateBlobSASQueryParameters(
-          {
-            containerName: container,
-            blobName: blob.name,
-            permissions: ContainerSASPermissions.parse('r'),
-            startsOn: new Date(new Date().valueOf()),
-            expiresOn:
-              new Date(new Date().valueOf() + 1000 * 60 * 60),
-            protocol: SASProtocol.Https,
-            version: '2020-08-04',
-          },
-          credential,
-        ).toString();
+        const starts = new Date();
+        const expires = new Date(starts.valueOf() + 1000 * 60 * 60);
+        const sas = await getSas(blob.name, starts, expires);
         csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
       }
     }

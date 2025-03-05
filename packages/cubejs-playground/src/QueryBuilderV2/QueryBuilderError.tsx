@@ -11,10 +11,8 @@ export function QueryBuilderError() {
 
   return (
     <>
-      {!isVerifying &&
-      verificationError &&
-      !verificationError.toString().includes('Values required for filter') ? (
-        <Alert theme="note" padding="1x">
+      {verificationError && !verificationError.toString().includes('Values required for filter') ? (
+        <Alert theme="note" padding="1x" opacity={isVerifying ? '.5' : 1}>
           {verificationError.toString().replace('Error: Error: ', '')}
         </Alert>
       ) : null}

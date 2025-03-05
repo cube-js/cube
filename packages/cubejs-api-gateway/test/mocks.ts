@@ -75,6 +75,10 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
     return 'postgres';
   },
 
+  async applyRowLevelSecurity(query: any) {
+    return { query, denied: false };
+  },
+
   async metaConfig() {
     return [
       {

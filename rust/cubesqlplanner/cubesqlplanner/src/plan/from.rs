@@ -1,15 +1,92 @@
-use super::Join;
-use super::QueryPlan;
+use super::{Join, QueryPlan, Schema, Select};
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseCube, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 #[derive(Clone)]
+pub enum SingleSource {
+    Subquery(Rc<QueryPlan>),
+    Cube(Rc<BaseCube>),
+    TableReference(String, Rc<Schema>),
+}
+
+impl SingleSource {
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
+        let sql = match &self {
+            SingleSource::Cube(cube) => {
+                let cubesql = cube.to_sql(context.clone(), templates)?;
+                format!(" {} ", cubesql)
+            }
+            SingleSource::Subquery(s) => format!("({})", s.to_sql(templates)?),
+            SingleSource::TableReference(r, _) => format!(" {} ", r),
+        };
+        Ok(sql)
+    }
+
+    pub fn schema(&self) -> Rc<Schema> {
+        match self {
+            SingleSource::Subquery(subquery) => subquery.schema(),
+            SingleSource::Cube(_) => Rc::new(Schema::empty()),
+            SingleSource::TableReference(_, schema) => schema.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct SingleAliasedSource {
+    pub source: SingleSource,
+    pub alias: String,
+}
+
+impl SingleAliasedSource {
+    pub fn new_from_cube(cube: Rc<BaseCube>, alias: Option<String>) -> Self {
+        let alias = alias.unwrap_or_else(|| cube.default_alias());
+        Self {
+            source: SingleSource::Cube(cube),
+            alias,
+        }
+    }
+
+    pub fn new_from_table_reference(
+        reference: String,
+        schema: Rc<Schema>,
+        alias: Option<String>,
+    ) -> Self {
+        let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&reference));
+        Self {
+            source: SingleSource::TableReference(reference, schema),
+            alias,
+        }
+    }
+
+    pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Self {
+        Self {
+            source: SingleSource::Subquery(plan),
+            alias,
+        }
+    }
+
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
+        let sql = self.source.to_sql(templates, context)?;
+
+        templates.query_aliased(&sql, &self.alias)
+    }
+}
+
+#[derive(Clone)]
 pub enum FromSource {
     Empty,
-    Cube(Rc<BaseCube>),
+    Single(SingleAliasedSource),
     Join(Rc<Join>),
-    Subquery(Rc<QueryPlan>, String),
 }
 
 #[derive(Clone)]
@@ -18,34 +95,53 @@ pub struct From {
 }
 
 impl From {
-    pub fn new(source: FromSource) -> Self {
-        Self { source }
+    pub fn new(source: FromSource) -> Rc<Self> {
+        Rc::new(Self { source })
     }
 
-    pub fn new_from_cube(cube: Rc<BaseCube>) -> Self {
-        Self::new(FromSource::Cube(cube))
+    pub fn new_from_cube(cube: Rc<BaseCube>, alias: Option<String>) -> Rc<Self> {
+        Self::new(FromSource::Single(SingleAliasedSource::new_from_cube(
+            cube, alias,
+        )))
     }
 
-    pub fn new_from_join(join: Rc<Join>) -> Self {
+    pub fn new_from_table_reference(
+        reference: String,
+        schema: Rc<Schema>,
+        alias: Option<String>,
+    ) -> Rc<Self> {
+        Self::new(FromSource::Single(
+            SingleAliasedSource::new_from_table_reference(reference, schema, alias),
+        ))
+    }
+
+    pub fn new_from_join(join: Rc<Join>) -> Rc<Self> {
         Self::new(FromSource::Join(join))
     }
 
-    pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Self {
-        Self::new(FromSource::Subquery(plan, alias))
+    pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Rc<Self> {
+        Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
+            plan, alias,
+        )))
     }
 
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn new_from_subselect(plan: Rc<Select>, alias: String) -> Rc<Self> {
+        Self::new(FromSource::Single(SingleAliasedSource::new_from_subquery(
+            Rc::new(QueryPlan::Select(plan)),
+            alias,
+        )))
+    }
+
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
         let sql = match &self.source {
             FromSource::Empty => format!(""),
-            FromSource::Cube(cube) => {
-                let cubesql = cube.to_sql(context.clone())?;
-                format!("      {} ", cubesql)
-            }
+            FromSource::Single(source) => source.to_sql(templates, context.clone())?,
             FromSource::Join(j) => {
-                format!("{}", j.to_sql(context.clone())?)
-            }
-            FromSource::Subquery(s, alias) => {
-                format!("({}) AS {}", s.to_sql()?, alias)
+                format!("{}", j.to_sql(templates, context.clone())?)
             }
         };
         Ok(sql)

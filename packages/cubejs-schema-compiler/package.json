@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "0.36.5",
+  "version": "1.2.16",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -40,8 +40,8 @@
     "@babel/standalone": "^7.24",
     "@babel/traverse": "^7.24",
     "@babel/types": "^7.24",
-    "@cubejs-backend/native": "^0.36.5",
-    "@cubejs-backend/shared": "^0.36.5",
+    "@cubejs-backend/native": "1.2.16",
+    "@cubejs-backend/shared": "1.2.16",
     "antlr4ts": "0.5.0-alpha.4",
     "camelcase": "^6.2.0",
     "cron-parser": "^4.9.0",
@@ -50,16 +50,17 @@
     "joi": "^17.8.3",
     "js-yaml": "^4.1.0",
     "lru-cache": "^5.1.1",
-    "moment-timezone": "^0.5.33",
+    "moment-timezone": "^0.5.46",
     "node-dijkstra": "^2.5.0",
     "ramda": "^0.27.2",
     "syntax-error": "^1.3.0",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "workerpool": "^9.2.0"
   },
   "devDependencies": {
-    "@cubejs-backend/apla-clickhouse": "^1.7.0",
-    "@cubejs-backend/linter": "^0.36.0",
-    "@cubejs-backend/query-orchestrator": "^0.36.5",
+    "@clickhouse/client": "^1.7.0",
+    "@cubejs-backend/linter": "1.2.16",
+    "@cubejs-backend/query-orchestrator": "1.2.16",
     "@types/babel__code-frame": "^7.0.6",
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.5",
@@ -75,9 +76,8 @@
     "jest": "^27",
     "mssql": "^10.0.2",
     "mysql": "^2.18.1",
+    "node-fetch": "2",
     "pg-promise": "^10.5.2",
-    "request": "^2.88.0",
-    "request-promise": "^4.2.4",
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
     "testcontainers": "^10.10.4",
@@ -99,6 +99,10 @@
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
     ],
-    "globalSetup": "<rootDir>/dist/test/global-setup.js"
+    "globalSetup": "<rootDir>/dist/test/global-setup.js",
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js",
+    "transformIgnorePatterns": [
+      "/node_modules/(?!node-fetch).+\\.js$"
+    ]
   }
 }

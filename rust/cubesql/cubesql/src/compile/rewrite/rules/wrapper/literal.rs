@@ -1,37 +1,46 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, literal_expr, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, LiteralExprValue,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
+        wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
 
-use crate::compile::rewrite::rules::utils::{DecomposedDayTime, DecomposedMonthDayNano};
+use crate::compile::rewrite::{
+    rewriter::{CubeEGraph, CubeRewrite},
+    rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
+    wrapper_replacer_context,
+};
 use datafusion::scalar::ScalarValue;
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn literal_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn literal_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-push-down-literal",
                 wrapper_pushdown_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 wrapper_pullup_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_literal("?alias_to_cube", "?value"),
             ),
@@ -39,17 +48,25 @@ impl WrapperRules {
                 "wrapper-push-down-interval-literal",
                 wrapper_pushdown_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 wrapper_pullup_replacer(
                     "?new_value",
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_interval_literal("?alias_to_cube", "?value", "?new_value"),
             ),
@@ -60,14 +77,14 @@ impl WrapperRules {
         &self,
         alias_to_cube_var: &str,
         value_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
                     for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
@@ -100,7 +117,7 @@ impl WrapperRules {
         alias_to_cube_var: &str,
         value_var: &str,
         new_value_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let new_value_var = var!(new_value_var);
@@ -108,7 +125,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
                     let contains_template =

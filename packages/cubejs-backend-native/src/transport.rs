@@ -3,8 +3,18 @@ use neon::prelude::*;
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use crate::auth::NativeAuthContext;
+use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator, ValueFromJs};
+use crate::node_obj_serializer::NodeObjSerializer;
+use crate::orchestrator::ResultWrapper;
+use crate::{
+    auth::TransportRequest, channel::call_js_with_channel_as_callback,
+    stream::call_js_with_stream_as_callback,
+};
 use async_trait::async_trait;
-use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
+use cubesql::compile::engine::df::scan::{
+    convert_transport_response, transform_response, MemberField, RecordBatch, SchemaRef,
+};
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
     SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
@@ -19,14 +29,6 @@ use cubesql::{
 use serde::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
-
-use crate::auth::NativeAuthContext;
-use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator};
-use crate::node_obj_serializer::NodeObjSerializer;
-use crate::{
-    auth::TransportRequest, channel::call_js_with_channel_as_callback,
-    stream::call_js_with_stream_as_callback,
-};
 
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
@@ -334,7 +336,9 @@ impl TransportService for NodeBridgeTransport {
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<TransportLoadResponse, CubeError> {
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         trace!("[transport] Request ->");
 
         let native_auth = ctx
@@ -347,10 +351,13 @@ impl TransportService for NodeBridgeTransport {
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
 
+        let mut req_seq_id: u32 = 0;
+
         loop {
+            req_seq_id += 1;
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, 1),
+                    id: format!("{}-span-{}", request_id, req_seq_id),
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -366,54 +373,115 @@ impl TransportService for NodeBridgeTransport {
                 streaming: false,
             })?;
 
-            let result = call_js_with_channel_as_callback(
+            let result = call_raw_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.on_sql_api_load.clone(),
-                Some(extra),
+                extra,
+                Box::new(|cx, v| Ok(cx.string(v).as_value(cx))),
+                Box::new(move |cx, v| {
+                    if let Ok(js_result_wrapped) = v.downcast::<JsObject, _>(cx) {
+                        let get_results_js_method: Handle<JsFunction> =
+                            js_result_wrapped.get(cx, "getResults").map_cube_err(
+                                "Can't get getResults() method from JS ResultWrapper object",
+                            )?;
+
+                        let results = get_results_js_method
+                            .call(cx, js_result_wrapped.upcast::<JsValue>(), [])
+                            .map_cube_err(
+                                "Error calling getResults() method of ResultWrapper object",
+                            )?;
+
+                        let js_res_wrapped_vec = results
+                            .downcast::<JsArray, _>(cx)
+                            .map_cube_err("Can't downcast JS result to array")?
+                            .to_vec(cx)
+                            .map_cube_err("Can't convert JS result to array")?;
+
+                        let native_wrapped_results = js_res_wrapped_vec
+                            .iter()
+                            .map(|r| ResultWrapper::from_js_result_wrapper(cx, *r))
+                            .collect::<Result<Vec<_>, _>>()
+                            .map_cube_err(
+                                "Can't construct result wrapper from JS ResultWrapper object",
+                            )?;
+
+                        Ok(ValueFromJs::ResultWrapper(native_wrapped_results))
+                    } else if let Ok(str) = v.downcast::<JsString, _>(cx) {
+                        Ok(ValueFromJs::String(str.value(cx)))
+                    } else {
+                        Err(CubeError::internal(
+                            "Can't downcast callback argument to string or resultWrapper object"
+                                .to_string(),
+                        ))
+                    }
+                }),
             )
             .await;
+
             if let Err(e) = &result {
                 if e.message.to_lowercase().contains("continue wait") {
                     continue;
                 }
             }
 
-            let response: serde_json::Value = result?;
+            match result? {
+                ValueFromJs::String(result) => {
+                    let response: serde_json::Value = match serde_json::from_str(&result) {
+                        Ok(json) => json,
+                        Err(err) => return Err(CubeError::internal(err.to_string())),
+                    };
 
-            #[cfg(debug_assertions)]
-            trace!("[transport] Request <- {:?}", response);
-            #[cfg(not(debug_assertions))]
-            trace!("[transport] Request <- <hidden>");
+                    #[cfg(debug_assertions)]
+                    trace!("[transport] Request <- {:?}", response);
+                    #[cfg(not(debug_assertions))]
+                    trace!("[transport] Request <- <hidden>");
 
-            if let Some(error_value) = response.get("error") {
-                match error_value {
-                    serde_json::Value::String(error) => {
-                        if error.to_lowercase() == *"continue wait" {
-                            debug!(
+                    if let Some(error_value) = response.get("error") {
+                        match error_value {
+                            serde_json::Value::String(error) => {
+                                if error.to_lowercase() == *"continue wait" {
+                                    debug!(
                                 "[transport] load - retrying request (continue wait) requestId: {}",
                                 request_id
                             );
 
-                            continue;
-                        } else {
-                            return Err(CubeError::user(error.clone()));
-                        }
-                    }
-                    other => {
-                        error!(
+                                    continue;
+                                } else {
+                                    return Err(CubeError::user(error.clone()));
+                                }
+                            }
+                            other => {
+                                error!(
                             "[transport] load - strange response, success which contains error: {:?}",
                             other
                         );
 
-                        return Err(CubeError::internal(
-                            "Error response with broken data inside".to_string(),
-                        ));
-                    }
-                }
-            };
+                                return Err(CubeError::internal(
+                                    "Error response with broken data inside".to_string(),
+                                ));
+                            }
+                        }
+                    };
 
-            break serde_json::from_value::<TransportLoadResponse>(response)
-                .map_err(|err| CubeError::user(err.to_string()));
+                    let response = match serde_json::from_value::<TransportLoadResponse>(response) {
+                        Ok(v) => v,
+                        Err(err) => {
+                            return Err(CubeError::user(err.to_string()));
+                        }
+                    };
+
+                    break convert_transport_response(response, schema.clone(), member_fields)
+                        .map_err(|err| CubeError::user(err.to_string()));
+                }
+                ValueFromJs::ResultWrapper(result_wrappers) => {
+                    break result_wrappers
+                        .into_iter()
+                        .map(|mut wrapper| {
+                            transform_response(&mut wrapper, schema.clone(), &member_fields)
+                        })
+                        .collect::<Result<Vec<_>, _>>();
+                }
+            }
         }
     }
 
@@ -433,7 +501,11 @@ impl TransportService for NodeBridgeTransport {
             .as_ref()
             .map(|s| s.span_id.clone())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+        let mut req_seq_id: u32 = 0;
+
         loop {
+            req_seq_id += 1;
             let native_auth = ctx
                 .as_any()
                 .downcast_ref::<NativeAuthContext>()
@@ -441,7 +513,7 @@ impl TransportService for NodeBridgeTransport {
 
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, 1),
+                    id: format!("{}-span-{}", request_id, req_seq_id),
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),

@@ -15,7 +15,9 @@ import {
   QuerySchemasResult,
   QueryTablesResult,
   UnloadOptions,
-  GenericDataBaseType
+  GenericDataBaseType,
+  TableColumn,
+  DatabaseStructure,
 } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
@@ -86,6 +88,21 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Databricks security token (PWD).
      */
     token?: string,
+
+    /**
+     * Azure tenant Id
+     */
+    azureTenantId?: string,
+
+    /**
+     * Azure service principal client Id
+     */
+    azureClientId?: string,
+
+    /**
+     * Azure service principal client secret
+     */
+    azureClientSecret?: string,
   };
 
 type ShowTableRow = {
@@ -130,7 +147,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 10;
   }
 
   /**
@@ -219,6 +236,16 @@ export class DatabricksDriver extends JDBCDriver {
         getEnv('dbExportBucketAzureKey', { dataSource }),
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      // Azure service principal
+      azureTenantId:
+        conf?.azureTenantId ||
+        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+      azureClientId:
+        conf?.azureClientId ||
+        getEnv('dbExportBucketAzureClientId', { dataSource }),
+      azureClientSecret:
+        conf?.azureClientSecret ||
+        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
     };
     if (config.readOnly === undefined) {
       // we can set readonly to true if there is no bucket config provided
@@ -392,10 +419,10 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns tables meta data object.
    */
-  public override async tablesSchema(): Promise<Record<string, Record<string, object>>> {
+  public override async tablesSchema(): Promise<DatabaseStructure> {
     const tables = await this.getTables();
 
-    const metadata: Record<string, Record<string, object>> = {};
+    const metadata: DatabaseStructure = {};
 
     await Promise.all(tables.map(async ({ database, tableName }) => {
       if (!(database in metadata)) {
@@ -499,7 +526,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns table columns types.
    */
-  public override async tableColumnTypes(table: string): Promise<{ name: any; type: string; }[]> {
+  public override async tableColumnTypes(table: string): Promise<TableColumn[]> {
     let tableFullName = '';
     const tableArray = table.split('.');
 
@@ -538,6 +565,7 @@ export class DatabricksDriver extends JDBCDriver {
       result.push({
         name: column.col_name,
         type: this.toGenericType(column.data_type),
+        attributes: [],
       });
     }
 
@@ -676,31 +704,36 @@ export class DatabricksDriver extends JDBCDriver {
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
 
-    switch (this.config.bucketType) {
-      case 'azure':
-        return this.extractFilesFromAzure(
-          { azureKey: this.config.azureKey || '' },
-          // Databricks uses different bucket address form, so we need to transform it
-          // to the one understandable by extractFilesFromAzure implementation
-          `${url.host}/${url.username}`,
-          tableName,
-        );
-      case 's3':
-        return this.extractUnloadedFilesFromS3(
-          {
-            credentials: {
-              accessKeyId: this.config.awsKey || '',
-              secretAccessKey: this.config.awsSecret || '',
-            },
-            region: this.config.awsRegion || '',
+    if (this.config.bucketType === 'azure') {
+      const {
+        azureKey,
+        azureClientId: clientId,
+        azureTenantId: tenantId,
+        azureClientSecret: clientSecret
+      } = this.config;
+      return this.extractFilesFromAzure(
+        { azureKey, clientId, tenantId, clientSecret },
+        // Databricks uses different bucket address form, so we need to transform it
+        // to the one understandable by extractFilesFromAzure implementation
+        `${url.host}/${url.username}`,
+        tableName,
+      );
+    } else if (this.config.bucketType === 's3') {
+      return this.extractUnloadedFilesFromS3(
+        {
+          credentials: {
+            accessKeyId: this.config.awsKey || '',
+            secretAccessKey: this.config.awsSecret || '',
           },
-          url.host,
-          tableName,
-        );
-      default:
-        throw new Error(`Unsupported export bucket type: ${
-          this.config.bucketType
-        }`);
+          region: this.config.awsRegion || '',
+        },
+        url.host,
+        tableName,
+      );
+    } else {
+      throw new Error(`Unsupported export bucket type: ${
+        this.config.bucketType
+      }`);
     }
   }
 

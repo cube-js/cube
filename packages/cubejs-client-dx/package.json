@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/dx",
-  "version": "0.36.0",
+  "version": "1.2.16",
   "engines": {},
   "repository": {
     "type": "git",
@@ -33,11 +33,15 @@
     "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-node": "^5.2.1",
+    "eslint-plugin-node": "^10.0.0",
     "jest": "^27"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "verbose": true,
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    }
   },
   "publishConfig": {
     "access": "public"
