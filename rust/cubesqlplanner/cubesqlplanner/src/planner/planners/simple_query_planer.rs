@@ -30,8 +30,11 @@ impl SimpleQueryPlanner {
     }
 
     pub fn plan(&self) -> Result<Rc<Select>, CubeError> {
+        let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
             &self.query_properties.all_member_symbols(false),
+            &self.join_planner,
+            &join,
             self.query_tools.clone(),
         )?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
@@ -49,11 +52,9 @@ impl SimpleQueryPlanner {
             })
         };
         let mut context_factory = self.context_factory.clone();
-        let from = self.join_planner.make_join_node_impl(
-            &None,
-            self.query_properties.simple_query_join()?,
-            &dimension_subquery_planner,
-        )?;
+        let from =
+            self.join_planner
+                .make_join_node_impl(&None, join, &dimension_subquery_planner)?;
         let mut select_builder = SelectBuilder::new(from.clone());
 
         for member in self
@@ -65,6 +66,12 @@ impl SimpleQueryPlanner {
         }
         let render_references = dimension_subquery_planner.dimensions_refs().clone();
         context_factory.set_render_references(render_references);
+        context_factory.set_rendered_as_multiplied_measures(
+            self.query_properties
+                .full_key_aggregate_measures()?
+                .rendered_as_multiplied_measures
+                .clone(),
+        );
         select_builder.set_filter(filter);
         select_builder.set_group_by(self.query_properties.group_by());
         select_builder.set_order_by(self.order_planner.default_order());

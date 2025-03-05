@@ -104,6 +104,8 @@ impl BestCubePlan {
             LogicalPlanLanguage::OrderReplacer(_) => 1,
             LogicalPlanLanguage::MemberReplacer(_) => 1,
             LogicalPlanLanguage::FilterReplacer(_) => 1,
+            LogicalPlanLanguage::FilterSimplifyPushDownReplacer(_) => 1,
+            LogicalPlanLanguage::FilterSimplifyPullUpReplacer(_) => 1,
             LogicalPlanLanguage::TimeDimensionDateRangeReplacer(_) => 1,
             LogicalPlanLanguage::InnerAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::OuterProjectionSplitReplacer(_) => 1,

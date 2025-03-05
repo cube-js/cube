@@ -1,0 +1,164 @@
+# Visual Model
+
+Visual Model editor provides the visual, no-code experience for building and enhancing
+the [data model][ref-data-modeling] of your semantic layer from within your web browser.
+
+Unlike the code-first [data model][ref-data-model] editor, Visual Model allows non-technical
+users to participate in data modeling without writing code. However, it does not support
+some advanced data modeling features listed as known [limitations](#limitations).
+
+<SuccessBox>
+
+Visual Model is available in Cube Cloud on
+[Premium and above](https://cube.dev/pricing) product tiers.
+
+</SuccessBox>
+
+<InfoBox>
+
+Visual Model extends and replaces the [Data Graph](https://cube.dev/blog/introducing-data-graph)
+feature.
+
+</InfoBox>
+
+<Screenshot src="https://ucarecdn.com/8c6c183c-6cf5-4ee1-ab67-36e37b62a12f/"/>
+
+## Prerequisites
+
+Visual Model integrates with the [development mode][ref-dev-mode],
+[environments][ref-environments], and [continuous deployment][ref-continuous-deployment]
+in Cube Cloud.
+
+Once you start editing the data model in Visual Model editor, you will automatically
+enter the development mode, so you can safely make changes and test them in
+[Playground][ref-playground] without affecting your production deployment.
+
+When you are ready to deploy your changes, it is recommended to create a pull request,
+which should be reviewed before merging to the production environment.
+
+## Working with cubes
+
+You can see [cubes][ref-cubes] on the <Btn>Cubes</Btn> tab of Visual Model.
+
+Cubes are represented as rectangles on the canvas with [joins][ref-joins] between them as
+an [entity-relationship diagram][wiki-erd] (ERD). You can pan and zoom the canvas and
+search cubes using the input box.
+
+### Adding cubes
+
+To add a cube from scratch, click the <Btn>+ Add Cube</Btn> button.
+
+You can also generate the data model for a new cube based on the database schema.
+To do so, click the <Btn>+ Generate Cube</Btn> button. It will bring up the
+modal window where you can select a table from your data source:
+
+<Screenshot src="https://ucarecdn.com/5738b483-91f2-436c-9768-ba7858a6f1c1/" />
+
+### Editing cubes
+
+To edit a cube, click it on the canvas. Then, in the sidebar, click the <Btn>Edit</Btn>
+button. This will bring up the modal window where you can edit the cube's details:
+
+<Screenshot
+  src="https://ucarecdn.com/09c12fc2-b4d3-4e96-a05c-002f7f0dcc5e/"
+  alt="Edit cube dialog"
+/>
+
+Yu can also click <Btn>+ Add → Dimension</Btn>, <Btn>+ Add → Measure</Btn>, or
+<Btn>+ Add → Access Policy</Btn> to quickly add respective members to the cube.
+
+### Working with joins
+
+You can add or edit joins via the <Btn>Relationships</Btn> tab while you're
+[editing a cube](#editing-cube).
+
+You can also add joins visually by dragging a line on the canvas from the side of one
+dimension to another:
+
+<YouTubeVideo url="https://drive.google.com/file/d/1t5RPLLv9CsKvpqeRm0Dh3pnfmpADP1hq/preview" />
+
+## Working with views
+
+You can see views on the <Btn>Views</Btn> tab of Visual Model.
+
+Views are represented as rectangles on the canvas. Cubes that are involved in a view
+and provide members for it, are shown to the left of the view.
+
+### Adding views
+
+To add a view, click the <Btn>+ Add View</Btn> button. It will bring up a dialog where you
+can choose the base cube, set the view details such as name and title, and add join paths.
+
+<Screenshot 
+  src="https://ucarecdn.com/ce5e9014-2ce6-4aa8-a811-469617708684/"
+  alt="Adding a view"
+/>
+
+### Editing views
+
+To edit a views, click it on the canvas. Then, in the sidebar, click the <Btn>Edit</Btn>
+button.
+
+## YAML mode
+
+All modal windows mentioned above provide the option to use the _YAML mode_ which can be
+entered by clicking the <Btn>Edit with YAML</Btn> button.
+
+In this mode, you can see and edit the data model represented using the [YAML syntax][ref-yaml-syntax].
+That allows you to work around known [limitations](#limitations) and use all data modeling
+features while staying in Visual Model editor.
+
+<Screenshot
+  src="https://ucarecdn.com/d8c15304-571d-4a3a-a58d-1574ab4d1712/"
+  alt="YAML mode"
+/>
+
+## Limitations
+
+Visual Model does not intend to support all available data modeling features.
+You always have options to use the [YAML mode](#yaml-mode) in Visual Model or switch the
+code-first [data model editor][ref-data-model].
+
+Currently, Visual Model does not support the following features in its UI:
+
+* Editing of [meta information][ref-meta] for cubes, views, and their members.
+* Editing [segments][ref-segments], [hierarchies][ref-hierarchies], and [refresh keys][ref-refresh-keys] in cubes.
+* Editing [folders][ref-folders] in views.
+* Adding [subquery dimensions][ref-sub-query] and time dimensions with [custom granularities][ref-granularities] in cubes.
+* Adding [drill members][ref-drill-members] and [rolling window][ref-rolling-window] measures in cubes.
+* Adding [pre-aggregations][ref-pre-aggregations].
+* Removing cubes and views.
+
+Cubes and views using these data modeling features will still be displayed in
+Visual Model. However, those features can only be edited via the [YAML mode](#yaml-mode)
+or in the code-forst data model editor.
+
+Additionally, Visual Model only allows editing of cubes and views that are
+defined using the [YAML syntax][ref-yaml-syntax] (not JavaScript). Also, it does not
+allow editing of [dynamic data models][ref-dynamic-data-models] or models which use
+[Jinja][ref-jinja].
+
+
+[ref-data-modeling]: /product/data-modeling/overview
+[ref-data-model]: /product/workspace/data-model
+[ref-meta]: /reference/data-model/cube#meta
+[ref-segments]: /reference/data-model/segments
+[ref-hierarchies]: /reference/data-model/hierarchies
+[ref-folders]: /reference/data-model/view#folders
+[ref-refresh-keys]: /reference/data-model/cube#refresh_key
+[ref-pre-aggregations]: /reference/data-model/pre-aggregations
+[ref-sub-query]: /reference/data-model/dimensions#sub_query
+[ref-granularities]: /reference/data-model/dimensions#granularities
+[ref-drill-members]: /reference/data-model/measures#drill_members
+[ref-rolling-window]: /reference/data-model/measures#rolling_window
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-jinja]: /product/data-modeling/dynamic/jinja
+[ref-continuous-deployment]: /product/deployment/cloud/continuous-deployment
+[ref-yaml-syntax]: /product/data-modeling/syntax#model-syntax
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-environments]: /product/workspace/environments
+[ref-playground]: /product/workspace/playground
+[ref-cubes]: /reference/data-model/cube
+[ref-joins]: /reference/data-model/joins
+[ref-join-types]: /reference/data-model/joins#relationship
+[wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model

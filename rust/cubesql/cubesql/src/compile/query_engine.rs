@@ -8,7 +8,7 @@ use crate::{
     compile::{
         engine::{
             df::{
-                optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
+                optimizers::{FilterPushDown, FilterSplitMeta, LimitPushDown, SortPushDown},
                 scan::CubeScanNode,
                 wrapper::CubeScanWrapperNode,
             },
@@ -142,6 +142,7 @@ pub trait QueryEngine {
             Arc::new(FilterPushDown::new()),
             Arc::new(SortPushDown::new()),
             Arc::new(LimitPushDown::new()),
+            Arc::new(FilterSplitMeta::new()),
         ];
         for optimizer in optimizers {
             // TODO: report an error when the plan can't be optimized

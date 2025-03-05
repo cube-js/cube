@@ -1,5 +1,6 @@
 use super::sql_nodes::SqlNode;
 use super::MemberSymbol;
+use crate::plan::Filter;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
@@ -8,11 +9,19 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct SqlEvaluatorVisitor {
     query_tools: Rc<QueryTools>,
+    all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
 }
 
 impl SqlEvaluatorVisitor {
-    pub fn new(query_tools: Rc<QueryTools>) -> Self {
-        Self { query_tools }
+    pub fn new(query_tools: Rc<QueryTools>, all_filters: Option<Filter>) -> Self {
+        Self {
+            query_tools,
+            all_filters,
+        }
+    }
+
+    pub fn all_filters(&self) -> Option<Filter> {
+        self.all_filters.clone()
     }
 
     pub fn apply(

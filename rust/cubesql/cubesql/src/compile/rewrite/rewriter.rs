@@ -208,7 +208,7 @@ impl Rewriter {
         .with_iter_limit(
             env::var("CUBESQL_REWRITE_MAX_ITERATIONS")
                 .map(|v| v.parse::<usize>().unwrap())
-                .unwrap_or(300),
+                .unwrap_or(500),
         )
         .with_node_limit(
             env::var("CUBESQL_REWRITE_MAX_NODES")
@@ -473,20 +473,16 @@ impl Rewriter {
         eval_stable_functions: bool,
     ) -> Vec<CubeRewrite> {
         let sql_push_down = Self::sql_push_down_enabled();
-        let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(
-                meta_context.clone(),
-                config_obj.clone(),
-                sql_push_down,
-            )),
-            Box::new(FilterRules::new(
+        let rules: &[&dyn RewriteRules] = &[
+            &MemberRules::new(meta_context.clone(), config_obj.clone(), sql_push_down),
+            &FilterRules::new(
                 meta_context.clone(),
                 config_obj.clone(),
                 eval_stable_functions,
-            )),
-            Box::new(DateRules::new(config_obj.clone())),
-            Box::new(OrderRules::new()),
-            Box::new(CommonRules::new(config_obj.clone())),
+            ),
+            &DateRules::new(config_obj.clone()),
+            &OrderRules::new(),
+            &CommonRules::new(config_obj.clone()),
         ];
         let mut rewrites = Vec::new();
         for r in rules {

@@ -10,8 +10,8 @@ use std::rc::Rc;
 
 #[nativebridge::native_bridge]
 pub trait MemberOrderBy {
-    #[field]
+    #[nbridge(field)]
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError>;
-    #[field]
+    #[nbridge(field)]
     fn dir(&self) -> Result<String, CubeError>;
 }

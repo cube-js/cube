@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.17](https://github.com/cube-js/cube/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix ORDER BY clause generation for queries with td with filters ([#9296](https://github.com/cube-js/cube/issues/9296)) ([1c8ce4f](https://github.com/cube-js/cube/commit/1c8ce4f475a0327fd4dc8fedf24ac9979aa2bffd))
+
+## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+### Features
+
+- **schema-compiler:** auto include hierarchy dimensions ([#9288](https://github.com/cube-js/cube/issues/9288)) ([162c5b4](https://github.com/cube-js/cube/commit/162c5b48f6ef489bf9f4bb95a1d4bca168b836c9))
+- **tesseract:** Pre-aggregation planning fallback ([#9230](https://github.com/cube-js/cube/issues/9230)) ([08650e2](https://github.com/cube-js/cube/commit/08650e241e2aa85705e3c68e4993098267f89c82))
+
+## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.13](https://github.com/cube-js/cube/compare/v1.2.12...v1.2.13) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
 ## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
 
 ### Bug Fixes

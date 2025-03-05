@@ -30,7 +30,7 @@ env:
 
 jobs:
   latest-tag-sha:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
@@ -55,7 +55,7 @@ jobs:
   integration-cloud:
     needs: latest-tag-sha
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     strategy:

@@ -229,36 +229,125 @@ Search can only be used on string dimensions.
 
 If desired, you may "bring your own" LLM model by providing a model and API credentials
 for a supported model provider. Do this by setting environment variables in your Cube
-deployment. See below for required variables by provider (required unless noted):
+deployment.
+
+- `CUBE_CLOUD_AI_COMPLETION_MODEL` - The AI model name to use (varies based on provider). For example `gpt-4o`.
+- `CUBE_CLOUD_AI_COMPLETION_PROVIDER` - The provider. Must be one of the following:
+  - `amazon-bedrock`
+  - `anthropic`
+  - `azure`
+  - `cohere`
+  - `deepseek`
+  - `fireworks`
+  - `google-generative-ai`
+  - `google-vertex-ai`
+  - `google-vertex-ai-anthropic`
+  - `groq`
+  - `mistral`
+  - `openai`
+  - `openai-compatible` (any provider with an OpenAI-compatible API; support may vary)
+  - `together-ai`
+  - `x-ai`
+
+See below for required variables by provider (required unless noted):
 
 #### AWS Bedrock
 
 <WarningBox>
-  The AI API currently supports only Anthropic Claude models on AWS Bedrock. Other
-  models may work but are not fully supported.
+  The AI API currently supports only Anthropic Claude models on AWS Bedrock.
+  Other models may work but are not fully supported.
 </WarningBox>
 
-- `CUBE_BEDROCK_MODEL_ID` - A supported [AWS Bedrock chat model](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html), for example `anthropic.claude-3-5-sonnet-20241022-v2:0`
-- `CUBE_BEDROCK_ACCESS_KEY` - An access key for an IAM user with `InvokeModelWithResponseStream` permissions on the desired region/model.
-- `CUBE_BEDROCK_ACCESS_SECRET` - The corresponding access secret
-- `CUBE_BEDROCK_REGION_ID` - A supported AWS Bedrock region, for example `us-west-2`
+- `CUBE_CLOUD_AI_AWS_ACCESS_KEY_ID` - An access key for an IAM user with `InvokeModelWithResponseStream` permissions on the desired region/model.
+- `CUBE_CLOUD_AI_AWS_SECRET_ACCESS_KEY` - The corresponding access secret
+- `CUBE_CLOUD_AI_AWS_REGION` - A supported AWS Bedrock region, for example `us-west-2`
+- `CUBE_CLOUD_AI_AWS_SESSION_TOKEN` - The session token (optional)
 
-#### GCP Vertex
+#### Anthropic
+
+- `CUBE_CLOUD_AI_ANTHROPIC_API_KEY`
+- `CUBE_CLOUD_AI_ANTHROPIC_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### Microsoft Azure OpenAI
+
+- `CUBE_CLOUD_AI_AZURE_RESOURCE_NAME`
+- `CUBE_CLOUD_AI_AZURE_API_KEY`
+- `CUBE_CLOUD_AI_AZURE_API_VERSION` (optional)
+- `CUBE_CLOUD_AI_AZURE_BASE_URL` (optional)
+
+#### Cohere
+
+- `CUBE_CLOUD_AI_COHERE_API_KEY`
+- `CUBE_CLOUD_AI_COHERE_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### DeepSeek
+
+- `CUBE_CLOUD_AI_DEEPSEEK_API_KEY`
+- `CUBE_CLOUD_AI_DEEPSEEK_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### Fireworks
+
+- `CUBE_CLOUD_AI_FIREWORKS_API_KEY`
+- `CUBE_CLOUD_AI_FIREWORKS_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### Google Generative AI
+
+- `CUBE_CLOUD_AI_GOOGLE_GENERATIVE_AI_API_KEY`
+- `CUBE_CLOUD_AI_GOOGLE_GENERATIVE_AI_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### GCP Vertex AI
 
 <WarningBox>
-  The AI API currently supports only Anthropic Claude models on GCP Vertex. Other
-  models may work but are not fully supported.
+  See <Btn>Google Vertex AI (Anthropic)</Btn> below if using Anthropic models
 </WarningBox>
 
-- `CUBE_VERTEX_MODEL_ID` - A supported GCP Vertex chat model, for example `claude-3-5-sonnet@20240620`
-- `CUBE_VERTEX_PROJECT_ID` - The GCP project the model is deployed in
-- `CUBE_VERTEX_REGION` - The GCP region the model is deployed in, for example `us-east5`
-- `CUBE_VERTEX_CREDENTIALS` - The private key for a service account with permissions to run the chosen model
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_PROJECT`
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_LOCATION`
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_CREDENTIALS`
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_PUBLISHER` - defaults to `google`; change if using another publisher (optional)
+
+#### GCP Vertex AI (Anthropic)
+
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_ANTHROPIC_PROJECT`
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_ANTHROPIC_LOCATION`
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_ANTHROPIC_CREDENTIALS`
+- `CUBE_CLOUD_AI_GOOGLE_VERTEX_ANTHROPIC_PUBLISHER` - defaults to `anthropic`; change if using another publisher (optional)
+
+#### Groq
+
+- `CUBE_CLOUD_AI_GROQ_API_KEY`
+- `CUBE_CLOUD_AI_GROQ_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### Mistral
+
+- `CUBE_CLOUD_AI_MISTRAL_API_KEY`
+- `CUBE_CLOUD_AI_MISTRAL_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
 
 #### OpenAI
 
-- `OPENAI_MODEL` - An OpenAI chat model ID, for example `gpt-4o`
-- `OPENAI_API_KEY` - An OpenAI API key (we recommend creating a service account for the AI API)
+- `CUBE_CLOUD_AI_OPENAI_API_KEY`
+- `CUBE_CLOUD_AI_OPENAI_ORGANIZATION` - (optional)
+- `CUBE_CLOUD_AI_OPENAI_PROJECT` - (optional)
+- `CUBE_CLOUD_AI_OPENAI_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
 
+#### OpenAI Compatible Providers
+
+<InfoBox>
+  Use this provider if your provider is not listed on this page but provides an
+  OpenAI compatible endpoint. Not all providers/models are supported.
+</InfoBox>
+
+- `CUBE_CLOUD_AI_OPENAI_COMPATIBLE_API_KEY`
+- `CUBE_CLOUD_AI_OPENAI_COMPATIBLE_BASE_URL`
+
+#### Together AI
+
+- `CUBE_CLOUD_AI_TOGETHER_API_KEY`
+- `CUBE_CLOUD_AI_TOGETHER_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### xAI (Grok)
+
+- `CUBE_CLOUD_AI_X_AI_API_KEY`
+- `CUBE_CLOUD_AI_X_AI_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
 
 [ref-ref-ai-api]: /product/apis-integrations/ai-api/reference

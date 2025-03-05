@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.17](/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.2.13](https://github.com/cube-js/cube/compare/v1.2.12...v1.2.13) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
 ## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

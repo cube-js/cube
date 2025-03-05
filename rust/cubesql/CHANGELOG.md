@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.17](/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+### Bug Fixes
+
+- **cubesql:** Use pushdown-pullup scheme for FilterSimplifyReplacer (#9278) ab5a64e, closes #9278
+
+## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
+
+### Bug Fixes
+
+- **cubejs-native:** sql over http drop sessions, correct error ([#9297](https://github.com/cube-js/cube/issues/9297)) ([6fad670](https://github.com/cube-js/cube/commit/6fad670c722fd91e29d950a36659ac4630cef64a))
+
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.13](https://github.com/cube-js/cube/compare/v1.2.12...v1.2.13) (2025-02-26)
+
+### Bug Fixes
+
+- **cubesql:** Split `__user` WHERE predicate into separate filter node ([#8812](https://github.com/cube-js/cube/issues/8812)) ([83baf7b](https://github.com/cube-js/cube/commit/83baf7bf5f83108fd6c3dd134a8739968e781f92))
+
+## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
+
+### Bug Fixes
+
+- **cubesql:** Generate typed null literals ([#9238](https://github.com/cube-js/cube/issues/9238)) ([1dfa10d](https://github.com/cube-js/cube/commit/1dfa10d7128841f24c5d94cd1c5bdd2c742ff9de))
+- **cubesql:** Match CubeScan timestamp literal types to member types ([#9275](https://github.com/cube-js/cube/issues/9275)) ([4a4e82b](https://github.com/cube-js/cube/commit/4a4e82ba602fc024a262a22ac65e3fcb7a4bba5c))
+
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+### Bug Fixes
+
+- **cubesql:** Break cost symmetry for (non)-push-to-Cube WrappedSelect ([#9155](https://github.com/cube-js/cube/issues/9155)) ([2c0e443](https://github.com/cube-js/cube/commit/2c0e443dc18379490e35a3d83b3888f66e12ade0))
+- **cubesql:** Generate proper projection wrapper for duplicated members in CubeScanNode ([#9233](https://github.com/cube-js/cube/issues/9233)) ([aba6430](https://github.com/cube-js/cube/commit/aba643082acc440cf5b3fe9828c2c38ac1a833c9))
+
 ## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
 
 ### Bug Fixes
