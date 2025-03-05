@@ -651,7 +651,11 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
 
     cube('orders', {
-        sql: 'select 1 as order_id, 100 as total, 1 as user_id',
+        sql: \`
+          SELECT 1 AS order_id, 100 AS total, 1 AS user_id UNION ALL
+          SELECT 2 AS order_id, 200 AS total, 1 AS user_id UNION ALL
+          SELECT 3 AS order_id, 500 AS total, 2 AS user_id
+        \`,
         joins: {
             users: {
                 relationship: 'hasMany',
@@ -677,7 +681,10 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         }
     });
     cube('users', {
-        sql: 'select 1 as user_id, false as internal',
+        sql: \`
+          SELECT 1 AS user_id, false AS internal UNION ALL
+          SELECT 2 AS user_id, true AS internal
+        \`,
         dimensions: {
             user_id: {
                 type: 'number',
@@ -3376,7 +3383,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     ]
   ));
 
-  it('multiplied measures missing column', async () => runQueryTest(
+  it('multiplied measures missing column grouped', async () => runQueryTest(
     {
       measures: [
         {
@@ -3391,6 +3398,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
           // eslint-disable-next-line no-template-curly-in-string
           definition: '${revenue_view.sum_total}',
           cubeName: 'revenue_view',
+          // cubeName: 'orders',
         },
         {
           // eslint-disable-next-line no-new-func
@@ -3404,6 +3412,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
           // eslint-disable-next-line no-template-curly-in-string
           definition: 'COUNT(DISTINCT ${revenue_view.user_id})',
           cubeName: 'revenue_view',
+          // cubeName: 'orders',
         },
       ],
       dimensions: [
@@ -3419,10 +3428,91 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
           // eslint-disable-next-line no-template-curly-in-string
           definition: '${revenue_view.internal}',
           cubeName: 'revenue_view',
+          // cubeName: 'users',
         },
       ],
+      order: [{
+        'revenue_view.internal': 'asc'
+      }]
     },
-    []
+    [
+      {
+        distinct_users: '1',
+        internal_user: false,
+        revenue_total: '300',
+      },
+      {
+        distinct_users: '1',
+        internal_user: true,
+        revenue_total: '500',
+      },
+    ]
+  ));
+
+  it('multiplied measures missing column ungrouped', async () => runQueryTest(
+    {
+      measures: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.sum_total}`'
+          ),
+          name: 'revenue_total',
+          expressionName: 'revenue_total',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.sum_total}',
+          cubeName: 'revenue_view',
+          // cubeName: 'orders',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.user_id}`'
+          ),
+          name: 'distinct_users',
+          expressionName: 'distinct_users',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.user_id}',
+          cubeName: 'revenue_view',
+          // cubeName: 'orders',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.internal}`'
+          ),
+          name: 'internal_user',
+          expressionName: 'internal_user',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.internal}',
+          cubeName: 'revenue_view',
+          // cubeName: 'users',
+        },
+      ],
+      order: [{
+        'revenue_view.order_id': 'asc'
+      }],
+      ungrouped: true,
+      allowUngroupedWithoutPrimaryKey: true,
+    },
+    [
+      // {
+      //   distinct_users: '1',
+      //   internal_user: true,
+      //   revenue_total: '500',
+      // },
+      // {
+      //   distinct_users: '1',
+      //   internal_user: false,
+      //   revenue_total: '300',
+      // },
+    ]
   ));
 
   // TODO not implemented
