@@ -1,14 +1,10 @@
----
-redirect_from:
-  - /cloud/cube-ide
-  - /cloud/dev-tools/cube-ide
-  - /cloud/workspace/cube-ide
----
-
 # Data Model
 
-With the web-based data model editor, you can write and test and your Cube [data
-model][ref-data-modeling] from your browser.
+Data model editor provides the code-first experience for building and enhancing the
+[data model][ref-data-modeling] of your semantic layer from within your web browser.
+
+Unlike the [Visual Model][ref-visual-model] editor, it provides the freedom to use all
+available data modeling features at the expense of a code-centric experience.
 
 <SuccessBox>
 
@@ -60,44 +56,6 @@ there are any unsaved changes:
   src="https://ucarecdn.com/67b8e943-0043-4398-84fc-91d83765ed10/"
   alt="Unsaved changes warning modal"
 />
-
-## Data Graph
-
-<InfoBox>
-  For Cube Cloud customers on the [Enterprise](https://cube.dev/pricing) tier, 
-  the Data Graph is replaced by [Visual Modeler][ref-visual-modeler].
-  Please see the [Visual Modeler page][ref-visual-modeler] for more details.
-</InfoBox> 
-
-In addition to exploring the code of data model files, you can view the visual
-representation of the data model, including relations between cubes.
-Click <Btn>Show Graph</Btn> in the top right part of the data model editor to
-open Data Graph:
-
-<Screenshot src="https://ucarecdn.com/30b7fa8c-fb9f-43fb-af1d-4ef98aae2829/" />
-
-Data Graph visualizes [cubes][ref-cubes] and [joins][ref-joins] between them as
-an [entity-relationship diagram][wiki-erd] (ERD). It allows to have a bird's-eye
-view of the data model and visually detect connected parts, i.e., groups of
-cubes that don't have any relationships with other groups.
-
-For clarity, only dimensions and custom SQL expressions used in joins are shown.
-Join [relationship types][ref-join-types] are depicted with the crow's foot
-notation:
-
-- Dash represents `one` in `one_to_one` and `one_to_many` types
-- Crow's foot represents `many` in `one_to_many` and `many_to_one` types
-
-You can pan and zoom the visualization, search cubes using the input box, hover
-over cubes to highlight their relationships, and click <Btn>Show Code</Btn> to
-view their code.
-
-<video width="100%" controls>
-  <source
-    src="https://ucarecdn.com/2cc26fee-f94e-4328-bc46-297bfdd6e726/video.mp4"
-    type="video/mp4"
-  />
-</video>
 
 ## Git integration
 
@@ -162,10 +120,6 @@ If you'd like to use the UI to create a pre-aggregation, you can click on the
 />
 
 [ref-data-modeling]: /product/data-modeling/overview
-[ref-cubes]: /reference/data-model/cube
-[ref-joins]: /reference/data-model/joins
-[ref-join-types]: /reference/data-model/joins#relationship
-[wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model
 [ref-rollup-designer]: /product/workspace/rollup-designer
 [ref-creating-deployment]: /product/deployment/cloud/deployments#creating-a-new-deployment
-[ref-visual-modeler]: /product/workspace/visual-modeler
+[ref-visual-model]: /product/workspace/visual-model

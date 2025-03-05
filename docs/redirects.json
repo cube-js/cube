@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/workspace/visual-modeler",
+    "destination": "/product/workspace/visual-model",
+    "permanent": true
+  },
+  {
     "source": "/product/apis-integrations/semantic-layer-sync/power-bi",
     "destination": "/product/configuration/visualization-tools/powerbi",
     "permanent": true
