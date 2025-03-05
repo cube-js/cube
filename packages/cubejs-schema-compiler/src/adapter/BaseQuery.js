@@ -1059,7 +1059,7 @@ export class BaseQuery {
           const member = m.measure ? m.measure : m.dimension;
           const memberPath = typeof member === 'string'
             ? member
-            : this.cubeEvaluator.pathFromArray([m.expressionCubeName, m.expressionName]);
+            : this.cubeEvaluator.pathFromArray([m.measure?.originalCubeName ?? m.expressionCubeName, m.expressionName]);
           return [memberPath, m.aliasName()];
         }),
         R.fromPairs,
@@ -1702,6 +1702,8 @@ export class BaseQuery {
       .filter(f => R.none(m => m.measure === f.measure, this.measures));
 
     return R.fromPairs(this.measures.concat(notAddedMeasureFilters).map(m => {
+      const measureName = typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`;
+
       const collectedMeasures = this.collectFrom(
         [m],
         this.collectMultipliedMeasures(context),
@@ -1715,7 +1717,57 @@ export class BaseQuery {
         const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
         throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
       }
-      return [typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`, collectedMeasures];
+      if (collectedMeasures.length === 0 && m.isMemberExpression) {
+        // `m` is member expression measure, but does not reference any other measure
+        // Consider this dimensions-only measure. This can happen at least in 2 cases:
+        // 1. Ad-hoc aggregation over dimension: SELECT MAX(dim) FROM cube
+        // 2. Ungrouped query with SQL pushdown will render every column as measure: SELECT dim1 FROM cube WHERE LOWER(dim2) = 'foo';
+        // Measures like this needs a special treatment to attach them to cube and decide if they are multiplied or not
+        // This would return measure object in `measure`, not path
+        // TODO return measure object for every measure
+
+        const memberNamesForMeasure = this.collectFrom(
+          [m],
+          this.collectMemberNamesFor.bind(this),
+          context ? ['collectMemberNamesFor', JSON.stringify(context)] : 'collectMemberNamesFor',
+          this.queryCache
+        );
+        const cubeNamesForMeasure = R.pipe(
+          R.map(mem => this.cubeEvaluator.parsePathAnyType(mem)[0]),
+          // Filtering views, because collectMemberNamesFor can return both view.dim and cube.dim
+          R.filter(cubeName => {
+            const cubeDef = this.cubeEvaluator.getCubeDefinition(cubeName);
+            return !cubeDef.isView;
+          }),
+          // Single member expression can reference multiple dimensions from same cube
+          R.uniq,
+        )(
+          memberNamesForMeasure
+        );
+
+        let cubeNameToAttach;
+        switch (cubeNamesForMeasure.length) {
+          case 1:
+            [cubeNameToAttach] = cubeNamesForMeasure;
+            break;
+          default:
+            throw new Error(`Expected single cube for dimension-only measure ${measureName}, got ${cubeNamesForMeasure}`);
+        }
+
+        const multiplied = this.multipliedJoinRowResult(cubeNameToAttach) || false;
+
+        const attachedMeasure = {
+          ...m.measure,
+          originalCubeName: m.measure.cubeName,
+          cubeName: cubeNameToAttach
+        };
+
+        return [measureName, [{
+          multiplied,
+          measure: attachedMeasure,
+        }]];
+      }
+      return [measureName, collectedMeasures];
     }));
   }
 
@@ -1982,9 +2034,31 @@ export class BaseQuery {
   }
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
+    // When member expression references view, it would have to collect join hints from view
+    // Consider join A->B, as many-to-one, so B is multiplied and A is not, and member expression like SUM(AB_view.dimB)
+    // Both `collectCubeNamesFor` and `collectJoinHintsFor` would return too many cubes here
+    // They both walk join hints, and gather every cube present there
+    // For view we would get both A and B, because join hints would go from join tree root
+    // Even though expression references only B, and should be OK to use it with B as keyCube
+    // So this check would build new join tree from both A and B, B will be multiplied, and that would break check
+
     return measures.map(measure => {
-      const cubes = this.collectFrom([measure], this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
-      const joinHints = this.collectFrom([measure], this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      const memberNamesForMeasure = this.collectFrom(
+        [measure],
+        this.collectMemberNamesFor.bind(this),
+        'collectMemberNamesFor',
+      );
+
+      const nonViewMembers = memberNamesForMeasure
+        .filter(mem => {
+          const cubeName = this.cubeEvaluator.parsePathAnyType(mem)[0];
+          const cubeDef = this.cubeEvaluator.getCubeDefinition(cubeName);
+          return !cubeDef.isView;
+        })
+        .map(m => this.memberInstanceByPath(m));
+
+      const cubes = this.collectFrom(nonViewMembers, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
+      const joinHints = this.collectFrom(nonViewMembers, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
       if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
         const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
