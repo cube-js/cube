@@ -20,7 +20,7 @@ env:
   CUBEJS_TESSERACT_ORCHESTRATOR: true
 jobs:
   latest-tag-sha:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
@@ -43,7 +43,8 @@ jobs:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
   build_native_linux:
-    runs-on: ubuntu-20.04
+    # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     name: Build Linux Native backend for Dev image
     container:
@@ -93,7 +94,7 @@ jobs:
   docker-image-dev:
     name: Release :dev image
     needs: [latest-tag-sha, build_native_linux]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     steps:
       - name: Check out the repo
@@ -133,7 +134,7 @@ jobs:
 
   trigger-test-suites:
     name: Trigger test suites run
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [docker-image-dev]
     timeout-minutes: 60
     steps:

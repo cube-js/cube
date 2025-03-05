@@ -67,7 +67,8 @@ jobs:
         run: ./node_modules/.bin/lerna publish from-package --yes
 
   native_linux:
-    runs-on: ubuntu-20.04
+    # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
@@ -590,18 +591,18 @@ jobs:
           - aarch64-unknown-linux-gnu
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             executable_name: cubestored
             strip: true
             compress: false
           - target: x86_64-unknown-linux-musl
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             executable_name: cubestored
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             executable_name: cubestored
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
@@ -764,7 +765,7 @@ jobs:
 
   trigger-test-suites:
     name: Trigger test suites run
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [docker-default]
     timeout-minutes: 15
     steps:
@@ -809,7 +810,7 @@ jobs:
 
   trigger-repo-sync:
     name: Trigger runtime repo
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [docker-default, detect_branch]
     timeout-minutes: 15
     steps:

@@ -277,18 +277,19 @@ jobs:
           - x86_64-unknown-linux-musl
           - aarch64-unknown-linux-gnu
         include:
-          - os: ubuntu-20.04
+          # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             executable_name: cubestored
             strip: true
             compress: false
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
             executable_name: cubestored
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'

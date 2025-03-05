@@ -111,7 +111,8 @@ jobs:
 
   native_linux:
     needs: [lint]
-    runs-on: ubuntu-20.04
+    # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} with Python ${{ matrix.python-version }}
     strategy:
