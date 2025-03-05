@@ -978,7 +978,7 @@ The root cause is that joins are [directed](#direction-of-joins) and there's no
 join path that goes *by join definitions in the data model* from `users` to
 `companies` or in the opposite direction.
 
-In [Data Graph][ref-data-graph], you can see that both `users` and `companies`
+In [Visual Model][ref-visual-model], you can see that both `users` and `companies`
 are to the right of `companies_to_users`, meaning that there's no way to go
 from `users` to `companies` moving left to right or right to left:
 
@@ -1047,7 +1047,7 @@ cubes:
 </CodeTabs>
 
 Now there's a join path that goes *by join definitions in the data model* from
-`users` to `companies_to_users` to `companies`. [Data Graph][ref-data-graph]
+`users` to `companies_to_users` to `companies`. [Visual Model][ref-visual-model]
 also shows that you can reach `companies` from `cubes` by going left to right.
 
 <Diagram src="https://ucarecdn.com/0736a570-c1c2-45b5-a806-e90a216ce202/" />
@@ -1057,4 +1057,4 @@ also shows that you can reach `companies` from `cubes` by going left to right.
 [ref-schema-ref-joins-relationship]: /reference/data-model/joins#relationship
 [self-many-to-many-no-assoc-table]: #many-to-many-relationship-without-an-associative-table
 [self-join-direction]: /product/data-modeling/concepts/working-with-joins#directions-of-joins
-[ref-data-graph]: /product/workspace/data-model#data-graph
+[ref-visual-model]: /product/workspace/visual-model

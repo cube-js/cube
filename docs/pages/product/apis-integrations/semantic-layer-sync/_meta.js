@@ -1,6 +1,6 @@
 module.exports = {
   "superset": "Apache Superset",
-  "metabase": "Metabase",≈
+  "metabase": "Metabase",
   "preset": "Preset",
   "tableau": "Tableau"
 }
