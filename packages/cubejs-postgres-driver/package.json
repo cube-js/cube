@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/postgres-driver",
   "description": "Cube.js Postgres database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.2.15",
+  "version": "1.2.16",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
