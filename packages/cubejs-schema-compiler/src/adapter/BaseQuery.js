@@ -1054,9 +1054,16 @@ export class BaseQuery {
   outerMeasuresJoinFullKeyQueryAggregate(innerMembers, outerMembers, toJoin) {
     const renderedReferenceContext = {
       renderedReference: R.pipe(
-        R.map(m => [m.measure || m.dimension, m.aliasName()]),
+        R.map(m => {
+          let memberPath;
+          if (m.measure) {
+            memberPath = typeof m.measure === 'string' ? m.measure : this.cubeEvaluator.pathFromArray([m.expressionCubeName, m.expressionName]);
+          } else {
+            memberPath = typeof m.dimension === 'string' ? m.dimension : this.cubeEvaluator.pathFromArray([m.expressionCubeName, m.expressionName]);
+          }
+          return [memberPath, m.aliasName()];
+        }),
         R.fromPairs,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       )(innerMembers),
     };
 
