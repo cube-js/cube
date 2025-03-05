@@ -63,6 +63,7 @@ impl CubeConfigPy {
             "schema_version",
             "pre_aggregations_schema",
             "orchestrator_options",
+            "fast_reload",
         ]
     }
 

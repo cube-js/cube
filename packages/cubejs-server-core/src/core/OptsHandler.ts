@@ -482,7 +482,8 @@ export class OptsHandler {
         jwkUrl: getEnv('jwkUrl'),
         claimsNamespace: getEnv('jwtClaimsNamespace'),
         ...opts.jwt,
-      }
+      },
+      fastReload: getEnv('fastReload'),
     };
 
     if (opts.contextToAppId && !opts.scheduledRefreshContexts) {

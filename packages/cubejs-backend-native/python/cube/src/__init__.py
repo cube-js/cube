@@ -77,6 +77,7 @@ class Configuration:
     semantic_layer_sync: Union[Dict, Callable[[], Dict]]
     pre_aggregations_schema: Union[Callable[[RequestContext], str]]
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
+    fast_reload: bool
 
     def __init__(self):
         self.web_sockets = None
@@ -125,6 +126,7 @@ class Configuration:
         self.semantic_layer_sync = None
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
+        self.fast_reload = None
 
     def __call__(self, func):
         if isinstance(func, str):

@@ -516,6 +516,7 @@ export class CubejsServerCore {
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
+          fastReload: this.options.fastReload,
         },
       );
 
@@ -689,7 +690,7 @@ export class CubejsServerCore {
         sqlCache: this.options.sqlCache,
         standalone: this.standalone,
         allowNodeRequire: options.allowNodeRequire,
-        fastReloadEnabled: options.fastReloadEnabled || getEnv('fastReloadEnabled'),
+        fastReload: options.fastReload || getEnv('fastReload'),
       },
     );
   }
