@@ -50,7 +50,7 @@ use datafusion::{
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
         replace_col_to_expr, Column, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct,
         EmptyRelation, Expr, ExprRewritable, ExprRewriter, GroupingSet, Like, Limit, LogicalPlan,
-        LogicalPlanBuilder, TableScan, Union,
+        LogicalPlanBuilder, Repartition, Subquery, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
@@ -1350,10 +1350,18 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Join(params) => {
                 let left_on = match_data_node!(node_by_id, params[2], JoinLeftOn);
                 let right_on = match_data_node!(node_by_id, params[3], JoinRightOn);
-                let left = self.to_logical_plan(params[0]);
-                let right = self.to_logical_plan(params[1]);
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
 
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                // It's OK to join two grouped queries: expected row count is not that high, so
+                // SQL API can, potentially, evaluate it completely
+                // We don't really want it, so cost function should make WrappedSelect preferable
+                // but still, we don't want to hard error on that
+                // But if any one of join sides is ungroued, SQL API does not have much of a choice
+                // but to process every row from ungrouped query, and that's Not Good
+                if Self::have_ungrouped_cube_scan_inside(&left)
+                    || Self::have_ungrouped_cube_scan_inside(&right)
+                {
                     if left_on.iter().any(|c| c.name == "__cubeJoinField")
                         || right_on.iter().any(|c| c.name == "__cubeJoinField")
                     {
@@ -1370,8 +1378,8 @@ impl LanguageToLogicalPlanConverter {
                     }
                 }
 
-                let left = Arc::new(left?);
-                let right = Arc::new(right?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
 
                 let join_type = match_data_node!(node_by_id, params[4], JoinJoinType);
                 let join_constraint = match_data_node!(node_by_id, params[5], JoinJoinConstraint);
@@ -1394,7 +1402,18 @@ impl LanguageToLogicalPlanConverter {
                 })
             }
             LogicalPlanLanguage::CrossJoin(params) => {
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
+
+                // See comment in Join conversion
+                // Note that DF can generate Filter(CrossJoin(...)) for complex join conditions
+                // But, from memory or dataset perspective it's the same: DF would buffer left side completely
+                // And then iterate over right side, evaluting predicate
+                // Regular join would use hash partitioning here, so it would be quicker, and utilize less CPU,
+                // but transfer and buffering will be the same
+                if Self::have_ungrouped_cube_scan_inside(&left)
+                    || Self::have_ungrouped_cube_scan_inside(&right)
+                {
                     return Err(CubeError::internal(
                         "Can not join Cubes. This is most likely due to one of the following reasons:\n\
                         • one of the cubes contains a group by\n\
@@ -1403,8 +1422,8 @@ impl LanguageToLogicalPlanConverter {
                     ));
                 }
 
-                let left = Arc::new(self.to_logical_plan(params[0])?);
-                let right = Arc::new(self.to_logical_plan(params[1])?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
                 let schema = Arc::new(left.schema().join(right.schema())?);
 
                 LogicalPlan::CrossJoin(CrossJoin {
@@ -2304,16 +2323,44 @@ impl LanguageToLogicalPlanConverter {
         })
     }
 
-    fn is_cube_scan_node(&self, node_id: Id) -> bool {
-        let node_by_id = &self.best_expr;
-        match node_by_id.index(node_id) {
-            LogicalPlanLanguage::CubeScan(_) | LogicalPlanLanguage::CubeScanWrapper(_) => {
-                return true
+    fn have_ungrouped_cube_scan_inside(node: &LogicalPlan) -> bool {
+        match node {
+            LogicalPlan::Projection(Projection { input, .. })
+            | LogicalPlan::Filter(Filter { input, .. })
+            | LogicalPlan::Window(Window { input, .. })
+            | LogicalPlan::Aggregate(Aggregate { input, .. })
+            | LogicalPlan::Sort(Sort { input, .. })
+            | LogicalPlan::Repartition(Repartition { input, .. })
+            | LogicalPlan::Limit(Limit { input, .. }) => {
+                Self::have_ungrouped_cube_scan_inside(input)
             }
-            _ => (),
+            LogicalPlan::Join(Join { left, right, .. })
+            | LogicalPlan::CrossJoin(CrossJoin { left, right, .. }) => {
+                Self::have_ungrouped_cube_scan_inside(left)
+                    || Self::have_ungrouped_cube_scan_inside(right)
+            }
+            LogicalPlan::Union(Union { inputs, .. }) => {
+                inputs.iter().any(Self::have_ungrouped_cube_scan_inside)
+            }
+            LogicalPlan::Subquery(Subquery {
+                input, subqueries, ..
+            }) => {
+                Self::have_ungrouped_cube_scan_inside(input)
+                    || subqueries.iter().any(Self::have_ungrouped_cube_scan_inside)
+            }
+            LogicalPlan::Extension(Extension { node }) => {
+                if let Some(cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
+                    cube_scan.request.ungrouped == Some(true)
+                } else if let Some(cube_scan_wrapper) =
+                    node.as_any().downcast_ref::<CubeScanWrapperNode>()
+                {
+                    cube_scan_wrapper.has_ungrouped_scan()
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
-
-        return false;
     }
 }
 
