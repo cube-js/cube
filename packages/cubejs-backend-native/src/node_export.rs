@@ -379,7 +379,9 @@ async fn handle_sql_query(
         }
     }
 
-    session_manager.drop_session(session_clone.state.connection_id).await;
+    session_manager
+        .drop_session(session_clone.state.connection_id)
+        .await;
 
     result
 }
