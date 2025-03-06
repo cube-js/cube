@@ -710,6 +710,115 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         ]
     });
 
+
+    cube('A', {
+        sql: \`
+          SELECT 1 AS a_id, 'foo' AS dim_a, 100 AS val_a UNION ALL
+          SELECT 2 AS a_id, 'foo' AS dim_a, 200 AS val_a UNION ALL
+          SELECT 3 AS a_id, 'bar' AS dim_a, 500 AS val_a
+        \`,
+        joins: {
+            B: {
+                relationship: 'hasMany',
+                sql: \`\${CUBE.a_id} = \${B.a_id}\`
+            },
+            C: {
+                relationship: 'hasMany',
+                sql: \`\${CUBE.a_id} = \${C.a_id}\`
+            },
+        },
+        measures: {
+            sum_a: {
+                type: 'sum',
+                sql: 'val_a'
+            }
+        },
+        dimensions: {
+            a_id: {
+                type: 'number',
+                sql: 'a_id',
+                primaryKey: true
+            },
+            dim_a: {
+                type: 'string',
+                sql: 'dim_a',
+            }
+        }
+    });
+    cube('B', {
+        sql: \`
+          SELECT 1 AS b_id, 1 AS a_id, 'foo' AS dim_b, 100 AS val_b UNION ALL
+          SELECT 2 AS b_id, 2 AS a_id, 'foo' AS dim_b, 200 AS val_b UNION ALL
+          SELECT 3 AS b_id, 2 AS a_id, 'bar' AS dim_b, 500 AS val_b
+        \`,
+        measures: {
+            sum_b: {
+                type: 'sum',
+                sql: 'val_b'
+            }
+        },
+        dimensions: {
+            b_id: {
+                type: 'number',
+                sql: 'b_id',
+                primaryKey: true
+            },
+            a_id: {
+                type: 'number',
+                sql: 'a_id',
+            },
+            dim_b: {
+                type: 'string',
+                sql: 'dim_b',
+            }
+        }
+    });
+    cube('C', {
+        sql: \`
+          SELECT 1 AS c_id, 2 AS a_id, 'foo' AS dim_c, 100 AS val_c UNION ALL
+          SELECT 2 AS c_id, 3 AS a_id, 'foo' AS dim_c, 200 AS val_c UNION ALL
+          SELECT 3 AS c_id, 3 AS a_id, 'bar' AS dim_c, 500 AS val_c UNION ALL
+          SELECT 4 AS c_id, 2 AS a_id, 'qux' AS dim_c, 7 AS val_c
+        \`,
+        measures: {
+            sum_c: {
+                type: 'sum',
+                sql: 'val_c'
+            }
+        },
+        dimensions: {
+            c_id: {
+                type: 'number',
+                sql: 'c_id',
+                primaryKey: true
+            },
+            a_id: {
+                type: 'number',
+                sql: 'a_id',
+            },
+            dim_c: {
+                type: 'string',
+                sql: 'dim_c',
+            }
+        }
+    });
+    view('ABC_view', {
+        cubes: [
+            {
+                join_path: 'A',
+                includes: ['a_id', 'dim_a', 'sum_a']
+            },
+            {
+                join_path: 'A.B',
+                includes: ['b_id', 'dim_b', 'sum_b']
+            },
+            {
+                join_path: 'A.C',
+                includes: ['c_id', 'dim_c', 'sum_c']
+            },
+        ]
+    });
+
     `);
 
   it('simple join', async () => {
@@ -3500,6 +3609,33 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       }],
       ungrouped: true,
       allowUngroupedWithoutPrimaryKey: true,
+    },
+    [
+      // {
+      //   distinct_users: '1',
+      //   internal_user: true,
+      //   revenue_total: '500',
+      // },
+      // {
+      //   distinct_users: '1',
+      //   internal_user: false,
+      //   revenue_total: '300',
+      // },
+    ]
+  ));
+
+  it('abc', async () => runQueryTest(
+    {
+      measures: [
+        // 'ABC_view.sum_a',
+        // 'ABC_view.sum_b',
+        // 'ABC_view.sum_c',
+      ],
+      dimensions: [
+        'ABC_view.a_id',
+        'ABC_view.b_id',
+        'ABC_view.c_id',
+      ],
     },
     [
       // {
