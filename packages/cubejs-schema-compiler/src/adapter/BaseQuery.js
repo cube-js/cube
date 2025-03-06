@@ -1156,10 +1156,11 @@ export class BaseQuery {
       R.map(m => this.newMeasure(m))
     );
 
+    // TODO dimensionOnlyMeasures should belong to proper subquery depending on join tree, not to regular measures
     const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy)
-      .concat(dimensionOnlyMeasures);
-    const regularMeasures = measuresToRender(false, false)(measureToHierarchy)
       // .concat(dimensionOnlyMeasures);
+    const regularMeasures = measuresToRender(false, false)(measureToHierarchy)
+      .concat(dimensionOnlyMeasures);
 
     const cumulativeMeasures =
       R.pipe(
