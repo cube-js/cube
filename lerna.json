@@ -1,13 +1,18 @@
 {
-  "version": "1.2.17",
+  "version": "1.2.18",
   "npmClient": "yarn",
   "command": {
     "bootstrap": {
       "npmClient": "yarn",
-      "npmClientArgs": ["--frozen-lockfile"]
+      "npmClientArgs": [
+        "--frozen-lockfile"
+      ]
     },
     "version": {
-      "allowBranch": ["master", "lts/*"]
+      "allowBranch": [
+        "master",
+        "lts/*"
+      ]
     }
   },
   "$schema": "node_modules/lerna/schemas/lerna-schema.json"

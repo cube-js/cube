@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.18](https://github.com/cube-js/cube.js/compare/v1.2.17...v1.2.18) (2025-03-06)
+
+**Note:** Version bump only for package @cubejs-backend/vertica-driver
+
+
+
+
+
 ## [1.2.17](https://github.com/cube-js/cube.js/compare/v1.2.16...v1.2.17) (2025-03-05)
 
 **Note:** Version bump only for package @cubejs-backend/vertica-driver
