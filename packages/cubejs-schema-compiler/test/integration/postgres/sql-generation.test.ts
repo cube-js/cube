@@ -45,6 +45,10 @@ describe('SQL Generation', () => {
           type: 'sum',
           sql: 'amount',
         },
+        revenue_1d_d1_dd: {
+          type: 'sum',
+          sql: 'amount',
+        },
         visitor_revenue: {
           type: 'sum',
           sql: 'amount',
@@ -3260,6 +3264,15 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     [{
       visitors_visitors_checkins_view__revenue: '2000',
       visitors_visitors_checkins_view__id_sum: '21'
+    }]
+  ));
+
+  it('aliases for columns with digits and underscores', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue_1d_d1_dd'],
+    },
+    [{
+      visitors__revenue_1d_d1_dd: '2000',
     }]
   ));
 
