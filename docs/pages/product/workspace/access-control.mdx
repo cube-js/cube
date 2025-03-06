@@ -1,12 +1,7 @@
----
-redirect_from:
-  - /cloud/access-control/
----
-
 # Access Control
 
-As an account administrator, you can define roles with specific permissions for
-resources and apply those roles to users within the account.
+As a Cube Cloud account administrator, you can define roles with specific permissions
+for Cube Cloud resources and apply those roles to users within the account.
 
 <SuccessBox>
 
@@ -15,25 +10,55 @@ Access control is available in Cube Cloud on
 
 </SuccessBox>
 
-## List all roles
+## Managing accounts
 
-To see a list of roles in your account, first go to the Team settings page by
-clicking on your avatar in the top right corner, then clicking on the "Team"
-button.
+Account administrators have ultimate control over the Cube Cloud account, including
+[managing roles](#managing-roles) and assigning them to users.
 
-On the Team settings page, click the "Roles" tab to see all the roles in your
-account:
+You can see which users are account administrators on the <Btn>Members</Btn> tab of the
+<Btn>Team & Security</Btn> page in your Cube Cloud. Account administrators have the
+<Btn>Admin</Btn> toggle enabled next to their name.
+
+## Managing roles
+
+In Cube Cloud, users are not assigned permissions directly. Instead, they are assigned
+_roles_ that are associated with _policies_. Each policy define what _actions_ they can
+perform and on what _resources_ they can perform those actions. This approach makes it
+easier to manage permissions at scale.
+
+Each role can be associated with one or more of the following policies:
+
+| Policy | Description |
+| --- | --- |
+| **Global** | Controls account-level functionality, e.g., as Billing. |
+| **Deployment** | Controls deployment-level functionality, e.g., as Playground. |
+| **Report** | Controls access to specific reports in Saved Reports. |
+| **ReportFolder** | Controls access to specific folders in Saved Reports. |
+
+Each policy can apply to _all resources_ or _specific resources_. For example, a policy
+could apply to all deployments or only to a specific deployment.
+
+Also, each policy can have _all actions_ or only _specific actions_ associated with it.
+For example, a policy could allow a user to view, create, or delete one or more
+deployments if it's associated with those specific actions.
+
+
+
+### Browsing roles
+
+To see a list of roles, go to the <Btn>Team & Security</Btn> page in your Cube Cloud
+account, then navigate to the <Btn>Roles</Btn> tab:
 
 <Screenshot
   alt="Cube Cloud Team Roles tab"
   src="https://ucarecdn.com/476cb30f-4939-41a8-a399-53d4f8a47dee/"
 />
 
-## Create a role
+### Creating a role
 
-To create a new role, click the "Add Role" button. Enter a name and optional
-description for the role, then click "Add Policy" and select either "Deployment"
-or "Global" for this policy's scope.
+To create a new role, click the <Btn>Add Role</Btn> button. Enter a name and an optional
+description for the role, then click <Btn>Add Policy</Btn> and select either <Btn>Deployment</Btn>
+or <Btn>Global</Btn> for this policy's scope.
 
 Deployment policies apply to deployment-level functionality, such as the
 Playground and Data Model editor. Global policies apply to account-level
