@@ -381,6 +381,8 @@ class ApiGateway {
       `${this.basePath}/v1/cubesql`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
+        const { query } = req.body;
+
         const requestStarted = new Date();
 
         res.setHeader('Content-Type', 'application/json');
@@ -388,8 +390,6 @@ class ApiGateway {
 
         try {
           await this.assertApiScope('data', req.context?.securityContext);
-
-          const { query } = req.body;
 
           this.log({
             type: 'Load Request',
@@ -420,6 +420,9 @@ class ApiGateway {
         } catch (e: any) {
           this.handleError({
             e,
+            query: {
+              sql: query,
+            },
             context: req.context,
             res: this.resToResultFn(res),
             requestStarted
