@@ -391,32 +391,32 @@ class ApiGateway {
         try {
           await this.assertApiScope('data', req.context?.securityContext);
 
-          this.log({
-            type: 'Load Request',
-            query: {
-              sql: query,
-            },
-            apiType: 'sql',
-            streaming: true
-          }, req.context);
+          // this.log({
+          //   type: 'Load Request',
+          //   query: {
+          //     sql: query,
+          //   },
+          //   apiType: 'sql',
+          //   streaming: true
+          // }, req.context);
 
           await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext);
 
-          this.log(
-            {
-              type: 'Load Request Success',
-              query: {
-                sql: query,
-              },
-              duration: this.duration(requestStarted),
-              apiType: 'sql',
-              isDataQuery: true,
-              isPlayground: Boolean(
-                req.context?.signedWithPlaygroundAuthSecret
-              ),
-            },
-            req.context,
-          );
+          // this.log(
+          //   {
+          //     type: 'Load Request Success',
+          //     query: {
+          //       sql: query,
+          //     },
+          //     duration: this.duration(requestStarted),
+          //     apiType: 'sql',
+          //     isDataQuery: true,
+          //     isPlayground: Boolean(
+          //       req.context?.signedWithPlaygroundAuthSecret
+          //     ),
+          //   },
+          //   req.context,
+          // );
         } catch (e: any) {
           this.handleError({
             e,
