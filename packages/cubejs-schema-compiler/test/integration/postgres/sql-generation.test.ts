@@ -658,7 +658,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         \`,
         joins: {
             users: {
-                relationship: 'hasMany',
+                relationship: 'belongsTo',
                 sql: \`\${CUBE.user_id} = \${users.user_id}\`
             }
         },
