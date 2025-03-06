@@ -6,6 +6,7 @@ use crate::plan::{
 use crate::plan::expression::FunctionExpression;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::{BaseMember, VisitorContext};
+use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -79,21 +80,30 @@ impl SelectBuilder {
         member: &Rc<dyn BaseMember>,
         references: Vec<QualifiedColumnName>,
         alias: Option<String>,
-    ) {
+    ) -> Result<(), CubeError> {
         let alias = if let Some(alias) = alias {
             alias
         } else {
             member.alias_name()
         };
 
-        let expr = Expr::Function(FunctionExpression {
-            function: "COALESCE".to_string(),
-            arguments: references
-                .into_iter()
-                // TODO unwrap
-                .map(|r| Expr::Reference(r))
-                .collect(),
-        });
+        let expr = if references.len() > 1 {
+            Expr::Function(FunctionExpression {
+                function: "COALESCE".to_string(),
+                arguments: references
+                    .into_iter()
+                    // TODO unwrap
+                    .map(|r| Expr::Reference(r))
+                    .collect(),
+            })
+        } else if references.len() == 1 {
+            Expr::Reference(references[0].clone())
+        } else {
+            return Err(CubeError::internal(
+                "Cannot add coalesce projection without references".to_string(),
+            ));
+        };
+
         let aliased_expr = AliasedExpr {
             expr,
             alias: alias.clone(),
@@ -102,6 +112,7 @@ impl SelectBuilder {
         self.projection_columns.push(aliased_expr);
         self.result_schema
             .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
+        Ok(())
     }
 
     pub fn set_filter(&mut self, filter: Option<Filter>) {

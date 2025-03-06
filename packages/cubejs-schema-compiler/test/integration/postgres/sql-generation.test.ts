@@ -714,8 +714,6 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
-    // console.log(query.buildSqlAndParams());
-
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
     console.log(JSON.stringify(res));
 
@@ -3377,6 +3375,45 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
           expect(cols[2]).toEqual('b__count');
         });
       });
+  });
+
+  it('don\'t use COALESCE with single argument', async () => {
+    if (!getEnv('nativeSqlPlanner')) {
+      return;
+    }
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_revenue'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitor_checkins.source',
+        operator: 'equals',
+        values: ['google']
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    });
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(queryAndParams[0]).not.toContain('COALESCE');
+
+    await dbRunner.testQuery(queryAndParams).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [{
+          visitors__source: 'some',
+          visitors__visitor_revenue: '100'
+        }]
+      );
+    });
   });
 
   it('expression cube name cache', async () => {
