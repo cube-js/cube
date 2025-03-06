@@ -30,6 +30,7 @@ use std::net::SocketAddr;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
@@ -185,6 +186,8 @@ async fn handle_sql_query(
     stream_methods: WritableStreamMethods,
     sql_query: &String,
 ) -> Result<(), CubeError> {
+    let start_time = SystemTime::now();
+
     let config = services
         .injector()
         .get_service_typed::<dyn ConfigObj>()
@@ -222,7 +225,26 @@ async fn handle_sql_query(
         .state
         .set_auth_context(Some(native_auth_ctx.clone()));
 
-    let connection_id = session.state.connection_id;
+    if let Some(auth_context) = session.state.auth_context() {
+        session
+            .session_manager
+            .server
+            .transport
+            .log_load_state(
+                None,
+                auth_context,
+                session.state.get_load_request_meta("sql"),
+                "Load Request".to_string(),
+                serde_json::json!({
+                    "query": {
+                        "sql": sql_query,
+                    }
+                }),
+            )
+            .await?;
+    }
+
+    let session_clone = Arc::clone(&session);
 
     let execute = || async move {
         // todo: can we use compiler_cache?
@@ -310,8 +332,56 @@ async fn handle_sql_query(
     };
 
     let result = execute().await;
+    let duration = start_time.elapsed().unwrap().as_millis() as u64;
 
-    session_manager.drop_session(connection_id).await;
+    match &result {
+        Ok(_) => {
+            session_clone
+                .session_manager
+                .server
+                .transport
+                .log_load_state(
+                    None,
+                    session_clone.state.auth_context().unwrap(),
+                    session_clone.state.get_load_request_meta("sql"),
+                    "Load Request Success".to_string(),
+                    serde_json::json!({
+                        "query": {
+                            "sql": sql_query,
+                        },
+                        "apiType": "sql",
+                        "duration": duration,
+                        "isDataQuery": true
+                    }),
+                )
+                .await?;
+        }
+        Err(err) => {
+            session_clone
+                .session_manager
+                .server
+                .transport
+                .log_load_state(
+                    None,
+                    session_clone.state.auth_context().unwrap(),
+                    session_clone.state.get_load_request_meta("sql"),
+                    "Cube SQL Error".to_string(),
+                    serde_json::json!({
+                        "query": {
+                            "sql": sql_query
+                        },
+                        "apiType": "sql",
+                        "duration": duration,
+                        "error": err.message,
+                    }),
+                )
+                .await?;
+        }
+    }
+
+    session_manager
+        .drop_session(session_clone.state.connection_id)
+        .await;
 
     result
 }
