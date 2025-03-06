@@ -3405,7 +3405,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     console.log(queryAndParams);
     expect(queryAndParams[0]).not.toContain('COALESCE');
 
-    return dbRunner.testQuery(queryAndParams).then(res => {
+    await dbRunner.testQuery(queryAndParams).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(
         [{
