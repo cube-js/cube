@@ -254,7 +254,7 @@ export class RefreshScheduler {
       authInfo: null,
       ...ctx,
       securityContext: ctx?.securityContext ? ctx.securityContext : {},
-      requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
+      requestId: `scheduler-${ctx?.requestId || uuidv4()}`,
     };
 
     const concurrency =
@@ -424,7 +424,7 @@ export class RefreshScheduler {
           return {
             dependencies,
             partitions: query.groupedPartitions.length && query.groupedPartitions[query.groupedPartitions.length - 1]
-              .filter(p => !partitionsFilter || !partitionsFilter.length || partitionsFilter.includes(p?.tableName)) || []
+              .filter(p => !partitionsFilter?.length || partitionsFilter.includes(p?.tableName)) || []
           };
         });
 
@@ -486,7 +486,7 @@ export class RefreshScheduler {
     });
     const queriesForPreAggregation = async (preAggregationIndex, timezone) => {
       const key = `${preAggregationIndex}_${timezone}`;
-      if (!queriesCache[key]) {
+      if (!(await queriesCache[key])) {
         const preAggregation = scheduledPreAggregations[preAggregationIndex];
         queriesCache[key] = this.refreshQueriesForPreAggregation(
           context, compilerApi, preAggregation, { ...queryingOptions, timezone }
@@ -591,7 +591,7 @@ export class RefreshScheduler {
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
         const queryIteratorStateKey = JSON.stringify({ ...securityContext, workerIndex });
-        const queryIterator = queryIteratorState && queryIteratorState[queryIteratorStateKey] ||
+        const queryIterator = queryIteratorState?.[queryIteratorStateKey] ||
           (await this.roundRobinRefreshPreAggregationsQueryIterator(
             context, compilerApi, queryingOptions, queriesCache
           ));
@@ -631,7 +631,7 @@ export class RefreshScheduler {
             preAggregations: dependencies.concat([partition]),
             continueWait: true,
             renewQuery: true,
-            forceBuildPreAggregations: queryingOptions.forceBuildPreAggregations != null ? queryingOptions.forceBuildPreAggregations : true,
+            forceBuildPreAggregations: queryingOptions.forceBuildPreAggregations ?? true,
             orphanedTimeout: 60 * 60,
             requestId: context.requestId,
             timezone: partition.timezone,

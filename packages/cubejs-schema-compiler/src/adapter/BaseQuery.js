@@ -14,7 +14,7 @@ import inflection from 'inflection';
 import {
   FROM_PARTITION_RANGE,
   MAX_SOURCE_ROW_LIMIT,
-  inDbTimeZone,
+  localTimestampToUtc,
   QueryAlias,
   getEnv,
   timeSeries as timeSeriesBase
@@ -2960,7 +2960,7 @@ export class BaseQuery {
   }
 
   inDbTimeZone(date) {
-    return inDbTimeZone(this.timezone, this.timestampFormat(), date);
+    return localTimestampToUtc(this.timezone, this.timestampFormat(), date);
   }
 
   /**
