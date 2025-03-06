@@ -19,9 +19,9 @@ type PreAggregationLoadCacheOptions = {
 export class PreAggregationLoadCache {
   private readonly driverFactory: DriverFactory;
 
-  private queryCache: QueryCache;
+  private readonly queryCache: QueryCache;
 
-  private preAggregations: PreAggregations;
+  private readonly preAggregations: PreAggregations;
 
   private readonly queryResults: any;
 
@@ -179,7 +179,7 @@ export class PreAggregationLoadCache {
       throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
     }
     const redisKey = this.tablesCachePrefixKey(preAggregation);
-    if (!this.versionEntries[redisKey]) {
+    if (!(await this.versionEntries[redisKey])) {
       this.versionEntries[redisKey] = this.calculateVersionEntries(preAggregation).catch(e => {
         delete this.versionEntries[redisKey];
         throw e;

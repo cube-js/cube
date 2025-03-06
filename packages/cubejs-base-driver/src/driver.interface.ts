@@ -37,7 +37,7 @@ export interface InlineTable {
 }
 export type InlineTables = InlineTable[];
 
-// It's more easy to use this interface with optional method release as a base interface instead of type assertion
+// It's easier to use this interface with optional method release as a base interface instead of type assertion
 export interface DownloadTableBase {
   /**
    * Optional function to release stream/cursor/connection
