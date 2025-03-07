@@ -168,6 +168,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     await this.installExtensions(officialExtensions, execAsync);
     await this.loadExtensions(officialExtensions, execAsync);
     const communityExtensions = getEnv('duckdbCommunityExtensions', this.config);
+    // @see https://duckdb.org/community_extensions/
     await this.installExtensions(communityExtensions, execAsync, 'community');
     await this.loadExtensions(communityExtensions, execAsync);
 
