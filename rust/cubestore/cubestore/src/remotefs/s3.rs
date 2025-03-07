@@ -113,10 +113,15 @@ async fn assume_role(
         .account;
 
     let assume_role_output = Client::new(Config::builder().region(Region::new(region)).build())
-        .assume_role(AssumeRoleRequest::builder()
-            .role_arn(format!("arn:aws:iam::{}:role/{}", account_id, role_or_access_key))
-            .duration_seconds(28800)
-            .build())
+        .assume_role(
+            AssumeRoleRequest::builder()
+                .role_arn(format!(
+                    "arn:aws:iam::{}:role/{}",
+                    account_id, role_or_access_key
+                ))
+                .duration_seconds(28800)
+                .build(),
+        )
         .send()
         .await
         .map_err(|e| CubeError::internal(format!("Failed to assume role: {}", e)))?
