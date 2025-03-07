@@ -856,7 +856,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('jobs', req?.context?.securityContext);
 
-      if (!query) {
+      if (!query || Object.keys(query).length === 0) {
         throw new UserError('No job description provided');
       }
 
@@ -906,11 +906,6 @@ class ApiGateway {
   ): Promise<string[]> {
     let jobs: string[] = [];
 
-    // For the sake of type check, as contexts are checked in preAggregationsJobs()
-    if (!selector.contexts) {
-      return jobs;
-    }
-
     // There might be a few contexts but dateRange if present is still the same
     // so let's normalize it only once.
     // It's expected that selector.dateRange is provided in local time (without timezone)
@@ -919,7 +914,7 @@ class ApiGateway {
       const start = parseLocalDate([{ val: selector.dateRange[0] }], 'UTC');
       const end = parseLocalDate([{ val: selector.dateRange[1] }], 'UTC');
       if (!start || !end) {
-        throw new Error(`Cannot parse selector date range ${selector.dateRange}`);
+        throw new UserError(`Cannot parse selector date range ${selector.dateRange}`);
       }
       selector.dateRange = [start, end];
     }
