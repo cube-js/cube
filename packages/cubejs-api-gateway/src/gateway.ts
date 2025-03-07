@@ -856,6 +856,10 @@ class ApiGateway {
     try {
       await this.assertApiScope('jobs', req?.context?.securityContext);
 
+      if (!query) {
+        throw new UserError('No job description provided');
+      }
+
       const { error } = preAggsJobsRequestSchema.validate(query);
       if (error) {
         throw new UserError(`Invalid Job query format: ${error.message || error.toString()}`);
