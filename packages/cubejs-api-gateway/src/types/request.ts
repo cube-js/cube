@@ -153,6 +153,7 @@ type PreAggsSelector = {
   dataSources?: string[],
   cubes?: string[],
   preAggregations?: string[],
+  dateRange?: [string, string], // We expect only single date Range for rebuilding
 };
 
 /**
