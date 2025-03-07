@@ -64,7 +64,7 @@ impl ToProtocolValue for TimestampValue {
 
         match self.tz_ref() {
             None => as_str.to_text(buf),
-            Some(_) => (as_str + &"+00").to_text(buf),
+            Some(_) => (as_str + "+00").to_text(buf),
         }
     }
 

@@ -3,26 +3,49 @@
 [Microsoft Excel](https://www.microsoft.com/en-us/microsoft-365/excel) is a
 popular spreadsheet application.
 
+<YouTubeVideo
+  url="https://www.youtube.com/embed/vG7iEdYTvIQ"
+  aspectRatio={5/4}
+/>
+
 ## Connect from Cube Cloud
 
-Cube Cloud provides the [MDX API][ref-mdx-api] for Excel.
+Cube Cloud provides two options to connect to Excel:
 
-Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
-page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Microsoft Excel</Btn> to get
-detailed instructions.
+| | [MDX API][ref-mdx-api] | [Cube Cloud for Excel][ref-cube-cloud-for-excel] |
+| --- | --- | --- |
+| Operating systems | Microsoft Windows | All, including macOS |
+| Platforms | Desktop | All, including web and mobile |
+| Pivot table support | Native [PivotTable][link-pivottable] | Custom [pivot table][ref-cube-cloud-for-excel-pivot] UI |
 
-<InfoBox>
+Navigate to the [Integrations][ref-integrations-tools] page, click <Btn>Connect to Cube</Btn>,
+and choose <Btn>Microsoft Excel</Btn> to get detailed instructions.
+
+## Connect from Cube Core
 
 There's no way to connect a Cube Core deployment to Excel.
 
-</InfoBox>
+## Connect from Microsoft Excel
 
-## Connecting from Excel
+### MDX API
 
 In Excel, go to the <Btn>Data</Btn> tab of the ribbon, click <Btn>Get Data</Btn>
-and select <Btn>From Database → From Analysis Services</Btn>.
+and select <Btn>From Database → From Analysis Services</Btn>. Then, enter the
+credentials.
 
-For additional configuration options, check the [MDX API][ref-mdx-api] page.
+To find your MDX API credentials, go to the [Integrations][ref-integrations-apis] page, click
+<Btn>API credentials</Btn>, and choose the <Btn>MDX API</Btn> tab.
 
+### Cube Cloud for Excel
+
+Follow the instructions to [install][ref-cube-cloud-for-excel-installation] the
+add-in and [authenticate][ref-cube-cloud-for-excel-authentication] to Cube Cloud.
 
 [ref-mdx-api]: /product/apis-integrations/mdx-api
+[link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
+[ref-cube-cloud-for-excel]: /product/apis-integrations/microsoft-excel
+[ref-cube-cloud-for-excel-pivot]: /product/apis-integrations/microsoft-excel#create-reports-via-pivot-table
+[ref-cube-cloud-for-excel-installation]: /product/apis-integrations/microsoft-excel#installation
+[ref-cube-cloud-for-excel-authentication]: /product/apis-integrations/microsoft-excel#authentication
+[ref-integrations-tools]: /product/workspace/integrations#connect-specific-tools
+[ref-integrations-apis]: /product/workspace/integrations#view-api-credentials

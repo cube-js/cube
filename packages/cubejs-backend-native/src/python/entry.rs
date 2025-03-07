@@ -77,9 +77,9 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
         let model_module = PyModule::from_code(py, &model_content, &model_file_name, "")?;
 
-        let mut collected_functions = CLReprObject::new();
-        let mut collected_variables = CLReprObject::new();
-        let mut collected_filters = CLReprObject::new();
+        let mut collected_functions = CLReprObject::new(CLReprObjectKind::Object);
+        let mut collected_variables = CLReprObject::new(CLReprObjectKind::Object);
+        let mut collected_filters = CLReprObject::new(CLReprObjectKind::Object);
 
         if model_module.hasattr("template")? {
             let template = model_module.getattr("template")?;

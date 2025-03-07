@@ -1,5 +1,6 @@
 module.exports = {
   contextToRoles: async (context) => context.securityContext.auth?.roles || [],
+  canSwitchSqlUser: async () => true,
   checkSqlAuth: async (req, user, password) => {
     if (user === 'admin') {
       if (password && password !== 'admin_password') {
@@ -60,6 +61,27 @@ module.exports = {
               minDefaultId: 20000,
             },
             roles: [],
+          },
+        },
+      };
+    }
+    if (user === 'restricted') {
+      if (password && password !== 'restricted_password') {
+        throw new Error(`Password doesn't match for ${user}`);
+      }
+      return {
+        password,
+        superuser: false,
+        securityContext: {
+          auth: {
+            username: 'default',
+            userAttributes: {
+              region: 'CA',
+              city: 'San Francisco',
+              canHaveAdmin: true,
+              minDefaultId: 20000,
+            },
+            roles: ['restricted'],
           },
         },
       };

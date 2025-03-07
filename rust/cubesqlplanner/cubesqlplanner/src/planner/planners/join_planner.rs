@@ -1,7 +1,7 @@
 use super::{CommonUtils, DimensionSubqueryPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::join_item::JoinItem;
 use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::SqlCall;
@@ -49,9 +49,7 @@ impl JoinPlanner {
             );
             dimension_subquery_planner.add_joins_for_cube(&mut join_builder, root.name())?;
             for join in joins.iter() {
-                let definition = join.join()?;
-                let sql_call = self
-                    .compile_join_condition(&join.static_data().original_from, definition.sql()?)?;
+                let sql_call = self.compile_join_condition(join.clone())?;
                 let on = JoinCondition::new_base_join(SqlJoinCondition::try_new(
                     self.query_tools.clone(),
                     sql_call,
@@ -71,13 +69,14 @@ impl JoinPlanner {
         }
     }
 
-    fn compile_join_condition(
+    pub fn compile_join_condition(
         &self,
-        cube_name: &String,
-        sql: Rc<dyn MemberSql>,
+        join_item: Rc<dyn JoinItem>,
     ) -> Result<Rc<SqlCall>, CubeError> {
+        let definition = join_item.join()?;
         let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        evaluator_compiler.compile_sql_call(&cube_name, sql)
+        evaluator_compiler
+            .compile_sql_call(&join_item.static_data().original_from, definition.sql()?)
     }
 }

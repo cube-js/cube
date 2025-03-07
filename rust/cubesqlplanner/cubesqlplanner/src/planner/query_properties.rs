@@ -135,14 +135,47 @@ impl QueryProperties {
             Vec::new()
         };
 
-        let measures = if let Some(measures) = &options.static_data().measures {
+        let measures = if let Some(measures) = &options.measures()? {
             measures
                 .iter()
-                .map(|m| {
-                    let evaluator = evaluator_compiler.add_measure_evaluator(m.clone())?;
-                    BaseMeasure::try_new_required(evaluator, query_tools.clone())
+                .map(|d| match d {
+                    OptionsMember::MemberName(member_name) => {
+                        let evaluator =
+                            evaluator_compiler.add_measure_evaluator(member_name.clone())?;
+                        BaseMeasure::try_new_required(evaluator, query_tools.clone())
+                    }
+                    OptionsMember::MemberExpression(member_expression) => {
+                        let cube_name =
+                            if let Some(name) = &member_expression.static_data().cube_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let name =
+                            if let Some(name) = &member_expression.static_data().expression_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let expression_evaluator = evaluator_compiler
+                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        BaseMeasure::try_new_from_expression(
+                            expression_evaluator,
+                            cube_name,
+                            name,
+                            member_expression.static_data().definition.clone(),
+                            query_tools.clone(),
+                        )
+                    }
                 })
                 .collect::<Result<Vec<_>, _>>()?
+            /* measures
+            .iter()
+            .map(|m| {
+                let evaluator = evaluator_compiler.add_measure_evaluator(m.clone())?;
+                BaseMeasure::try_new_required(evaluator, query_tools.clone())
+            })
+            .collect::<Result<Vec<_>, _>>()? */
         } else {
             Vec::new()
         };

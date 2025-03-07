@@ -62,6 +62,7 @@ class Configuration:
     logger: Callable
     context_to_app_id: Union[str, Callable[[RequestContext], str]]
     context_to_orchestrator_id: Union[str, Callable[[RequestContext], str]]
+    context_to_cube_store_router_id: Union[str, Callable[[RequestContext], str]]
     driver_factory: Callable[[RequestContext], Dict]
     external_driver_factory: Callable[[RequestContext], Dict]
     db_type: Union[str, Callable[[RequestContext], str]]
@@ -77,6 +78,7 @@ class Configuration:
     pre_aggregations_schema: Union[Callable[[RequestContext], str], str]
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
     context_to_roles: Callable[[RequestContext], list[str]]
+    fast_reload: bool
 
     def __init__(self):
         self.web_sockets = None
@@ -108,6 +110,7 @@ class Configuration:
         self.logger = None
         self.context_to_app_id = None
         self.context_to_orchestrator_id = None
+        self.context_to_cube_store_router_id = None
         self.driver_factory = None
         self.external_driver_factory = None
         self.db_type = None
@@ -125,6 +128,7 @@ class Configuration:
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
         self.context_to_roles = None
+        self.fast_reload = None
 
     def __call__(self, func):
         if isinstance(func, str):

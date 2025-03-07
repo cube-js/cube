@@ -46,6 +46,10 @@ impl TimeDimensionSymbol {
         self.base_symbol.cube_name()
     }
 
+    pub fn is_multi_stage(&self) -> bool {
+        self.base_symbol.is_multi_stage()
+    }
+
     pub fn name(&self) -> String {
         self.base_symbol.name()
     }

@@ -14,6 +14,8 @@ pub struct V1CubeMetaDimension {
     pub name: String,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(rename = "shortTitle", skip_serializing_if = "Option::is_none")]
+    pub short_title: Option<String>,
     #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(rename = "type")]
@@ -32,6 +34,7 @@ impl V1CubeMetaDimension {
         V1CubeMetaDimension {
             name,
             title: None,
+            short_title: None,
             description: None,
             r#type,
             alias_member: None,

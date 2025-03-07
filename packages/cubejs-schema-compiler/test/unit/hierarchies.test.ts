@@ -25,14 +25,15 @@ describe('Cube hierarchies', () => {
         public: true,
         levels: [
           'orders_users_view.status',
-          'orders_users_view.number'
+          'orders_users_view.number',
+          'orders_users_view.user_city'
         ],
       },
       {
         name: 'orders_users_view.some_other_hierarchy',
         public: true,
         title: 'Some other hierarchy',
-        levels: ['orders_users_view.state']
+        levels: ['orders_users_view.state', 'orders_users_view.user_city']
       }
     ]);
 
@@ -50,6 +51,44 @@ describe('Cube hierarchies', () => {
       (it) => it.config.name === 'all_hierarchy_view'
     );
     expect(allHierarchyView.config.hierarchies.length).toBe(3);
+
+    const prefixedHierarchy = allHierarchyView.config.hierarchies.find((it) => it.name === 'all_hierarchy_view.users_users_hierarchy');
+    expect(prefixedHierarchy).toBeTruthy();
+    expect(prefixedHierarchy?.levels).toEqual(['all_hierarchy_view.users_age', 'all_hierarchy_view.users_city']);
+  });
+
+  it('auto include hierarchy members', async () => {
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/hierarchies.yml'),
+      'utf8'
+    );
+    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+
+    await compiler.compile();
+
+    const view1 = metaTransformer.cubes.find(
+      (it) => it.config.name === 'only_hierarchy_included_view'
+    );
+
+    expect(view1.config.dimensions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'only_hierarchy_included_view.status' }),
+        expect.objectContaining({ name: 'only_hierarchy_included_view.number' }),
+        expect.objectContaining({ name: 'only_hierarchy_included_view.city' })
+      ])
+    );
+
+    // Members from the `users` cube are not included as `users` is not selected (not joined)
+    const view2 = metaTransformer.cubes.find(
+      (it) => it.config.name === 'auto_include_view'
+    );
+    expect(view2.config.dimensions.length).toEqual(2);
+    expect(view2.config.dimensions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'auto_include_view.status' }),
+        expect.objectContaining({ name: 'auto_include_view.number' }),
+      ])
+    );
   });
 
   it(('hierarchy with measure'), async () => {

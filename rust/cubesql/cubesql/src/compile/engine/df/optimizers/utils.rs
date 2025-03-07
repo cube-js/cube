@@ -44,7 +44,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(left, right)| Expr::BinaryExpr {
                 left: Box::new(left),
-                op: op.clone(),
+                op: *op,
                 right: Box::new(right),
             })
         }
@@ -60,9 +60,9 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(left, right)| Expr::AnyExpr {
                 left: Box::new(left),
-                op: op.clone(),
+                op: *op,
                 right: Box::new(right),
-                all: all.clone(),
+                all: *all,
             })
         }
         Expr::Like(Like {
@@ -77,10 +77,10 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, pattern)| {
                 Expr::Like(Like {
-                    negated: negated.clone(),
+                    negated: *negated,
                     expr: Box::new(expr),
                     pattern: Box::new(pattern),
-                    escape_char: escape_char.clone(),
+                    escape_char: *escape_char,
                 })
             })
         }
@@ -96,10 +96,10 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, pattern)| {
                 Expr::ILike(Like {
-                    negated: negated.clone(),
+                    negated: *negated,
                     expr: Box::new(expr),
                     pattern: Box::new(pattern),
-                    escape_char: escape_char.clone(),
+                    escape_char: *escape_char,
                 })
             })
         }
@@ -115,10 +115,10 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, pattern)| {
                 Expr::SimilarTo(Like {
-                    negated: negated.clone(),
+                    negated: *negated,
                     expr: Box::new(expr),
                     pattern: Box::new(pattern),
-                    escape_char: escape_char.clone(),
+                    escape_char: *escape_char,
                 })
             })
         }
@@ -148,7 +148,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             };
             rewrites.map(|(expr, low, high)| Expr::Between {
                 expr: Box::new(expr),
-                negated: negated.clone(),
+                negated: *negated,
                 low: Box::new(low),
                 high: Box::new(high),
             })
@@ -211,8 +211,8 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             nulls_first,
         } => rewrite(expr, map)?.map(|expr| Expr::Sort {
             expr: Box::new(expr),
-            asc: asc.clone(),
-            nulls_first: nulls_first.clone(),
+            asc: *asc,
+            nulls_first: *nulls_first,
         }),
         Expr::ScalarFunction { fun, args } => args
             .iter()
@@ -249,7 +249,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             .map(|args| Expr::AggregateFunction {
                 fun: fun.clone(),
                 args,
-                distinct: distinct.clone(),
+                distinct: *distinct,
             }),
         Expr::WindowFunction {
             fun,
@@ -283,7 +283,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
                     args,
                     partition_by,
                     order_by,
-                    window_frame: window_frame.clone(),
+                    window_frame: *window_frame,
                 })
         }
         Expr::AggregateUDF { fun, args } => args
@@ -310,7 +310,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
                 .map(|list| Expr::InList {
                     expr: Box::new(expr),
                     list,
-                    negated: negated.clone(),
+                    negated: *negated,
                 })
         }
         // As rewrites are used to push things down or up the plan, wildcards
@@ -329,7 +329,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
             rewrites.map(|(expr, subquery)| Expr::InSubquery {
                 expr: Box::new(expr),
                 subquery: Box::new(subquery),
-                negated: negated.clone(),
+                negated: *negated,
             })
         }
     })
@@ -386,7 +386,7 @@ pub fn is_const_expr(expr: &Expr) -> bool {
             _ => false,
         },
         Expr::InList { expr, list, .. } => {
-            is_const_expr(expr) && list.iter().map(|item| is_const_expr(item)).all(|item| item)
+            is_const_expr(expr) && list.iter().all(|item| is_const_expr(item))
         }
         _ => false,
     }
@@ -415,25 +415,25 @@ pub fn get_expr_columns(expr: &Expr) -> Vec<Column> {
         Expr::BinaryExpr { left, right, .. } | Expr::AnyExpr { left, right, .. } => {
             get_expr_columns(left)
                 .into_iter()
-                .chain(get_expr_columns(right).into_iter())
+                .chain(get_expr_columns(right))
                 .collect()
         }
         Expr::Like(Like { expr, pattern, .. })
         | Expr::ILike(Like { expr, pattern, .. })
         | Expr::SimilarTo(Like { expr, pattern, .. }) => get_expr_columns(expr)
             .into_iter()
-            .chain(get_expr_columns(pattern).into_iter())
+            .chain(get_expr_columns(pattern))
             .collect(),
         Expr::GetIndexedField { expr, key } => get_expr_columns(expr)
             .into_iter()
-            .chain(get_expr_columns(key).into_iter())
+            .chain(get_expr_columns(key))
             .collect(),
         Expr::Between {
             expr, low, high, ..
         } => get_expr_columns(expr)
             .into_iter()
-            .chain(get_expr_columns(low).into_iter())
-            .chain(get_expr_columns(high).into_iter())
+            .chain(get_expr_columns(low))
+            .chain(get_expr_columns(high))
             .collect(),
         Expr::Case {
             expr,
@@ -447,15 +447,14 @@ pub fn get_expr_columns(expr: &Expr) -> Vec<Column> {
             .chain(when_then_expr.iter().flat_map(|(when, then)| {
                 get_expr_columns(when)
                     .into_iter()
-                    .chain(get_expr_columns(then).into_iter())
+                    .chain(get_expr_columns(then))
                     .collect::<Vec<_>>()
             }))
             .chain(
                 else_expr
                     .as_ref()
                     .map(|else_expr| get_expr_columns(else_expr))
-                    .unwrap_or(vec![])
-                    .into_iter(),
+                    .unwrap_or(vec![]),
             )
             .collect(),
         Expr::ScalarFunction { args, .. }
@@ -553,11 +552,20 @@ pub fn plan_has_projections(plan: &LogicalPlan) -> bool {
 }
 
 #[cfg(test)]
-pub fn make_sample_table(name: &str, fields: Vec<&str>) -> Result<LogicalPlan> {
+pub fn make_sample_table(
+    name: &str,
+    int_fields: Vec<&str>,
+    str_fields: Vec<&str>,
+) -> Result<LogicalPlan> {
     let schema = Schema::new(
-        fields
+        int_fields
             .into_iter()
             .map(|field| Field::new(field, DataType::Int32, true))
+            .chain(
+                str_fields
+                    .into_iter()
+                    .map(|field| Field::new(field, DataType::Utf8, true)),
+            )
             .collect(),
     );
     LogicalPlanBuilder::scan_empty(Some(name), &schema, None)?.build()
@@ -565,5 +573,5 @@ pub fn make_sample_table(name: &str, fields: Vec<&str>) -> Result<LogicalPlan> {
 
 #[cfg(test)]
 pub fn sample_table() -> Result<LogicalPlan> {
-    make_sample_table("t1", vec!["c1", "c2", "c3"])
+    make_sample_table("t1", vec!["c1", "c2", "c3"], vec![])
 }

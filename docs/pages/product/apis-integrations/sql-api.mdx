@@ -1,35 +1,33 @@
----
-redirect_from:
-  - /backend/sql
----
-
 # SQL API
 
-SQL API enables Cube to deliver data over the [Postgres-compatible
-protocol][postgres-protocol] to certain kinds of data applications, including
-but not limited to the following ones:
+The SQL API enables Cube to deliver data over the [Postgres-compatible
+protocol][postgres-protocol] to a wide range of [data visualization tools][ref-dataviz-tools].
+In general, if an application connects to [PostgreSQL][link-postgres] database,
+it can connect to Cube as well.
 
-- Most commonly, [business intelligence tools][ref-bi], e.g.,
-  [Tableau][ref-tableau], [Power BI][ref-powerbi], [ThoughtSpot][ref-thoughtspot],
-  [Sigma][ref-sigma], [Looker Studio][ref-looker-studio], [Superset /
-  Preset][ref-superset], and [Metabase][ref-metabase]
-- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter], [Hex][ref-hex],
-  or [Deepnote][ref-deepnote]
-- Reverse ETL tools, e.g., Census or Hightouch
+Unlike [DAX API][ref-dax-api], [MDX API][ref-mdx-api], and [Semantic Layer Sync][ref-sls],
+the SQL API provides a more generic way to work with Cube, limited to what the SQL
+query language and the Postgres protocol can offer.
 
-Often, the SQL API is used to enable internal or self-serve [business
+The SQL API works with the following kinds of data applications:
+
+- [BI tools][ref-bi], e.g., [ThoughtSpot][ref-thoughtspot], [Sigma][ref-sigma],
+[Looker Studio][ref-looker-studio], enabling internal or self-serve [business
 intelligence][cube-bi-use-case] use cases.
+- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter], [Hex][ref-hex],
+or [Deepnote][ref-deepnote].
+- Reverse ETL tools, e.g., Census or Hightouch.
 
-See [SQL API reference][ref-ref-sql-api] for the list of supported SQL commands,
-functions, and operators. Also, check [query format][ref-sql-query-format] for
-details about supported queries.
-
-<InfoBox>
+<ReferenceBox>
 
 Please use [this GitHub issue](https://github.com/cube-js/cube/issues/3906) to
 suggest tools of your interest and vote for already proposed ones.
 
-</InfoBox>
+</ReferenceBox>
+
+See [SQL API reference][ref-ref-sql-api] for the list of supported SQL commands,
+functions, and operators. Also, check [query format][ref-sql-query-format] for
+details about supported queries.
 
 ## Example request
 
@@ -233,23 +231,24 @@ You can use the `CUBEJS_MAX_SESSIONS` environment variable to adjust the session
 limit.
 
 
+[link-postgres]: https://www.postgresql.org
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-sql-api-auth]: /product/apis-integrations/sql-api/security
 [ref-config-checksqlauth]: /reference/configuration/config#checksqlauth
 [ref-config-canswitchsqluser]: /reference/configuration/config#canswitchsqluser
+[ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-bi]: /product/configuration/visualization-tools#bi-data-exploration-tools
-[ref-superset]: /product/configuration/visualization-tools/superset
-[ref-tableau]: /product/configuration/visualization-tools/tableau
-[ref-powerbi]: /product/configuration/visualization-tools/powerbi
 [ref-thoughtspot]: /product/configuration/visualization-tools/thoughtspot
 [ref-sigma]: /product/configuration/visualization-tools/sigma
 [ref-looker-studio]: /product/configuration/visualization-tools/looker-studio
-[ref-metabase]: /product/configuration/visualization-tools/metabase
 [ref-notebooks]: /product/configuration/visualization-tools#notebooks
 [ref-jupyter]: /product/configuration/visualization-tools/jupyter
 [ref-hex]: /product/configuration/visualization-tools/hex
 [ref-deepnote]: /product/configuration/visualization-tools/deepnote
 [ref-sql-query-format]: /product/apis-integrations/sql-api/query-format
-[ref-ref-sql-api]: /reference/sql-api
+[ref-ref-sql-api]: /product/apis-integrations/sql-api/reference
 [ref-data-model-concepts]: /product/data-modeling/concepts
 [ref-regular-queries]: /product/apis-integrations/queries#regular-query
 [ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing

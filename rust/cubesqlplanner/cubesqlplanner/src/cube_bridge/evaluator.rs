@@ -19,7 +19,7 @@ pub struct CubeEvaluatorStatic {
     pub primary_keys: HashMap<String, Vec<String>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CallDep {
     pub name: String,
     pub parent: Option<usize>,
@@ -27,7 +27,7 @@ pub struct CallDep {
 
 #[nativebridge::native_bridge(CubeEvaluatorStatic)]
 pub trait CubeEvaluator {
-    #[field]
+    #[nbridge(field)]
     fn primary_keys(&self) -> Result<HashMap<String, String>, CubeError>;
     fn parse_path(&self, path_type: String, path: String) -> Result<Vec<String>, CubeError>;
     fn measure_by_path(&self, measure_path: String)

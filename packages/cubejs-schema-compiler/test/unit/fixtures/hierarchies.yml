@@ -66,6 +66,8 @@ views:
         includes:
           - age
           - state
+          - name: city
+            alias: user_city
   - name: orders_includes_excludes_view
     cubes:
       - join_path: orders
@@ -85,5 +87,17 @@ views:
       - join_path: users
         prefix: true
         includes: "*"
-
-
+  - name: only_hierarchy_included_view
+    cubes:
+      - join_path: orders
+        includes:
+          - orders_hierarchy
+      - join_path: users
+        includes:
+          - city
+  - name: auto_include_view
+    cubes:
+      - join_path: orders
+        includes:
+          - orders_hierarchy
+          - some_other_hierarchy

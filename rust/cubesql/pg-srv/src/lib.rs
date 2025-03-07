@@ -2,10 +2,6 @@
 //! You can find overview of the protocol at
 //! <https://www.postgresql.org/docs/10/protocol.html>
 
-// #![feature(backtrace)]
-// #![feature(type_ascription)]
-#![feature(error_generic_member_access)]
-
 mod decoding;
 mod encoding;
 
@@ -20,23 +16,49 @@ pub use encoding::*;
 pub use extended::*;
 pub use pg_type::*;
 
-use std::backtrace::Backtrace;
+use std::{backtrace::Backtrace, fmt::Formatter};
 
 /// Protocol error abstract of handled/unhandled errors, it should not handle any kind of business logic errors
-#[derive(thiserror::Error, Debug)]
+/// TODO: Migrate back to thiserror crate, when Rust will stabilize feature(error_generic_member_access)
+#[derive(Debug)]
 pub enum ProtocolError {
-    #[error("IO Error: {}", .source)]
     IO {
-        #[from]
         source: std::io::Error,
         backtrace: Backtrace,
     },
-    #[error("Error: {}", .source.message)]
     ErrorResponse {
-        #[from]
         source: protocol::ErrorResponse,
         backtrace: Backtrace,
     },
+}
+
+impl std::fmt::Display for ProtocolError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProtocolError::IO { source, .. } => f.write_fmt(format_args!("IO error: {}", source)),
+            ProtocolError::ErrorResponse { source, .. } => {
+                f.write_fmt(format_args!("Error: {}", source.message))
+            }
+        }
+    }
+}
+
+impl From<std::io::Error> for ProtocolError {
+    fn from(source: std::io::Error) -> Self {
+        ProtocolError::IO {
+            source,
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+impl From<protocol::ErrorResponse> for ProtocolError {
+    fn from(source: protocol::ErrorResponse) -> Self {
+        ProtocolError::ErrorResponse {
+            source,
+            backtrace: Backtrace::capture(),
+        }
+    }
 }
 
 impl ProtocolError {

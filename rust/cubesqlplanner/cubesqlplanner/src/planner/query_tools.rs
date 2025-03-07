@@ -11,7 +11,6 @@ use crate::plan::FilterItem;
 use crate::planner::sql_evaluator::collectors::collect_join_hints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
-use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -187,7 +186,7 @@ impl QueryTools {
     }
 
     pub fn alias_name(&self, name: &str) -> String {
-        name.to_case(Case::Snake).replace(".", "__")
+        PlanSqlTemplates::alias_name(name)
     }
 
     pub fn escaped_alias_name(&self, name: &str) -> String {

@@ -281,11 +281,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             .map(|i| Arc::new(inputs[i].clone()))
             .collect::<Vec<_>>();
         let mut joins_expr = vec![];
-        let join_types = self
-            .joins
-            .iter()
-            .map(|(_, _, t)| t.clone())
-            .collect::<Vec<_>>();
+        let join_types = self.joins.iter().map(|(_, _, t)| *t).collect::<Vec<_>>();
         let mut filter_expr = vec![];
         let mut having_expr = vec![];
         let mut order_expr = vec![];
@@ -332,7 +328,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
 
         Arc::new(WrappedSelectNode::new(
             self.schema.clone(),
-            self.select_type.clone(),
+            self.select_type,
             projection_expr,
             self.subqueries.clone(),
             group_expr,
@@ -976,7 +972,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int16(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int16(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1001,7 +997,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1026,7 +1022,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int64(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1051,7 +1047,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Float32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Float32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1076,7 +1072,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Float64(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Float64(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1099,7 +1095,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Boolean(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Boolean(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1129,7 +1125,7 @@ pub fn transform_response<V: ValueObject>(
                             // TODO switch parsing to microseconds
                             if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
-                            } else if let Some(nanos) = timestamp.timestamp_nanos_opt() {
+                            } else if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
                                 builder.append_value(nanos)?;
                             } else {
                                 log::error!(
@@ -1141,7 +1137,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1177,7 +1173,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1217,7 +1213,7 @@ pub fn transform_response<V: ValueObject>(
                         }
                     },
                     {
-                        (ScalarValue::Date32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Date32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1279,7 +1275,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1293,7 +1289,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1307,7 +1303,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }

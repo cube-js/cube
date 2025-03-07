@@ -8,25 +8,25 @@ import { CompilerApi } from '../../src/core/CompilerApi';
 const schemaContent = `
 cube('Foo', {
   sql: \`select * from foo_\${SECURITY_CONTEXT.tenantId.unsafeValue()}\`,
-  
+
   measures: {
     count: {
       type: 'count'
     },
-    
+
     total: {
       sql: 'amount',
       type: 'sum'
     },
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
       type: 'time'
     }
   },
-  
+
   preAggregations: {
     main: {
       type: 'originalSql',
@@ -87,20 +87,20 @@ cube('Foo', {
 
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
     }
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
       type: 'time'
     }
   },
-  
+
   preAggregations: {
     first: {
       type: 'rollup',
@@ -131,42 +131,42 @@ const repositoryWithRollupJoin: SchemaFileRepository = {
     { fileName: 'main.js', content: `
       cube(\`Users\`, {
           sql: \`SELECT * FROM public.users\`,
-        
+
           preAggregations: {
             usersRollup: {
               dimensions: [CUBE.id],
             },
           },
-        
+
           measures: {
             count: {
               type: \`count\`,
             },
           },
-        
+
           dimensions: {
             id: {
               sql: \`id\`,
               type: \`string\`,
               primaryKey: true,
             },
-            
+
             name: {
               sql: \`name\`,
               type: \`string\`,
             },
           },
         });
-        
+
         cube('Orders', {
           sql: \`SELECT * FROM orders\`,
-        
+
           preAggregations: {
             ordersRollup: {
               measures: [CUBE.count],
               dimensions: [CUBE.userId, CUBE.status],
             },
-            
+
             ordersRollupJoin: {
               type: \`rollupJoin\`,
               measures: [CUBE.count],
@@ -174,20 +174,20 @@ const repositoryWithRollupJoin: SchemaFileRepository = {
               rollups: [Users.usersRollup, CUBE.ordersRollup],
             },
           },
-        
+
           joins: {
             Users: {
               relationship: \`belongsTo\`,
               sql: \`\${CUBE.userId} = \${Users.id}\`,
             },
           },
-        
+
           measures: {
             count: {
               type: \`count\`,
             },
           },
-        
+
           dimensions: {
             id: {
               sql: \`id\`,
@@ -215,13 +215,13 @@ const repositoryWithoutPreAggregations: SchemaFileRepository = {
       fileName: 'main.js', content: `
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
     }
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',

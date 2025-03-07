@@ -766,3 +766,80 @@ GROUP BY
         .sql
         .contains(r#"\"expr\":\"${KibanaSampleDataEcommerce.sumPrice}\""#));
 }
+
+#[tokio::test]
+async fn test_join_on_multiple_columns() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    CAST(dim_str0 AS TEXT) || ' - ' || CAST(dim_str1 AS TEXT) AS "concat_dims"
+FROM MultiTypeCube
+INNER JOIN (
+    SELECT
+        CAST(dim_str0 AS TEXT) || ' - ' || CAST(dim_str1 AS TEXT) AS "concat_dims",
+        AVG(avgPrice) AS "avg_price"
+    FROM MultiTypeCube
+    GROUP BY
+        1
+    ORDER BY
+        2 DESC NULLS LAST,
+        1 ASC NULLS FIRST
+    LIMIT 10
+) "grouped"
+ON
+    CAST(MultiTypeCube.dim_str0 AS TEXT) || ' - ' || CAST(MultiTypeCube.dim_str1 AS TEXT)
+        =
+    "grouped"."concat_dims"
+GROUP BY
+    1
+;
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+
+    assert_eq!(request.ungrouped, None);
+
+    assert_eq!(request.subquery_joins.as_ref().unwrap().len(), 1);
+
+    let subquery = &request.subquery_joins.unwrap()[0];
+
+    assert!(!subquery.sql.contains("ungrouped"));
+    assert_eq!(subquery.join_type, "INNER");
+    assert!(subquery
+        .on
+        .contains(r#"CAST(${MultiTypeCube.dim_str0} AS STRING)"#));
+    assert!(subquery
+        .on
+        .contains(r#"CAST(${MultiTypeCube.dim_str1} AS STRING)"#));
+    assert!(subquery.on.contains(r#" = \"grouped\".\"concat_dims\""#));
+
+    // Dimension from ungrouped side
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains(r#"CAST(${MultiTypeCube.dim_str0} AS STRING)"#));
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains(r#"CAST(${MultiTypeCube.dim_str1} AS STRING)"#));
+}

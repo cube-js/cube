@@ -1092,7 +1092,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
             ast::Value::SingleQuotedString(str)
             | ast::Value::DoubleQuotedString(str)
             | ast::Value::NationalStringLiteral(str) => {
-                if vec!["false", "true"].contains(&str.as_str()) || str.len() < 4 {
+                if ["false", "true"].contains(&str.as_str()) || str.len() < 4 {
                     return Ok(());
                 }
                 *str = "[REPLACED]".to_string();

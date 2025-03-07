@@ -10,25 +10,25 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "dcf3e4aa26fd112043ef26fa4a78db5dbd443c86", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
-anyhow = "1.0"
-thiserror = "1.0.50"
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "dcf3e4aa26fd112043ef26fa4a78db5dbd443c86", default-features = false, features = [
+    "regex_expressions",
+    "unicode_expressions",
+] }
+thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "6a54d27d3b75a04b9f9cbe309a83078aa54b32fd" }
 base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
-itertools = "0.10.2"
+itertools = "0.14.0"
 serde_json = "^1.0"
 bytes = "1.2"
 futures = "0.3.23"
 rand = "0.8.3"
 hashbrown = "0.14.3"
-smallvec = "1.7.0"
-byteorder = "1.3.4"
 log = "0.4.21"
-rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
+rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"] }
 postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
 # which panic with Could not determine the UTC offset on this system.
@@ -39,15 +39,15 @@ async-trait = "0.1.36"
 regex = "1.5"
 uuid = { version = "1", features = ["serde", "v4"] }
 bincode = "1.3.1"
-chrono = "0.4.31"
+chrono = "0.4.39"
 chrono-tz = "0.6"
-mockall = "0.8.1"
-tokio-util = { version = "0.7", features=["compat"] }
+tokio-util = { version = "0.7", features = ["compat"] }
 comfy-table = "7.1.0"
 bitflags = "1.3.2"
-egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.com/cube-js/egg.git", features = ["serde-1"] }
+egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.com/cube-js/egg.git", features = [
+    "serde-1",
+] }
 paste = "1.0.6"
-csv = "1.1.6"
 tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
 futures-core = "0.3.23"
@@ -55,7 +55,7 @@ futures-util = "0.3.23"
 sha1_smol = "1.0.0"
 tera = { version = "1", default-features = false }
 minijinja = { version = "1", features = ["json", "loader"] }
-lru = "0.12.1"
+lru = "0.13.0"
 sha2 = "0.10.8"
 bigdecimal = "0.4.2"
 indexmap = "1.9.3"
@@ -65,7 +65,10 @@ indexmap = "1.9.3"
 pretty_assertions = "1.0.0"
 insta = "1.12"
 portpicker = "0.1.1"
-tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] }
+tokio-postgres = { version = "0.7.7", features = [
+    "with-chrono-0_4",
+    "runtime",
+] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
 criterion = { version = "0.4.0", features = ["html_reports"] }
@@ -90,25 +93,15 @@ harness = false
 # Feel free to remove any rule from here and fix all warnings with it
 # Or to write a comment why rule should stay disabled
 [lints.clippy]
-clone_on_copy = "allow"
 collapsible_if = "allow"
 collapsible_match = "allow"
 collapsible_else_if = "allow"
 comparison_chain = "allow"
 derive_ord_xor_partial_ord = "allow"
 field_reassign_with_default = "allow"
-if_same_then_else = "allow"
-into_iter_on_ref = "allow"
-iter_cloned_collect = "allow"
-iter_next_slice = "allow"
 len_without_is_empty = "allow"
 len_zero = "allow"
 let_and_return = "allow"
-manual_flatten = "allow"
-manual_range_contains = "allow"
-map_clone = "allow"
-map_flatten = "allow"
-map_identity = "allow"
 match_like_matches_macro = "allow"
 match_ref_pats = "allow"
 match_single_binding = "allow"
@@ -126,7 +119,6 @@ new_without_default = "allow"
 non_canonical_partial_ord_impl = "allow"
 nonminimal_bool = "allow"
 only_used_in_recursion = "allow"
-op_ref = "allow"
 option_as_ref_deref = "allow"
 partialeq_ne_impl = "allow"
 ptr_arg = "allow"
@@ -146,8 +138,5 @@ unnecessary_mut_passed = "allow"
 unnecessary_to_owned = "allow"
 unnecessary_unwrap = "allow"
 unused_unit = "allow"
-unwrap_or_default = "allow"
-useless_conversion = "allow"
 useless_format = "allow"
-useless_vec = "allow"
 wrong_self_convention = "allow"
