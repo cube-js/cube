@@ -10,6 +10,10 @@ Access control is available in Cube Cloud on
 
 </SuccessBox>
 
+You can [manage accounts](#managing-accounts) as an account administrator,
+[manage roles](#managing-roles), [assign them](#assigning-roles-to-users) to users,
+and associate [supported actions](#actions) with those roles.
+
 ## Managing accounts
 
 Account administrators have ultimate control over the Cube Cloud account, including
@@ -30,10 +34,10 @@ Each role can be associated with one or more of the following policies:
 
 | Policy | Description |
 | --- | --- |
-| **Global** | Controls account-level functionality, e.g., as Billing. |
-| **Deployment** | Controls deployment-level functionality, e.g., as Playground. |
-| **Report** | Controls access to specific reports in Saved Reports. |
-| **ReportFolder** | Controls access to specific folders in Saved Reports. |
+| `Global` | Controls account-level functionality, e.g., as Billing. |
+| `Deployment` | Controls deployment-level functionality, e.g., as Playground. |
+| `Report` | Controls access to specific reports in Saved Reports. |
+| `ReportFolder` | Controls access to specific folders in Saved Reports. |
 
 Each policy can apply to _all resources_ or _specific resources_. For example, a policy
 could apply to all deployments or only to a specific deployment.
@@ -42,7 +46,7 @@ Also, each policy can have _all actions_ or only _specific actions_ associated w
 For example, a policy could allow a user to view, create, or delete one or more
 deployments if it's associated with those specific actions.
 
-
+See [actions reference](#actions) for a list of available actions.
 
 ### Browsing roles
 
@@ -88,3 +92,51 @@ Existing users' roles can be modified from the "Members" tab on the Team page:
   alt="Cube Cloud Team Roles tab"
   src="https://ucarecdn.com/a72cad30-487b-484a-b557-0f0e157c89b1/"
 />
+
+## Actions
+
+Policies can have the following actions associated with them.
+
+Actions for the `Global` policy:
+
+| Action | Description |
+| --- | --- |
+| `Alerts Access`<br/>`Alerts Create`<br/>`Alerts Edit`<br/>`Alerts Delete` | View, create, edit, and delete [budgets][ref-budgets]. |
+| `Billing Access` | Access the billing data of the Cube Cloud account. |
+| `Deployment Manage` | Create and delete deployments in the Cube Cloud account. |
+
+Actions for the `Deployment` policy:
+
+| Action | Description |
+| --- | --- |
+| `Deployment View`<br/>`Deployment Edit` | Access the deployment, change its settings. |
+| `Playground Access` | Use [Playground][ref-playground]. |
+| `Data Model View` | View the source code in the [data model][ref-data-model] editor, use [Visual Model][ref-visual-model]. |
+| `Data Model Edit (all branches)`<br/>`Data Model Edit (dev branches only)` | Use the [development mode][ref-dev-mode], edit the data model, perform Git operations (e.g., commit, pull, push). |
+| `Queries & Metrics Access` | Use [Query History][ref-query-history] and [Performance Insights][ref-perf-insights]. |
+| `SQL Runner Access` | Use [SQL Runner][ref-sql-runner]. |
+| `Data Assets Access` | Use [Semantic Catalog][ref-semantic-catalog] and [AI Assistant][ref-ai-assistant]. |
+
+Actions for the `Report` policy:
+
+| Action | Description |
+| --- | --- |
+| `ReportRead`<br/>`ReportManage` | View and create/delete reports. |
+
+Actions for the `ReportFolder` policy:
+
+| Action | Description |
+| --- | --- |
+| `ReportRead`<br/>`ReportManage` | View and create/delete report folders. |
+
+
+[ref-budgets]: /product/workspace/budgets
+[ref-playground]: /product/workspace/playground
+[ref-data-model]: /product/workspace/data-model
+[ref-visual-model]: /product/workspace/visual-model
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-query-history]: /product/workspace/query-history
+[ref-perf-insights]: /product/workspace/performance
+[ref-sql-runner]: /product/workspace/sql-runner
+[ref-semantic-catalog]: /product/workspace/semantic-catalog
+[ref-ai-assistant]: /product/workspace/ai-assistant
