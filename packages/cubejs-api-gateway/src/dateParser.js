@@ -75,7 +75,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
       throw new UserError(`Can't parse date: '${from}'`);
     }
 
-    if (!Array.isArray(fromResults) || !fromResults.length) {
+    if (!Array.isArray(toResults) || !toResults.length) {
       throw new UserError(`Can't parse date: '${to}'`);
     }
 
