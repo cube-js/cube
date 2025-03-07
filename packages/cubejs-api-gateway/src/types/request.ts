@@ -148,7 +148,7 @@ type SqlApiRequest = BaseRequest & {
  * Pre-aggregations selector object.
  */
 type PreAggsSelector = {
-  contexts?: {securityContext: any}[],
+  contexts: {securityContext: any}[],
   timezones: string[],
   dataSources?: string[],
   cubes?: string[],
@@ -178,7 +178,7 @@ type PreAggJob = {
  * The `/cubejs-system/v1/pre-aggregations/jobs` endpoint object type.
  */
 type PreAggsJobsRequest = {
-  action: 'post' | 'get' | 'delete',
+  action: 'post' | 'get',
   selector?: PreAggsSelector,
   tokens?: string[]
   resType?: 'object' | 'array'

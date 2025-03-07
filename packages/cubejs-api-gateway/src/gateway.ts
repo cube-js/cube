@@ -949,7 +949,7 @@ class ApiGateway {
     selector: PreAggsSelector
   ): Promise<string[]> {
     const compiler = await this.getCompilerApi(context);
-    const { timezones } = selector;
+    const { timezones, dateRange } = selector;
     const preaggs = await compiler.preAggregations({
       dataSources: selector.dataSources,
       cubes: selector.cubes,
@@ -965,12 +965,13 @@ class ApiGateway {
           {
             metadata: undefined,
             timezones,
+            dateRange,
             preAggregations: preaggs.map(p => ({
               id: p.id,
-              cacheOnly: undefined, // boolean
+              cacheOnly: false,
               partitions: undefined, // string[]
             })),
-            forceBuildPreAggregations: undefined,
+            forceBuildPreAggregations: false,
             throwErrors: false,
           }
         );
