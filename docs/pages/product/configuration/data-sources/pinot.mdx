@@ -14,8 +14,9 @@ workloads. [StarTree][link-startree] is a fully-managed platform for Pinot.
 - The hostname for the [Pinot][pinot] broker
 - The port for the [Pinot][pinot] broker
 
-With the current implementation of the Pinot driver, you have to enable the
-[multi-stage query engine][link-pinot-msqe] in your Pinot cluster.
+Note that the following features should be enabled in your Pinot cluster:
+- [Multi-stage query engine][link-pinot-msqe].
+- [Advanced null value support][link-pinot-nvs].
 
 ## Setup
 
@@ -41,14 +42,15 @@ CUBEJS_DB_PASS=**********
 
 ## Environment Variables
 
-| Environment Variable | Description                                | Possible Values     | Required |
-|----------------------|--------------------------------------------|---------------------|:--------:|
-| `CUBEJS_DB_HOST`     | The host URL for your Pinot broker         | A valid host URL    |    ✅    |
-| `CUBEJS_DB_PORT`     | The port for the database connection       | A valid port number |    ✅    |
-| `CUBEJS_DB_USER`     | The username used to connect to the broker | A valid username    |    ❌    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the broker | A valid password    |    ❌    |
-| `CUBEJS_DB_NAME`     | The database name for StarTree             | A valid name        |    ❌    |
-| `CUBEJS_DB_PINOT_AUTH_TOKEN` | The authentication token for StarTree | A valid token    |    ❌    |
+| Environment Variable            | Description                                           | Possible Values     | Required |
+|---------------------------------|-------------------------------------------------------|---------------------|:--------:|
+| `CUBEJS_DB_HOST`                | The host URL for your Pinot broker                    | A valid host URL    |    ✅    |
+| `CUBEJS_DB_PORT`                | The port for the database connection                  | A valid port number |    ✅    |
+| `CUBEJS_DB_USER`                | The username used to connect to the broker            | A valid username    |    ❌    |
+| `CUBEJS_DB_PASS`                | The password used to connect to the broker            | A valid password    |    ❌    |
+| `CUBEJS_DB_NAME`                | The database name for StarTree                        | A valid name        |    ❌    |
+| `CUBEJS_DB_PINOT_NULL_HANDLING` | If `true`, enables null handling. Default is `false`  | `true`, `false`     |    ❌    |
+| `CUBEJS_DB_PINOT_AUTH_TOKEN`    | The authentication token for StarTree                 | A valid token       |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -97,6 +99,7 @@ Cube does not require any additional configuration to enable SSL as Pinot connec
 [link-pinot]: https://pinot.apache.org/
 [pinot]: https://docs.pinot.apache.org/
 [link-pinot-msqe]: https://docs.pinot.apache.org/reference/multi-stage-engine
+[link-pinot-nvs]: https://docs.pinot.apache.org/developers/advanced/null-value-support#advanced-null-handling-support
 [pinot-docs-approx-agg-fns]:
   https://docs.pinot.apache.org/users/user-guide-query/query-syntax/how-to-handle-unique-counting
 [ref-recipe-enable-ssl]:
