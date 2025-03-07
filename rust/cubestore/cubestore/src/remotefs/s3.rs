@@ -123,8 +123,12 @@ async fn assume_role(
         .credentials
         .ok_or_else(|| CubeError::internal("Failed to get credentials".to_string()))?;
 
-    let access_key = assume_role_output.access_key_id.ok_or_else(|| CubeError::internal("Failed to get access key".to_string()))?;
-    let secret_key = assume_role_output.secret_access_key.ok_or_else(|| CubeError::internal("Failed to get secret key".to_string()))?;
+    let access_key = assume_role_output
+        .access_key_id
+        .ok_or_else(|| CubeError::internal("Failed to get access key".to_string()))?;
+    let secret_key = assume_role_output
+        .secret_access_key
+        .ok_or_else(|| CubeError::internal("Failed to get secret key".to_string()))?;
 
     Ok((access_key, secret_key))
 }
