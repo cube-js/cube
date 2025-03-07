@@ -63,6 +63,7 @@
   "jest": {
     "testEnvironment": "node",
     "collectCoverage": false,
+    "coverageReporters": ["text", "html"],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
       "dist/src/**/*.js",
