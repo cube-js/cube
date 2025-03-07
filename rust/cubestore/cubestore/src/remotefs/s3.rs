@@ -61,9 +61,7 @@ impl S3RemoteFs {
     
         let role_name = env::var("CUBESTORE_AWS_IAM_ROLE").ok();
         let (access_key, secret_key) = match role_name {
-            Some(role_name) => {
-                assume_role(&role_name, &region.to_string()).await
-            }
+            Some(role_name) => assume_role(&role_name, &region.to_string()).await,
             None => (
                 env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok(),
                 env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok(),
