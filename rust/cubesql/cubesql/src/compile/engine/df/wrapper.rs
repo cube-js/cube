@@ -1309,6 +1309,15 @@ impl CubeScanWrapperNode {
 
                                 let load_request = &ungrouped_scan_node.request;
 
+                                let (dimensions_only_projection, projection_with_measures) =
+                                    projection.iter().partition::<Vec<_>, _>(
+                                        |(_column, used_members)| {
+                                            used_members.iter().all(|member| {
+                                                plan.meta.find_dimension_with_name(member).is_some()
+                                            })
+                                        },
+                                    );
+
                                 let load_request = V1LoadRequestQuery {
                                     measures: Some(
                                         aggregate
@@ -1320,16 +1329,15 @@ impl CubeScanWrapperNode {
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
                                             })
-                                            .chain(
-                                                // TODO understand type of projections
-                                                projection.iter().map(|(m, used_members)| {
+                                            .chain(projection_with_measures.iter().map(
+                                                |(m, used_members)| {
                                                     Self::ungrouped_member_def(
                                                         m,
                                                         used_members,
                                                         &ungrouped_scan_node.used_cubes,
                                                     )
-                                                }),
-                                            )
+                                                },
+                                            ))
                                             .chain(window.iter().map(|(m, used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
@@ -1351,6 +1359,15 @@ impl CubeScanWrapperNode {
                                                     t,
                                                 )
                                             })
+                                            .chain(dimensions_only_projection.iter().map(
+                                                |(m, used_members)| {
+                                                    Self::ungrouped_member_def(
+                                                        m,
+                                                        used_members,
+                                                        &ungrouped_scan_node.used_cubes,
+                                                    )
+                                                },
+                                            ))
                                             .collect::<Result<_>>()?,
                                     ),
                                     segments: Some(
