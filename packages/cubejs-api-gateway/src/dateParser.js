@@ -65,8 +65,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
       moment.tz(timezone).endOf('day').add(1, 'day')
     ];
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
-    // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
-    const [all, from, to] = dateString.match(/^from (.*) to (.*)$/);
+    const [, from, to] = dateString.match(/^from (.*) to (.*)$/);
 
     const current = moment(now).tz(timezone);
     const fromResults = parse(from, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
@@ -89,7 +88,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
     momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   } else {
     const results = parse(dateString, new Date(moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
-    if (!results || !results.length) {
+    if (!results?.length) {
       throw new UserError(`Can't parse date: '${dateString}'`);
     }
 
