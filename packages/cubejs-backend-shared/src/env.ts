@@ -1784,6 +1784,35 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Pinot / Startree Null value support
+   */
+
+  pinotNullHandling: ({ dataSource }: { dataSource: string }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_PINOT_NULL_HANDLING', dataSource)
+    ];
+
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_PINOT_NULL_HANDLING',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return false;
+    }
+  },
+
   /** ****************************************************************
    * Dremio Driver                                                   *
    ***************************************************************** */
