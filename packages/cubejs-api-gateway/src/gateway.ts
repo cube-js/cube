@@ -912,8 +912,8 @@ class ApiGateway {
     // It's expected that selector.dateRange is provided in local time (without timezone)
     // At the same time it is ok to get timestamps with `Z` (in UTC).
     if (selector.dateRange) {
-      const start = parseLocalDate(selector.dateRange[0], 'UTC');
-      const end = parseLocalDate(selector.dateRange[1], 'UTC');
+      const start = parseLocalDate([{ val: selector.dateRange[0] }], 'UTC');
+      const end = parseLocalDate([{ val: selector.dateRange[1] }], 'UTC');
       if (!start || !end) {
         throw new Error(`Cannot parse selector date range ${selector.dateRange}`);
       }
