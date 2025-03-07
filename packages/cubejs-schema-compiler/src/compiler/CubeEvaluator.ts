@@ -601,9 +601,7 @@ export class CubeEvaluator extends CubeSymbols {
 
   public isInstanceOfType(type: 'measures' | 'dimensions' | 'segments', path: string | string[]): boolean {
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
-    const symbol = this.evaluatedCubes[cubeAndName[0]] &&
-      this.evaluatedCubes[cubeAndName[0]][type] &&
-      this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+    const symbol = this.evaluatedCubes[cubeAndName[0]]?.[type]?.[cubeAndName[1]];
     return symbol !== undefined;
   }
 
@@ -655,7 +653,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public isRbacEnabledForCube(cube: any): boolean {
-    return cube.accessPolicy && cube.accessPolicy.length;
+    return cube.accessPolicy?.length;
   }
 
   public isRbacEnabled(): boolean {
