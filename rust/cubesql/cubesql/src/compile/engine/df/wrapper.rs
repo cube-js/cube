@@ -849,6 +849,7 @@ impl CubeScanWrapperNode {
                                     expr,
                                     None,
                                     Arc::new(HashMap::new()),
+                                    None,
                                 )
                                 .await?;
                                 columns.push(AliasedColumn { expr, alias });
@@ -1563,6 +1564,7 @@ impl CubeScanWrapperNode {
             } else {
                 original_expr.clone()
             };
+
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
                 plan.clone(),
                 sql,
@@ -1570,6 +1572,7 @@ impl CubeScanWrapperNode {
                 expr.clone(),
                 push_to_cube_context,
                 subqueries.clone(),
+                None,
             )
             .await?;
             let expr_sql =
@@ -1674,6 +1677,7 @@ impl CubeScanWrapperNode {
         expr: Expr,
         push_to_cube_context: Option<&'ctx PushToCubeContext>,
         subqueries: Arc<HashMap<String, String>>,
+        mut used_members: Option<&'ctx mut HashSet<String>>,
     ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send + 'ctx>> {
         Box::pin(async move {
             match expr {
@@ -1685,6 +1689,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     Ok((expr, sql_query))
@@ -1723,6 +1728,7 @@ impl CubeScanWrapperNode {
                                     expr,
                                     None,
                                     subqueries.clone(),
+                                    used_members,
                                 )
                                 .await;
                             }
@@ -1757,6 +1763,9 @@ impl CubeScanWrapperNode {
                             })?;
                         match member {
                             MemberField::Member(member) => {
+                                if let Some(used_members) = used_members {
+                                    used_members.insert(member.clone());
+                                }
                                 Ok((format!("${{{}}}", member), sql_query))
                             }
                             MemberField::Literal(value) => {
@@ -1767,6 +1776,7 @@ impl CubeScanWrapperNode {
                                     Expr::Literal(value.clone()),
                                     push_to_cube_context,
                                     subqueries.clone(),
+                                    used_members,
                                 )
                                 .await
                             }
@@ -1818,6 +1828,7 @@ impl CubeScanWrapperNode {
                         *left,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (right, sql_query) = Self::generate_sql_for_expr(
@@ -1827,6 +1838,7 @@ impl CubeScanWrapperNode {
                         *right,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -1849,6 +1861,7 @@ impl CubeScanWrapperNode {
                         *like.expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (pattern, sql_query) = Self::generate_sql_for_expr(
@@ -1858,6 +1871,7 @@ impl CubeScanWrapperNode {
                         *like.pattern,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (escape_char, sql_query) = match like.escape_char {
@@ -1869,6 +1883,7 @@ impl CubeScanWrapperNode {
                                 Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members,
                             )
                             .await?;
                             (Some(escape_char), sql_query)
@@ -1894,6 +1909,7 @@ impl CubeScanWrapperNode {
                         *ilike.expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (pattern, sql_query) = Self::generate_sql_for_expr(
@@ -1903,6 +1919,7 @@ impl CubeScanWrapperNode {
                         *ilike.pattern,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (escape_char, sql_query) = match ilike.escape_char {
@@ -1914,6 +1931,7 @@ impl CubeScanWrapperNode {
                                 Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members,
                             )
                             .await?;
                             (Some(escape_char), sql_query)
@@ -1940,6 +1958,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql =
@@ -1962,6 +1981,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -1983,6 +2003,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -2004,6 +2025,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -2032,6 +2054,7 @@ impl CubeScanWrapperNode {
                             *expr,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -2048,6 +2071,7 @@ impl CubeScanWrapperNode {
                             *when,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         let (then, sql_query_next) = Self::generate_sql_for_expr(
@@ -2057,6 +2081,7 @@ impl CubeScanWrapperNode {
                             *then,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -2070,6 +2095,7 @@ impl CubeScanWrapperNode {
                             *else_expr,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members,
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -2093,6 +2119,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let data_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
@@ -2113,6 +2140,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -2446,6 +2474,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2483,6 +2512,7 @@ impl CubeScanWrapperNode {
                                         args[1].clone(),
                                         push_to_cube_context,
                                         subqueries.clone(),
+                                        used_members,
                                     )
                                     .await?;
                                     return Ok((
@@ -2526,6 +2556,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2566,6 +2597,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2595,6 +2627,7 @@ impl CubeScanWrapperNode {
                                 expr,
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members.as_deref_mut(),
                             )
                             .await?;
                             sql_query = query;
@@ -2623,6 +2656,7 @@ impl CubeScanWrapperNode {
                                 expr,
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members.as_deref_mut(),
                             )
                             .await?;
                             sql_query = query;
@@ -2664,6 +2698,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2678,6 +2713,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2692,6 +2728,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2728,6 +2765,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2740,6 +2778,7 @@ impl CubeScanWrapperNode {
                             expr,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2771,6 +2810,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2781,6 +2821,7 @@ impl CubeScanWrapperNode {
                         *subquery,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     sql_query = query;
