@@ -108,7 +108,7 @@ type ResponseResultFn =
   (
     message: (Record<string, any> | Record<string, any>[]) | DataResult | ErrorResponse,
     extra?: { status: number }
-  ) => void;
+  ) => void | Promise<void>;
 
 /**
  * Base HTTP request parameters map data type.
