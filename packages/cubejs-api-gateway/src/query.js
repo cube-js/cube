@@ -6,9 +6,10 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
 import { QueryType } from './types/enums';
+import { PreAggsJobsRequest } from "./types/request";
 
 const getQueryGranularity = (queries) => R.pipe(
-  R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
+  R.map(({ timeDimensions }) => timeDimensions[0]?.granularity),
   R.filter(Boolean),
   R.uniq
 )(queries);
@@ -145,6 +146,22 @@ const normalizeQueryOrder = order => {
   return result;
 };
 
+export const preAggsJobsRequestSchema = Joi.object().keys({
+  action: Joi.string().valid('post', 'get').required(),
+  selector: Joi.object().keys({
+    contexts: Joi.array().items(
+      Joi.object().keys({
+        securityContext: Joi.required(),
+      })
+    ).min(1).required(),
+    timezones: Joi.array().items(Joi.string()).min(1).required(),
+    dataSources: Joi.array().items(Joi.string()),
+    cubes: Joi.array().items(Joi.string()),
+    preAggregations: Joi.array().items(Joi.string()),
+    dateRange: Joi.array().length(2).items(Joi.string()),
+  }).optional(),
+});
+
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 const normalizeQueryFilters = (filter) => (
@@ -196,9 +213,9 @@ const normalizeQuery = (query, persistent) => {
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
-  const validQuery = query.measures && query.measures.length ||
-    query.dimensions && query.dimensions.length ||
-    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
+  const validQuery = query.measures?.length ||
+    query.dimensions?.length ||
+    query.timeDimensions?.filter(td => !!td.granularity).length;
   if (!validQuery) {
     throw new UserError(
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'

@@ -8,6 +8,7 @@ import structuredClone from '@ungap/structured-clone';
 import {
   getEnv,
   getRealType,
+  parseLocalDate,
   QueryAlias,
 } from '@cubejs-backend/shared';
 import {
@@ -81,7 +82,9 @@ import {
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
-  normalizeQueryPreAggregations, remapToQueryAdapterFormat,
+  normalizeQueryPreAggregations,
+  preAggsJobsRequestSchema,
+  remapToQueryAdapterFormat,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -843,7 +846,6 @@ class ApiGateway {
    *   ]
    * }
    * ```
-   * TODO (buntarb): selector object validator.
    */
   private async preAggregationsJobs(req: Request, res: ExpressResponse) {
     const response = this.resToResultFn(res);
@@ -853,41 +855,14 @@ class ApiGateway {
     let result;
     try {
       await this.assertApiScope('jobs', req?.context?.securityContext);
+
+      const { error } = preAggsJobsRequestSchema.validate(query);
+      if (error) {
+        throw new UserError(`Invalid Job query format: ${error.message || error.toString()}`);
+      }
+
       switch (query.action) {
         case 'post':
-          if (
-            !(<PreAggsSelector>query.selector).timezones ||
-            (<PreAggsSelector>query.selector).timezones.length === 0
-          ) {
-            throw new UserError(
-              'A user\'s selector must contain at least one time zone.'
-            );
-          }
-          if (
-            !(<PreAggsSelector>query.selector).contexts ||
-            (
-              <{securityContext: any}[]>(
-                <PreAggsSelector>query.selector
-              ).contexts
-            ).length === 0
-          ) {
-            throw new UserError(
-              'A user\'s selector must contain at least one context element.'
-            );
-          } else {
-            let e = false;
-            (<{securityContext: any}[]>(
-              <PreAggsSelector>query.selector
-            ).contexts).forEach((c) => {
-              if (!c.securityContext) e = true;
-            });
-            if (e) {
-              throw new UserError(
-                'Every context element must contain the ' +
-                '\'securityContext\' property.'
-              );
-            }
-          }
           result = await this.preAggregationsJobsPOST(
             context,
             <PreAggsSelector>query.selector
@@ -930,6 +905,19 @@ class ApiGateway {
     // For the sake of type check, as contexts are checked in preAggregationsJobs()
     if (!selector.contexts) {
       return jobs;
+    }
+
+    // There might be a few contexts but dateRange if present is still the same
+    // so let's normalize it only once.
+    // It's expected that selector.dateRange is provided in local time (without timezone)
+    // At the same time it is ok to get timestamps with `Z` (in UTC).
+    if (selector.dateRange) {
+      const start = parseLocalDate(selector.dateRange[0], 'UTC');
+      const end = parseLocalDate(selector.dateRange[1], 'UTC');
+      if (!start || !end) {
+        throw new Error(`Cannot parse selector date range ${selector.dateRange}`);
+      }
+      selector.dateRange = [start, end];
     }
 
     const promise = Promise.all(
