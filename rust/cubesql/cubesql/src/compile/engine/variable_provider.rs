@@ -25,7 +25,7 @@ impl VariablesProvider {
 
     fn get_session_value(&self, identifier: Vec<String>, var_type: VarType) -> Result<ScalarValue> {
         let key = if identifier.len() > 1 {
-            let ignore_first = identifier[0].to_ascii_lowercase() == "@@session";
+            let ignore_first = identifier[0].eq_ignore_ascii_case("@@session");
             if ignore_first {
                 identifier[1..].concat()
             } else {
@@ -48,7 +48,7 @@ impl VariablesProvider {
 
     fn get_global_value(&self, identifier: Vec<String>) -> Result<ScalarValue> {
         let key = if identifier.len() > 1 {
-            let ignore_first = identifier[0].to_ascii_lowercase() == "@@global";
+            let ignore_first = identifier[0].eq_ignore_ascii_case("@@global");
 
             if ignore_first {
                 identifier[1..].concat()
@@ -85,7 +85,7 @@ impl VarProvider for VariablesProvider {
 
         match (&first_word_vec[0], &first_word_vec[1]) {
             ('@', '@') => {
-                if identifier.len() > 1 && identifier[0].to_ascii_lowercase() == "@@session" {
+                if identifier.len() > 1 && identifier[0].eq_ignore_ascii_case("@@session") {
                     return self.get_session_value(identifier, VarType::System);
                 }
 

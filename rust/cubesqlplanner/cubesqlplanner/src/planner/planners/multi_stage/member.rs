@@ -66,11 +66,53 @@ pub enum MultiStageLeafMemberType {
 }
 
 #[derive(Clone)]
-pub struct RollingWindowDescription {
-    pub time_dimension: Rc<dyn BaseMember>,
+pub struct RegularRollingWindow {
     pub trailing: Option<String>,
     pub leading: Option<String>,
     pub offset: String,
+}
+
+#[derive(Clone)]
+pub struct ToDateRollingWindow {
+    pub granularity: String,
+}
+
+#[derive(Clone)]
+pub enum RollingWindowType {
+    Regular(RegularRollingWindow),
+    ToDate(ToDateRollingWindow),
+}
+
+#[derive(Clone)]
+pub struct RollingWindowDescription {
+    pub time_dimension: Rc<dyn BaseMember>,
+    pub rolling_window: RollingWindowType,
+}
+
+impl RollingWindowDescription {
+    pub fn new_regular(
+        time_dimension: Rc<dyn BaseMember>,
+        trailing: Option<String>,
+        leading: Option<String>,
+        offset: String,
+    ) -> Self {
+        let regular_window = RegularRollingWindow {
+            trailing,
+            leading,
+            offset,
+        };
+        Self {
+            time_dimension,
+            rolling_window: RollingWindowType::Regular(regular_window),
+        }
+    }
+
+    pub fn new_to_date(time_dimension: Rc<dyn BaseMember>, granularity: String) -> Self {
+        Self {
+            time_dimension,
+            rolling_window: RollingWindowType::ToDate(ToDateRollingWindow { granularity }),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -94,7 +136,6 @@ pub struct MultiStageInodeMember {
     add_group_by: Vec<String>,
     group_by: Option<Vec<String>>,
     time_shifts: Vec<MultiStageTimeShift>,
-    is_ungrupped: bool,
 }
 
 impl MultiStageInodeMember {
@@ -104,7 +145,6 @@ impl MultiStageInodeMember {
         add_group_by: Vec<String>,
         group_by: Option<Vec<String>>,
         time_shifts: Vec<MultiStageTimeShift>,
-        is_ungrupped: bool,
     ) -> Self {
         Self {
             inode_type,
@@ -112,7 +152,6 @@ impl MultiStageInodeMember {
             add_group_by,
             group_by,
             time_shifts,
-            is_ungrupped,
         }
     }
 
@@ -135,10 +174,6 @@ impl MultiStageInodeMember {
     pub fn time_shifts(&self) -> &Vec<MultiStageTimeShift> {
         &self.time_shifts
     }
-
-    pub fn is_ungrupped(&self) -> bool {
-        self.is_ungrupped
-    }
 }
 
 #[derive(Clone)]
@@ -150,13 +185,22 @@ pub enum MultiStageMemberType {
 pub struct MultiStageMember {
     member_type: MultiStageMemberType,
     evaluation_node: Rc<MemberSymbol>,
+    is_ungrupped: bool,
+    has_aggregates_on_top: bool,
 }
 
 impl MultiStageMember {
-    pub fn new(member_type: MultiStageMemberType, evaluation_node: Rc<MemberSymbol>) -> Rc<Self> {
+    pub fn new(
+        member_type: MultiStageMemberType,
+        evaluation_node: Rc<MemberSymbol>,
+        is_ungrupped: bool,
+        has_aggregates_on_top: bool,
+    ) -> Rc<Self> {
         Rc::new(Self {
             member_type,
             evaluation_node,
+            is_ungrupped,
+            has_aggregates_on_top,
         })
     }
 
@@ -170,5 +214,13 @@ impl MultiStageMember {
 
     pub fn full_name(&self) -> String {
         self.evaluation_node.full_name()
+    }
+
+    pub fn is_ungrupped(&self) -> bool {
+        self.is_ungrupped
+    }
+
+    pub fn has_aggregates_on_top(&self) -> bool {
+        self.has_aggregates_on_top
     }
 }

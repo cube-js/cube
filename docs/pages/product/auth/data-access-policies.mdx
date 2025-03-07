@@ -1,0 +1,173 @@
+# Data access policies
+
+Data access policies provide a holistic mechanism to manage [member-level](#member-level-access)
+and [row-level](#row-level-access) security for different [data access roles](#data-access-roles).
+You can define access control rules in data model files, allowing for an organized
+and maintainable approach to security.
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/yJfnYB27wSQ"
+  aspectRatio={4/3}
+/>
+
+## Data access roles
+
+Each request to Cube includes a [security context][ref-sec-ctx], which can contain
+information about the user. You can use the [`context_to_roles` configuration
+option][ref-ctx-to-roles] to derive the user's roles from the security context:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('context_to_roles')
+def context_to_roles(ctx: dict) -> list[str]:
+  return ctx['securityContext'].get('roles', ['default'])
+```
+
+```javascript
+module.exports = {
+  contextToRoles: ({ securityContext }) => {
+    return securityContext.roles || ['default']
+  }
+}
+```
+
+</CodeTabs>
+
+A user can have more than one role.
+
+## Policies
+
+You can define policies that target specific roles and contain member-level and (or)
+row-level security rules:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+        # For all roles, restrict access entirely
+      - role: "*"
+        member_level:
+          includes: []
+
+        # For the `manager` role,
+        #   allow access to all members
+        #   but filter rows by the user's country
+      - role: manager
+        conditions:
+          - if: "{ securityContext.is_EMEA_based }"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: country
+              operator: equals
+              values: [ "{ securityContext.country }" ]
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      // For all roles, restrict access entirely
+      role: `*`,
+      member_level: {
+        includes: []
+      }
+    },
+    {
+      // For the `manager` role,
+      //   allow access to all members
+      //   but filter rows by the user's country
+      role: `manager`,
+      conditions: [
+        { if: securityContext.is_EMEA_based }
+      ],
+      member_level: {
+        includes: `*`
+      },
+      row_level: {
+        filters: [
+          {
+            member: `country`,
+            operator: `equals`,
+            values: [ securityContext.country ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+You can define data access policies both in cubes and views. If you use views,
+it is recommended to keep all your cubes private and define access policies in views only.
+It will make your security rules easier to maintain and reason about, especially
+when it comes to [member-level access](#member-level-access).
+
+For more details on available parameters, check out the [data access policies reference][ref-ref-dap].
+
+## Policy evaluation
+
+When processing a request, Cube will evaluate the data access policies and combine them
+with relevant custom security rules, e.g., [`public` parameters][ref-mls-public] for member-level security
+and [`query_rewrite` filters][ref-rls-queryrewrite] for row-level security.
+
+If multiple access policies apply to a request, they are _combined together_
+using the _OR_ semantics. For example, if a user has two roles with different
+policies, the user will get the union of the permissions in these policies.
+
+### Member-level access
+
+Member-level security rules in data access policies are _combined together_
+with `public` parameters of cube and view members using the _AND_ semantics.
+Both will apply to the request.
+
+_When querying a view,_ member-level security rules defined in the view are _**not** combined together_
+with member-level security rules defined in relevant cubes.
+**Only the ones from the view will apply to the request.**
+
+<InfoBox>
+
+This is consistent with how column-level security works in SQL databases. If you have
+a view that exposes a subset of columns from a table, it doesnt matter if the
+columns in the table are public or not, the view will expose them anyway.
+
+</InfoBox>
+
+### Row-level access
+
+Row-level filters in data access policies are _combined together_ with filters defined
+using the [`query_rewrite` configuration option][ref-config-queryrewrite].
+Both will apply to the request.
+
+_When querying a view,_ row-level filters defined in the view are _combined together_
+with row-level filters defined in relevant cubes. Both will apply to the request.
+
+<InfoBox>
+
+This is consistent with how row-level security works in SQL databases. If you have
+a view that exposes a subset of rows from another view, the result set will be
+filtered by the row-level security rules of both views.
+
+</InfoBox>
+
+
+[ref-mls]: /product/auth/member-level-security
+[ref-mls-public]: /product/auth/member-level-security#managing-member-level-access
+[ref-rls]: /product/auth/row-level-security
+[ref-rls-queryrewrite]: /product/auth/row-level-security#managing-row-level-access
+[ref-sec-ctx]: /product/auth/context
+[ref-ctx-to-roles]: /reference/configuration/config#context_to_roles
+[ref-ref-dap]: /reference/data-model/data-access-policies
+[ref-config-queryrewrite]: /reference/configuration/config#query_rewrite

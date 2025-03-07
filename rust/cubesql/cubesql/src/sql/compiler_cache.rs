@@ -212,7 +212,7 @@ impl CompilerCache for CompilerCacheImpl {
                         )),
                     });
                     compiler_id_to_entry.put(
-                        (meta_context.compiler_id.clone(), protocol.clone()),
+                        (meta_context.compiler_id, protocol.clone()),
                         cache_entry.clone(),
                     );
                     cache_entry

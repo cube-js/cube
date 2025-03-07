@@ -1,8 +1,3 @@
----
-redirect_from:
-  - /config/databases/ksqldb
----
-
 # ksqlDB
 
 [ksqlDB](https://ksqldb.io) is a purpose-built database for stream processing
@@ -18,7 +13,17 @@ ksqlDB support is available in Cube Cloud on the
 
 See how you can use ksqlDB and Cube Cloud to power real-time analytics in Power BI:
 
-<YouTubeVideo url="https://www.youtube.com/embed/RD_HZ7xE8G0" />
+<YouTubeVideo
+  url="https://www.youtube.com/embed/RD_HZ7xE8G0"
+  aspectRatio={4/3.55}
+/>
+
+<InfoBox>
+
+In this video, the SQL API is used to connect to [Power BI][ref-powerbi].
+Currently, it's recommended to use the [DAX API][ref-dax-api].
+
+</InfoBox>
 
 ## Prerequisites
 
@@ -69,3 +74,6 @@ CUBEJS_DB_PASS=password
 ksqlDB supports only
 [streaming pre-aggregations](/product/caching/using-pre-aggregations#streaming-pre-aggregations).
 
+
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-dax-api]: /product/apis-integrations/dax-api

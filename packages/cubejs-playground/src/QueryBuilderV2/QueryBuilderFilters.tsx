@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Flex, Flow, Space, tasty } from '@cube-dev/ui-kit';
+import { Button, ClearIcon, Flex, Flow, Space, tasty } from '@cube-dev/ui-kit';
 import { TCubeDimension, TCubeMeasure } from '@cubejs-client/core';
 
 import { useQueryBuilderContext } from './context';
@@ -112,7 +112,7 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
       }
       extra={
         timeCounter || dimensionCounter || measureCounter || segmentsCounter ? (
-          <Button size="small" theme="danger" onPress={onClearAction}>
+          <Button icon={<ClearIcon />} size="small" theme="danger" onPress={onClearAction}>
             Remove All
           </Button>
         ) : null

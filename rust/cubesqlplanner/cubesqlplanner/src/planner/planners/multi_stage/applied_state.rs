@@ -160,26 +160,63 @@ impl MultiStageAppliedState {
         false
     }
 
-    pub fn expand_date_range_filter(
+    pub fn replace_regular_date_range_filter(
         &mut self,
         member_name: &String,
         left_interval: Option<String>,
         right_interval: Option<String>,
     ) {
-        self.time_dimensions_filters = self.expand_date_range_filter_impl(
+        let operator = FilterOperator::RegularRollingWindowDateRange;
+        let values = vec![left_interval.clone(), right_interval.clone()];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
             member_name,
             &self.time_dimensions_filters,
-            &left_interval,
-            &right_interval,
+            &operator,
+            &values,
+            &None,
         );
     }
 
-    fn expand_date_range_filter_impl(
+    pub fn replace_to_date_date_range_filter(
+        &mut self,
+        member_name: &String,
+        granularity: &String,
+    ) {
+        let operator = FilterOperator::ToDateRollingWindowDateRange;
+        let values = vec![Some(granularity.clone())];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            &values,
+            &None,
+        );
+    }
+
+    pub fn replace_range_in_date_filter(
+        &mut self,
+        member_name: &String,
+        new_from: String,
+        new_to: String,
+    ) {
+        let operator = FilterOperator::InDateRange;
+        let replacement_values = vec![Some(new_from), Some(new_to)];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            &vec![],
+            &Some(replacement_values),
+        );
+    }
+
+    fn change_date_range_filter_impl(
         &self,
         member_name: &String,
         filters: &Vec<FilterItem>,
-        left_interval: &Option<String>,
-        right_interval: &Option<String>,
+        operator: &FilterOperator,
+        additional_values: &Vec<Option<String>>,
+        replacement_values: &Option<Vec<Option<String>>>,
     ) -> Vec<FilterItem> {
         let mut result = Vec::new();
         for item in filters.iter() {
@@ -187,11 +224,12 @@ impl MultiStageAppliedState {
                 FilterItem::Group(group) => {
                     let new_group = FilterItem::Group(Rc::new(FilterGroup::new(
                         group.operator.clone(),
-                        self.expand_date_range_filter_impl(
+                        self.change_date_range_filter_impl(
                             member_name,
                             filters,
-                            left_interval,
-                            right_interval,
+                            operator,
+                            additional_values,
+                            replacement_values,
                         ),
                     )));
                     result.push(new_group);
@@ -200,10 +238,13 @@ impl MultiStageAppliedState {
                     let itm = if &itm.member_name() == member_name
                         && matches!(itm.filter_operator(), FilterOperator::InDateRange)
                     {
-                        let mut values = itm.values().clone();
-                        values.push(left_interval.clone());
-                        values.push(right_interval.clone());
-                        itm.change_operator(FilterOperator::InDateRangeExtended, values)
+                        let mut values = if let Some(values) = replacement_values {
+                            values.clone()
+                        } else {
+                            itm.values().clone()
+                        };
+                        values.extend(additional_values.iter().cloned());
+                        itm.change_operator(operator.clone(), values)
                     } else {
                         itm.clone()
                     };

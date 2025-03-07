@@ -9,37 +9,36 @@ With a rich set of APIs, Cube can power and deliver data to all kinds of data
 applications.
 
 [Data APIs](#data-apis) are used to run queries against the data model.
-Despite using various transports and query formats, all data APIs share common
+Despite varying protocols and query formats, all data APIs share common
 [querying concepts][ref-queries].
 
-<Diagram src="https://ucarecdn.com/023ca78a-aa96-493a-9799-95955a6d8948/" />
+<Diagram src="https://ucarecdn.com/4abc9729-66a3-489f-9d48-0bf27e728c87/" />
 
 Also, there are [management APIs](#management-apis) to control Cube deployments
 externally.
 
-<Diagram src="https://ucarecdn.com/8b9c0a27-c9bf-4f32-86b7-223c9fae8cc8/" />
+<Diagram src="https://ucarecdn.com/3ff02e30-a010-480d-b6d6-3b927baa0dfe/" />
 
 ## Data APIs
 
 A few rules of thumb to help you choose an API:
 
-* When implementing internal or self-serve [business intelligence][cube-issbi] use
-case, pick the [SQL API][ref-sql-api] and [Semantic Layer Sync][ref-sls]. The
-SQL API allows querying Cube with a Postgres-compatible [dialect of
-SQL][ref-sql-syntax], either by writing queries manually or generating them with
-BI tools.
+* To connect to [Microsoft Power BI][ref-powerbi], use the [DAX API][ref-dax-api].
 
-* To connect to Microsoft Excel, use the [MDX API][ref-mdx-api]. To connect to
-Google Sheets, use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets].
+* To connect to [Microsoft Excel][ref-excel], use either the [MDX API][ref-mdx-api]
+or [Cube Cloud for Excel][ref-cube-cloud-for-excel].
 
-* When implementing [embedded analytics][cube-ea] and [real-time
-analytics][cube-rta] use cases, pick [REST API][ref-rest-api] or [GraphQL
-API][ref-graphql-api]. Also, the [JavaScript SDK][ref-js-sdk] will simplify
-integration with your front-end code. The REST API uses a [JSON-based query
-format][ref-json-syntax], and the GraphQL API accepts [GraphQL
-queries][ref-graphql-syntax].
+* To connect to [Google Sheets][ref-sheets], use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets].
 
-* For AI use cases, consider using the [AI API][ref-ai-api].
+* For internal or self-serve [business intelligence][cube-issbi], use
+[Semantic Layer Sync][ref-sls] in case it supports your BI tools.
+Otherwise, connect via the [SQL API][ref-sql-api] directly.
+
+* For [embedded analytics][cube-ea] and [real-time analytics][cube-rta], use
+[REST API][ref-rest-api] or [GraphQL API][ref-graphql-api]. When using the REST API,
+the [JavaScript SDK][ref-js-sdk] can simplify integration with your front-end code.
+
+* For AI use cases, use the [AI API][ref-ai-api].
 
 <ReferenceBox>
 
@@ -48,15 +47,26 @@ for an unofficial, community-maintained [client library for Python](https://gith
 
 </ReferenceBox>
 
-### Support for data modeling
+### Data modeling
 
 Support for data modeling features differ across APIs, integrations, and [visualization
 tools][ref-viz-tools]. Some of the features with partial support are listed below:
 
-| Feature | Supported in | Not supported in |
+| Feature | ✅ Supported in | ❌ Not supported in |
 | --- | --- | --- |
-| [Hierarchies][ref-hierarchies] | ✅ [Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>✅ Cube Cloud for Excel<br/>✅ [Cube Cloud for Sheets][ref-cube-cloud-for-sheets] | ❌ All other tools |
-| [Folders][ref-folders] | ✅ [Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls]<br/>✅ Cube Cloud for Excel<br/>✅ [Cube Cloud for Sheets][ref-cube-cloud-for-sheets] | ❌ All other tools |
+| [Hierarchies][ref-hierarchies] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls] | All other tools |
+| [Folders][ref-folders] | [Microsoft Power BI][ref-powerbi] via the [DAX API][ref-dax-api]<br/>[Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]<br/>[Tableau][ref-tableau] via [Semantic Layer Sync][ref-sls] | All other tools |
+
+### Authentication methods
+
+Support for authentication methods differ across APIs, integrations, and [visualization
+tools][ref-viz-tools]:
+
+| Method | ✅ Supported in |
+| --- | --- |
+| [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
+| [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
+| [Access token][ref-auth-tokens] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api]<br/>[AI API][ref-ai-api] |
 
 ## Management APIs
 
@@ -68,6 +78,7 @@ API][ref-orchestration-api].
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
 [cube-rta]: https://cube.dev/use-cases/real-time-analytics
 [ref-queries]: /product/apis-integrations/queries
+[ref-dax-api]: /product/apis-integrations/dax-api
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-graphql-api]: /product/apis-integrations/graphql-api
@@ -76,11 +87,15 @@ API][ref-orchestration-api].
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-js-sdk]: /product/apis-integrations/javascript-sdk
-[ref-sql-syntax]: /product/apis-integrations/sql-api#querying-fundamentals
-[ref-json-syntax]: /product/apis-integrations/rest-api/query-format
-[ref-graphql-syntax]: /product/apis-integrations/graphql-api#getting-started
+[ref-cube-cloud-for-excel]: /product/apis-integrations/microsoft-excel
 [ref-cube-cloud-for-sheets]: /product/apis-integrations/google-sheets
 [ref-viz-tools]: /product/configuration/visualization-tools
 [ref-hierarchies]: /reference/data-model/hierarchies
 [ref-folders]: /reference/data-model/view#folders
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-excel]: /product/configuration/visualization-tools/excel
+[ref-sheets]: /product/configuration/visualization-tools/google-sheets
 [ref-tableau]: /product/configuration/visualization-tools/tableau
+[ref-auth-user-pass]: /product/auth#user-name-and-password
+[ref-auth-idp]: /product/auth#identity-provider
+[ref-auth-tokens]: /product/auth#access-token

@@ -2,6 +2,7 @@ use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -35,6 +36,7 @@ impl SqlNode for MultiStageRankNode {
         node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(m) => {
@@ -48,6 +50,7 @@ impl SqlNode for MultiStageRankNode {
                                     visitor,
                                     node_processor.clone(),
                                     query_tools.clone(),
+                                    templates,
                                 )?;
                                 Ok(format!("{} {}", sql, item.direction()))
                             })
@@ -69,6 +72,7 @@ impl SqlNode for MultiStageRankNode {
                         node,
                         query_tools.clone(),
                         node_processor.clone(),
+                        templates,
                     )?
                 }
             }

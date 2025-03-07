@@ -62,6 +62,7 @@ import {
   hiddenCube,
   viewMetaExposed,
   preAggsCustomersRunningTotal,
+  queryingECommerceCompareDateRangesByCustomerOverProductNameByMonth,
 } from './tests';
 import { testSet } from './driverTest';
 
@@ -155,4 +156,8 @@ export const preAggsTestSet = testSet([
 export const productionTestSet = testSet([
   hiddenMember,
   hiddenCube,
+]);
+
+export const multiQueryTestSet = testSet([
+  queryingECommerceCompareDateRangesByCustomerOverProductNameByMonth,
 ]);

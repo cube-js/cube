@@ -405,7 +405,10 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
         },
-        FilterSimplifyReplacer {
+        FilterSimplifyPushDownReplacer {
+            filters: Vec<LogicalPlan>,
+        },
+        FilterSimplifyPullUpReplacer {
             filters: Vec<LogicalPlan>,
         },
         OrderReplacer {
@@ -513,6 +516,19 @@ crate::plan_to_language! {
         },
         QueryParam {
             index: usize,
+        },
+        JoinCheckStage {
+            expr: Arc<Expr>,
+        },
+        JoinCheckPushDown {
+            expr: Arc<Expr>,
+            left_input: Arc<LogicalPlan>,
+            right_input: Arc<LogicalPlan>,
+        },
+        JoinCheckPullUp {
+            expr: Arc<Expr>,
+            left_input: Arc<LogicalPlan>,
+            right_input: Arc<LogicalPlan>,
         },
     }
 }
@@ -678,7 +694,7 @@ impl LogicalPlanData {
         {
             {
                 let column_name = expr_column_name(&expr, &None);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -689,7 +705,7 @@ impl LogicalPlanData {
             }
             {
                 let column_name = expr_column_name_with_relation(&expr, &mut relation);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -1709,8 +1725,7 @@ fn case_expr<D: Display>(
             "CaseExprWhenThenExpr",
             when_then
                 .into_iter()
-                .map(|(when, then)| vec![when, then])
-                .flatten()
+                .flat_map(|(when, then)| [when, then])
                 .collect(),
         ),
         case_expr_else_expr(else_expr),
@@ -1889,8 +1904,12 @@ fn filter_replacer(
     )
 }
 
-fn filter_simplify_replacer(members: impl Display) -> String {
-    format!("(FilterSimplifyReplacer {})", members)
+fn filter_simplify_push_down_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPushDownReplacer {})", members)
+}
+
+fn filter_simplify_pull_up_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPullUpReplacer {})", members)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
@@ -2150,6 +2169,18 @@ fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
 
 fn distinct(input: impl Display) -> String {
     format!("(Distinct {})", input)
+}
+
+fn join_check_stage(expr: impl Display) -> String {
+    format!("(JoinCheckStage {expr})")
+}
+
+fn join_check_push_down(expr: impl Display, left: impl Display, right: impl Display) -> String {
+    format!("(JoinCheckPushDown {expr} {left} {right})")
+}
+
+fn join_check_pull_up(expr: impl Display, left: impl Display, right: impl Display) -> String {
+    format!("(JoinCheckPullUp {expr} {left} {right})")
 }
 
 pub fn original_expr_name(egraph: &CubeEGraph, id: Id) -> Option<String> {

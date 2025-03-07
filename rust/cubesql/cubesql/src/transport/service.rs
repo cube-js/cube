@@ -418,7 +418,7 @@ impl SqlTemplates {
             .iter()
             .chain(aggregate.iter())
             .chain(projection.iter())
-            .map(|c| c.clone())
+            .cloned()
             .collect::<Vec<_>>();
         let quoted_from_alias = self.quote_identifier(&alias)?;
         let has_grouping_sets = group_descs.iter().any(|d| d.is_some());

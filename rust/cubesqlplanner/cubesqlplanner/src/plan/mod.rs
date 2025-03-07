@@ -16,7 +16,7 @@ pub use cte::Cte;
 pub use expression::{Expr, MemberExpression};
 pub use filter::{Filter, FilterGroup, FilterItem};
 pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
-pub use join::{Join, JoinCondition, JoinItem, RollingWindowJoinCondition};
+pub use join::{Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition};
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use schema::{QualifiedColumnName, Schema, SchemaColumn};

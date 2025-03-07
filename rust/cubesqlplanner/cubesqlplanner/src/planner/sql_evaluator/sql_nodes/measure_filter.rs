@@ -2,6 +2,7 @@ use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -27,10 +28,15 @@ impl SqlNode for MeasureFilterSqlNode {
         node: &Rc<MemberSymbol>,
         query_tools: Rc<QueryTools>,
         node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        let input =
-            self.input
-                .to_sql(visitor, node, query_tools.clone(), node_processor.clone())?;
+        let input = self.input.to_sql(
+            visitor,
+            node,
+            query_tools.clone(),
+            node_processor.clone(),
+            templates,
+        )?;
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
                 let measure_filters = ev.measure_filters();
@@ -43,7 +49,8 @@ impl SqlNode for MeasureFilterSqlNode {
                                 filter.eval(
                                     &visitor,
                                     node_processor.clone(),
-                                    query_tools.clone()
+                                    query_tools.clone(),
+                                    templates
                                 )?
                             ))
                         })

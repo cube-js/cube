@@ -38,7 +38,7 @@ curl \
  -X POST  \
  -H "Content-Type: application/json" \
  -H "Authorization: EXAMPLE-API-TOKEN" \
- --data '{ "messages": [{ "role": "user", "content": "What cities have the highest aov this year?", "views": ["orders_view"] }]}' \
+ --data '{ "messages": [{ "role": "user", "content": "What cities have the highest aov this year?" }], "views": ["orders_view"] }' \
  https://YOUR_CUBE_API/cubejs-api/v1/ai/query/completions
 ```
 

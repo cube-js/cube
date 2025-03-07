@@ -14,37 +14,46 @@ use crate::wrappers::{neon::context::ContextHolder, object::NativeObject};
 use cubesql::CubeError;
 use neon::prelude::*;
 
-pub struct NeonObject<'cx: 'static, C: Context<'cx>> {
-    context: ContextHolder<'cx, C>,
-    object: Handle<'cx, JsValue>,
+pub struct NeonTypeHandle<C: Context<'static>, V: Value + 'static> {
+    context: ContextHolder<C>,
+    object: Handle<'static, V>,
 }
 
-impl<'cx: 'static, C: Context<'cx> + 'cx> NeonObject<'cx, C> {
-    pub fn new(context: ContextHolder<'cx, C>, object: Handle<'cx, JsValue>) -> Self {
+impl<C: Context<'static> + 'static, V: Value + 'static> NeonTypeHandle<C, V> {
+    pub fn new(context: ContextHolder<C>, object: Handle<'static, V>) -> Self {
         Self { context, object }
     }
 
-    pub fn get_object(&self) -> Handle<'cx, JsValue> {
-        self.object.clone()
+    fn get_context(&self) -> ContextHolder<C> {
+        self.context.clone()
     }
 
-    pub fn get_object_ref(&self) -> &Handle<'cx, JsValue> {
-        &self.object
-    }
-
-    pub fn into_object(self) -> Handle<'cx, JsValue> {
+    pub fn get_object(&self) -> Handle<'static, V> {
         self.object
     }
 
-    pub fn map_neon_object<T, F>(&self, f: F) -> T
+    pub fn get_object_ref(&self) -> &Handle<'static, V> {
+        &self.object
+    }
+
+    pub fn into_object(self) -> Handle<'static, V> {
+        self.object
+    }
+
+    pub fn upcast(&self) -> NeonObject<C> {
+        NeonObject::new(self.context.clone(), self.object.upcast())
+    }
+
+    pub fn map_neon_object<T, F>(&self, f: F) -> Result<T, CubeError>
     where
-        F: FnOnce(&mut C, &Handle<'cx, JsValue>) -> T,
+        F: FnOnce(&mut C, &Handle<'static, V>) -> T,
     {
         self.context.with_context(|cx| f(cx, &self.object))
     }
+
     pub fn map_downcast_neon_object<JT: Value, T, F>(&self, f: F) -> Result<T, CubeError>
     where
-        F: FnOnce(&mut C, &Handle<'cx, JT>) -> Result<T, CubeError>,
+        F: FnOnce(&mut C, &Handle<'static, JT>) -> Result<T, CubeError>,
     {
         self.context.with_context(|cx| {
             let obj = self
@@ -52,84 +61,115 @@ impl<'cx: 'static, C: Context<'cx> + 'cx> NeonObject<'cx, C> {
                 .downcast::<JT, _>(cx)
                 .map_err(|_| CubeError::internal("Downcast error".to_string()))?;
             f(cx, &obj)
-        })
+        })?
     }
 
-    pub fn is_a<U: Value>(&self) -> bool {
+    pub fn is_a<U: Value>(&self) -> Result<bool, CubeError> {
         self.context.with_context(|cx| self.object.is_a::<U, _>(cx))
     }
 }
 
-impl<'cx: 'static, C: Context<'cx> + 'cx> NativeObject<NeonInnerTypes<'cx, C>>
-    for NeonObject<'cx, C>
-{
-    fn get_context(&self) -> ContextHolder<'cx, C> {
+impl<C: Context<'static>, V: Value + 'static> Clone for NeonTypeHandle<C, V> {
+    fn clone(&self) -> Self {
+        Self {
+            context: self.context.clone(),
+            object: self.object,
+        }
+    }
+}
+
+pub struct NeonObject<C: Context<'static>> {
+    context: ContextHolder<C>,
+    object: Handle<'static, JsValue>,
+}
+
+impl<C: Context<'static> + 'static> NeonObject<C> {
+    pub fn new(context: ContextHolder<C>, object: Handle<'static, JsValue>) -> Self {
+        Self { context, object }
+    }
+
+    pub fn get_object(&self) -> Handle<'static, JsValue> {
+        self.object
+    }
+
+    pub fn get_object_ref(&self) -> &Handle<'static, JsValue> {
+        &self.object
+    }
+
+    pub fn into_object(self) -> Handle<'static, JsValue> {
+        self.object
+    }
+
+    pub fn is_a<U: Value>(&self) -> Result<bool, CubeError> {
+        self.context.with_context(|cx| self.object.is_a::<U, _>(cx))
+    }
+
+    pub fn downcast<U: Value>(&self) -> Result<NeonTypeHandle<C, U>, CubeError> {
+        let obj = self.context.with_context(|cx| {
+            self.object
+                .downcast::<U, _>(cx)
+                .map_err(|_| CubeError::internal("Downcast error".to_string()))
+        })??;
+        Ok(NeonTypeHandle::new(self.context.clone(), obj))
+    }
+
+    pub fn downcast_with_err_msg<U: Value>(
+        &self,
+        msg: &str,
+    ) -> Result<NeonTypeHandle<C, U>, CubeError> {
+        let obj = self.context.with_context(|cx| {
+            self.object
+                .downcast::<U, _>(cx)
+                .map_err(|_| CubeError::internal(msg.to_string()))
+        })??;
+        Ok(NeonTypeHandle::new(self.context.clone(), obj))
+    }
+}
+
+impl<C: Context<'static> + 'static> NativeObject<NeonInnerTypes<C>> for NeonObject<C> {
+    fn get_context(&self) -> ContextHolder<C> {
         self.context.clone()
     }
 
-    fn into_struct(self) -> Result<NeonStruct<'cx, C>, CubeError> {
-        if !self.is_a::<JsObject>() {
-            return Err(CubeError::internal(format!(
-                "NeonObject is not the JsObject"
-            )));
-        }
-        Ok(NeonStruct::new(self))
+    fn into_struct(self) -> Result<NeonStruct<C>, CubeError> {
+        let obj = self.downcast_with_err_msg::<JsObject>("NeonObject is not the JsObject")?;
+        Ok(NeonStruct::new(obj))
     }
-    fn into_function(self) -> Result<NeonFunction<'cx, C>, CubeError> {
-        if !self.is_a::<JsFunction>() {
-            return Err(CubeError::internal(format!(
-                "NeonObject is not the JsFunction"
-            )));
-        }
-        Ok(NeonFunction::new(self))
+    fn into_function(self) -> Result<NeonFunction<C>, CubeError> {
+        let obj = self.downcast_with_err_msg::<JsFunction>("NeonObject is not the JsArray")?;
+        Ok(NeonFunction::new(obj))
     }
-    fn into_array(self) -> Result<NeonArray<'cx, C>, CubeError> {
-        if !self.is_a::<JsArray>() {
-            return Err(CubeError::internal(format!(
-                "NeonObject is not the JsArray"
-            )));
-        }
-        Ok(NeonArray::new(self))
+    fn into_array(self) -> Result<NeonArray<C>, CubeError> {
+        let obj = self.downcast_with_err_msg::<JsArray>("NeonObject is not the JsArray")?;
+        Ok(NeonArray::new(obj))
     }
-    fn into_string(self) -> Result<NeonString<'cx, C>, CubeError> {
-        if !self.is_a::<JsString>() {
-            return Err(CubeError::internal(format!(
-                "NeonObject is not the JsString"
-            )));
-        }
-        Ok(NeonString::new(self))
+    fn into_string(self) -> Result<NeonString<C>, CubeError> {
+        let obj = self.downcast_with_err_msg::<JsString>("NeonObject is not the JsString")?;
+        Ok(NeonString::new(obj))
     }
-    fn into_number(self) -> Result<NeonNumber<'cx, C>, CubeError> {
-        if !self.is_a::<JsNumber>() {
-            return Err(CubeError::internal(format!(
-                "NeonObject is not the JsNumber"
-            )));
-        }
-        Ok(NeonNumber::new(self))
+    fn into_number(self) -> Result<NeonNumber<C>, CubeError> {
+        let obj = self.downcast_with_err_msg::<JsNumber>("NeonObject is not the JsNumber")?;
+        Ok(NeonNumber::new(obj))
     }
-    fn into_boolean(self) -> Result<NeonBoolean<'cx, C>, CubeError> {
-        if !self.is_a::<JsBoolean>() {
-            return Err(CubeError::internal(format!(
-                "NeonObject is not the JsBoolean"
-            )));
-        }
-        Ok(NeonBoolean::<C>::new(self))
+    fn into_boolean(self) -> Result<NeonBoolean<C>, CubeError> {
+        let obj = self.downcast_with_err_msg::<JsBoolean>("NeonObject is not the JsBoolean")?;
+        Ok(NeonBoolean::new(obj))
     }
 
-    fn is_null(&self) -> bool {
+    fn is_null(&self) -> Result<bool, CubeError> {
         self.is_a::<JsNull>()
     }
 
-    fn is_undefined(&self) -> bool {
+    fn is_undefined(&self) -> Result<bool, CubeError> {
         self.is_a::<JsUndefined>()
     }
 }
 
-impl<'cx: 'static, C: Context<'cx>> Clone for NeonObject<'cx, C> {
+impl<C: Context<'static>> Clone for NeonObject<C> {
     fn clone(&self) -> Self {
         Self {
             context: self.context.clone(),
-            object: self.object.clone(),
+            object: self.object,
         }
     }
 }

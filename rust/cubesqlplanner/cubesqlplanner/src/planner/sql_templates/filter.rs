@@ -61,6 +61,22 @@ impl FilterTemplates {
         )
     }
 
+    pub fn time_not_in_range_filter(
+        &self,
+        column: String,
+        from_timestamp: String,
+        to_timestamp: String,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/time_not_in_range_filter",
+            context! {
+                column => column,
+                from_timestamp => from_timestamp,
+                to_timestamp => to_timestamp,
+            },
+        )
+    }
+
     pub fn in_where(
         &self,
         column: String,
@@ -150,6 +166,10 @@ impl FilterTemplates {
                 param => param
             },
         )
+    }
+
+    pub fn always_true(&self) -> Result<String, CubeError> {
+        Ok(self.render.get_template("filters/always_true")?.clone())
     }
 
     pub fn gte(&self, column: String, param: String) -> Result<String, CubeError> {

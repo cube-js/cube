@@ -106,7 +106,7 @@ impl MultiStageQueryPlanner {
     fn create_multi_stage_inode_member(
         &self,
         base_member: Rc<MemberSymbol>,
-    ) -> Result<MultiStageInodeMember, CubeError> {
+    ) -> Result<(MultiStageInodeMember, bool), CubeError> {
         let inode = if let Some(measure) =
             BaseMeasure::try_new(base_member.clone(), self.query_tools.clone())?
         {
@@ -129,24 +129,28 @@ impl MultiStageQueryPlanner {
             };
             let is_ungrupped = match &member_type {
                 MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
-                _ => false,
+                _ => self.query_properties.ungrouped(),
             };
-            MultiStageInodeMember::new(
-                member_type,
-                measure.reduce_by().clone().unwrap_or_default(),
-                measure.add_group_by().clone().unwrap_or_default(),
-                measure.group_by().clone(),
-                time_shifts,
+            (
+                MultiStageInodeMember::new(
+                    member_type,
+                    measure.reduce_by().clone().unwrap_or_default(),
+                    measure.add_group_by().clone().unwrap_or_default(),
+                    measure.group_by().clone(),
+                    time_shifts,
+                ),
                 is_ungrupped,
             )
         } else {
-            MultiStageInodeMember::new(
-                MultiStageInodeMemberType::Calculate,
-                vec![],
-                vec![],
-                None,
-                vec![],
-                false,
+            (
+                MultiStageInodeMember::new(
+                    MultiStageInodeMemberType::Calculate,
+                    vec![],
+                    vec![],
+                    None,
+                    vec![],
+                ),
+                self.query_properties.ungrouped(),
             )
         };
         Ok(inode)
@@ -168,6 +172,8 @@ impl MultiStageQueryPlanner {
                             time_dimension.clone(),
                         )),
                         time_dimension.member_evaluator(),
+                        true,
+                        false,
                     ),
                     state.clone(),
                     vec![],
@@ -183,6 +189,7 @@ impl MultiStageQueryPlanner {
         &self,
         member: Rc<MemberSymbol>,
         state: Rc<MultiStageAppliedState>,
+        ungrouped: bool,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let alias = format!("cte_{}", descriptions.len());
@@ -190,6 +197,8 @@ impl MultiStageQueryPlanner {
             MultiStageMember::new(
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
                 member,
+                self.query_properties.ungrouped() || ungrouped,
+                true,
             ),
             state,
             vec![],
@@ -197,6 +206,28 @@ impl MultiStageQueryPlanner {
         );
         descriptions.push(description.clone());
         Ok(description)
+    }
+
+    fn get_to_date_rolling_granularity(
+        &self,
+        rolling_window: &RollingWindow,
+    ) -> Result<Option<String>, CubeError> {
+        let is_to_date = rolling_window
+            .rolling_type
+            .as_ref()
+            .map_or(false, |tp| tp == "to_date");
+
+        if is_to_date {
+            if let Some(granularity) = &rolling_window.granularity {
+                Ok(Some(granularity.clone()))
+            } else {
+                Err(CubeError::user(format!(
+                    "Granularity required for to_date rolling window"
+                )))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     fn make_rolling_base_state(
@@ -218,13 +249,36 @@ impl MultiStageQueryPlanner {
             &time_dimension.get_granularity(),
         )?;
 
-        new_state.change_time_dimension_granularity(&time_dimension_name, result_granularity);
+        if time_dimension.get_date_range().is_some() && result_granularity.is_some() {
+            let granularity = time_dimension.get_granularity().unwrap(); //FIXME remove this unwrap
+            let date_range = time_dimension.get_date_range().unwrap(); //FIXME remove this unwrap
+            let series = self
+                .query_tools
+                .base_tools()
+                .generate_time_series(granularity, date_range.clone())?;
+            if !series.is_empty() {
+                let new_from_date = series.first().unwrap()[0].clone();
+                let new_to_date = series.last().unwrap()[1].clone();
+                new_state.replace_range_in_date_filter(
+                    &time_dimension_name,
+                    new_from_date,
+                    new_to_date,
+                );
+            }
+        }
 
-        new_state.expand_date_range_filter(
-            &time_dimension_name,
-            rolling_window.trailing.clone(),
-            rolling_window.leading.clone(),
-        );
+        new_state
+            .change_time_dimension_granularity(&time_dimension_name, result_granularity.clone());
+
+        if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
+            new_state.replace_to_date_date_range_filter(&time_dimension_name, &granularity);
+        } else {
+            new_state.replace_regular_date_range_filter(
+                &time_dimension_name,
+                rolling_window.trailing.clone(),
+                rolling_window.leading.clone(),
+            );
+        }
 
         Ok(Rc::new(new_state))
     }
@@ -244,12 +298,24 @@ impl MultiStageQueryPlanner {
                         trailing: Some("unbounded".to_string()),
                         leading: None,
                         offset: None,
+                        rolling_type: None,
+                        granularity: None,
                     }
+                };
+                let ungrouped = match member.as_ref() {
+                    MemberSymbol::Measure(measure_symbol) => {
+                        measure_symbol.is_rolling_window() && !measure_symbol.is_addictive()
+                    }
+                    _ => false,
                 };
                 let time_dimensions = self.query_properties.time_dimensions();
                 if time_dimensions.len() == 0 {
-                    let rolling_base =
-                        self.add_rolling_window_base(member.clone(), state.clone(), descriptions)?;
+                    let rolling_base = self.add_rolling_window_base(
+                        member.clone(),
+                        state.clone(),
+                        ungrouped,
+                        descriptions,
+                    )?;
                     return Ok(Some(rolling_base));
                 }
                 if time_dimensions.len() != 1 {
@@ -268,6 +334,7 @@ impl MultiStageQueryPlanner {
                             &rolling_window,
                             state.clone(),
                         )?,
+                        ungrouped,
                         descriptions,
                     )?,
                 ];
@@ -276,11 +343,17 @@ impl MultiStageQueryPlanner {
 
                 let alias = format!("cte_{}", descriptions.len());
 
-                let rolling_window_descr = RollingWindowDescription {
-                    time_dimension: time_dimension.clone(),
-                    trailing: rolling_window.trailing.clone(),
-                    leading: rolling_window.leading.clone(),
-                    offset: rolling_window.offset.clone().unwrap_or("end".to_string()),
+                let rolling_window_descr = if let Some(granularity) =
+                    self.get_to_date_rolling_granularity(&rolling_window)?
+                {
+                    RollingWindowDescription::new_to_date(time_dimension, granularity)
+                } else {
+                    RollingWindowDescription::new_regular(
+                        time_dimension,
+                        rolling_window.trailing.clone(),
+                        rolling_window.leading.clone(),
+                        rolling_window.offset.clone().unwrap_or("end".to_string()),
+                    )
                 };
 
                 let inode_member = MultiStageInodeMember::new(
@@ -289,11 +362,15 @@ impl MultiStageQueryPlanner {
                     vec![],
                     None,
                     vec![],
-                    false,
                 );
 
                 let description = MultiStageQueryDescription::new(
-                    MultiStageMember::new(MultiStageMemberType::Inode(inode_member), member),
+                    MultiStageMember::new(
+                        MultiStageMemberType::Inode(inode_member),
+                        member,
+                        self.query_properties.ungrouped(),
+                        false,
+                    ),
                     state.clone(),
                     input,
                     alias.clone(),
@@ -329,9 +406,9 @@ impl MultiStageQueryPlanner {
         }
 
         let childs = member_childs(&member)?;
-
-        let description = if childs.is_empty() {
-            if has_multi_stage_members(&member, false)? {
+        let has_multi_stage_members = has_multi_stage_members(&member, false)?;
+        let description = if childs.is_empty() || !has_multi_stage_members {
+            if has_multi_stage_members {
                 return Err(CubeError::internal(format!(
                     "Leaf multi stage query cannot contain multi stage member"
                 )));
@@ -342,13 +419,16 @@ impl MultiStageQueryPlanner {
                 MultiStageMember::new(
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
                     member.clone(),
+                    self.query_properties.ungrouped(),
+                    false,
                 ),
                 state.clone(),
                 vec![],
                 alias.clone(),
             )
         } else {
-            let multi_stage_member = self.create_multi_stage_inode_member(member.clone())?;
+            let (multi_stage_member, is_ungrupped) =
+                self.create_multi_stage_inode_member(member.clone())?;
 
             let dimensions_to_add = multi_stage_member
                 .add_group_by()
@@ -386,7 +466,12 @@ impl MultiStageQueryPlanner {
 
             let alias = format!("cte_{}", descriptions.len());
             MultiStageQueryDescription::new(
-                MultiStageMember::new(MultiStageMemberType::Inode(multi_stage_member), member),
+                MultiStageMember::new(
+                    MultiStageMemberType::Inode(multi_stage_member),
+                    member,
+                    is_ungrupped,
+                    false,
+                ),
                 state.clone(),
                 input,
                 alias.clone(),

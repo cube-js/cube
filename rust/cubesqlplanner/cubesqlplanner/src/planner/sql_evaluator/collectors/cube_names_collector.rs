@@ -24,31 +24,48 @@ impl TraversalVisitor for CubeNamesCollector {
     fn on_node_traverse(
         &mut self,
         node: &Rc<MemberSymbol>,
+        path: &Vec<String>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if e.owned_by_cube() {
-                    self.names.insert(e.cube_name().clone());
+                    if !path.is_empty() {
+                        for p in path {
+                            self.names.insert(p.clone());
+                        }
+                    } else {
+                        self.names.insert(e.cube_name().clone());
+                    }
                 }
-                for name in e.get_dependent_cubes().into_iter() {
-                    self.names.insert(name);
+                if e.is_sub_query() {
+                    return Ok(None);
                 }
+            }
+            MemberSymbol::TimeDimension(e) => {
+                return self.on_node_traverse(e.base_symbol(), path, &())
             }
             MemberSymbol::Measure(e) => {
                 if e.owned_by_cube() {
-                    self.names.insert(e.cube_name().clone());
-                }
-                for name in e.get_dependent_cubes().into_iter() {
-                    self.names.insert(name);
+                    if !path.is_empty() {
+                        for p in path {
+                            self.names.insert(p.clone());
+                        }
+                    } else {
+                        self.names.insert(e.cube_name().clone());
+                    }
                 }
             }
             MemberSymbol::CubeName(e) => {
+                if !path.is_empty() {
+                    for p in path {
+                        self.names.insert(p.clone());
+                    }
+                }
                 self.names.insert(e.cube_name().clone());
             }
-            MemberSymbol::CubeTable(e) => {
-                self.names.insert(e.cube_name().clone());
-            }
+            MemberSymbol::CubeTable(_) => {}
+            MemberSymbol::MemberExpression(_) => {}
         };
         Ok(Some(()))
     }

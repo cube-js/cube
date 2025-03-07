@@ -1,7 +1,7 @@
 # Hierarchies
 
-The `hierarchies` property contains a set of hierarchies. You can think about a
-hierarchy as a means to group [dimensions][ref-ref-dimensions] together and organize
+You can use the `hierarchies` parameter within [cubes][ref-ref-cubes] to define hierarchies.
+You can think about a hierarchy as a means to group [dimensions][ref-ref-dimensions] together and organize
 them into levels of granularity, allowing users to drill down or roll up for analysis.
 
 <InfoBox>
@@ -13,6 +13,11 @@ You can also preview hierarchies in [Playground][ref-playground].
 </InfoBox>
 
 Any hierarchy should have the following parameters: [`name`](#name) and [`levels`](#levels).
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/Y5E6DmH_Hz4"
+  aspectRatio={4/3}
+/>
 
 ## Parameters
 
@@ -298,8 +303,9 @@ cubes:
 </CodeTabs>
 
 
+[ref-ref-cubes]: /reference/data-model/cube
 [ref-ref-dimensions]: /reference/data-model/dimensions
 [ref-naming]: /product/data-modeling/syntax#naming
-[ref-apis-support]: /product/apis-integrations#support-for-data-modeling
+[ref-apis-support]: /product/apis-integrations#data-modeling
 [ref-playground]: /product/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /product/configuration/visualization-tools

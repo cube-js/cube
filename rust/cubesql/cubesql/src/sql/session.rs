@@ -339,12 +339,10 @@ impl SessionState {
             .expect("failed to unlock variables for reading");
 
         match &*guard {
-            Some(vars) => vars.get(name).map(|v| v.clone()),
+            Some(vars) => vars.get(name).cloned(),
             _ => match &self.protocol {
-                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).map(|v| v.clone()),
-                DatabaseProtocol::PostgreSQL => {
-                    POSTGRES_DEFAULT_VARIABLES.get(name).map(|v| v.clone())
-                }
+                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).cloned(),
+                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES.get(name).cloned(),
                 DatabaseProtocol::Extension(ext) => ext.get_session_variable_default(name),
             },
         }
@@ -377,7 +375,7 @@ impl SessionState {
         Arc::clone(&self.temp_tables)
     }
 
-    pub fn get_load_request_meta(&self) -> LoadRequestMeta {
+    pub fn get_load_request_meta(&self, api_type: &str) -> LoadRequestMeta {
         let application_name = if let Some(var) = self.get_variable("application_name") {
             Some(var.value.to_string())
         } else {
@@ -386,7 +384,7 @@ impl SessionState {
 
         LoadRequestMeta::new(
             self.protocol.get_name().to_string(),
-            "sql".to_string(),
+            api_type.to_string(),
             application_name,
         )
     }
@@ -462,7 +460,7 @@ impl From<&Session> for SessionStatActivity {
             application_name,
             client_addr: session.state.client_ip.clone(),
             client_hostname: None,
-            client_port: session.state.client_port.clone(),
+            client_port: session.state.client_port,
             query,
         }
     }

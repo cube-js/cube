@@ -16,7 +16,7 @@ import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { PreAggregationDescription } from './PreAggregations';
+import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
@@ -71,41 +71,25 @@ export type QueryBody = {
 /**
  * Temp (partition/lambda) table definition.
  */
-export type TempTable = {
-  type: string; // for ex.: "rollup"
-  buildRangeEnd: string;
-  lastUpdatedAt: number;
-  queryKey: unknown;
-  refreshKeyValues: [{
-    'refresh_key': string,
-  }][];
-  targetTableName: string; // full table name (with suffix)
-  lambdaTable?: {
-    name: string,
-    columns: {
-      name: string,
-      type: string,
-      attributes?: string[],
-    }[];
-    csvRows: string;
-  };
-};
+export type TempTable = LoadPreAggregationResult;
 
 /**
  * Pre-aggregation table (stored in the first element) to temp table
  * definition (stored in the second element) link.
  */
 export type PreAggTableToTempTable = [
-  string, // common table name (without sufix)
+  string, // common table name (without suffix)
   TempTable,
 ];
 
+export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
+
+export type CacheKeyItem = string | string[] | QueryTuple | QueryTuple[] | undefined;
+
 export type CacheKey =
-  | string
-  | [
-      query: string | QueryTuple,
-      options?: string[]
-    ];
+  [CacheKeyItem, CacheKeyItem] |
+  [CacheKeyItem, CacheKeyItem, CacheKeyItem] |
+  [CacheKeyItem, CacheKeyItem, CacheKeyItem, CacheKeyItem];
 
 type CacheEntry = {
   time: number;
@@ -187,7 +171,7 @@ export class QueryCache {
   /**
    * Generates from the `queryBody` the final `sql` query and push it to
    * the queue. Returns promise which will be resolved by the different
-   * objects, depend from the original `queryBody` object. For the
+   * objects, depend on the original `queryBody` object. For the
    * persistent queries returns the `stream.Writable` instance.
    *
    * @throw Error
@@ -374,7 +358,7 @@ export class QueryCache {
   }
 
   public static queryCacheKey(queryBody: QueryBody): CacheKey {
-    const key = [
+    const key: CacheKey = [
       queryBody.query,
       queryBody.values,
       (queryBody.preAggregations || []).map(p => p.loadSql)
@@ -384,7 +368,7 @@ export class QueryCache {
     }
     // @ts-ignore
     key.persistent = queryBody.persistent;
-    return <CacheKey>key;
+    return key;
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
@@ -397,7 +381,7 @@ export class QueryCache {
 
   public static replacePreAggregationTableNames(
     queryAndParams: string | QueryWithParams,
-    preAggregationsTablesToTempTables: PreAggTableToTempTable[],
+    preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
   ): string | QueryTuple {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams

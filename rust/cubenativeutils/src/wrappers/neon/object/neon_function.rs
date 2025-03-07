@@ -1,4 +1,4 @@
-use super::NeonObject;
+use super::{NeonObject, NeonTypeHandle};
 use crate::wrappers::{
     neon::inner_types::NeonInnerTypes,
     object::{NativeFunction, NativeType},
@@ -10,39 +10,37 @@ use neon::prelude::*;
 use regex::Regex;
 
 #[derive(Clone)]
-pub struct NeonFunction<'cx: 'static, C: Context<'cx>> {
-    object: NeonObject<'cx, C>,
+pub struct NeonFunction<C: Context<'static>> {
+    object: NeonTypeHandle<C, JsFunction>,
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NeonFunction<'cx, C> {
-    pub fn new(object: NeonObject<'cx, C>) -> Self {
+impl<C: Context<'static> + 'static> NeonFunction<C> {
+    pub fn new(object: NeonTypeHandle<C, JsFunction>) -> Self {
         Self { object }
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonFunction<'cx, C> {
-    fn into_object(self) -> NeonObject<'cx, C> {
-        self.object
+impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonFunction<C> {
+    fn into_object(self) -> NeonObject<C> {
+        self.object.upcast()
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeFunction<NeonInnerTypes<'cx, C>> for NeonFunction<'cx, C> {
+impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFunction<C> {
     fn call(
         &self,
-        args: Vec<NativeObjectHandle<NeonInnerTypes<'cx, C>>>,
-    ) -> Result<NativeObjectHandle<NeonInnerTypes<'cx, C>>, CubeError> {
+        args: Vec<NativeObjectHandle<NeonInnerTypes<C>>>,
+    ) -> Result<NativeObjectHandle<NeonInnerTypes<C>>, CubeError> {
         let neon_args = args
             .into_iter()
             .map(|arg| -> Result<_, CubeError> { Ok(arg.into_object().get_object()) })
             .collect::<Result<Vec<_>, _>>()?;
         let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
-            let this = neon_object
-                .downcast::<JsFunction, _>(cx)
-                .map_err(|_| CubeError::internal(format!("Neon object is not JsFunction")))?;
             let null = cx.null();
-            this.call(cx, null, neon_args)
-                .map_err(|_| CubeError::internal(format!("Failed to call function ")))
-        })?;
+            neon_object
+                .call(cx, null, neon_args)
+                .map_err(|_| CubeError::internal("Failed to call function ".to_string()))
+        })??;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
             neon_reuslt,
@@ -53,17 +51,14 @@ impl<'cx, C: Context<'cx> + 'cx> NativeFunction<NeonInnerTypes<'cx, C>> for Neon
         let result =
             self.object
                 .map_neon_object(|cx, neon_object| -> Result<String, CubeError> {
-                    let this = neon_object.downcast::<JsFunction, _>(cx).map_err(|_| {
-                        CubeError::internal(format!("Neon object is not JsFunction"))
-                    })?;
-                    let res = this
+                    let res = neon_object
                         .to_string(cx)
                         .map_err(|_| {
-                            CubeError::internal(format!("Can't convert function to string"))
+                            CubeError::internal("Can't convert function to string".to_string())
                         })?
                         .value(cx);
                     Ok(res)
-                })?;
+                })??;
         Ok(result)
     }
 

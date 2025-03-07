@@ -1,6 +1,7 @@
 module.exports = {
   "percentiles": "Calculating averages and percentiles",
   "nested-aggregates": "Calculating nested aggregates",
+  "filtered-aggregates": "Calculating filtered aggregates",
   "period-over-period": "Calculating period-over-period changes",
   "custom-granularity": "Implementing custom time dimension granularities",
   "snapshots": "Implementing data snapshots",

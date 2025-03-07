@@ -55,79 +55,79 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.boolean(v).into_object(),
+            self.context.boolean(v)?.into_object(),
         ))
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v as f64)?.into_object(),
         ))
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.number(v as f64).into_object(),
+            self.context.number(v)?.into_object(),
         ))
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.string(String::from(v)).into_object(),
+            self.context.string(String::from(v))?.into_object(),
         ))
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(
-            self.context.string(String::from(v)).into_object(),
+            self.context.string(String::from(v))?.into_object(),
         ))
     }
 
@@ -138,7 +138,7 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
     }
 
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        Ok(self.context.undefined())
+        Ok(self.context.null()?)
     }
 
     fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
@@ -149,11 +149,11 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        Ok(self.context.undefined())
+        Ok(self.context.undefined()?)
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
-        Ok(self.context.undefined())
+        Ok(self.context.undefined()?)
     }
 
     fn serialize_unit_variant(
@@ -185,18 +185,16 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
         _name: &'static str,
         _variant_index: u32,
         _variant: &'static str,
-        _value: &T,
+        value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
         T: ?Sized + Serialize,
     {
-        Err(NativeObjSerializerError::Message(
-            "serialize_newtype_variant is not implemented".to_string(),
-        ))
+        NativeSerdeSerializer::serialize(value, self.context.clone())
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        let seq = self.context.empty_array();
+        let seq = self.context.empty_array()?;
 
         Ok(NativeSeqSerializer {
             context: self.context.clone(),
@@ -234,7 +232,7 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        let obj = self.context.empty_struct();
+        let obj = self.context.empty_struct()?;
         Ok(NativeMapSerializer {
             context: self.context.clone(),
             obj,
@@ -246,7 +244,7 @@ impl<IT: InnerTypes> ser::Serializer for NativeSerdeSerializer<IT> {
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        let obj = self.context.empty_struct();
+        let obj = self.context.empty_struct()?;
         Ok(NativeMapSerializer {
             context: self.context.clone(),
             obj,

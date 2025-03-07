@@ -238,6 +238,11 @@ export class CubeEvaluator extends CubeSymbols {
     if (cube.isView && (cube.includedMembers || []).length) {
       const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
       const includedCubeNames: string[] = R.uniq(includedMemberPaths.map(it => it.split('.')[0]));
+      // Path to name (which can be prefixed or aliased) map for hierarchy
+      const hierarchyPathToName = cube.includedMembers.filter(it => it.type === 'hierarchies').reduce((acc, it) => ({
+        ...acc,
+        [it.memberPath]: it.name
+      }), {});
       const includedHierarchyNames = cube.includedMembers.filter(it => it.type === 'hierarchies').map(it => it.memberPath.split('.')[1]);
 
       for (const cubeName of includedCubeNames) {
@@ -258,10 +263,16 @@ export class CubeEvaluator extends CubeSymbols {
                 }
 
                 return null;
-              }).filter(Boolean);
+              })
+                .filter(Boolean);
 
+              const name = hierarchyPathToName[[cubeName, it.name].join('.')];
+              if (!name) {
+                throw new UserError(`Hierarchy '${it.name}' not found in cube '${cubeName}'`);
+              }
               return {
                 ...it,
+                name,
                 levels
               };
             })
@@ -448,8 +459,8 @@ export class CubeEvaluator extends CubeSymbols {
 
   public timeDimensionPathsForCube(cube: any) {
     return R.compose(
-      R.map(nameToDefinition => `${cube}.${nameToDefinition[0]}`),
-      R.toPairs,
+      R.map(dimName => `${cube}.${dimName}`),
+      R.keys,
       // @ts-ignore
       R.filter((d: any) => d.type === 'time')
       // @ts-ignore
@@ -460,12 +471,19 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(cube).measures || {};
   }
 
+  public timeDimensionsForCube(cube) {
+    return R.filter(
+      (d: any) => d.type === 'time',
+      this.cubeFromPath(cube).dimensions || {}
+    );
+  }
+
   public preAggregationsForCube(path: string) {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
   /**
-   * Returns pre-aggregations filtered by the spcified selector.
+   * Returns pre-aggregations filtered by the specified selector.
    * @param {{
    *  scheduled: boolean,
    *  dataSource: Array<string>,

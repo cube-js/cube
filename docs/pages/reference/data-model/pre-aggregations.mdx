@@ -6,8 +6,8 @@ redirect_from:
 
 # Pre-aggregations
 
-[Pre-aggregations][ref-pre-aggs] can be defined using the `pre_aggregations`
-parameter of a [cube][ref-ref-cubes].
+You can use the `pre_aggregations` parameter within [cubes][ref-ref-cubes] to define
+[pre-aggregations][ref-pre-aggs].
 
 Pre-aggregations must have, at minimum, a [name](#name) and a [type](#type).
 Pre-aggregations must include all dimensions and measures you will query with.
@@ -1111,8 +1111,12 @@ refreshes.
 ### `allow_non_strict_date_range_match`
 
 The `allow_non_strict_date_range_match` property can be used to allow queries to
-match this pre-aggregation when using non-strict date ranges. This is useful
-when using a visualization tools such as [Apache
+match this pre-aggregation when using non-strict date ranges.
+By default Cube checks if requested date range exactly matches pre-aggregation granularity.
+For example if you're requesting half of a day or your date range filter is just one millisecond off for daily granularity pre-aggregation Cube would not use such a pre-aggregation by default.
+Use this flag to lift this strict check.
+This is useful
+when using a visualization tools such as Tableau or [Apache
 Superset][ref-config-downstream-superset] that use loose date ranges by default.
 
 <CodeTabs>

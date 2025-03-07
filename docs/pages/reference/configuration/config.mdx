@@ -52,8 +52,6 @@ environment variable. The default value is `model`.
 Use [`repositoryFactory`][self-repofactory] for [multitenancy][ref-multitenancy]
 or when a more flexible setup is needed.
 
-{/* TODO: https://cubedevinc.atlassian.net/browse/CC-3095 */}
-
 ### `context_to_app_id`
 
 It's a [multitenancy][ref-multitenancy] option.
@@ -890,7 +888,7 @@ environment variable, this option is enabled as well for the best user experienc
 
 ### `base_path`
 
-The base path for the [REST API](/reference/rest-api).
+The base path for the [REST API](/product/apis-integrations/rest-api/reference).
 
 <CodeTabs>
 
@@ -1308,11 +1306,64 @@ module.exports = {
 
 </CodeTabs>
 
+### `context_to_roles`
+
+Used by [data access policies][ref-dap]. This option is used to derive a list of
+[data access roles][ref-dap-roles] from the [security context][ref-sec-ctx].
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('context_to_roles')
+def context_to_roles(ctx: dict) -> list[str]:
+  return ctx['securityContext'].get('roles', ['default'])
+```
+
+```javascript
+
+module.exports = {
+  contextToRoles: ({ securityContext }) => {
+    return securityContext.roles || ['default']
+  }
+}
+```
+
+</CodeTabs>
+
+If the [user roles mapping][ref-ldap-roles-mapping] in the [LDAP integration][ref-ldap-integration]
+is configured and the [authentication integration][ref-auth-integration] is enabled,
+the `context_to_roles` option might be defined as follows:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('context_to_roles')
+def context_to_roles(ctx: dict) -> list[str]:
+  cloud_ctx = ctx['securityContext'].get('cloud', {'roles': []})
+  return cloud_ctx.get('roles', [])
+```
+
+```javascript
+
+module.exports = {
+  contextToRoles: ({ securityContext }) => {
+    const cloud_ctx = securityContext.cloud || { roles: [] }
+    return cloud_ctx.roles || []
+  }
+}
+```
+
+</CodeTabs>
+
 ## Utility
 
 ### `logger`
 
-A function to server as a custom logger.
+A function to define a custom logger.
 
 Accepts the following arguments:
 - `message`: the message to be logged
@@ -1408,7 +1459,7 @@ If not defined, Cube will lookup for environment variable
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
 [ref-development-mode]: /product/configuration#development-mode
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
-[ref-rest-api]: /reference/rest-api
+[ref-rest-api]: /product/apis-integrations/rest-api
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-pre-aggregations-refresh-key]:
   /reference/data-model/pre-aggregations#refresh_key
@@ -1440,3 +1491,8 @@ If not defined, Cube will lookup for environment variable
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
 [link-github-cube-drivers]: https://github.com/cube-js/cube/tree/master/packages
 [ref-ungrouped-query]: /product/apis-integrations/queries#ungrouped-query
+[ref-dap]: /product/auth/data-access-policies
+[ref-dap-roles]: /product/auth/data-access-policies#data-access-roles
+[ref-auth-integration]: /product/auth#authentication-integration
+[ref-ldap-roles-mapping]: /product/workspace/sso#user-roles-mapping
+[ref-ldap-integration]: /product/workspace/sso#ldap-integration

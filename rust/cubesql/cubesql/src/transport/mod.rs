@@ -10,6 +10,7 @@ pub type CubeMetaMeasure = cubeclient::models::V1CubeMetaMeasure;
 pub type CubeMetaSegment = cubeclient::models::V1CubeMetaSegment;
 pub type CubeMetaJoin = cubeclient::models::V1CubeMetaJoin;
 pub type CubeMetaFolder = cubeclient::models::V1CubeMetaFolder;
+pub type CubeMetaHierarchy = cubeclient::models::V1CubeMetaHierarchy;
 // Request/Response
 pub type TransportLoadResponse = cubeclient::models::V1LoadResponse;
 pub type TransportLoadRequestQuery = cubeclient::models::V1LoadRequestQuery;
