@@ -165,7 +165,8 @@ fn spawn_creds_refresh_loop(
             };
 
             let (access_key, secret_key) = if is_role {
-                let (access_key, secret_key) = assume_role(&role_or_access_key.as_ref().unwrap(), &region.to_string()).await;
+                let (access_key, secret_key) =
+                    assume_role(&role_or_access_key.as_ref().unwrap(), &region.to_string()).await;
                 (Some(access_key), Some(secret_key))
             } else {
                 let secret_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
