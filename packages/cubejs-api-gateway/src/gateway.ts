@@ -926,30 +926,30 @@ class ApiGateway {
     selector: PreAggsSelector,
   ): Promise<string[]> {
     let jobs: string[] = [];
-    if (!selector.contexts?.length) {
-      jobs = await this.postPreAggregationsBuildJobs(
-        context,
-        selector,
-      );
-    } else {
-      const promise = Promise.all(
-        selector.contexts.map(async (config) => {
-          const ctx = <RequestContext>{
-            ...context,
-            ...config,
-          };
-          const _jobs = await this.postPreAggregationsBuildJobs(
-            ctx,
-            selector,
-          );
-          return _jobs;
-        })
-      );
-      const resolve = await promise;
-      resolve.forEach((_jobs) => {
-        jobs = jobs.concat(_jobs);
-      });
+
+    // For the sake of type check, as contexts are checked in preAggregationsJobs()
+    if (!selector.contexts) {
+      return jobs;
     }
+
+    const promise = Promise.all(
+      selector.contexts.map(async (config) => {
+        const ctx = <RequestContext>{
+          ...context,
+          ...config,
+        };
+        const _jobs = await this.postPreAggregationsBuildJobs(
+          ctx,
+          selector,
+        );
+        return _jobs;
+      })
+    );
+    const resolve = await promise;
+    resolve.forEach((_jobs) => {
+      jobs = jobs.concat(_jobs);
+    });
+
     return jobs;
   }
 
