@@ -400,6 +400,45 @@ class ApiGateway {
       })
     );
 
+    app.get(
+      `${this.basePath}/v1/meta/model_name`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        await this.metaModelName({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      })
+    );
+
+    app.get(
+      `${this.basePath}/v1/meta/:nameModel`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        const { nameModel } = req.params;
+        await this.metaModelByName({
+          context: req.context,
+          nameModel,
+          res: this.resToResultFn(res),
+        });
+      })
+    );
+
+    app.get(
+      `${this.basePath}/v1/meta/:nameModel/:field`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        const { nameModel } = req.params;
+        const { field } = req.params;
+        await this.metaFieldModelByName({
+          context: req.context,
+          nameModel,
+          field,
+          res: this.resToResultFn(res),
+        });
+      })
+    );
+
     app.post(
       `${this.basePath}/v1/cubesql`,
       userMiddlewares,
@@ -577,6 +616,36 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
+  private transformCubeConfig(cube: any, cubeDefinitions: any) {
+    return {
+      ...transformCube(cube, cubeDefinitions),
+      measures: cube.measures?.map(measure => transformMeasure(measure, cubeDefinitions)),
+      dimensions: cube.dimensions?.map(dimension => transformDimension(dimension, cubeDefinitions)),
+      segments: cube.segments?.map(segment => transformSegment(segment, cubeDefinitions)),
+      joins: transformJoins(cubeDefinitions[cube.name]?.joins),
+      preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations)
+    };
+  }
+
+  private extractModelNames(cubes: any[]) {
+    return cubes.map(cube => ({ name: cube.config?.name }));
+  }
+
+  private async fetchMetaConfig(context: RequestContext, includeCompiler: boolean) {
+    const compilerApi = await this.getCompilerApi(context);
+    return compilerApi.metaConfig(context, {
+      requestId: context.requestId,
+      includeCompilerId: includeCompiler
+    });
+  }
+
+  private async fetchMetaConfigExtended(context: ExtendedRequestContext) {
+    const compilerApi = await this.getCompilerApi(context);
+    return compilerApi.metaConfigExtended(context, {
+      requestId: context.requestId
+    });
+  }
+
   public async meta({ context, res, includeCompilerId, onlyCompilerId }: {
     context: RequestContext,
     res: MetaResponseResultFn,
@@ -584,28 +653,17 @@ class ApiGateway {
     onlyCompilerId?: boolean
   }) {
     const requestStarted = new Date();
-
     try {
       await this.assertApiScope('meta', context.securityContext);
-      const compilerApi = await this.getCompilerApi(context);
-      const metaConfig = await compilerApi.metaConfig(context, {
-        requestId: context.requestId,
-        includeCompilerId: includeCompilerId || onlyCompilerId
-      });
+      const metaConfig = await this.fetchMetaConfig(context, !!(includeCompilerId || onlyCompilerId));
       if (onlyCompilerId) {
-        const response: { cubes: any[], compilerId?: string } = {
-          cubes: [],
-          compilerId: metaConfig.compilerId
-        };
-        res(response);
+        res({ cubes: [], compilerId: metaConfig.compilerId });
         return;
       }
       const cubesConfig = includeCompilerId ? metaConfig.cubes : metaConfig;
-      const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
+      const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map((cube: any) => cube.config);
       const response: { cubes: any[], compilerId?: string } = { cubes };
-      if (includeCompilerId) {
-        response.compilerId = metaConfig.compilerId;
-      }
+      if (includeCompilerId) response.compilerId = metaConfig.compilerId;
       res(response);
     } catch (e: any) {
       this.handleError({
@@ -620,39 +678,74 @@ class ApiGateway {
 
   public async metaExtended({ context, res }: { context: ExtendedRequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
-
     try {
       await this.assertApiScope('meta', context.securityContext);
-      const compilerApi = await this.getCompilerApi(context);
-      const metaConfigExtended = await compilerApi.metaConfigExtended(context, {
-        requestId: context.requestId,
-      });
-      const { metaConfig, cubeDefinitions } = metaConfigExtended;
-
+      const { metaConfig, cubeDefinitions } = await this.fetchMetaConfigExtended(context);
       const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
-        .map((meta) => meta.config)
-        .map((cube) => ({
-          ...transformCube(cube, cubeDefinitions),
-          measures: cube.measures?.map((measure) => ({
-            ...transformMeasure(measure, cubeDefinitions),
-          })),
-          dimensions: cube.dimensions?.map((dimension) => ({
-            ...transformDimension(dimension, cubeDefinitions),
-          })),
-          segments: cube.segments?.map((segment) => ({
-            ...transformSegment(segment, cubeDefinitions),
-          })),
-          joins: transformJoins(cubeDefinitions[cube.name]?.joins),
-          preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
-        }));
+        .map((meta: any) => meta.config)
+        .map((cube: any) => this.transformCubeConfig(cube, cubeDefinitions));
       res({ cubes });
     } catch (e: any) {
-      this.handleError({
-        e,
-        context,
-        res,
-        requestStarted,
-      });
+      this.handleError({ e, context, res, requestStarted });
+    }
+  }
+
+  public async metaModelName({ context, res }: { context: ExtendedRequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+    try {
+      await this.assertApiScope('meta', context.securityContext);
+      const { metaConfig } = await this.fetchMetaConfigExtended(context);
+      const cubes = this.extractModelNames(metaConfig);
+      res({ cubes });
+    } catch (e: any) {
+      this.handleError({ e, context, res, requestStarted });
+    }
+  }
+
+  private async getModelCubes(context: ExtendedRequestContext, nameModel: string) {
+    const { metaConfig, cubeDefinitions } = await this.fetchMetaConfigExtended(context);
+    return this.filterVisibleItemsInMeta(context, metaConfig)
+      .map((meta: any) => meta.config)
+      .map((cube: any) => this.transformCubeConfig(cube, cubeDefinitions))
+      .filter((cube: any) => cube.name === nameModel);
+  }
+
+  public async metaModelByName({ context, nameModel, res }: { context: ExtendedRequestContext, nameModel: string, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+    try {
+      await this.assertApiScope('meta', context.securityContext);
+      const cubes = await this.getModelCubes(context, nameModel);
+      if (!cubes.length) {
+        res({ error: `Model ${nameModel} not found` });
+        return;
+      }
+      res({ cubes });
+    } catch (e: any) {
+      this.handleError({ e, context, res, requestStarted });
+    }
+  }
+
+  public async metaFieldModelByName({ context, nameModel, field, res }: { context: ExtendedRequestContext, nameModel: string, field?: string, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+    try {
+      await this.assertApiScope('meta', context.securityContext);
+      const cubes = await this.getModelCubes(context, nameModel);
+      if (!cubes.length) {
+        res({ error: `Model ${nameModel} not found` });
+        return;
+      }
+      if (field) {
+        const cube = cubes[0];
+        if (!(field in cube)) {
+          res({ error: `Field ${field} not found in model ${nameModel}` });
+          return;
+        }
+        res({ value: cube[field] });
+        return;
+      }
+      res({ cubes });
+    } catch (e: any) {
+      this.handleError({ e, context, res, requestStarted });
     }
   }
 

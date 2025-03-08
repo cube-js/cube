@@ -91,6 +91,116 @@ describe('Gateway Api Scopes', () => {
     apiGateway.release();
   });
 
+  test('GET /v1/meta/model_name should return model names', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
+    });
+
+    const response = await request(app)
+      .get('/cubejs-api/v1/meta/model_name')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(200);
+
+    expect(response.body).toEqual({ cubes: [{ name: 'Foo' }] });
+
+    apiGateway.release();
+  });
+
+  test('GET /v1/meta/:nameModel should return model data', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
+    });
+
+    const response = await request(app)
+      .get('/cubejs-api/v1/meta/Foo')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(200);
+
+    expect(response.body).toEqual(
+      {
+        cubes: [
+          {
+            name: 'Foo',
+            description: 'cube from compilerApi mock',
+            measures: [
+              {
+                name: 'Foo.bar',
+                description: 'measure from compilerApi mock',
+                isVisible: true,
+              },
+            ],
+            dimensions: [
+              {
+                name: 'Foo.id',
+                description: 'id dimension from compilerApi mock',
+                isVisible: true,
+              },
+              {
+                name: 'Foo.time',
+                isVisible: true,
+              },
+            ],
+            segments: [
+              {
+                name: 'Foo.quux',
+                description: 'segment from compilerApi mock',
+                isVisible: true,
+              },
+            ],
+            sql: '\'SELECT * FROM Foo\'',
+          }
+        ]
+      }
+    );
+
+    apiGateway.release();
+  });
+
+  test('GET /v1/meta/:nameModel should return error if model not found', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
+    });
+
+    const response = await request(app)
+      .get('/cubejs-api/v1/meta/UnknownModel')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(200);
+
+    expect(response.body).toEqual({ error: 'Model UnknownModel not found' });
+
+    apiGateway.release();
+  });
+
+  test('GET /v1/meta/:nameModel/:field should return specific field', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
+    });
+
+    const response = await request(app)
+      .get('/cubejs-api/v1/meta/Foo/name')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(200);
+
+    expect(response.body).toEqual({ value: 'Foo' });
+
+    apiGateway.release();
+  });
+
+  test('GET /v1/meta/:nameModel/:field should return error if field not found', async () => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
+    });
+
+    const response = await request(app)
+      .get('/cubejs-api/v1/meta/Foo/unknownField')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(200);
+
+    expect(response.body).toEqual({ error: 'Field unknownField not found in model Foo' });
+
+    apiGateway.release();
+  });
+
   test('GraphQL declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => ['meta', 'data', 'jobs'],
