@@ -25,7 +25,7 @@
     "@cubejs-backend/base-driver": "1.2.19",
     "@cubejs-backend/schema-compiler": "1.2.19",
     "@cubejs-backend/shared": "1.2.19",
-    "axios": "^0.28.0",
+    "axios": "^1.8.2",
     "sqlstring": "^2.3.1"
   },
   "devDependencies": {
