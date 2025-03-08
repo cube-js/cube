@@ -7285,7 +7285,7 @@ ORDER BY
                     json!({
                         "cube_name": "WideCube",
                         "alias": "pivot_grouping",
-                        "cube_params": ["WideCube"],
+                        "cube_params": [],
                         "expr": "0",
                         "grouping_set": null,
                     })
@@ -11809,16 +11809,16 @@ ORDER BY "source"."str0" ASC
                     json!({
                         "cube_name": "KibanaSampleDataEcommerce",
                         "alias": "ta_1_order_date_",
-                        "cube_params": ["KibanaSampleDataEcommerce", "Logs"],
+                        "cube_params": ["KibanaSampleDataEcommerce"],
                         "expr": "((${KibanaSampleDataEcommerce.order_date} = DATE('1994-05-01')) OR (${KibanaSampleDataEcommerce.order_date} = DATE('1996-05-03')))",
                         "grouping_set": null,
                     }).to_string(),
                 ]),
                 segments: Some(vec![
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cube_name": "Logs",
                         "alias": "lower_ta_2_conte",
-                        "cube_params": ["KibanaSampleDataEcommerce", "Logs"],
+                        "cube_params": ["Logs"],
                         "expr": "(LOWER(${Logs.content}) = $0$)",
                         "grouping_set": null,
                     }).to_string(),

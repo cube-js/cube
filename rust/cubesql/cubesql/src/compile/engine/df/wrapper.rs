@@ -1264,6 +1264,8 @@ impl CubeScanWrapperNode {
                                         subqueries_sql.clone(),
                                     )
                                     .await?;
+
+                                    let join_condition_members = &join_condition[0].1;
                                     let join_condition = join_condition[0].0.expr.clone();
                                     sql = new_sql;
 
@@ -1275,6 +1277,7 @@ impl CubeScanWrapperNode {
                                                 expr: join_condition,
                                                 alias: "__join__alias__unused".to_string(),
                                             },
+                                            join_condition_members,
                                             &ungrouped_scan_node.used_cubes,
                                         )?;
                                         serde_json::json!(res).to_string()
@@ -1310,24 +1313,27 @@ impl CubeScanWrapperNode {
                                     measures: Some(
                                         aggregate
                                             .iter()
-                                            .map(|(m, _used_members)| {
+                                            .map(|(m, used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
                                             })
                                             .chain(
                                                 // TODO understand type of projections
-                                                projection.iter().map(|(m, _used_members)| {
+                                                projection.iter().map(|(m, used_members)| {
                                                     Self::ungrouped_member_def(
                                                         m,
+                                                        used_members,
                                                         &ungrouped_scan_node.used_cubes,
                                                     )
                                                 }),
                                             )
-                                            .chain(window.iter().map(|(m, _used_members)| {
+                                            .chain(window.iter().map(|(m, used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
                                             }))
@@ -1337,9 +1343,10 @@ impl CubeScanWrapperNode {
                                         group_by
                                             .iter()
                                             .zip(group_descs.iter())
-                                            .map(|((m, _used_members), t)| {
+                                            .map(|((m, used_members), t)| {
                                                 Self::dimension_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                     t,
                                                 )
@@ -1349,9 +1356,10 @@ impl CubeScanWrapperNode {
                                     segments: Some(
                                         filter
                                             .iter()
-                                            .map(|(m, _used_members)| {
+                                            .map(|(m, used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
                                             })
@@ -1592,40 +1600,55 @@ impl CubeScanWrapperNode {
         Ok((aliased_columns, sql))
     }
 
-    fn make_member_def(
+    fn make_member_def<'m>(
         column: &AliasedColumn,
-        used_cubes: &Vec<String>,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
     ) -> Result<UngrouppedMemberDef> {
+        let used_cubes = used_members
+            .into_iter()
+            .flat_map(|member| member.split_once('.'))
+            .map(|(cube, _rest)| cube)
+            .unique()
+            .map(|cube| cube.to_string())
+            .collect::<Vec<_>>();
+        let cube_name = used_cubes
+            .first()
+            .or_else(|| ungrouped_scan_cubes.first())
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "Can't generate SQL for column without cubes: {:?}",
+                    column
+                ))
+            })?
+            .clone();
+
         let res = UngrouppedMemberDef {
-            cube_name: used_cubes
-                .iter()
-                .next()
-                .ok_or_else(|| {
-                    DataFusionError::Internal(format!(
-                        "Can't generate SQL for column without cubes: {:?}",
-                        column
-                    ))
-                })?
-                .to_string(),
+            cube_name,
             alias: column.alias.clone(),
-            cube_params: used_cubes.clone(),
+            cube_params: used_cubes,
             expr: column.expr.clone(),
             grouping_set: None,
         };
         Ok(res)
     }
 
-    fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
-        let res = Self::make_member_def(column, used_cubes)?;
+    fn ungrouped_member_def<'m>(
+        column: &AliasedColumn,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
+    ) -> Result<String> {
+        let res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
         Ok(serde_json::json!(res).to_string())
     }
 
-    fn dimension_member_def(
+    fn dimension_member_def<'m>(
         column: &AliasedColumn,
-        used_cubes: &Vec<String>,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
         grouping_type: &Option<GroupingSetDesc>,
     ) -> Result<String> {
-        let mut res = Self::make_member_def(column, used_cubes)?;
+        let mut res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
         res.grouping_set = grouping_type.clone();
         Ok(serde_json::json!(res).to_string())
     }
