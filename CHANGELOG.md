@@ -3,25 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-## [1.2.18](https://github.com/cube-js/cube/compare/v1.2.17...v1.2.18) (2025-03-06)
-
-
-### Bug Fixes
-
-* **cubesql:** Calculate proper limit and offset for CubeScan in nested limits case ([#8924](https://github.com/cube-js/cube/issues/8924)) ([0e95f18](https://github.com/cube-js/cube/commit/0e95f18bede4d2c79c8c3b729004715aa8aa7a58))
-* **cubesql:** Make cube join check stricter ([#9043](https://github.com/cube-js/cube/issues/9043)) ([feaf03b](https://github.com/cube-js/cube/commit/feaf03b5a0199abda5e6d1f41ae5487c509a1276))
-* **query-orchestrator:** Fix improper pre-aggregation buildRange construction for non UTC timezones ([#9284](https://github.com/cube-js/cube/issues/9284)) ([ef12d8d](https://github.com/cube-js/cube/commit/ef12d8d02702df7dcc1e6531c1b0aee6afa576ef))
-* **tesseract:** Don't generate COALESCE with single argument ([#9300](https://github.com/cube-js/cube/issues/9300)) ([3174be1](https://github.com/cube-js/cube/commit/3174be17cd1d9ba6aa1c0ec3ccbd0c5426342dc0))
-* **tesseract:** fix wrong default alias for symbols with digits in name ([#9299](https://github.com/cube-js/cube/issues/9299)) ([329d228](https://github.com/cube-js/cube/commit/329d2289e115a5f71714755323a8b8a92a260519))
-
+## [1.2.19](https://github.com/cube-js/cube/compare/v1.2.18...v1.2.19) (2025-03-08)
 
 ### Features
 
-* **cubesql:** Support multiple columns on each side in ungrouped-grouped join condition ([#9282](https://github.com/cube-js/cube/issues/9282)) ([e25d5c1](https://github.com/cube-js/cube/commit/e25d5c1ce686e743c67fce45ae596270c9e1ddbe))
+- **pinot-driver:** Add enableNullHandling to query options using env var ([#9310](https://github.com/cube-js/cube/issues/9310)) ([df763cc](https://github.com/cube-js/cube/commit/df763cc9a375eb656d6ac4dc10adbd9a68082a0e))
 
+## [1.2.18](https://github.com/cube-js/cube/compare/v1.2.17...v1.2.18) (2025-03-06)
 
+### Bug Fixes
 
+- **cubesql:** Calculate proper limit and offset for CubeScan in nested limits case ([#8924](https://github.com/cube-js/cube/issues/8924)) ([0e95f18](https://github.com/cube-js/cube/commit/0e95f18bede4d2c79c8c3b729004715aa8aa7a58))
+- **cubesql:** Make cube join check stricter ([#9043](https://github.com/cube-js/cube/issues/9043)) ([feaf03b](https://github.com/cube-js/cube/commit/feaf03b5a0199abda5e6d1f41ae5487c509a1276))
+- **query-orchestrator:** Fix improper pre-aggregation buildRange construction for non UTC timezones ([#9284](https://github.com/cube-js/cube/issues/9284)) ([ef12d8d](https://github.com/cube-js/cube/commit/ef12d8d02702df7dcc1e6531c1b0aee6afa576ef))
+- **tesseract:** Don't generate COALESCE with single argument ([#9300](https://github.com/cube-js/cube/issues/9300)) ([3174be1](https://github.com/cube-js/cube/commit/3174be17cd1d9ba6aa1c0ec3ccbd0c5426342dc0))
+- **tesseract:** fix wrong default alias for symbols with digits in name ([#9299](https://github.com/cube-js/cube/issues/9299)) ([329d228](https://github.com/cube-js/cube/commit/329d2289e115a5f71714755323a8b8a92a260519))
 
+### Features
+
+- **cubesql:** Support multiple columns on each side in ungrouped-grouped join condition ([#9282](https://github.com/cube-js/cube/issues/9282)) ([e25d5c1](https://github.com/cube-js/cube/commit/e25d5c1ce686e743c67fce45ae596270c9e1ddbe))
 
 ## [1.2.17](https://github.com/cube-js/cube/compare/v1.2.16...v1.2.17) (2025-03-05)
 

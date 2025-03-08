@@ -3,13 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.19](https://github.com/cube-js/cube/compare/v1.2.18...v1.2.19) (2025-03-08)
+
+### Features
+
+- **pinot-driver:** Add enableNullHandling to query options using env var ([#9310](https://github.com/cube-js/cube/issues/9310)) ([df763cc](https://github.com/cube-js/cube/commit/df763cc9a375eb656d6ac4dc10adbd9a68082a0e))
+
 ## [1.2.18](https://github.com/cube-js/cube/compare/v1.2.17...v1.2.18) (2025-03-06)
 
 **Note:** Version bump only for package @cubejs-backend/pinot-driver
-
-
-
-
 
 ## [1.2.17](https://github.com/cube-js/cube/compare/v1.2.16...v1.2.17) (2025-03-05)
 

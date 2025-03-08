@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/maven",
   "description": "Cube.js Maven Wrapper for java dependencies downloading",
   "author": "Cube Dev, Inc.",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -31,12 +31,12 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "1.2.18",
+    "@cubejs-backend/shared": "1.2.19",
     "source-map-support": "^0.5.19",
     "xmlbuilder2": "^2.4.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.2.18",
+    "@cubejs-backend/linter": "1.2.19",
     "@types/jest": "^27",
     "@types/node": "^18",
     "jest": "^27",
