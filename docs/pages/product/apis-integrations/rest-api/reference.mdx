@@ -139,8 +139,6 @@ properties under the `sql` key:
 
 | Property, type | Description |
 | --- | --- |
-| `data_source`, `string` | [Data source][ref-data-sources] name or `cubestore` |
-| `query_plan`, `object` | Query execution plan |
 | `query_type`, `string` | `regular` for [regular][ref-regular-queries] queries,<br/>`post_processing` for queries with [post-processing][ref-query-wpp],<br/>`pushdown` for queries with [pushdown][ref-query-wpd] |
 
 For queries with the `sql` format, in case of an error, the response will only contain
