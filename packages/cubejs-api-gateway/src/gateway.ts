@@ -401,7 +401,7 @@ class ApiGateway {
     );
 
     app.get(
-      `${this.basePath}/v1/meta/model_name`,
+      `${this.basePath}/v1/meta/namesModel`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
         await this.metaModelName({

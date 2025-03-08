@@ -91,13 +91,13 @@ describe('Gateway Api Scopes', () => {
     apiGateway.release();
   });
 
-  test('GET /v1/meta/model_name should return model names', async () => {
+  test('GET /v1/meta/namesModel should return model names', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
     });
 
     const response = await request(app)
-      .get('/cubejs-api/v1/meta/model_name')
+      .get('/cubejs-api/v1/meta/namesModel')
       .set('Authorization', AUTH_TOKEN)
       .expect(200);
 
