@@ -124,6 +124,21 @@ export type DBResponsePrimitive =
   number |
   string;
 
+// TODO type this better, to make it proper disjoint union
+export type Sql4SqlOk = {
+  sql: string,
+    values: Array<string | null>,
+};
+export type Sql4SqlError = { error: string };
+export type Sql4SqlCommon = {
+  query_type: {
+    regular: boolean;
+    post_processing: boolean;
+    pushdown: boolean;
+  }
+};
+export type Sql4SqlResponse = Sql4SqlCommon & (Sql4SqlOk | Sql4SqlError);
+
 let loadedNative: any = null;
 
 export function loadNative() {
@@ -387,6 +402,13 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   const native = loadNative();
 
   await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+// TODO parse result from native code
+export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: any): Promise<Sql4SqlResponse> => {
+  const native = loadNative();
+
+  return native.sql4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): String => {

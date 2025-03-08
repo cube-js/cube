@@ -7,6 +7,7 @@ pub mod auth;
 pub mod channel;
 pub mod config;
 pub mod cross;
+pub mod cubesql_utils;
 pub mod gateway;
 pub mod logger;
 pub mod node_export;
@@ -15,6 +16,7 @@ pub mod node_obj_serializer;
 pub mod orchestrator;
 #[cfg(feature = "python")]
 pub mod python;
+pub mod sql4sql;
 pub mod stream;
 pub mod template;
 pub mod transport;

@@ -130,13 +130,7 @@ accessible for everyone.
 | `data`    | [`/v1/load`][ref-ref-load], [`/v1/sql`][ref-ref-sql]                                      | ✅ Yes                 |
 | `graphql` | `/graphql`                                                                                | ✅ Yes                 |
 | `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj]                                                | ❌ No                  |
-
-<InfoBox>
-
-Exception: `/livez` and `/readyz` endpoints don't belong to any scope. Access to
-these endpoints can't be controlled using API scopes.
-
-</InfoBox>
+| No scope  | `/livez`, `/readyz`                                                                       | ✅ Yes, always |
 
 You can set accessible API scopes _for all requests_ using the
 `CUBEJS_DEFAULT_API_SCOPES` environment variable. For example, to disallow
@@ -282,10 +276,10 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-conf-basepath]: /reference/configuration/config#basepath
 [ref-conf-contexttoapiscopes]:
   /reference/configuration/config#contexttoapiscopes
-[ref-ref-load]: /product/apis-integrations/rest-api/reference#v1load
-[ref-ref-meta]: /product/apis-integrations/rest-api/reference#v1meta
-[ref-ref-sql]: /product/apis-integrations/rest-api/reference#v1sql
-[ref-ref-paj]: /product/apis-integrations/rest-api/reference#v1pre-aggregationsjobs
+[ref-ref-load]: /product/apis-integrations/rest-api/reference#base_pathv1load
+[ref-ref-meta]: /product/apis-integrations/rest-api/reference#base_pathv1meta
+[ref-ref-sql]: /product/apis-integrations/rest-api/reference#base_pathv1sql
+[ref-ref-paj]: /product/apis-integrations/rest-api/reference#base_pathv1pre-aggregationsjobs
 [ref-security-context]: /product/auth/context
 [ref-graphql-api]: /product/apis-integrations/graphql-api
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api

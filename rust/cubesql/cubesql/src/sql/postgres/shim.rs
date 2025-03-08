@@ -1792,8 +1792,7 @@ impl AsyncPostgresShim {
         let cache_entry = self.get_cache_entry().await?;
         let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
-        let statements =
-            parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL, qtrace)?;
+        let statements = parse_sql_to_statements(query, DatabaseProtocol::PostgreSQL, qtrace)?;
 
         if statements.len() == 0 {
             self.write(protocol::EmptyQuery::new()).await?;
