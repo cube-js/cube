@@ -43,6 +43,10 @@ To enable or disable the DAX API on a specific deployment, go to <Btn>Settings</
 in the Cube Cloud sidebar, then <Btn>Configuration</Btn>, and then toggle the
 <Btn>Enable DAX API</Btn> option.
 
+By default, the DAX API exposes all [time dimensions][ref-time-dimensions] as calendar
+hierarchies. You can set the `CUBEJS_DAX_CREATE_DATE_HIERARCHIES` environment
+variable to `false` to disable this behavior.
+
 ## Authentication
 
 The DAX API supports the user name and password authentication method.
@@ -54,12 +58,6 @@ The DAX API supports the user name and password authentication method.
 The DAX API works only with [views][ref-views], not cubes.
 
 </InfoBox>
-
-{/*
-
-TODO
-
-*/}
 
 ### Connection methods
 
@@ -85,3 +83,4 @@ it removes the benefits of using a semantic layer.
 [ref-ref-dax-api]: /product/apis-integrations/dax-api/reference
 [ref-views]: /product/data-modeling/concepts#views
 [link-powerbi-connection]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-live-connect-dq-datasets
+[ref-time-dimensions]: /product/data-modeling/concepts#time-dimensions
