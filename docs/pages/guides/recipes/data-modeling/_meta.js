@@ -4,6 +4,7 @@ module.exports = {
   "filtered-aggregates": "Calculating filtered aggregates",
   "period-over-period": "Calculating period-over-period changes",
   "custom-granularity": "Implementing custom time dimension granularities",
+  "custom-calendar": "Implementing custom calendars",
   "snapshots": "Implementing data snapshots",
   "entity-attribute-value": "Implementing Entity-Attribute-Value Model (EAV)",
   "passing-dynamic-parameters-in-a-query": "Passing dynamic parameters in a query",
