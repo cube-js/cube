@@ -1556,8 +1556,8 @@ async fn wrapper_cast_limit_explicit_members() {
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .request;
-    assert_eq!(request.measures.unwrap().len(), 1);
-    assert_eq!(request.dimensions.unwrap().len(), 0);
+    assert_eq!(request.measures.unwrap().len(), 0);
+    assert_eq!(request.dimensions.unwrap().len(), 1);
 }
 
 #[tokio::test]
