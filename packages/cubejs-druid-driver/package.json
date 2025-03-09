@@ -31,7 +31,7 @@
     "@cubejs-backend/base-driver": "1.2.19",
     "@cubejs-backend/schema-compiler": "1.2.19",
     "@cubejs-backend/shared": "1.2.19",
-    "axios": "^0.28.0"
+    "axios": "^1.8.2"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.2.19",
