@@ -265,6 +265,136 @@ Example response:
 }
 ```
 
+## `{base_path}/v1/meta/namesModel`
+
+Get names  for cubes and views defined in the data model.
+
+Response
+
+- `cubes` - Array of cubes and views
+- `name` - Codename of the cube/view
+
+Example request:
+
+```bash{outputLines: 2-4}
+curl \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -G \
+  http://localhost:4000/cubejs-api/v1/meta/namesModel
+```
+
+Example response:
+
+```json
+{
+  "cubes": [
+    {
+      "name": "Users"
+    }
+  ]
+}
+```
+
+## `{base_path}/v1/meta/:nameModel`
+
+Get all the information about cubes or views by knowing the name that is passed to :nameModel.
+
+Response
+
+- `cubes` - Array of cubes and views
+- `name` - Codename of the cube/view
+- `type` - Type can be "cube" or "view"
+- `title` - Human-readable cube/view name
+- `meta` - Custom metadata
+- `measures` - Array of measures in this cube/view
+- `dimensions` - Array of dimensions in this cube/view
+- `hierarchies` - Array of hierarchies in this cube
+- `segments` - Array of segments in this cube/view
+- `folders` - Array of folders in this view
+- `connectedComponent` - An integer representing a join relationship. If the same value is returned for two cubes, then there is
+at least one join path between them.
+
+Example request:
+
+```bash{outputLines: 2-4}
+curl \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -G \
+  http://localhost:4000/cubejs-api/v1/meta/Users
+```
+
+Example response:
+
+```json
+{
+  "cubes": [
+    {
+      "name": "Users",
+      "title": "Users",
+      "meta": {
+          "someKey": "someValue",
+          "nested": {
+            "someKey": "someValue"
+          }
+      },
+      "connectedComponent": 1,
+      "measures": [
+        {
+          "name": "users.count",
+          "title": "Users Count",
+          "shortTitle": "Count",
+          "aliasName": "users.count",
+          "type": "number",
+          "aggType": "count",
+          "drillMembers": ["users.id", "users.city", "users.createdAt"]
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "users.city",
+          "title": "Users City",
+          "type": "string",
+          "aliasName": "users.city",
+          "shortTitle": "City",
+          "suggestFilterValues": true
+        }
+      ],
+      "segments": []
+    }
+  ]
+}
+```
+
+## `{base_path}/v1/meta/:nameModel/:field`
+
+Get information :field about cubes or views, knowing the name that is passed to :nameModel.
+
+Response
+
+- `value` - Value from the field by cubes or views
+
+Example request:
+
+```bash{outputLines: 2-4}
+curl \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -G \
+  http://localhost:4000/cubejs-api/v1/meta/Users/meta
+```
+
+Example response:
+
+```json
+{
+  "value": {
+    "someKey": "someValue",
+    "nested": {
+      "someKey": "someValue"
+    }
+  }
+}
+```
+
 ## `{base_path}/v1/pre-aggregations/jobs`
 
 Trigger pre-aggregation build jobs or retrieve statuses of such jobs.
