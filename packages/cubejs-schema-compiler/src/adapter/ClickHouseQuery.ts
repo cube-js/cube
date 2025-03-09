@@ -1,4 +1,6 @@
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import R from 'ramda';
+
+import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -18,7 +20,7 @@ class ClickHouseFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lower(${this.allocateParam(param)}), '${s}')`;
+    return `${column} ${not ? 'NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 
   public castParameter() {
@@ -123,7 +125,7 @@ export class ClickHouseQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  public getFieldAlias(id) {
+  public getField(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
@@ -134,16 +136,34 @@ export class ClickHouseQuery extends BaseQuery {
       d => equalIgnoreCase(d.dimension, id),
     );
 
+    if (!field) {
+      field = this.measures.find(
+        d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
+      );
+    }
+
+    return field;
+  }
+
+  public getFieldAlias(id) {
+    const field = this.getField(id);
+
     if (field) {
       return field.aliasName();
     }
 
-    field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
+    return null;
+  }
+
+  public getFieldType(hash) {
+    if (!hash || !hash.id) {
+      return null;
+    }
+
+    const field = this.getField(hash.id);
 
     if (field) {
-      return field.aliasName();
+      return field.definition().type;
     }
 
     return null;
@@ -166,6 +186,43 @@ export class ClickHouseQuery extends BaseQuery {
 
     const direction = hash.desc ? 'DESC' : 'ASC';
     return `${fieldAlias} ${direction}`;
+  }
+
+  public getCollation() {
+    const useCollation = getEnv('clickhouseUseCollation', { dataSource: this.dataSource });
+    if (useCollation) {
+      return getEnv('clickhouseSortCollation', { dataSource: this.dataSource });
+    }
+    return null;
+  }
+
+  public override orderBy() {
+    //
+    // ClickHouse orders string by bytes, so we need to use COLLATE 'en' to order by string
+    //
+    if (R.isEmpty(this.order)) {
+      return '';
+    }
+
+    const collation = this.getCollation();
+
+    const orderByString = R.pipe(
+      R.map((order) => {
+        let orderString = this.orderHashToString(order);
+        if (collation && this.getFieldType(order) === 'string') {
+          orderString = `${orderString} COLLATE '${collation}'`;
+        }
+        return orderString;
+      }),
+      R.reject(R.isNil),
+      R.join(', ')
+    )(this.order);
+
+    if (!orderByString) {
+      return '';
+    }
+
+    return ` ORDER BY ${orderByString}`;
   }
 
   public groupByClause() {
@@ -281,6 +338,22 @@ export class ClickHouseQuery extends BaseQuery {
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
     delete templates.types.binary;
+
+    const collation = this.getCollation();
+
+    if (collation) {
+      templates.expressions.sort = `${templates.expressions.sort}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
+      templates.expressions.order_by = `${templates.expressions.order_by}{% if data_type and data_type == 'string' %} COLLATE '${collation}'{% endif %}`;
+
+      const oldOrderBy = '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}';
+
+      const newOrderBy =
+        '{% if order_by %}\nORDER BY {% for item in order_by %}{{ item.expr }}' +
+        `{%- if item.data_type and item.data_type == 'string' %} COLLATE '${collation}'{% endif %}` +
+        '{%- if not loop.last %}, {% endif %}{% endfor %}{% endif %}';
+
+      templates.statements.select = templates.statements.select.replace(oldOrderBy, newOrderBy);
+    }
     return templates;
   }
 }
