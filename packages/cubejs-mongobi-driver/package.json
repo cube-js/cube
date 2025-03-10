@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.2.22",
-    "@types/generic-pool": "^3.1.9",
+    "@types/generic-pool": "^3.8.2",
     "testcontainers": "^10.13.0",
     "typescript": "~5.2.2"
   },

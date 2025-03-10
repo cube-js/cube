@@ -33,13 +33,13 @@
     "@cubejs-backend/cubestore-driver": "1.2.22",
     "@cubejs-backend/shared": "1.2.22",
     "csv-write-stream": "^2.0.0",
-    "generic-pool": "^3.7.1",
+    "generic-pool": "^3.8.2",
     "lru-cache": "^5.1.1",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.2.22",
-    "@types/generic-pool": "^3.1.9",
+    "@types/generic-pool": "^3.8.2",
     "@types/jest": "^27",
     "@types/node": "^18",
     "@types/ramda": "^0.27.32",
