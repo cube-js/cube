@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/athena-driver",
   "description": "Cube.js Athena database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.2.19",
+  "version": "1.2.20",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -29,13 +29,13 @@
   "types": "dist/src/index.d.ts",
   "dependencies": {
     "@aws-sdk/client-athena": "^3.22.0",
-    "@cubejs-backend/base-driver": "1.2.19",
-    "@cubejs-backend/shared": "1.2.19",
+    "@cubejs-backend/base-driver": "1.2.20",
+    "@cubejs-backend/shared": "1.2.20",
     "sqlstring": "^2.3.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.2.19",
-    "@cubejs-backend/testing-shared": "1.2.19",
+    "@cubejs-backend/linter": "1.2.20",
+    "@cubejs-backend/testing-shared": "1.2.20",
     "@types/ramda": "^0.27.40",
     "typescript": "~5.2.2"
   },

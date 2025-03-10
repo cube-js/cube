@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.20](https://github.com/cube-js/cube/compare/v1.2.19...v1.2.20) (2025-03-10)
+
+### Bug Fixes
+
+- Allow config http protocol to be passed to clickhouse driver. ([#9195](https://github.com/cube-js/cube/issues/9195)) ([0c15b01](https://github.com/cube-js/cube/commit/0c15b016359037281da856d72846c19b1bfb39aa))
+
 ## [1.2.19](https://github.com/cube-js/cube/compare/v1.2.18...v1.2.19) (2025-03-08)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver
