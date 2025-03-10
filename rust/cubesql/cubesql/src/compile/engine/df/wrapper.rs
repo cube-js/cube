@@ -23,8 +23,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet, JoinType,
-        LogicalPlan, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, ExprSchemable,
+        GroupingSet, JoinType, LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
@@ -842,6 +842,12 @@ impl CubeScanWrapperNode {
                                 // When generating column expression that points to literal member it would render literal and generate alias
                                 // Here it should just generate the literal
                                 // 2. It would not allow to provide aliases for expressions, instead it usually generates them
+
+                                let data_type = expr
+                                    .get_type(&node.schema)
+                                    .and_then(|dt| Self::generate_sql_type(generator.clone(), dt))
+                                    .unwrap_or_else(|_| "".to_string());
+
                                 let (expr, sql) = Self::generate_sql_for_expr(
                                     plan.clone(),
                                     new_sql,
@@ -851,7 +857,11 @@ impl CubeScanWrapperNode {
                                     Arc::new(HashMap::new()),
                                 )
                                 .await?;
-                                columns.push(AliasedColumn { expr, alias });
+                                columns.push(AliasedColumn {
+                                    expr,
+                                    alias,
+                                    data_type,
+                                });
                                 new_sql = sql;
                             }
 
@@ -1266,6 +1276,13 @@ impl CubeScanWrapperNode {
                                     let join_condition = join_condition[0].expr.clone();
                                     sql = new_sql;
 
+                                    let data_type = condition
+                                        .get_type(&schema)
+                                        .and_then(|dt| {
+                                            Self::generate_sql_type(generator.clone(), dt)
+                                        })
+                                        .unwrap_or_else(|_| "".to_string());
+
                                     let join_sql_expression = {
                                         // TODO this is NOT a proper way to generate member expr here
                                         // TODO Do we even want a full-blown member expression here? or arguments + expr will be enough?
@@ -1273,6 +1290,7 @@ impl CubeScanWrapperNode {
                                             &AliasedColumn {
                                                 expr: join_condition,
                                                 alias: "__join__alias__unused".to_string(),
+                                                data_type,
                                             },
                                             &ungrouped_scan_node.used_cubes,
                                         )?;
@@ -1563,6 +1581,13 @@ impl CubeScanWrapperNode {
             } else {
                 original_expr.clone()
             };
+            //let data_type = expr.get_type(&schema.clone())?;
+            //let data_type = Self::generate_sql_type(generator.clone(), data_type.clone())?;
+            let data_type = expr
+                .get_type(&schema)
+                .and_then(|dt| Self::generate_sql_type(generator.clone(), dt))
+                .unwrap_or_else(|_| "".to_string());
+
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
                 plan.clone(),
                 sql,
@@ -1580,6 +1605,7 @@ impl CubeScanWrapperNode {
             aliased_columns.push(AliasedColumn {
                 expr: expr_sql,
                 alias,
+                data_type,
             });
         }
         Ok((aliased_columns, sql))
@@ -2106,6 +2132,10 @@ impl CubeScanWrapperNode {
                     asc,
                     nulls_first,
                 } => {
+                    let data_type = expr
+                        .get_type(plan.schema())
+                        .and_then(|dt| Self::generate_sql_type(sql_generator.clone(), dt))
+                        .unwrap_or_else(|_| "".to_string());
                     let (expr, sql_query) = Self::generate_sql_for_expr(
                         plan.clone(),
                         sql_query,
@@ -2117,7 +2147,7 @@ impl CubeScanWrapperNode {
                     .await?;
                     let resulting_sql = sql_generator
                         .get_sql_templates()
-                        .sort_expr(expr, asc, nulls_first)
+                        .sort_expr(expr, asc, nulls_first, data_type)
                         .map_err(|e| {
                             DataFusionError::Internal(format!(
                                 "Can't generate SQL for sort expr: {}",
