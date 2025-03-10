@@ -1,5 +1,361 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`SQL API Cube SQL over HTTP sql4sql double aggregation post-processing 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "error": "Provided query can not be executed without post-processing.",
+      "query_type": "post_processing",
+      "status": "error",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "127",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql regular query 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "query_type": "regular",
+      "sql": Array [
+        "SELECT
+      sum(\\"orders\\".amount) \\"total\\"
+    FROM
+      (
+  select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at
+  UNION ALL
+  select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at
+  UNION ALL
+  select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at
+  UNION ALL
+  select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at
+  UNION ALL
+  select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at
+  ) AS \\"orders\\" ",
+        Array [],
+      ],
+      "status": "ok",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "638",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql regular query with missing column 1`] = `
+Object {
+  "body": Object {
+    "error": "Error: SQLCompilationError: Internal: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
+    "stack": "Error: SQLCompilationError: Internal: Initial planning error: Error during planning: Invalid identifier '#foobar' for schema fields:[Orders.count, Orders.orderCount, Orders.netCollectionCompleted, Orders.arpu, Orders.refundRate, Orders.refundOrdersCount, Orders.overallOrders, Orders.totalAmount, Orders.toRemove, Orders.numberTotal, Orders.amountRank, Orders.amountReducedByStatus, Orders.statusPercentageOfTotal, Orders.amountRankView, Orders.amountRankDateMax, Orders.amountRankDate, Orders.countAndTotalAmount, Orders.createdAtMax, Orders.createdAtMaxProxy, Orders.id, Orders.status, Orders.createdAt, Orders.__user, Orders.__cubeJoinField], metadata:{}",
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "1395",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 500,
+  "statusText": "Internal Server Error",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql regular query with parameters 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "query_type": "regular",
+      "sql": Array [
+        "SELECT
+      sum(\\"orders\\".amount) \\"total\\"
+    FROM
+      (
+  select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at
+  UNION ALL
+  select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at
+  UNION ALL
+  select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at
+  UNION ALL
+  select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at
+  UNION ALL
+  select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at
+  ) AS \\"orders\\"  WHERE (\\"orders\\".status = $1)",
+        Array [
+          "foo",
+        ],
+      ],
+      "status": "ok",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "674",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql set variable 1`] = `
+Object {
+  "body": Object {
+    "error": "Error: This query doesnt have a plan, because it already has values for response",
+    "stack": "Error: This query doesnt have a plan, because it already has values for response",
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "241",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 500,
+  "statusText": "Internal Server Error",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql strictly post-processing 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "error": "Provided query can not be executed without post-processing.",
+      "query_type": "post_processing",
+      "status": "error",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "127",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql wrapper 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "query_type": "pushdown",
+      "sql": Array [
+        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\" 
+FROM (
+  SELECT
+        sum(\\"orders\\".amount) \\"sum_orders_total\\"
+      FROM
+        (
+    select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at
+    UNION ALL
+    select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at
+    UNION ALL
+    select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at
+    UNION ALL
+    select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at
+    UNION ALL
+    select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at
+    ) AS \\"orders\\"  WHERE ((LOWER(\\"orders\\".status) = UPPER(\\"orders\\".status)))
+) AS \\"Orders\\"",
+        Array [],
+      ],
+      "status": "ok",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "816",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql wrapper with parameters 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "query_type": "pushdown",
+      "sql": Array [
+        "SELECT \\"Orders\\".\\"sum_orders_total\\" \\"total\\" 
+FROM (
+  SELECT
+        sum(\\"orders\\".amount) \\"sum_orders_total\\"
+      FROM
+        (
+    select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at
+    UNION ALL
+    select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at
+    UNION ALL
+    select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at
+    UNION ALL
+    select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at
+    UNION ALL
+    select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at
+    ) AS \\"orders\\"  WHERE ((LOWER(\\"orders\\".status) = $1))
+) AS \\"Orders\\"",
+        Array [
+          "foo",
+        ],
+      ],
+      "status": "ok",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "799",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
 exports[`SQL API Postgres (Data) SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC: sql_orders 1`] = `
 Array [
   Object {

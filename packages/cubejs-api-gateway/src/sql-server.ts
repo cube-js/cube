@@ -3,9 +3,11 @@ import {
   registerInterface,
   shutdownInterface,
   execSql,
+  sql4sql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
+  Sql4SqlResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
@@ -60,6 +62,10 @@ export class SQLServer {
 
   public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
     await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
+  }
+
+  public async sql4sql(sqlQuery: string, securityContext?: any): Promise<Sql4SqlResponse> {
+    return sql4sql(this.sqlInterfaceInstance!, sqlQuery, securityContext);
   }
 
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {

@@ -147,6 +147,89 @@ describe('SQL API', () => {
 
       expect(rows).toBe(ROWS_LIMIT);
     });
+
+    describe('sql4sql', () => {
+      async function generateSql(query: string) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/sql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+          },
+          body: JSON.stringify({
+            query,
+            format: 'sql',
+          }),
+        });
+        const { status, statusText, headers } = response;
+        const body = await response.json();
+
+        // To stabilize responses
+        delete body.requestId;
+        headers.delete('date');
+        headers.delete('etag');
+
+        return {
+          status,
+          statusText,
+          headers,
+          body,
+        };
+      }
+
+      it('regular query', async () => {
+        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders;`)).toMatchSnapshot();
+      });
+
+      it('regular query with missing column', async () => {
+        expect(await generateSql(`SELECT SUM(foobar) AS total FROM Orders;`)).toMatchSnapshot();
+      });
+
+      it('regular query with parameters', async () => {
+        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders WHERE status = 'foo';`)).toMatchSnapshot();
+      });
+
+      it('strictly post-processing', async () => {
+        expect(await generateSql(`SELECT version();`)).toMatchSnapshot();
+      });
+
+      it('double aggregation post-processing', async () => {
+        expect(await generateSql(`
+          SELECT AVG(total)
+          FROM (
+            SELECT
+              status,
+              SUM(totalAmount) AS total
+            FROM Orders
+            GROUP BY 1
+          ) t
+        `)).toMatchSnapshot();
+      });
+
+      it('wrapper', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = UPPER(status)
+        `)).toMatchSnapshot();
+      });
+
+      it('wrapper with parameters', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = 'foo'
+        `)).toMatchSnapshot();
+      });
+
+      it('set variable', async () => {
+        expect(await generateSql(`
+          SET MyVariable = 'Foo'
+        `)).toMatchSnapshot();
+      });
+    });
   });
 
   describe('Postgres (Auth)', () => {

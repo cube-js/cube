@@ -41,16 +41,16 @@ static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn parse_sql_to_statements(
-    query: &String,
+    query: &str,
     protocol: DatabaseProtocol,
     qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Vec<Statement>> {
-    let original_query = query.clone();
+    let original_query = query;
 
     log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
-    let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
+    let query = query.replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
     let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
     // @todo Implement CONVERT function
     let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
@@ -247,13 +247,14 @@ pub fn parse_sql_to_statements(
     };
 
     parse_result.map_err(|err| {
-        CompilationError::user(format!("Unable to parse: {:?}", err))
-            .with_meta(Some(HashMap::from([("query".to_string(), original_query)])))
+        CompilationError::user(format!("Unable to parse: {:?}", err)).with_meta(Some(
+            HashMap::from([("query".to_string(), original_query.to_string())]),
+        ))
     })
 }
 
 pub fn parse_sql_to_statement(
-    query: &String,
+    query: &str,
     protocol: DatabaseProtocol,
     qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Statement> {
@@ -274,7 +275,10 @@ pub fn parse_sql_to_statement(
                     ))
                 };
 
-                Err(err.with_meta(Some(HashMap::from([("query".to_string(), query.clone())]))))
+                Err(err.with_meta(Some(HashMap::from([(
+                    "query".to_string(),
+                    query.to_string(),
+                )]))))
             }
         }
     }
