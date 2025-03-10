@@ -1,10 +1,11 @@
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
-use cubesql::transport::TransportService;
+use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
 use serde_json::Map;
 use tokio::sync::Semaphore;
+use uuid::Uuid;
 
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
@@ -27,7 +28,6 @@ use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
@@ -183,7 +183,10 @@ async fn handle_sql_query(
     stream_methods: WritableStreamMethods,
     sql_query: &str,
 ) -> Result<(), CubeError> {
-    let start_time = SystemTime::now();
+    let span_id = Some(Arc::new(SpanId::new(
+        Uuid::new_v4().to_string(),
+        serde_json::json!({ "sql": sql_query }),
+    )));
 
     let transport_service = services
         .injector()
@@ -197,14 +200,12 @@ async fn handle_sql_query(
                 .server
                 .transport
                 .log_load_state(
-                    None,
+                    span_id.clone(),
                     auth_context,
                     session.state.get_load_request_meta("sql"),
                     "Load Request".to_string(),
                     serde_json::json!({
-                        "query": {
-                            "sql": sql_query,
-                        }
+                        "query": span_id.as_ref().unwrap().query_key,
                     }),
                 )
                 .await?;
@@ -300,7 +301,6 @@ async fn handle_sql_query(
         };
 
         let result = execute().await;
-        let duration = start_time.elapsed().unwrap().as_millis() as u64;
 
         match &result {
             Ok(_) => {
@@ -309,7 +309,7 @@ async fn handle_sql_query(
                     .server
                     .transport
                     .log_load_state(
-                        None,
+                        span_id.clone(),
                         session_clone.state.auth_context().unwrap(),
                         session_clone.state.get_load_request_meta("sql"),
                         "Load Request Success".to_string(),
@@ -318,7 +318,7 @@ async fn handle_sql_query(
                                 "sql": sql_query,
                             },
                             "apiType": "sql",
-                            "duration": duration,
+                            "duration": span_id.as_ref().unwrap().duration(),
                             "isDataQuery": true
                         }),
                     )
@@ -330,7 +330,7 @@ async fn handle_sql_query(
                     .server
                     .transport
                     .log_load_state(
-                        None,
+                        span_id.clone(),
                         session_clone.state.auth_context().unwrap(),
                         session_clone.state.get_load_request_meta("sql"),
                         "Cube SQL Error".to_string(),
@@ -339,7 +339,7 @@ async fn handle_sql_query(
                                 "sql": sql_query
                             },
                             "apiType": "sql",
-                            "duration": duration,
+                            "duration": span_id.as_ref().unwrap().duration(),
                             "error": err.message,
                         }),
                     )
