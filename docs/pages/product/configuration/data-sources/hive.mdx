@@ -39,7 +39,9 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_HIVE_VER`        |                                                                                     |                           |    ❌    |
 | `CUBEJS_DB_HIVE_THRIFT_VER` |                                                                                     |                           |    ❌    |
 | `CUBEJS_DB_HIVE_CDH_VER`    |                                                                                     |                           |    ❌    |
-| `CUBEJS_CONCURRENCY`        | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |
 | `CUBEJS_DB_MAX_POOL`        | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
 [hive]: https://hive.apache.org/

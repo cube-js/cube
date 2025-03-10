@@ -1,5 +1,15 @@
 [
   {
+    "source": "/product/configuration/advanced/multiple-data-sources",
+    "destination": "/product/configuration/multiple-data-sources",
+    "permanent": true
+  },
+  {
+    "source": "/product/configuration/advanced/multitenancy",
+    "destination": "/product/configuration/multitenancy",
+    "permanent": true
+  },
+  {
     "source": "/product/workspace/visual-modeler",
     "destination": "/product/workspace/visual-model",
     "permanent": true
@@ -901,12 +911,12 @@
   },
   {
     "source": "/config/multitenancy",
-    "destination": "/product/configuration/advanced/multitenancy",
+    "destination": "/product/configuration/multitenancy",
     "permanent": true
   },
   {
     "source": "/config/multiple-data-sources",
-    "destination": "/product/configuration/advanced/multiple-data-sources",
+    "destination": "/product/configuration/multiple-data-sources",
     "permanent": true
   },
   {

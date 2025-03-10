@@ -69,11 +69,13 @@ deployment][ref-demo-deployment] in Cube Cloud.
 | `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY` | The Secret Access Key to use for database connections                                                                 | A valid Secret Access Key                                     |    ❌    |                                    ✅                                     |
 | `CUBEJS_DB_DUCKDB_S3_ENDPOINT`          | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ❌    |                                    ✅                                     |
 | `CUBEJS_DB_DUCKDB_S3_REGION`            | The [region of the bucket][duckdb-docs-s3-import]                                                                     | A valid AWS region                                            |    ❌    |                                    ✅                                     |
-| `CUBEJS_CONCURRENCY`                    | The number of concurrent connections each queue has to the database. Default is `2`                                   | A valid number                                                |    ❌    |                                    ✅                                     |
 | `CUBEJS_DB_DUCKDB_S3_USE_SSL`           | Use SSL for connection                                                                                                | A boolean                                                     |    ❌    |                                    ❌                                     |
 | `CUBEJS_DB_DUCKDB_S3_URL_STYLE`         | To choose the S3 URL style(vhost or path)                                                                             | 'vhost' or 'path'                                             |    ❌    |                                    ❌                                     |
 | `CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN`     | The token for the S3 session                                                                                          | A valid Session Token                                         |    ❌    |                                    ✅                                     |
 | `CUBEJS_DB_DUCKDB_EXTENSIONS`           | A comma-separated list of DuckDB extensions	to install and load                                                       | A comma-separated list of DuckDB extensions                   |    ❌    |                                    ✅                                     |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
 ## Pre-Aggregation Feature Support
 
