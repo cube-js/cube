@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.20](https://github.com/cube-js/cube/compare/v1.2.19...v1.2.20) (2025-03-10)
+
+### Features
+
+- Add SQL queries support in /v1/sql endpoint ([#9301](https://github.com/cube-js/cube/issues/9301)) ([7eba663](https://github.com/cube-js/cube/commit/7eba6639164ed3cffef4c6b68f5bc8d9a7cc740e))
+
 ## [1.2.19](https://github.com/cube-js/cube/compare/v1.2.18...v1.2.19) (2025-03-08)
 
 **Note:** Version bump only for package @cubejs-backend/native
