@@ -113,6 +113,38 @@ The number of concurrent connections each query queue has to the database.
 It can be also set as `concurrency` in the [`orchestrator_options` configuration
 option](/reference/configuration/config#orchestrator_options).
 
+If you'd like to adjust the concurrency for the refresh worker, use
+`CUBEJS_REFRESH_WORKER_CONCURRENCY`.
+
+## `CUBEJS_REFRESH_WORKER_CONCURRENCY`
+
+The number of concurrent connections each query queue of the refresh worker
+has to the database.
+
+| Possible Values | Default in Development       | Default in Production        |
+| --------------- | ---------------------------- | ---------------------------- |
+| A valid number  | Same as `CUBEJS_CONCURRENCY` | Same as `CUBEJS_CONCURRENCY` |
+
+## `CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`
+
+How many pre-aggregations the refresh worker will build in parallel for each
+application id as determined by the [`context_to_app_id`](#context_to_app_id)
+configuration option.
+
+Note that this parameter doesn't override the overall refresh worker concurrency,
+configured via the `CUBEJS_REFRESH_WORKER_CONCURRENCY` environment variable, and
+it should be adjusted accordingly.
+
+| Possible Values                      | Default in Development | Default in Production |
+| ------------------------------------ | ---------------------- | --------------------- |
+| A valid number of concurrent queries | 10                     | 10                    |
+
+<InfoBox>
+
+Previously, this environment variable was named `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`.
+
+</InfoBox>
+
 ## `CUBEJS_CUBESTORE_HOST`
 
 The hostname of the Cube Store deployment
@@ -1038,15 +1070,7 @@ mode](/product/caching/using-pre-aggregations#rollup-only-mode) for details.
 It can be also set using the [`orchestrator_options.rollupOnlyMode` configuration
 option](/reference/configuration/config#orchestrator_options).
 
-## `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`
 
-How many pre-aggregations refresh worker will build in parallel. Please note
-changing this param doesn't change queue concurrency and it should be adjusted
-accordingly
-
-| Possible Values                                | Default in Development | Default in Production |
-| ---------------------------------------------- | ---------------------- | --------------------- |
-| A valid number of concurrent refresh processes | 10                     | 10                    |
 
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 

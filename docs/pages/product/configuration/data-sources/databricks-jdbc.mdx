@@ -60,8 +60,10 @@ docker run -it -p 4000:4000 --env-file=.env cube-jdk
 | `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection | A valid token         |    ✅    |
 | `CUBEJS_DB_DATABRICKS_CATALOG`       | The name of the [Databricks catalog][databricks-catalog] to connect to                                                | A valid catalog name  |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs] (Not needed if using Unity Catalog connection)         | A valid mount path    |    ❌    |
-| `CUBEJS_CONCURRENCY`                 | The number of concurrent connections each queue has to the database. Default is `2`             | A valid number        |    ❌    |
 | `CUBEJS_DB_MAX_POOL`                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
 ## Pre-Aggregation Feature Support
 

@@ -67,7 +67,9 @@ CUBEJS_DB_PASS=password
 | `CUBEJS_DB_URL`      | The host URL for ksqlDB with port                                             | A valid database host URL |    ✅    |
 | `CUBEJS_DB_USER`     | The username used to connect to the ksqlDB. API key for Confluent Cloud.      | A valid port number       |    ✅    |
 | `CUBEJS_DB_PASS`     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.   | A valid database name     |    ✅    |
-| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the DB. Default is `1` | A valid number            |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
 ## Pre-Aggregations Support
 
