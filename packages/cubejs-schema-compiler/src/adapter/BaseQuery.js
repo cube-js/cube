@@ -1709,7 +1709,17 @@ export class BaseQuery {
         const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
         throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
       }
-      return [typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`, collectedMeasures];
+
+      let measureKey;
+      if (typeof m.measure === 'string') {
+        measureKey = m.measure;
+      } else if (m.isMemberExpression) {
+        // TODO expressionName vs definition?
+        measureKey = m.expressionName;
+      } else {
+        measureKey = `${m.measure.cubeName}.${m.measure.name}`;
+      }
+      return [measureKey, collectedMeasures];
     }));
   }
 
