@@ -280,6 +280,7 @@ const queryPreAggregationsSchema = Joi.object().keys({
   preAggregations: Joi.array().items(Joi.object().keys({
     id: Joi.string().required(),
     cacheOnly: Joi.boolean(),
+    metaOnly: Joi.boolean(),
     partitions: Joi.array().items(Joi.string()),
     refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
   }))
