@@ -688,10 +688,39 @@ export class RefreshScheduler {
     if (queryingOptions.dateRange) {
       preAggregations.forEach(preAggregation => {
         preAggregation.partitions = preAggregation.partitions
-          .filter(p => PreAggregationPartitionRangeLoader.intersectDateRanges(
-            [p.buildRangeStart, p.buildRangeEnd],
-            queryingOptions.dateRange,
-          ));
+          .filter(p => {
+            if (!p.buildRangeStart && !p.buildRangeEnd) {
+              return true; // If there is no range specified - we should include it like rebuild in anyway
+            }
+
+            return PreAggregationPartitionRangeLoader.intersectDateRanges(
+              [p.buildRangeStart, p.buildRangeEnd],
+              queryingOptions.dateRange,
+            );
+          });
+        preAggregation.partitionsWithDependencies.forEach(pd => {
+          pd.partitions = pd.partitions.filter(p => {
+            if (!p.buildRangeStart && !p.buildRangeEnd) {
+              return true; // If there is no range specified - we should include it like rebuild in any way
+            }
+
+            return PreAggregationPartitionRangeLoader.intersectDateRanges(
+              [p.buildRangeStart, p.buildRangeEnd],
+              queryingOptions.dateRange,
+            );
+          });
+
+          pd.dependencies = pd.dependencies.filter(p => {
+            if (!p.buildRangeStart && !p.buildRangeEnd) {
+              return true; // If there is no range specified - we should include it like rebuild in any way
+            }
+
+            return PreAggregationPartitionRangeLoader.intersectDateRanges(
+              [p.buildRangeStart, p.buildRangeEnd],
+              queryingOptions.dateRange,
+            );
+          });
+        });
       });
     }
 
