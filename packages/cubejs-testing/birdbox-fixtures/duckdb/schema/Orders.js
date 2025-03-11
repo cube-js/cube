@@ -29,5 +29,9 @@ cube(`Orders`, {
       sql: `status`,
       type: `string`,
     },
+    amount: {
+      sql: `amount`,
+      type: `number`,
+    },
   },
 });

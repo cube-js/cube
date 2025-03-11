@@ -12,6 +12,12 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 };
 
 class DuckDBFilter extends BaseFilter {
+  public castParameter() {
+    if (this.measure || this.definition().type === 'number') {
+      return 'CAST(? AS DOUBLE)';
+    }
+    return '?';
+  }
 }
 
 export class DuckDBQuery extends BaseQuery {
