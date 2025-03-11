@@ -27,6 +27,6 @@ impl SqlService for SqlAuthDefaultImpl {
         meta: Arc<MetaContext>,
         session: Arc<Session>,
     ) -> CompilationResult<QueryPlan> {
-        convert_sql_to_cube_query(&query, meta, session).await
+        convert_sql_to_cube_query(&query, meta, session, None).await
     }
 }

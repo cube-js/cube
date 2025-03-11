@@ -503,6 +503,7 @@ async fn test_join_cubes_on_wrong_field_error() {
         .to_string(),
         meta.clone(),
         get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        None,
     )
     .await;
 
@@ -527,6 +528,7 @@ async fn test_join_cubes_filter_from_wrong_side_error() {
             .to_string(),
         meta.clone(),
         get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        None
     )
         .await;
 
@@ -554,6 +556,7 @@ async fn test_join_cubes_with_aggr_error() {
             .to_string(),
         meta.clone(),
         get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
+        None
     )
         .await;
 

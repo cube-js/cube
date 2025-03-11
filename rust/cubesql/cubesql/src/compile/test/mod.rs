@@ -1021,7 +1021,13 @@ impl TestContext {
 
     pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {
         // TODO push to_string() deeper
-        convert_sql_to_cube_query(&query.to_string(), self.meta.clone(), self.session.clone()).await
+        convert_sql_to_cube_query(
+            &query.to_string(),
+            self.meta.clone(),
+            self.session.clone(),
+            None,
+        )
+        .await
     }
 
     pub async fn execute_query_with_flags(
@@ -1131,6 +1137,7 @@ pub async fn convert_select_to_query_plan_with_meta(
         &query,
         meta_context.clone(),
         get_test_session(DatabaseProtocol::PostgreSQL, meta_context).await,
+        None,
     )
     .await;
 

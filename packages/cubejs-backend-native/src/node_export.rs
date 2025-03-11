@@ -212,6 +212,7 @@ async fn handle_sql_query(
         }
 
         let session_clone = Arc::clone(&session);
+        let span_id_clone = span_id.clone();
 
         let execute = || async move {
             // todo: can we use compiler_cache?
@@ -221,7 +222,8 @@ async fn handle_sql_query(
                 .map_err(|err| {
                     CubeError::internal(format!("Failed to get meta context: {}", err))
                 })?;
-            let query_plan = convert_sql_to_cube_query(sql_query, meta_context, session).await?;
+            let query_plan =
+                convert_sql_to_cube_query(sql_query, meta_context, session, span_id_clone).await?;
 
             let mut stream = get_df_batches(&query_plan).await?;
 

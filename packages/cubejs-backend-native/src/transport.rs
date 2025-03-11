@@ -341,6 +341,8 @@ impl TransportService for NodeBridgeTransport {
     ) -> Result<Vec<RecordBatch>, CubeError> {
         trace!("[transport] Request ->");
 
+        println!("!!!! LOAD {:?}", span_id);
+
         let native_auth = ctx
             .as_any()
             .downcast_ref::<NativeAuthContext>()

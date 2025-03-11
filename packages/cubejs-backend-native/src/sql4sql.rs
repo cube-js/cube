@@ -166,7 +166,8 @@ async fn handle_sql4sql_query(
             .await
             .map_err(|err| CubeError::internal(format!("Failed to get meta context: {err}")))?;
         let query_plan =
-            convert_sql_to_cube_query(sql_query, meta_context.clone(), session.clone()).await?;
+            convert_sql_to_cube_query(sql_query, meta_context.clone(), session.clone(), None)
+                .await?;
         let logical_plan = query_plan.try_as_logical_plan()?;
         get_sql(&session, meta_context, Arc::new(logical_plan.clone())).await
     })
