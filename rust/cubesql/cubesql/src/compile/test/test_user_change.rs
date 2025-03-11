@@ -163,7 +163,7 @@ async fn test_change_user_via_filter_or() {
         convert_sql_to_cube_query(
             &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
             meta.clone(),
-            get_test_session(DatabaseProtocol::PostgreSQL, meta).await
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         ).await;
 
     // TODO: We need to propagate error to result, to assert message
