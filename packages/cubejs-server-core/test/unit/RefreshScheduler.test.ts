@@ -840,10 +840,11 @@ describe('Refresh Scheduler', () => {
       const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
 
       let finish = false;
+      let jobs: string[];
 
       while (!finish) {
         try {
-          await refreshScheduler.postBuildJobs(
+          jobs = await refreshScheduler.postBuildJobs(
             ctx,
             {
               metadata: undefined,
@@ -882,6 +883,11 @@ describe('Refresh Scheduler', () => {
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_orphaned') && o.timezone === 'America/Los_Angeles').length).toEqual(5);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_second') && o.timezone === 'UTC').length).toEqual(5);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_second') && o.timezone === 'America/Los_Angeles').length).toEqual(5);
+
+      // Let's also test the getCachedBuildJobs()
+      const buildJobs = await refreshScheduler.getCachedBuildJobs(ctx, jobs);
+      const allTokensExist = jobs.every(token => buildJobs.some(job => job.token === token));
+      expect(allTokensExist).toBeTruthy();
     });
 
     test('Only `first` pre-aggregation', async () => {
