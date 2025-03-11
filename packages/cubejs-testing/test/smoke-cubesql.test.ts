@@ -147,6 +147,89 @@ describe('SQL API', () => {
 
       expect(rows).toBe(ROWS_LIMIT);
     });
+
+    describe('sql4sql', () => {
+      async function generateSql(query: string) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/sql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+          },
+          body: JSON.stringify({
+            query,
+            format: 'sql',
+          }),
+        });
+        const { status, statusText, headers } = response;
+        const body = await response.json();
+
+        // To stabilize responses
+        delete body.requestId;
+        headers.delete('date');
+        headers.delete('etag');
+
+        return {
+          status,
+          statusText,
+          headers,
+          body,
+        };
+      }
+
+      it('regular query', async () => {
+        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders;`)).toMatchSnapshot();
+      });
+
+      it('regular query with missing column', async () => {
+        expect(await generateSql(`SELECT SUM(foobar) AS total FROM Orders;`)).toMatchSnapshot();
+      });
+
+      it('regular query with parameters', async () => {
+        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders WHERE status = 'foo';`)).toMatchSnapshot();
+      });
+
+      it('strictly post-processing', async () => {
+        expect(await generateSql(`SELECT version();`)).toMatchSnapshot();
+      });
+
+      it('double aggregation post-processing', async () => {
+        expect(await generateSql(`
+          SELECT AVG(total)
+          FROM (
+            SELECT
+              status,
+              SUM(totalAmount) AS total
+            FROM Orders
+            GROUP BY 1
+          ) t
+        `)).toMatchSnapshot();
+      });
+
+      it('wrapper', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = UPPER(status)
+        `)).toMatchSnapshot();
+      });
+
+      it('wrapper with parameters', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = 'foo'
+        `)).toMatchSnapshot();
+      });
+
+      it('set variable', async () => {
+        expect(await generateSql(`
+          SET MyVariable = 'Foo'
+        `)).toMatchSnapshot();
+      });
+    });
   });
 
   describe('Postgres (Auth)', () => {
@@ -535,6 +618,36 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot('join grouped with filter');
     });
 
+    test('join with grouped query on coalesce', async () => {
+      const query = `
+        SELECT
+          "Orders".status AS status,
+          COUNT(*) AS count
+        FROM
+          "Orders"
+          INNER JOIN
+          (
+            SELECT
+              status,
+              SUM(totalAmount)
+            FROM
+              "Orders"
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 2
+          ) top_orders
+        ON
+          (COALESCE("Orders".status, '') = COALESCE(top_orders.status, '')) AND
+          (("Orders".status IS NOT NULL) = (top_orders.status IS NOT NULL))
+        GROUP BY 1
+        ORDER BY 1
+        `;
+
+      const res = await connection.query(query);
+      // Expect only top statuses 2 by total amount: processed and shipped
+      expect(res.rows).toMatchSnapshot('join grouped on coalesce');
+    });
+
     test('where segment is false', async () => {
       const query =
         'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
@@ -629,6 +742,41 @@ filter_subq AS (
 
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('query-view-deep-joins');
+    });
+
+    test('wrapper with duplicated members', async () => {
+      const query = `
+        SELECT
+          "foo",
+          "bar",
+          CASE
+            WHEN "bar" = 'new'
+            THEN 1
+            ELSE 0
+            END
+            AS "bar_expr"
+        FROM (
+          SELECT
+            "rows"."foo" AS "foo",
+            "rows"."bar" AS "bar"
+          FROM (
+            SELECT
+              "status" AS "foo",
+              "status" AS "bar"
+            FROM Orders
+          ) "rows"
+          GROUP BY
+            "foo",
+            "bar"
+        ) "_"
+        ORDER BY
+          "bar_expr"
+          LIMIT 1
+        ;
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('wrapper-duplicated-members');
     });
   });
 });

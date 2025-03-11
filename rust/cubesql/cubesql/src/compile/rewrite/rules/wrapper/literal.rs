@@ -28,6 +28,7 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                         "?grouped_subqueries",
+                        "?ungrouped_scan",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -38,6 +39,7 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                         "?grouped_subqueries",
+                        "?ungrouped_scan",
                     ),
                 ),
                 self.transform_literal("?alias_to_cube", "?value"),
@@ -52,6 +54,7 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                         "?grouped_subqueries",
+                        "?ungrouped_scan",
                     ),
                 ),
                 wrapper_pullup_replacer(
@@ -62,6 +65,7 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                         "?grouped_subqueries",
+                        "?ungrouped_scan",
                     ),
                 ),
                 self.transform_interval_literal("?alias_to_cube", "?value", "?new_value"),

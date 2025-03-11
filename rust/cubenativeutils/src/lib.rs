@@ -1,2 +1,2 @@
 pub mod wrappers;
-pub use cubesql::CubeError;
+pub use cubesql::{CubeError, CubeErrorCauseType};

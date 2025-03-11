@@ -572,7 +572,7 @@ WHERE
         ));
 }
 
-/// Using NOW() in wrapper should render proper timestamptz in SQL
+/// Using NOW() in wrapper should render NOW() in SQL
 #[tokio::test]
 async fn test_wrapper_now() {
     if !Rewriter::sql_push_down_enabled() {
@@ -611,10 +611,10 @@ GROUP BY
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
+        .contains("${KibanaSampleDataEcommerce.order_date} >= NOW()"));
 }
 
-/// Using NOW() in ungrouped wrapper should render proper timestamptz in SQL
+/// Using NOW() in ungrouped wrapper should render NOW() in SQL
 #[tokio::test]
 async fn test_wrapper_now_ungrouped() {
     if !Rewriter::sql_push_down_enabled() {
@@ -651,7 +651,7 @@ WHERE
         .find_cube_scan_wrapped_sql()
         .wrapped_sql
         .sql
-        .contains("${KibanaSampleDataEcommerce.order_date} >= timestamptz"));
+        .contains("${KibanaSampleDataEcommerce.order_date} >= NOW()"));
 }
 
 #[tokio::test]
@@ -1174,7 +1174,7 @@ WHERE
     let last_mod_month_re =
         Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "last_mod_month""#).unwrap();
     assert!(last_mod_month_re.is_match(&sql));
-    let sum_price_re = Regex::new(r#"CASE WHEN "logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
+    let sum_price_re = Regex::new(r#"CASE WHEN \("logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL\) THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
         .unwrap();
     assert!(sum_price_re.is_match(&sql));
     let cube_user_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "cube_user""#).unwrap();
@@ -1416,4 +1416,326 @@ async fn wrapper_agg_dimension_over_limit() {
         .wrapped_sql
         .sql
         .contains("\"ungrouped\": true"));
+}
+
+// TODO allow number measures and add test for those
+/// Projection(Filter(CubeScan(ungrouped))) should have projection expressions pushed down to Cube
+#[tokio::test]
+async fn wrapper_projection_flatten_simple_measure() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+  maxPrice
+FROM
+  MultiTypeCube
+WHERE
+  LOWER(CAST(dim_num0 AS TEXT)) = 'all'
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures.unwrap().len(), 1);
+    assert_eq!(request.dimensions.unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn wrapper_duplicated_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        format!(
+            r#"
+SELECT
+    "foo",
+    "bar",
+    CASE
+        WHEN "bar" IS NOT NULL
+        THEN 1
+        ELSE 0
+        END
+    AS "bar_expr"
+FROM (
+    SELECT
+        "rows"."foo" AS "foo",
+        "rows"."bar" AS "bar"
+    FROM (
+        SELECT
+            "dim_str0" AS "foo",
+            "dim_str0" AS "bar"
+        FROM MultiTypeCube
+    ) "rows"
+    GROUP BY
+        "foo",
+        "bar"
+) "_"
+ORDER BY
+    "bar_expr"
+LIMIT 1
+;
+        "#
+        )
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    // Generated SQL should contain realiasing of one member to two columns
+    assert!(logical_plan
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains(r#""foo" "foo""#));
+    assert!(logical_plan
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains(r#""foo" "bar""#));
+}
+
+/// Simple wrapper with cast should have explicit members, not zero
+#[tokio::test]
+async fn wrapper_cast_limit_explicit_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            CAST(dim_date0 AS DATE) AS "dim_date0"
+        FROM
+            MultiTypeCube
+        LIMIT 10
+        ;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    // Query should mention just a single member
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.measures.unwrap().len(), 0);
+    assert_eq!(request.dimensions.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn wrapper_typed_null() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            dim_str0,
+            AVG(avgPrice),
+            CASE
+                WHEN SUM((NULLIF(0.0, 0.0))) IS NOT NULL THEN SUM((NULLIF(0.0, 0.0)))
+                ELSE 0
+                END
+        FROM MultiTypeCube
+        GROUP BY 1
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    assert!(query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql
+        .contains("SUM(CAST(NULL AS DOUBLE))"));
+}
+
+/// Tests that exactly same expression in projection and filter have correct alias after rewriting
+#[tokio::test]
+async fn test_same_expression_in_projection_and_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    DATE_TRUNC('day', CAST(dim_date0 AS TIMESTAMP))
+FROM MultiTypeCube
+WHERE
+    DATE_TRUNC('day', CAST(dim_date0 AS TIMESTAMP)) >=
+     '2025-01-01'
+GROUP BY
+    1
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let dimensions = request.dimensions.unwrap();
+    assert_eq!(dimensions.len(), 1);
+    let dimension = &dimensions[0];
+    assert!(dimension.contains("DATE_TRUNC"));
+    let segments = request.segments.unwrap();
+    assert_eq!(segments.len(), 1);
+    let segment = &segments[0];
+    assert!(segment.contains("DATE_TRUNC"));
+}
+
+/// Aggregation with falsy filter should NOT get pushed to CubeScan with limit=0
+/// This test currently produces WrappedSelect with WHERE FALSE, which is OK for our purposes
+#[tokio::test]
+async fn select_agg_where_false() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE 1 = 0".to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            order: Some(vec![]),
+            limit: None,
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+
+    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    assert!(!sql.contains("\"ungrouped\":"));
+    assert!(sql.contains(r#"\"expr\":\"FALSE\""#));
+    assert!(sql.contains(r#""limit": 50000"#));
+}
+
+/// Aggregation(dimension) with falsy filter should NOT get pushed to CubeScan with limit=0
+/// This test currently produces WrappedSelect with WHERE FALSE, which is OK for our purposes
+#[tokio::test]
+async fn wrapper_dimension_agg_where_false() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            MAX(customer_gender)
+        FROM
+            KibanaSampleDataEcommerce
+        WHERE 1 = 0
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: None,
+            ungrouped: Some(true),
+            ..Default::default()
+        }
+    );
+
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+
+    // Final query uses grouped query to Cube.js with WHERE FALSE, but without LIMIT 0
+    assert!(!sql.contains("\"ungrouped\":"));
+    assert!(sql.contains(r#"\"expr\":\"FALSE\""#));
+    assert!(!sql.contains(r#""limit""#));
+    assert!(sql.contains("LIMIT 50000"));
 }

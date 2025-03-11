@@ -101,19 +101,34 @@ terms][ref-enterprise-premier-tier-support], and [limits][ref-cloud-limits].
 
 ## Resources
 
-The following resource types incur CCU consumption (measured in 5-minute intervals):
+The following resource types incur CCU consumption and apply to _individual resources_
+of deployments within a Cube Cloud account. The consumption is measured in 5-minute intervals.
 
-| Resource type             | CCUs per hour                                        |
-| ------------------------- | :--------------------------------------------------: |
-| [Production Cluster][ref-production-cluster] | Depends on a [chosen tier](#deployment-tiers)           |
-| [Development Instance][ref-development-instance] | Depends on a [chosen tier](#deployment-tiers)           |
-| Cube API Instance         | Depends on a [chosen tier](#deployment-tiers)           |
-| Cube Store Worker         | Depends on a [chosen tier](#cube-store-worker-tiers) |
-| [Semantic Catalog][ref-semantic-catalog] | Depends on a [chosen tier](#semantic-catalog-tiers) |
-| [Dedicated infrastructure][ref-dedicated-infra] | 3 |
-| [Query History][ref-query-history] | Depends on a [chosen tier](#query-history-tiers)     |
-| [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) |
-| [Audit Log][ref-audit-log] | Depends on a [chosen tier](#audit-log-tiers) |
+| Resource type | CCUs per hour | Notes |
+| --- | :---: | --- |
+| [Production Cluster][ref-production-cluster] | <nobr>4..8</nobr> | Depends on a [chosen tier](#deployment-tiers) |
+| [Development Instance][ref-development-instance] | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
+| Cube API Instance | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
+| Cube Store Worker | <nobr>1..2</nobr> | Depends on a [chosen tier](#cube-store-worker-tiers) |
+| [Semantic Catalog][ref-semantic-catalog] | <nobr>2..4</nobr> | Depends on a [chosen tier](#semantic-catalog-tiers) |
+| [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
+| [Monitoring Integrations][ref-monitoring-integrations] | <nobr>1..4</nobr> | Depends on a [chosen tier](#monitoring-integrations-tiers) |
+
+The following resource types incur CCU consumption and apply to _individual requests_
+to deployments within a Cube Cloud account:
+
+| Resource type | CCUs per request | Notes |
+| --- | :---: | --- |
+| [AI API][ref-ai-api] | <nobr>0..1</nobr> | Depends on [configuration](#ai-requests-consumption) |
+| [AI Assistant][ref-ai-assistant] | <nobr>0..1</nobr> | Depends on [configuration](#ai-requests-consumption) |
+
+The following resource types incur CCU consumption and apply to the _whole Cube Cloud
+account_:
+
+| Resource type | CCUs per hour | Notes |
+| --- | :---: | --- |
+| [Dedicated infrastructure][ref-dedicated-infra] | 3 | — |
+| [Audit Log][ref-audit-log] | <nobr>4..6</nobr> | Depends on the [chosen tier](#audit-log-tiers) |
 
 ### Deployment tiers
 
@@ -124,7 +139,7 @@ requests through [APIs & integrations][ref-apis] under the following tiers:
 | Tier | <nobr>CCUs per hour</nobr> | <nobr>CPU and memory</nobr> | Dependent features |
 | ---- | :--- | --- | --- |
 | S    | <nobr>4 — _for Production Cluster_</nobr><br/><nobr>1 — _for Development Instance_</nobr><br/><nobr>1 — _for Cube API Instance_</nobr> | 100% | — |
-| M    | <nobr>8 — _for Production Cluster_</nobr><br/><nobr>2 — _for Development Instance_</nobr><br/><nobr>2 — _for Cube API Instance_</nobr> | 200% | <nobr>[MDX API][ref-mdx-api]</nobr> |
+| M    | <nobr>8 — _for Production Cluster_</nobr><br/><nobr>2 — _for Development Instance_</nobr><br/><nobr>2 — _for Cube API Instance_</nobr> | 200% | [DAX API][ref-dax-api], [MDX API][ref-mdx-api] |
 
 You can upgrade to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
@@ -184,6 +199,16 @@ You can upgrade to a chosen tier in the
 
 You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
+
+### AI requests consumption
+
+[AI API][ref-ai-api] and [AI Assistant][ref-ai-assistant] consume CCUs per request apart from
+[Enterprise and above][cube-pricing] product tiers where customers can provide their own suitable
+LLM if wanted and then will be exempt from this charge:
+
+| <nobr>CCUs per request</nobr> |
+| :------------------------: |
+| 1                          |
 
 ### Audit Log tiers
 
@@ -336,7 +361,10 @@ product tier level. Payments are non-refundable.
 [ref-development-instance]: /product/deployment/cloud/deployment-types#development-instance
 [ref-apis]: /product/apis-integrations
 [ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-dax-api]: /product/apis-integrations/dax-api
 [ref-cube-store-architecture]: /product/caching/running-in-production#architecture
 [ref-data-at-rest-encryption]: /product/caching/running-in-production#data-at-rest-encryption
 [ref-customer-managed-keys]: /product/workspace/encryption-keys
 [ref-semantic-catalog]: /product/workspace/semantic-catalog
+[ref-ai-api]: /product/apis-integrations/ai-api
+[ref-ai-assistant]: /product/workspace/ai-assistant

@@ -113,6 +113,38 @@ The number of concurrent connections each query queue has to the database.
 It can be also set as `concurrency` in the [`orchestrator_options` configuration
 option](/reference/configuration/config#orchestrator_options).
 
+If you'd like to adjust the concurrency for the refresh worker, use
+`CUBEJS_REFRESH_WORKER_CONCURRENCY`.
+
+## `CUBEJS_REFRESH_WORKER_CONCURRENCY`
+
+The number of concurrent connections each query queue of the refresh worker
+has to the database.
+
+| Possible Values | Default in Development       | Default in Production        |
+| --------------- | ---------------------------- | ---------------------------- |
+| A valid number  | Same as `CUBEJS_CONCURRENCY` | Same as `CUBEJS_CONCURRENCY` |
+
+## `CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`
+
+How many pre-aggregations the refresh worker will build in parallel for each
+application id as determined by the [`context_to_app_id`](#context_to_app_id)
+configuration option.
+
+Note that this parameter doesn't override the overall refresh worker concurrency,
+configured via the `CUBEJS_REFRESH_WORKER_CONCURRENCY` environment variable, and
+it should be adjusted accordingly.
+
+| Possible Values                      | Default in Development | Default in Production |
+| ------------------------------------ | ---------------------- | --------------------- |
+| A valid number of concurrent queries | 10                     | 10                    |
+
+<InfoBox>
+
+Previously, this environment variable was named `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`.
+
+</InfoBox>
+
 ## `CUBEJS_CUBESTORE_HOST`
 
 The hostname of the Cube Store deployment
@@ -663,6 +695,17 @@ The cluster name to use when connecting to [Materialize](/product/configuration/
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | A valid Materialize cluster name                          | N/A                    | N/A                   |
 
+## `CUBEJS_DB_MYSQL_USE_NAMED_TIMEZONES`
+
+This flag controls how time zones conversion is done in the generated SQL for MySQL:
+- If it is set to `true`, time zone names are used. In this case, your MySQL server needs
+to be [configured][mysql-server-tz-support] properly.
+- If it is set to `false`, numeric offsets are used instead.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_SNOWFLAKE_ACCOUNT`
 
 The Snowflake account identifier to use when connecting to the database.
@@ -728,6 +771,22 @@ The Snowflake warehouse to use when connecting to the database.
 | Possible Values                                                        | Default in Development | Default in Production |
 | ---------------------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account | N/A                    | N/A                   |
+
+## `CUBEJS_DB_PINOT_NULL_HANDLING`
+
+The Startree/Pinot null value support. If `true`, enables null handling.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` |	`false`                | `false`               |
+
+## `CUBEJS_DB_PINOT_AUTH_TOKEN`
+
+The authentication token for StarTree to be passed as HTTP headers.
+
+| Possible Values                     | Default in Development | Default in Production |
+| ----------------------------------- | ---------------------- | --------------------- |
+| A valid string containing the token |	N/A                    | N/A                   |
 
 ## `CUBEJS_DB_SSL`
 
@@ -1011,15 +1070,7 @@ mode](/product/caching/using-pre-aggregations#rollup-only-mode) for details.
 It can be also set using the [`orchestrator_options.rollupOnlyMode` configuration
 option](/reference/configuration/config#orchestrator_options).
 
-## `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`
 
-How many pre-aggregations refresh worker will build in parallel. Please note
-changing this param doesn't change queue concurrency and it should be adjusted
-accordingly
-
-| Possible Values                                | Default in Development | Default in Production |
-| ---------------------------------------------- | ---------------------- | --------------------- |
-| A valid number of concurrent refresh processes | 10                     | 10                    |
 
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 
@@ -1182,6 +1233,14 @@ Number of seconds before session's SQL API security context will be invalidated.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A valid integer number | `300`                 | `300`                |
+
+## `CUBEJS_DAX_CREATE_DATE_HIERARCHIES`
+
+If `true`, the DAX API will expose time dimensions as calendar hierarchies.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true` | `true` |
 
 ## `CUBEJS_TELEMETRY`
 
@@ -1612,3 +1671,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming
 [ref-row-limit]: /product/apis-integrations/queries#row-limit
+[mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html

@@ -359,7 +359,8 @@ impl SplitRules {
                 Some(0) | Some(1)
             ) {
                 return false;
-            } else if matches!(
+            }
+            if matches!(
                 aggr_expr_var
                     .and_then(|v| egraph[subst[v]].data.trivial_push_down)
                     .zip(group_expr_var.and_then(|v| egraph[subst[v]].data.trivial_push_down))
@@ -491,7 +492,7 @@ impl SplitRules {
             let projection_expr = group_expr_node
                 .iter()
                 .chain(aggr_expr_node.iter())
-                .map(|id| *id)
+                .copied()
                 .collect::<Vec<_>>();
             subst.insert(
                 projection_expr_var,

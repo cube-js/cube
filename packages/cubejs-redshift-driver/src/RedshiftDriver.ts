@@ -16,6 +16,7 @@ import {
   StreamOptions,
   StreamTableDataWithTypes,
   TableColumn,
+  TableStructure,
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
@@ -57,7 +58,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 4;
+    return 5;
   }
 
   /**
@@ -339,6 +340,19 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
   public async loadUserDefinedTypes(): Promise<void> {
     // @todo Implement for Redshift, column \"typcategory\" does not exist in pg_type
+  }
+
+  public override async tableColumnTypes(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    // We might get table from Spectrum schema, so common request via `information_schema.columns`
+    // won't return anything. `getColumnsForSpecificTables` is aware of Spectrum tables.
+    const columns = await this.getColumnsForSpecificTables([{
+      schema_name: schema,
+      table_name: name,
+    }]);
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public async isUnloadSupported() {

@@ -3,6 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
 import type { Request as ExpressRequest } from 'express';
+import { ResultWrapper } from './ResultWrapper';
+
+export * from './ResultWrapper';
 
 export interface BaseMeta {
   // postgres or mysql
@@ -98,23 +101,65 @@ export type SQLInterfaceOptions = {
   gatewayPort?: number,
 };
 
+export interface TransformConfig {
+  fileName: string;
+  transpilers: string[];
+  compilerId: string;
+  metaData?: {
+    cubeNames: string[];
+    cubeSymbols: Record<string, Record<string, boolean>>;
+    contextSymbols: Record<string, string>;
+  }
+}
+
+export interface TransformResponse {
+  code: string;
+  errors: string[];
+  warnings: string[];
+}
+
+export type DBResponsePrimitive =
+  null |
+  boolean |
+  number |
+  string;
+
+// TODO type this better, to make it proper disjoint union
+export type Sql4SqlOk = {
+  sql: string,
+    values: Array<string | null>,
+};
+export type Sql4SqlError = { error: string };
+export type Sql4SqlCommon = {
+  query_type: {
+    regular: boolean;
+    post_processing: boolean;
+    pushdown: boolean;
+  }
+};
+export type Sql4SqlResponse = Sql4SqlCommon & (Sql4SqlOk | Sql4SqlError);
+
+let loadedNative: any = null;
+
 export function loadNative() {
+  if (loadedNative) {
+    return loadedNative;
+  }
+
   // Development version
   if (fs.existsSync(path.join(__dirname, '/../../index.node'))) {
-    return require(path.join(__dirname, '/../../index.node'));
+    loadedNative = require(path.join(__dirname, '/../../index.node'));
+    return loadedNative;
   }
 
   if (fs.existsSync(path.join(__dirname, '/../../native/index.node'))) {
-    return require(path.join(__dirname, '/../../native/index.node'));
+    loadedNative = require(path.join(__dirname, '/../../native/index.node'));
+    return loadedNative;
   }
 
   throw new Error(
     `Unable to load @cubejs-backend/native, probably your system (${process.arch}-${process.platform}) with Node.js ${process.version} is not supported.`,
   );
-}
-
-export function isSupported(): boolean {
-  return fs.existsSync(path.join(__dirname, '/../../index.node')) || fs.existsSync(path.join(__dirname, '/../../native/index.node'));
 }
 
 function wrapNativeFunctionWithChannelCallback(
@@ -253,15 +298,32 @@ function wrapNativeFunctionWithStream(
         });
       } else if (response.error) {
         writerOrChannel.reject(errorString(response));
+      } else if (response.isWrapper) { // Native wrapped result
+        writerOrChannel.resolve(response);
       } else {
-        // TODO remove JSON.stringify()
         writerOrChannel.resolve(JSON.stringify(response));
       }
     } catch (e: any) {
       if (!!response && !!response.stream) {
         response.stream.destroy(e);
       }
-      writerOrChannel.reject(errorString(e));
+
+      try {
+        writerOrChannel.reject(errorString(e));
+      } catch (rejectError) {
+        // This is async function, just for usability, it's return value is not expected anywhere
+        // Rust part does not care for returned promises, so we should take care here to avoid unhandled rejections
+        // `writerOrChannel.reject` can throw when channel is already dropped by Rust side
+        // This can happen directly, when drop happened between creating channel and calling `reject`,
+        // or indirectly, when drop happened between creating channel and calling `resolve`, resolve raised an exception
+        // that was caught here
+        // There's nothing we can do, or should do with this: there's nobody to respond to
+        if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+          console.debug('[js] writerOrChannel.reject exception', {
+            e: rejectError,
+          });
+        }
+      }
     }
   };
 }
@@ -342,10 +404,70 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
 };
 
+// TODO parse result from native code
+export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: any): Promise<Sql4SqlResponse> => {
+  const native = loadNative();
+
+  return native.sql4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
+};
+
 export const buildSqlAndParams = (cubeEvaluator: any): String => {
   const native = loadNative();
 
   return native.buildSqlAndParams(cubeEvaluator);
+};
+
+export type ResultRow = Record<string, string>;
+
+export const parseCubestoreResultMessage = async (message: ArrayBuffer): Promise<ResultWrapper> => {
+  const native = loadNative();
+
+  const msg = await native.parseCubestoreResultMessage(message);
+  return new ResultWrapper(msg);
+};
+
+export const getCubestoreResult = (ref: ResultWrapper): ResultRow[] => {
+  const native = loadNative();
+
+  return native.getCubestoreResult(ref);
+};
+
+/**
+ * Transform and prepare single query final result data that is sent to the client.
+ *
+ * @param transformDataObj Data needed to transform raw query results
+ * @param rows Raw data received from the source DB via driver or reference to a native CubeStore response result
+ * @param resultData Final query result structure without actual data
+ * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
+ */
+export const getFinalQueryResult = (transformDataObj: Object, rows: any, resultData: Object): Promise<ArrayBuffer> => {
+  const native = loadNative();
+
+  return native.getFinalQueryResult(transformDataObj, rows, resultData);
+};
+
+/**
+ * Transform and prepare multiple query final results data into a single response structure.
+ *
+ * @param transformDataArr Array of data needed to transform raw query results
+ * @param rows Array of raw data received from the source DB via driver or reference to native CubeStore response results
+ * @param responseData Final combined query result structure without actual data
+ * @return {Promise<ArrayBuffer>} ArrayBuffer with json-serialized data which should be directly sent to the client
+ */
+export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[], responseData: Object): Promise<ArrayBuffer> => {
+  const native = loadNative();
+
+  return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
+};
+
+export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+  const native = loadNative();
+
+  if (native.transpileJs) {
+    return native.transpileJs(content, metadata);
+  }
+
+  throw new Error('TranspileJs native implementation not found!');
 };
 
 export interface PyConfiguration {

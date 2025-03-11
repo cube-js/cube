@@ -64,17 +64,22 @@ const QueryBuilderInternals = memo(function QueryBuilderInternals() {
           styles={{ padding: '0 1x' }}
           onChange={(tab: string) => setTab(tab as Tab)}
         >
-          <Tab id="results" title="Results" />
-          <Tab id="generated-sql" title="Generated SQL" />
-          <Tab id="sql" title="SQL API" />
-          <Tab id="json" title="REST API" />
-          <Tab id="graphql" title="GraphQL API" />
+          <Tab keepMounted id="results" title="Results">
+            <QueryBuilderResults forceMinHeight={!isChartExpanded} />
+          </Tab>
+          <Tab id="generated-sql" title="Generated SQL">
+            <QueryBuilderGeneratedSQL />
+          </Tab>
+          <Tab id="sql" title="SQL API">
+            <QueryBuilderSQL />
+          </Tab>
+          <Tab id="json" title="REST API">
+            <QueryBuilderRest />
+          </Tab>
+          <Tab id="graphql" title="GraphQL API">
+            <QueryBuilderGraphQL />
+          </Tab>
         </Tabs>
-        {tab === 'results' && <QueryBuilderResults forceMinHeight={!isChartExpanded} />}
-        {tab === 'generated-sql' && <QueryBuilderGeneratedSQL />}
-        {tab === 'json' && <QueryBuilderRest />}
-        {tab === 'sql' && <QueryBuilderSQL />}
-        {tab === 'graphql' && <QueryBuilderGraphQL />}
       </>
     );
   }, [tab, isChartExpanded]);

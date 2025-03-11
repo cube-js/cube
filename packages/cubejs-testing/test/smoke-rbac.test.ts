@@ -152,6 +152,12 @@ describe('Cube RBAC Engine', () => {
       // Querying a cube with nested filters and mixed values should not cause any issues
       expect(res.rows).toMatchSnapshot('users');
     });
+
+    test('SELECT * from users_view', async () => {
+      const res = await connection.query('SELECT * FROM users_view limit 10');
+      // Make sure view policies are evaluated correctly in yaml schemas
+      expect(res.rows).toMatchSnapshot('users_view_js');
+    });
   });
 
   describe('RBAC via SQL API manager', () => {
@@ -189,6 +195,28 @@ describe('Cube RBAC Engine', () => {
       const res = await connection.query('SELECT COUNT(city) as count from "users" HAVING (COUNT(1) > 0)');
       // Pushed SQL queries should not fail
       expect(res.rows).toMatchSnapshot('users_member_expression');
+    });
+  });
+
+  describe('RBAC via SQL changing users', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('restricted', 'restricted_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('Switching user should allow more members to be visible', async () => {
+      const resDefault = await connection.query('SELECT * FROM line_items limit 10');
+      expect(resDefault.rows).toMatchSnapshot('line_items_default');
+
+      await connection.query('SET USER=admin');
+
+      const resAdmin = await connection.query('SELECT * FROM line_items limit 10');
+      expect(resAdmin.rows).toMatchSnapshot('line_items');
     });
   });
 
@@ -397,6 +425,12 @@ describe('Cube RBAC Engine [Python config]', () => {
       // This query should return all rows because of the `allow_all` statement
       // It should also exclude the `created_at` dimension as per memberLevel policy
       expect(res.rows).toMatchSnapshot('users_python');
+    });
+
+    test('SELECT * from users_view', async () => {
+      const res = await connection.query('SELECT * FROM users_view limit 10');
+      // Make sure view policies are evaluated correctly in yaml schemas
+      expect(res.rows).toMatchSnapshot('users_view_python');
     });
   });
 });

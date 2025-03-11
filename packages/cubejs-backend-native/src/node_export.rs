@@ -1,29 +1,25 @@
-use cubesql::compile::DatabaseProtocol;
-use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
+use cubesql::compile::parser::parse_sql_to_statement;
+use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
-use cubesql::config::ConfigObj;
-use cubesql::sql::SessionManager;
-use cubesql::transport::TransportService;
+use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
 
 use serde_json::Map;
 use tokio::sync::Semaphore;
-
-use std::net::SocketAddr;
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
+use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
+use crate::sql4sql::sql4sql;
 use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::batch_to_rows;
-use cubenativeutils::wrappers::neon::context::ContextHolder;
+use cubenativeutils::wrappers::neon::context::neon_run_with_guarded_lifetime;
 use cubenativeutils::wrappers::neon::inner_types::NeonInnerTypes;
 use cubenativeutils::wrappers::neon::object::NeonObject;
 use cubenativeutils::wrappers::object_handle::NativeObjectHandle;
@@ -31,13 +27,15 @@ use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
 
-struct SQLInterface {
-    services: Arc<NodeCubeServices>,
+pub(crate) struct SQLInterface {
+    pub(crate) services: Arc<NodeCubeServices>,
 }
 
 impl Finalize for SQLInterface {}
@@ -184,127 +182,186 @@ async fn handle_sql_query(
     native_auth_ctx: Arc<NativeAuthContext>,
     channel: Arc<Channel>,
     stream_methods: WritableStreamMethods,
-    sql_query: &String,
+    sql_query: &str,
 ) -> Result<(), CubeError> {
-    let config = services
-        .injector()
-        .get_service_typed::<dyn ConfigObj>()
-        .await;
+    let span_id = Some(Arc::new(SpanId::new(
+        Uuid::new_v4().to_string(),
+        serde_json::json!({ "sql": sql_query }),
+    )));
 
     let transport_service = services
         .injector()
         .get_service_typed::<dyn TransportService>()
         .await;
-    let session_manager = services
-        .injector()
-        .get_service_typed::<SessionManager>()
-        .await;
 
-    let (host, port) = match SocketAddr::from_str(
-        &config
-            .postgres_bind_address()
-            .clone()
-            .unwrap_or("127.0.0.1:15432".into()),
-    ) {
-        Ok(addr) => (addr.ip().to_string(), addr.port()),
-        Err(e) => {
-            return Err(CubeError::internal(format!(
-                "Failed to parse postgres_bind_address: {}",
-                e
-            )))
+    with_session(&services, native_auth_ctx.clone(), |session| async move {
+        if let Some(auth_context) = session.state.auth_context() {
+            session
+                .session_manager
+                .server
+                .transport
+                .log_load_state(
+                    span_id.clone(),
+                    auth_context,
+                    session.state.get_load_request_meta("sql"),
+                    "Load Request".to_string(),
+                    serde_json::json!({
+                        "query": span_id.as_ref().unwrap().query_key,
+                    }),
+                )
+                .await?;
         }
-    };
 
-    let session = session_manager
-        .create_session(DatabaseProtocol::PostgreSQL, host, port, None)
-        .await?;
+        let session_clone = Arc::clone(&session);
+        let span_id_clone = span_id.clone();
 
-    session
-        .state
-        .set_auth_context(Some(native_auth_ctx.clone()));
+        let execute = || async move {
+            // todo: can we use compiler_cache?
+            let meta_context = transport_service
+                .meta(native_auth_ctx)
+                .await
+                .map_err(|err| {
+                    CubeError::internal(format!("Failed to get meta context: {}", err))
+                })?;
 
-    // todo: can we use compiler_cache?
-    let meta_context = transport_service
-        .meta(native_auth_ctx)
-        .await
-        .map_err(|err| CubeError::internal(format!("Failed to get meta context: {}", err)))?;
-    let query_plan = convert_sql_to_cube_query(sql_query, meta_context, session).await?;
-
-    let mut stream = get_df_batches(&query_plan).await?;
-
-    let semaphore = Arc::new(Semaphore::new(0));
-
-    let drain_handler = OnDrainHandler::new(
-        channel.clone(),
-        stream_methods.stream.clone(),
-        semaphore.clone(),
-    );
-
-    drain_handler.handle(stream_methods.on.clone()).await?;
-
-    let mut is_first_batch = true;
-    while let Some(batch) = stream.next().await {
-        let (columns, data) = batch_to_rows(batch?)?;
-
-        if is_first_batch {
-            let mut schema = Map::new();
-            schema.insert("schema".into(), columns);
-            let columns = format!(
-                "{}{}",
-                serde_json::to_string(&serde_json::Value::Object(schema))?,
-                CHUNK_DELIM
-            );
-            is_first_batch = false;
-
-            call_js_fn(
-                channel.clone(),
-                stream_methods.write.clone(),
-                Box::new(|cx| {
-                    let arg = cx.string(columns).upcast::<JsValue>();
-
-                    Ok(vec![arg.upcast::<JsValue>()])
-                }),
-                Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
-                    Ok(v) => Ok(v.value(cx)),
-                    Err(_) => Err(CubeError::internal(
-                        "Failed to downcast write response".to_string(),
-                    )),
-                }),
-                stream_methods.stream.clone(),
+            let stmt =
+                parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;
+            let query_plan = convert_statement_to_cube_query(
+                stmt,
+                meta_context,
+                session,
+                &mut None,
+                span_id_clone,
             )
             .await?;
+
+            let mut stream = get_df_batches(&query_plan).await?;
+
+            let semaphore = Arc::new(Semaphore::new(0));
+
+            let drain_handler = OnDrainHandler::new(
+                channel.clone(),
+                stream_methods.stream.clone(),
+                semaphore.clone(),
+            );
+
+            drain_handler.handle(stream_methods.on.clone()).await?;
+
+            let mut is_first_batch = true;
+            while let Some(batch) = stream.next().await {
+                let (columns, data) = batch_to_rows(batch?)?;
+
+                if is_first_batch {
+                    let mut schema = Map::new();
+                    schema.insert("schema".into(), columns);
+                    let columns = format!(
+                        "{}{}",
+                        serde_json::to_string(&serde_json::Value::Object(schema))?,
+                        CHUNK_DELIM
+                    );
+                    is_first_batch = false;
+
+                    call_js_fn(
+                        channel.clone(),
+                        stream_methods.write.clone(),
+                        Box::new(|cx| {
+                            let arg = cx.string(columns).upcast::<JsValue>();
+
+                            Ok(vec![arg.upcast::<JsValue>()])
+                        }),
+                        Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                            Ok(v) => Ok(v.value(cx)),
+                            Err(_) => Err(CubeError::internal(
+                                "Failed to downcast write response".to_string(),
+                            )),
+                        }),
+                        stream_methods.stream.clone(),
+                    )
+                    .await?;
+                }
+
+                let mut rows = Map::new();
+                rows.insert("data".into(), serde_json::Value::Array(data));
+                let data = format!("{}{}", serde_json::to_string(&rows)?, CHUNK_DELIM);
+                let js_stream_write_fn = stream_methods.write.clone();
+
+                let should_pause = !call_js_fn(
+                    channel.clone(),
+                    js_stream_write_fn,
+                    Box::new(|cx| {
+                        let arg = cx.string(data).upcast::<JsValue>();
+
+                        Ok(vec![arg.upcast::<JsValue>()])
+                    }),
+                    Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                        Ok(v) => Ok(v.value(cx)),
+                        Err(_) => Err(CubeError::internal(
+                            "Failed to downcast write response".to_string(),
+                        )),
+                    }),
+                    stream_methods.stream.clone(),
+                )
+                .await?;
+
+                if should_pause {
+                    let permit = semaphore.acquire().await?;
+                    permit.forget();
+                }
+            }
+
+            Ok::<(), CubeError>(())
+        };
+
+        let result = execute().await;
+
+        match &result {
+            Ok(_) => {
+                session_clone
+                    .session_manager
+                    .server
+                    .transport
+                    .log_load_state(
+                        span_id.clone(),
+                        session_clone.state.auth_context().unwrap(),
+                        session_clone.state.get_load_request_meta("sql"),
+                        "Load Request Success".to_string(),
+                        serde_json::json!({
+                            "query": {
+                                "sql": sql_query,
+                            },
+                            "apiType": "sql",
+                            "duration": span_id.as_ref().unwrap().duration(),
+                            "isDataQuery": true
+                        }),
+                    )
+                    .await?;
+            }
+            Err(err) => {
+                session_clone
+                    .session_manager
+                    .server
+                    .transport
+                    .log_load_state(
+                        span_id.clone(),
+                        session_clone.state.auth_context().unwrap(),
+                        session_clone.state.get_load_request_meta("sql"),
+                        "Cube SQL Error".to_string(),
+                        serde_json::json!({
+                            "query": {
+                                "sql": sql_query
+                            },
+                            "apiType": "sql",
+                            "duration": span_id.as_ref().unwrap().duration(),
+                            "error": err.message,
+                        }),
+                    )
+                    .await?;
+            }
         }
 
-        let mut rows = Map::new();
-        rows.insert("data".into(), serde_json::Value::Array(data));
-        let data = format!("{}{}", serde_json::to_string(&rows)?, CHUNK_DELIM);
-        let js_stream_write_fn = stream_methods.write.clone();
-
-        let should_pause = !call_js_fn(
-            channel.clone(),
-            js_stream_write_fn,
-            Box::new(|cx| {
-                let arg = cx.string(data).upcast::<JsValue>();
-
-                Ok(vec![arg.upcast::<JsValue>()])
-            }),
-            Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
-                Ok(v) => Ok(v.value(cx)),
-                Err(_) => Err(CubeError::internal(
-                    "Failed to downcast write response".to_string(),
-                )),
-            }),
-            stream_methods.stream.clone(),
-        )
-        .await?;
-
-        if should_pause {
-            let permit = semaphore.acquire().await.unwrap();
-            permit.forget();
-        }
-    }
-
-    Ok(())
+        result
+    })
+    .await
 }
 
 struct WritableStreamMethods {
@@ -463,37 +520,29 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 //============ sql planner ===================
 
 fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
-    //IMPORTANT It seems to be safe here, because context lifetime is bound to function, but this
-    //context should be used only inside function
-    let mut cx = extend_function_context_lifetime(cx);
-    let options = cx.argument::<JsValue>(0)?;
+    neon_run_with_guarded_lifetime(cx, |neon_context_holder| {
+        let options =
+            NativeObjectHandle::<NeonInnerTypes<FunctionContext<'static>>>::new(NeonObject::new(
+                neon_context_holder.clone(),
+                neon_context_holder
+                    .with_context(|cx| cx.argument::<JsValue>(0))
+                    .unwrap()?,
+            ));
 
-    let neon_context_holder = ContextHolder::new(cx);
-
-    let options = NativeObjectHandle::<NeonInnerTypes<'static, FunctionContext<'static>>>::new(
-        NeonObject::new(neon_context_holder.clone(), options),
-    );
-
-    let context_holder =
-        NativeContextHolder::<NeonInnerTypes<'static, FunctionContext<'static>>>::new(
+        let context_holder = NativeContextHolder::<NeonInnerTypes<FunctionContext<'static>>>::new(
             neon_context_holder,
         );
 
-    let base_query_options = Rc::new(NativeBaseQueryOptions::from_native(options).unwrap());
+        let base_query_options = Rc::new(NativeBaseQueryOptions::from_native(options).unwrap());
 
-    let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
+        let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
 
-    //arg_clrep.into_js(&mut cx)
-    let res = base_query.build_sql_and_params().unwrap();
+        let res = base_query.build_sql_and_params();
 
-    let result: NeonObject<'static, FunctionContext<'static>> = res.into_object();
-    let result = result.into_object();
-
-    Ok(result)
-}
-
-fn extend_function_context_lifetime<'a>(cx: FunctionContext<'a>) -> FunctionContext<'static> {
-    unsafe { std::mem::transmute::<FunctionContext<'a>, FunctionContext<'static>>(cx) }
+        let result: NeonObject<FunctionContext<'static>> = res.into_object();
+        let result = result.into_object();
+        Ok(result)
+    })
 }
 
 fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
@@ -510,10 +559,15 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("registerInterface", register_interface::<C>)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("execSql", exec_sql)?;
+    cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
+    //============ sql planner exports ===================
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
+
+    //========= sql orchestrator exports =================
+    crate::orchestrator::register_module(&mut cx)?;
 
     crate::template::template_register_module(&mut cx)?;
 

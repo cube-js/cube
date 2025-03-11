@@ -110,7 +110,7 @@ impl JinjaEngine {
         let template_compile_context = CLRepr::from_js_ref(cx.argument::<JsValue>(1)?, &mut cx)?;
         let template_python_context = CLRepr::from_js_ref(cx.argument::<JsValue>(2)?, &mut cx)?;
 
-        let mut to_jinja_ctx = CLReprObject::new();
+        let mut to_jinja_ctx = CLReprObject::new(CLReprObjectKind::Object);
         to_jinja_ctx.insert("COMPILE_CONTEXT".to_string(), template_compile_context);
 
         if !template_python_context.is_null() {

@@ -1,4 +1,5 @@
 use super::{Expr, SingleAliasedSource};
+use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, VisitorContext};
 use cubenativeutils::CubeError;
@@ -6,7 +7,7 @@ use lazy_static::lazy_static;
 
 use std::rc::Rc;
 
-pub struct RollingWindowJoinCondition {
+pub struct RegularRollingWindowJoinCondition {
     time_series_source: String,
     trailing_interval: Option<String>,
     leading_interval: Option<String>,
@@ -14,7 +15,7 @@ pub struct RollingWindowJoinCondition {
     time_dimension: Expr,
 }
 
-impl RollingWindowJoinCondition {
+impl RegularRollingWindowJoinCondition {
     pub fn new(
         time_series_source: String,
         trailing_interval: Option<String>,
@@ -87,6 +88,50 @@ impl RollingWindowJoinCondition {
     }
 }
 
+pub struct ToDateRollingWindowJoinCondition {
+    time_series_source: String,
+    granularity: String,
+    time_dimension: Expr,
+    query_tools: Rc<QueryTools>,
+}
+
+impl ToDateRollingWindowJoinCondition {
+    pub fn new(
+        time_series_source: String,
+        granularity: String,
+        time_dimension: Expr,
+        query_tools: Rc<QueryTools>,
+    ) -> Self {
+        Self {
+            time_series_source,
+            granularity,
+            time_dimension,
+            query_tools,
+        }
+    }
+
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
+        let date_column = self.time_dimension.to_sql(templates, context)?;
+
+        //(dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+
+        let date_from =
+            templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
+        let date_to =
+            templates.column_reference(&Some(self.time_series_source.clone()), "date_from")?;
+        let grouped_from = self
+            .query_tools
+            .base_tools()
+            .time_grouped_column(self.granularity.clone(), date_from)?;
+        let result = format!("{date_column} >= {grouped_from} and {date_column} <= {date_to}");
+        Ok(result)
+    }
+}
+
 pub struct DimensionJoinCondition {
     // AND (... OR ...)
     conditions: Vec<Vec<(Expr, Expr)>>,
@@ -145,7 +190,8 @@ impl DimensionJoinCondition {
 pub enum JoinCondition {
     DimensionJoinCondition(DimensionJoinCondition),
     BaseJoinCondition(Rc<dyn BaseJoinCondition>),
-    RollingWindowJoinCondition(RollingWindowJoinCondition),
+    RegularRollingWindowJoinCondition(RegularRollingWindowJoinCondition),
+    ToDateRollingWindowJoinCondition(ToDateRollingWindowJoinCondition),
 }
 
 impl JoinCondition {
@@ -153,19 +199,33 @@ impl JoinCondition {
         Self::DimensionJoinCondition(DimensionJoinCondition::new(conditions, null_check))
     }
 
-    pub fn new_rolling_join(
+    pub fn new_regular_rolling_join(
         time_series_source: String,
         trailing_interval: Option<String>,
         leading_interval: Option<String>,
         offset: String,
         time_dimension: Expr,
     ) -> Self {
-        Self::RollingWindowJoinCondition(RollingWindowJoinCondition::new(
+        Self::RegularRollingWindowJoinCondition(RegularRollingWindowJoinCondition::new(
             time_series_source,
             trailing_interval,
             leading_interval,
             offset,
             time_dimension,
+        ))
+    }
+
+    pub fn new_to_date_rolling_join(
+        time_series_source: String,
+        granularity: String,
+        time_dimension: Expr,
+        query_tools: Rc<QueryTools>,
+    ) -> Self {
+        Self::ToDateRollingWindowJoinCondition(ToDateRollingWindowJoinCondition::new(
+            time_series_source,
+            granularity,
+            time_dimension,
+            query_tools,
         ))
     }
 
@@ -180,8 +240,13 @@ impl JoinCondition {
     ) -> Result<String, CubeError> {
         match &self {
             JoinCondition::DimensionJoinCondition(cond) => cond.to_sql(templates, context),
-            JoinCondition::BaseJoinCondition(cond) => cond.to_sql(context),
-            JoinCondition::RollingWindowJoinCondition(cond) => cond.to_sql(templates, context),
+            JoinCondition::BaseJoinCondition(cond) => cond.to_sql(context, templates),
+            JoinCondition::RegularRollingWindowJoinCondition(cond) => {
+                cond.to_sql(templates, context)
+            }
+            JoinCondition::ToDateRollingWindowJoinCondition(cond) => {
+                cond.to_sql(templates, context)
+            }
         }
     }
 }

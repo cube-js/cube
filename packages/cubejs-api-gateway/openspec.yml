@@ -127,6 +127,8 @@ components:
           type: "string"
         title:
           type: "string"
+        shortTitle:
+          type: "string"
         description:
           type: "string"
         type:
@@ -150,6 +152,8 @@ components:
           type: "string"
         title:
           type: "string"
+        shortTitle:
+          type: "string"
         description:
           type: "string"
         type:
@@ -168,6 +172,20 @@ components:
           type: "string"
         members:
           type: array
+          items:
+            type: "string"
+    V1CubeMetaHierarchy:
+      type: "object"
+      required:
+        - name
+        - levels
+      properties:
+        name:
+          type: "string"
+        title:
+          type: "string"
+        levels:
+          type: "array"
           items:
             type: "string"
     V1CubeMeta:
@@ -209,6 +227,10 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1CubeMetaFolder"
+        hierarchies:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1CubeMetaHierarchy"
     V1CubeMetaType:
       type: "string"
       description: Type of cube

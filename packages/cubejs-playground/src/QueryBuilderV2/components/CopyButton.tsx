@@ -1,5 +1,11 @@
-import { Button, useToastsApi, copy, tasty, CubeButtonProps } from '@cube-dev/ui-kit';
-import { CopyOutlined } from '@ant-design/icons';
+import {
+  Button,
+  useToastsApi,
+  copy,
+  tasty,
+  CubeButtonProps,
+  CopyIcon as CopyIconUIKit,
+} from '@cube-dev/ui-kit';
 import { useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 
@@ -18,7 +24,7 @@ const CopyButtonElement = tasty(Button, {
   label: 'Copy value to clipboard',
   type: 'clear',
   size: 'small',
-  icon: <CopyOutlined />,
+  icon: <CopyIconUIKit />,
 });
 
 export function CopyButton(props: CopyButtonProps) {

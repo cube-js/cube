@@ -7,12 +7,14 @@ use itertools::Itertools;
 use std::rc::Rc;
 
 pub trait BaseMember {
-    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError>;
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError>;
     fn alias_name(&self) -> String;
     fn member_evaluator(&self) -> Rc<MemberSymbol>;
-    fn full_name(&self) -> String {
-        self.member_evaluator().full_name()
-    }
+    fn full_name(&self) -> String;
     fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember>;
     fn cube_name(&self) -> &String;
     fn name(&self) -> &String;
@@ -40,20 +42,19 @@ impl BaseMemberHelper {
         members.iter().map(|m| m.alias_name()).collect_vec()
     }
 
+    pub fn extract_symbols_from_members(
+        members: &Vec<Rc<dyn BaseMember>>,
+    ) -> Vec<Rc<MemberSymbol>> {
+        members.iter().map(|m| m.member_evaluator()).collect_vec()
+    }
+
     pub fn default_alias(
         cube_name: &String,
         member_name: &String,
         member_suffix: &Option<String>,
         query_tools: Rc<QueryTools>,
     ) -> Result<String, CubeError> {
-        let cube_definition = query_tools
-            .cube_evaluator()
-            .cube_from_path(cube_name.clone())?;
-        let cube_alias = if let Some(sql_alias) = &cube_definition.static_data().sql_alias {
-            sql_alias
-        } else {
-            cube_name
-        };
+        let cube_alias = query_tools.alias_for_cube(cube_name)?;
         Ok(PlanSqlTemplates::memeber_alias_name(
             &cube_alias,
             &member_name,

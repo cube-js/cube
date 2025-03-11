@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     any::Any,
     cmp::min,
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     convert::TryInto,
     fmt,
     future::Future,
@@ -146,7 +146,7 @@ impl SqlQuery {
     }
 
     pub fn extend_values(&mut self, values: impl IntoIterator<Item = Option<String>>) {
-        self.values.extend(values.into_iter());
+        self.values.extend(values);
     }
 
     pub fn replace_sql(&mut self, sql: String) {
@@ -346,11 +346,8 @@ impl ColumnRemapping {
     /// Replace every column expression in `expr` according to this remapping. Column expressions
     /// not present in `self` will stay the same.
     pub fn remap(&self, expr: &Expr) -> result::Result<Expr, CubeError> {
-        replace_col(
-            expr.clone(),
-            &self.column_remapping.iter().map(|(k, v)| (k, v)).collect(),
-        )
-        .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
+        replace_col(expr.clone(), &self.column_remapping.iter().collect())
+            .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
     }
 
     pub fn extend(&mut self, other: ColumnRemapping) {
@@ -514,7 +511,7 @@ pub struct SqlGenerationResult {
 static DATE_PART_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[A-Za-z_ ]+$").unwrap());
 
 macro_rules! generate_sql_for_timestamp {
-    (@generic $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
+    (@generic $literal:ident, $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
         if let Some($value) = $value {
             let value = $value_block.to_rfc3339_opts(SecondsFormat::Millis, true);
             (
@@ -530,32 +527,70 @@ macro_rules! generate_sql_for_timestamp {
                 $sql_query,
             )
         } else {
-            ("NULL".to_string(), $sql_query)
+            (Self::generate_null_for_literal($sql_generator, &$literal)?, $sql_query)
         }
     };
-    ($value:ident, timestamp, $sql_generator:expr, $sql_query:expr) => {
+    ($literal:ident, $value:ident, timestamp, $sql_generator:expr, $sql_query:expr) => {
         generate_sql_for_timestamp!(
-            @generic $value, { Utc.timestamp_opt($value as i64, 0).unwrap() }, $sql_generator, $sql_query
+            @generic $literal, $value, { Utc.timestamp_opt($value as i64, 0).unwrap() }, $sql_generator, $sql_query
         )
     };
-    ($value:ident, timestamp_millis_opt, $sql_generator:expr, $sql_query:expr) => {
+    ($literal:ident, $value:ident, timestamp_millis_opt, $sql_generator:expr, $sql_query:expr) => {
         generate_sql_for_timestamp!(
-            @generic $value, { Utc.timestamp_millis_opt($value as i64).unwrap() }, $sql_generator, $sql_query
+            @generic $literal, $value, { Utc.timestamp_millis_opt($value as i64).unwrap() }, $sql_generator, $sql_query
         )
     };
-    ($value:ident, timestamp_micros, $sql_generator:expr, $sql_query:expr) => {
+    ($literal:ident, $value:ident, timestamp_micros, $sql_generator:expr, $sql_query:expr) => {
         generate_sql_for_timestamp!(
-            @generic $value, { Utc.timestamp_micros($value as i64).unwrap() }, $sql_generator, $sql_query
+            @generic $literal, $value, { Utc.timestamp_micros($value as i64).unwrap() }, $sql_generator, $sql_query
         )
     };
-    ($value:ident, $method:ident, $sql_generator:expr, $sql_query:expr) => {
+    ($literal:ident, $value:ident, $method:ident, $sql_generator:expr, $sql_query:expr) => {
         generate_sql_for_timestamp!(
-            @generic $value, { Utc.$method($value as i64) }, $sql_generator, $sql_query
+            @generic $literal, $value, { Utc.$method($value as i64) }, $sql_generator, $sql_query
         )
     };
 }
 
 impl CubeScanWrapperNode {
+    pub fn has_ungrouped_scan(&self) -> bool {
+        Self::has_ungrouped_wrapped_node(self.wrapped_plan.as_ref())
+    }
+
+    fn has_ungrouped_wrapped_node(node: &LogicalPlan) -> bool {
+        match node {
+            LogicalPlan::Extension(Extension { node }) => {
+                if let Some(cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
+                    cube_scan.request.ungrouped == Some(true)
+                } else if let Some(wrapped_select) =
+                    node.as_any().downcast_ref::<WrappedSelectNode>()
+                {
+                    // Don't really care if push-to-Cube or not, any aggregation should be ok here from execution perspective
+                    if wrapped_select.select_type == WrappedSelectType::Aggregate {
+                        false
+                    } else {
+                        Self::has_ungrouped_wrapped_node(wrapped_select.from.as_ref())
+                            || wrapped_select
+                                .joins
+                                .iter()
+                                .map(|(join, _, _)| join.as_ref())
+                                .any(Self::has_ungrouped_wrapped_node)
+                            || wrapped_select
+                                .subqueries
+                                .iter()
+                                .map(|subq| subq.as_ref())
+                                .any(Self::has_ungrouped_wrapped_node)
+                    }
+                } else {
+                    false
+                }
+            }
+            LogicalPlan::EmptyRelation(_) => false,
+            // Everything else is unexpected actually
+            _ => false,
+        }
+    }
+
     pub async fn generate_sql(
         &self,
         transport: Arc<dyn TransportService>,
@@ -736,6 +771,7 @@ impl CubeScanWrapperNode {
                         // And tuning literals to measures would require ugly wrapping with noop aggregation function
                         // TODO investigate Cube.js joins, try to implement dimension member expression
                         let mut has_literal_members = false;
+                        let mut has_duplicated_members = false;
                         let mut wrapper_exprs = vec![];
 
                         for (member, field) in
@@ -744,9 +780,18 @@ impl CubeScanWrapperNode {
                             let alias = remapper.add_column(&field.qualified_column())?;
                             let expr = match member {
                                 MemberField::Member(f) => {
-                                    member_to_alias.insert(f.to_string(), alias.clone());
-                                    // `alias` is column name that would be generated by Cube.js, just reference that
-                                    Expr::Column(Column::from_name(alias.clone()))
+                                    match member_to_alias.entry(f.to_string()) {
+                                        Entry::Vacant(entry) => {
+                                            entry.insert(alias.clone());
+                                            // `alias` is column name that would be generated by Cube.js, just reference that
+                                            Expr::Column(Column::from_name(alias.clone()))
+                                        }
+                                        Entry::Occupied(entry) => {
+                                            // This member already has an alias, generate wrapper that would use it
+                                            has_duplicated_members = true;
+                                            Expr::Column(Column::from_name(entry.get().clone()))
+                                        }
+                                    }
                                 }
                                 MemberField::Literal(value) => {
                                     has_literal_members = true;
@@ -773,7 +818,7 @@ impl CubeScanWrapperNode {
                             .await?;
 
                         // TODO is this check necessary?
-                        let sql = if has_literal_members {
+                        let sql = if has_literal_members || has_duplicated_members {
                             // Need to generate wrapper SELECT with literal columns
                             // Generated columns need to have same aliases as targets in `remapper`
                             // Because that's what plans higher up would use in generated SQL
@@ -804,6 +849,7 @@ impl CubeScanWrapperNode {
                                     expr,
                                     None,
                                     Arc::new(HashMap::new()),
+                                    None,
                                 )
                                 .await?;
                                 columns.push(AliasedColumn { expr, alias });
@@ -994,6 +1040,14 @@ impl CubeScanWrapperNode {
                                                     "Unsupported ungrouped CubeScan as join subquery: {join_cube_scan:?}"
                                                 )));
                                             }
+                                        } else if let Some(wrapped_select) =
+                                            node.as_any().downcast_ref::<WrappedSelectNode>()
+                                        {
+                                            if wrapped_select.push_to_cube {
+                                                return Err(CubeError::internal(format!(
+                                                    "Unsupported push_to_cube WrappedSelect as join subquery: {wrapped_select:?}"
+                                                )));
+                                            }
                                         } else {
                                             // TODO support more grouped cases here
                                             return Err(CubeError::internal(format!(
@@ -1070,7 +1124,7 @@ impl CubeScanWrapperNode {
                                     alias: subq_alias.unwrap_or_else(|| alias.clone()),
                                     sql: subq_sql_string,
                                     condition: cond.clone(),
-                                    join_type: join_type.clone(),
+                                    join_type: join_type,
                                 });
                                 known_join_subqueries.insert(alias.clone());
                             }
@@ -1210,7 +1264,9 @@ impl CubeScanWrapperNode {
                                         subqueries_sql.clone(),
                                     )
                                     .await?;
-                                    let join_condition = join_condition[0].expr.clone();
+
+                                    let join_condition_members = &join_condition[0].1;
+                                    let join_condition = join_condition[0].0.expr.clone();
                                     sql = new_sql;
 
                                     let join_sql_expression = {
@@ -1221,6 +1277,7 @@ impl CubeScanWrapperNode {
                                                 expr: join_condition,
                                                 alias: "__join__alias__unused".to_string(),
                                             },
+                                            join_condition_members,
                                             &ungrouped_scan_node.used_cubes,
                                         )?;
                                         serde_json::json!(res).to_string()
@@ -1252,28 +1309,39 @@ impl CubeScanWrapperNode {
 
                                 let load_request = &ungrouped_scan_node.request;
 
+                                let (dimensions_only_projection, projection_with_measures) =
+                                    projection.iter().partition::<Vec<_>, _>(
+                                        |(_column, used_members)| {
+                                            used_members.iter().all(|member| {
+                                                plan.meta.find_dimension_with_name(member).is_some()
+                                            })
+                                        },
+                                    );
+
                                 let load_request = V1LoadRequestQuery {
                                     measures: Some(
                                         aggregate
                                             .iter()
-                                            .map(|m| {
+                                            .map(|(m, used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
                                             })
-                                            .chain(
-                                                // TODO understand type of projections
-                                                projection.iter().map(|m| {
+                                            .chain(projection_with_measures.iter().map(
+                                                |(m, used_members)| {
                                                     Self::ungrouped_member_def(
                                                         m,
+                                                        used_members,
                                                         &ungrouped_scan_node.used_cubes,
                                                     )
-                                                }),
-                                            )
-                                            .chain(window.iter().map(|m| {
+                                                },
+                                            ))
+                                            .chain(window.iter().map(|(m, used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
                                             }))
@@ -1283,21 +1351,32 @@ impl CubeScanWrapperNode {
                                         group_by
                                             .iter()
                                             .zip(group_descs.iter())
-                                            .map(|(m, t)| {
+                                            .map(|((m, used_members), t)| {
                                                 Self::dimension_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                     t,
                                                 )
                                             })
+                                            .chain(dimensions_only_projection.iter().map(
+                                                |(m, used_members)| {
+                                                    Self::ungrouped_member_def(
+                                                        m,
+                                                        used_members,
+                                                        &ungrouped_scan_node.used_cubes,
+                                                    )
+                                                },
+                                            ))
                                             .collect::<Result<_>>()?,
                                     ),
                                     segments: Some(
                                         filter
                                             .iter()
-                                            .map(|m| {
+                                            .map(|(m, used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
+                                                    used_members,
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
                                             })
@@ -1317,13 +1396,13 @@ impl CubeScanWrapperNode {
                                                         let aliased_column = aggr_expr
                                                             .iter()
                                                             .find_position(|e| {
-                                                                expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                             })
                                                             .map(|(i, _)| aggregate[i].clone()).or_else(|| {
                                                             projection_expr
                                                                 .iter()
                                                                 .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                                 })
                                                                 .map(|(i, _)| {
                                                                     projection[i].clone()
@@ -1332,7 +1411,7 @@ impl CubeScanWrapperNode {
                                                             flat_group_expr
                                                                 .iter()
                                                                 .find_position(|e| {
-                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                    expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false)
                                                                 })
                                                                 .map(|(i, _)| group_by[i].clone())
                                                         }).ok_or_else(|| {
@@ -1345,7 +1424,7 @@ impl CubeScanWrapperNode {
                                                             ))
                                                         })?;
                                                         Ok(vec![
-                                                            aliased_column.alias.clone(),
+                                                            aliased_column.0.alias.clone(),
                                                             if *asc { "asc".to_string() } else { "desc".to_string() },
                                                         ])
                                                     }
@@ -1360,7 +1439,7 @@ impl CubeScanWrapperNode {
                                         load_request.order.clone()
                                     },
                                     ungrouped: if let WrappedSelectType::Projection = select_type {
-                                        load_request.ungrouped.clone()
+                                        load_request.ungrouped
                                     } else {
                                         None
                                     },
@@ -1368,13 +1447,13 @@ impl CubeScanWrapperNode {
                                     limit: if let Some(limit) = limit {
                                         Some(limit as i32)
                                     } else {
-                                        load_request.limit.clone()
+                                        load_request.limit
                                     },
                                     // TODO is it okay to just override offset?
                                     offset: if let Some(offset) = offset {
                                         Some(offset as i32)
                                     } else {
-                                        load_request.offset.clone()
+                                        load_request.offset
                                     },
 
                                     // Original scan node can already have consumed filters from Logical plan
@@ -1416,24 +1495,24 @@ impl CubeScanWrapperNode {
                                     .get_sql_templates()
                                     .select(
                                         sql.sql.to_string(),
-                                        projection,
-                                        group_by,
+                                        projection.into_iter().map(|(m, _)| m).collect(),
+                                        group_by.into_iter().map(|(m, _)| m).collect(),
                                         group_descs,
-                                        aggregate,
+                                        aggregate.into_iter().map(|(m, _)| m).collect(),
                                         // TODO
                                         from_alias.unwrap_or("".to_string()),
                                         if !filter.is_empty() {
                                             Some(
                                                 filter
                                                     .iter()
-                                                    .map(|f| f.expr.to_string())
+                                                    .map(|(f, _)| f.expr.to_string())
                                                     .join(" AND "),
                                             )
                                         } else {
                                             None
                                         },
                                         None,
-                                        order,
+                                        order.into_iter().map(|(m, _)| m).collect(),
                                         limit,
                                         offset,
                                         distinct,
@@ -1495,7 +1574,7 @@ impl CubeScanWrapperNode {
         can_rename_columns: bool,
         push_to_cube_context: Option<&PushToCubeContext<'_>>,
         subqueries: Arc<HashMap<String, String>>,
-    ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
+    ) -> result::Result<(Vec<(AliasedColumn, HashSet<String>)>, SqlQuery), CubeError> {
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
             let expr = if let Some(column_remapping) = column_remapping {
@@ -1510,6 +1589,8 @@ impl CubeScanWrapperNode {
             } else {
                 original_expr.clone()
             };
+
+            let mut used_members = HashSet::new();
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
                 plan.clone(),
                 sql,
@@ -1517,6 +1598,7 @@ impl CubeScanWrapperNode {
                 expr.clone(),
                 push_to_cube_context,
                 subqueries.clone(),
+                Some(&mut used_members),
             )
             .await?;
             let expr_sql =
@@ -1524,48 +1606,66 @@ impl CubeScanWrapperNode {
             sql = new_sql_query;
 
             let alias = next_remapper.add_expr(&schema, &original_expr, &expr)?;
-            aliased_columns.push(AliasedColumn {
-                expr: expr_sql,
-                alias,
-            });
+            aliased_columns.push((
+                AliasedColumn {
+                    expr: expr_sql,
+                    alias,
+                },
+                used_members,
+            ));
         }
         Ok((aliased_columns, sql))
     }
 
-    fn make_member_def(
+    fn make_member_def<'m>(
         column: &AliasedColumn,
-        used_cubes: &Vec<String>,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
     ) -> Result<UngrouppedMemberDef> {
+        let used_cubes = used_members
+            .into_iter()
+            .flat_map(|member| member.split_once('.'))
+            .map(|(cube, _rest)| cube)
+            .unique()
+            .map(|cube| cube.to_string())
+            .collect::<Vec<_>>();
+        let cube_name = used_cubes
+            .first()
+            .or_else(|| ungrouped_scan_cubes.first())
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "Can't generate SQL for column without cubes: {:?}",
+                    column
+                ))
+            })?
+            .clone();
+
         let res = UngrouppedMemberDef {
-            cube_name: used_cubes
-                .iter()
-                .next()
-                .ok_or_else(|| {
-                    DataFusionError::Internal(format!(
-                        "Can't generate SQL for column without cubes: {:?}",
-                        column
-                    ))
-                })?
-                .to_string(),
+            cube_name,
             alias: column.alias.clone(),
-            cube_params: used_cubes.clone(),
+            cube_params: used_cubes,
             expr: column.expr.clone(),
             grouping_set: None,
         };
         Ok(res)
     }
 
-    fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
-        let res = Self::make_member_def(column, used_cubes)?;
+    fn ungrouped_member_def<'m>(
+        column: &AliasedColumn,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
+    ) -> Result<String> {
+        let res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
         Ok(serde_json::json!(res).to_string())
     }
 
-    fn dimension_member_def(
+    fn dimension_member_def<'m>(
         column: &AliasedColumn,
-        used_cubes: &Vec<String>,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
         grouping_type: &Option<GroupingSetDesc>,
     ) -> Result<String> {
-        let mut res = Self::make_member_def(column, used_cubes)?;
+        let mut res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
         res.grouping_set = grouping_type.clone();
         Ok(serde_json::json!(res).to_string())
     }
@@ -1591,6 +1691,27 @@ impl CubeScanWrapperNode {
             .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for type: {}", e)))
     }
 
+    fn generate_typed_null(
+        sql_generator: Arc<dyn SqlGenerator>,
+        data_type: Option<DataType>,
+    ) -> result::Result<String, DataFusionError> {
+        let Some(data_type) = data_type else {
+            return Ok("NULL".to_string());
+        };
+
+        let sql_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
+        let result = Self::generate_sql_cast_expr(sql_generator, "NULL".to_string(), sql_type)?;
+        Ok(result)
+    }
+
+    fn generate_null_for_literal(
+        sql_generator: Arc<dyn SqlGenerator>,
+        value: &ScalarValue,
+    ) -> result::Result<String, DataFusionError> {
+        let data_type = value.get_datatype();
+        Self::generate_typed_null(sql_generator, Some(data_type))
+    }
+
     /// This function is async to be able to call to JS land,
     /// in case some SQL generation could not be done through Jinja
     pub fn generate_sql_for_expr<'ctx>(
@@ -1600,6 +1721,7 @@ impl CubeScanWrapperNode {
         expr: Expr,
         push_to_cube_context: Option<&'ctx PushToCubeContext>,
         subqueries: Arc<HashMap<String, String>>,
+        mut used_members: Option<&'ctx mut HashSet<String>>,
     ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send + 'ctx>> {
         Box::pin(async move {
             match expr {
@@ -1611,6 +1733,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     Ok((expr, sql_query))
@@ -1649,6 +1772,7 @@ impl CubeScanWrapperNode {
                                     expr,
                                     None,
                                     subqueries.clone(),
+                                    used_members,
                                 )
                                 .await;
                             }
@@ -1683,6 +1807,9 @@ impl CubeScanWrapperNode {
                             })?;
                         match member {
                             MemberField::Member(member) => {
+                                if let Some(used_members) = used_members {
+                                    used_members.insert(member.clone());
+                                }
                                 Ok((format!("${{{}}}", member), sql_query))
                             }
                             MemberField::Literal(value) => {
@@ -1693,6 +1820,7 @@ impl CubeScanWrapperNode {
                                     Expr::Literal(value.clone()),
                                     push_to_cube_context,
                                     subqueries.clone(),
+                                    used_members,
                                 )
                                 .await
                             }
@@ -1744,6 +1872,7 @@ impl CubeScanWrapperNode {
                         *left,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (right, sql_query) = Self::generate_sql_for_expr(
@@ -1753,6 +1882,7 @@ impl CubeScanWrapperNode {
                         *right,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -1775,6 +1905,7 @@ impl CubeScanWrapperNode {
                         *like.expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (pattern, sql_query) = Self::generate_sql_for_expr(
@@ -1784,6 +1915,7 @@ impl CubeScanWrapperNode {
                         *like.pattern,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (escape_char, sql_query) = match like.escape_char {
@@ -1795,6 +1927,7 @@ impl CubeScanWrapperNode {
                                 Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members,
                             )
                             .await?;
                             (Some(escape_char), sql_query)
@@ -1820,6 +1953,7 @@ impl CubeScanWrapperNode {
                         *ilike.expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (pattern, sql_query) = Self::generate_sql_for_expr(
@@ -1829,6 +1963,7 @@ impl CubeScanWrapperNode {
                         *ilike.pattern,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (escape_char, sql_query) = match ilike.escape_char {
@@ -1840,6 +1975,7 @@ impl CubeScanWrapperNode {
                                 Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members,
                             )
                             .await?;
                             (Some(escape_char), sql_query)
@@ -1866,6 +2002,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql =
@@ -1888,6 +2025,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -1909,6 +2047,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -1930,6 +2069,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -1958,6 +2098,7 @@ impl CubeScanWrapperNode {
                             *expr,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -1974,6 +2115,7 @@ impl CubeScanWrapperNode {
                             *when,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         let (then, sql_query_next) = Self::generate_sql_for_expr(
@@ -1983,6 +2125,7 @@ impl CubeScanWrapperNode {
                             *then,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -1996,6 +2139,7 @@ impl CubeScanWrapperNode {
                             *else_expr,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members,
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -2019,6 +2163,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let data_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
@@ -2039,6 +2184,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     let resulting_sql = sql_generator
@@ -2068,15 +2214,25 @@ impl CubeScanWrapperNode {
                                         ))
                                     })
                             })
-                            .unwrap_or(Ok("NULL".to_string()))?,
+                            .transpose()?
+                            .map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::Float32(f) => (
-                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string()),
+                            f.map(|f| format!("{f}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::Float64(f) => (
-                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string()),
+                            f.map(|f| format!("{f}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::Decimal128(x, precision, scale) => {
@@ -2096,41 +2252,65 @@ impl CubeScanWrapperNode {
                                         data_type,
                                     )?
                                 } else {
-                                    "NULL".to_string()
+                                    Self::generate_null_for_literal(sql_generator, &literal)?
                                 },
                                 sql_query,
                             )
                         }
                         ScalarValue::Int8(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::Int16(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::Int32(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::Int64(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::UInt8(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::UInt16(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::UInt32(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::UInt64(x) => (
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            x.map(|x| format!("{x}")).map_or_else(
+                                || Self::generate_null_for_literal(sql_generator, &literal),
+                                Ok,
+                            )?,
                             sql_query,
                         ),
                         ScalarValue::Utf8(x) => {
@@ -2138,7 +2318,10 @@ impl CubeScanWrapperNode {
                                 let param_index = sql_query.add_value(x);
                                 (format!("${}$", param_index), sql_query)
                             } else {
-                                ("NULL".into(), sql_query)
+                                (
+                                    Self::generate_typed_null(sql_generator, Some(DataType::Utf8))?,
+                                    sql_query,
+                                )
                             }
                         }
                         // ScalarValue::LargeUtf8(_) => {}
@@ -2179,42 +2362,54 @@ impl CubeScanWrapperNode {
                                     sql_query,
                                 )
                             } else {
-                                ("NULL".to_string(), sql_query)
+                                (
+                                    Self::generate_null_for_literal(sql_generator, &literal)?,
+                                    sql_query,
+                                )
                             }
                         }
                         // ScalarValue::Date64(_) => {}
 
                         // generate_sql_for_timestamp will call Utc constructors, so only support UTC zone for now
                         // DataFusion can return "UTC" for stuff like `NOW()` during constant folding
-                        ScalarValue::TimestampSecond(s, tz)
-                            if matches!(tz.as_deref(), None | Some("UTC")) =>
-                        {
-                            generate_sql_for_timestamp!(s, timestamp, sql_generator, sql_query)
-                        }
-                        ScalarValue::TimestampMillisecond(ms, tz)
+                        ScalarValue::TimestampSecond(s, ref tz)
                             if matches!(tz.as_deref(), None | Some("UTC")) =>
                         {
                             generate_sql_for_timestamp!(
+                                literal,
+                                s,
+                                timestamp,
+                                sql_generator,
+                                sql_query
+                            )
+                        }
+                        ScalarValue::TimestampMillisecond(ms, ref tz)
+                            if matches!(tz.as_deref(), None | Some("UTC")) =>
+                        {
+                            generate_sql_for_timestamp!(
+                                literal,
                                 ms,
                                 timestamp_millis_opt,
                                 sql_generator,
                                 sql_query
                             )
                         }
-                        ScalarValue::TimestampMicrosecond(ms, tz)
+                        ScalarValue::TimestampMicrosecond(ms, ref tz)
                             if matches!(tz.as_deref(), None | Some("UTC")) =>
                         {
                             generate_sql_for_timestamp!(
+                                literal,
                                 ms,
                                 timestamp_micros,
                                 sql_generator,
                                 sql_query
                             )
                         }
-                        ScalarValue::TimestampNanosecond(nanoseconds, tz)
+                        ScalarValue::TimestampNanosecond(nanoseconds, ref tz)
                             if matches!(tz.as_deref(), None | Some("UTC")) =>
                         {
                             generate_sql_for_timestamp!(
+                                literal,
                                 nanoseconds,
                                 timestamp_nanos,
                                 sql_generator,
@@ -2238,7 +2433,10 @@ impl CubeScanWrapperNode {
                                     sql_query,
                                 )
                             } else {
-                                ("NULL".to_string(), sql_query)
+                                (
+                                    Self::generate_null_for_literal(sql_generator, &literal)?,
+                                    sql_query,
+                                )
                             }
                         }
                         ScalarValue::IntervalDayTime(x) => {
@@ -2248,7 +2446,10 @@ impl CubeScanWrapperNode {
                                 let generated_sql = decomposed.generate_interval_sql(&templates)?;
                                 (generated_sql, sql_query)
                             } else {
-                                ("NULL".to_string(), sql_query)
+                                (
+                                    Self::generate_null_for_literal(sql_generator, &literal)?,
+                                    sql_query,
+                                )
                             }
                         }
                         ScalarValue::IntervalMonthDayNano(x) => {
@@ -2258,11 +2459,16 @@ impl CubeScanWrapperNode {
                                 let generated_sql = decomposed.generate_interval_sql(&templates)?;
                                 (generated_sql, sql_query)
                             } else {
-                                ("NULL".to_string(), sql_query)
+                                (
+                                    Self::generate_null_for_literal(sql_generator, &literal)?,
+                                    sql_query,
+                                )
                             }
                         }
                         // ScalarValue::Struct(_, _) => {}
-                        ScalarValue::Null => ("NULL".to_string(), sql_query),
+                        ScalarValue::Null => {
+                            (Self::generate_typed_null(sql_generator, None)?, sql_query)
+                        }
                         x => {
                             return Err(DataFusionError::Internal(format!(
                                 "Can't generate SQL for literal: {:?}",
@@ -2312,6 +2518,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2349,6 +2556,7 @@ impl CubeScanWrapperNode {
                                         args[1].clone(),
                                         push_to_cube_context,
                                         subqueries.clone(),
+                                        used_members,
                                     )
                                     .await?;
                                     return Ok((
@@ -2392,6 +2600,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2432,6 +2641,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2461,6 +2671,7 @@ impl CubeScanWrapperNode {
                                 expr,
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members.as_deref_mut(),
                             )
                             .await?;
                             sql_query = query;
@@ -2489,6 +2700,7 @@ impl CubeScanWrapperNode {
                                 expr,
                                 push_to_cube_context,
                                 subqueries.clone(),
+                                used_members.as_deref_mut(),
                             )
                             .await?;
                             sql_query = query;
@@ -2530,6 +2742,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2544,6 +2757,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2558,6 +2772,7 @@ impl CubeScanWrapperNode {
                             arg,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2594,6 +2809,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2606,6 +2822,7 @@ impl CubeScanWrapperNode {
                             expr,
                             push_to_cube_context,
                             subqueries.clone(),
+                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2637,6 +2854,7 @@ impl CubeScanWrapperNode {
                         *expr,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2647,6 +2865,7 @@ impl CubeScanWrapperNode {
                         *subquery,
                         push_to_cube_context,
                         subqueries.clone(),
+                        used_members,
                     )
                     .await?;
                     sql_query = query;

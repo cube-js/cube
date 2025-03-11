@@ -1,15 +1,32 @@
-use std::{backtrace::Backtrace, collections::HashMap};
+use std::{backtrace::Backtrace, collections::HashMap, fmt::Formatter};
 
-#[derive(thiserror::Error, Debug)]
+/// TODO: Migrate back to thiserror crate, when Rust will stabilize feature(error_generic_member_access)
+#[derive(Debug)]
 pub enum CompilationError {
-    #[error("SQLCompilationError: Internal: {0}")]
     Internal(String, Backtrace, Option<HashMap<String, String>>),
-    #[error("SQLCompilationError: User: {0}")]
     User(String, Option<HashMap<String, String>>),
-    #[error("SQLCompilationError: Unsupported: {0}")]
     Unsupported(String, Option<HashMap<String, String>>),
-    #[error("SQLCompilationError: Fatal: {0}")]
     Fatal(String, Option<HashMap<String, String>>),
+}
+
+impl std::fmt::Display for CompilationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompilationError::Internal(message, _, _) => {
+                f.write_fmt(format_args!("SQLCompilationError: Internal: {}", message))
+            }
+            CompilationError::User(message, _) => {
+                f.write_fmt(format_args!("SQLCompilationError: User: {}", message))
+            }
+            CompilationError::Unsupported(message, _) => f.write_fmt(format_args!(
+                "SQLCompilationError: Unsupported: {}",
+                message
+            )),
+            CompilationError::Fatal(message, _) => {
+                f.write_fmt(format_args!("SQLCompilationError: Fatal: {}", message))
+            }
+        }
+    }
 }
 
 impl PartialEq for CompilationError {

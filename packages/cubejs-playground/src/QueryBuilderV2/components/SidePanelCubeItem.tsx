@@ -1,4 +1,4 @@
-import { Cube, TCubeDimension, TCubeMeasure, TCubeSegment } from '@cubejs-client/core';
+import { Cube } from '@cubejs-client/core';
 import { ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Block, Button, Space, tasty, Text, CubeIcon, ViewIcon } from '@cube-dev/ui-kit';
 
@@ -589,8 +589,8 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
           ...hierarchyNames.filter((hierarchy) => folder.members.includes(hierarchy)),
           ...dimensions.filter((dimension) => folder.members.includes(dimension)),
         ].sort(sortFn),
-        ...measures.filter((measure) => folder.members.includes(measure)),
-        ...segments.filter((segment) => folder.members.includes(segment))
+        ...measures.filter((measure) => folder.members.includes(measure)).sort(sortFn),
+        ...segments.filter((segment) => folder.members.includes(segment)).sort(sortFn)
       );
 
       return acc;
@@ -606,8 +606,8 @@ export function SidePanelCubeItem(props: CubeListItemProps) {
         (dimension) => !folderMembers.includes(dimension) && !hierarchyMembers.includes(dimension)
       ),
     ].sort(sortFn),
-    ...measures.filter((measure) => !folderMembers.includes(measure)),
-    ...segments.filter((segment) => !folderMembers.includes(segment)),
+    ...measures.filter((measure) => !folderMembers.includes(measure)).sort(sortFn),
+    ...segments.filter((segment) => !folderMembers.includes(segment)).sort(sortFn),
   ];
 
   // When switching between to and from search mode reset the open instances

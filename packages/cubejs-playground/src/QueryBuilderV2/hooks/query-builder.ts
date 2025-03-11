@@ -525,7 +525,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
       }
     }
 
-    return names;
+    return names.reverse();
   });
 
   // Updaters with simple common logic for dimensions, measures and segments
@@ -540,7 +540,7 @@ export function useQueryBuilder(props: UseQueryBuilderProps) {
           return false;
         }
 
-        let names: string[];
+        let names: string[] = [name];
 
         if (type === 'dimensions') {
           names = getConnectedDimensionNames(name);

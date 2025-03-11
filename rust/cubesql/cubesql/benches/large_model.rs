@@ -77,6 +77,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
             V1CubeMetaMeasure {
                 name: format!("{}.count", cube_name),
                 title: None,
+                short_title: None,
                 description: None,
                 r#type: "number".to_string(),
                 agg_type: Some("count".to_string()),
@@ -85,6 +86,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
             V1CubeMetaMeasure {
                 name: format!("{}.sum", cube_name),
                 title: None,
+                short_title: None,
                 description: None,
                 r#type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
@@ -101,6 +103,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
         segments: vec![],
         joins: None,
         folders: None,
+        hierarchies: None,
         meta: None,
     }]
 }

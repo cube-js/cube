@@ -24,7 +24,7 @@ export interface FilterOptionsButtonProps {
 
 export function FilterOptionsButton({ type, disableKeys, onAction }: FilterOptionsButtonProps) {
   const items = useMemo(() => {
-    const items: { key: string, label: string, color?: string }[] = [];
+    const items: { key: string; label: string; color?: string }[] = [];
 
     if (type === 'or' || type === 'and') {
       if (type === 'and') {

@@ -33,6 +33,7 @@ export type PinotDriverConfiguration = {
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
+  nullHandling?: boolean;
 };
 
 type AuthorizationHeaders = {
@@ -74,7 +75,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency() {
-    return 2;
+    return 10;
   }
 
   private config: PinotDriverConfiguration;
@@ -108,6 +109,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
         : undefined,
       authToken: getEnv('pinotAuthToken', { dataSource }),
       ssl: this.getSslOptions(dataSource),
+      nullHandling: getEnv('pinotNullHandling', { dataSource }),
       queryTimeout: getEnv('dbQueryTimeout', { dataSource }),
       ...config
     };
@@ -167,7 +169,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       }),
       body: JSON.stringify({
         sql: query,
-        queryOptions: `useMultistageEngine=true;timeoutMs=${this.config.queryTimeout}`
+        queryOptions: `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout}`
       })
     });
 

@@ -27,12 +27,13 @@ import { TCubeMemberType } from '@cubejs-client/core';
 
 import { useStoredTimezones, useEvent } from './hooks';
 import { MemberLabel } from './components/MemberLabel';
+import { InfoIconButton } from './components/InfoIconButton';
 import { useQueryBuilderContext } from './context';
 import { ORDER_LABEL_BY_TYPE } from './utils/labels';
 import { formatNumber } from './utils/formatters';
 import { TIMEZONES } from './utils/timezones';
 
-const DEFAULT_LIMIT = 5_000;
+const DEFAULT_LIMIT = 0; // no limit
 
 const ALL_TIMEZONES: {
   tzCode: string;
@@ -42,7 +43,7 @@ const ALL_TIMEZONES: {
 }[] = [
   {
     tzCode: '',
-    label: 'UTC (Default)',
+    label: 'UTC (default)',
     name: 'Coordinated Universal Time',
     utc: '+00:00',
   },
@@ -53,8 +54,9 @@ const AVAILABLE_TIMEZONES = ALL_TIMEZONES.map((tz) => tz.tzCode);
 const LIMIT_OPTIONS: { key: number; label: string }[] = [
   { key: 100, label: '100' },
   { key: 1000, label: '1,000' },
-  { key: 5000, label: '5,000 (Default)' },
-  { key: 0, label: 'Max Row Limit' },
+  { key: 5000, label: '5,000' },
+  { key: 50000, label: '50,000' },
+  { key: 0, label: 'Default limit' },
 ];
 const LIMIT_OPTION_VALUES = LIMIT_OPTIONS.map((option) => option.key) as number[];
 
@@ -369,23 +371,15 @@ export function QueryBuilderExtras() {
           <Dialog width="36x">
             <Content padding="1x 1.5x" gap="1.5x">
               <Flow gap="1x">
-                <Space gap=".75x">
+                <Space gap=".25x">
                   <Title level={4} preset="h6">
                     Query
                   </Title>
-                  <TooltipProvider
-                    title="Click to learn more about query format"
-                    width="max-content"
-                  >
-                    <Button
-                      to="!https://cube.dev/docs/product/apis-integrations/rest-api/query-format#query-properties"
-                      aria-label="Query format"
-                      width="3x"
-                      height="3x"
-                      type="clear"
-                      icon={<InfoCircleIcon />}
-                    />
-                  </TooltipProvider>
+                  <InfoIconButton
+                    tooltip="Click to learn more about the query format"
+                    tooltipSuffix=""
+                    to="!https://cube.dev/docs/product/apis-integrations/rest-api/query-format#query-properties"
+                  />
                 </Space>
                 <Checkbox
                   aria-label="Ungrouped"
@@ -398,14 +392,14 @@ export function QueryBuilderExtras() {
                   Ungrouped
                 </Checkbox>
                 <Checkbox
-                  aria-label="Show total rows"
+                  aria-label="Show total number of rows"
                   isSelected={query.total ?? false}
                   onChange={(total) => {
                     updateQuery({ total: total || undefined });
                     close();
                   }}
                 >
-                  Show total rows
+                  Show total number of rows
                 </Checkbox>
               </Flow>
               <ComboBox
@@ -601,6 +595,13 @@ export function QueryBuilderLimitSelect() {
             Reset
           </Link>
         ) : null
+      }
+      labelSuffix={
+        <InfoIconButton
+          tooltip="Click to learn more about the row limit"
+          tooltipSuffix=""
+          to="!https://cube.dev/docs/product/apis-integrations/queries#row-limit"
+        />
       }
       selectedKey={query.limit == null ? '0' : String(query.limit)}
       onSelectionChange={(val: Key) => {

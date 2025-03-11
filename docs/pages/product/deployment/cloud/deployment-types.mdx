@@ -165,6 +165,7 @@ module.exports = {
 If your implementation of `context_to_app_id` returns identifiers that change
 over time for each tenant, requests from one tenant would likely hit multiple
 production clusters and you would not have the benefit of reduced memory footprint.
+Also you might see 502 or timeout errors in case of different cluster nodes would return different `context_to_app_id` results for the same request.
 
 </WarningBox>
 

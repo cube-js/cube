@@ -333,7 +333,7 @@ impl SplitRules {
                     let inner_alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(
                         AliasExprAlias(original_expr.to_string()),
                     ));
-                    subst.insert(inner_alias_var, inner_alias.clone());
+                    subst.insert(inner_alias_var, inner_alias);
 
                     let outer_alias_column =
                         MemberRules::add_alias_column(egraph, original_expr, None);

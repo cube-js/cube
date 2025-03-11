@@ -8,7 +8,7 @@ use crate::{
     compile::{
         engine::{
             df::{
-                optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
+                optimizers::{FilterPushDown, FilterSplitMeta, LimitPushDown, SortPushDown},
                 scan::CubeScanNode,
                 wrapper::CubeScanWrapperNode,
             },
@@ -104,7 +104,7 @@ pub trait QueryEngine {
                     .log_load_state(
                         Some(span_id.clone()),
                         auth_context,
-                        state.get_load_request_meta(),
+                        state.get_load_request_meta("sql"),
                         "SQL API Query Planning".to_string(),
                         serde_json::json!({
                             "query": span_id.query_key.clone(),
@@ -142,6 +142,7 @@ pub trait QueryEngine {
             Arc::new(FilterPushDown::new()),
             Arc::new(SortPushDown::new()),
             Arc::new(LimitPushDown::new()),
+            Arc::new(FilterSplitMeta::new()),
         ];
         for optimizer in optimizers {
             // TODO: report an error when the plan can't be optimized
@@ -286,7 +287,7 @@ pub trait QueryEngine {
                     .log_load_state(
                         Some(span_id.clone()),
                         auth_context,
-                        state.get_load_request_meta(),
+                        state.get_load_request_meta("sql"),
                         "SQL API Query Planning Success".to_string(),
                         serde_json::json!({
                             "query": span_id.query_key.clone(),
@@ -302,7 +303,7 @@ pub trait QueryEngine {
         // to catch all SQL generation errors during planning
         let rewrite_plan = Self::evaluate_wrapped_sql(
             self.transport_ref().clone(),
-            Arc::new(state.get_load_request_meta()),
+            Arc::new(state.get_load_request_meta("sql")),
             rewrite_plan,
         )
         .await?;
@@ -390,7 +391,7 @@ impl QueryEngine for SqlQueryEngine {
     ) -> Result<DFSessionContext, CompilationError> {
         let query_planner = Arc::new(CubeQueryPlanner::new(
             self.transport_ref().clone(),
-            state.get_load_request_meta(),
+            state.get_load_request_meta("sql"),
             self.config_ref().clone(),
         ));
         let mut ctx = DFSessionContext::with_state(

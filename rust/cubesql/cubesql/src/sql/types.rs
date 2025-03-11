@@ -89,7 +89,7 @@ impl ColumnType {
             ColumnType::Blob => DataType::Utf8,
             ColumnType::Decimal(p, s) => DataType::Decimal(*p, *s),
             ColumnType::List(field) => DataType::List(field.clone()),
-            ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Millisecond, None),
+            ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
         }
     }
 }

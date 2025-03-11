@@ -1,0 +1,21 @@
+# Refreshing pre-aggregations
+
+_Pre-aggregation refresh_ is the process of building pre-aggregations and updating
+them with new data. Pre-aggregation refresh is the responsibility of the _refresh
+worker_.
+
+## Configuration
+
+You can use the following environment variables to configure the refresh worker
+behavior:
+
+- `CUBEJS_REFRESH_WORKER` (see also `CUBEJS_PRE_AGGREGATIONS_BUILDER`)
+- `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
+- `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
+- `CUBEJS_DB_QUERY_TIMEOUT`
+- `CUBEJS_REFRESH_WORKER_CONCURRENCY` (see also `CUBEJS_CONCURRENCY`)
+- `CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`
+- `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`
+
+
+[ref-multitenancy]: /product/configuration/advanced/multitenancy

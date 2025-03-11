@@ -4,7 +4,7 @@ use crate::{
     compile::rewrite::{
         rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
         DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-        TimeDimensionGranularity, WrappedSelectUngroupedScan,
+        TimeDimensionGranularity, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
@@ -104,6 +104,8 @@ impl BestCubePlan {
             LogicalPlanLanguage::OrderReplacer(_) => 1,
             LogicalPlanLanguage::MemberReplacer(_) => 1,
             LogicalPlanLanguage::FilterReplacer(_) => 1,
+            LogicalPlanLanguage::FilterSimplifyPushDownReplacer(_) => 1,
+            LogicalPlanLanguage::FilterSimplifyPullUpReplacer(_) => 1,
             LogicalPlanLanguage::TimeDimensionDateRangeReplacer(_) => 1,
             LogicalPlanLanguage::InnerAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::OuterProjectionSplitReplacer(_) => 1,
@@ -122,6 +124,9 @@ impl BestCubePlan {
             LogicalPlanLanguage::ProjectionSplitPushDownReplacer(_) => 1,
             LogicalPlanLanguage::ProjectionSplitPullUpReplacer(_) => 1,
             LogicalPlanLanguage::QueryParam(_) => 1,
+            LogicalPlanLanguage::JoinCheckStage(_) => 1,
+            LogicalPlanLanguage::JoinCheckPushDown(_) => 1,
+            LogicalPlanLanguage::JoinCheckPullUp(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as
             // there's always rewrite rule it's fine to have replacer cost.
             // Needs to be added as alias rewrite always more expensive than original function.
@@ -140,7 +145,7 @@ impl BestCubePlan {
 
         let time_dimensions_used_as_dimensions = match enode {
             LogicalPlanLanguage::DimensionName(DimensionName(name)) => {
-                if let Some(dimension) = self.meta_context.find_dimension_with_name(name.clone()) {
+                if let Some(dimension) = self.meta_context.find_dimension_with_name(name) {
                     if dimension.is_time() {
                         1
                     } else {
@@ -186,6 +191,11 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        let wrapped_select_non_push_to_cube = match enode {
+            LogicalPlanLanguage::WrappedSelectPushToCube(WrappedSelectPushToCube(false)) => 1,
+            _ => 0,
+        };
+
         let wrapped_select_ungrouped_scan = match enode {
             LogicalPlanLanguage::WrappedSelectUngroupedScan(WrappedSelectUngroupedScan(true)) => 1,
             _ => 0,
@@ -215,6 +225,7 @@ impl BestCubePlan {
             ungrouped_aggregates: 0,
             wrapper_nodes,
             joins,
+            wrapped_select_non_push_to_cube,
             wrapped_select_ungrouped_scan,
             empty_wrappers: 0,
             ast_size_outside_wrapper: 0,
@@ -234,11 +245,13 @@ impl BestCubePlan {
 /// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
 /// - `filters` > `filter_members` - optimize for push down of filters
+/// - `zero_members_wrapper` > `filter_members` - prefer CubeScan(filters) to WrappedSelect(CubeScan(*), filters)
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
 /// - `non_pushed_down_window` > `wrapper_nodes` - prefer to always push down window functions
 /// - `non_pushed_down_limit_sort` > `wrapper_nodes` - prefer to always push down limit-sort expressions
+/// - `wrapped_select_non_push_to_cube` > `wrapped_select_ungrouped_scan` - otherwise cost would prefer any aggregation, even non-push-to-Cube
 /// - match errors by priority - optimize for more specific errors
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
@@ -255,16 +268,17 @@ pub struct CubePlanCost {
     non_pushed_down_limit_sort: i64,
     joins: usize,
     wrapper_nodes: i64,
-    wrapped_select_ungrouped_scan: usize,
     ast_size_outside_wrapper: usize,
+    wrapped_select_non_push_to_cube: usize,
+    wrapped_select_ungrouped_scan: usize,
     filters: i64,
     structure_points: i64,
-    filter_members: i64,
     // This is separate from both non_detected_cube_scans and cube_members
     // Because it's ok to use all members inside wrapper (so non_detected_cube_scans would be zero)
     // And we want to select representation with less members
     // But only when members are present!
     zero_members_wrapper: i64,
+    filter_members: i64,
     cube_members: i64,
     errors: i64,
     time_dimensions_used_as_dimensions: i64,
@@ -382,6 +396,8 @@ impl CubePlanCost {
                 + other.ast_size_outside_wrapper,
             ungrouped_aggregates: self.ungrouped_aggregates + other.ungrouped_aggregates,
             wrapper_nodes: self.wrapper_nodes + other.wrapper_nodes,
+            wrapped_select_non_push_to_cube: self.wrapped_select_non_push_to_cube
+                + other.wrapped_select_non_push_to_cube,
             wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan
                 + other.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes + other.cube_scan_nodes,
@@ -468,6 +484,7 @@ impl CubePlanCost {
             } + self.ungrouped_aggregates,
             unwrapped_subqueries: self.unwrapped_subqueries,
             wrapper_nodes: self.wrapper_nodes,
+            wrapped_select_non_push_to_cube: self.wrapped_select_non_push_to_cube,
             wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes,
             ast_size_without_alias: self.ast_size_without_alias,
@@ -708,7 +725,7 @@ where
         let mut ids = HashMap::<IdWithState<L, S>, Id>::default();
         let mut todo = node
             .children()
-            .into_iter()
+            .iter()
             .map(|id| IdWithState::new(*id, Arc::clone(&state)))
             .collect::<Vec<_>>();
 

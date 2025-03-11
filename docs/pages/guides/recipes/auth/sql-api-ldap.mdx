@@ -5,7 +5,10 @@ API](/product/apis-integrations/sql-api) with a LDAP catalog. You can use
 this approach to enable single sign-on (SSO) experience in BI tools
 connecting to Cube for your end users.
 
-<YouTubeVideo url="https://www.youtube.com/embed/vGF7n4WWriA?si=RIk7G3a4lO2DnNJj"/>
+<YouTubeVideo
+  url="https://www.youtube.com/embed/vGF7n4WWriA"
+  aspectRatio={4/2.25}
+/>
 
 ## Use case
 
@@ -22,6 +25,13 @@ Here's a step-by-step breakdown of the authentication flow:
 * Power BI sends them over a TLS-secured SQL API connection to Cube.
 * Cube verifies the credentials via the Secure LDAP service.
 * If credentials are correct, users get access to the dataset.
+
+<InfoBox>
+
+In this recipe, the SQL API is used to connect to [Power BI][ref-powerbi].
+Currently, it's recommended to use the [DAX API][ref-dax-api].
+
+</InfoBox>
 
 ## Configuration
 
@@ -175,3 +185,7 @@ module.exports = {
 };
 
 ```
+
+
+[ref-dax-api]: /product/apis-integrations/dax-api
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi

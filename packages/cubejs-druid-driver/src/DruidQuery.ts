@@ -1,4 +1,3 @@
-import moment from 'moment-timezone';
 import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {

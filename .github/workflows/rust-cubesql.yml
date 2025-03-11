@@ -32,7 +32,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt, clippy
@@ -111,7 +111,8 @@ jobs:
 
   native_linux:
     needs: [lint]
-    runs-on: ubuntu-20.04
+    # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} with Python ${{ matrix.python-version }}
     strategy:
@@ -138,7 +139,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -244,7 +245,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -327,7 +328,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt

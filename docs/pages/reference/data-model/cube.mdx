@@ -12,7 +12,7 @@ Cubes are typically declared in separate files with one cube per file.
 Within each cube are definitions of [measures][ref-ref-measures],
 [dimensions][ref-ref-dimensions], [hierarchies][ref-ref-hierarchies],
 [segments][ref-ref-segments], [joins][ref-ref-joins] between cubes,
-and [pre-aggregations][ref-ref-pre-aggs].
+[pre-aggregations][ref-ref-pre-aggs], and [data access policies][ref-ref-dap].
 
 <CodeTabs>
 
@@ -110,88 +110,31 @@ cubes:
 
 </CodeTabs>
 
-### `data_source`
+### `sql_alias`
 
-Each cube can have its own `data_source` name to support scenarios where data
-should be fetched from multiple databases. The value of the `data_source`
-parameter will be passed to the [`driverFactory()`][ref-config-driverfactory]
-function as part of the `context` parameter. By default, each cube has a
-`default` value for its `data_source`; to override it you can use:
+Use `sql_alias` when auto-generated cube alias prefix is too long and truncated
+by databases such as Postgres:
 
 <CodeTabs>
 
 ```javascript
-cube(`order_facts`, {
-  data_source: `prod_db`,
+cube(`order_facts_about_literally_everything_in_the_world`, {
   sql_table: `orders`,
+  sql_alias: `order_facts`,
 });
 ```
 
 ```yaml
 cubes:
-  - name: order_facts
-    data_source: prod_db
+  - name: order_facts_about_literally_everything_in_the_world
     sql_table: orders
+    sql_alias: order_facts
 ```
 
 </CodeTabs>
 
-### `description`
-
-This parameter provides a human-readable description of a cube.
-When applicable, it will be displayed in [Playground][ref-playground] and exposed
-to data consumers via [APIs and integrations][ref-apis].
-
-A description can give a hint both to your team and end users, making sure they
-interpret the data correctly. 
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  sql_table: `orders`,
-  title: `Product Orders`,
-  description: `All orders-related information`,
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    sql_table: orders
-    title: Product Orders
-    description: All orders-related information
-```
-
-</CodeTabs>
-
-### `meta`
-
-Custom metadata. Can be used to pass any information to the frontend.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  sql_table: `orders`,
-  title: `Product Orders`,
-  meta: {
-    any: `value`
-  }
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    sql_table: orders
-    title: Product Orders
-    meta:
-      any: value
-
-```
-
-</CodeTabs>
+It'll generate aliases for members such as `order_facts__count`. `sql_alias` affects
+all member names including pre-aggregation table names.
 
 ### `extends`
 
@@ -276,6 +219,151 @@ cube(`extended_order_facts`, {
 });
 ```
 
+### `data_source`
+
+Each cube can have its own `data_source` name to support scenarios where data
+should be fetched from multiple databases. The value of the `data_source`
+parameter will be passed to the [`driverFactory()`][ref-config-driverfactory]
+function as part of the `context` parameter. By default, each cube has a
+`default` value for its `data_source`; to override it you can use:
+
+<CodeTabs>
+
+```javascript
+cube(`order_facts`, {
+  data_source: `prod_db`,
+  sql_table: `orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: order_facts
+    data_source: prod_db
+    sql_table: orders
+```
+
+</CodeTabs>
+
+### `sql`
+
+The `sql` parameter specifies the SQL that will be used to generate a table that
+will be queried by a cube. It can be any valid SQL query, but usually it takes
+the form of a `SELECT * FROM my_table` query. Please note that you don't need to
+use `GROUP BY` in a SQL query on the cube level. This query should return a
+plain table, without aggregations.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql: `SELECT * FROM orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+```
+
+</CodeTabs>
+
+With JavaScript models, you can also reference other cubes' SQL statements for
+code reuse:
+
+```javascript
+cube(`companies`, {
+  sql: `
+    SELECT users.company_name, users.company_id
+    FROM ${users.sql()} AS users
+  `,
+});
+```
+
+It is recommended to prefer the [`sql_table`](#parameters-sql-table) parameter
+over the `sql` parameter for all cubes that are supposed to use queries like
+this: `SELECT * FROM table`.
+
+### `sql_table`
+
+The `sql_table` parameter is used as a concise way for defining a cube that uses
+a query like this: `SELECT * FROM table`. Instead of using the
+[`sql`](#parameters-sql) parameter, use `sql_table` with the table name that this
+cube will query.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `public.orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: public.orders
+```
+
+</CodeTabs>
+
+### `title`
+
+Use `title` to change the display name of the cube. By default, Cube will
+humanize the cube's name, so for instance, `users_orders` would become
+`Users Orders`. If default humanizing doesn't work in your case, please use the
+title parameter. It is highly recommended to give human readable names to your
+cubes. It will help everyone on a team better understand the data structure and
+will help maintain a consistent set of definitions across an organization.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+    title: Product Orders
+```
+
+</CodeTabs>
+
+### `description`
+
+This parameter provides a human-readable description of a cube.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+A description can give a hint both to your team and end users, making sure they
+interpret the data correctly. 
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`,
+  description: `All orders-related information`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+    title: Product Orders
+    description: All orders-related information
+```
+
+</CodeTabs>
+
 ### `public`
 
 The `public` parameter is used to manage the visibility of a cube. Valid values
@@ -318,7 +406,7 @@ The default values for `refresh_key` are
 Refresh key of a query is a concatenation of all cubes refresh keys involved in
 query. For rollup queries pre-aggregation table name is used as a refresh key.
 
-You can set up a custom refresh check SQL by changing `refresh_key` property.
+You can set up a custom refresh check SQL by changing the `refresh_key` parameter.
 Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or
 examining a metadata table for whatever system is managing the data to see when
 it last ran. timestamp in that case.
@@ -374,7 +462,7 @@ cubes:
 
 `every` - can be set as an interval with granularities `second`, `minute`,
 `hour`, `day`, and `week` or accept CRON string with some limitations. If you
-set `every` as CRON string, you can use the `timezone` property.
+set `every` as CRON string, you can use the `timezone` parameter.
 
 For example:
 
@@ -462,103 +550,9 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 └───────────────────────── second (0 - 59, optional)
 ```
 
-### `sql`
+### `meta`
 
-The `sql` parameter specifies the SQL that will be used to generate a table that
-will be queried by a cube. It can be any valid SQL query, but usually it takes
-the form of a `SELECT * FROM my_table` query. Please note that you don't need to
-use `GROUP BY` in a SQL query on the cube level. This query should return a
-plain table, without aggregations.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  sql: `SELECT * FROM orders`,
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    sql: SELECT * FROM orders
-```
-
-</CodeTabs>
-
-With JavaScript models, you can also reference other cubes' SQL statements for
-code reuse:
-
-```javascript
-cube(`companies`, {
-  sql: `
-    SELECT users.company_name, users.company_id
-    FROM ${users.sql()} AS users
-  `,
-});
-```
-
-It is recommended to prefer the [`sql_table`](#parameters-sql-table) property
-over the `sql` property for all cubes that are supposed to use queries like
-this: `SELECT * FROM table`.
-
-### `sql_table`
-
-The `sql_table` property is used as a concise way for defining a cube that uses
-a query like this: `SELECT * FROM table`. Instead of using the
-[`sql`](#parameters-sql) property, use `sql_table` with the table name that this
-cube will query.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  sql_table: `public.orders`,
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    sql_table: public.orders
-```
-
-</CodeTabs>
-
-### `sql_alias`
-
-Use `sql_alias` when auto-generated cube alias prefix is too long and truncated
-by DB such as Postgres:
-
-<CodeTabs>
-
-```javascript
-cube(`order_facts`, {
-  sql_table: `orders`,
-  sql_alias: `ofacts`,
-});
-```
-
-```yaml
-cubes:
-  - name: order_facts
-    sql_table: orders
-    sql_alias: ofacts
-```
-
-</CodeTabs>
-
-It'll generate aliases for members such as `ofacts__count`. `sql_alias` affects
-all member names including pre-aggregation table names.
-
-### `title`
-
-Use `title` to change the display name of the cube. By default, Cube will
-humanize the cube's name, so for instance, `users_orders` would become
-`Users Orders`. If default humanizing doesn't work in your case, please use the
-title parameter. It is highly recommended to give human readable names to your
-cubes. It will help everyone on a team better understand the data structure and
-will help maintain a consistent set of definitions across an organization.
+Custom metadata. Can be used to pass any information to the frontend.
 
 <CodeTabs>
 
@@ -566,6 +560,9 @@ will help maintain a consistent set of definitions across an organization.
 cube(`orders`, {
   sql_table: `orders`,
   title: `Product Orders`,
+  meta: {
+    any: `value`
+  }
 });
 ```
 
@@ -574,9 +571,40 @@ cubes:
   - name: orders
     sql_table: orders
     title: Product Orders
+    meta:
+      any: value
+
 ```
 
 </CodeTabs>
+
+### `pre_aggregations`
+
+The `pre_aggregations` parameter is used to configure [pre-aggregations][ref-ref-pre-aggs].
+
+### `joins`
+
+The `joins` parameter is used to configure [joins][ref-ref-joins].
+
+### `dimensions`
+
+The `dimensions` parameter is used to configure [dimensions][ref-ref-dimensions].
+
+### `hierarchies`
+
+The `hierarchies` parameter is used to configure [hierarchies][ref-ref-hierarchies].
+
+### `segments`
+
+The `segments` parameter is used to configure [segments][ref-ref-segments].
+
+### `measures`
+
+The `measures` parameter is used to configure [measures][ref-ref-measures].
+
+### `access_policy`
+
+The `access_policy` parameter is used to configure [data access policies][ref-ref-dap].
 
 
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
@@ -586,8 +614,8 @@ cubes:
 [ref-dev-playground]: /product/workspace/playground
 [ref-recipe-control-access-cubes-views]:
   /guides/recipes/access-control/controlling-access-to-cubes-and-views
-[ref-restapi-meta]: /reference/rest-api#v1meta
-[ref-restapi-sql]: /reference/rest-api#v1sql
+[ref-restapi-meta]: /product/apis-integrations/rest-api/reference#v1meta
+[ref-restapi-sql]: /product/apis-integrations/rest-api/reference#v1sql
 [ref-sec-ctx]: /product/auth/context
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-playground]: /product/workspace/playground
@@ -598,3 +626,4 @@ cubes:
 [ref-ref-segments]: /reference/data-model/segments
 [ref-ref-joins]: /reference/data-model/joins
 [ref-ref-pre-aggs]: /reference/data-model/pre-aggregations
+[ref-ref-dap]: /reference/data-model/data-access-policies
