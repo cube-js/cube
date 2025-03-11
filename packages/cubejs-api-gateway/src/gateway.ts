@@ -771,8 +771,8 @@ class ApiGateway {
             preAggregations: [{ id: preAggregationId }]
           }
         );
-      const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
-      const preAggregationPartition = partitions && partitions.find(p => p?.tableName === versionEntry.table_name);
+      const { partitions } = (preAggregationPartitions?.[0] || {});
+      const preAggregationPartition = partitions?.find(p => p?.tableName === versionEntry.table_name);
 
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
