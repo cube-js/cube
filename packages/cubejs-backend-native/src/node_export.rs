@@ -1,4 +1,5 @@
-use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
+use cubesql::compile::parser::parse_sql_to_statement;
+use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::transport::{SpanId, TransportService};
 use futures::StreamExt;
@@ -222,8 +223,17 @@ async fn handle_sql_query(
                 .map_err(|err| {
                     CubeError::internal(format!("Failed to get meta context: {}", err))
                 })?;
-            let query_plan =
-                convert_sql_to_cube_query(sql_query, meta_context, session, span_id_clone).await?;
+
+            let stmt =
+                parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;
+            let query_plan = convert_statement_to_cube_query(
+                stmt,
+                meta_context,
+                session,
+                &mut None,
+                span_id_clone,
+            )
+            .await?;
 
             let mut stream = get_df_batches(&query_plan).await?;
 

@@ -640,8 +640,7 @@ pub async fn convert_sql_to_cube_query(
     query: &str,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
-    span_id: Option<Arc<SpanId>>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone(), &mut None)?;
-    convert_statement_to_cube_query(stmt, meta, session, &mut None, span_id).await
+    convert_statement_to_cube_query(stmt, meta, session, &mut None, None).await
 }
