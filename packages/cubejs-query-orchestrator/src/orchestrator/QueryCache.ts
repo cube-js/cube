@@ -865,7 +865,14 @@ export class QueryCache {
           });
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
-          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+          this.logger('Dropping Cache', {
+            cacheKey,
+            error: e.stack || e,
+            requestId: options.requestId,
+            spanId,
+            primaryQuery,
+            renewCycle
+          });
           this.cacheDriver.remove(redisKey)
             .catch(err => this.logger('Error removing key', {
               cacheKey,

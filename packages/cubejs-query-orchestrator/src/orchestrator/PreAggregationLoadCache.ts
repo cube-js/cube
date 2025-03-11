@@ -194,8 +194,8 @@ export class PreAggregationLoadCache {
     if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
       this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
         query,
-        <string[]>values,
-        [query, <string[]>values],
+        values,
+        [query, values],
         60 * 60,
         {
           renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
