@@ -1,4 +1,5 @@
 use super::filter::compiler::FilterCompiler;
+use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
 
 use super::sql_evaluator::MemberSymbol;
@@ -60,6 +61,7 @@ pub struct QueryProperties {
     dimensions_filters: Vec<FilterItem>,
     time_dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
+    segments: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
     order_by: Vec<OrderByItem>,
     row_limit: Option<usize>,
@@ -180,6 +182,63 @@ impl QueryProperties {
             Vec::new()
         };
 
+        let segments = if let Some(segments) = &options.segments()? {
+            segments
+                .iter()
+                .map(|d| -> Result<_, CubeError> {
+                    let segment = match d {
+                        OptionsMember::MemberName(member_name) => {
+                            let mut iter = query_tools
+                                .cube_evaluator()
+                                .parse_path("segments".to_string(), member_name.clone())?
+                                .into_iter();
+                            let cube_name = iter.next().unwrap();
+                            let name = iter.next().unwrap();
+                            let definition = query_tools
+                                .cube_evaluator()
+                                .segment_by_path(member_name.clone())?;
+                            let expression_evaluator = evaluator_compiler
+                                .compile_sql_call(&cube_name, definition.sql()?)?;
+                            BaseSegment::try_new(
+                                expression_evaluator,
+                                cube_name,
+                                name,
+                                Some(member_name.clone()),
+                                query_tools.clone(),
+                            )
+                        }
+                        OptionsMember::MemberExpression(member_expression) => {
+                            let cube_name =
+                                if let Some(name) = &member_expression.static_data().cube_name {
+                                    name.clone()
+                                } else {
+                                    "".to_string()
+                                };
+                            let name = if let Some(name) =
+                                &member_expression.static_data().expression_name
+                            {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                            let expression_evaluator = evaluator_compiler
+                                .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                            BaseSegment::try_new(
+                                expression_evaluator,
+                                cube_name,
+                                name,
+                                None,
+                                query_tools.clone(),
+                            )
+                        }
+                    }?;
+                    Ok(FilterItem::Segment(segment))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            Vec::new()
+        };
+
         let mut filter_compiler = FilterCompiler::new(&mut evaluator_compiler, query_tools.clone());
         if let Some(filters) = &options.static_data().filters {
             for filter in filters {
@@ -227,11 +286,13 @@ impl QueryProperties {
             &time_dimensions_filters,
             &dimensions_filters,
             &measures_filters,
+            &segments,
         )?;
 
         Ok(Rc::new(Self {
             measures,
             dimensions,
+            segments,
             time_dimensions,
             time_dimensions_filters,
             dimensions_filters,
@@ -254,6 +315,7 @@ impl QueryProperties {
         time_dimensions_filters: Vec<FilterItem>,
         dimensions_filters: Vec<FilterItem>,
         measures_filters: Vec<FilterItem>,
+        segments: Vec<FilterItem>,
         order_by: Vec<OrderByItem>,
         row_limit: Option<usize>,
         offset: Option<usize>,
@@ -274,6 +336,7 @@ impl QueryProperties {
             &time_dimensions_filters,
             &dimensions_filters,
             &measures_filters,
+            &segments,
         )?;
 
         Ok(Rc::new(Self {
@@ -282,6 +345,7 @@ impl QueryProperties {
             time_dimensions,
             time_dimensions_filters,
             dimensions_filters,
+            segments,
             measures_filters,
             order_by,
             row_limit,
@@ -305,6 +369,7 @@ impl QueryProperties {
             &self.time_dimensions_filters,
             &self.dimensions_filters,
             &self.measures_filters,
+            &self.segments,
         )
     }
 
@@ -316,6 +381,7 @@ impl QueryProperties {
         time_dimensions_filters: &Vec<FilterItem>,
         dimensions_filters: &Vec<FilterItem>,
         measures_filters: &Vec<FilterItem>,
+        segments: &Vec<FilterItem>,
     ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>, CubeError> {
         let dimensions_join_hints = query_tools
             .cached_data_mut()
@@ -329,6 +395,9 @@ impl QueryProperties {
         let dimensions_filters_join_hints = query_tools
             .cached_data_mut()
             .join_hints_for_filter_item_vec(&dimensions_filters)?;
+        let segments_join_hints = query_tools
+            .cached_data_mut()
+            .join_hints_for_filter_item_vec(&segments)?;
         let measures_filters_join_hints = query_tools
             .cached_data_mut()
             .join_hints_for_filter_item_vec(&measures_filters)?;
@@ -340,6 +409,7 @@ impl QueryProperties {
         dimension_and_filter_join_hints_concat
             .extend(time_dimensions_filters_join_hints.into_iter());
         dimension_and_filter_join_hints_concat.extend(dimensions_filters_join_hints.into_iter());
+        dimension_and_filter_join_hints_concat.extend(segments_join_hints.into_iter());
         // TODO This is not quite correct. Decide on how to handle it. Keeping it here just to blow up on unsupported case
         dimension_and_filter_join_hints_concat.extend(measures_filters_join_hints.into_iter());
 
@@ -454,6 +524,7 @@ impl QueryProperties {
             .time_dimensions_filters
             .iter()
             .chain(self.dimensions_filters.iter())
+            .chain(self.segments.iter())
             .cloned()
             .collect_vec();
         if items.is_empty() {
@@ -593,6 +664,7 @@ impl QueryProperties {
             FilterItem::Item(item) => {
                 members.insert(item.member_name());
             }
+            FilterItem::Segment(_) => {}
         }
     }
 
@@ -685,6 +757,7 @@ impl QueryProperties {
                     )?);
                 }
             }
+            FilterItem::Segment(_) => {}
         }
         Ok(())
     }

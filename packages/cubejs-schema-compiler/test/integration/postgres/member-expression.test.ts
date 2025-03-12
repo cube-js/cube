@@ -13,6 +13,10 @@ cubes:
   - name: customers
     sql: >
       SELECT 9 as ID, 'state1' as STATE, 'New York' as CITY
+      UNION ALL
+      SELECT 10 as ID, 'state2' as STATE, 'New York' as CITY
+      UNION ALL
+      SELECT 11 as ID, 'state3' as STATE, 'LA' as CITY
 
     dimensions:
       - name: id
@@ -100,14 +104,24 @@ views:
         cubeName: 'customers_view',
       },
     ],
+    segments: [
+      {
+        // eslint-disable-next-line no-new-func
+        expression: new Function(
+          'customers_view',
+          // eslint-disable-next-line no-template-curly-in-string
+          'return `(${customers_view.city} = \'New York\')`'
+        ),
+        // eslint-disable-next-line no-template-curly-in-string
+        definition: '(${customers_view.city} = \'New York\')',
+        expressionName: 'castomers_view_c',
+        cubeName: 'customers_view',
+      },
+
+    ],
     allowUngroupedWithoutPrimaryKey: true,
     ungrouped: true,
-  }, [
+  },
 
-    { orders__date_year: '2023-01-01T00:00:00.000Z',
-      orders__revenue: '15',
-      orders__revenue_1_y_ago: '5',
-      orders__cagr_1_y: '2.0000000000000000' },
-    { orders__date_year: '2024-01-01T00:00:00.000Z', orders__revenue: '30', orders__revenue_1_y_ago: '15', orders__cagr_1_y: '1.0000000000000000' },
-    { orders__date_year: '2025-01-01T00:00:00.000Z', orders__revenue: '5', orders__revenue_1_y_ago: '30', orders__cagr_1_y: '-0.83333333333333333333' }]));
+  [{ count: 1, city: 'New York', cubejoinfield: 'NULL' }, { count: 1, city: 'New York', cubejoinfield: 'NULL' }]));
 });
