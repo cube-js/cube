@@ -1983,8 +1983,9 @@ export class BaseQuery {
       if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
         const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
+          const measureName = measure.isMemberExpression ? measure.expressionName : measure.measure;
           throw new UserError(
-            `'${measure.measure}' references cubes that lead to row multiplication. Please rewrite it using sub query.`
+            `'${measureName}' references cubes that lead to row multiplication. Please rewrite it using sub query.`
           );
         }
         return true;
