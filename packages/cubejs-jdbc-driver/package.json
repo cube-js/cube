@@ -32,7 +32,7 @@
     "sqlstring": "^2.3.0"
   },
   "optionalDependencies": {
-    "@cubejs-backend/jdbc": "^0.8.0",
+    "@cubejs-backend/jdbc": "^0.8.1",
     "java": "^0.14.0"
   },
   "license": "Apache-2.0",
