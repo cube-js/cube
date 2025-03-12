@@ -331,6 +331,19 @@ describe('Member expressions on views', () => {
       ],
       testMeasures: [
         {
+          name: 'one_sum',
+          // eslint-disable-next-line no-template-curly-in-string
+          expression: 'SUM(1)',
+          expectedResults: [
+            {
+              single_cube_one_sum: '1',
+            },
+            {
+              single_cube_one_sum: '2',
+            },
+          ],
+        },
+        {
           name: 'val_sum',
           // eslint-disable-next-line no-template-curly-in-string
           expression: '${single_cube.val_sum}',
@@ -383,6 +396,19 @@ describe('Member expressions on views', () => {
         },
       ],
       testMeasures: [
+        {
+          name: 'one_sum',
+          // eslint-disable-next-line no-template-curly-in-string
+          expression: 'SUM(1)',
+          expectedResults: [
+            {
+              single_view_one_sum: '1',
+            },
+            {
+              single_view_one_sum: '2',
+            },
+          ],
+        },
         {
           name: 'val_sum',
           // eslint-disable-next-line no-template-curly-in-string
@@ -448,6 +474,19 @@ describe('Member expressions on views', () => {
         },
       ],
       testMeasures: [
+        {
+          name: 'one_sum',
+          // eslint-disable-next-line no-template-curly-in-string
+          expression: 'SUM(1)',
+          expectedResults: [
+            {
+              many_to_one_view_one_sum: '1',
+            },
+            {
+              many_to_one_view_one_sum: '3',
+            },
+          ],
+        },
         {
           name: 'root_val_sum',
           // eslint-disable-next-line no-template-curly-in-string
@@ -545,6 +584,22 @@ describe('Member expressions on views', () => {
         },
       ],
       testMeasures: [
+        {
+          name: 'one_sum',
+          // eslint-disable-next-line no-template-curly-in-string
+          expression: 'SUM(1)',
+          expectedResults: [
+            {
+              one_to_many_view_one_sum: '3',
+            },
+            {
+              one_to_many_view_one_sum: '1',
+            },
+            {
+              one_to_many_view_one_sum: '2',
+            },
+          ],
+        },
         {
           name: 'root_val_sum',
           // eslint-disable-next-line no-template-curly-in-string

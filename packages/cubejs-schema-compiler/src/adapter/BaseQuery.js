@@ -1747,6 +1747,13 @@ export class BaseQuery {
 
         let cubeNameToAttach;
         switch (cubeNamesForMeasure.length) {
+          case 0:
+            // For zero reference measure there's nothing to derive info about measure from
+            // So it assume that it's a regular measure, and it will be evaluated on top of join tree
+            return [measureName, [{
+              multiplied: false,
+              measure: m.measure,
+            }]];
           case 1:
             [cubeNameToAttach] = cubeNamesForMeasure;
             break;
