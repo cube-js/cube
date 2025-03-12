@@ -29,7 +29,7 @@
     "@cubejs-backend/schema-compiler": "1.2.22",
     "@cubejs-backend/shared": "1.2.22",
     "async-mutex": "0.3.2",
-    "axios": "^0.28.0",
+    "axios": "^1.8.3",
     "kafkajs": "^2.2.3",
     "sqlstring": "^2.3.1"
   },
@@ -41,7 +41,11 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "transformIgnorePatterns": ["node_modules/(?!axios)/"],
+    "moduleNameMapper": {
+      "^axios$": "axios/dist/node/axios.cjs"
+    }
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.2.22",
