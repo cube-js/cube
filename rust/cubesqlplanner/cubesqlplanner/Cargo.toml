@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "dcf3e4aa26fd112043ef26fa4a78db5dbd443c86", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1a612fc26f762f3837ecf26df2e83ba38f11a8a2", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 itertools = "0.10.2"
 cubeclient = { path = "../../cubesql/cubeclient" }
