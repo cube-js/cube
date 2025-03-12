@@ -15,7 +15,7 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
-    sql::database_variables::postgres::session_vars::CUBESQL_DISABLE_POST_PROCESSING_VAR,
+    sql::database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR,
     sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
@@ -348,7 +348,7 @@ impl Rewriter {
         let penalize_post_processing = self
             .cube_context
             .session_state
-            .get_variable(CUBESQL_DISABLE_POST_PROCESSING_VAR)
+            .get_variable(CUBESQL_PENALIZE_POST_PROCESSING_VAR)
             .map(|v| v.value);
         let penalize_post_processing = match penalize_post_processing {
             Some(ScalarValue::Boolean(val)) => val.unwrap_or(false),

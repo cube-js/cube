@@ -8,7 +8,7 @@ use cubesql::compile::datafusion::variable::VarType;
 use cubesql::compile::engine::df::scan::CubeScanNode;
 use cubesql::compile::engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode};
 use cubesql::compile::{convert_sql_to_cube_query, DatabaseVariable};
-use cubesql::sql::{Session, CUBESQL_DISABLE_POST_PROCESSING_VAR};
+use cubesql::sql::{Session, CUBESQL_PENALIZE_POST_PROCESSING_VAR};
 use cubesql::transport::MetaContext;
 use cubesql::CubeError;
 
@@ -164,7 +164,7 @@ async fn handle_sql4sql_query(
     with_session(&services, native_auth_ctx.clone(), |session| async move {
         if disable_post_processing {
             let v = DatabaseVariable {
-                name: CUBESQL_DISABLE_POST_PROCESSING_VAR.to_string(),
+                name: CUBESQL_PENALIZE_POST_PROCESSING_VAR.to_string(),
                 value: ScalarValue::Boolean(Some(true)),
                 var_type: VarType::UserDefined,
                 readonly: false,
