@@ -254,7 +254,8 @@ class MockDriver extends BaseDriver {
 
   public cancelledQueries: any[] = [];
 
-  private tablesQueryDelay: any;
+  // FIXME: With small or absent delay 'Manual pre-aggregations rebuild via postBuildJobs' tests fails with incorrect results.
+  private tablesQueryDelay: any = 200;
 
   private schema: any;
 
