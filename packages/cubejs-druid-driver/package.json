@@ -31,7 +31,7 @@
     "@cubejs-backend/base-driver": "1.2.22",
     "@cubejs-backend/schema-compiler": "1.2.22",
     "@cubejs-backend/shared": "1.2.22",
-    "axios": "^0.28.0"
+    "axios": "^1.8.3"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "1.2.22",
@@ -49,6 +49,12 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "transformIgnorePatterns": [
+      "node_modules/(?!axios)/"
+    ],
+    "moduleNameMapper": {
+      "^axios$": "axios/dist/node/axios.cjs"
+    }
   }
 }
