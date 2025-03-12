@@ -16,16 +16,6 @@ type PreAggregationLoadCacheOptions = {
   tablePrefixes?: string[],
 };
 
-function createDeferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
 export class PreAggregationLoadCache {
   private readonly driverFactory: DriverFactory;
 
@@ -34,8 +24,6 @@ export class PreAggregationLoadCache {
   private readonly preAggregations: PreAggregations;
 
   private readonly queryResults: any;
-
-  private queryResultRequests: { [redisKey: string]: { resolve: CallableFunction, reject: CallableFunction }[]} = {};
 
   private readonly externalDriverFactory: any;
 
@@ -202,26 +190,9 @@ export class PreAggregationLoadCache {
 
   public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
     const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
-    const queryKey = this.queryCache.queryRedisKey([query, values]);
 
-    // Have result in cache
-    if (this.queryResults[queryKey]) {
-      return this.queryResults[queryKey];
-    }
-
-    // There is ongoing request
-    if (this.queryResultRequests[queryKey]) {
-      const { promise, resolve, reject } = createDeferred();
-      this.queryResultRequests[queryKey].push({ resolve, reject });
-
-      return promise;
-    }
-
-    // Making query for a first time
-    this.queryResultRequests[queryKey] = [];
-
-    try {
-      this.queryResults[queryKey] = await this.queryCache.cacheQueryResult(
+    if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
+      this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
         query,
         values,
         [query, values],
@@ -238,24 +209,8 @@ export class PreAggregationLoadCache {
           external: queryOptions?.external
         }
       );
-
-      let r = (this.queryResultRequests[queryKey] || []).pop();
-      while (r) {
-        r.resolve(this.queryResults[queryKey]);
-        r = this.queryResultRequests[queryKey].pop();
-      }
-
-      return this.queryResults[queryKey];
-    } catch (err) {
-      let r = (this.queryResultRequests[queryKey] || []).pop();
-      while (r) {
-        r.reject(err);
-        r = this.queryResultRequests[queryKey].pop();
-      }
-      throw err;
-    } finally {
-      this.queryResultRequests[queryKey] = null;
     }
+    return this.queryResults[this.queryCache.queryRedisKey([query, values])];
   }
 
   public hasKeyQueryResult(keyQuery) {
