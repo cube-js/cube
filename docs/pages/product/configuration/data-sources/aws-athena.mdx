@@ -1,9 +1,4 @@
----
-redirect_from:
-  - /config/databases/aws-athena
----
-
-# AWS Athena
+# Amazon Athena
 
 ## Prerequisites
 
@@ -39,7 +34,7 @@ Configuration</Btn> in your deployment.
 
 </InfoBox>
 
-In Cube Cloud, select **AWS Athena** when creating a new deployment and fill in
+In Cube Cloud, select AWS Athena** when creating a new deployment and fill in
 the required fields:
 
 <Screenshot
@@ -65,7 +60,9 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
 | `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |
 | `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
-| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5`                                    | A valid number                                   |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
 ## Pre-Aggregation Feature Support
 

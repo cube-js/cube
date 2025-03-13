@@ -1,9 +1,3 @@
----
-redirect_from:
-  - /cloud/workspace/logs
-  - /monitoring/integrations
----
-
 # Monitoring Integrations
 
 Cube Cloud allows exporting logs and metrics to external monitoring tools so you
@@ -105,13 +99,14 @@ default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
 ### Inputs for logs
 
 Sinks accept the `inputs` option that allows to specify which components of a
-Cube Cloud deployment should export their logs. Supported inputs:
+Cube Cloud deployment should export their logs:
 
-- `cubejs-server`
-- `refresh-scheduler`
-- `ext-db`
-- `warmup-job`
-- `cubestore`
+| Input name | Description |
+| --- | --- |
+| `cubejs-server` | Logs of API instances |
+| `refresh-scheduler` | Logs of the refresh worker |
+| `warmup-job` | Logs of the [pre-aggregation warm-up][ref-preagg-warmup] |
+| `cubestore` | Logs of Cube Store |
 
 Example configuration for exporting logs to
 [Datadog][vector-docs-sinks-datadog]:
@@ -122,7 +117,6 @@ type = "datadog_logs"
 inputs = [
   "cubejs-server",
   "refresh-scheduler",
-  "ext-db",
   "warmup-job",
   "cubestore"
 ]
@@ -169,7 +163,6 @@ connection_string = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;Acc
 inputs = [
   "cubejs-server",
   "refresh-scheduler",
-  "ext-db",
   "warmup-job",
   "cubestore"
 ]
@@ -185,20 +178,28 @@ levels = [
 
 ### Inputs for metrics
 
-Metrics are exported using the `metrics` input. You can filter them by providing
-an array of metric names via the `list` option.
+Metrics are exported using the `metrics` input. Metrics will have their respective
+metric names and_types: [`gauge`][vector-docs-metrics-gauge] or
+[`counter`][vector-docs-metrics-counter].
 
-| Name                     | Type                                     | Applies to           | Description                                    |
-| ------------------------ | ---------------------------------------- | -------------------- | ---------------------------------------------- |
-| `cpu`                    | [`gauge`][vector-docs-metrics-gauge]     | Node of a deployment | Percent of free CPU against requests           |
-| `memory`                 | [`gauge`][vector-docs-metrics-gauge]     | Node of a deployment | Percent of free Memory against requests        |
-| `requests-count`         | [`counter`][vector-docs-metrics-counter] | Deployment           | Total number of processed requests             |
-| `requests-errors-count`  | [`counter`][vector-docs-metrics-counter] | Deployment           | Number of requests processed with errors       |
-| `requests-success-count` | [`counter`][vector-docs-metrics-counter] | Deployment           | Number of requests processed successfully      |
-| `requests-duration`      | [`counter`][vector-docs-metrics-counter] | Deployment           | Total time taken to process requests (seconds) |
+All metrics of the `counter` type reset to zero at the midnight (UTC) and increment
+during the next 24 hours.
 
-You can further filter exported metrics by providing an array of `inputs` that
-applies to metics only.
+You can filter metrics by providing an array of _input names_ via the `list` option.
+
+| Input name | Metric name, type | Description |
+| --- | --- | --- |
+| `cpu` | `cube_cpu_usage_ratio`, `gauge` | CPU usage of a particular node in the deployment. Usually, a number in the 0—100 range. May exceed 100 if the node is under load  |
+| `memory` | `cube_memory_usage_ratio`, `gauge` | Memory usage of a particular node in the deployment. Usually, a number in the 0—100 range. May exceed 100 if the node is under load |
+| `requests-count` | `cube_requests_total`, `counter` | Number of API requests to the deployment |
+| `requests-success-count` | `cube_requests_success_total`, `counter` | Number of successful API requests to the deployment |
+| `requests-errors-count` | `cube_requests_errors_total`, `counter` | Number of errorneous API requests to the deployment |
+| `requests-duration` | `cube_requests_duration_ms_total`, `counter` | Total time taken to process API requests, milliseconds |
+| `requests-success-duration` | `cube_requests_duration_ms_success`, `counter` | Total time taken to process successful API requests, milliseconds |
+| `requests-errors-duration` | `cube_requests_duration_ms_errors`, `counter` | Total time taken to process errorneous API requests, milliseconds |
+
+You can further filter exported metrics by providing an array of `inputs`. It applies to
+metics only.
 
 Example configuration for exporting all metrics from `cubejs-server` to
 [Prometheus][vector-docs-sinks-prometheus] using the `prometheus_remote_write`
@@ -301,3 +302,4 @@ setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 [mimir]: https://grafana.com/oss/mimir/
 [grafana-cloud]: https://grafana.com/products/cloud/
 [ref-prod-env]: /product/workspace/environments#production-environment
+[ref-preagg-warmup]: /product/deployment/cloud/warm-up#pre-aggregation-warm-up

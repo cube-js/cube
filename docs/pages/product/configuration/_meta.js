@@ -1,5 +1,7 @@
 module.exports = {
   "data-sources": "Data sources",
   "visualization-tools": "Visualization tools",
-  "advanced": "Advanced"
+  "multiple-data-sources": "Multiple data sources",
+  "concurrency": "Concurrency",
+  "multitenancy": "Multitenancy"
 }

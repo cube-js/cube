@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/pinot-driver",
   "description": "Cube.js Pinot database driver",
   "author": "Julian Ronsse, InTheMemory, Cube Dev, Inc.",
-  "version": "1.2.20",
+  "version": "1.2.21",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -27,9 +27,9 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.2.20",
-    "@cubejs-backend/schema-compiler": "1.2.20",
-    "@cubejs-backend/shared": "1.2.20",
+    "@cubejs-backend/base-driver": "1.2.21",
+    "@cubejs-backend/schema-compiler": "1.2.21",
+    "@cubejs-backend/shared": "1.2.21",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.2",
     "sqlstring": "^2.3.3"
@@ -39,7 +39,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.2.20",
+    "@cubejs-backend/linter": "1.2.21",
     "@types/jest": "^27",
     "jest": "^27",
     "should": "^13.2.3",
