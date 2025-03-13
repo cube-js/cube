@@ -1169,6 +1169,19 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * ClickHouse compression flag.
+   */
+  clickhouseCompression: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_CLICKHOUSE_COMPRESSION', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * ElasticSearch Driver                                            *
    ***************************************************************** */

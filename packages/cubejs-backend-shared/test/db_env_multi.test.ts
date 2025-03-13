@@ -1539,6 +1539,35 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("clickhouseCompression")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_COMPRESSION = 'wrong1';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_COMPRESSION = 'wrong2';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_CLICKHOUSE_COMPRESSION;
+    delete process.env.CUBEJS_DS_WRONG_DB_CLICKHOUSE_COMPRESSION;
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("elasticApiId")', () => {
     process.env.CUBEJS_DB_ELASTIC_APIKEY_ID = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_ELASTIC_APIKEY_ID = 'postgres1';
