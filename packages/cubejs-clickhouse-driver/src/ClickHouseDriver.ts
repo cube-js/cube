@@ -151,8 +151,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const database = config.database ?? (getEnv('dbName', { dataSource }) as string) ?? 'default';
 
     // TODO this is a bit inconsistent with readOnly
-    this.readOnlyMode =
-      getEnv('clickhouseReadOnly', { dataSource }) === 'true';
+    this.readOnlyMode = getEnv('clickhouseReadOnly', { dataSource });
 
     // Expect that getEnv('dbQueryTimeout') will always return a value
     const requestTimeoutEnv: number = getEnv('dbQueryTimeout', { dataSource }) * 1000;
@@ -168,8 +167,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       requestTimeout,
       compression: {
         // Response compression can't be enabled for a user with readonly=1, as ClickHouse will not allow settings modifications for such user.
-        response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource }) === 'true',
-        request: getEnv('clickhouseCompression', { dataSource }) === 'true',
+        response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource }),
+        request: getEnv('clickhouseCompression', { dataSource }),
       },
       clickhouseSettings: {
         // If ClickHouse user's permissions are restricted with "readonly = 1",
