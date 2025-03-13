@@ -87,7 +87,9 @@ export function dateParser(dateString, timezone, now = new Date()) {
 
     momentRange = [momentRange[0].startOf(exactGranularity), momentRange[1].endOf(exactGranularity)];
   } else {
-    const results = parse(dateString, new Date(moment().tz(timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
+    const current = moment(now).tz(timezone);
+    const results = parse(dateString, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
+
     if (!results?.length) {
       throw new UserError(`Can't parse date: '${dateString}'`);
     }

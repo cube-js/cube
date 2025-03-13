@@ -181,12 +181,12 @@ describe('dateParser', () => {
     );
   });
 
-  test('from 12AM till now by 1 hour', () => {
+  test('from 12AM till now by hour', () => {
     Date.now = jest.fn().mockReturnValue(new Date(2021, 2, 5, 13, 0, 0, 0));
-    expect(dateParser('from 12AM till now by 1 hour', 'UTC', new Date(2021, 2, 5, 13, 0, 0, 0))).toStrictEqual(
+    expect(dateParser('2 weeks ago by hour', 'UTC', new Date(Date.UTC(2021, 2, 5, 13, 0, 0, 0)))).toStrictEqual(
       [
-        '2021-03-05T00:00:00.000',
-        '2021-03-05T11:59:59.999'
+        '2021-02-19T13:00:00.000',
+        '2021-02-19T13:59:59.999'
       ]
     );
 
