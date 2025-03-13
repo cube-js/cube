@@ -146,20 +146,34 @@ const normalizeQueryOrder = order => {
   return result;
 };
 
-export const preAggsJobsRequestSchema = Joi.object().keys({
+export const preAggsJobsRequestSchema = Joi.object({
   action: Joi.string().valid('post', 'get').required(),
-  selector: Joi.object().keys({
-    contexts: Joi.array().items(
-      Joi.object().keys({
-        securityContext: Joi.required(),
-      })
-    ).min(1).required(),
-    timezones: Joi.array().items(Joi.string()).min(1).required(),
-    dataSources: Joi.array().items(Joi.string()),
-    cubes: Joi.array().items(Joi.string()),
-    preAggregations: Joi.array().items(Joi.string()),
-    dateRange: Joi.array().length(2).items(Joi.string()),
-  }).optional(),
+  selector: Joi.when('action', {
+    is: 'post',
+    then: Joi.object({
+      contexts: Joi.array().items(
+        Joi.object({
+          securityContext: Joi.required(),
+        })
+      ).min(1).required(),
+      timezones: Joi.array().items(Joi.string()).min(1).required(),
+      dataSources: Joi.array().items(Joi.string()),
+      cubes: Joi.array().items(Joi.string()),
+      preAggregations: Joi.array().items(Joi.string()),
+      dateRange: Joi.array().length(2).items(Joi.string()),
+    }).optional(),
+    otherwise: Joi.forbidden(),
+  }),
+  tokens: Joi.when('action', {
+    is: 'get',
+    then: Joi.array().items(Joi.string()).min(1).required(),
+    otherwise: Joi.forbidden(),
+  }),
+  resType: Joi.when('action', {
+    is: 'get',
+    then: Joi.string().valid('object').optional(),
+    otherwise: Joi.forbidden(),
+  }),
 });
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
