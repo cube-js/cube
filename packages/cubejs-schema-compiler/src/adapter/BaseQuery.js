@@ -1586,11 +1586,28 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * Generates a SELECT query for over time series analysis, handling one measure at a time.
+   * The query performs a LEFT JOIN between a date series and the base query.
+   * 
+   * @param {Array} cumulativeMeasures - Array containing a single measure to analyze over time
+   * @param {string} dateSeriesSql - SQL for generating the date series
+   * @param {string} baseQuery - The base query to join with
+   * @param {string} dateJoinConditionSql - The JOIN condition between date series and base query
+   * @param {string} baseQueryAlias - Alias for the base query
+   * @param {string} dateSeriesGranularity - Granularity for the date series
+   * @returns {string} The complete SELECT query
+   * 
+   * @note If the measure is of type 'calculated', the GROUP BY clause will be omitted
+   * since calculated measures must already be grouped in the base query. For non-calculated measures, 
+   * the appropriate GROUP BY clause will be included.
+   */
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias, dateSeriesGranularity) {
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures, dateSeriesGranularity);
+    const groupable = !cumulativeMeasures.some(m => BaseQuery.isCalculatedMeasureType(m.measureDefinition().type));
     return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
-      this.groupByClause();
+      (groupable ? this.groupByClause() : '');
   }
 
   overTimeSeriesForSelect(cumulativeMeasures, dateSeriesGranularity) {

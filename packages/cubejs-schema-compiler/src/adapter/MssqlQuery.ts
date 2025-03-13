@@ -151,6 +151,16 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
+    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
+    const groupable = !cumulativeMeasures.some(m => BaseQuery.isCalculatedMeasureType(m.measureDefinition().type));
+
+    if (!groupable) {
+      return (
+        `SELECT ${forSelect} FROM ${dateSeriesSql}` +
+        ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}`
+      );
+    }
+
     // Group by time dimensions
     const timeDimensionsColumns = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
@@ -164,7 +174,6 @@ export class MssqlQuery extends BaseQuery {
     // Combine time dimensions and regular dimensions for GROUP BY clause
     const allGroupByColumns = timeDimensionsColumns.concat(dimensionColumns);
 
-    const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     return (
       `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +

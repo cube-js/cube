@@ -166,13 +166,14 @@ export class BigqueryQuery extends BaseQuery {
       this.dimensions.concat(cumulativeMeasures).map(s => s.aliasName())
     ).filter(c => !!c).join(', ');
     const dateSeriesAlias = this.timeDimensions.map(d => `${d.dateSeriesAliasName()}`).filter(c => !!c)[0];
+    const groupable = !cumulativeMeasures.some(m => BaseQuery.isCalculatedMeasureType(m.measureDefinition().type));
     return `
     WITH ${dateSeriesSql} SELECT ${aliasesForSelect} FROM
     ${dateSeriesAlias} ${outerSeriesAlias}
     LEFT JOIN (
       SELECT ${forSelect} FROM ${dateSeriesAlias}
       INNER JOIN (${baseQuery}) AS ${baseQueryAlias} ON ${dateJoinConditionSql}
-      ${this.groupByClause()}
+      ${groupable ? this.groupByClause() : ''}
     ) AS ${outerBase} ON ${outerSeriesAlias}.${this.escapeColumnName('date_from')} = ${outerBase}.${timeDimensionAlias}
     `;
   }
