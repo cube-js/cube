@@ -65,7 +65,7 @@ export function dateParser(dateString, timezone, now = new Date()) {
       moment.tz(timezone).endOf('day').add(1, 'day')
     ];
   } else if (dateString.match(/^from (.*) to (.*)$/)) {
-    const [, from, to] = dateString.match(/^from (.*) to (.*)$/);
+    const [, from, to] = dateString.match(/^from\s{1,3}(.{0,50})\s{1,3}to\s{1,3}(.{0,50})$/);
 
     const current = moment(now).tz(timezone);
     const fromResults = parse(from, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
