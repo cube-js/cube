@@ -135,7 +135,7 @@ export async function hookPreaggs(
           },
           tokens,
         );
-  
+
       selectors.forEach((info) => {
         const { status } = info;
         if (status.indexOf('failure') >= 0) {
