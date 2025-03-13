@@ -53,22 +53,14 @@ export async function buildPreaggs(
   selector: any,
 ) {
   return new Promise((resolve, reject) => {
-    console.log('Starting building pre-agg', selector);
-
     postRequest(
       port,
       '/cubejs-api/v1/pre-aggregations/jobs',
       token,
       { action: 'post', selector },
     ).then((post) => {
-      console.log('Building pre-agg postRequest callback', selector);
-
       readData(post).then((_jobs) => {
-        console.log('Building pre-agg readData callback', selector);
-
         const jobs = <string[]>JSON.parse(_jobs.toString());
-
-        console.log('Building pre-agg readData jobs', selector, jobs);
         if (jobs.length === 0) {
           resolve(true);
         } else {
@@ -81,7 +73,6 @@ export async function buildPreaggs(
               { action: 'get', resType: 'object', tokens: jobs },
             );
             const statuses = JSON.parse((await readData(get)).toString());
-            console.log('Building pre-agg readData jobs statuses', selector, statuses);
             Object.keys(statuses).forEach((t: string) => {
               const { status } = statuses[t];
               if (status.indexOf('failure') >= 0) {

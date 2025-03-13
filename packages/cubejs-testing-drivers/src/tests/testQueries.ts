@@ -141,7 +141,6 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
     // MUST be the first test in the list!
     execute('must built pre-aggregations', async () => {
-      console.log('Starting building pre-aggs');
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['Customers.RAExternal'],
