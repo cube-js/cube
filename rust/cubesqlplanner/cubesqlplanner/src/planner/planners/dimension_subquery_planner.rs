@@ -120,6 +120,7 @@ impl DimensionSubqueryPlanner {
             dimensions_filters,
             vec![],
             vec![],
+            vec![],
             None,
             None,
             true,
@@ -189,6 +190,9 @@ impl DimensionSubqueryPlanner {
                 Ok(true)
             }
             FilterItem::Item(filter_item) => {
+                Ok(collect_sub_query_dimensions(&filter_item.member_evaluator())?.is_empty())
+            }
+            FilterItem::Segment(filter_item) => {
                 Ok(collect_sub_query_dimensions(&filter_item.member_evaluator())?.is_empty())
             }
         }
