@@ -1,7 +1,6 @@
 import R from 'ramda';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { pausePromise, SchemaFileRepository } from '@cubejs-backend/shared';
-import { clearInterval } from 'timers';
+import { pausePromise, SchemaFileRepository, createPromiseLock } from '@cubejs-backend/shared';
 import { CubejsServerCore, CompilerApi, RefreshScheduler } from '../../src';
 
 const schemaContent = `
@@ -232,16 +231,6 @@ cube('Bar', {
     },
   ]),
 };
-
-function createDeferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 class MockDriver extends BaseDriver {
   public tables: any[] = [];
@@ -864,18 +853,18 @@ describe('Refresh Scheduler', () => {
         }
       }
 
-      const deferred = createDeferred();
+      const lock = createPromiseLock();
       const orchestrator = await serverCore.getOrchestratorApi(ctx);
 
       const interval = setInterval(async () => {
         const queuedList = await orchestrator.getPreAggregationQueueStates();
 
         if (queuedList.length === 0) {
-          deferred.resolve();
+          lock.resolve();
         }
       }, 500);
 
-      await deferred.promise;
+      await lock.promise;
       clearInterval(interval);
 
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'UTC').length).toEqual(5);
@@ -923,18 +912,18 @@ describe('Refresh Scheduler', () => {
         }
       }
 
-      const deferred = createDeferred();
+      const lock = createPromiseLock();
       const orchestrator = await serverCore.getOrchestratorApi(ctx);
 
       const interval = setInterval(async () => {
         const queuedList = await orchestrator.getPreAggregationQueueStates();
 
         if (queuedList.length === 0) {
-          deferred.resolve();
+          lock.resolve();
         }
       }, 500);
 
-      await deferred.promise;
+      await lock.promise;
       clearInterval(interval);
 
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'UTC').length).toEqual(5);
@@ -976,18 +965,18 @@ describe('Refresh Scheduler', () => {
         }
       }
 
-      const deferred = createDeferred();
+      const lock = createPromiseLock();
       const orchestrator = await serverCore.getOrchestratorApi(ctx);
 
       const interval = setInterval(async () => {
         const queuedList = await orchestrator.getPreAggregationQueueStates();
 
         if (queuedList.length === 0) {
-          deferred.resolve();
+          lock.resolve();
         }
       }, 500);
 
-      await deferred.promise;
+      await lock.promise;
       clearInterval(interval);
 
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'UTC').length).toEqual(3);
