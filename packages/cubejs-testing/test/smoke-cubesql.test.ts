@@ -149,7 +149,7 @@ describe('SQL API', () => {
     });
 
     describe('sql4sql', () => {
-      async function generateSql(query: string) {
+      async function generateSql(query: string, disablePostPprocessing: boolean = false) {
         const response = await fetch(`${birdbox.configuration.apiUrl}/sql`, {
           method: 'POST',
           headers: {
@@ -159,6 +159,7 @@ describe('SQL API', () => {
           body: JSON.stringify({
             query,
             format: 'sql',
+            disable_post_processing: disablePostPprocessing,
           }),
         });
         const { status, statusText, headers } = response;
@@ -193,6 +194,10 @@ describe('SQL API', () => {
         expect(await generateSql(`SELECT version();`)).toMatchSnapshot();
       });
 
+      it('strictly post-processing with disabled post-processing', async () => {
+        expect(await generateSql(`SELECT version();`, true)).toMatchSnapshot();
+      });
+
       it('double aggregation post-processing', async () => {
         expect(await generateSql(`
           SELECT AVG(total)
@@ -204,6 +209,19 @@ describe('SQL API', () => {
             GROUP BY 1
           ) t
         `)).toMatchSnapshot();
+      });
+
+      it('double aggregation post-processing with disabled post-processing', async () => {
+        expect(await generateSql(`
+          SELECT AVG(total)
+          FROM (
+            SELECT
+              status,
+              SUM(totalAmount) AS total
+            FROM Orders
+            GROUP BY 1
+          ) t
+        `, true)).toMatchSnapshot();
       });
 
       it('wrapper', async () => {

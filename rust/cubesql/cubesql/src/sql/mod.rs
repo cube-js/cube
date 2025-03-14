@@ -15,6 +15,7 @@ pub use auth_service::{
     AuthContext, AuthContextRef, AuthenticateResponse, HttpAuthContext, SqlAuthDefaultImpl,
     SqlAuthService,
 };
+pub use database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR;
 pub use postgres::*;
 pub use server_manager::ServerManager;
 pub use session::{Session, SessionProcessList, SessionProperties, SessionState};
