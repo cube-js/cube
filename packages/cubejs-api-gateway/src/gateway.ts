@@ -874,7 +874,7 @@ class ApiGateway {
           if (result.length === 0) {
             throw new UserError(
               'A user\'s selector doesn\'t match any of the ' +
-              'pre-aggregations defined by the Cube schemas.'
+              'pre-aggregations defined in the data model.'
             );
           }
           break;
