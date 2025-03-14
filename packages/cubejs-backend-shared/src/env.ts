@@ -233,7 +233,7 @@ const variables: Record<string, (...args: any) => any> = {
   transpilationNative: () => get('CUBEJS_TRANSPILATION_NATIVE')
     .default('false')
     .asBoolStrict(),
-  caseInsensitiveDuplicateCheck: () => get('CUBEJS_CASE_INSENSITIVE_DUPLICATE_CHECK')
+  caseInsensitiveDuplicatesCheck: () => get('CUBEJS_CASE_INSENSITIVE_DUPLICATES_CHECK')
     .default('false')
     .asBoolStrict(),
 
