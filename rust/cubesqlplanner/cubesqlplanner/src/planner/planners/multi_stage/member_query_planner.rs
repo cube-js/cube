@@ -375,6 +375,7 @@ impl MultiStageMemberQueryPlanner {
             self.description.state().time_dimensions_filters().clone(),
             self.description.state().dimensions_filters().clone(),
             self.description.state().measures_filters().clone(),
+            vec![], //TODO May be we should push down segments on some cases
             vec![],
             None,
             None,

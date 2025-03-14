@@ -1,4 +1,4 @@
-use crate::planner::filter::BaseFilter;
+use crate::planner::filter::{BaseFilter, BaseSegment};
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
@@ -34,6 +34,7 @@ impl FilterGroup {
 pub enum FilterItem {
     Group(Rc<FilterGroup>),
     Item(Rc<BaseFilter>),
+    Segment(Rc<BaseSegment>),
 }
 
 #[derive(Clone)]
@@ -78,6 +79,10 @@ impl FilterItem {
                 let sql = item.to_sql(context.clone(), templates)?;
                 format!("({})", sql)
             }
+            FilterItem::Segment(item) => {
+                let sql = item.to_sql(context.clone(), templates)?;
+                format!("({})", sql)
+            }
         };
         Ok(res)
     }
@@ -96,6 +101,7 @@ impl FilterItem {
                 }
             }
             FilterItem::Item(item) => result.push(item.member_evaluator().clone()),
+            FilterItem::Segment(item) => result.push(item.member_evaluator().clone()),
         }
     }
 }

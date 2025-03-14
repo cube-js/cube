@@ -683,6 +683,7 @@ export class BaseQuery {
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
+      segments: this.options.segments,
       timeDimensions: this.options.timeDimensions,
       timezone: this.options.timezone,
       joinGraph: this.joinGraph,

@@ -1104,7 +1104,7 @@ mod tests {
 
         assert_eq!(
             logical_plan,
-            "Projection: CAST(utctimestamp() AS current_timestamp() AS Timestamp(Nanosecond, None)) AS COL\
+            "Projection: CAST(utctimestamp() AS current_timestamp AS Timestamp(Nanosecond, None)) AS COL\
             \n  EmptyRelation",
         );
     }
