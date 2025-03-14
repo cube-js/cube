@@ -250,7 +250,9 @@ impl SqlCall {
         if let Some(filter) = filter {
             let mut res = Vec::new();
             for item in filter.items.iter() {
-                res.push(self.filters_to_native_filter_item_impl(item));
+                if let Some(item) = self.filters_to_native_filter_item_impl(item) {
+                    res.push(item);
+                }
             }
             Some(res)
         } else {
@@ -258,34 +260,40 @@ impl SqlCall {
         }
     }
 
-    fn filters_to_native_filter_item_impl(&self, filter_item: &FilterItem) -> NativeFilterItem {
+    fn filters_to_native_filter_item_impl(
+        &self,
+        filter_item: &FilterItem,
+    ) -> Option<NativeFilterItem> {
         match filter_item {
             FilterItem::Group(group) => {
                 let mut native_items = Vec::new();
                 for itm in group.items.iter() {
-                    native_items.push(self.filters_to_native_filter_item_impl(itm));
+                    if let Some(item) = self.filters_to_native_filter_item_impl(itm) {
+                        native_items.push(item);
+                    }
                 }
                 let (or, and) = match group.operator {
                     crate::plan::filter::FilterGroupOperator::Or => (Some(native_items), None),
                     crate::plan::filter::FilterGroupOperator::And => (None, Some(native_items)),
                 };
-                NativeFilterItem {
+                Some(NativeFilterItem {
                     or,
                     and,
                     member: None,
                     dimension: None,
                     operator: None,
                     values: None,
-                }
+                })
             }
-            FilterItem::Item(filter) => NativeFilterItem {
+            FilterItem::Item(filter) => Some(NativeFilterItem {
                 or: None,
                 and: None,
                 member: Some(filter.member_name()),
                 dimension: None,
                 operator: Some(filter.filter_operator().to_string()),
                 values: Some(filter.values().clone()),
-            },
+            }),
+            FilterItem::Segment(_) => None,
         }
     }
 }

@@ -22,6 +22,7 @@ pub mod member_order_by;
 pub mod member_sql;
 pub mod options_member;
 pub mod security_context;
+pub mod segment_definition;
 pub mod sql_templates_render;
 pub mod sql_utils;
 pub mod struct_with_sql_member;

@@ -123,6 +123,9 @@ impl ReferencesBuilder {
                     self.validate_filter_item(itm)?
                 }
             }
+            FilterItem::Segment(segment) => {
+                self.validate_member(segment.member_evaluator().clone(), &None)?
+            }
         }
         Ok(())
     }
@@ -143,6 +146,11 @@ impl ReferencesBuilder {
                     self.resolve_references_for_filter_item(itm, references)?
                 }
             }
+            FilterItem::Segment(segment) => self.resolve_references_for_member(
+                segment.member_evaluator().clone(),
+                &None,
+                references,
+            )?,
         }
         Ok(())
     }

@@ -131,6 +131,7 @@ impl MultiStageAppliedState {
                         result.push(FilterItem::Item(itm.clone()));
                     }
                 }
+                FilterItem::Segment(_) => {}
             }
         }
         result
@@ -155,6 +156,7 @@ impl MultiStageAppliedState {
                         return true;
                     }
                 }
+                FilterItem::Segment(_) => {}
             }
         }
         false
@@ -250,6 +252,7 @@ impl MultiStageAppliedState {
                     };
                     result.push(FilterItem::Item(itm));
                 }
+                FilterItem::Segment(segment) => result.push(FilterItem::Segment(segment.clone())),
             }
         }
         result
