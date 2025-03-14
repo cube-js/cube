@@ -183,23 +183,6 @@ export class CubeSymbols {
 
   protected transform(cubeName: string, errorReporter: ErrorReporter, splitViews: SplitViews) {
     const cube = this.getCubeDefinition(cubeName);
-    const duplicateNames = R.compose(
-      R.map((nameToDefinitions: any) => nameToDefinitions[0]),
-      R.toPairs,
-      R.filter((definitionsByName: any) => definitionsByName.length > 1),
-      R.groupBy((nameToDefinition: any) => nameToDefinition[0]),
-      R.unnest,
-      R.map(R.toPairs),
-      // @ts-ignore
-      R.filter((v: any) => !!v)
-      // @ts-ignore
-    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
-
-    // @ts-ignore
-    if (duplicateNames.length > 0) {
-      // @ts-ignore
-      errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
-    }
 
     camelizeCube(cube);
 
@@ -216,6 +199,24 @@ export class CubeSymbols {
 
     if (this.evaluateViews) {
       this.prepareIncludes(cube, errorReporter, splitViews);
+    }
+
+    const duplicateNames = R.compose(
+      R.map((nameToDefinitions: any) => nameToDefinitions[0]),
+      R.toPairs,
+      R.filter((definitionsByName: any) => definitionsByName.length > 1),
+      R.groupBy((nameToDefinition: any) => nameToDefinition[0]),
+      R.unnest,
+      R.map(R.toPairs),
+      // @ts-ignore
+      R.filter((v: any) => !!v)
+      // @ts-ignore
+    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
+
+    // @ts-ignore
+    if (duplicateNames.length > 0) {
+      // @ts-ignore
+      errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
 
     return Object.assign(
