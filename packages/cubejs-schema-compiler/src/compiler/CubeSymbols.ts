@@ -524,7 +524,7 @@ export class CubeSymbols {
 
   /**
    * This method is mainly used for evaluating RLS conditions and filters.
-   * It allows referencing security_context (lowecase) in dynamic conditions or filter values.
+   * It allows referencing security_context (lowercase) in dynamic conditions or filter values.
    *
    * It currently does not support async calls because inner resolveSymbol and
    * resolveSymbolsCall are sync. Async support may be added later with deeper
