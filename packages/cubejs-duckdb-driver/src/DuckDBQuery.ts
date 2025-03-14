@@ -13,9 +13,13 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 
 class DuckDBFilter extends BaseFilter {
   public castParameter() {
-    if (this.measure || this.definition().type === 'number') {
+    const numberTypes = ['number', 'count', 'count_distinct', 'count_distinct_approx', 'sum', 'avg', 'min', 'max'];
+    const definition = this.definition();
+
+    if (numberTypes.includes(definition.type)) {
       return 'CAST(? AS DOUBLE)';
     }
+   
     return '?';
   }
 }
@@ -60,5 +64,13 @@ export class DuckDBQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     return templates;
+  }
+
+  public timeStampParam(timeDimension: any) {
+    if (timeDimension.measure) {
+      // For time measures, we don't need to check dateFieldType
+      return super.timeStampCast('?');
+    }
+    return super.timeStampParam(timeDimension);
   }
 }
