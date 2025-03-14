@@ -31,16 +31,17 @@ CUBEJS_DB_PASS=**********
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                                         | Possible Values           | Required |
-| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_HOST`                | The host URL for a database                                                         | A valid database host URL |    ✅    |
-| `CUBEJS_DB_PORT`                | The port for the database connection                                                | A valid port number       |    ❌    |
-| `CUBEJS_DB_NAME`                | The name of the database to connect to                                              | A valid database name     |    ✅    |
-| `CUBEJS_DB_USER`                | The username used to connect to the database                                        | A valid database username |    ✅    |
-| `CUBEJS_DB_PASS`                | The password used to connect to the database                                        | A valid database password |    ✅    |
-| `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |
-| `CUBEJS_DB_MAX_POOL`            | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |
-| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+| Environment Variable               | Description                                                                         | Possible Values           | Required |
+| ---------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_HOST`                   | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| `CUBEJS_DB_PORT`                   | The port for the database connection                                                | A valid port number       |    ❌    |
+| `CUBEJS_DB_NAME`                   | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| `CUBEJS_DB_USER`                   | The username used to connect to the database                                        | A valid database username |    ✅    |
+| `CUBEJS_DB_PASS`                   | The password used to connect to the database                                        | A valid database password |    ✅    |
+| `CUBEJS_DB_CLICKHOUSE_READONLY`    | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |
+| `CUBEJS_DB_CLICKHOUSE_COMPRESSION` | Whether the ClickHouse client has compression enabled or not                        | `true`, `false`           |    ❌    |
+| `CUBEJS_DB_MAX_POOL`               | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |
+| `CUBEJS_CONCURRENCY`               | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
 
 [ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
@@ -129,6 +130,9 @@ Database][ref-recipe-enable-ssl].
 You can connect to a ClickHouse database when your user's permissions are
 [restricted][clickhouse-readonly] to read-only, by setting
 `CUBEJS_DB_CLICKHOUSE_READONLY` to `true`.
+
+You can connect to a ClickHouse database with compression enabled, by setting
+`CUBEJS_DB_CLICKHOUSE_COMPRESSION` to `true`.
 
 [clickhouse]: https://clickhouse.tech/
 [clickhouse-docs-users]:
