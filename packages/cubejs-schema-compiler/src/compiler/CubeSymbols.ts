@@ -48,17 +48,19 @@ export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 export class CubeSymbols {
   public symbols: Record<string | symbol, any>;
 
-  private builtCubes: Record<string, any>;
+  private readonly builtCubes: Record<string, any>;
 
   private cubeDefinitions: Record<string, CubeDefinition>;
 
-  private funcArgumentsValues: Record<string, string[]>;
+  private readonly funcArgumentsValues: Record<string, string[]>;
 
   public cubeList: any[];
 
-  private evaluateViews: boolean;
+  private readonly evaluateViews: boolean;
 
   private resolveSymbolsCallContext: any;
+
+  private readonly duplicateCheckerFn: (cube: any, memberType: string, memberName: string) => boolean;
 
   public constructor(evaluateViews = false) {
     this.symbols = {};
@@ -67,6 +69,12 @@ export class CubeSymbols {
     this.funcArgumentsValues = {};
     this.cubeList = [];
     this.evaluateViews = evaluateViews;
+
+    if (getEnv('caseInsensitiveDuplicateCheck')) {
+      this.duplicateCheckerFn = this.duplicateCheckerCaseInsensitive;
+    } else {
+      this.duplicateCheckerFn = this.duplicateCheckerCaseSensitive;
+    }
   }
 
   public compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
@@ -360,12 +368,20 @@ export class CubeSymbols {
 
   protected applyIncludeMembers(includeMembers: any[], cube: CubeDefinition, type: string, errorReporter: ErrorReporter) {
     for (const [memberName, memberDefinition] of includeMembers) {
-      if (cube[type]?.[memberName]) {
+      if (this.duplicateCheckerFn(cube, type, memberName)) {
         errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member or assigning it an alias.`);
       } else if (type !== 'hierarchies') {
         cube[type][memberName] = memberDefinition;
       }
     }
+  }
+
+  private duplicateCheckerCaseSensitive(cube: any, memberType: string, memberName: string): boolean {
+    return cube[memberType][memberName];
+  }
+
+  private duplicateCheckerCaseInsensitive(cube: any, memberType: string, memberName: string): boolean {
+    return Object.keys(cube[memberType]).map(v => v.toLowerCase()).includes(memberName.toLowerCase());
   }
 
   protected membersFromCubes(parentCube: CubeDefinition, cubes: any[], type: string, errorReporter: ErrorReporter, splitViews: SplitViews, memberSets: any) {
