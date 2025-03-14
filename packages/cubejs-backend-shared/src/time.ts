@@ -251,12 +251,12 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
   return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
 };
 
-export const parseLocalDate = (data: any, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string | null => {
+export const parseLocalDate = (data: { [key: string]: string }[] | null | undefined, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string | null => {
   if (!data) {
     return null;
   }
   data = JSON.parse(JSON.stringify(data));
-  const value = data[0] && data[0][Object.keys(data[0])[0]];
+  const value = data?.[0]?.[Object.keys(data[0])[0]];
   if (!value) {
     return null;
   }

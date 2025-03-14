@@ -58,6 +58,13 @@ export type MeasureDefinition = {
   timeShiftReferences?: TimeShiftDefinitionReference[],
 };
 
+export type PreAggregationFilters = {
+  dataSources?: string[],
+  cubes?: string[],
+  preAggregationIds?: string[],
+  scheduled?: boolean,
+};
+
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, any> = {};
 
@@ -484,15 +491,8 @@ export class CubeEvaluator extends CubeSymbols {
 
   /**
    * Returns pre-aggregations filtered by the specified selector.
-   * @param {{
-   *  scheduled: boolean,
-   *  dataSource: Array<string>,
-   *  cubes: Array<string>,
-   *  preAggregationIds: Array<string>
-   * }} filter pre-aggregations selector
-   * @returns {*}
    */
-  public preAggregations(filter) {
+  public preAggregations(filter: PreAggregationFilters) {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
@@ -601,9 +601,7 @@ export class CubeEvaluator extends CubeSymbols {
 
   public isInstanceOfType(type: 'measures' | 'dimensions' | 'segments', path: string | string[]): boolean {
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
-    const symbol = this.evaluatedCubes[cubeAndName[0]] &&
-      this.evaluatedCubes[cubeAndName[0]][type] &&
-      this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+    const symbol = this.evaluatedCubes[cubeAndName[0]]?.[type]?.[cubeAndName[1]];
     return symbol !== undefined;
   }
 
@@ -655,7 +653,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public isRbacEnabledForCube(cube: any): boolean {
-    return cube.accessPolicy && cube.accessPolicy.length;
+    return cube.accessPolicy?.length;
   }
 
   public isRbacEnabled(): boolean {

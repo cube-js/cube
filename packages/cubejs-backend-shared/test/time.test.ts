@@ -267,7 +267,6 @@ describe('extractDate', () => {
     expect(parseLocalDate(null, timezone)).toBeNull();
     expect(parseLocalDate(undefined, timezone)).toBeNull();
     expect(parseLocalDate([], timezone)).toBeNull();
-    expect(parseLocalDate('', timezone)).toBeNull();
   });
 
   it('should return null if no valid date is found in data', () => {

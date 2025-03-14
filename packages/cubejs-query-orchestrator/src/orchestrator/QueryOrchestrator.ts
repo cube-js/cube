@@ -379,7 +379,7 @@ export class QueryOrchestrator {
       preAggregations.map(p => {
         const { preAggregation } = p.preAggregation;
         const partition = p.partitions[0];
-        preAggregation.dataSource = (partition && partition.dataSource) || 'default';
+        preAggregation.dataSource = partition?.dataSource || 'default';
         preAggregation.preAggregationsSchema = preAggregationsSchema;
         return preAggregation;
       }),
