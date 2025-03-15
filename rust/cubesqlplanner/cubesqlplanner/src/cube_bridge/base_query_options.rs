@@ -67,6 +67,8 @@ pub trait BaseQueryOptions {
     fn measures(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
     #[nbridge(field, optional, vec)]
     fn dimensions(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
+    #[nbridge(field, optional, vec)]
+    fn segments(&self) -> Result<Option<Vec<OptionsMember>>, CubeError>;
     #[nbridge(field)]
     fn cube_evaluator(&self) -> Result<Rc<dyn CubeEvaluator>, CubeError>;
     #[nbridge(field)]

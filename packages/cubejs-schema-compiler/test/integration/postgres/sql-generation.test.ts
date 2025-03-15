@@ -35,6 +35,12 @@ describe('SQL Generation', () => {
         }
       },
 
+      segments: {
+        some_source: {
+          sql: \`\${CUBE}.source = 'some'\`
+        }
+      },
+
       measures: {
         visitor_count: {
           type: 'number',
@@ -3274,6 +3280,43 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     [{
       visitors__revenue_1d_d1_dd: '2000',
     }]
+  ));
+
+  it('simple join with segment', async () => runQueryTest(
+    {
+      measures: [
+        'visitors.visitor_revenue',
+        'visitors.visitor_count',
+        'visitor_checkins.visitor_checkins_count',
+        'visitors.per_visitor_revenue'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      segments: ['visitors.some_source'],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors.created_at'
+      }]
+    },
+    [
+      {
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitor_revenue: '100',
+        visitors__visitor_count: '1',
+        vc__visitor_checkins_count: '3',
+        visitors__per_visitor_revenue: '100'
+      },
+      {
+        visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+        visitors__visitor_revenue: '200',
+        visitors__visitor_count: '1',
+        vc__visitor_checkins_count: '2',
+        visitors__per_visitor_revenue: '200'
+      },
+    ]
   ));
 
   // Subquery aggregation for multiplied measure (and any `keysSelect` for that matter)
