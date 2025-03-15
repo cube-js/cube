@@ -150,8 +150,12 @@ macro_rules! match_column_type {
             ColumnType::Timestamp => $matcher!(Timestamp, TimestampMicrosecondBuilder, Timestamp),
             ColumnType::Boolean => $matcher!(Boolean, BooleanBuilder, Boolean),
             // TODO upgrade DF
-            ColumnType::Decimal { scale, precision } => $matcher!(Decimal, Decimal128Builder, Decimal, scale, precision),
-            ColumnType::Decimal96 { scale, precision } => $matcher!(Decimal, Decimal128Builder, Decimal, scale, precision),
+            ColumnType::Decimal { scale, precision } => {
+                $matcher!(Decimal, Decimal128Builder, Decimal, scale, precision)
+            }
+            ColumnType::Decimal96 { scale, precision } => {
+                $matcher!(Decimal, Decimal128Builder, Decimal, scale, precision)
+            }
             ColumnType::Float => $matcher!(Float, Float64Builder, Float),
         }
     }};
@@ -160,10 +164,18 @@ macro_rules! match_column_type {
 pub fn create_array_builder(t: &ColumnType) -> Box<dyn ArrayBuilder> {
     macro_rules! create_builder {
         ($type: tt, Decimal128Builder, Decimal, $scale: expr, $precision: expr) => {
-            Box::new(Decimal128Builder::new().with_data_type(datafusion::arrow::datatypes::DataType::Decimal128(*$precision as u8, *$scale as i8)))
+            Box::new(Decimal128Builder::new().with_data_type(
+                datafusion::arrow::datatypes::DataType::Decimal128(
+                    *$precision as u8,
+                    *$scale as i8,
+                ),
+            ))
         };
         ($type: tt, Decimal128Builder, Int96) => {
-            Box::new(Decimal128Builder::new().with_data_type(datafusion::arrow::datatypes::DataType::Decimal128(38, 0)))
+            Box::new(
+                Decimal128Builder::new()
+                    .with_data_type(datafusion::arrow::datatypes::DataType::Decimal128(38, 0)),
+            )
         };
         ($type: tt, $builder: tt $(,$arg: tt)*) => {
             Box::new($builder::new())
