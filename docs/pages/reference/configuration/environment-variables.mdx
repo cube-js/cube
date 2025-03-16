@@ -1424,23 +1424,31 @@ Ignored when `CUBESTORE_META_ADDR` is set.
 
 ## `CUBESTORE_MINIO_ACCESS_KEY_ID`
 
-The Access Key ID for minIO. Required when using minIO.
+The Access Key ID for MinIO. Required when using MinIO.
 
 | Possible Values             | Default in Development | Default in Production |
 | --------------------------- | ---------------------- | --------------------- |
-| A valid minIO Access Key ID | N/A                    | N/A                   |
+| A valid MinIO Access Key ID | N/A                    | N/A                   |
 
 ## `CUBESTORE_MINIO_BUCKET`
 
-The name of the bucket that you want to use minIO. Required when using minIO.
+The name of the bucket that you want to use MinIO. Required when using MinIO.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
 | A valid bucket name | N/A                    | N/A                   |
 
+## `CUBESTORE_MINIO_SUB_PATH`
+
+The name of sub path (folder) inside the bucket that you want to use. Required when using MinIO.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A valid sub path (folder) name | N/A                    | N/A                   |
+
 ## `CUBESTORE_MINIO_CREDS_REFRESH_EVERY_MINS`
 
-The number of minutes after which Cube Store should refresh minIO credentials.
+The number of minutes after which Cube Store should refresh MinIO credentials.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1448,7 +1456,7 @@ The number of minutes after which Cube Store should refresh minIO credentials.
 
 ## `CUBESTORE_MINIO_REGION`
 
-The region of a bucket in AWS. Optional when using minIO.
+The region of a bucket in AWS. Optional when using MinIO.
 
 | Possible Values                                        | Default in Development | Default in Production |
 | ------------------------------------------------------ | ---------------------- | --------------------- |
@@ -1456,19 +1464,19 @@ The region of a bucket in AWS. Optional when using minIO.
 
 ## `CUBESTORE_MINIO_SECRET_ACCESS_KEY`
 
-The Secret Access Key for minIO. Required when using minIO.
+The Secret Access Key for MinIO. Required when using MinIO.
 
 | Possible Values                 | Default in Development | Default in Production |
 | ------------------------------- | ---------------------- | --------------------- |
-| A valid minIO Secret Access Key | N/A                    | N/A                   |
+| A valid MinIO Secret Access Key | N/A                    | N/A                   |
 
 ## `CUBESTORE_MINIO_SERVER_ENDPOINT`
 
-The minIO server endpoint. Required when using minIO.
+The MinIO server endpoint. Required when using MinIO.
 
 | Possible Values        | Default in Development | Default in Production |
 | ---------------------- | ---------------------- | --------------------- |
-| A valid minIO endpoint | N/A                    | N/A                   |
+| A valid MinIO endpoint | N/A                    | N/A                   |
 
 ```dotenv
 CUBESTORE_MINIO_SERVER_ENDPOINT=http://localhost:9000
