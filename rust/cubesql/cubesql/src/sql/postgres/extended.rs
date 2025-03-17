@@ -547,6 +547,11 @@ impl Portal {
 
                             self.state = Some(PortalState::Finished(FinishedState { description }));
 
+                            if row_count == 0 {
+                                return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
+                                    CommandComplete::Plain("CREATE TABLE".to_string()),
+                                )));
+                            }
                             return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
                                 CommandComplete::Select(row_count),
                             )));

@@ -162,6 +162,44 @@ impl QueryRouter {
                     .await
             }
             (
+                x @ ast::Statement::CreateTable {
+                    name,
+                    ..
+                },
+                DatabaseProtocol::PostgreSQL,
+            ) => {
+                println!("CREATE TABLE: {:#?}", x);
+                let stmt = ast::Statement::Query(Box::new(ast::Query {
+                    with: None,
+                    body: ast::SetExpr::Select(Box::new(ast::Select {
+                        distinct: false,
+                        top: None,
+                        projection: vec![ast::SelectItem::ExprWithAlias {
+                            expr: ast::Expr::Value(ast::Value::Number("1".to_string(), false)),
+                            alias: ast::Ident {
+                                value: "COL".to_string(),
+                                quote_style: Some('"'),
+                            },
+                        }],
+                        into: None,
+                        from: vec![],
+                        lateral_views: vec![],
+                        selection: None,
+                        group_by: vec![],
+                        cluster_by: vec![],
+                        distribute_by: vec![],
+                        sort_by: vec![],
+                        having: None,
+                    })),
+                    order_by: vec![],
+                    limit: Some(ast::Expr::Value(ast::Value::Number("0".to_string(), false))),
+                    offset: None,
+                    fetch: None,
+                    lock: None,
+                }));
+                self.create_table_to_plan(name, &stmt, qtrace, span_id.clone()).await
+            }
+            (
                 ast::Statement::Drop {
                     object_type, names, ..
                 },
