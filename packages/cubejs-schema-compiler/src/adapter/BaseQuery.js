@@ -1733,12 +1733,10 @@ export class BaseQuery {
           this.queryCache
         );
         const cubeNamesForMeasure = R.pipe(
-          R.map(mem => this.cubeEvaluator.parsePathAnyType(mem)[0]),
-          // Filtering views, because collectMemberNamesFor can return both view.dim and cube.dim
-          R.filter(cubeName => {
-            const cubeDef = this.cubeEvaluator.getCubeDefinition(cubeName);
-            return !cubeDef.isView;
-          }),
+          R.map(member => this.memberInstanceByPath(member)),
+          // collectMemberNamesFor can return both view.dim and cube.dim
+          R.filter(member => member.definition().ownedByCube),
+          R.map(member => member.cube().name),
           // Single member expression can reference multiple dimensions from same cube
           R.uniq,
         )(
@@ -2057,12 +2055,8 @@ export class BaseQuery {
       );
 
       const nonViewMembers = memberNamesForMeasure
-        .filter(mem => {
-          const cubeName = this.cubeEvaluator.parsePathAnyType(mem)[0];
-          const cubeDef = this.cubeEvaluator.getCubeDefinition(cubeName);
-          return !cubeDef.isView;
-        })
-        .map(m => this.memberInstanceByPath(m));
+        .map(member => this.memberInstanceByPath(member))
+        .filter(member => member.definition().ownedByCube);
 
       const cubes = this.collectFrom(nonViewMembers, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
       const joinHints = this.collectFrom(nonViewMembers, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
