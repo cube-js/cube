@@ -9,7 +9,7 @@ import { BaseQuery } from '../adapter';
 
 import type { ErrorReporter } from './ErrorReporter';
 
-interface CubeDefinition {
+export interface CubeDefinition {
   name: string;
   extends?: string;
   measures?: Record<string, any>;
