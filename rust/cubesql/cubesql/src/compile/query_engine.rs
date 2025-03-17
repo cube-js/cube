@@ -10,7 +10,7 @@ use crate::{
             df::{
                 optimizers::{FilterPushDown, FilterSplitMeta, LimitPushDown, SortPushDown},
                 scan::CubeScanNode,
-                wrapper::CubeScanWrapperNode,
+                wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode},
             },
             udf::*,
             CubeContext, VariablesProvider,
@@ -580,7 +580,11 @@ fn is_olap_query(parent: &LogicalPlan) -> Result<bool, CompilationError> {
 
         fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
             if let LogicalPlan::Extension(ext) = plan {
-                if let Some(_) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
+                let node = ext.node.as_any();
+                if node.is::<CubeScanNode>()
+                    || node.is::<CubeScanWrapperNode>()
+                    || node.is::<CubeScanWrappedSqlNode>()
+                {
                     self.0 = true;
 
                     return Ok(false);
