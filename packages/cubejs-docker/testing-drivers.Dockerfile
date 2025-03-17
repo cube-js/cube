@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:20.17.0-bookworm-slim AS base
+FROM node:20.19.0-bookworm-slim AS base
 
 ARG IMAGE_VERSION=dev
 
