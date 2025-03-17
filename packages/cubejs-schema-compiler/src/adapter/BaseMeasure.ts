@@ -146,6 +146,14 @@ export class BaseMeasure {
       return this.query.runningTotalDateJoinCondition();
     }
     const { rollingWindow } = definition;
+    if (rollingWindow.type === 'shifted') {
+      if (rollingWindow.mode === 'to_date') {
+        return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity, rollingWindow.length);
+      }
+      return this.query.rollingWindowDateJoinCondition(
+        rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset, rollingWindow.length
+      );
+    }
     if (rollingWindow.type === 'to_date') {
       return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity);
     }

@@ -196,6 +196,16 @@ const ToDate = {
   granularity: GranularitySchema,
 };
 
+const Shifted = {
+  type: Joi.string().valid('shifted'),
+  length: timeInterval,
+  mode: Joi.any().valid('to_date', 'fixed'),
+  trailing: timeInterval,
+  leading: timeInterval,
+  offset: Joi.any().valid('start', 'end'),
+  granularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter','year'),
+};
+
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
   format: Joi.any().valid('percent', 'currency', 'number'),
@@ -218,6 +228,7 @@ const BaseMeasure = {
       { is: 'quarter_to_date', then: QuarterToDate },
       { is: 'month_to_date', then: MonthToDate },
       { is: 'to_date', then: ToDate },
+      { is: 'shifted', then: Shifted },
       { is: 'fixed',
         then: FixedRollingWindow,
         otherwise: FixedRollingWindow

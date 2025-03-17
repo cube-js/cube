@@ -794,29 +794,37 @@ export class BaseQuery {
     );
   }
 
-  rollingWindowToDateJoinCondition(granularity) {
+  rollingWindowToDateJoinCondition(granularity, shift) {
     return this.timeDimensions.map(
       d => [
         d,
-        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+          const shiftedDateFrom = shift ? this.addInterval(dateFrom, shift) : dateFrom;
+          const shiftedDateTo = shift ? this.addInterval(dateTo, shift) : dateTo;
+          return `${dateField} >= ${this.timeGroupedColumn(granularity, shiftedDateFrom)} AND ${dateField} <= ${shiftedDateTo}`;
+        }
       ]
     );
   }
 
-  rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
+  rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset, shift) {
     offset = offset || 'end';
     return this.timeDimensions.map(
       d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+        // Apply shift to both dateFrom and dateTo if shift is provided
+        const shiftedDateFrom = shift ? this.addInterval(dateFrom, shift) : dateFrom;
+        const shiftedDateTo = shift ? this.addInterval(dateTo, shift) : dateTo;
+        
         // dateFrom based window
         const conditions = [];
         if (trailingInterval !== 'unbounded') {
-          const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
+          const startDate = isFromStartToEnd || offset === 'start' ? shiftedDateFrom : shiftedDateTo;
           const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
           const sign = offset === 'start' ? '>=' : '>';
           conditions.push(`${dateField} ${sign} ${trailingStart}`);
         }
         if (leadingInterval !== 'unbounded') {
-          const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
+          const endDate = isFromStartToEnd || offset === 'end' ? shiftedDateTo : shiftedDateFrom;
           const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
           const sign = offset === 'end' ? '<=' : '<';
           conditions.push(`${dateField} ${sign} ${leadingEnd}`);
