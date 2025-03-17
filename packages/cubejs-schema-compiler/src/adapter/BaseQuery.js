@@ -1697,13 +1697,60 @@ export class BaseQuery {
       ${this.query()}`;
   }
 
+  dimensionOnlyMeasureToHierarchy(context, m) {
+    const measureName = typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`;
+    const memberNamesForMeasure = this.collectFrom(
+      [m],
+      this.collectMemberNamesFor.bind(this),
+      context ? ['collectMemberNamesFor', JSON.stringify(context)] : 'collectMemberNamesFor',
+      this.queryCache
+    );
+    const cubeNamesForMeasure = R.pipe(
+      R.map(member => this.memberInstanceByPath(member)),
+      // collectMemberNamesFor can return both view.dim and cube.dim
+      R.filter(member => member.definition().ownedByCube),
+      R.map(member => member.cube().name),
+      // Single member expression can reference multiple dimensions from same cube
+      R.uniq,
+    )(
+      memberNamesForMeasure
+    );
+
+    let cubeNameToAttach;
+    switch (cubeNamesForMeasure.length) {
+      case 0:
+        // For zero reference measure there's nothing to derive info about measure from
+        // So it assume that it's a regular measure, and it will be evaluated on top of join tree
+        return [measureName, [{
+          multiplied: false,
+          measure: m.measure,
+        }]];
+      case 1:
+        [cubeNameToAttach] = cubeNamesForMeasure;
+        break;
+      default:
+        throw new Error(`Expected single cube for dimension-only measure ${measureName}, got ${cubeNamesForMeasure}`);
+    }
+
+    const multiplied = this.multipliedJoinRowResult(cubeNameToAttach) || false;
+
+    const attachedMeasure = {
+      ...m.measure,
+      originalCubeName: m.measure.cubeName,
+      cubeName: cubeNameToAttach
+    };
+
+    return [measureName, [{
+      multiplied,
+      measure: attachedMeasure,
+    }]];
+  }
+
   collectRootMeasureToHieararchy(context) {
     const notAddedMeasureFilters = R.flatten(this.measureFilters.map(f => f.getMembers()))
       .filter(f => R.none(m => m.measure === f.measure, this.measures));
 
     return R.fromPairs(this.measures.concat(notAddedMeasureFilters).map(m => {
-      const measureName = typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`;
-
       const collectedMeasures = this.collectFrom(
         [m],
         this.collectMultipliedMeasures(context),
@@ -1725,53 +1772,9 @@ export class BaseQuery {
         // Measures like this needs a special treatment to attach them to cube and decide if they are multiplied or not
         // This would return measure object in `measure`, not path
         // TODO return measure object for every measure
-
-        const memberNamesForMeasure = this.collectFrom(
-          [m],
-          this.collectMemberNamesFor.bind(this),
-          context ? ['collectMemberNamesFor', JSON.stringify(context)] : 'collectMemberNamesFor',
-          this.queryCache
-        );
-        const cubeNamesForMeasure = R.pipe(
-          R.map(member => this.memberInstanceByPath(member)),
-          // collectMemberNamesFor can return both view.dim and cube.dim
-          R.filter(member => member.definition().ownedByCube),
-          R.map(member => member.cube().name),
-          // Single member expression can reference multiple dimensions from same cube
-          R.uniq,
-        )(
-          memberNamesForMeasure
-        );
-
-        let cubeNameToAttach;
-        switch (cubeNamesForMeasure.length) {
-          case 0:
-            // For zero reference measure there's nothing to derive info about measure from
-            // So it assume that it's a regular measure, and it will be evaluated on top of join tree
-            return [measureName, [{
-              multiplied: false,
-              measure: m.measure,
-            }]];
-          case 1:
-            [cubeNameToAttach] = cubeNamesForMeasure;
-            break;
-          default:
-            throw new Error(`Expected single cube for dimension-only measure ${measureName}, got ${cubeNamesForMeasure}`);
-        }
-
-        const multiplied = this.multipliedJoinRowResult(cubeNameToAttach) || false;
-
-        const attachedMeasure = {
-          ...m.measure,
-          originalCubeName: m.measure.cubeName,
-          cubeName: cubeNameToAttach
-        };
-
-        return [measureName, [{
-          multiplied,
-          measure: attachedMeasure,
-        }]];
+        return this.dimensionOnlyMeasureToHierarchy(context, m);
       }
+      const measureName = typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`;
       return [measureName, collectedMeasures];
     }));
   }
