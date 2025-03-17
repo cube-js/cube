@@ -15,6 +15,7 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
+    sql::database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR,
     sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
@@ -344,15 +345,26 @@ impl Rewriter {
             .rewrite_rules(cache_entry, true)
             .await?;
 
+        let penalize_post_processing = self
+            .cube_context
+            .session_state
+            .get_variable(CUBESQL_PENALIZE_POST_PROCESSING_VAR)
+            .map(|v| v.value);
+        let penalize_post_processing = match penalize_post_processing {
+            Some(ScalarValue::Boolean(val)) => val.unwrap_or(false),
+            _ => false,
+        };
+
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
             tokio::task::spawn_blocking(move || {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
+                // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
                 let best = if top_down_extractor {
                     let mut extractor = TopDownExtractor::new(
                         &runner.egraph,
-                        BestCubePlan::new(cube_context.meta.clone()),
+                        BestCubePlan::new(cube_context.meta.clone(), penalize_post_processing),
                         CubePlanTopDownState::new(),
                     );
                     let Some((best_cost, best)) = extractor.find_best(root) else {
@@ -363,7 +375,7 @@ impl Rewriter {
                 } else {
                     let extractor = Extractor::new(
                         &runner.egraph,
-                        BestCubePlan::new(cube_context.meta.clone()),
+                        BestCubePlan::new(cube_context.meta.clone(), penalize_post_processing),
                     );
                     let (best_cost, best) = extractor.find_best(root);
                     log::debug!("Best cost: {:#?}", best_cost);
@@ -376,6 +388,7 @@ impl Rewriter {
                 };
                 let new_root = Id::from(best.as_ref().len() - 1);
                 log::debug!("Best: {}", best.pretty(120));
+                // TODO maybe pass penalize_post_processing here as well, to break with sane error
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
