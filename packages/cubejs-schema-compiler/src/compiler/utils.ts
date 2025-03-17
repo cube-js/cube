@@ -54,6 +54,9 @@ export function camelizeCube(cube: any): unknown {
   return cube;
 }
 
+/**
+ * This is a simple cube-views topological sorting based on Kahn's algorythm.
+ */
 export function topologicalSort(edges: GraphEdge[]): CubeDef[] {
   const graph = new Map();
   const outDegree = new Map();
