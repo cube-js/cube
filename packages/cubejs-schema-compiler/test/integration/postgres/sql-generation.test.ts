@@ -659,6 +659,176 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         }
       }
     });
+
+    cube('orders', {
+        sql: \`
+          SELECT 1 AS order_id, 100 AS total, 1 AS user_id UNION ALL
+          SELECT 2 AS order_id, 200 AS total, 1 AS user_id UNION ALL
+          SELECT 3 AS order_id, 500 AS total, 2 AS user_id
+        \`,
+        joins: {
+            users: {
+                relationship: 'belongsTo',
+                sql: \`\${CUBE.user_id} = \${users.user_id}\`
+            }
+        },
+        measures: {
+            sum_total: {
+                type: 'sum',
+                sql: 'total'
+            }
+        },
+        dimensions: {
+            order_id: {
+                type: 'number',
+                sql: 'order_id',
+                primaryKey: true
+            },
+            user_id: {
+                type: 'number',
+                sql: 'user_id',
+            }
+        }
+    });
+    cube('users', {
+        sql: \`
+          SELECT 1 AS user_id, false AS internal UNION ALL
+          SELECT 2 AS user_id, true AS internal
+        \`,
+        dimensions: {
+            user_id: {
+                type: 'number',
+                sql: 'user_id',
+                primaryKey: true
+            },
+            internal: {
+                type: 'boolean',
+                sql: 'internal'
+            },
+        }
+    });
+    view('revenue_view', {
+        cubes: [
+            {
+                join_path: 'orders',
+                includes: ['sum_total', 'user_id']
+            },
+            {
+                join_path: 'orders.users',
+                includes: ['internal']
+            }
+        ]
+    });
+
+
+    cube('A', {
+        sql: \`
+          SELECT 1 AS a_id, 'foo' AS dim_a, 100 AS val_a UNION ALL
+          SELECT 2 AS a_id, 'foo' AS dim_a, 200 AS val_a UNION ALL
+          SELECT 3 AS a_id, 'bar' AS dim_a, 500 AS val_a
+        \`,
+        joins: {
+            B: {
+                relationship: 'hasMany',
+                sql: \`\${CUBE.a_id} = \${B.a_id}\`
+            },
+            C: {
+                relationship: 'hasMany',
+                sql: \`\${CUBE.a_id} = \${C.a_id}\`
+            },
+        },
+        measures: {
+            sum_a: {
+                type: 'sum',
+                sql: 'val_a'
+            }
+        },
+        dimensions: {
+            a_id: {
+                type: 'number',
+                sql: 'a_id',
+                primaryKey: true
+            },
+            dim_a: {
+                type: 'string',
+                sql: 'dim_a',
+            }
+        }
+    });
+    cube('B', {
+        sql: \`
+          SELECT 1 AS b_id, 1 AS a_id, 'foo' AS dim_b, 100 AS val_b UNION ALL
+          SELECT 2 AS b_id, 2 AS a_id, 'foo' AS dim_b, 200 AS val_b UNION ALL
+          SELECT 3 AS b_id, 2 AS a_id, 'bar' AS dim_b, 500 AS val_b
+        \`,
+        measures: {
+            sum_b: {
+                type: 'sum',
+                sql: 'val_b'
+            }
+        },
+        dimensions: {
+            b_id: {
+                type: 'number',
+                sql: 'b_id',
+                primaryKey: true
+            },
+            a_id: {
+                type: 'number',
+                sql: 'a_id',
+            },
+            dim_b: {
+                type: 'string',
+                sql: 'dim_b',
+            }
+        }
+    });
+    cube('C', {
+        sql: \`
+          SELECT 1 AS c_id, 2 AS a_id, 'foo' AS dim_c, 100 AS val_c UNION ALL
+          SELECT 2 AS c_id, 3 AS a_id, 'foo' AS dim_c, 200 AS val_c UNION ALL
+          SELECT 3 AS c_id, 3 AS a_id, 'bar' AS dim_c, 500 AS val_c UNION ALL
+          SELECT 4 AS c_id, 2 AS a_id, 'qux' AS dim_c, 7 AS val_c
+        \`,
+        measures: {
+            sum_c: {
+                type: 'sum',
+                sql: 'val_c'
+            }
+        },
+        dimensions: {
+            c_id: {
+                type: 'number',
+                sql: 'c_id',
+                primaryKey: true
+            },
+            a_id: {
+                type: 'number',
+                sql: 'a_id',
+            },
+            dim_c: {
+                type: 'string',
+                sql: 'dim_c',
+            }
+        }
+    });
+    view('ABC_view', {
+        cubes: [
+            {
+                join_path: 'A',
+                includes: ['a_id', 'dim_a', 'sum_a']
+            },
+            {
+                join_path: 'A.B',
+                includes: ['b_id', 'dim_b', 'sum_b']
+            },
+            {
+                join_path: 'A.C',
+                includes: ['c_id', 'dim_c', 'sum_c']
+            },
+        ]
+    });
+
     `);
 
   it('simple join', async () => {
@@ -3373,6 +3543,165 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         visitors_visitors_checkins_view__revenue: '300',
         visitors_visitors_checkins_view__visitor_checkins_count: '5',
       },
+    ]
+  ));
+
+  it('multiplied measures missing column grouped', async () => runQueryTest(
+    {
+      measures: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.sum_total}`'
+          ),
+          name: 'revenue_total',
+          expressionName: 'revenue_total',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.sum_total}',
+          cubeName: 'revenue_view',
+          // cubeName: 'orders',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `COUNT(DISTINCT ${revenue_view.user_id})`'
+          ),
+          name: 'distinct_users',
+          expressionName: 'distinct_users',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'COUNT(DISTINCT ${revenue_view.user_id})',
+          cubeName: 'revenue_view',
+          // cubeName: 'orders',
+        },
+      ],
+      dimensions: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.internal}`'
+          ),
+          name: 'internal_user',
+          expressionName: 'internal_user',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.internal}',
+          cubeName: 'revenue_view',
+          // cubeName: 'users',
+        },
+      ],
+      order: [{
+        'revenue_view.internal': 'asc'
+      }]
+    },
+    [
+      {
+        distinct_users: '1',
+        internal_user: false,
+        revenue_total: '300',
+      },
+      {
+        distinct_users: '1',
+        internal_user: true,
+        revenue_total: '500',
+      },
+    ]
+  ));
+
+  it('multiplied measures missing column ungrouped', async () => runQueryTest(
+    {
+      measures: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.sum_total}`'
+          ),
+          name: 'revenue_total',
+          expressionName: 'revenue_total',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.sum_total}',
+          cubeName: 'revenue_view',
+          // cubeName: 'orders',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.user_id}`'
+          ),
+          name: 'distinct_users',
+          expressionName: 'distinct_users',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.user_id}',
+          cubeName: 'revenue_view',
+          // cubeName: 'orders',
+        },
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'revenue_view',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${revenue_view.internal}`'
+          ),
+          name: 'internal_user',
+          expressionName: 'internal_user',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${revenue_view.internal}',
+          cubeName: 'revenue_view',
+          // cubeName: 'users',
+        },
+      ],
+      order: [{
+        'revenue_view.order_id': 'asc'
+      }],
+      ungrouped: true,
+      allowUngroupedWithoutPrimaryKey: true,
+    },
+    [
+      // {
+      //   distinct_users: '1',
+      //   internal_user: true,
+      //   revenue_total: '500',
+      // },
+      // {
+      //   distinct_users: '1',
+      //   internal_user: false,
+      //   revenue_total: '300',
+      // },
+    ]
+  ));
+
+  it('abc', async () => runQueryTest(
+    {
+      measures: [
+        // 'ABC_view.sum_a',
+        // 'ABC_view.sum_b',
+        // 'ABC_view.sum_c',
+      ],
+      dimensions: [
+        'ABC_view.a_id',
+        'ABC_view.b_id',
+        'ABC_view.c_id',
+      ],
+    },
+    [
+      // {
+      //   distinct_users: '1',
+      //   internal_user: true,
+      //   revenue_total: '500',
+      // },
+      // {
+      //   distinct_users: '1',
+      //   internal_user: false,
+      //   revenue_total: '300',
+      // },
     ]
   ));
 

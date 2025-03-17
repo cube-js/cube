@@ -951,6 +951,7 @@ export class BaseQuery {
         ] : [])
           .concat(
             R.pipe(
+              // TODO for member expressions this can be misleading: it can be a name of view, which does not have PK
               R.groupBy(m => m.cube().name),
               R.toPairs,
               R.map(
@@ -1055,18 +1056,29 @@ export class BaseQuery {
   outerMeasuresJoinFullKeyQueryAggregate(innerMembers, outerMembers, toJoin) {
     const renderedReferenceContext = {
       renderedReference: R.pipe(
-        R.map(m => [m.measure || m.dimension, m.aliasName()]),
+        R.map(m => {
+          let memberPath;
+          if (m.measure) {
+            memberPath = typeof m.measure === 'string' ? m.measure : this.cubeEvaluator.pathFromArray([m.expressionCubeName, m.expressionName]);
+          } else {
+            memberPath = typeof m.dimension === 'string' ? m.dimension : this.cubeEvaluator.pathFromArray([m.expressionCubeName, m.expressionName]);
+          }
+          return [memberPath, m.aliasName()];
+        }),
         R.fromPairs,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       )(innerMembers),
     };
 
     const join = R.drop(1, toJoin)
-      .map(
-        (q, i) => (this.dimensionAliasNames().length ?
-          `INNER JOIN ${this.wrapInParenthesis((q))} as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
-          `, ${this.wrapInParenthesis(q)} as q_${i + 1}`),
-      ).join('\n');
+      .map((q, i) => {
+        console.log("outerMeasuresJoinFullKeyQueryAggregate generating join, this.dimensionAliasNames()", this.dimensionAliasNames());
+        return this.dimensionAliasNames().length
+          ? `INNER JOIN ${this.wrapInParenthesis(q)} as q_${
+              i + 1
+            } ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}`
+          : `, ${this.wrapInParenthesis(q)} as q_${i + 1}`;
+      })
+      .join("\n");
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
       () => this.dimensionColumns('q_0').concat(outerMembers.map(m => m.selectColumns())).join(', '),
@@ -1121,9 +1133,22 @@ export class BaseQuery {
       return allMemberChildren[m]?.some(c => hasMultiStageMembers(c)) || false;
     };
 
+    // This is a bit of a hack
+    // For now object can only come from dimension-only measure branch inside collectRootMeasureToHieararchy
+    // So just filters those out, and treat them as regular measures
+    // TODO teach rest of code here to work with member expressions
+    const dimensionOnlyMeasures = Object.values(measureToHierarchy)
+      .flat()
+      .map((m) => m.measure)
+      .filter((m) => typeof m === 'object');
+
     const measuresToRender = (multiplied, cumulative) => R.pipe(
       R.values,
       R.flatten,
+      R.filter(
+        // To filter out member expressions
+        m => typeof m.measure === 'string'
+      ),
       R.filter(
         m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative && !hasMultiStageMembers(m.measure)
       ),
@@ -1132,8 +1157,11 @@ export class BaseQuery {
       R.map(m => this.newMeasure(m))
     );
 
-    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
-    const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
+    // TODO dimensionOnlyMeasures should belong to proper subquery depending on join tree, not to regular measures
+    const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy)
+      // .concat(dimensionOnlyMeasures);
+    const regularMeasures = measuresToRender(false, false)(measureToHierarchy)
+      .concat(dimensionOnlyMeasures);
 
     const cumulativeMeasures =
       R.pipe(
@@ -1709,6 +1737,19 @@ export class BaseQuery {
       if (!collectedMeasures.length && m.isMemberExpression && m.query.allCubeNames.length > 1 && m.measureSql() === 'COUNT(*)') {
         const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
         throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
+      }
+      if (collectedMeasures.length === 0 && m.isMemberExpression) {
+        // `m` is member expression measure, but does not reference any other measure
+        // Consider this dimensions-only measure. This can happen at least in 2 cases:
+        // 1. Ad-hoc aggregation over dimension: SELECT MAX(dim) FROM cube
+        // 2. Ungrouped query with SQL pushdown will render every column as measure: SELECT dim1 FROM cube WHERE LOWER(dim2) = 'foo';
+        // Measures like this considered regular: they depend only on dimensions and join tree
+        // This would return measure object in `measure`, not path
+        // TODO return measure object for every measure
+        return [`${m.measure.cubeName}.${m.measure.name}`, [{
+          multiplied: false,
+          measure: m,
+        }]];
       }
       return [typeof m.measure === 'string' ? m.measure : `${m.measure.cubeName}.${m.measure.name}`, collectedMeasures];
     }));
