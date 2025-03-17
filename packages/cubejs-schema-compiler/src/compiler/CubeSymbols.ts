@@ -123,10 +123,19 @@ export class CubeSymbols {
         graph.set(`${cube.name}-none`, [{ cubeDef: cube, name: cube.name }]);
       } else {
         cube.cubes?.forEach(c => {
-          const jp = c.joinPath || c.join_path;
+          const jp = c.joinPath || c.join_path; // View is not camelized yet
           if (jp) {
             // It's enough to ref the very first level, as everything else will be evaluated on its own
-            const cubeJoinPath = this.funcArguments(jp)[0]; // View is not camelized yet
+            let cubeJoinPath;
+            const fa = this.funcArguments(jp);
+            if (fa?.length > 0) {
+              [cubeJoinPath] = fa;
+            } else { // It's a function without params so it's safe to call it without further processing
+              const res = jp.apply(null);
+              if (typeof res === 'string') {
+                [cubeJoinPath] = res.split('.');
+              }
+            }
             graph.set(`${cube.name}-${cubeJoinPath}`, [{ cubeDef: cube, name: cube.name }, { name: cubeJoinPath }]);
           }
         });
