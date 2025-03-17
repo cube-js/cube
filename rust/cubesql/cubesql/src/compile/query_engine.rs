@@ -394,15 +394,20 @@ impl QueryEngine for SqlQueryEngine {
             state.get_load_request_meta("sql"),
             self.config_ref().clone(),
         ));
-        let mut ctx = DFSessionContext::with_state(
-            default_session_builder(
-                DFSessionConfig::new()
-                    .create_default_catalog_and_schema(false)
-                    .with_information_schema(false)
-                    .with_default_catalog_and_schema("db", "public"),
-            )
-            .with_query_planner(query_planner),
-        );
+        let mut df_state = default_session_builder(
+            DFSessionConfig::new()
+                .create_default_catalog_and_schema(false)
+                .with_information_schema(false)
+                .with_default_catalog_and_schema("db", "public"),
+        )
+        .with_query_planner(query_planner);
+        df_state
+            .optimizer
+            .rules
+            // projection_push_down is broken even for non-OLAP queries
+            // TODO enable it back
+            .retain(|r| r.name() != "projection_push_down");
+        let mut ctx = DFSessionContext::with_state(df_state);
 
         if state.protocol == DatabaseProtocol::MySQL {
             let system_variable_provider =
