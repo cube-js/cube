@@ -330,6 +330,7 @@ class ApiGateway {
       if (req.query.format === 'sql') {
         await this.sql4sql({
           query: req.query.query,
+          disablePostProcessing: req.query.disable_post_processing === 'true',
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -349,6 +350,7 @@ class ApiGateway {
       if (req.body.format === 'sql') {
         await this.sql4sql({
           query: req.body.query,
+          disablePostProcessing: req.body.disable_post_processing,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -1401,13 +1403,14 @@ class ApiGateway {
 
   protected async sql4sql({
     query,
+    disablePostProcessing,
     context,
     res,
-  }: {query: string} & BaseRequest) {
+  }: {query: string, disablePostProcessing: boolean} & BaseRequest) {
     try {
       await this.assertApiScope('data', context.securityContext);
 
-      const result = await this.sqlServer.sql4sql(query, context.securityContext);
+      const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
       res({ sql: result });
     } catch (e: any) {
       this.handleError({
