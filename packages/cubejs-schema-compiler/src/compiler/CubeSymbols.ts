@@ -119,9 +119,7 @@ export class CubeSymbols {
     const graph = new Map<string, GraphEdge>();
 
     for (const cube of cubes) {
-      if (!cube.isView) { // Cubes are independent
-        graph.set(`${cube.name}-none`, [{ cubeDef: cube, name: cube.name }]);
-      } else {
+      if (cube.isView) {
         cube.cubes?.forEach(c => {
           const jp = c.joinPath || c.join_path; // View is not camelized yet
           if (jp) {
@@ -147,6 +145,12 @@ export class CubeSymbols {
             graph.set(`${cube.name}-${ref}`, [{ cubeDef: cube, name: cube.name }, { name: ref }]);
           });
         }
+      } else if (cube.joins && Object.keys(cube.joins).length > 0) {
+        Object.keys(cube.joins).forEach(j => {
+          graph.set(`${cube.name}-${j}`, [{ cubeDef: cube, name: cube.name }, { name: j }]);
+        });
+      } else {
+        graph.set(`${cube.name}-none`, [{ cubeDef: cube, name: cube.name }]);
       }
     }
 
