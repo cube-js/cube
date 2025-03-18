@@ -83,6 +83,44 @@ const cubeDefs: CubeDefinition[] = [
       CheckinCreatedAt: { type: 'time', sql: () => 'created_at' },
     },
   },
+
+  // Separate graph configuration with loops
+  {
+    name: 'view',
+    isView: true,
+    cubes: [
+      { join_path: () => 'A', includes: ['aid'] },
+    ]
+  },
+  {
+    name: 'A',
+    dimensions: { aid: { type: 'number', sql: () => 'aid' } },
+    joins: {
+      B: { relationship: 'hasMany', sql: (CUBE) => 'join' },
+      D: { relationship: 'hasMany', sql: (CUBE) => 'join' }
+    },
+  },
+  {
+    name: 'B',
+    dimensions: { bid: { type: 'number', sql: () => 'bid' } },
+    joins: {
+      A: { relationship: 'hasMany', sql: (CUBE) => 'join' },
+      E: { relationship: 'hasMany', sql: (CUBE) => 'join' }
+    },
+  },
+  {
+    name: 'D',
+    dimensions: { did: { type: 'number', sql: () => 'did' } },
+    joins: {
+      A: { relationship: 'hasMany', sql: (CUBE) => 'join' },
+      B: { relationship: 'hasMany', sql: (CUBE) => 'join' },
+      E: { relationship: 'hasMany', sql: (CUBE) => 'join' }
+    },
+  },
+  {
+    name: 'E',
+    dimensions: { eid: { type: 'number', sql: () => 'eid' } },
+  },
 ];
 
 describe('Cube Symbols Compiler', () => {
@@ -153,6 +191,26 @@ describe('Cube Symbols Compiler', () => {
 
     compiler.compile(cubeDefsTest, reporter);
     expect(() => reporter.throwIfAny()).toThrow(/sum defined more than once/);
+  });
+
+  it('throws error if dependency loop involving view is detected', () => {
+    process.env.CUBEJS_CASE_INSENSITIVE_DUPLICATES_CHECK = 'true';
+
+    const reporter = new ConsoleErrorReporter();
+    const compiler = new CubeSymbols(true);
+
+    const cubeDefsTest: CubeDefinition[] = [...cubeDefs];
+    // Change the A cube to be a view
+    cubeDefsTest[7] = {
+      name: 'A',
+      isView: true,
+      cubes: [
+        { join_path: () => 'B', includes: ['bid'] },
+        { join_path: () => 'D', includes: ['did'] },
+      ]
+    };
+
+    expect(() => compiler.compile(cubeDefsTest, reporter)).toThrow(/A view cannot be part of a dependency loop/);
   });
 
   it('compiles correct cubes and views (case sensitive)', () => {
