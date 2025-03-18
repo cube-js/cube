@@ -1,0 +1,150 @@
+# Analyzing data from Query History export
+
+You can use Query History export to bring Query History data to an external monitoring
+solution for further analysis.
+
+In this recipe, we will show you how to export Query History data to Amazon S3, and then
+analyze it using Cube by reading the data from S3 using DuckDB.
+
+<WarningBox>
+
+This recipe is work-in-progress.
+
+</WarningBox>
+
+## Configuration
+
+Vector configuration for exporting Query History to Amazon S3 and console:
+
+```toml
+[sinks.aws_s3]
+type = "aws_s3"
+inputs = [
+  "query-history"
+]
+bucket = "cube-query-history-export-demo"
+region = "us-east-2"
+compression = "gzip"
+ 
+[sinks.aws_s3.auth]
+access_key_id = "$CUBE_CLOUD_MONITORING_AWS_ACCESS_KEY_ID"
+secret_access_key = "$CUBE_CLOUD_MONITORING_AWS_SECRET_ACCESS_KEY"
+ 
+[sinks.aws_s3.encoding]
+codec = "json"
+ 
+[sinks.aws_s3.healthcheck]
+enabled = false
+
+
+[sinks.my_console]
+type = "console"
+inputs = [
+  "query-history"
+]
+target = "stdout"
+encoding = { codec = "json" }
+```
+
+Environment variables:
+
+```bash
+CUBE_CLOUD_MONITORING_AWS_ACCESS_KEY_ID=your-access-key-id
+CUBE_CLOUD_MONITORING_AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
+CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID=your-access-key-id
+CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY=your-secret-access-key
+CUBEJS_DB_DUCKDB_S3_REGION=us-east-2
+```
+
+## Data modeling
+
+Example data model for analyzing data from Query History export that is brought to a
+bucket in Amazon S3:
+
+```yaml
+cubes:
+  - name: requests
+    sql: >
+      SELECT
+        *,
+        api_response_duration_ms / 1000 AS api_response_duration,
+        EPOCH_MS(start_time_unix_ms) AS start_time,
+        EPOCH_MS(end_time_unix_ms) AS end_time
+      FROM read_json_auto('s3://cube-query-history-export-demo/**/*.log.gz')
+    
+    dimensions:
+      - name: trace_id
+        sql: trace_id
+        type: string
+        primary_key: true
+
+      - name: deployment_id
+        sql: deployment_id
+        type: number
+
+      - name: environment_name
+        sql: environment_name
+        type: string
+
+      - name: api_type
+        sql: api_type
+        type: string
+
+      - name: api_query
+        sql: api_query
+        type: string
+
+      - name: security_context
+        sql: security_context
+        type: string
+
+      - name: cache_type
+        sql: cache_type
+        type: string
+
+      - name: start_time
+        sql: start_time
+        type: time
+
+      - name: end_time
+        sql: end_time
+        type: time
+
+      - name: duration
+        sql: api_response_duration
+        type: number
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: error_message
+        sql: error_message
+        type: string
+
+    segments:
+      - name: production_environment
+        sql: "{environment_name} IS NULL"
+
+      - name: errors
+        sql: "{status} <> 'success'"
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_duration
+        type: sum
+        sql: "{duration}"
+        
+      - name: avg_duration
+        type: number
+        sql: "{total_duration} / {count}"
+```
+
+## Result
+
+<Screenshot src="https://ucarecdn.com/327373f0-217b-4a91-8ac7-fd2d97c79513/" />
+
+<Screenshot src="https://ucarecdn.com/ced0e81e-e9d0-4b81-8b95-76166b66dd9d/" />
