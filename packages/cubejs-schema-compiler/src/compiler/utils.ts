@@ -57,32 +57,19 @@ export function camelizeCube(cube: any): unknown {
 /**
  * This is a simple cube-views topological sorting based on Kahn's algorythm.
  */
-export function topologicalSort(edges: GraphEdge[]): CubeDef[] {
-  const graph = new Map();
-  const outDegree = new Map();
+export function topologicalSort([nodes, edges]: [Map<string, CubeDef>, GraphEdge[]]): CubeDef[] {
+  const inDegree = new Map<string, Set<string>>();
+  const outDegree = new Map<string, number>();
+
+  nodes.forEach(node => {
+    outDegree.set(node.name, 0);
+    inDegree.set(node.name, new Set());
+  });
 
   for (const [from, to] of edges) {
-    if (!graph.has(from.name)) {
-      graph.set(from.name, { cubeDef: from.cubeDef, from: [] });
-      outDegree.set(from.name, 0);
-    } else {
-      const n = graph.get(from.name);
-      if (!n.cubeDef) {
-        n.cubeDef = from.cubeDef;
-      }
-    }
-
-    if (to) {
-      if (!graph.has(to.name)) {
-        graph.set(to.name, { from: [from.name] });
-        outDegree.set(to.name, 0);
-      } else {
-        const n = graph.get(to.name);
-        n.from.push(from.name);
-      }
-
-      outDegree.set(from.name, (outDegree.get(from.name) || 0) + 1);
-    }
+    const n = inDegree.get(to) || new Set();
+    n.add(from);
+    outDegree.set(from, (outDegree.get(from) ?? 0) + 1);
   }
 
   const queue: string[] = [...outDegree.entries()].filter(([_, deg]) => deg === 0).map(([name]) => name);
@@ -95,22 +82,55 @@ export function topologicalSort(edges: GraphEdge[]): CubeDef[] {
       break;
     }
 
-    const node = graph.get(nodeName);
+    const from = inDegree.get(nodeName) || new Set();
 
-    sorted.push(node.cubeDef);
+    sorted.push(nodes.get(nodeName));
 
-    for (const neighbor of node.from) {
-      outDegree.set(neighbor, outDegree.get(neighbor) - 1);
+    for (const neighbor of from) {
+      outDegree.set(neighbor, (outDegree.get(neighbor) || 1) - 1);
       if (outDegree.get(neighbor) === 0) {
         queue.push(neighbor);
       }
     }
   }
 
-  if (sorted.length !== graph.size) {
-    const remainingNodes = [...graph.keys()].filter(node => !sorted.includes(node));
+  if (sorted.length !== nodes.size) {
+    const remainingNodes = [...nodes.keys()].filter(node => !sorted.includes(node));
     throw new Error(`Cyclical dependence detected! Potential problems with ${remainingNodes.join(', ')}.`);
   }
 
   return sorted;
+}
+
+export function findCyclesInGraph(adjacencyList: Map<string, Set<string>>): string[][] {
+  const visited = new Set<string>();
+  const stack = new Set<string>();
+  const cycles: string[][] = [];
+
+  const dfs = (node: string, path: string[]) => {
+    if (stack.has(node)) {
+      const cycleStart = path.indexOf(node);
+      cycles.push(path.slice(cycleStart));
+      return;
+    }
+    if (visited.has(node)) return;
+
+    visited.add(node);
+    stack.add(node);
+    path.push(node);
+
+    for (const neighbor of adjacencyList.get(node) ?? []) {
+      dfs(neighbor, [...path]);
+    }
+
+    stack.delete(node);
+  };
+
+  for (const node of adjacencyList.keys()) {
+    if (!visited.has(node)) {
+      dfs(node, []);
+    }
+  }
+
+  return cycles;
 }
