@@ -13,7 +13,7 @@ import {
 } from '@cubejs-backend/shared';
 import { InlineTable, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
+import { QueryCache, QueryWithParams } from './QueryCache';
 import {
   getLastUpdatedAtTimestamp,
   LAMBDA_TABLE_PREFIX,
@@ -83,8 +83,8 @@ export class PreAggregationPartitionRangeLoader {
     this.compilerCacheFn = options.compilerCacheFn || ((subKey, cacheFn) => cacheFn());
   }
 
-  private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
-    const [query, values, queryOptions]: QueryTuple = rangeQuery;
+  private async loadRangeQuery(rangeQuery: QueryWithParams, partitionRange?: QueryDateRange) {
+    const [query, values, queryOptions]: QueryWithParams = rangeQuery;
     const invalidate =
       this.preAggregation.invalidateKeyQueries?.[0]
         ? this.preAggregation.invalidateKeyQueries[0].slice(0, 2)

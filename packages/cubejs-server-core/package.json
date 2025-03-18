@@ -85,6 +85,7 @@
       "<rootDir>/dist/test/setup.js"
     ],
     "collectCoverage": false,
+    "coverageReporters": ["text", "html"],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
       "dist/src/**/*.js",
