@@ -621,6 +621,7 @@ pub enum DBResponsePrimitive {
     Boolean(bool),
     Number(f64),
     String(String),
+    Uncommon(Value),
 }
 
 impl Display for DBResponsePrimitive {
@@ -630,6 +631,9 @@ impl Display for DBResponsePrimitive {
             DBResponsePrimitive::Boolean(b) => b.to_string(),
             DBResponsePrimitive::Number(n) => n.to_string(),
             DBResponsePrimitive::String(s) => s.clone(),
+            DBResponsePrimitive::Uncommon(v) => {
+                serde_json::to_string(&v).unwrap_or_else(|_| v.to_string())
+            }
         };
         write!(f, "{}", str)
     }
