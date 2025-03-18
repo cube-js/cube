@@ -845,7 +845,10 @@ export class BaseQuery {
         const periodStart = this.timeGroupedColumn(granularity, shiftedDateFrom);
         // Get the end of the period (last moment)
         const periodEnd = this.subtractInterval(
-          this.addInterval(this.timeGroupedColumn(granularity, shiftedDateTo), `1 ${granularity}`), `1 second`
+          this.addInterval(
+            this.timeGroupedColumn(granularity, shiftedDateTo), 
+            granularity == 'quarter' ? `3 month` : `1 ${granularity}`
+          ), `1 second`
         );
         
         return `${dateField} >= ${periodStart} AND ${dateField} <= ${periodEnd}`;
