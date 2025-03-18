@@ -18,8 +18,20 @@ const cubeDefs: CubeDefinition[] = [
     isView: true,
     cubes: [
       { join_path: (users) => 'users', includes: '*' },
-      { joinPath: () => 'clients', includes: '*' },
+      { joinPath: () => 'users.clients', includes: '*' },
     ]
+  },
+  {
+    name: 'clients',
+    measures: {
+      Count: { type: 'count', sql: () => 'sql' },
+      Sum: { type: 'sum', sql: () => 'sql' },
+    },
+    dimensions: {
+      UserId: { type: 'number', sql: () => 'user_id' },
+      Name: { type: 'string', sql: () => 'user_name' },
+      CreatedAt: { type: 'time', sql: () => 'created_at' },
+    },
   },
   {
     name: 'users',
@@ -45,20 +57,8 @@ const cubeDefs: CubeDefinition[] = [
     isView: true,
     cubes: [
       { join_path: () => 'emails', includes: '*' },
-      { joinPath: () => 'users_view', includes: ['userId'] },
+      { joinPath: () => 'users_view', includes: ['UserId'] },
     ]
-  },
-  {
-    name: 'clients',
-    measures: {
-      Count: { type: 'count', sql: () => 'sql' },
-      Sum: { type: 'sum', sql: () => 'sql' },
-    },
-    dimensions: {
-      UserId: { type: 'number', sql: () => 'user_id' },
-      Name: { type: 'string', sql: () => 'user_name' },
-      CreatedAt: { type: 'time', sql: () => 'created_at' },
-    },
   },
   {
     name: 'emails',
@@ -70,6 +70,17 @@ const cubeDefs: CubeDefinition[] = [
       mailId: { type: 'number', sql: () => 'user_id' },
       Address: { type: 'string', sql: () => 'email' },
       MailCreatedAt: { type: 'time', sql: () => 'created_at' },
+    },
+  },
+  {
+    name: 'checkins',
+    measures: {
+      CheckinsCount: { type: 'count', sql: () => 'sql' },
+      SumCheckins: { type: 'sum', sql: () => 'sql' },
+    },
+    dimensions: {
+      checkinId: { type: 'number', sql: () => 'user_id' },
+      CheckinCreatedAt: { type: 'time', sql: () => 'created_at' },
     },
   },
 ];
