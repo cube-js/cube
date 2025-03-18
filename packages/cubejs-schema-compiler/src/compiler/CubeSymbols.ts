@@ -4,7 +4,7 @@ import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
-import { camelizeCube, topologicalSort } from './utils';
+import { camelizeCube, findCyclesInGraph, topologicalSort } from './utils';
 import { BaseQuery } from '../adapter';
 
 import type { ErrorReporter } from './ErrorReporter';
@@ -47,19 +47,11 @@ export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
 export type CubeDef = any;
 
-export type GraphNode = {
-  cubeDef: CubeDef;
-  name: string;
-};
-
-export type ReferenceNode = {
-  name: string;
-};
-
 /**
- * Treat it as GraphNode depends on ReferenceNode
+ * Tuple of 2 node names
+ * Treat it as first node depends on the last
  */
-export type GraphEdge = [GraphNode, ReferenceNode?];
+export type GraphEdge = [string, string];
 
 export class CubeSymbols {
   public symbols: Record<string | symbol, any>;
@@ -115,10 +107,20 @@ export class CubeSymbols {
     }
   }
 
-  private prepareDepsGraph(cubes: CubeDefinition[]): GraphEdge[] {
-    const graph = new Map<string, GraphEdge>();
+  private prepareDepsGraph(cubes: CubeDefinition[]): [Map<string, CubeDef>, GraphEdge[]] {
+    const graphNodes = new Map<string, CubeDef>();
+    const adjacencyList = new Map<string, Set<string>>(); // To search for cycles
+
+    const addEdge = (from: string, to: string) => {
+      if (!adjacencyList.has(from)) {
+        adjacencyList.set(from, new Set());
+      }
+      adjacencyList.get(from)!.add(to);
+    };
 
     for (const cube of cubes) {
+      graphNodes.set(cube.name, cube);
+
       if (cube.isView) {
         cube.cubes?.forEach(c => {
           const jp = c.joinPath || c.join_path; // View is not camelized yet
@@ -134,7 +136,7 @@ export class CubeSymbols {
                 [cubeJoinPath] = res.split('.');
               }
             }
-            graph.set(`${cube.name}-${cubeJoinPath}`, [{ cubeDef: cube, name: cube.name }, { name: cubeJoinPath }]);
+            addEdge(cube.name, cubeJoinPath);
           }
         });
 
@@ -142,19 +144,63 @@ export class CubeSymbols {
         if (typeof cube.includes === 'function') {
           const refs = this.funcArguments(cube.includes);
           refs.forEach(ref => {
-            graph.set(`${cube.name}-${ref}`, [{ cubeDef: cube, name: cube.name }, { name: ref }]);
+            addEdge(cube.name, ref);
           });
         }
       } else if (cube.joins && Object.keys(cube.joins).length > 0) {
         Object.keys(cube.joins).forEach(j => {
-          graph.set(`${cube.name}-${j}`, [{ cubeDef: cube, name: cube.name }, { name: j }]);
+          addEdge(cube.name, j);
         });
       } else {
-        graph.set(`${cube.name}-none`, [{ cubeDef: cube, name: cube.name }]);
+        adjacencyList.set(cube.name, new Set());
       }
     }
 
-    return Array.from(graph.values());
+    const cycles = findCyclesInGraph(adjacencyList);
+
+    for (const cycle of cycles) {
+      const cycleSet = new Set(cycle);
+
+      // Validate that cycle doesn't have views
+      if (cycle.some(node => graphNodes.get(node)?.isView)) {
+        throw new UserError(`A view cannot be part of a dependency loop. Please review your cube definitions ${cycle.join(', ')} and ensure that no views are included in loops.`);
+      }
+
+      // Let's find external dependencies (who refers to the loop)
+      const externalNodes = new Set<string>();
+      for (const [from, toSet] of adjacencyList.entries()) {
+        if (!cycleSet.has(from)) {
+          for (const to of toSet) {
+            if (cycleSet.has(to)) {
+              externalNodes.add(from);
+            }
+          }
+        }
+      }
+
+      // Remove all edges inside the loop
+      for (const node of cycle) {
+        adjacencyList.set(node, new Set([...adjacencyList.get(node)!].filter(n => !cycleSet.has(n))));
+      }
+
+      // If there are external dependencies, point them to every node in the loop
+      if (externalNodes.size > 0) {
+        for (const external of externalNodes) {
+          for (const cube of cycle) {
+            addEdge(external, cube);
+          }
+        }
+      }
+    }
+
+    const graphEdges: GraphEdge[] = [];
+    for (const [from, toSet] of adjacencyList) {
+      for (const to of toSet) {
+        graphEdges.push([from, to]);
+      }
+    }
+
+    return [graphNodes, graphEdges];
   }
 
   public getCubeDefinition(cubeName: string) {
