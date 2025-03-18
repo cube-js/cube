@@ -27,6 +27,11 @@ impl Dialect for MySqlDialectWithBackTicks {
     fn is_identifier_part(&self, ch: char) -> bool {
         self.is_identifier_start(ch) || (ch >= '0' && ch <= '9')
     }
+
+    // Behavior we previously had hard-coded into sqlparser
+    fn supports_string_literal_backslash_escape(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

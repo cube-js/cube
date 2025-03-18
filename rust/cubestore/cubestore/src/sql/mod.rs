@@ -511,6 +511,8 @@ pub fn fully_qualified_or_lower(ident: &Ident) -> String {
 pub struct MySqlDialectWithBackTicks {}
 
 impl Dialect for MySqlDialectWithBackTicks {
+    // TODO upgrade DF: There are unimplemented functions as of sqlparser 0.50.0.
+
     fn is_delimited_identifier_start(&self, ch: char) -> bool {
         ch == '"' || ch == '`'
     }
@@ -528,6 +530,11 @@ impl Dialect for MySqlDialectWithBackTicks {
 
     fn is_identifier_part(&self, ch: char) -> bool {
         self.is_identifier_start(ch) || (ch >= '0' && ch <= '9')
+    }
+
+    // Behavior we previously had hard-coded into sqlparser
+    fn supports_string_literal_backslash_escape(&self) -> bool {
+        true
     }
 }
 
