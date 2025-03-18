@@ -136,9 +136,9 @@ jobs:
 #      - name: Cargo test cubesql
 #        run: |
 #          cargo test --manifest-path rust/cubesql/Cargo.toml -j 1
-#      - name: Cargo test cubesqlplanner
-#        run: |
-#          cargo test --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 1
+      - name: Cargo test cubesqlplanner
+        run: |
+          cargo test --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 1
 
   lint:
     runs-on: ubuntu-24.04
@@ -199,9 +199,9 @@ jobs:
 #      - name: Cargo fmt cubesql
 #        run: |
 #          cargo fmt --manifest-path rust/cubesql/Cargo.toml -- --check
-#      - name: Cargo fmt cubesqlplanner
-#        run: |
-#          cargo fmt --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -- --check
+      - name: Cargo fmt cubesqlplanner
+        run: |
+          cargo fmt --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -- --check
 
   build:
     runs-on: ubuntu-24.04
@@ -266,9 +266,9 @@ jobs:
 #      - name: Cargo build cubesql
 #        run: |
 #          cargo build --manifest-path rust/cubesql/Cargo.toml -j 4
-#      - name: Cargo build cubesqlplanner
-#        run: |
-#          cargo build --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 4
+      - name: Cargo build cubesqlplanner
+        run: |
+          cargo build --manifest-path rust/cubesqlplanner/cubesqlplanner/Cargo.toml -j 4
 
   build-cubestore:
     needs: [latest-tag-sha]
