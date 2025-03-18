@@ -199,7 +199,7 @@ const ToDate = {
 const Shifted = {
   type: Joi.string().valid('shifted'),
   length: timeInterval,
-  mode: Joi.any().valid('to_date', 'fixed'),
+  mode: Joi.any().valid('to_date', 'fixed', 'last'),
   trailing: timeInterval,
   leading: timeInterval,
   offset: Joi.any().valid('start', 'end'),

@@ -150,6 +150,9 @@ export class BaseMeasure {
       if (rollingWindow.mode === 'to_date') {
         return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity, rollingWindow.length);
       }
+      if (rollingWindow.mode === 'last') {
+        return this.query.rollingWindowLastJoinCondition(rollingWindow.granularity, rollingWindow.length);
+      }
       return this.query.rollingWindowDateJoinCondition(
         rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset, rollingWindow.length
       );

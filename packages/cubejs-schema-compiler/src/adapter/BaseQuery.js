@@ -834,6 +834,25 @@ export class BaseQuery {
     );
   }
 
+  rollingWindowLastJoinCondition(granularity, length) {
+    return this.timeDimensions.map(
+      d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
+        // For "last" mode, we want to shift back by the length and use the entire period
+        const shiftedDateFrom = this.addInterval(dateFrom, length);
+        const shiftedDateTo = this.addInterval(dateTo, length);
+        
+        // Get the start of the period based on granularity
+        const periodStart = this.timeGroupedColumn(granularity, shiftedDateFrom);
+        // Get the end of the period (last moment)
+        const periodEnd = this.subtractInterval(
+          this.addInterval(this.timeGroupedColumn(granularity, shiftedDateTo), `1 ${granularity}`), `1 second`
+        );
+        
+        return `${dateField} >= ${periodStart} AND ${dateField} <= ${periodEnd}`;
+      }]
+    );
+  }
+
   /**
    * @param {string} date
    * @param {string} interval
