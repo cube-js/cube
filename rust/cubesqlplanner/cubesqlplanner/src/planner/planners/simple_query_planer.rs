@@ -1,8 +1,8 @@
 use super::{DimensionSubqueryPlanner, JoinPlanner, OrderPlanner};
-use crate::plan::{Filter, From, QualifiedColumnName, Select, SelectBuilder};
+use crate::plan::{Filter, QualifiedColumnName, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions_from_symbols;
-use crate::planner::sql_evaluator::sql_nodes::{render_references, SqlNodesFactory};
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;

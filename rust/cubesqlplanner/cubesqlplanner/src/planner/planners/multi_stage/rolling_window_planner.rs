@@ -10,7 +10,6 @@ use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
 use crate::planner::BaseMeasure;
 use crate::planner::{BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
-use std::fmt::format;
 use std::rc::Rc;
 
 pub struct RollingWindowPlanner {
