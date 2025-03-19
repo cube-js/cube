@@ -252,7 +252,7 @@ export class CompilerApi {
     if (filter.memberReference) {
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
-        filter.values,
+        filter.values || (() => undefined),
         context
       );
       result.member = filter.memberReference;

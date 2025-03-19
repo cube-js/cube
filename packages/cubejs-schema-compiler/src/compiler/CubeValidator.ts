@@ -627,18 +627,28 @@ const PolicyFilterSchema = Joi.object().keys({
     'notStartsWith',
     'endsWith',
     'notEndsWith',
+    'in',
+    'notIn',
     'gt',
     'gte',
     'lt',
     'lte',
+    'set',
+    'notSet',
     'inDateRange',
     'notInDateRange',
+    'onTheDate',
     'beforeDate',
     'beforeOrOnDate',
     'afterDate',
     'afterOrOnDate',
+    'measureFilter',
   ).required(),
-  values: Joi.func().required(),
+  values: Joi.when('operator', {
+    is: Joi.valid('set', 'notSet'),
+    then: Joi.func().optional(),
+    otherwise: Joi.func().required()
+  })
 });
 
 const PolicyFilterConditionSchema = Joi.object().keys({
