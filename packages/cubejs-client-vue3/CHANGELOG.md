@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.24](https://github.com/cube-js/cube.js/compare/v1.2.23...v1.2.24) (2025-03-18)
+
+**Note:** Version bump only for package @cubejs-client/vue3
+
+## [1.2.23](https://github.com/cube-js/cube.js/compare/v1.2.22...v1.2.23) (2025-03-17)
+
+**Note:** Version bump only for package @cubejs-client/vue3
+
 ## [1.2.22](https://github.com/cube-js/cube.js/compare/v1.2.21...v1.2.22) (2025-03-14)
 
 **Note:** Version bump only for package @cubejs-client/vue3

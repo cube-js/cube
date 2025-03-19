@@ -12,7 +12,6 @@ expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\n       
 | logical_plan after common_sub_expression_eliminate    | SAME TEXT AS ABOVE                              |
 | logical_plan after eliminate_limit                    | SAME TEXT AS ABOVE                              |
 | logical_plan after projection_drop_out                | SAME TEXT AS ABOVE                              |
-| logical_plan after projection_push_down               | SAME TEXT AS ABOVE                              |
 | logical_plan after filter_push_down                   | SAME TEXT AS ABOVE                              |
 | logical_plan after limit_push_down                    | SAME TEXT AS ABOVE                              |
 | logical_plan after SingleDistinctAggregationToGroupBy | SAME TEXT AS ABOVE                              |

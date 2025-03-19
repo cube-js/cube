@@ -12,7 +12,7 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { PreAggTableToTempTableNames, QueryCache, QueryTuple } from './QueryCache';
+import { PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
@@ -30,7 +30,7 @@ import { PreAggregationLoadCache } from './PreAggregationLoadCache';
 
 type IndexesSql = { sql: [string, unknown[]], indexName: string }[];
 
-type QueryKey = [QueryTuple, IndexesSql, InvalidationKeys] | [QueryTuple, InvalidationKeys];
+type QueryKey = [QueryWithParams, IndexesSql, InvalidationKeys] | [QueryWithParams, InvalidationKeys];
 
 type QueryOptions = {
   queryKey: QueryKey;

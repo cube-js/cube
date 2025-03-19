@@ -119,12 +119,6 @@ If `disable_post_processing` is set to `true`, Cube will try to generate the SQL
 as if the query is run without [post-processing][ref-query-wpp], i.e., if it's run as a
 query with [pushdown][ref-query-wpd].
 
-<WarningBox>
-
-Currently, the `disable_post_processing` parameter is not yet supported.
-
-</WarningBox>
-
 The response will contain a JSON object with the following properties under the `sql` key:
 
 | Property, type | Description |
@@ -279,6 +273,7 @@ Trigger pre-aggregation build jobs or retrieve statuses of such jobs.
 | `selector.datasources`     | Array of data source names which have pre-aggregations defined | ❌       |
 | `selector.cubes`           | Array of cube names which contain pre-aggregations             | ❌       |
 | `selector.preAggregations` | Array of pre-aggregation names                                 | ❌       |
+| `selector.dateRange`       | Date Range tuple ['range-date-start', 'range-date-end']        | ❌       |
 
 To trigger pre-aggregation builds, send a `POST` request with a payload
 including `post` as the `action` and `selector` properties. The response will
@@ -332,6 +327,27 @@ curl \
       "contexts": [{ "securityContext": {} }],
       "timezones": ["UTC"],
       "preAggregations": ["orders.main"]
+    }
+  }' \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  https://localhost:4000/cubejs-api/v1/pre-aggregations/jobs
+```
+
+Example request triggering builds of the `main` pre-aggregation defined in the
+`orders` cube within date range with some security context data
+and an `America/Los_Angeles` timezone:
+
+```bash{outputLines: 2-13}
+curl \
+  -d '{
+    "action": "post",
+    "selector": {
+      "contexts": [{ "securityContext": { "tenantId": "tenant1" } }],
+      "timezones": ["America/Los_Angeles"],
+      "preAggregations": ["orders.main"],
+      "dateRange": ["2020-01-01", "2020-02-01"]
     }
   }' \
   -H "Authorization: EXAMPLE-API-TOKEN" \

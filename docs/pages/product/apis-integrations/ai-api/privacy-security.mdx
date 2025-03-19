@@ -4,10 +4,10 @@ With Cube’s AI API, your credentials are never shared with AI, and neither is 
 
 ## Data Retention Policy
 
-Your data isn’t used by third-party LLMs to train models or improve products. We partner with OpenAI to enforce a strict data retention policy.
+By default, the Cube AI API uses Anthropic models via GCP VertexAI. Your data isn’t used by Google or Anthropic to train models or improve products.
 
-- No data is used for LLM model training or product improvements by third-party LLMs.
-- OpenAI may securely retain API inputs and outputs for up to 30 days for abuse monitoring purposes. Data is permanently deleted after that time.
+- Google does not retain customer data or use it for training or model improvement purposes.
+- Usage is governed by the [Anthropic on Vertex Commercial Terms of Service][ref-anthropic-tos], which specify that Anthropic does not receive access to prompts or outputs and may not train models on customer data.
 
 ## Dynamic grounding with secure data retrieval
 
@@ -24,3 +24,5 @@ Your data isn’t used by third-party LLMs to train models or improve products. 
 
 - Data masking policies enforced by Cube are also enforced in AI API usage.
 - You can configure what must and must not be masked in the Cube Semantic Layer.
+
+[ref-anthropic-tos]: https://www-cdn.anthropic.com/471bd07290603ee509a5ea0d5ccf131ea5897232/anthropic-vertex-commercial-terms-march-2024.pdf

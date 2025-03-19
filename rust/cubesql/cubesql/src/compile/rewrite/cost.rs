@@ -14,11 +14,15 @@ use indexmap::IndexSet;
 #[derive(Debug)]
 pub struct BestCubePlan {
     meta_context: Arc<MetaContext>,
+    penalize_post_processing: bool,
 }
 
 impl BestCubePlan {
-    pub fn new(meta_context: Arc<MetaContext>) -> Self {
-        Self { meta_context }
+    pub fn new(meta_context: Arc<MetaContext>, penalize_post_processing: bool) -> Self {
+        Self {
+            meta_context,
+            penalize_post_processing,
+        }
     }
 
     pub fn initial_cost(&self, enode: &LogicalPlanLanguage, top_down: bool) -> CubePlanCost {
@@ -208,6 +212,8 @@ impl BestCubePlan {
 
         CubePlanCost {
             replacers: this_replacers,
+            // Will be filled in finalize
+            penalized_ast_size_outside_wrapper: 0,
             table_scans,
             filters,
             filter_members,
@@ -239,8 +245,15 @@ impl BestCubePlan {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct CubePlanCostOptions {
+    top_down: bool,
+    penalize_post_processing: bool,
+}
+
 /// This cost struct maintains following structural relationships:
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
+/// - `penalized_ast_size_outside_wrapper` > other nodes - this is used to force "no post processing" mode, only CubeScan and CubeScanWrapped are expected as result
 /// - `table_scans` > other nodes - having table scan means not detected cube scan
 /// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
@@ -256,6 +269,7 @@ impl BestCubePlan {
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
     replacers: i64,
+    penalized_ast_size_outside_wrapper: usize,
     table_scans: i64,
     empty_wrappers: i64,
     non_detected_cube_scans: i64,
@@ -353,11 +367,11 @@ impl CubePlanCostAndState {
         }
     }
 
-    pub fn finalize(&self, enode: &LogicalPlanLanguage) -> Self {
+    pub fn finalize(&self, enode: &LogicalPlanLanguage, options: CubePlanCostOptions) -> Self {
         Self {
             cost: self
                 .cost
-                .finalize(&self.state, &self.sort_state, enode, false),
+                .finalize(&self.state, &self.sort_state, enode, options),
             state: self.state.clone(),
             sort_state: self.sort_state.clone(),
         }
@@ -368,6 +382,8 @@ impl CubePlanCost {
     pub fn add_child(&self, other: &Self) -> Self {
         Self {
             replacers: self.replacers + other.replacers,
+            // Will be filled in finalize
+            penalized_ast_size_outside_wrapper: 0,
             table_scans: self.table_scans + other.table_scans,
             filters: self.filters + other.filters,
             non_detected_cube_scans: (if other.cube_members == 0 {
@@ -419,10 +435,22 @@ impl CubePlanCost {
         state: &CubePlanState,
         sort_state: &SortState,
         enode: &LogicalPlanLanguage,
-        top_down: bool,
+        options: CubePlanCostOptions,
     ) -> Self {
+        let ast_size_outside_wrapper = match state {
+            CubePlanState::Wrapped => 0,
+            CubePlanState::Unwrapped(size) => *size,
+            CubePlanState::Wrapper => 0,
+        } + self.ast_size_outside_wrapper;
+        let penalized_ast_size_outside_wrapper = if options.penalize_post_processing {
+            ast_size_outside_wrapper
+        } else {
+            0
+        };
+
         Self {
             replacers: self.replacers,
+            penalized_ast_size_outside_wrapper,
             table_scans: self.table_scans,
             filters: self.filters,
             non_detected_cube_scans: match state {
@@ -440,7 +468,7 @@ impl CubePlanCost {
             },
             non_pushed_down_limit_sort: match sort_state {
                 SortState::DirectChild => self.non_pushed_down_limit_sort,
-                SortState::Current if top_down => self.non_pushed_down_limit_sort,
+                SortState::Current if options.top_down => self.non_pushed_down_limit_sort,
                 _ => 0,
             },
             // Don't track state here: we want representation that have fewer wrappers with zero members _in total_
@@ -449,11 +477,7 @@ impl CubePlanCost {
             errors: self.errors,
             structure_points: self.structure_points,
             joins: self.joins,
-            ast_size_outside_wrapper: match state {
-                CubePlanState::Wrapped => 0,
-                CubePlanState::Unwrapped(size) => *size,
-                CubePlanState::Wrapper => 0,
-            } + self.ast_size_outside_wrapper,
+            ast_size_outside_wrapper,
             empty_wrappers: match state {
                 CubePlanState::Wrapped => 0,
                 CubePlanState::Unwrapped(_) => 0,
@@ -538,7 +562,13 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 let child = costs(*id);
                 cost.add_child(&child)
             })
-            .finalize(enode);
+            .finalize(
+                enode,
+                CubePlanCostOptions {
+                    top_down: false,
+                    penalize_post_processing: self.penalize_post_processing,
+                },
+            );
         res
     }
 }
@@ -880,6 +910,15 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
         node: &LogicalPlanLanguage,
         state: &CubePlanTopDownState,
     ) -> CubePlanCost {
-        CubePlanCost::finalize(&cost, &state.wrapped, &state.limit, node, true)
+        CubePlanCost::finalize(
+            &cost,
+            &state.wrapped,
+            &state.limit,
+            node,
+            CubePlanCostOptions {
+                top_down: true,
+                penalize_post_processing: self.penalize_post_processing,
+            },
+        )
     }
 }

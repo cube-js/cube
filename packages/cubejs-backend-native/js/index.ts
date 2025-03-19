@@ -405,10 +405,10 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
 };
 
 // TODO parse result from native code
-export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: any): Promise<Sql4SqlResponse> => {
+export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> => {
   const native = loadNative();
 
-  return native.sql4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
+  return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): String => {
