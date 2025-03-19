@@ -262,7 +262,6 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let execution_time = SystemTime::now();
         let session_context = self.execution_context()?;
-        // TODO context
         let results = collect(worker_plan.clone(), session_context.task_ctx())
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
@@ -298,9 +297,8 @@ impl QueryExecutor for QueryExecutorImpl {
             );
         }
         // TODO: stream results as they become available.
-        // TOOD upgrade DF
-        // let results = regroup_batches(results?, max_batch_rows)?;
-        Ok((worker_plan.schema(), results?, data_loaded_size.get()))
+        let results = regroup_batches(results?, max_batch_rows)?;
+        Ok((worker_plan.schema(), results, data_loaded_size.get()))
     }
 
     async fn router_plan(
