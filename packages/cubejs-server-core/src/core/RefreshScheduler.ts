@@ -3,7 +3,10 @@ import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { Required } from '@cubejs-backend/shared';
-import { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
+import {
+  PreAggregationDescription,
+  PreAggregationPartitionRangeLoader
+} from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from './server';
 import { CompilerApi } from './CompilerApi';
@@ -30,6 +33,7 @@ type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concur
 type PreAggregationsQueryingOptions = {
   metadata?: any,
   timezones: string[],
+  dateRange?: [string, string],
   preAggregations: {
     id: string,
     cacheOnly?: boolean,
@@ -681,37 +685,79 @@ export class RefreshScheduler {
   ): Promise<string[]> {
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
+    if (queryingOptions.dateRange) {
+      preAggregations.forEach(preAggregation => {
+        preAggregation.partitions = preAggregation.partitions
+          .filter(p => {
+            if (!p.buildRangeStart && !p.buildRangeEnd) {
+              return true; // If there is no range specified - we should include it like rebuild in anyway
+            }
+
+            return PreAggregationPartitionRangeLoader.intersectDateRanges(
+              [p.buildRangeStart, p.buildRangeEnd],
+              queryingOptions.dateRange,
+            );
+          });
+        preAggregation.partitionsWithDependencies.forEach(pd => {
+          pd.partitions = pd.partitions.filter(p => {
+            if (!p.buildRangeStart && !p.buildRangeEnd) {
+              return true; // If there is no range specified - we should include it like rebuild in any way
+            }
+
+            return PreAggregationPartitionRangeLoader.intersectDateRanges(
+              [p.buildRangeStart, p.buildRangeEnd],
+              queryingOptions.dateRange,
+            );
+          });
+
+          pd.dependencies = pd.dependencies.filter(p => {
+            if (!p.buildRangeStart && !p.buildRangeEnd) {
+              return true; // If there is no range specified - we should include it like rebuild in any way
+            }
+
+            return PreAggregationPartitionRangeLoader.intersectDateRanges(
+              [p.buildRangeStart, p.buildRangeEnd],
+              queryingOptions.dateRange,
+            );
+          });
+        });
+      });
+    }
+
     const preAggregationsLoadCacheByDataSource = {};
     const jobsPromise = Promise.all(
-      preAggregations.map(async (p: any) => {
-        const { partitionsWithDependencies } = p;
-        return Promise.all(
-          partitionsWithDependencies.map(({ partitions, dependencies }) => (
-            Promise.all(
-              partitions.map(
-                async (partition): Promise<JobedPreAggregation[]> => {
-                  const job = await orchestratorApi.executeQuery({
-                    preAggregations: dependencies.concat([partition]),
-                    continueWait: true,
-                    renewQuery: false,
-                    forceBuildPreAggregations: true,
-                    orphanedTimeout: 60 * 60,
-                    requestId: context.requestId,
-                    timezone: partition.timezone,
-                    scheduledRefresh: false,
-                    preAggregationsLoadCacheByDataSource,
-                    metadata: queryingOptions.metadata,
-                    isJob: true,
-                  });
-                  job[0].dataSource = partition.dataSource;
-                  job[0].timezone = partition.timezone;
-                  return job;
-                }
+      preAggregations
+        // Filter out pre-aggs without partitions
+        .filter(p => p.partitions.length)
+        .map(async (p: any) => {
+          const { partitionsWithDependencies } = p;
+          return Promise.all(
+            partitionsWithDependencies.map(({ partitions, dependencies }) => (
+              Promise.all(
+                partitions.map(
+                  async (partition): Promise<JobedPreAggregation[]> => {
+                    const job = await orchestratorApi.executeQuery({
+                      preAggregations: dependencies.concat([partition]),
+                      continueWait: true,
+                      renewQuery: false,
+                      forceBuildPreAggregations: true,
+                      orphanedTimeout: 60 * 60,
+                      requestId: context.requestId,
+                      timezone: partition.timezone,
+                      scheduledRefresh: false,
+                      preAggregationsLoadCacheByDataSource,
+                      metadata: queryingOptions.metadata,
+                      isJob: true,
+                    });
+                    job[0].dataSource = partition.dataSource;
+                    job[0].timezone = partition.timezone;
+                    return job;
+                  }
+                )
               )
-            )
-          ))
-        );
-      })
+            ))
+          );
+        })
     );
 
     const jobedPAs = await jobsPromise;
