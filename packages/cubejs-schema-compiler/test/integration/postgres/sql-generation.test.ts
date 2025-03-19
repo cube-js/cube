@@ -90,6 +90,13 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
+        countRollingThreeMonth: {
+          type: 'count',
+          rollingWindow: {
+            trailing: '3 month',
+            offset: 'end'
+          }
+        },
         countRollingUnbounded: {
           type: 'count',
           rollingWindow: {
@@ -895,7 +902,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     timeDimensions: [
       {
         dimension: 'visitors.created_at',
-        granularity: 'three_days',
+        granularity: 'month',
         dateRange: ['2017-01-01', '2017-01-10']
       },
       {
@@ -1087,6 +1094,29 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__count_rolling: null },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
   ]));
+
+  it('rolling count without date range', async () => {
+    if (!getEnv('nativeSqlPlanner')) return;
+    await runQueryTest({
+      measures: [
+        'visitors.countRollingThreeMonth'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'month',
+      }],
+      order: [{
+        id: 'visitors.created_at'
+      }],
+      timezone: 'America/Los_Angeles'
+    }, [
+      { visitors__created_at_month: '2016-09-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+      { visitors__created_at_month: '2016-10-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+      { visitors__created_at_month: '2016-11-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+      { visitors__created_at_month: '2016-12-01T00:00:00.000Z', visitors__count_rolling_three_month: null },
+      { visitors__created_at_month: '2017-01-01T00:00:00.000Z', visitors__count_rolling_three_month: '5' },
+    ]);
+  });
 
   it('rolling qtd', async () => runQueryTest({
     measures: [
@@ -3408,18 +3438,18 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
       compiler: joinedSchemaCompilers.compiler,
     },
-    {
-      measures: ['B.bval_sum', 'B.count'],
-      dimensions: ['B.aid'],
-      filters: [{
-        member: 'C.did',
-        operator: 'lt',
-        values: ['10']
-      }],
-      order: [{
-        'B.bval_sum': 'desc'
-      }]
-    });
+      {
+        measures: ['B.bval_sum', 'B.count'],
+        dimensions: ['B.aid'],
+        filters: [{
+          member: 'C.did',
+          operator: 'lt',
+          values: ['10']
+        }],
+        order: [{
+          'B.bval_sum': 'desc'
+        }]
+      });
     const sql = query.buildSqlAndParams();
     return dbRunner
       .testQuery(sql)

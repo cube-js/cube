@@ -75,6 +75,28 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.full_name())));
     }
 
+    pub fn add_projection_function_expression(
+        &mut self,
+        function: &str,
+        args: Vec<Rc<dyn BaseMember>>,
+        alias: String,
+    ) {
+        let expr = Expr::Function(FunctionExpression {
+            function: function.to_string(),
+            arguments: args
+                .into_iter()
+                .map(|r| Expr::Member(MemberExpression::new(r.clone())))
+                .collect(),
+        });
+        let aliased_expr = AliasedExpr {
+            expr,
+            alias: alias.clone(),
+        };
+
+        self.projection_columns.push(aliased_expr);
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), None));
+    }
     pub fn add_projection_coalesce_member(
         &mut self,
         member: &Rc<dyn BaseMember>,
@@ -147,16 +169,16 @@ impl SelectBuilder {
         self.ctes = ctes;
     }
 
-    fn make_cube_references(&self) -> HashMap<String, String> {
+    pub fn make_cube_references(from: Rc<From>) -> HashMap<String, String> {
         let mut refs = HashMap::new();
-        match &self.from.source {
+        match &from.source {
             crate::plan::FromSource::Single(source) => {
-                self.add_cube_reference_if_needed(source, &mut refs)
+                Self::add_cube_reference_if_needed(source, &mut refs)
             }
             crate::plan::FromSource::Join(join) => {
-                self.add_cube_reference_if_needed(&join.root, &mut refs);
+                Self::add_cube_reference_if_needed(&join.root, &mut refs);
                 for join_item in join.joins.iter() {
-                    self.add_cube_reference_if_needed(&join_item.from, &mut refs);
+                    Self::add_cube_reference_if_needed(&join_item.from, &mut refs);
                 }
             }
             crate::plan::FromSource::Empty => {}
@@ -165,7 +187,6 @@ impl SelectBuilder {
     }
 
     fn add_cube_reference_if_needed(
-        &self,
         source: &SingleAliasedSource,
         refs: &mut HashMap<String, String>,
     ) {
@@ -194,7 +215,7 @@ impl SelectBuilder {
     }
 
     pub fn build(self, mut nodes_factory: SqlNodesFactory) -> Select {
-        let cube_references = self.make_cube_references();
+        let cube_references = Self::make_cube_references(self.from.clone());
         nodes_factory.set_cube_name_references(cube_references);
         let schema = if self.projection_columns.is_empty() {
             self.make_asteriks_schema()
