@@ -703,6 +703,13 @@ export class DatabricksDriver extends JDBCDriver {
     // wasbs://real-container-name@account.blob.core.windows.net
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
+    const prefix = url.pathname.slice(1);
+    let delimiter = '';
+    if (prefix && !prefix.endsWith('/')) {
+      delimiter = '/';
+    }
+
+    const objectSearchPrefix = `${prefix}${delimiter}${tableName}`;
 
     if (this.config.bucketType === 'azure') {
       const {
@@ -716,7 +723,7 @@ export class DatabricksDriver extends JDBCDriver {
         // Databricks uses different bucket address form, so we need to transform it
         // to the one understandable by extractFilesFromAzure implementation
         `${url.host}/${url.username}`,
-        tableName,
+        objectSearchPrefix,
       );
     } else if (this.config.bucketType === 's3') {
       return this.extractUnloadedFilesFromS3(
@@ -728,7 +735,7 @@ export class DatabricksDriver extends JDBCDriver {
           region: this.config.awsRegion || '',
         },
         url.host,
-        tableName,
+        objectSearchPrefix,
       );
     } else {
       throw new Error(`Unsupported export bucket type: ${
