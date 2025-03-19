@@ -95,6 +95,10 @@ Good examples of names:
 When defining cubes, you would often provide SQL snippets in `sql` and
 `sql_table` parameters.
 
+You should include a reference to the object that the column belongs to. 
+In most cases, this reference should be the same cube in which 
+you are defining the element (`CUBE`).
+
 Provided SQL expressions should match your database SQL dialect, e.g.,
 to aggregate a list of strings, you would probably pick the [`LISTAGG`
 function][link-snowflake-listagg] in Snowflake and the [`STRING_AGG`
@@ -109,12 +113,12 @@ cubes:
 
     measures:
       - name: statuses
-        sql: "STRING_AGG(status)"
+        sql: "STRING_AGG({CUBE}.status)"
         type: string
 
     dimensions:
       - name: status
-        sql: "UPPER(status)"
+        sql: "UPPER({CUBE}.status)"
         type: string
 ```
 
@@ -124,14 +128,14 @@ cube(`orders`, {
 
   measures: {
     statuses: {
-      sql: `STRING_AGG(status)`,
+      sql: `STRING_AGG(${CUBE}.status)`,
       type: `string`,
     },
   },
 
   dimensions: {
     status: {
-      sql: `UPPER(status)`,
+      sql: `UPPER(${CUBE}.status)`,
       type: `string`,
     },
   },
