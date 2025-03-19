@@ -1,12 +1,14 @@
 use super::{
     MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
-    MultiStageQueryDescription, RollingWindowDescription,
+    MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::plan::{
     Cte, Expr, From, JoinBuilder, JoinCondition, MemberExpression, OrderBy, QualifiedColumnName,
-    QueryPlan, Schema, SelectBuilder, TimeSeries,
+    QueryPlan, Schema, SelectBuilder, TimeSeries, TimeSeriesDateRange,
 };
-use crate::planner::planners::{multi_stage::RollingWindowType, OrderPlanner, QueryPlanner};
+use crate::planner::planners::{
+    multi_stage::RollingWindowType, OrderPlanner, QueryPlanner, SimpleQueryPlanner,
+};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
@@ -52,27 +54,89 @@ impl MultiStageMemberQueryPlanner {
                 super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
                     self.plan_time_series_query(time_dimension.clone())
                 }
+                super::MultiStageLeafMemberType::TimeSeriesGetRange(time_dimension) => {
+                    self.plan_time_series_get_range_query(time_dimension.clone())
+                }
             },
         }
     }
 
-    fn plan_time_series_query(
+    fn plan_time_series_get_range_query(
         &self,
         time_dimension: Rc<BaseTimeDimension>,
     ) -> Result<Rc<Cte>, CubeError> {
-        let granularity = time_dimension.get_granularity().unwrap(); //FIXME remove this unwrap
-        let date_range = time_dimension.get_date_range().unwrap(); //FIXME remove this unwrap
-        let from_date = date_range[0].clone();
-        let to_date = date_range[1].clone();
-        let seria = self
-            .query_tools
-            .base_tools()
-            .generate_time_series(granularity, date_range.clone())?;
+        let cte_query_properties = QueryProperties::try_new_from_precompiled(
+            self.query_tools.clone(),
+            vec![],
+            vec![],
+            vec![time_dimension.clone()],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            None,
+            None,
+            true,
+            true,
+        )?;
+        let mut context_factory = SqlNodesFactory::new();
+        let simple_query_planer = SimpleQueryPlanner::new(
+            self.query_tools.clone(),
+            cte_query_properties,
+            SqlNodesFactory::new(),
+        );
+        let (mut select_builder, render_references) = simple_query_planer.make_select_builder()?;
+        let args = vec![time_dimension.clone().as_base_member()];
+        select_builder.add_projection_function_expression(
+            "MAX",
+            args.clone(),
+            "date_to".to_string(),
+        );
+
+        select_builder.add_projection_function_expression(
+            "MIN",
+            args.clone(),
+            "date_from".to_string(),
+        );
+        context_factory.set_render_references(render_references);
+        let select = Rc::new(select_builder.build(context_factory));
+        let query_plan = Rc::new(QueryPlan::Select(select));
+        Ok(Rc::new(Cte::new(
+            query_plan,
+            format!("time_series_get_range"),
+        )))
+    }
+
+    fn plan_time_series_query(
+        &self,
+        time_series_description: Rc<TimeSeriesDescription>,
+    ) -> Result<Rc<Cte>, CubeError> {
+        let time_dimension = time_series_description.time_dimension.clone();
+        let granularity = time_dimension.get_granularity().map_or_else(
+            || {
+                Err(CubeError::user(
+                    "Time dimension granularity is required for rolling window".to_string(),
+                ))
+            },
+            |g| Ok(g.clone()),
+        )?;
+        let ts_date_range = if let Some(date_range) = time_dimension.get_date_range() {
+            TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
+        } else {
+            if let Some(date_range_cte) = &time_series_description.date_range_cte {
+                TimeSeriesDateRange::Generated(date_range_cte.clone())
+            } else {
+                return Err(CubeError::internal(
+                    "Date range cte is required for time series without date range".to_string(),
+                ));
+            }
+        };
         let time_seira = TimeSeries::new(
+            self.query_tools.clone(),
             time_dimension.full_name(),
-            Some(from_date),
-            Some(to_date),
-            seria,
+            ts_date_range,
+            granularity,
         );
         let query_plan = Rc::new(QueryPlan::TimeSeries(Rc::new(time_seira)));
         Ok(Rc::new(Cte::new(query_plan, format!("time_series"))))

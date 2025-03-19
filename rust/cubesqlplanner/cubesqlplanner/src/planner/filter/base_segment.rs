@@ -1,8 +1,7 @@
-use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{MemberExpressionSymbol, MemberSymbol, SqlCall};
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
+use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

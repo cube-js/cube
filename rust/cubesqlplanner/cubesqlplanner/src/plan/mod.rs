@@ -21,5 +21,5 @@ pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use schema::{QualifiedColumnName, Schema, SchemaColumn};
 pub use select::{AliasedExpr, Select};
-pub use time_series::TimeSeries;
+pub use time_series::{TimeSeries, TimeSeriesDateRange};
 pub use union::Union;

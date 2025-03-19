@@ -6,34 +6,34 @@
  * @license Apache-2.0
  */
 
-import R from 'ramda';
 import cronParser from 'cron-parser';
-import moment from 'moment-timezone';
 import inflection from 'inflection';
+import moment from 'moment-timezone';
+import R from 'ramda';
 
-import {
-  FROM_PARTITION_RANGE,
-  MAX_SOURCE_ROW_LIMIT,
-  localTimestampToUtc,
-  QueryAlias,
-  getEnv,
-  timeSeries as timeSeriesBase
-} from '@cubejs-backend/shared';
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
 } from '@cubejs-backend/native';
+import {
+  FROM_PARTITION_RANGE,
+  MAX_SOURCE_ROW_LIMIT,
+  QueryAlias,
+  getEnv,
+  localTimestampToUtc,
+  timeSeries as timeSeriesBase
+} from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
-import { BaseMeasure } from './BaseMeasure';
+import { SqlParser } from '../parser/SqlParser';
 import { BaseDimension } from './BaseDimension';
-import { BaseSegment } from './BaseSegment';
 import { BaseFilter } from './BaseFilter';
 import { BaseGroupFilter } from './BaseGroupFilter';
+import { BaseMeasure } from './BaseMeasure';
+import { BaseSegment } from './BaseSegment';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import { Granularity } from './Granularity';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
-import { SqlParser } from '../parser/SqlParser';
-import { Granularity } from './Granularity';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -571,13 +571,10 @@ export class BaseQuery {
    * @returns {string}
    */
   countAllQuery(sql) {
-    return `select count(*) ${
-      this.escapeColumnName(QueryAlias.TOTAL_COUNT)
-    } from (\n${
-      sql
-    }\n) ${
-      this.escapeColumnName(QueryAlias.ORIGINAL_QUERY)
-    }`;
+    return `select count(*) ${this.escapeColumnName(QueryAlias.TOTAL_COUNT)
+      } from (\n${sql
+      }\n) ${this.escapeColumnName(QueryAlias.ORIGINAL_QUERY)
+      }`;
   }
 
   regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery) {
@@ -967,8 +964,7 @@ export class BaseQuery {
           ).concat(
             R.map(
               ([multiplied, measure]) => this.withCubeAliasPrefix(
-                `${
-                  this.aliasName(measure.measure.replace('.', '_'))
+                `${this.aliasName(measure.measure.replace('.', '_'))
                 }_cumulative`,
                 () => this.overTimeSeriesQuery(
                   multiplied
@@ -983,7 +979,7 @@ export class BaseQuery {
                 ),
               )
             )(cumulativeMeasures)
-          // TODO SELECT *
+            // TODO SELECT *
           ).concat(multiStageMembers.map(m => `SELECT * FROM ${m.alias}`));
     }
 
@@ -1891,10 +1887,9 @@ export class BaseQuery {
       )
     ), inlineWhereConditions);
 
-    return `SELECT ${this.selectAllDimensionsAndMeasures(measures)} FROM ${
-      query
-    } ${this.baseWhere(filters.concat(inlineWhereConditions))}` +
-    (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
+    return `SELECT ${this.selectAllDimensionsAndMeasures(measures)} FROM ${query
+      } ${this.baseWhere(filters.concat(inlineWhereConditions))}` +
+      (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
   /**
@@ -1946,14 +1941,11 @@ export class BaseQuery {
       .join(', ');
 
     const primaryKeyJoinConditions = primaryKeyDimensions.map((pkd) => (
-      `${
-        this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS)
-      }.${
-        pkd.aliasName()
-      } = ${
-        shouldBuildJoinForMeasureSelect
-          ? `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}`
-          : this.dimensionSql(pkd)
+      `${this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS)
+      }.${pkd.aliasName()
+      } = ${shouldBuildJoinForMeasureSelect
+        ? `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}`
+        : this.dimensionSql(pkd)
       }`
     )).join(' AND ');
 
@@ -2026,9 +2018,8 @@ export class BaseQuery {
         'collectSubQueryDimensionsFor'
       )
     ), inlineWhereConditions);
-    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimensions)} FROM ${
-      query
-    } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
+    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimensions)} FROM ${query
+      } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
   }
 
   keysSelect(primaryKeyDimensions) {
@@ -3337,7 +3328,7 @@ export class BaseQuery {
         }
         throw new UserError('Output schema is only supported for rollup pre-aggregations');
       },
-      { inputProps: { }, cache: this.queryCache }
+      { inputProps: {}, cache: this.queryCache }
     );
   }
 
@@ -3457,14 +3448,18 @@ export class BaseQuery {
         join: '{{ join_type }} JOIN {{ source }} ON {{ condition }}',
         cte: '{{ alias }} AS ({{ query | indent(2, true) }})',
         time_series_select: 'SELECT date_from::timestamp AS "date_from",\n' +
-        'date_to::timestamp AS "date_to" \n' +
-        'FROM(\n' +
-        '    VALUES ' +
-        '{% for time_item in seria  %}' +
-        '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
-        '{% if not loop.last %}, {% endif %}' +
-        '{% endfor %}' +
-        ') AS dates (date_from, date_to)'
+          'date_to::timestamp AS "date_to" \n' +
+          'FROM(\n' +
+          '    VALUES ' +
+          '{% for time_item in seria  %}' +
+          '(\'{{ time_item | join(\'\\\', \\\'\') }}\')' +
+          '{% if not loop.last %}, {% endif %}' +
+          '{% endfor %}' +
+          ') AS dates (date_from, date_to)',
+        time_series_get_range: 'SELECT {{ max_expr }} as {{ quoted_max_name }},\n' +
+          '{{ min_expr }} as {{ quoted_min_name }}\n' +
+          'FROM {{ from_prepared }}\n' +
+          '{% if filter %}WHERE {{ filter }}{% endif %}'
       },
       expressions: {
         column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',
@@ -3742,7 +3737,7 @@ export class BaseQuery {
       sql: `${refreshKeyQuery.nowTimestampSql()} < ${updateWindow ?
         refreshKeyQuery.addTimestampInterval(dateTo, updateWindow) :
         dateTo
-      }`,
+        }`,
       label: originalRefreshKey
     }]);
   }
@@ -4078,11 +4073,11 @@ export class BaseQuery {
     const filterParamArg = filterParamArgs.filter(p => {
       const member = p.__member();
       return member === filter.measure ||
-             member === filter.dimension ||
-            (aliases[member] && (
-              aliases[member] === filter.measure ||
-              aliases[member] === filter.dimension
-            ));
+        member === filter.dimension ||
+        (aliases[member] && (
+          aliases[member] === filter.measure ||
+          aliases[member] === filter.dimension
+        ));
     })[0];
 
     if (!filterParamArg) {
