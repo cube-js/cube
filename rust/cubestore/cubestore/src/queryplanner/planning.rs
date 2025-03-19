@@ -2522,7 +2522,10 @@ pub mod tests {
         let plan = SqlToRel::new(i)
             .statement_to_plan(DFStatement::Statement(Box::new(statement)))
             .unwrap();
-        QueryPlannerImpl::execution_context_helper(SessionConfig::new()).state().optimize(&plan).unwrap()
+        QueryPlannerImpl::execution_context_helper(SessionConfig::new())
+            .state()
+            .optimize(&plan)
+            .unwrap()
     }
 
     #[derive(Debug)]

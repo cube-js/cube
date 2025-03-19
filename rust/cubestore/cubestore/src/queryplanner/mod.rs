@@ -273,7 +273,9 @@ impl QueryPlannerImpl {
     }
 
     fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
-        Ok(Arc::new(Self::execution_context_helper(self.metadata_cache_factory.make_session_config())))
+        Ok(Arc::new(Self::execution_context_helper(
+            self.metadata_cache_factory.make_session_config(),
+        )))
     }
 }
 

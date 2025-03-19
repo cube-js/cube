@@ -35,11 +35,11 @@ pub struct NoopParquetMetadataCache {
 }
 
 impl NoopParquetMetadataCache {
-     /// Creates a new DefaultMetadataCache
+    /// Creates a new DefaultMetadataCache
     pub fn new() -> Arc<Self> {
         Arc::new(NoopParquetMetadataCache {
             default_factory: DefaultParquetFileReaderFactory::new(Arc::new(
-                 object_store::local::LocalFileSystem::new(),
+                object_store::local::LocalFileSystem::new(),
             )),
         })
     }
@@ -55,9 +55,8 @@ impl ParquetFileReaderFactory for NoopParquetMetadataCache {
     ) -> datafusion::common::Result<Box<dyn AsyncFileReader + Send>> {
         self.default_factory
             .create_reader(partition_index, file_meta, metadata_size_hint, metrics)
-     }
- }
-
+    }
+}
 
 /// LruMetadataCache, caches parquet metadata.
 pub struct LruParquetMetadataCacheFactory {
@@ -138,7 +137,11 @@ pub struct LruCachingFileReader {
 }
 
 impl LruCachingFileReader {
-    pub fn new(path: object_store::path::Path, reader: Box<dyn AsyncFileReader>, cache: Arc<moka::sync::Cache<object_store::path::Path, Arc<ParquetMetaData>>>) -> LruCachingFileReader {
+    pub fn new(
+        path: object_store::path::Path,
+        reader: Box<dyn AsyncFileReader>,
+        cache: Arc<moka::sync::Cache<object_store::path::Path, Arc<ParquetMetaData>>>,
+    ) -> LruCachingFileReader {
         LruCachingFileReader {
             path,
             reader,
@@ -164,7 +167,7 @@ impl AsyncFileReader for LruCachingFileReader {
 
     fn get_metadata(
         &mut self,
-        encryption_config: &Option<ParquetEncryptionConfig>
+        encryption_config: &Option<ParquetEncryptionConfig>,
     ) -> BoxFuture<'_, datafusion::parquet::errors::Result<Arc<ParquetMetaData>>> {
         let cache = self.cache.clone();
         let path = self.path.clone();

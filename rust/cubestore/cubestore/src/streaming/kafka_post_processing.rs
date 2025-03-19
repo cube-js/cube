@@ -95,7 +95,10 @@ impl KafkaPostProcessPlan {
             .clone()
             .with_new_children(vec![filter_input])?;
 
-        let task_context = QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.make_session_config()).task_ctx();
+        let task_context = QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory.make_session_config(),
+        )
+        .task_ctx();
 
         let mut out_batches = collect(projection, task_context).await?;
         let res = if out_batches.len() == 1 {

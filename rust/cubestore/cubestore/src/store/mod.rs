@@ -433,7 +433,12 @@ impl ChunkDataStore for ChunkStore {
         if old_chunk_ids.is_empty() {
             return Ok(());
         }
-        let task_context = QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.cache_factory().make_session_config()).task_ctx();
+        let task_context = QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory
+                .cache_factory()
+                .make_session_config(),
+        )
+        .task_ctx();
 
         let batches_stream = merge_chunks(
             key_size,
@@ -1344,9 +1349,17 @@ impl ChunkStore {
                     schema.clone(),
                 )?);
 
-                assert!(aggregate.properties().output_ordering().is_some_and(|ordering| ordering.len() == key_size));
+                assert!(aggregate
+                    .properties()
+                    .output_ordering()
+                    .is_some_and(|ordering| ordering.len() == key_size));
 
-                let task_context = QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.cache_factory().make_session_config()).task_ctx();
+                let task_context = QueryPlannerImpl::execution_context_helper(
+                    self.metadata_cache_factory
+                        .cache_factory()
+                        .make_session_config(),
+                )
+                .task_ctx();
 
                 let batches = collect(aggregate, task_context).await?;
                 if batches.is_empty() {

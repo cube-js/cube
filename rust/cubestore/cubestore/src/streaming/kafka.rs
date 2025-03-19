@@ -450,9 +450,7 @@ mod tests {
             .await
             .unwrap();
 
-        let batches = collect(phys_plan, plan_ctx.task_ctx())
-            .await
-            .unwrap();
+        let batches = collect(phys_plan, plan_ctx.task_ctx()).await.unwrap();
         let res = batches_to_dataframe(batches).unwrap();
         res.get_rows()[0].values()[0].clone()
     }
@@ -489,9 +487,7 @@ mod tests {
             .unwrap();
         let phys_plan = phys_plan.with_new_children(vec![inp]).unwrap();
 
-        let batches = collect(phys_plan, plan_ctx.task_ctx())
-            .await
-            .unwrap();
+        let batches = collect(phys_plan, plan_ctx.task_ctx()).await.unwrap();
         let res = batches_to_dataframe(batches).unwrap();
         res.get_rows().to_vec()
     }

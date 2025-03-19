@@ -158,7 +158,9 @@ crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 impl QueryExecutorImpl {
     fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
         // This is supposed to be identical to QueryImplImpl::execution_context.
-        Ok(Arc::new(QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.make_session_config())))
+        Ok(Arc::new(QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory.make_session_config(),
+        )))
     }
 }
 

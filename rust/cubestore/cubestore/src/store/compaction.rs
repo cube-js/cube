@@ -192,13 +192,24 @@ impl CompactionServiceImpl {
             .deactivate_and_mark_failed_chunks_for_replay(failed)
             .await;
 
-        let task_context = QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.cache_factory().make_session_config()).task_ctx();
+        let task_context = QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory
+                .cache_factory()
+                .make_session_config(),
+        )
+        .task_ctx();
 
         let in_memory_res = self
             .compact_chunks_to_memory(mem_chunks, &partition, &index, &table, task_context.clone())
             .await;
         let persistent_res = self
-            .compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table, task_context)
+            .compact_chunks_to_persistent(
+                persistent_chunks,
+                &partition,
+                &index,
+                &table,
+                task_context,
+            )
             .await;
         deactivate_res?;
         in_memory_res?;
@@ -695,9 +706,21 @@ impl CompactionService for CompactionServiceImpl {
             IndexType::Regular => None,
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
         };
-        let task_context = QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.cache_factory().make_session_config()).task_ctx();
-        let records =
-            merge_chunks(key_size, main_table, new, unique_key, aggregate_columns, task_context).await?;
+        let task_context = QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory
+                .cache_factory()
+                .make_session_config(),
+        )
+        .task_ctx();
+        let records = merge_chunks(
+            key_size,
+            main_table,
+            new,
+            unique_key,
+            aggregate_columns,
+            task_context,
+        )
+        .await?;
         let count_and_min = write_to_files(
             records,
             total_rows as usize,
@@ -899,7 +922,12 @@ impl CompactionService for CompactionServiceImpl {
             key_len,
             // TODO should it respect table partition_split_threshold?
             self.config.partition_split_threshold() as usize,
-            QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.cache_factory().make_session_config()).task_ctx(),
+            QueryPlannerImpl::execution_context_helper(
+                self.metadata_cache_factory
+                    .cache_factory()
+                    .make_session_config(),
+            )
+            .task_ctx(),
         )
         .await?;
         // There is no point if we cannot split the partition.
@@ -2343,7 +2371,12 @@ impl MultiSplit {
             ROW_GROUP_SIZE,
             self.metadata_cache_factory.clone(),
         );
-        let task_context = QueryPlannerImpl::execution_context_helper(self.metadata_cache_factory.cache_factory().make_session_config()).task_ctx();
+        let task_context = QueryPlannerImpl::execution_context_helper(
+            self.metadata_cache_factory
+                .cache_factory()
+                .make_session_config(),
+        )
+        .task_ctx();
         let records = if !in_files.is_empty() {
             read_files(
                 &in_files.into_iter().map(|(f, _)| f).collect::<Vec<_>>(),
@@ -2355,8 +2388,7 @@ impl MultiSplit {
             .await?
             .execute(0, task_context)?
         } else {
-            EmptyExec::new(Arc::new(store.arrow_schema()))
-                .execute(0, task_context)?
+            EmptyExec::new(Arc::new(store.arrow_schema())).execute(0, task_context)?
         };
         let row_counts = write_to_files_by_keys(
             records,
