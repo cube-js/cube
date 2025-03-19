@@ -572,9 +572,9 @@ export class BaseQuery {
    */
   countAllQuery(sql) {
     return `select count(*) ${this.escapeColumnName(QueryAlias.TOTAL_COUNT)
-      } from (\n${sql
-      }\n) ${this.escapeColumnName(QueryAlias.ORIGINAL_QUERY)
-      }`;
+    } from (\n${sql
+    }\n) ${this.escapeColumnName(QueryAlias.ORIGINAL_QUERY)
+    }`;
   }
 
   regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery) {
@@ -1888,7 +1888,7 @@ export class BaseQuery {
     ), inlineWhereConditions);
 
     return `SELECT ${this.selectAllDimensionsAndMeasures(measures)} FROM ${query
-      } ${this.baseWhere(filters.concat(inlineWhereConditions))}` +
+    } ${this.baseWhere(filters.concat(inlineWhereConditions))}` +
       (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
@@ -2019,7 +2019,7 @@ export class BaseQuery {
       )
     ), inlineWhereConditions);
     return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimensions)} FROM ${query
-      } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
+    } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
   }
 
   keysSelect(primaryKeyDimensions) {
@@ -3737,7 +3737,7 @@ export class BaseQuery {
       sql: `${refreshKeyQuery.nowTimestampSql()} < ${updateWindow ?
         refreshKeyQuery.addTimestampInterval(dateTo, updateWindow) :
         dateTo
-        }`,
+      }`,
       label: originalRefreshKey
     }]);
   }
