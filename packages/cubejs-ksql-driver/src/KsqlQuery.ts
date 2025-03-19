@@ -6,6 +6,7 @@ const GRANULARITY_TO_INTERVAL = {
   hour: (date: string) => `FORMAT_TIMESTAMP(${date}, 'yyyy-MM-dd''T''HH:00:00.000')`,
   minute: (date: string) => `FORMAT_TIMESTAMP(${date}, 'yyyy-MM-dd''T''HH:mm:00.000')`,
   second: (date: string) => `FORMAT_TIMESTAMP(${date}, 'yyyy-MM-dd''T''HH:mm:ss.000')`,
+  millisecond: (date: string) => `FORMAT_TIMESTAMP(${date}, 'yyyy-MM-dd''T''HH:mm:ss.SSS')`,
   month: (date: string) => `FORMAT_TIMESTAMP(${date}, 'yyyy-MM-01''T''00:00:00.000')`,
   quarter: (date: string) => `FORMAT_TIMESTAMP(PARSE_TIMESTAMP(FORMAT_TIMESTAMP(${date}, 'YYYY-qq'), 'YYYY-qq'), 'yyyy-MM-dd''T''00:00:00.000')`,
   year: (date: string) => `FORMAT_TIMESTAMP(${date}, 'yyyy-01-01''T''00:00:00.000')`
