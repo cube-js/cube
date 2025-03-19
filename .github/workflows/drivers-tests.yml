@@ -207,6 +207,7 @@ jobs:
         clickhouse-export-bucket-s3
         databricks-jdbc
         databricks-jdbc-export-bucket-s3
+        databricks-jdbc-export-bucket-s3-prefix
         databricks-jdbc-export-bucket-azure
         redshift
         redshift-export-bucket-s3
@@ -231,6 +232,7 @@ jobs:
           - clickhouse-export-bucket-s3
           - databricks-jdbc
           - databricks-jdbc-export-bucket-s3
+          - databricks-jdbc-export-bucket-s3-prefix
           - databricks-jdbc-export-bucket-azure
           - mssql
           - mysql
