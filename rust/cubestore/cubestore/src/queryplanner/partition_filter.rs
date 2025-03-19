@@ -457,7 +457,10 @@ impl Builder<'_> {
     fn extract_decimal(v: &ScalarValue, scale: i8) -> Option<TableValue> {
         let decimal_value = match v {
             ScalarValue::Decimal128(v, _input_precision, input_scale) => {
-                Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64 - (*input_scale as i64))
+                Builder::int_to_decimal_value(
+                    v.unwrap() as i128,
+                    scale as i64 - (*input_scale as i64),
+                )
             }
             ScalarValue::Int16(v) => {
                 Builder::int_to_decimal_value(v.unwrap() as i128, scale as i64)

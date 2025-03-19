@@ -161,7 +161,11 @@ impl KafkaPostProcessPlanner {
         // entire Analyzer pass, because make_projection_and_filter_physical_plans specifically
         // skips the Analyzer pass and LogicalPlan optimization steps performed by
         // SessionState::create_physical_plan.
-        let logical_plan: LogicalPlan = datafusion::optimizer::Analyzer::new().execute_and_check(logical_plan, &ConfigOptions::default(), |_, _| {})?;
+        let logical_plan: LogicalPlan = datafusion::optimizer::Analyzer::new().execute_and_check(
+            logical_plan,
+            &ConfigOptions::default(),
+            |_, _| {},
+        )?;
         let source_unique_columns = self.extract_source_unique_columns(&logical_plan)?;
 
         let (projection_plan, filter_plan) = self
@@ -540,9 +544,10 @@ impl KafkaPostProcessPlanner {
         match expr {
             Expr::Column(c) => Ok(c.name.clone()),
             Expr::Alias(Alias { name, .. }) => Ok(name.clone()),
-            _ => Err(CubeError::user(
-                format!("All expressions must have aliases in kafka streaming queries, expression is {:?}", expr),
-            )),
+            _ => Err(CubeError::user(format!(
+                "All expressions must have aliases in kafka streaming queries, expression is {:?}",
+                expr
+            ))),
         }
     }
 
@@ -550,8 +555,12 @@ impl KafkaPostProcessPlanner {
         fn find_column_name(expr: &Expr) -> Result<Option<String>, CubeError> {
             match expr {
                 Expr::Column(c) => Ok(Some(c.name.clone())),
-                Expr::Alias(Alias { expr: e, relation: _, name: _ }) => find_column_name(&**e),
-                Expr::ScalarFunction(ScalarFunction{ func: _, args }) => {
+                Expr::Alias(Alias {
+                    expr: e,
+                    relation: _,
+                    name: _,
+                }) => find_column_name(&**e),
+                Expr::ScalarFunction(ScalarFunction { func: _, args }) => {
                     let mut column_name: Option<String> = None;
                     for arg in args {
                         if let Some(name) = find_column_name(arg)? {

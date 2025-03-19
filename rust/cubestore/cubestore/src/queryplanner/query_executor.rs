@@ -1701,9 +1701,7 @@ impl fmt::Debug for ClusterSendExec {
     }
 }
 
-pub fn find_topmost_cluster_send_exec(
-    mut p: &Arc<dyn ExecutionPlan>,
-) -> Option<&ClusterSendExec> {
+pub fn find_topmost_cluster_send_exec(mut p: &Arc<dyn ExecutionPlan>) -> Option<&ClusterSendExec> {
     loop {
         if let Some(p) = p.as_any().downcast_ref::<ClusterSendExec>() {
             return Some(p);

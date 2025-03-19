@@ -66,12 +66,25 @@ pub struct DataFrame {
 
 impl DataFrame {
     pub fn new(columns: Vec<Column>, data: Vec<Row>) -> DataFrame {
-        DataFrame { columns, data: Arc::new(data) }
+        DataFrame {
+            columns,
+            data: Arc::new(data),
+        }
     }
 
     pub fn lowercase(&self) -> Self {
         Self {
-            columns: self.columns.iter().map(|c| Column::new(c.get_name().to_lowercase(), c.get_column_type().clone(), c.get_index().clone())).collect(),
+            columns: self
+                .columns
+                .iter()
+                .map(|c| {
+                    Column::new(
+                        c.get_name().to_lowercase(),
+                        c.get_column_type().clone(),
+                        c.get_index().clone(),
+                    )
+                })
+                .collect(),
             data: self.data.clone(),
         }
     }

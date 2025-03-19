@@ -49,7 +49,9 @@ use crate::metastore::{
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::query_executor::{batches_to_dataframe, find_topmost_cluster_send_exec, ClusterSendExec, QueryExecutor};
+use crate::queryplanner::query_executor::{
+    batches_to_dataframe, find_topmost_cluster_send_exec, ClusterSendExec, QueryExecutor,
+};
 use crate::queryplanner::serialized_plan::{PreSerializedPlan, RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
@@ -1212,13 +1214,12 @@ impl SqlService for SqlServiceImpl {
                             .query_executor
                             .router_plan(router_plan.to_serialized_plan()?, self.cluster.clone())
                             .await?;
-                        let worker_planning_params = if let Some(p) =
-                            find_topmost_cluster_send_exec(&router_plan)
-                        {
-                            p.worker_planning_params()
-                        } else {
-                            WorkerPlanningParams::no_worker()
-                        };
+                        let worker_planning_params =
+                            if let Some(p) = find_topmost_cluster_send_exec(&router_plan) {
+                                p.worker_planning_params()
+                            } else {
+                                WorkerPlanningParams::no_worker()
+                            };
                         return Ok(QueryPlans {
                             router: router_plan,
                             worker: self
