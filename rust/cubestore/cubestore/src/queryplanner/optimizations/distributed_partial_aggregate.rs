@@ -4,7 +4,6 @@ use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::AggregateTopKExec;
 use datafusion::error::DataFusionError;
-use datafusion::physical_optimizer::topk_aggregation::TopKAggregation;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
