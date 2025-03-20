@@ -101,11 +101,21 @@ const hydrators: HydrationConfiguration[] = [
         }
       );
     },
+  },
+  {
+    types: ['object'], // Workaround for HLL_SNOWFLAKE
+    toValue: () => (value) => {
+      if (!value) {
+        return null;
+      }
+
+      return JSON.stringify(value);
+    },
   }
 ];
 
 const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
-  // It's a limitation for now, because anyway we dont work with JSON objects in Cube Store.
+  // It's a limitation for now, because anyway we don't work with JSON objects in Cube Store.
   object: 'HLL_SNOWFLAKE',
   number: 'decimal',
   timestamp_ntz: 'timestamp'
