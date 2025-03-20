@@ -39,7 +39,7 @@ pub fn run_sql_tests(
     extra_args: Vec<String>,
     runner: impl Fn(/*test_name*/ &str, TestFn) + RefUnwindSafe + Send + Sync + Clone + 'static,
 ) {
-    let tests = sql_tests()
+    let tests = sql_tests(prefix)
         .into_iter()
         .map(|(name, test_fn)| {
             let runner = runner.clone();
