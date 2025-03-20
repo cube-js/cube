@@ -1307,12 +1307,19 @@ impl ClusterSendExec {
         })
     }
 
+    /// Also used by WorkerExec (to produce the exact same plan properties so we get the same optimizations).
     pub fn compute_properties(
         input_properties: &PlanProperties,
         partitions_num: usize,
     ) -> PlanProperties {
+        // Coalescing partitions (on the worker side) loses existing orderings:
+        let mut eq_properties = input_properties.eq_properties.clone();
+        if input_properties.output_partitioning().partition_count() > 1 {
+            eq_properties.clear_orderings();
+            eq_properties.clear_per_partition_constants();
+        }
         PlanProperties::new(
-            input_properties.eq_properties.clone(),
+            eq_properties,
             Partitioning::UnknownPartitioning(partitions_num),
             input_properties.execution_mode.clone(),
         )
@@ -1685,6 +1692,7 @@ impl ExecutionPlan for ClusterSendExec {
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
+        // TODO:  If this is in place, and it is obeyed (with EnforceDistribution?), then we don't need to use a CoalescePartitions node in worker exec.
         vec![Distribution::SinglePartition; self.children().len()]
     }
 }

@@ -1757,13 +1757,11 @@ impl WorkerExec {
         required_input_ordering: Option<LexRequirement>,
         worker_planning_params: WorkerPlanningParams,
     ) -> WorkerExec {
-        let properties =
-            input
-                .properties()
-                .clone()
-                .with_partitioning(Partitioning::UnknownPartitioning(
-                    worker_planning_params.worker_partition_count,
-                ));
+        // This, importantly, gives us the same PlanProperties as ClusterSendExec.
+        let properties = ClusterSendExec::compute_properties(
+            input.properties(),
+            worker_planning_params.worker_partition_count,
+        );
         WorkerExec {
             input,
             max_batch_rows,
@@ -1796,12 +1794,16 @@ impl ExecutionPlan for WorkerExec {
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 1);
         let input = children.into_iter().next().unwrap();
+        let properties: PlanProperties = ClusterSendExec::compute_properties(
+            input.properties(),
+            self.properties.output_partitioning().partition_count(),
+        );
         Ok(Arc::new(WorkerExec {
             input,
             max_batch_rows: self.max_batch_rows,
             limit_and_reverse: self.limit_and_reverse.clone(),
             required_input_ordering: self.required_input_ordering.clone(),
-            properties: self.properties.clone(),
+            properties,
         }))
     }
 
@@ -1831,7 +1833,7 @@ impl ExecutionPlan for WorkerExec {
 
     fn maintains_input_order(&self) -> Vec<bool> {
         // TODO upgrade DF: If the WorkerExec has the number of partitions so it can produce the same output, we could occasionally return true.
-        // vec![self.num_clustersend_partitions <= 1 && self.input_for_optimizations.output_partitioning().partition_count() <= 1]
+        // vec![self.input_for_optimizations.output_partitioning().partition_count() <= 1]
 
         // For now, same as default implementation:
         vec![false]
@@ -1883,7 +1885,7 @@ pub mod tests {
     use datafusion::error::DataFusionError;
     use datafusion::execution::{SessionState, SessionStateBuilder};
     use datafusion::logical_expr::{AggregateUDF, LogicalPlan, ScalarUDF, TableSource, WindowUDF};
-    use datafusion::prelude::{SessionConfig, SessionContext};
+    use datafusion::prelude::SessionConfig;
     use datafusion::sql::TableReference;
     use std::collections::HashMap;
     use std::iter::FromIterator;
