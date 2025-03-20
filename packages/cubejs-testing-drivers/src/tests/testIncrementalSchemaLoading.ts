@@ -26,7 +26,11 @@ export function incrementalSchemaLoadingSuite(
   });
 
   execute('should load schemas', async () => {
+    const start = performance.now();
+    console.log('should load schemas', 'start');
     const inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
+    console.log('should load schemas', 'after getSchemas', performance.now() - start);
+    console.log('should load schemas', 'inputSchemas', inputSchemas);
     expect(inputSchemas).toBeInstanceOf(Array);
     expect(inputSchemas.length).toBeGreaterThan(0);
     expect(inputSchemas).toContainEqual({
@@ -35,9 +39,14 @@ export function incrementalSchemaLoadingSuite(
   });
 
   execute('should load tables for specific schemas', async () => {
+    const start = performance.now();
+    console.log('should load tables for specific schemas', 'start');
     let inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
+    console.log('should load schemas', 'after getSchemas', performance.now() - start);
     inputSchemas = inputSchemas.filter((s) => !!s.schema_name);
     const inputTables = await driver().getTablesForSpecificSchemas(inputSchemas);
+    console.log('should load schemas', 'after getTablesForSpecificSchemas', performance.now() - start);
+    console.log('should load schemas', 'inputTables', inputTables);
     expect(inputTables).toBeInstanceOf(Array);
     expect(inputTables.length).toBeGreaterThan(0);
     expect(inputTables).toContainEqual({

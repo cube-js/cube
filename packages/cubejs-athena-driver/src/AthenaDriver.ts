@@ -480,6 +480,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       ...(this.config.catalog != null ? { QueryExecutionContext: { Catalog: this.config.catalog } } : {})
     };
     const { QueryExecutionId } = await this.athena.startQueryExecution(request);
+    console.log('athena started query ', query, QueryExecutionId);
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
   }
 
