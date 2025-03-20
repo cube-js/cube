@@ -17,6 +17,12 @@ _previous period_.
 these `rolling_window` measures and uses them in a calculation, e.g.,
 divides or subtracts them.
 
+<WarningBox>
+
+Please note that Redshift does not support intervals of type month or year.
+
+</WarningBox>
+
 The following data model allows to calculate a month-over-month change of
 some value. `current_month_sum` and `previous_month_sum` measures define
 two rolling windows and the `month_over_month_ratio` measure divides
