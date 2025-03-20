@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
+
+### Features
+
+- **duckdb-driver:** Fix numeric filter comparisons in DuckDB ([#9328](https://github.com/cube-js/cube/issues/9328)) ([969508d](https://github.com/cube-js/cube/commit/969508dd33984d0928f514ff07edbc50a0c949e3)), closes [#9281](https://github.com/cube-js/cube/issues/9281) [#9281](https://github.com/cube-js/cube/issues/9281)
+
 ## [1.2.24](https://github.com/cube-js/cube/compare/v1.2.23...v1.2.24) (2025-03-18)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
+
+### Bug Fixes
+
+- **backend-native:** Fix result wrapper parsing ([#9361](https://github.com/cube-js/cube/issues/9361)) ([1b70644](https://github.com/cube-js/cube/commit/1b70644ef81e97864447d57e4b627f7f28d8be34))
+
 ## [1.2.24](https://github.com/cube-js/cube/compare/v1.2.23...v1.2.24) (2025-03-18)
 
 ### Features
