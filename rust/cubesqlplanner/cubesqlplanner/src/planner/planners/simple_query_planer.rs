@@ -1,10 +1,11 @@
 use super::{DimensionSubqueryPlanner, JoinPlanner, OrderPlanner};
-use crate::plan::{Filter, Select, SelectBuilder};
+use crate::plan::{Filter, QualifiedColumnName, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions_from_symbols;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct SimpleQueryPlanner {
@@ -30,18 +31,7 @@ impl SimpleQueryPlanner {
     }
 
     pub fn plan(&self) -> Result<Rc<Select>, CubeError> {
-        let join = self.query_properties.simple_query_join()?;
-        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
-            &self.query_properties.all_member_symbols(false),
-            &self.join_planner,
-            &join,
-            self.query_tools.clone(),
-        )?;
-        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-            &subquery_dimensions,
-            self.query_tools.clone(),
-            self.query_properties.clone(),
-        )?;
+        let (mut select_builder, render_references) = self.make_select_builder()?;
 
         let filter = self.query_properties.all_filters();
         let having = if self.query_properties.measures_filters().is_empty() {
@@ -52,10 +42,6 @@ impl SimpleQueryPlanner {
             })
         };
         let mut context_factory = self.context_factory.clone();
-        let from =
-            self.join_planner
-                .make_join_node_impl(&None, join, &dimension_subquery_planner)?;
-        let mut select_builder = SelectBuilder::new(from.clone());
 
         for member in self
             .query_properties
@@ -64,7 +50,6 @@ impl SimpleQueryPlanner {
         {
             select_builder.add_projection_member(member, None);
         }
-        let render_references = dimension_subquery_planner.dimensions_refs().clone();
         context_factory.set_render_references(render_references);
         context_factory.set_rendered_as_multiplied_measures(
             self.query_properties
@@ -80,5 +65,28 @@ impl SimpleQueryPlanner {
         select_builder.set_offset(self.query_properties.offset());
         let res = Rc::new(select_builder.build(context_factory));
         Ok(res)
+    }
+
+    pub fn make_select_builder(
+        &self,
+    ) -> Result<(SelectBuilder, HashMap<String, QualifiedColumnName>), CubeError> {
+        let join = self.query_properties.simple_query_join().unwrap();
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &self.query_properties.all_member_symbols(false),
+            &self.join_planner,
+            &join,
+            self.query_tools.clone(),
+        )?;
+        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+            &subquery_dimensions,
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+        )?;
+        let from =
+            self.join_planner
+                .make_join_node_impl(&None, join, &dimension_subquery_planner)?;
+        let render_references = dimension_subquery_planner.dimensions_refs().clone();
+        let select_builder = SelectBuilder::new(from);
+        Ok((select_builder, render_references))
     }
 }

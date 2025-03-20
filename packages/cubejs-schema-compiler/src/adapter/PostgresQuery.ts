@@ -82,6 +82,9 @@ export class PostgresQuery extends BaseQuery {
     templates.types.double = 'DOUBLE PRECISION';
     templates.types.binary = 'BYTEA';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    templates.statements.generated_time_series_select = 'SELECT date_from AS "date_from",\n' +
+      'date_from + interval \'{{ granularity }}\' - interval \'1 millisecond\' AS "date_to" \n' +
+      'FROM generate_series({{ start }}::timestamp, {{ end }}:: timestamp, \'{{ granularity }}\'::interval) "date_from" ';
     return templates;
   }
 

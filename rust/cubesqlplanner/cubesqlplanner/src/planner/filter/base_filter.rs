@@ -26,6 +26,7 @@ pub struct BaseFilter {
     filter_type: FilterType,
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,
+    use_raw_values: bool,
     templates: FilterTemplates,
 }
 
@@ -66,6 +67,7 @@ impl BaseFilter {
             filter_operator,
             values,
             templates,
+            use_raw_values: false,
         }))
     }
 
@@ -73,6 +75,7 @@ impl BaseFilter {
         &self,
         filter_operator: FilterOperator,
         values: Vec<Option<String>>,
+        use_raw_values: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
             query_tools: self.query_tools.clone(),
@@ -81,6 +84,7 @@ impl BaseFilter {
             filter_operator,
             values,
             templates: self.templates.clone(),
+            use_raw_values,
         })
     }
 
@@ -94,6 +98,10 @@ impl BaseFilter {
 
     pub fn filter_operator(&self) -> &FilterOperator {
         &self.filter_operator
+    }
+
+    pub fn use_raw_values(&self) -> bool {
+        self.use_raw_values
     }
 
     pub fn member_name(&self) -> String {
@@ -432,6 +440,9 @@ impl BaseFilter {
         value: &String,
         use_db_time_zone: bool,
     ) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.clone());
+        }
         let from = self.format_from_date(value)?;
 
         let res = if use_db_time_zone && &from != FROM_PARTITION_RANGE {
@@ -447,6 +458,9 @@ impl BaseFilter {
         value: &String,
         use_db_time_zone: bool,
     ) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.clone());
+        }
         let from = self.format_to_date(value)?;
 
         let res = if use_db_time_zone && &from != TO_PARTITION_RANGE {
@@ -552,6 +566,9 @@ impl BaseFilter {
     }
 
     fn allocate_timestamp_param(&self, param: &str) -> String {
+        if self.use_raw_values {
+            return param.to_string();
+        }
         let placeholder = self.query_tools.allocate_param(param);
         format!("{}::timestamptz", placeholder)
     }
