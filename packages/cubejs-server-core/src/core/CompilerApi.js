@@ -252,7 +252,7 @@ export class CompilerApi {
     if (filter.memberReference) {
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
-        filter.values,
+        filter.values || (() => undefined),
         context
       );
       result.member = filter.memberReference;
@@ -339,9 +339,23 @@ export class CompilerApi {
       viewFiltersPerCubePerRole,
       hasAllowAllForCube
     );
-    query.filters = query.filters || [];
-    query.filters.push(rlsFilter);
+    if (rlsFilter) {
+      query.filters = query.filters || [];
+      query.filters.push(rlsFilter);
+    }
     return { query, denied: false };
+  }
+
+  removeEmptyFilters(filter) {
+    if (filter?.and) {
+      const and = filter.and.map(f => this.removeEmptyFilters(f)).filter(f => f);
+      return and.length > 1 ? { and } : and.at(0) || null;
+    }
+    if (filter?.or) {
+      const or = filter.or.map(f => this.removeEmptyFilters(f)).filter(f => f);
+      return or.length > 1 ? { or } : or.at(0) || null;
+    }
+    return filter;
   }
 
   buildFinalRlsFilter(cubeFiltersPerCubePerRole, viewFiltersPerCubePerRole, hasAllowAllForCube) {
@@ -369,7 +383,7 @@ export class CompilerApi {
       {}
     );
 
-    return {
+    return this.removeEmptyFilters({
       and: [{
         or: Object.keys(cubeFiltersPerRole).map(role => ({
           and: cubeFiltersPerRole[role]
@@ -379,7 +393,7 @@ export class CompilerApi {
           and: viewFiltersPerRole[role]
         }))
       }]
-    };
+    });
   }
 
   async compilerCacheFn(requestId, key, path) {

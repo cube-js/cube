@@ -184,6 +184,9 @@ impl ValueObject for ResultWrapper {
             DBResponsePrimitive::String(s) => FieldValue::String(Cow::Borrowed(s)),
             DBResponsePrimitive::Number(n) => FieldValue::Number(*n),
             DBResponsePrimitive::Boolean(b) => FieldValue::Bool(*b),
+            DBResponsePrimitive::Uncommon(v) => FieldValue::String(Cow::Owned(
+                serde_json::to_string(&v).unwrap_or_else(|_| v.to_string()),
+            )),
             DBResponsePrimitive::Null => FieldValue::Null,
         })
     }
