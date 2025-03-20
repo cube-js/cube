@@ -32,7 +32,7 @@ pub type TestFn = Box<
         + Sync
         + RefUnwindSafe,
 >;
-pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
+pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
     return vec![
         t("insert", insert),
         t("select_test", select_test),
@@ -218,10 +218,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_measures_for_stream_table",
             unique_key_and_multi_measures_for_stream_table,
         ),
-        t(
-            "unique_key_and_multi_partitions",
-            unique_key_and_multi_partitions,
-        ),
+        ("unique_key_and_multi_partitions", {
+            let prefix = prefix.to_owned();
+            Box::new(move |service| {
+                Box::pin(unique_key_and_multi_partitions(prefix.clone(), service))
+            })
+        }),
         t(
             "unique_key_and_multi_partitions_hash_aggregate",
             unique_key_and_multi_partitions_hash_aggregate,
@@ -3022,19 +3024,23 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .plan_query("SELECT url, SUM(hits) FROM s.Data GROUP BY 1")
         .await
         .unwrap();
+    let pp_opts = PPOptions {
+        show_partitions: true,
+        ..PPOptions::none()
+    };
     assert_eq!(
-        pp_phys_plan(p.router.as_ref()),
-        "SortedFinalAggregate\
+        pp_phys_plan_ext(p.router.as_ref(), &pp_opts),
+        "SortedFinalAggregate, partitions: 1\
         \n  ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
-        pp_phys_plan(p.worker.as_ref()),
-        "SortedFinalAggregate\
-        \n  Worker\
-        \n    SortedPartialAggregate\
-        \n      Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
-        \n        Sort\
-        \n          Empty"
+        pp_phys_plan_ext(p.worker.as_ref(), &pp_opts),
+        "SortedFinalAggregate, partitions: 1\
+        \n  Worker, partitions: 1\
+        \n    SortedPartialAggregate, partitions: 1\
+        \n      Scan, index: default:1:[1]:sort_on[url], fields: [url, hits], partitions: 1\
+        \n        Sort, partitions: 1\
+        \n          Empty, partitions: 1"
     );
 
     // When there is no index, we fallback to inplace aggregates.
@@ -3042,21 +3048,22 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         .plan_query("SELECT day, SUM(hits) FROM s.Data GROUP BY 1")
         .await
         .unwrap();
+    // TODO: Can we not have CoalescePartitions?  We don't want.
     assert_eq!(
-        pp_phys_plan(p.router.as_ref()),
-        "LinearFinalAggregate\
-        \n  CoalescePartitions\
+        pp_phys_plan_ext(p.router.as_ref(), &pp_opts),
+        "LinearFinalAggregate, partitions: 1\
+        \n  CoalescePartitions, partitions: 1\
         \n    ClusterSend, partitions: [[1]]"
     );
     assert_eq!(
-        pp_phys_plan(p.worker.as_ref()),
-        "LinearFinalAggregate\
-        \n  CoalescePartitions\
-        \n    Worker\
-        \n      CoalescePartitions\
-        \n        LinearPartialAggregate\
-        \n          Scan, index: default:1:[1], fields: [day, hits]\
-        \n            Empty"
+        pp_phys_plan_ext(p.worker.as_ref(), &pp_opts),
+        "LinearFinalAggregate, partitions: 1\
+        \n  CoalescePartitions, partitions: 1\
+        \n    Worker, partitions: 1\
+        \n      CoalescePartitions, partitions: 1\
+        \n        LinearPartialAggregate, partitions: 1\
+        \n          Scan, index: default:1:[1], fields: [day, hits], partitions: 1\
+        \n            Empty, partitions: 1"
     );
 
     service
@@ -3070,17 +3077,17 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    let phys_plan = pp_phys_plan_ext(p.worker.as_ref(), &pp_opts);
     assert_eq!(
         phys_plan,
-        "PartiallySortedFinalAggregate\
-        \n  Worker\
-        \n    PartiallySortedPartialAggregate\
-        \n      CoalesceBatchesExec\
-        \n        Filter\
-        \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
-        \n            Sort\
-        \n              Empty"
+        "PartiallySortedFinalAggregate, partitions: 1\
+        \n  Worker, partitions: 1\
+        \n    PartiallySortedPartialAggregate, partitions: 1\
+        \n      CoalesceBatchesExec, partitions: 1\
+        \n        Filter, partitions: 1\
+        \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *, partitions: 1\
+        \n            Sort, partitions: 1\
+        \n              Empty, partitions: 1"
     );
     let p = service
         .plan_query(
@@ -3088,17 +3095,17 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    let phys_plan = pp_phys_plan_ext(p.worker.as_ref(), &pp_opts);
     assert_eq!(
         phys_plan,
-        "PartiallySortedFinalAggregate\
-        \n  Worker\
-        \n    PartiallySortedPartialAggregate\
-        \n      CoalesceBatchesExec\
-        \n        Filter\
-        \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
-        \n            Sort\
-        \n              Empty"
+        "PartiallySortedFinalAggregate, partitions: 1\
+        \n  Worker, partitions: 1\
+        \n    PartiallySortedPartialAggregate, partitions: 1\
+        \n      CoalesceBatchesExec, partitions: 1\
+        \n        Filter, partitions: 1\
+        \n          Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *, partitions: 1\
+        \n            Sort, partitions: 1\
+        \n              Empty, partitions: 1"
     );
 }
 
@@ -3621,7 +3628,6 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    // TODO: test MergeSort node is present if ClusterSend has multiple partitions.
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
         "SortedFinalAggregate\
@@ -7242,7 +7248,7 @@ async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClie
     );
 }
 
-async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
+async fn unique_key_and_multi_partitions(prefix: String, service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA test").await.unwrap();
     service.exec_query("CREATE TABLE test.unique_parts1 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
     service.exec_query("CREATE TABLE test.unique_parts2 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
@@ -7285,21 +7291,66 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
 
-    let r = service
-        .exec_query(
-            "SELECT a, b FROM (
+    let query = "SELECT a, b FROM (
                     SELECT * FROM test.unique_parts1
                     UNION ALL
                     SELECT * FROM test.unique_parts2
-                ) `tt` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 100",
-        )
-        .await
-        .unwrap();
+                ) `tt` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 100";
+
+    let r = service.exec_query(query).await.unwrap();
 
     assert_eq!(
         to_rows(&r),
         rows(&[(1, 1), (2, 2), (3, 3), (4, 4), (11, 11), (22, 22)])
     );
+
+    let test_multiple_partitions = match prefix.as_str() {
+        "cluster" => true,
+        "in_process" => false,
+        "multi_process" => false,
+        _ => false,
+    };
+
+    // Assert that we get a MergeSort node when there are multiple partitions.
+    if test_multiple_partitions {
+        let plan = service.plan_query(query).await.unwrap();
+
+        assert_eq!(
+            pp_phys_plan_ext(
+                plan.router.as_ref(),
+                &PPOptions {
+                    show_partitions: true,
+                    ..PPOptions::none()
+                }
+            ),
+            "Sort, fetch: 100, partitions: 1\
+            \n  SortedFinalAggregate, partitions: 1\
+            \n    MergeSort, partitions: 1\
+            \n      ClusterSend, partitions: [[2], [1]]"
+        );
+        assert_eq!(pp_phys_plan_ext(plan.worker.as_ref(), &PPOptions{ show_partitions: true, ..PPOptions::none()}),
+            "Sort, fetch: 100, partitions: 1\
+            \n  SortedFinalAggregate, partitions: 1\
+            \n    MergeSort, partitions: 1\
+            \n      Worker, partitions: 2\
+            \n        GlobalLimit, n: 100, partitions: 1\
+            \n          SortedPartialAggregate, partitions: 1\
+            \n            MergeSort, partitions: 1\
+            \n              Union, partitions: 2\
+            \n                Projection, [a, b], partitions: 1\
+            \n                  LastRowByUniqueKey, partitions: 1\
+            \n                    MergeSort, partitions: 1\
+            \n                      Scan, index: default:1:[1]:sort_on[a, b], fields: [a, b, c, e, __seq], partitions: 2\
+            \n                        FilterByKeyRange, partitions: 1\
+            \n                          MemoryScan, partitions: 1\
+            \n                        FilterByKeyRange, partitions: 1\
+            \n                          MemoryScan, partitions: 1\
+            \n                Projection, [a, b], partitions: 1\
+            \n                  LastRowByUniqueKey, partitions: 1\
+            \n                    Scan, index: default:2:[2]:sort_on[a, b], fields: [a, b, c, e, __seq], partitions: 1\
+            \n                      FilterByKeyRange, partitions: 1\
+            \n                        MemoryScan, partitions: 1");
+    }
 }
 
 async fn unique_key_and_multi_partitions_hash_aggregate(service: Box<dyn SqlClient>) {
