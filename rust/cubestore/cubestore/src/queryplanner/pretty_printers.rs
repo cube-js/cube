@@ -1,7 +1,9 @@
 //! Presentation of query plans for use in tests.
 
 use bigdecimal::ToPrimitive;
+use datafusion::arrow::datatypes::Schema;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
+use datafusion::common::DFSchema;
 use datafusion::datasource::physical_plan::ParquetExec;
 use datafusion::datasource::{DefaultTableSource, TableProvider};
 use datafusion::error::DataFusionError;
@@ -36,7 +38,7 @@ use crate::queryplanner::topk::{
     AggregateTopKExec, ClusterAggregateTopKLower, ClusterAggregateTopKUpper,
 };
 use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
-use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider, QueryPlan};
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
@@ -53,29 +55,24 @@ pub struct PPOptions {
     pub show_filters: bool,
     pub show_sort_by: bool,
     pub show_aggregations: bool,
-    // TODO: Maybe prettify output, name this show_schema.
-    pub debug_schema: bool,
+    pub show_schema: bool,
     // Applies only to physical plan.
     pub show_output_hints: bool,
     pub show_check_memory_nodes: bool,
+    pub show_partitions: bool,
 }
 
 impl PPOptions {
-    pub fn not_everything() -> PPOptions {
+    #[allow(unused)]
+    pub fn everything() -> PPOptions {
         PPOptions {
             show_filters: true,
             show_sort_by: true,
             show_aggregations: true,
-            debug_schema: false,
+            show_schema: true,
             show_output_hints: true,
             show_check_memory_nodes: true,
-        }
-    }
-
-    pub fn truly_everything() -> PPOptions {
-        PPOptions {
-            debug_schema: true,
-            ..PPOptions::not_everything()
+            show_partitions: true,
         }
     }
 
@@ -95,7 +92,21 @@ pub fn pp_phys_plan_ext(p: &dyn ExecutionPlan, o: &PPOptions) -> String {
 }
 
 pub fn pp_plan(p: &LogicalPlan) -> String {
-    pp_plan_ext(p, &PPOptions::default())
+    pp_plan_ext(p, &PPOptions::none())
+}
+
+pub fn pp_query_plan_ext(qp: &QueryPlan, o: &PPOptions) -> String {
+    pp_plan_ext(
+        match qp {
+            QueryPlan::Meta(p) => p,
+            QueryPlan::Select(pre_serialized_plan, _) => pre_serialized_plan.logical_plan(),
+        },
+        o,
+    )
+}
+
+pub fn pp_query_plan(p: &QueryPlan) -> String {
+    pp_query_plan_ext(p, &PPOptions::none())
 }
 
 pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
@@ -180,7 +191,7 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                     }
                 }
                 LogicalPlan::Union(Union { schema, .. }) => {
-                    self.output += &format!("Union, schema: {}", schema)
+                    self.output += &format!("Union, schema: {}", pp_df_schema(schema.as_ref()))
                 }
                 LogicalPlan::Join(Join { on, .. }) => {
                     self.output += &format!(
@@ -381,8 +392,8 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 }
             }
 
-            if self.opts.debug_schema {
-                self.output += &format!(", debug_schema: {:?}", plan.schema());
+            if self.opts.show_schema {
+                self.output += &format!(", schema: {}", pp_df_schema(plan.schema().as_ref()));
             }
 
             if !saw_expected_topk_lower {
@@ -483,6 +494,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "\n";
         }
         out.extend(repeat_n(' ', indent));
+
+        let mut skip_show_partitions = false;
 
         let a = p.as_any();
         if let Some(t) = a.downcast_ref::<CubeTableExec>() {
@@ -597,6 +610,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     })
                     .join(", ")
             );
+            skip_show_partitions = true;
         } else if let Some(topk) = a.downcast_ref::<AggregateTopKExec>() {
             *out += &format!("AggregateTopK, limit: {:?}", topk.limit);
             if o.show_aggregations {
@@ -670,14 +684,6 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += &to_string.split(" ").next().unwrap_or(&to_string);
         }
 
-        // TODO upgrade DF - remove
-        // *out += &format!(", schema: {}", p.schema());
-        // *out += &format!(
-        //     ", partitions: {}, output_ordering: {:?}",
-        //     p.properties().partitioning.partition_count(),
-        //     p.output_ordering()
-        // );
-
         if o.show_output_hints {
             let properties: &PlanProperties = p.properties();
 
@@ -737,8 +743,15 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
         }
 
-        if o.debug_schema {
-            *out += &format!(", debug_schema: {:?}", p.schema());
+        if o.show_schema {
+            *out += &format!(", schema: {}", pp_schema(p.schema().as_ref()));
+        }
+
+        if o.show_partitions && !skip_show_partitions {
+            *out += &format!(
+                ", partitions: {}",
+                p.properties().output_partitioning().partition_count()
+            );
         }
     }
 }
@@ -760,4 +773,18 @@ fn pp_row_range(r: &RowRange) -> String {
 
 fn pp_exprs(v: &Vec<Expr>) -> String {
     "[".to_owned() + &v.iter().map(|e: &Expr| format!("{}", e)).join(", ") + "]"
+}
+
+fn pp_df_schema(schema: &DFSchema) -> String {
+    // Like pp_schema but with qualifiers.
+    format!("{}", schema)
+}
+
+fn pp_schema(schema: &Schema) -> String {
+    // Mimicking DFSchema's Display
+    format!(
+        "fields:[{}], metadata:{:?}",
+        schema.fields.iter().map(|f| f.name()).join(", "),
+        schema.metadata
+    )
 }

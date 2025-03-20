@@ -1692,7 +1692,7 @@ impl ExecutionPlan for ClusterSendExec {
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
-        // TODO:  If this is in place, and it is obeyed (with EnforceDistribution?), then we don't need to use a CoalescePartitions node in worker exec.
+        // TODO:  Ensure this is obeyed... or allow worker partitions to be sent separately.
         vec![Distribution::SinglePartition; self.children().len()]
     }
 }
