@@ -4,24 +4,21 @@
  * @fileoverview The `SnowflakeDriver` and related types declaration.
  */
 
-import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
+import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, RowStatement } from 'snowflake-sdk';
 import {
   BaseDriver,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
   DownloadTableCSVData,
+  DownloadTableMemoryData,
+  DriverCapabilities,
   DriverInterface,
   GenericDataBaseType,
-  TableStructure,
-  UnloadOptions,
   StreamOptions,
   StreamTableDataWithTypes,
-  DownloadTableMemoryData,
-  DownloadQueryResultsResult,
-  DownloadQueryResultsOptions,
-  DriverCapabilities,
+  TableStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import fs from 'fs/promises';
@@ -198,9 +195,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return 8;
   }
 
+  /**
+   * Returns the configurable driver options
+   * Note: It returns the unprefixed option names.
+   * In case of using multisources options need to be prefixed manually.
+   */
   public static driverEnvVariables() {
-    // TODO (buntarb): check how this method can/must be used with split
-    // names by the data source.
     return [
       'CUBEJS_DB_NAME',
       'CUBEJS_DB_USER',
@@ -211,9 +211,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       'CUBEJS_DB_SNOWFLAKE_ROLE',
       'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
       'CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR',
+      'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH',
+      'CUBEJS_DB_SNOWFLAKE_HOST',
+      'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS',
-      'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH',
       'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
     ];
   }
@@ -257,10 +259,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       privateKey += '\n';
     }
 
-    snowflake.configure({
-      // TODO: Remove after release of https://github.com/snowflakedb/snowflake-connector-nodejs/pull/912
-      logLevel: 'OFF' as any
-    });
+    snowflake.configure({ logLevel: 'OFF' });
 
     this.config = {
       readOnly: false,
@@ -416,9 +415,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       this.config.token = await this.readOAuthToken();
     }
 
-    const connection = snowflake.createConnection(this.config);
-
-    return connection;
+    return snowflake.createConnection(this.config);
   }
 
   /**
@@ -475,8 +472,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       }
     }
 
-    // eslint-disable-next-line no-return-assign
-    return this.connection = this.initConnection();
+    this.connection = this.initConnection();
+    return this.connection;
   }
 
   /**
@@ -758,7 +755,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         const hydrationMap = this.generateHydrationMap(stmt.getColumns());
         const types: {name: string, type: string}[] =
           this.getTypes(stmt);
-        if (rows && rows.length && Object.keys(hydrationMap).length) {
+        if (rows?.length && Object.keys(hydrationMap).length) {
           for (const row of rows) {
             for (const [field, toValue] of Object.entries(hydrationMap)) {
               if (row.hasOwnProperty(field)) {
@@ -922,6 +919,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   public async getTablesQuery(schemaName: string) {
     const tables = await super.getTablesQuery(schemaName.toUpperCase());
-    return tables.map(t => ({ table_name: t.TABLE_NAME && t.TABLE_NAME.toLowerCase() }));
+    return tables.map(t => ({ table_name: t.TABLE_NAME?.toLowerCase() }));
   }
 }
