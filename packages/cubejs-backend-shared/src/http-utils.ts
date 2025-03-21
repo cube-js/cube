@@ -67,9 +67,10 @@ type DownloadAndExtractFile = {
   showProgress: boolean;
   cwd: string;
   noExtract?: boolean;
+  dstFileName?: string;
 };
 
-export async function downloadAndExtractFile(url: string, { cwd, noExtract }: DownloadAndExtractFile) {
+export async function downloadAndExtractFile(url: string, { cwd, noExtract, dstFileName }: DownloadAndExtractFile) {
   const request = new Request(url, {
     headers: new Headers({
       'Content-Type': 'application/octet-stream',
@@ -101,7 +102,11 @@ export async function downloadAndExtractFile(url: string, { cwd, noExtract }: Do
   });
 
   if (noExtract) {
-    fs.copyFileSync(savedFilePath, cwd);
+    if (dstFileName) {
+      fs.copyFileSync(savedFilePath, path.resolve(path.join(cwd, dstFileName)));
+    } else {
+      fs.copyFileSync(savedFilePath, cwd);
+    }
   } else {
     await decompress(savedFilePath, cwd);
   }

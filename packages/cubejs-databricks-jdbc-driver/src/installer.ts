@@ -34,6 +34,7 @@ export async function downloadJDBCDriver(): Promise<string | null> {
         showProgress: true,
         cwd: path.resolve(path.join(__dirname, '..', 'download')),
         noExtract: true,
+        dstFileName: 'databricks-jdbc-1.0.2-oss.jar',
       }
     );
 
