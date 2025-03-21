@@ -40,6 +40,15 @@
           "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
         }
       }
+    },
+    "encrypted-pk": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR": "SNOWFLAKE_JWT",
+          "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY}",
+          "CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS": "${DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS}"
+        }
+      }
     }
   },
   "cube": {
