@@ -28,7 +28,7 @@
     "@cubejs-backend/base-driver": "1.2.25",
     "@cubejs-backend/shared": "1.2.25",
     "date-fns-timezone": "^0.1.4",
-    "snowflake-sdk": "^1.13.1"
+    "snowflake-sdk": "^2.0.3"
   },
   "license": "Apache-2.0",
   "publishConfig": {

@@ -30,7 +30,7 @@
     "@cubejs-backend/base-driver": "1.2.25",
     "@cubejs-backend/shared": "1.2.25",
     "@types/mysql": "^2.15.21",
-    "generic-pool": "^3.6.0",
+    "generic-pool": "^3.8.2",
     "mysql": "^2.18.1"
   },
   "devDependencies": {

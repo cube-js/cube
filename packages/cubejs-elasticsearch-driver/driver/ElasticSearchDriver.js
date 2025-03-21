@@ -84,9 +84,12 @@ class ElasticSearchDriver extends BaseDriver {
     }
   }
 
+  /**
+   * Returns the configurable driver options
+   * Note: It returns the unprefixed option names.
+   * In case of using multisources options need to be prefixed manually.
+   */
   static driverEnvVariables() {
-    // TODO (buntarb): check how this method can/must be used with split
-    // names by the data source.
     return [
       'CUBEJS_DB_URL',
       'CUBEJS_DB_ELASTIC_QUERY_FORMAT',
