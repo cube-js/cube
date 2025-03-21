@@ -12,15 +12,14 @@ use crate::metastore::{
 };
 use crate::metastore::{Column, ColumnType, MetaStore};
 use crate::sql::cache::SqlResultCache;
-use crate::sql::fully_qualified_or_lower;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef};
+use crate::sql::{quoted_value_or_lower, quoted_value_or_retain_case};
 use crate::telemetry::incoming_traffic_agent_event;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use sqlparser::ast::*;
-use std::mem::take;
 
 #[async_trait]
 
@@ -293,12 +292,12 @@ impl TableCreator {
         if let Some(mut p) = partitioned_index {
             let part_index_name = match p.name.0.as_mut_slice() {
                 &mut [ref schema, ref mut name] => {
-                    if fully_qualified_or_lower(&schema) != schema_name {
+                    if quoted_value_or_retain_case(&schema) != schema_name {
                         return Err(CubeError::user(format!("CREATE TABLE in schema '{}' cannot reference PARTITIONED INDEX from schema '{}'", schema_name, schema)));
                     }
-                    take(&mut fully_qualified_or_lower(&name))
+                    quoted_value_or_retain_case(&name)
                 }
-                &mut [ref mut name] => take(&mut fully_qualified_or_lower(&name)),
+                &mut [ref mut name] => quoted_value_or_retain_case(&name),
                 _ => {
                     return Err(CubeError::user(format!(
                         "PARTITIONED INDEX must consist of 1 or 2 identifiers, got '{}'",
@@ -308,8 +307,8 @@ impl TableCreator {
             };
 
             let mut columns = Vec::new();
-            for mut c in p.columns {
-                columns.push(take(&mut fully_qualified_or_lower(&c)));
+            for c in p.columns {
+                columns.push(quoted_value_or_lower(&c));
             }
 
             indexes_to_create.push(IndexDef {
@@ -339,7 +338,7 @@ impl TableCreator {
                         .iter()
                         .map(|c| {
                             if let Expr::Identifier(ident) = &c.expr {
-                                Ok(fully_qualified_or_lower(&ident))
+                                Ok(quoted_value_or_lower(&ident))
                             } else {
                                 Err(CubeError::internal(format!(
                                     "Unexpected column expression: {:?}",
@@ -400,16 +399,10 @@ impl TableCreator {
                     select_statement,
                     None,
                     stream_offset,
-                    unique_key
-                        .map(|keys| keys.iter().map(|c| fully_qualified_or_lower(&c)).collect()),
+                    unique_key.map(|keys| keys.iter().map(|c| quoted_value_or_lower(&c)).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
-                            .map(|c| {
-                                (
-                                    fully_qualified_or_lower(&c.0),
-                                    fully_qualified_or_lower(&c.1),
-                                )
-                            })
+                            .map(|c| (quoted_value_or_lower(&c.0), quoted_value_or_lower(&c.1)))
                             .collect()
                     }),
                     None,
@@ -487,15 +480,10 @@ impl TableCreator {
                 select_statement,
                 source_columns,
                 stream_offset,
-                unique_key.map(|keys| keys.iter().map(|c| fully_qualified_or_lower(&c)).collect()),
+                unique_key.map(|keys| keys.iter().map(|c| quoted_value_or_lower(&c)).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
-                        .map(|c| {
-                            (
-                                fully_qualified_or_lower(&c.0),
-                                fully_qualified_or_lower(&c.1),
-                            )
-                        })
+                        .map(|c| (quoted_value_or_lower(&c.0), quoted_value_or_lower(&c.1)))
                         .collect()
                 }),
                 partition_split_threshold,
@@ -579,7 +567,7 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
 
     for (i, col) in columns.iter().enumerate() {
         let cube_col = Column::new(
-            fully_qualified_or_lower(&col.name),
+            quoted_value_or_lower(&col.name),
             match &col.data_type {
                 DataType::Date
                 | DataType::Time(_, _)
