@@ -48,8 +48,8 @@ impl SQLInterface {
 
 fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
-    let check_auth = options
-        .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
+    let check_sql_auth = options
+        .get::<JsFunction, _, _>(&mut cx, "checkSqlAuth")?
         .root(&mut cx);
     let transport_sql_api_load = options
         .get::<JsFunction, _, _>(&mut cx, "sqlApiLoad")?
@@ -101,7 +101,7 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         transport_sql_generator,
         transport_can_switch_user_for_session,
     );
-    let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
+    let auth_service = NodeBridgeAuthService::new(cx.channel(), check_sql_auth);
 
     std::thread::spawn(move || {
         let config = C::new(NodeConfigurationFactoryOptions {

@@ -107,10 +107,9 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
-      checkAuth: async ({ request, user, password }) => {
+      checkSqlAuth: async ({ request, user, password }) => {
         const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
-        // Strip securityContext to improve speed deserialization
         return {
           password: returnedPassword,
           superuser: superuser || false,
