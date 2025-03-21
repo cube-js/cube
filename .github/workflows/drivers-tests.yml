@@ -213,6 +213,7 @@ jobs:
         redshift
         redshift-export-bucket-s3
         snowflake
+        snowflake-encrypted-pk
         snowflake-export-bucket-s3
         snowflake-export-bucket-azure
         snowflake-export-bucket-azure-via-storage-integration
@@ -242,6 +243,7 @@ jobs:
           - redshift
           - redshift-export-bucket-s3
           - snowflake
+          - snowflake-encrypted-pk
           - snowflake-export-bucket-s3
           - snowflake-export-bucket-azure
           - snowflake-export-bucket-azure-via-storage-integration
