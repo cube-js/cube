@@ -1,8 +1,9 @@
-use crate::gateway::ApiGatewayState;
+use crate::gateway::{ApiGatewayRouterBuilder, ApiGatewayState};
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Json;
+use axum::{Extension, Json};
 use serde::Serialize;
+use crate::gateway::auth_middleware::AuthExtension;
 
 #[derive(Serialize)]
 pub struct HandlerResponse {
@@ -10,7 +11,8 @@ pub struct HandlerResponse {
 }
 
 pub async fn stream_handler_v2(
-    State(_state): State<ApiGatewayState>,
+    State(_gateway_state): State<ApiGatewayState>,
+    Extension(_auth): Extension<AuthExtension>,
 ) -> (StatusCode, Json<HandlerResponse>) {
     (
         StatusCode::NOT_IMPLEMENTED,

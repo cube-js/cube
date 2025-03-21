@@ -6,6 +6,7 @@ use cubesql::CubeError;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, Mutex};
+use tower::ServiceBuilder;
 
 pub trait ApiGatewayServer: ProcessingLoop {}
 
@@ -78,6 +79,12 @@ impl ProcessingLoop for ApiGatewayServerImpl {
 
             log::trace!("Shutdown signal received");
         };
+
+        let router = router.layer(
+            ServiceBuilder::new()
+                .layer(crate::gateway::auth_middleware::gateway_auth_middleware)
+                .into_inner(),
+        );
 
         axum::serve(listener, router)
             .with_graceful_shutdown(shutdown_signal())

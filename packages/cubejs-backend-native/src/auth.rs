@@ -145,7 +145,7 @@ impl GatewayAuthService for NodeBridgeAuthService {
         req: GatewayCheckAuthRequest,
         token: String,
     ) -> Result<GatewayAuthenticateResponse, CubeError> {
-        trace!("[sql auth] Request ->");
+        trace!("[auth] Request ->");
 
         let request_id = Uuid::new_v4().to_string();
 
@@ -163,7 +163,7 @@ impl GatewayAuthService for NodeBridgeAuthService {
             Some(extra),
         )
         .await?;
-        trace!("[sql auth] Request <- {:?}", response);
+        trace!("[auth] Request <- {:?}", response);
 
         Ok(GatewayAuthenticateResponse {
             context: Arc::new(NativeAuthContext {

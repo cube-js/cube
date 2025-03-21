@@ -19,7 +19,7 @@ pub struct GatewayAuthenticateResponse {
 
 #[derive(Debug, Serialize)]
 pub struct GatewayCheckAuthRequest {
-    protocol: String,
+    pub(crate) protocol: String,
 }
 
 #[async_trait]
