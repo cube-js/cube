@@ -12,7 +12,7 @@ use cubesql::sql::{Session, CUBESQL_PENALIZE_POST_PROCESSING_VAR};
 use cubesql::transport::MetaContext;
 use cubesql::CubeError;
 
-use crate::auth::NativeAuthContext;
+use crate::auth::NativeSQLAuthContext;
 use crate::config::NodeCubeServices;
 use crate::cubesql_utils::with_session;
 use crate::tokio_runtime_node;
@@ -157,7 +157,7 @@ async fn get_sql(
 
 async fn handle_sql4sql_query(
     services: Arc<NodeCubeServices>,
-    native_auth_ctx: Arc<NativeAuthContext>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
     sql_query: &str,
     disable_post_processing: bool,
 ) -> Result<Sql4SqlResponse, CubeError> {
@@ -205,7 +205,7 @@ pub fn sql4sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
     let channel = cx.channel();
 
-    let native_auth_ctx = Arc::new(NativeAuthContext {
+    let native_auth_ctx = Arc::new(NativeSQLAuthContext {
         user: Some(String::from("unknown")),
         superuser: false,
         security_context,

@@ -8,7 +8,7 @@ use serde_json::Map;
 use tokio::sync::Semaphore;
 use uuid::Uuid;
 
-use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
+use crate::auth::{NativeSQLAuthContext, NodeBridgeAuthService, NodeBridgeAuthServiceOptions};
 use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
@@ -48,6 +48,9 @@ impl SQLInterface {
 
 fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
+    let check_auth = options
+        .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
+        .root(&mut cx);
     let check_sql_auth = options
         .get::<JsFunction, _, _>(&mut cx, "checkSqlAuth")?
         .root(&mut cx);
@@ -101,7 +104,13 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         transport_sql_generator,
         transport_can_switch_user_for_session,
     );
-    let auth_service = NodeBridgeAuthService::new(cx.channel(), check_sql_auth);
+    let auth_service = NodeBridgeAuthService::new(
+        cx.channel(),
+        NodeBridgeAuthServiceOptions {
+            check_auth,
+            check_sql_auth,
+        },
+    );
 
     std::thread::spawn(move || {
         let config = C::new(NodeConfigurationFactoryOptions {
@@ -179,7 +188,7 @@ const CHUNK_DELIM: &str = "\n";
 
 async fn handle_sql_query(
     services: Arc<NodeCubeServices>,
-    native_auth_ctx: Arc<NativeAuthContext>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
     channel: Arc<Channel>,
     stream_methods: WritableStreamMethods,
     sql_query: &str,
@@ -411,7 +420,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let channel = Arc::new(cx.channel());
     let node_stream_arc = Arc::new(node_stream_root);
 
-    let native_auth_ctx = Arc::new(NativeAuthContext {
+    let native_auth_ctx = Arc::new(NativeSQLAuthContext {
         user: Some(String::from("unknown")),
         superuser: false,
         security_context,
