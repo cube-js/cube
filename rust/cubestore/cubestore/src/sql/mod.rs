@@ -264,10 +264,7 @@ impl SqlServiceImpl {
                 IndexDef {
                     name,
                     multi_index: None,
-                    columns: columns
-                        .iter()
-                        .map(|c| fully_qualified_or_lower(&c))
-                        .collect(),
+                    columns: columns.iter().map(|c| quoted_value_or_lower(&c)).collect(),
                     index_type: IndexType::Regular, //TODO realize aggregate index here too
                 },
             )
@@ -291,13 +288,13 @@ impl SqlServiceImpl {
         for column in columns {
             let c = if let Some(item) = table_columns
                 .iter()
-                .find(|voc| *voc.get_name() == fully_qualified_or_lower(&column))
+                .find(|voc| *voc.get_name() == quoted_value_or_lower(&column))
             {
                 item
             } else {
                 return Err(CubeError::user(format!(
                     "Column {} is not present in table {}.{}.",
-                    fully_qualified_or_lower(&column),
+                    quoted_value_or_lower(&column),
                     schema_name,
                     table_name
                 )));
@@ -502,12 +499,16 @@ pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<boo
         })
 }
 
-pub fn fully_qualified_or_lower(ident: &Ident) -> String {
+pub fn quoted_value_or_lower(ident: &Ident) -> String {
     if ident.quote_style.is_some() {
         ident.value.to_string()
     } else {
         ident.value.to_lowercase()
     }
+}
+
+pub fn quoted_value_or_retain_case(ident: &Ident) -> String {
+    ident.value.to_string()
 }
 
 #[derive(Debug)]
@@ -683,7 +684,7 @@ impl SqlService for SqlServiceImpl {
                     Some(&vec![metrics::format_tag("command", "create_schema")]),
                 );
 
-                let name = fully_qualified_or_lower(&schema_name.0[0]);
+                let name = quoted_value_or_retain_case(&schema_name.0[0]);
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
@@ -715,8 +716,8 @@ impl SqlService for SqlServiceImpl {
                         name
                     )));
                 }
-                let schema_name = &fully_qualified_or_lower(&nv[0]);
-                let table_name = &fully_qualified_or_lower(&nv[1]);
+                let schema_name = &quoted_value_or_retain_case(&nv[0]);
+                let table_name = &quoted_value_or_retain_case(&nv[1]);
                 let mut import_format = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "input_format")
@@ -888,8 +889,8 @@ impl SqlService for SqlServiceImpl {
                         table_name
                     )));
                 }
-                let schema_name = &fully_qualified_or_lower(&table_name.0[0]);
-                let table_name = &fully_qualified_or_lower(&table_name.0[1]);
+                let schema_name = &quoted_value_or_retain_case(&table_name.0[0]);
+                let table_name = &quoted_value_or_retain_case(&table_name.0[1]);
                 let name = name.ok_or(CubeError::user(format!(
                     "Index name is not defined during index creation for {}.{}",
                     schema_name, table_name
@@ -959,7 +960,7 @@ impl SqlService for SqlServiceImpl {
                     };
                     let source = self
                         .db
-                        .create_or_update_source(fully_qualified_or_lower(&name), creds?)
+                        .create_or_update_source(quoted_value_or_lower(&name), creds?)
                         .await?;
                     Ok(Arc::new(DataFrame::from(vec![source])))
                 } else {
@@ -1057,8 +1058,8 @@ impl SqlService for SqlServiceImpl {
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", query)));
                 }
-                let schema_name = &fully_qualified_or_lower(&nv[0]);
-                let table_name = &fully_qualified_or_lower(&nv[1]);
+                let schema_name = &quoted_value_or_retain_case(&nv[0]);
+                let table_name = &quoted_value_or_retain_case(&nv[1]);
 
                 self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
                     .await?;
