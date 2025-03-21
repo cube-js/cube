@@ -4,27 +4,21 @@
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
 
+import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
-import {
+  DatabaseStructure,
   DriverCapabilities,
+  GenericDataBaseType,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
   QueryTablesResult,
-  UnloadOptions,
-  GenericDataBaseType,
   TableColumn,
-  DatabaseStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import {
-  JDBCDriver,
-  JDBCDriverConfiguration,
-} from '@cubejs-backend/jdbc-driver';
+import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
+import { extractUidFromJdbcUrl, resolveJDBCDriver } from './helpers';
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -132,7 +126,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Show warning message flag.
    */
-  private showSparkProtocolWarn: boolean;
+  private readonly showSparkProtocolWarn: boolean;
 
   /**
    * Driver Configuration.
@@ -429,8 +423,7 @@ export class DatabricksDriver extends JDBCDriver {
         metadata[database] = {};
       }
 
-      const columns = await this.tableColumnTypes(`${database}.${tableName}`);
-      metadata[database][tableName] = columns;
+      metadata[database][tableName] = await this.tableColumnTypes(`${database}.${tableName}`);
     }));
 
     return metadata;
