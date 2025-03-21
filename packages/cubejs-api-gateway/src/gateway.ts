@@ -120,8 +120,10 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
-// Prepared CheckAuthFn, default or from config: always async, returns nothing
-type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<void>;
+// Prepared CheckAuthFn, default or from config: always async
+type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<{
+  securityContext: any;
+}>;
 
 class ApiGateway {
   protected readonly refreshScheduler: any;
@@ -148,9 +150,9 @@ class ApiGateway {
 
   public readonly checkAuthSystemFn: PreparedCheckAuthFn;
 
-  protected readonly contextToApiScopesFn: ContextToApiScopesFn;
+  public readonly contextToApiScopesFn: ContextToApiScopesFn;
 
-  protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
+  public readonly contextToApiScopesDefFn: ContextToApiScopesFn =
     async () => ['graphql', 'meta', 'data'];
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
@@ -544,18 +546,22 @@ class ApiGateway {
     }
 
     if (getEnv('nativeApiGateway')) {
-      const proxyMiddleware = createProxyMiddleware<Request, Response>({
-        target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
-        changeOrigin: true,
-      });
-
-      app.use(
-        `${this.basePath}/v2`,
-        proxyMiddleware as any
-      );
+      this.enableNativeApiGateway(app);
     }
 
     app.use(this.handleErrorMiddleware);
+  }
+
+  protected enableNativeApiGateway(app: ExpressApplication) {
+    const proxyMiddleware = createProxyMiddleware<Request, Response>({
+      target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
+      changeOrigin: true,
+    });
+
+    app.use(
+      `${this.basePath}/v2`,
+      proxyMiddleware as any
+    );
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
@@ -2250,6 +2256,10 @@ class ApiGateway {
 
         showWarningAboutNotObject = true;
       }
+
+      return {
+        securityContext: req.securityContext
+      };
     };
   }
 
@@ -2333,6 +2343,10 @@ class ApiGateway {
         // @todo Move it to 401 or 400
         throw new CubejsHandlerError(403, 'Forbidden', 'Authorization header isn\'t set');
       }
+
+      return {
+        securityContext: req.securityContext
+      };
     };
   }
 
@@ -2343,6 +2357,7 @@ class ApiGateway {
 
     if (this.playgroundAuthSecret) {
       const systemCheckAuthFn = this.createCheckAuthSystemFn();
+
       return async (ctx, authorization) => {
         // TODO: separate two auth workflows
         try {
@@ -2354,6 +2369,10 @@ class ApiGateway {
             throw mainAuthError;
           }
         }
+
+        return {
+          securityContext: ctx.securityContext,
+        };
       };
     }
 
@@ -2371,6 +2390,10 @@ class ApiGateway {
 
     return async (ctx, authorization) => {
       await systemCheckAuthFn(ctx, authorization);
+
+      return {
+        securityContext: ctx.securityContext
+      };
     };
   }
 

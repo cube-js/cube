@@ -3,22 +3,46 @@ import express, { Application as ExpressApplication, RequestHandler } from 'expr
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { pausePromise } from '@cubejs-backend/shared';
+import {getEnv, pausePromise} from '@cubejs-backend/shared';
 
 import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request } from '../src';
 import { AdapterApiMock, DataSourceStorageMock } from './mocks';
 import { RequestContext } from '../src/interfaces';
 import { generateAuthToken } from './utils';
 
+class ApiGatewayOpenAPI extends ApiGateway {
+  protected isRunning: Promise<void> | null = null;
+
+  public coerceForSqlQuery(query, context: RequestContext) {
+    return super.coerceForSqlQuery(query, context);
+  }
+
+  public async startSQLServer(): Promise<void> {
+    if (this.isRunning) {
+      return this.isRunning;
+    }
+
+    this.isRunning = this.sqlServer.init({});
+
+    return this.isRunning;
+  }
+
+  public async shutdownSQLServer(): Promise<void> {
+    try {
+      await this.sqlServer.shutdown('fast');
+    } catch (error) {
+      console.log(`Error while shutting down server: ${error}`);
+    }
+
+    this.isRunning = null;
+  }
+}
+
 function createApiGateway(handler: RequestHandler, logger: () => any, options: Partial<ApiGatewayOptions>) {
   const adapterApi: any = new AdapterApiMock();
   const dataSourceStorage: any = new DataSourceStorageMock();
 
-  class ApiGatewayFake extends ApiGateway {
-    public coerceForSqlQuery(query, context: RequestContext) {
-      return super.coerceForSqlQuery(query, context);
-    }
-
+  class ApiGatewayFake extends ApiGatewayOpenAPI {
     public initApp(app: ExpressApplication) {
       const userMiddlewares: RequestHandler[] = [
         this.checkAuth,
@@ -26,6 +50,7 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
       ];
 
       app.get('/test-auth-fake', userMiddlewares, handler);
+      this.enableNativeApiGateway(app);
 
       app.use(this.handleErrorMiddleware);
     }
@@ -49,6 +74,61 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
     app,
   };
 }
+
+describe('test authorization with native gateway', () => {
+  const expectSecurityContext = (securityContext) => {
+    expect(securityContext.uid).toEqual(5);
+    expect(securityContext.iat).toBeDefined();
+    expect(securityContext.exp).toBeDefined();
+  };
+
+  let app: ExpressApplication;
+  let apiGateway: ApiGatewayOpenAPI;
+
+  const handlerMock = jest.fn((req, res) => {
+    expectSecurityContext(req.context.authInfo);
+    expectSecurityContext(req.context.securityContext);
+
+    res.status(200).end();
+  });
+  const loggerMock = jest.fn(() => {
+    //
+  });
+
+  beforeAll(async () => {
+    const result = createApiGateway(handlerMock, loggerMock, {});
+
+    app = result.app;
+    apiGateway = result.apiGateway;
+
+    await result.apiGateway.startSQLServer();
+  });
+
+  beforeEach(() => {
+    handlerMock.mockClear();
+    loggerMock.mockClear();
+  });
+
+  afterAll(async () => {
+    await apiGateway.shutdownSQLServer();
+  });
+
+  it('default authorization', async () => {
+    const token = generateAuthToken({ uid: 5, });
+
+    await request(app)
+      .get('/cubejs-api/v2/stream')
+      .set('Authorization', `${token}`)
+      .expect(501);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    // We should not call js handler, request should go into rust code
+    expect(handlerMock.mock.calls.length).toEqual(0);
+
+    await apiGateway.shutdownSQLServer();
+  });
+});
 
 describe('test authorization', () => {
   test('default authorization', async () => {

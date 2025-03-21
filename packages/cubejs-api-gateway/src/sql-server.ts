@@ -1,5 +1,6 @@
 import {
   setupLogger,
+  resetLogger,
   registerInterface,
   shutdownInterface,
   execSql,
@@ -14,7 +15,7 @@ import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
 import type { ApiGateway } from './gateway';
-import type { CheckSQLAuthFn, ExtendedRequestContext, CanSwitchSQLUserFn } from './interfaces';
+import type { CheckAuthFn, CheckSQLAuthFn, ExtendedRequestContext, CanSwitchSQLUserFn } from './interfaces';
 
 export type SQLServerOptions = {
   checkSqlAuth?: CheckSQLAuthFn,
@@ -107,6 +108,19 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
+      contextToApiScopes: async ({ securityContext }) => {
+        return this.apiGateway.contextToApiScopesFn(
+          securityContext,
+          getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()
+        );
+      },
+      checkAuth: async ({ request, token }) => {
+        const { securityContext } = await this.apiGateway.checkAuthFn(request, token);
+
+        return {
+          securityContext
+        };
+      },
       checkSqlAuth: async ({ request, user, password }) => {
         const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
@@ -369,5 +383,9 @@ export class SQLServer {
 
   public async shutdown(mode: ShutdownMode): Promise<void> {
     await shutdownInterface(this.sqlInterfaceInstance!, mode);
+
+    resetLogger(
+      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
+    );
   }
 }

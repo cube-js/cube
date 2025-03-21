@@ -29,6 +29,7 @@ findshlibs = "0.10.2"
 futures = "0.3.30"
 http-body-util = "0.1"
 axum = { version = "0.7.5", features = ["default", "ws"] }
+tower = "0.5.2"
 libc = "0.2"
 log = "0.4.21"
 log-reroute = "0.1"

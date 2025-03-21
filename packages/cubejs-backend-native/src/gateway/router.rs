@@ -1,34 +1,35 @@
+use crate::gateway::gateway_auth_middleware;
 use crate::gateway::handlers::stream_handler_v2;
-use crate::gateway::ApiGatewayState;
+use crate::gateway::state::ApiGatewayStateRef;
 use axum::routing::{get, MethodRouter};
 use axum::Router;
 
 #[derive(Debug, Clone)]
 pub struct ApiGatewayRouterBuilder {
-    router: Router<ApiGatewayState>,
-}
-
-impl Default for ApiGatewayRouterBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
+    router: Router<ApiGatewayStateRef>,
 }
 
 impl ApiGatewayRouterBuilder {
-    pub fn new() -> Self {
+    pub fn new(state: ApiGatewayStateRef) -> Self {
         let router = Router::new();
-        let router = router.route("/v2/stream", get(stream_handler_v2));
+        let router = router.route(
+            "/v2/stream",
+            get(stream_handler_v2).layer(axum::middleware::from_fn_with_state(
+                state,
+                gateway_auth_middleware,
+            )),
+        );
 
         Self { router }
     }
 
-    pub fn route(self, path: &str, method_router: MethodRouter<ApiGatewayState>) -> Self {
+    pub fn route(self, path: &str, method_router: MethodRouter<ApiGatewayStateRef>) -> Self {
         Self {
             router: self.router.route(path, method_router),
         }
     }
 
-    pub fn build(self) -> Router<ApiGatewayState> {
+    pub fn build(self) -> Router<ApiGatewayStateRef> {
         self.router
     }
 }
