@@ -1,6 +1,8 @@
 import path from 'path';
 import { downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
 
+export const OSS_DRIVER_VERSION = '1.0.2';
+
 function acceptedByEnv() {
   const acceptStatus = getEnv('databrickAcceptPolicy');
   if (acceptStatus) {
@@ -26,21 +28,21 @@ export async function downloadJDBCDriver(): Promise<string | null> {
   const driverAccepted = acceptedByEnv();
 
   if (driverAccepted) {
-    console.log('Downloading databricks-jdbc-1.0.2-oss.jar');
+    console.log(`Downloading databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`);
 
     await downloadAndExtractFile(
-      'https://repo1.maven.org/maven2/com/databricks/databricks-jdbc/1.0.2-oss/databricks-jdbc-1.0.2-oss.jar',
+      `https://repo1.maven.org/maven2/com/databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss/databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
       {
         showProgress: true,
         cwd: path.resolve(path.join(__dirname, '..', 'download')),
         noExtract: true,
-        dstFileName: 'databricks-jdbc-1.0.2-oss.jar',
+        dstFileName: `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
       }
     );
 
-    console.log('Release notes: https://mvnrepository.com/artifact/com.databricks/databricks-jdbc/1.0.2-oss');
+    console.log(`Release notes: https://mvnrepository.com/artifact/com.databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss`);
 
-    return path.resolve(path.join(__dirname, '..', 'download', 'databricks-jdbc-1.0.2-oss.jar'));
+    return path.resolve(path.join(__dirname, '..', 'download', `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`));
   }
 
   return null;
