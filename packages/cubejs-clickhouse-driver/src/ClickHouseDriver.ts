@@ -111,6 +111,7 @@ type ClickHouseDriverConfig = {
   database: string,
   requestTimeout: number,
   exportBucket: ClickhouseDriverExportAWS | null,
+  compression: { response?: boolean; request?: boolean },
   clickhouseSettings: ClickHouseSettings,
 };
 
@@ -150,8 +151,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const database = config.database ?? (getEnv('dbName', { dataSource }) as string) ?? 'default';
 
     // TODO this is a bit inconsistent with readOnly
-    this.readOnlyMode =
-      getEnv('clickhouseReadOnly', { dataSource }) === 'true';
+    this.readOnlyMode = getEnv('clickhouseReadOnly', { dataSource });
 
     // Expect that getEnv('dbQueryTimeout') will always return a value
     const requestTimeoutEnv: number = getEnv('dbQueryTimeout', { dataSource }) * 1000;
@@ -165,6 +165,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(dataSource),
       readOnly: !!config.readOnly,
       requestTimeout,
+      compression: {
+        // Response compression can't be enabled for a user with readonly=1, as ClickHouse will not allow settings modifications for such user.
+        response: this.readOnlyMode ? false : getEnv('clickhouseCompression', { dataSource }),
+        request: getEnv('clickhouseCompression', { dataSource }),
+      },
       clickhouseSettings: {
         // If ClickHouse user's permissions are restricted with "readonly = 1",
         // change settings queries are not allowed. Thus, "join_use_nulls" setting
@@ -224,6 +229,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       username: this.config.username,
       password: this.config.password,
       database: this.config.database,
+      compression: this.config.compression,
       clickhouse_settings: this.config.clickhouseSettings,
       request_timeout: this.config.requestTimeout,
       max_open_connections: maxPoolSize,
