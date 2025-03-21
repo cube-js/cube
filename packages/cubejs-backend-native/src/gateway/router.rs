@@ -2,6 +2,7 @@ use crate::gateway::handlers::stream_handler_v2;
 use crate::gateway::ApiGatewayState;
 use axum::routing::{get, MethodRouter};
 use axum::Router;
+use tower::ServiceBuilder;
 
 #[derive(Debug, Clone)]
 pub struct ApiGatewayRouterBuilder {

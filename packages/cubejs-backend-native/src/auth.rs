@@ -13,18 +13,28 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::channel::call_js_with_channel_as_callback;
+use crate::gateway::{
+    GatewayAuthContext, GatewayAuthService, GatewayAuthenticateResponse, GatewayCheckAuthRequest,
+};
 
 #[derive(Debug)]
 pub struct NodeBridgeAuthService {
     channel: Arc<Channel>,
+    check_auth: Arc<Root<JsFunction>>,
     check_sql_auth: Arc<Root<JsFunction>>,
 }
 
+pub struct NodeBridgeAuthServiceOptions {
+    pub check_auth: Root<JsFunction>,
+    pub check_sql_auth: Root<JsFunction>,
+}
+
 impl NodeBridgeAuthService {
-    pub fn new(channel: Channel, check_sql_auth: Root<JsFunction>) -> Self {
+    pub fn new(channel: Channel, options: NodeBridgeAuthServiceOptions) -> Self {
         Self {
             channel: Arc::new(channel),
-            check_sql_auth: Arc::new(check_sql_auth),
+            check_auth: Arc::new(options.check_auth),
+            check_sql_auth: Arc::new(options.check_sql_auth),
         }
     }
 }
@@ -36,14 +46,14 @@ pub struct TransportRequest {
 }
 
 #[derive(Debug, Serialize)]
-struct CheckSQLAuthRequest {
+struct CheckSQLAuthTransportRequest {
     request: TransportRequest,
     user: Option<String>,
     password: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct CheckSQLAuthResponse {
+struct CheckSQLAuthTransportResponse {
     password: Option<String>,
     superuser: bool,
     #[serde(rename = "securityContext", skip_serializing_if = "Option::is_none")]
@@ -53,13 +63,13 @@ struct CheckSQLAuthResponse {
 }
 
 #[derive(Debug)]
-pub struct NativeAuthContext {
+pub struct NativeSQLAuthContext {
     pub user: Option<String>,
     pub superuser: bool,
     pub security_context: Option<serde_json::Value>,
 }
 
-impl AuthContext for NativeAuthContext {
+impl AuthContext for NativeSQLAuthContext {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -72,11 +82,11 @@ impl SqlAuthService for NodeBridgeAuthService {
         user: Option<String>,
         password: Option<String>,
     ) -> Result<AuthenticateResponse, CubeError> {
-        trace!("[auth] Request ->");
+        trace!("[sql auth] Request ->");
 
         let request_id = Uuid::new_v4().to_string();
 
-        let extra = serde_json::to_string(&CheckSQLAuthRequest {
+        let extra = serde_json::to_string(&CheckSQLAuthTransportRequest {
             request: TransportRequest {
                 id: format!("{}-span-1", request_id),
                 meta: None,
@@ -84,16 +94,16 @@ impl SqlAuthService for NodeBridgeAuthService {
             user: user.clone(),
             password: password.clone(),
         })?;
-        let response: CheckSQLAuthResponse = call_js_with_channel_as_callback(
+        let response: CheckSQLAuthTransportResponse = call_js_with_channel_as_callback(
             self.channel.clone(),
             self.check_sql_auth.clone(),
             Some(extra),
         )
         .await?;
-        trace!("[auth] Request <- {:?}", response);
+        trace!("[sql auth] Request <- {:?}", response);
 
         Ok(AuthenticateResponse {
-            context: Arc::new(NativeAuthContext {
+            context: Arc::new(NativeSQLAuthContext {
                 user,
                 superuser: response.superuser,
                 security_context: response.security_context,
@@ -104,4 +114,63 @@ impl SqlAuthService for NodeBridgeAuthService {
     }
 }
 
-di_service!(NodeBridgeAuthService, [SqlAuthService]);
+#[derive(Debug, Serialize)]
+struct CheckAuthTransportRequest {
+    request: TransportRequest,
+    req: GatewayCheckAuthRequest,
+    token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckAuthTransportResponse {
+    #[serde(rename = "securityContext", skip_serializing_if = "Option::is_none")]
+    security_context: Option<serde_json::Value>,
+}
+
+#[derive(Debug)]
+pub struct NativeAuthContext {
+    pub security_context: Option<serde_json::Value>,
+}
+
+impl GatewayAuthContext for NativeAuthContext {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+#[async_trait]
+impl GatewayAuthService for NodeBridgeAuthService {
+    async fn authenticate(
+        &self,
+        req: GatewayCheckAuthRequest,
+        token: String,
+    ) -> Result<GatewayAuthenticateResponse, CubeError> {
+        trace!("[auth] Request ->");
+
+        let request_id = Uuid::new_v4().to_string();
+
+        let extra = serde_json::to_string(&CheckAuthTransportRequest {
+            request: TransportRequest {
+                id: format!("{}-span-1", request_id),
+                meta: None,
+            },
+            req,
+            token: token.clone(),
+        })?;
+        let response: CheckAuthTransportResponse = call_js_with_channel_as_callback(
+            self.channel.clone(),
+            self.check_auth.clone(),
+            Some(extra),
+        )
+        .await?;
+        trace!("[auth] Request <- {:?}", response);
+
+        Ok(GatewayAuthenticateResponse {
+            context: Arc::new(NativeAuthContext {
+                security_context: response.security_context,
+            }),
+        })
+    }
+}
+
+di_service!(NodeBridgeAuthService, [SqlAuthService, GatewayAuthService]);
