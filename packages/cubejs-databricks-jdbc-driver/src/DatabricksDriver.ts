@@ -704,11 +704,7 @@ export class DatabricksDriver extends JDBCDriver {
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
     const prefix = url.pathname.slice(1);
-    let delimiter = '';
-    if (prefix && !prefix.endsWith('/')) {
-      delimiter = '/';
-    }
-
+    const delimiter = (prefix && !prefix.endsWith('/')) ? '/' : '';
     const objectSearchPrefix = `${prefix}${delimiter}${tableName}`;
 
     if (this.config.bucketType === 'azure') {
