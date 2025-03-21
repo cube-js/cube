@@ -289,7 +289,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
       privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
       privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
-      privateKey,
       ...(privateKey ? { privateKey } : {}),
       exportBucket: this.getExportBucket(dataSource),
       resultPrefetch: 1,
