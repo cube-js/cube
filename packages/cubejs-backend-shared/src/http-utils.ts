@@ -66,9 +66,10 @@ export async function streamWithProgress(
 type DownloadAndExtractFile = {
   showProgress: boolean;
   cwd: string;
+  noExtract?: boolean;
 };
 
-export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndExtractFile) {
+export async function downloadAndExtractFile(url: string, { cwd, noExtract }: DownloadAndExtractFile) {
   const request = new Request(url, {
     headers: new Headers({
       'Content-Type': 'application/octet-stream',
@@ -99,7 +100,11 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
     });
   });
 
-  await decompress(savedFilePath, cwd);
+  if (noExtract) {
+    fs.copyFileSync(savedFilePath, cwd);
+  } else {
+    await decompress(savedFilePath, cwd);
+  }
 
   try {
     fs.unlinkSync(savedFilePath);
