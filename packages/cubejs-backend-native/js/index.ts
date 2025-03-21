@@ -88,7 +88,7 @@ export interface CanSwitchUserPayload {
 
 export type SQLInterfaceOptions = {
   pgPort?: number,
-  checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
+  checkSqlAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
   meta: (payload: MetaPayload) => unknown | Promise<unknown>,
@@ -347,8 +347,8 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('Argument options must be an object');
   }
 
-  if (typeof options.checkAuth !== 'function') {
-    throw new Error('options.checkAuth must be a function');
+  if (typeof options.checkSqlAuth !== 'function') {
+    throw new Error('options.checkSqlAuth must be a function');
   }
 
   if (typeof options.load !== 'function') {
@@ -378,7 +378,7 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
   const native = loadNative();
   return native.registerInterface({
     ...options,
-    checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
+    checkSqlAuth: wrapNativeFunctionWithChannelCallback(options.checkSqlAuth),
     load: wrapNativeFunctionWithChannelCallback(options.load),
     sql: wrapNativeFunctionWithChannelCallback(options.sql),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
