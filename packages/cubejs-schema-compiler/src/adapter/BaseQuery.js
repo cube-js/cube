@@ -2639,6 +2639,9 @@ export class BaseQuery {
             dimension: this.cubeEvaluator.pathFromArray([cubeName, name]),
             granularity: subPropertyName
           });
+          // for time dimension with granularity convertedToTz() is called internally in dimensionSql() flow,
+          // so we need to ignore convertTz later even if context convertTzForRawTimeDimension is set to true
+          this.safeEvaluateSymbolContext().ignoreConvertTzForTimeDimension = true;
           return td.dimensionSql();
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
@@ -2647,6 +2650,7 @@ export class BaseQuery {
             res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
           }
           if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
+            !this.safeEvaluateSymbolContext().ignoreConvertTzForTimeDimension &&
             !memberExpressionType &&
             symbol.type === 'time' &&
             this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
