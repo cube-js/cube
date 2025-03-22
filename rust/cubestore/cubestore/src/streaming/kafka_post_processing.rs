@@ -1,6 +1,6 @@
 use crate::metastore::Column;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
-use crate::queryplanner::{QueryPlan, QueryPlannerImpl};
+use crate::queryplanner::{sql_to_rel_options, QueryPlan, QueryPlannerImpl};
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
@@ -207,7 +207,7 @@ impl KafkaPostProcessPlanner {
                 ..
             }) => {
                 let provider = TopicTableProvider::new(self.topic.clone(), &self.source_columns);
-                let query_planner = SqlToRel::new(&provider);
+                let query_planner = SqlToRel::new_with_options(&provider, sql_to_rel_options());
                 let logical_plan = query_planner
                     .statement_to_plan(DFStatement::Statement(Box::new(statement.clone())))?;
                 Ok(logical_plan)
