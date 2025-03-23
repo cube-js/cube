@@ -5,11 +5,13 @@ redirect_from:
 
 # Query History
 
-The Query History screen in Cube Cloud is a one-stop shop for all performance
-and diagnostic information about queries issued for a deployment. It is kept
-up-to-date in real time and provides a quick way to check whether queries are
-being accelerated with [pre-aggregations][ref-caching-gs-preaggs], how long they
-took to execute, and if they failed.
+The Query History feature in Cube Cloud is a one-stop shop for all performance
+and diagnostic information about queries issued for a deployment.
+
+It provides a real-time and historic view of requests to [data APIs][ref-apis] of your
+Cube Cloud deployment, so you can check whether queries were accelerated with
+[pre-aggregations][ref-caching-gs-preaggs], how long they took to execute, and if they
+failed.
 
 <SuccessBox>
 
@@ -19,6 +21,13 @@ You can also choose a [Query History tier](/product/deployment/cloud/pricing#que
 
 </SuccessBox>
 
+You can set the [time range](#setting-the-time-range), [explore queries](#exploring-queries)
+and filter them, drill down on specific queries to [see more details](#inspecting-api-queries).
+
+You can also use [Query History export][ref-query-history-export] to bring Query History
+data to an external monitoring solution for further analysis.
+
+<br/>
 <video width="100%" controls>
   <source
     src="https://ucarecdn.com/ceba0bdc-298b-44e6-8491-2b0e39985465/video.mp4"
@@ -221,3 +230,5 @@ while the query is in the query execution queue:
 [ref-cache-types]: /product/caching#cache-type
 [ref-security-context]: /product/auth/context
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-apis]: /product/apis-integrations
+[ref-query-history-export]: /product/workspace/monitoring#query-history-export
