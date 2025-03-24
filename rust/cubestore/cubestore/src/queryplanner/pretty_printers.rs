@@ -32,7 +32,9 @@ use crate::queryplanner::rolling::RollingWindowAggregate;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::SortColumn;
-use crate::queryplanner::topk::{AggregateTopKExec, ClusterAggregateTopK};
+use crate::queryplanner::topk::{
+    AggregateTopKExec, ClusterAggregateTopKLower, ClusterAggregateTopKUpper,
+};
 use crate::queryplanner::trace_data_loaded::TraceDataLoadedExec;
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::streaming::topic_table_provider::TopicTableProvider;
@@ -99,7 +101,9 @@ pub fn pp_plan(p: &LogicalPlan) -> String {
 pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
     let mut v = Printer {
         level: 0,
+        expecting_topk_lower: false,
         output: String::new(),
+        level_stack: Vec::new(),
         opts,
     };
     p.visit(&mut v).unwrap();
@@ -107,7 +111,11 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
 
     pub struct Printer<'a> {
         level: usize,
+        expecting_topk_lower: bool,
         output: String,
+        // We pop a stack of levels instead of decrementing the level, because with topk upper/lower
+        // node pairs, we skip a level.
+        level_stack: Vec<usize>,
         opts: &'a PPOptions,
     }
 
@@ -115,15 +123,23 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
         type Node = LogicalPlan;
 
         fn f_down(&mut self, plan: &LogicalPlan) -> Result<TreeNodeRecursion, DataFusionError> {
+            self.level_stack.push(self.level);
+
+            let initial_output_len = self.output.len();
             if self.level != 0 {
                 self.output += "\n";
             }
+
+            let was_expecting_topk_lower = self.expecting_topk_lower;
+            self.expecting_topk_lower = false;
+            let mut saw_expected_topk_lower = false;
+
             self.output.extend(repeat_n(' ', 2 * self.level));
             match plan {
                 LogicalPlan::Projection(Projection {
                     expr,
                     schema,
-                    input,
+                    input: _,
                     ..
                 }) => {
                     self.output += &format!(
@@ -252,22 +268,60 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                     .collect_vec())
                                 .collect_vec()
                         )
-                    } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>()
+                    } else if let Some(topk) =
+                        node.as_any().downcast_ref::<ClusterAggregateTopKUpper>()
                     {
+                        // We have some cute, or ugly, code here, to avoid having separate upper and
+                        // lower nodes in the pretty-printing.  Maybe this is to create fewer
+                        // differences in the tests in the upgrade DF and non-upgrade DF branch.
+
                         self.output += &format!("ClusterAggregateTopK, limit: {}", topk.limit);
-                        if self.opts.show_aggregations {
-                            self.output += &format!(", aggs: {}", pp_exprs(&topk.aggregate_expr))
-                        }
-                        if self.opts.show_sort_by {
-                            self.output += &format!(
-                                ", sortBy: {}",
-                                pp_sort_columns(topk.group_expr.len(), &topk.order_by)
-                            );
-                        }
-                        if self.opts.show_filters {
-                            if let Some(having) = &topk.having_expr {
-                                self.output += &format!(", having: {:?}", having)
+                        let lower_node: Option<&ClusterAggregateTopKLower> =
+                            match topk.input.as_ref() {
+                                LogicalPlan::Extension(Extension { node }) => {
+                                    if let Some(lower_node) =
+                                        node.as_any().downcast_ref::<ClusterAggregateTopKLower>()
+                                    {
+                                        Some(lower_node)
+                                    } else {
+                                        None
+                                    }
+                                }
+                                _ => None,
+                            };
+
+                        if let Some(lower_node) = lower_node {
+                            if self.opts.show_aggregations {
+                                self.output +=
+                                    &format!(", aggs: {}", pp_exprs(&lower_node.aggregate_expr))
                             }
+                            if self.opts.show_sort_by {
+                                self.output += &format!(
+                                    ", sortBy: {}",
+                                    pp_sort_columns(lower_node.group_expr.len(), &topk.order_by)
+                                );
+                            }
+                            if self.opts.show_filters {
+                                if let Some(having) = &topk.having_expr {
+                                    self.output += &format!(", having: {:?}", having)
+                                }
+                            }
+                            self.expecting_topk_lower = true;
+                        } else {
+                            self.output += ", (ERROR: no matching lower node)";
+                        }
+                        self.expecting_topk_lower = true;
+                    } else if let Some(topk) =
+                        node.as_any().downcast_ref::<ClusterAggregateTopKLower>()
+                    {
+                        if !was_expecting_topk_lower {
+                            self.output +=
+                                &format!("ClusterAggregateTopKLower (ERROR: unexpected)");
+                        } else {
+                            // Pop the newline and indentation we just pushed.
+                            self.output.truncate(initial_output_len);
+                            // And then note that we shouldn't increment the level.
+                            saw_expected_topk_lower = true;
                         }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                         self.output += &format!("PanicWorker")
@@ -331,12 +385,19 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 self.output += &format!(", debug_schema: {:?}", plan.schema());
             }
 
-            self.level += 1;
+            if !saw_expected_topk_lower {
+                self.level += 1;
+            } else if !was_expecting_topk_lower {
+                // Not the cleanest place to put this message, but it's not supposed to happen.
+                self.output += ", ERROR: no topk lower node";
+            }
+
             Ok(TreeNodeRecursion::Continue)
         }
 
         fn f_up(&mut self, _plan: &LogicalPlan) -> Result<TreeNodeRecursion, DataFusionError> {
-            self.level -= 1;
+            // The level_stack shouldn't be empty, fwiw.
+            self.level = self.level_stack.pop().unwrap_or_default();
             Ok(TreeNodeRecursion::Continue)
         }
     }

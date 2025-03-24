@@ -7,7 +7,7 @@ use crate::queryplanner::planning::{
 };
 use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
-use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
+use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind,
@@ -1055,15 +1055,34 @@ impl PreSerializedPlan {
                     let PanicWorkerNode {} = panic_worker; // (No fields to recurse; just clone the existing Arc `node`.)
                     LogicalPlan::Extension(Extension { node: node.clone() })
                 } else if let Some(cluster_agg_topk) =
-                    node.as_any().downcast_ref::<ClusterAggregateTopK>()
+                    node.as_any().downcast_ref::<ClusterAggregateTopKUpper>()
                 {
-                    let ClusterAggregateTopK {
+                    let ClusterAggregateTopKUpper {
                         limit,
+                        input,
+                        order_by,
+                        having_expr,
+                    } = cluster_agg_topk;
+                    let input = PreSerializedPlan::remove_unused_tables(
+                        input,
+                        partition_ids_to_execute,
+                        inline_tables_to_execute,
+                    )?;
+                    LogicalPlan::Extension(Extension {
+                        node: Arc::new(ClusterAggregateTopKUpper {
+                            limit: *limit,
+                            input: Arc::new(input),
+                            order_by: order_by.clone(),
+                            having_expr: having_expr.clone(),
+                        }),
+                    })
+                } else if let Some(cluster_agg_topk) =
+                    node.as_any().downcast_ref::<ClusterAggregateTopKLower>()
+                {
+                    let ClusterAggregateTopKLower {
                         input,
                         group_expr,
                         aggregate_expr,
-                        order_by,
-                        having_expr,
                         schema,
                         snapshots,
                     } = cluster_agg_topk;
@@ -1073,13 +1092,10 @@ impl PreSerializedPlan {
                         inline_tables_to_execute,
                     )?;
                     LogicalPlan::Extension(Extension {
-                        node: Arc::new(ClusterAggregateTopK {
-                            limit: *limit,
+                        node: Arc::new(ClusterAggregateTopKLower {
                             input: Arc::new(input),
                             group_expr: group_expr.clone(),
                             aggregate_expr: aggregate_expr.clone(),
-                            order_by: order_by.clone(),
-                            having_expr: having_expr.clone(),
                             schema: schema.clone(),
                             snapshots: snapshots.clone(),
                         }),
@@ -1796,8 +1812,11 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
                 ExtensionNodeSerialized::RollingWindowAggregate(serialized) => Arc::new(
                     RollingWindowAggregate::from_serialized(serialized, inputs, ctx)?,
                 ),
-                ExtensionNodeSerialized::ClusterAggregateTopK(serialized) => Arc::new(
-                    ClusterAggregateTopK::from_serialized(serialized, inputs, ctx)?,
+                ExtensionNodeSerialized::ClusterAggregateTopKUpper(serialized) => Arc::new(
+                    ClusterAggregateTopKUpper::from_serialized(serialized, inputs, ctx)?,
+                ),
+                ExtensionNodeSerialized::ClusterAggregateTopKLower(serialized) => Arc::new(
+                    ClusterAggregateTopKLower::from_serialized(serialized, inputs, ctx)?,
                 ),
             },
         })
@@ -1818,10 +1837,18 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
             ExtensionNodeSerialized::RollingWindowAggregate(
                 rolling_window_aggregate.to_serialized()?,
             )
-        } else if let Some(topk_aggregate) =
-            node.node.as_any().downcast_ref::<ClusterAggregateTopK>()
+        } else if let Some(topk_aggregate) = node
+            .node
+            .as_any()
+            .downcast_ref::<ClusterAggregateTopKUpper>()
         {
-            ExtensionNodeSerialized::ClusterAggregateTopK(topk_aggregate.to_serialized()?)
+            ExtensionNodeSerialized::ClusterAggregateTopKUpper(topk_aggregate.to_serialized()?)
+        } else if let Some(topk_aggregate) = node
+            .node
+            .as_any()
+            .downcast_ref::<ClusterAggregateTopKLower>()
+        {
+            ExtensionNodeSerialized::ClusterAggregateTopKLower(topk_aggregate.to_serialized()?)
         } else {
             todo!("{:?}", node)
         };
