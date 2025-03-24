@@ -22,6 +22,7 @@ import {
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import fs from 'fs/promises';
+import crypto from 'crypto';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
@@ -245,8 +246,30 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       assertDataSource('default');
 
     let privateKey = getEnv('snowflakePrivateKey', { dataSource });
-    if (privateKey && !privateKey.endsWith('\n')) {
-      privateKey += '\n';
+
+    if (privateKey) {
+      // If the private key is encrypted - we need to decrypt it before passing to
+      // snowflake sdk.
+      if (privateKey.includes('BEGIN ENCRYPTED PRIVATE KEY')) {
+        const keyPasswd = getEnv('snowflakePrivateKeyPass', { dataSource });
+
+        if (!keyPasswd) {
+          throw new Error(
+            'Snowflake encrypted private key provided, but no passphrase was given.'
+          );
+        }
+
+        const privateKeyObject = crypto.createPrivateKey({
+          key: privateKey,
+          format: 'pem',
+          passphrase: keyPasswd
+        });
+
+        privateKey = privateKeyObject.export({
+          format: 'pem',
+          type: 'pkcs8'
+        });
+      }
     }
 
     snowflake.configure({ logLevel: 'OFF' });
@@ -266,7 +289,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
       privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
       privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
-      privateKey,
+      ...(privateKey ? { privateKey } : {}),
       exportBucket: this.getExportBucket(dataSource),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
