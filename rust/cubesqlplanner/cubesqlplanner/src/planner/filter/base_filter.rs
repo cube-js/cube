@@ -273,19 +273,19 @@ impl BaseFilter {
         date: String,
         interval: &Option<String>,
         is_sub: bool,
-    ) -> Result<String, CubeError> {
+    ) -> Result<Option<String>, CubeError> {
         if let Some(interval) = interval {
             if interval != "unbounded" {
                 if is_sub {
-                    self.templates.sub_interval(date, interval.clone())
+                    Ok(Some(self.templates.sub_interval(date, interval.clone())?))
                 } else {
-                    self.templates.add_interval(date, interval.clone())
+                    Ok(Some(self.templates.add_interval(date, interval.clone())?))
                 }
             } else {
-                Ok(date.to_string())
+                Ok(None)
             }
         } else {
-            Ok(date.to_string())
+            Ok(Some(date.to_string()))
         }
     }
 
@@ -295,20 +295,29 @@ impl BaseFilter {
         let from = if self.values.len() >= 3 {
             self.extend_date_range_bound(from, &self.values[2], true)?
         } else {
-            from
+            Some(from)
         };
 
         let to = if self.values.len() >= 4 {
             self.extend_date_range_bound(to, &self.values[3], false)?
         } else {
-            to
+            Some(to)
         };
 
         let date_field = self
             .query_tools
             .base_tools()
             .convert_tz(member_sql.to_string())?;
-        self.templates.time_range_filter(date_field, from, to)
+        if let (Some(from), Some(to)) = (&from, &to) {
+            self.templates
+                .time_range_filter(date_field, from.clone(), to.clone())
+        } else if let Some(from) = &from {
+            self.templates.gte(date_field, from.clone())
+        } else if let Some(to) = &to {
+            self.templates.lte(date_field, to.clone())
+        } else {
+            self.templates.always_true()
+        }
     }
 
     fn to_date_rolling_window_date_range(&self, member_sql: &str) -> Result<String, CubeError> {

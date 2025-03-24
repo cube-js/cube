@@ -8,8 +8,9 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
 use crate::planner::BaseMeasure;
-use crate::planner::{BaseTimeDimension, GranularityHelper, QueryProperties};
+use crate::planner::{BaseMember, BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct RollingWindowPlanner {
@@ -37,7 +38,7 @@ impl RollingWindowPlanner {
                     rolling_window.clone()
                 } else {
                     RollingWindow {
-                        trailing: Some("unbounded".to_string()),
+                        trailing: None,
                         leading: None,
                         offset: None,
                         rolling_type: None,
@@ -60,12 +61,19 @@ impl RollingWindowPlanner {
                     )?;
                     return Ok(Some(rolling_base));
                 }
-                if time_dimensions.len() != 1 {
+                let uniq_time_dimensions = time_dimensions
+                    .iter()
+                    .unique_by(|a| (a.cube_name(), a.name(), a.get_date_range()))
+                    .collect_vec();
+                if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
-                        "Rolling window requires one time dimension".to_string(),
+                        "Rolling window requires one time dimension and equal date ranges"
+                            .to_string(),
                     ));
                 }
-                let time_dimension = time_dimensions[0].clone();
+
+                let time_dimension =
+                    GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
 
                 let input = vec![
                     self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?,
@@ -81,11 +89,11 @@ impl RollingWindowPlanner {
                     )?,
                 ];
 
-                let time_dimension = time_dimensions[0].clone();
-
                 let alias = format!("cte_{}", descriptions.len());
 
-                let rolling_window_descr = if let Some(granularity) =
+                let rolling_window_descr = if measure.is_running_total() {
+                    RollingWindowDescription::new_running_total(time_dimension)
+                } else if let Some(granularity) =
                     self.get_to_date_rolling_granularity(&rolling_window)?
                 {
                     RollingWindowDescription::new_to_date(time_dimension, granularity)
@@ -297,7 +305,7 @@ impl RollingWindowPlanner {
         rolling_window: &RollingWindow,
         state: Rc<MultiStageAppliedState>,
     ) -> Result<Rc<MultiStageAppliedState>, CubeError> {
-        let time_dimension_name = time_dimension.member_evaluator().full_name();
+        let time_dimension_base_name = time_dimension.base_dimension().full_name();
         let mut new_state = state.clone_state();
         let trailing_granularity =
             GranularityHelper::granularity_from_interval(&rolling_window.trailing);
@@ -315,10 +323,10 @@ impl RollingWindowPlanner {
         if templates.supports_generated_time_series() {
             let (from, to) =
                 self.make_time_seires_from_to_dates_suqueries_conditions("time_series")?;
-            new_state.replace_range_to_subquery_in_date_filter(&time_dimension_name, from, to);
+            new_state.replace_range_to_subquery_in_date_filter(&time_dimension_base_name, from, to);
         } else if time_dimension.get_date_range().is_some() && result_granularity.is_some() {
-            let granularity = time_dimension.get_granularity().unwrap(); //FIXME remove this unwrap
-            let date_range = time_dimension.get_date_range().unwrap(); //FIXME remove this unwrap
+            let granularity = time_dimension.get_granularity().unwrap();
+            let date_range = time_dimension.get_date_range().unwrap();
             let series = self
                 .query_tools
                 .base_tools()
@@ -327,21 +335,21 @@ impl RollingWindowPlanner {
                 let new_from_date = series.first().unwrap()[0].clone();
                 let new_to_date = series.last().unwrap()[1].clone();
                 new_state.replace_range_in_date_filter(
-                    &time_dimension_name,
+                    &time_dimension_base_name,
                     new_from_date,
                     new_to_date,
                 );
             }
         }
-
-        new_state
-            .change_time_dimension_granularity(&time_dimension_name, result_granularity.clone());
+        let new_time_dimension = time_dimension.change_granularity(result_granularity.clone());
+        //We keep only one time_dimension in the leaf query because, even if time_dimension values have different granularity, in the leaf query we need to group by the lowest granularity.
+        new_state.set_time_dimensions(vec![new_time_dimension]);
 
         if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
-            new_state.replace_to_date_date_range_filter(&time_dimension_name, &granularity);
+            new_state.replace_to_date_date_range_filter(&time_dimension_base_name, &granularity);
         } else {
             new_state.replace_regular_date_range_filter(
-                &time_dimension_name,
+                &time_dimension_base_name,
                 rolling_window.trailing.clone(),
                 rolling_window.leading.clone(),
             );

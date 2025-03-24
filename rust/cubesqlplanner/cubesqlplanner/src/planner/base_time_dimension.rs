@@ -126,7 +126,7 @@ impl BaseTimeDimension {
         self.dimension.clone()
     }
 
-    pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
+    pub fn base_member_evaluator(&self) -> Rc<MemberSymbol> {
         self.dimension.member_evaluator()
     }
 

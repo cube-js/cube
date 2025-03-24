@@ -150,7 +150,7 @@ impl MultiStageMemberQueryPlanner {
     ) -> Result<Rc<Cte>, CubeError> {
         let inputs = self.input_cte_aliases();
         assert!(inputs.len() == 2);
-        let dimensions = self.all_dimensions();
+        let all_dimensions = self.all_dimensions();
 
         let root_alias = format!("time_series");
         let cte_schema = cte_schemas.get(&inputs[0]).unwrap().clone();
@@ -164,8 +164,8 @@ impl MultiStageMemberQueryPlanner {
         let input = &inputs[1];
         let alias = format!("rolling_source");
         let rolling_base_cte_schema = cte_schemas.get(input).unwrap().clone();
-        let time_dimension_alias =
-            rolling_base_cte_schema.resolve_member_alias(&rolling_window_desc.time_dimension);
+        let time_dimension_alias = rolling_base_cte_schema
+            .resolve_member_alias(&rolling_window_desc.time_dimension.clone().as_base_member());
         let on = match &rolling_window_desc.rolling_window {
             RollingWindowType::Regular(regular_rolling_window) => {
                 JoinCondition::new_regular_rolling_join(
@@ -190,6 +190,13 @@ impl MultiStageMemberQueryPlanner {
                     self.query_tools.clone(),
                 )
             }
+            RollingWindowType::RunningTotal => JoinCondition::new_rolling_total_join(
+                root_alias.clone(),
+                Expr::Reference(QualifiedColumnName::new(
+                    Some(alias.clone()),
+                    time_dimension_alias,
+                )),
+            ),
         };
         join_builder.left_join_table_reference(
             input.clone(),
@@ -203,7 +210,7 @@ impl MultiStageMemberQueryPlanner {
         let group_by = if self.description.member().is_ungrupped() {
             vec![]
         } else {
-            dimensions
+            all_dimensions
                 .iter()
                 .map(|dim| Expr::Member(MemberExpression::new(dim.clone())))
                 .collect_vec()
@@ -219,7 +226,29 @@ impl MultiStageMemberQueryPlanner {
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut render_references = HashMap::new();
         let mut select_builder = SelectBuilder::new(from.clone());
-        for dim in dimensions.iter() {
+
+        //We insert render reference for main time dimension (with the some granularity as in time series to avoid unnessesary date_tranc)
+        render_references.insert(
+            rolling_window_desc.time_dimension.full_name(),
+            QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
+        );
+
+        //We also insert render reference for the base dimension of time dimension (i.e. without `_granularit` prefix to let other time dimensions make date_tranc)
+        render_references.insert(
+            rolling_window_desc
+                .time_dimension
+                .base_dimension()
+                .full_name(),
+            QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
+        );
+
+        for dim in self.description.state().time_dimensions().iter() {
+            let alias =
+                references_builder.resolve_alias_for_member(&dim.full_name(), &Some(alias.clone()));
+            context_factory.add_dimensions_with_ignored_timezone(dim.full_name());
+            select_builder.add_projection_member(&dim.clone().as_base_member(), alias);
+        }
+        for dim in self.description.state().dimensions().iter() {
             if dim.full_name() == rolling_window_desc.time_dimension.full_name() {
                 render_references.insert(
                     dim.full_name(),
@@ -234,7 +263,7 @@ impl MultiStageMemberQueryPlanner {
             }
             let alias =
                 references_builder.resolve_alias_for_member(&dim.full_name(), &Some(alias.clone()));
-            select_builder.add_projection_member(&dim, alias);
+            select_builder.add_projection_member(&dim.clone().as_base_member(), alias);
         }
 
         let query_member = self.query_member_as_base_member()?;
