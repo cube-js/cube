@@ -51,7 +51,7 @@ use crate::queryplanner::query_executor::{
     batches_to_dataframe, ClusterSendExec, InlineTableProvider,
 };
 use crate::queryplanner::serialized_plan::SerializedPlan;
-use crate::queryplanner::topk::ClusterAggregateTopK;
+use crate::queryplanner::topk::{ClusterAggregateTopKUpper, ClusterAggregateTopKLower};
 // use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 
@@ -920,7 +920,7 @@ fn compute_workers(
                         node.as_any().downcast_ref::<ClusterSendNode>()
                     {
                         &cs.snapshots
-                    } else if let Some(cs) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+                    } else if let Some(cs) = node.as_any().downcast_ref::<ClusterAggregateTopKLower>() {
                         &cs.snapshots
                     } else {
                         return Ok(TreeNodeRecursion::Continue);
