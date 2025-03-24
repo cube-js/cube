@@ -1,6 +1,8 @@
 use crate::queryplanner::planning::{ClusterSendNode, CubeExtensionPlanner};
 use crate::queryplanner::topk::execute::{AggregateTopKExec, TopKAggregateFunction};
-use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn, MIN_TOPK_STREAM_ROWS};
+use crate::queryplanner::topk::{
+    ClusterAggregateTopKLower, ClusterAggregateTopKUpper, SortColumn, MIN_TOPK_STREAM_ROWS,
+};
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeScalarUDFKind};
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
@@ -25,6 +27,7 @@ use datafusion::prelude::Expr;
 use datafusion::sql::TableReference;
 use itertools::Itertools;
 use std::cmp::max;
+use std::fmt;
 use std::sync::Arc;
 
 /// Replaces `Limit(Sort(Aggregate(ClusterSend)))` with [ClusterAggregateTopK] when possible.
@@ -124,15 +127,19 @@ fn materialize_topk_under_limit_sort(
                         return Ok(None);
                     }
                     let topk = LogicalPlan::Extension(Extension {
-                        node: Arc::new(ClusterAggregateTopK {
+                        node: Arc::new(ClusterAggregateTopKUpper {
+                            input: Arc::new(LogicalPlan::Extension(Extension {
+                                node: Arc::new(ClusterAggregateTopKLower {
+                                    input: cs.input.clone(),
+                                    group_expr: group_expr.clone(),
+                                    aggregate_expr: aggr_expr.clone(),
+                                    schema: aggregate_schema.clone(),
+                                    snapshots: cs.snapshots.clone(),
+                                }),
+                            })),
                             limit: fetch,
-                            input: cs.input.clone(),
-                            group_expr: group_expr.clone(),
-                            aggregate_expr: aggr_expr.clone(),
                             order_by: sort_columns,
                             having_expr: projection.having_expr.clone(),
-                            schema: aggregate_schema.clone(),
-                            snapshots: cs.snapshots.clone(),
                         }),
                     });
                     if projection.has_projection {
@@ -520,14 +527,15 @@ fn field_index(
 pub fn plan_topk(
     planner: &dyn PhysicalPlanner,
     ext_planner: &CubeExtensionPlanner,
-    node: &ClusterAggregateTopK,
+    upper_node: &ClusterAggregateTopKUpper,
+    lower_node: &ClusterAggregateTopKLower,
     input: Arc<dyn ExecutionPlan>,
     ctx: &SessionState,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // Partial aggregate on workers. Mimics corresponding planning code from DataFusion.
     let physical_input_schema = input.schema();
-    let logical_input_schema = node.input.schema();
-    let group_expr = node
+    let logical_input_schema = lower_node.input.schema();
+    let group_expr = lower_node
         .group_expr
         .iter()
         .map(|e| {
@@ -543,7 +551,7 @@ pub fn plan_topk(
         datafusion::physical_plan::udaf::AggregateFunctionExpr,
         Option<Arc<dyn PhysicalExpr>>,
         Option<Vec<PhysicalSortExpr>>,
-    )> = node
+    )> = lower_node
         .aggregate_expr
         .iter()
         .map(|e| {
@@ -574,14 +582,14 @@ pub fn plan_topk(
     // missing qualifiers and other info is okay.
     let aggregate_dfschema = Arc::new(DFSchema::try_from(aggregate_schema.clone())?);
 
-    let agg_fun = node
+    let agg_fun = lower_node
         .aggregate_expr
         .iter()
         .map(|e| extract_aggregate_fun(e).unwrap())
         .collect_vec();
-    //
+
     // Sort on workers.
-    let sort_expr = node
+    let sort_expr = upper_node
         .order_by
         .iter()
         .map(|c| {
@@ -612,29 +620,29 @@ pub fn plan_topk(
     let schema = sort_schema.clone();
     let cluster = ext_planner.plan_cluster_send(
         sort,
-        &node.snapshots,
+        &lower_node.snapshots,
         /*use_streaming*/ true,
-        /*max_batch_rows*/ max(2 * node.limit, MIN_TOPK_STREAM_ROWS),
+        /*max_batch_rows*/ max(2 * upper_node.limit, MIN_TOPK_STREAM_ROWS),
         None,
         None,
         Some(sort_requirement.clone()),
     )?;
 
-    let having = if let Some(predicate) = &node.having_expr {
-        Some(planner.create_physical_expr(predicate, &node.schema, ctx)?)
+    let having = if let Some(predicate) = &upper_node.having_expr {
+        Some(planner.create_physical_expr(predicate, &lower_node.schema, ctx)?)
     } else {
         None
     };
 
     let topk_exec: Arc<AggregateTopKExec> = Arc::new(AggregateTopKExec::new(
-        node.limit,
+        upper_node.limit,
         group_expr_len,
         initial_aggregate_expr,
         &agg_fun
             .into_iter()
             .map(|(tkaf, _)| tkaf)
             .collect::<Vec<_>>(),
-        node.order_by.clone(),
+        upper_node.order_by.clone(),
         having,
         cluster,
         schema,
@@ -663,5 +671,62 @@ pub fn make_sort_expr(
         )
         .unwrap(),
         _ => col,
+    }
+}
+
+/// Temporarily used to bamboozle DF while constructing the initial plan -- so that we pass its
+/// assertions about the output schema.  Hypothetically, we instead might actually place down a
+/// legitimate AggregateExec node, and then have the ClusterAggregateTopKUpper node replace that
+/// child.
+#[derive(Debug)]
+pub struct DummyTopKLowerExec {
+    pub schema: Arc<Schema>,
+    pub input: Arc<dyn ExecutionPlan>,
+}
+
+impl datafusion::physical_plan::DisplayAs for DummyTopKLowerExec {
+    fn fmt_as(
+        &self,
+        _t: datafusion::physical_plan::DisplayFormatType,
+        f: &mut fmt::Formatter,
+    ) -> fmt::Result {
+        write!(f, "DummyTopKLowerExec")
+    }
+}
+
+impl ExecutionPlan for DummyTopKLowerExec {
+    fn name(&self) -> &str {
+        "DummyTopKLowerExec"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn properties(&self) -> &datafusion::physical_plan::PlanProperties {
+        panic!("DataFusion invoked DummyTopKLowerExec::properties");
+    }
+
+    fn schema(&self) -> Arc<Schema> {
+        self.schema.clone()
+    }
+
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+        vec![&self.input]
+    }
+
+    fn with_new_children(
+        self: Arc<Self>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
+        panic!("DataFusion invoked DummyTopKLowerExec::with_new_children");
+    }
+
+    fn execute(
+        &self,
+        partition: usize,
+        context: Arc<datafusion::execution::TaskContext>,
+    ) -> datafusion::error::Result<datafusion::execution::SendableRecordBatchStream> {
+        panic!("DataFusion invoked DummyTopKLowerExec::execute");
     }
 }
