@@ -50,9 +50,11 @@ use crate::queryplanner::serialized_plan::PreSerializedPlan;
 use crate::queryplanner::serialized_plan::{
     IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
 };
-use crate::queryplanner::topk::plan_topk;
-use crate::queryplanner::topk::ClusterAggregateTopK;
-use crate::queryplanner::topk::{materialize_topk, ClusterAggregateTopKSerialized};
+use crate::queryplanner::topk::{
+    materialize_topk, ClusterAggregateTopKLowerSerialized, ClusterAggregateTopKUpperSerialized,
+};
+use crate::queryplanner::topk::{plan_topk, DummyTopKLowerExec};
+use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
 use crate::CubeError;
@@ -1384,7 +1386,8 @@ pub enum ExtensionNodeSerialized {
     ClusterSend(ClusterSendSerialized),
     PanicWorker(PanicWorkerSerialized),
     RollingWindowAggregate(RollingWindowAggregateSerialized),
-    ClusterAggregateTopK(ClusterAggregateTopKSerialized),
+    ClusterAggregateTopKUpper(ClusterAggregateTopKUpperSerialized),
+    ClusterAggregateTopKLower(ClusterAggregateTopKLowerSerialized),
 }
 
 #[derive(Debug, Clone)]
@@ -1625,7 +1628,7 @@ impl ExtensionPlanner for CubeExtensionPlanner {
         &self,
         planner: &dyn PhysicalPlanner,
         node: &dyn UserDefinedLogicalNode,
-        _logical_inputs: &[&LogicalPlan],
+        logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
         state: &SessionState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
@@ -1681,10 +1684,43 @@ impl ExtensionPlanner for CubeExtensionPlanner {
                 })?),
                 /* required input ordering */ None,
             )?))
-        } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
+        } else if let Some(topk_lower) = node.as_any().downcast_ref::<ClusterAggregateTopKLower>() {
             assert_eq!(inputs.len(), 1);
-            let input = inputs.iter().next().unwrap();
-            Ok(Some(plan_topk(planner, self, topk, input.clone(), state)?))
+
+            // We need a dummy execution plan node, so we can pass DF's assertion of the schema.
+            Ok(Some(Arc::new(DummyTopKLowerExec {
+                schema: topk_lower.schema.inner().clone(),
+                input: inputs[0].clone(),
+            })))
+        } else if let Some(topk_upper) = node.as_any().downcast_ref::<ClusterAggregateTopKUpper>() {
+            assert_eq!(inputs.len(), 1);
+            assert_eq!(logical_inputs.len(), 1);
+            let msg: &'static str =
+                "ClusterAggregateTopKUpper expects its child to be a ClusterAggregateTopKLower";
+            let LogicalPlan::Extension(Extension { node }) = logical_inputs[0] else {
+                return Err(DataFusionError::Internal(msg.to_owned()));
+            };
+            let Some(lower_node) = node.as_any().downcast_ref::<ClusterAggregateTopKLower>() else {
+                return Err(DataFusionError::Internal(msg.to_owned()));
+            };
+
+            // The input should be (and must be) a DummyTopKLowerExec node.
+            let Some(DummyTopKLowerExec {
+                schema: _,
+                input: lower_input,
+            }) = inputs[0].as_any().downcast_ref::<DummyTopKLowerExec>()
+            else {
+                return Err(DataFusionError::Internal("ClusterAggregateTopKUpper expects its physical input to be a DummyTopKLowerExec".to_owned()));
+            };
+
+            Ok(Some(plan_topk(
+                planner,
+                self,
+                topk_upper,
+                lower_node,
+                lower_input.clone(),
+                state,
+            )?))
         } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
             assert_eq!(inputs.len(), 0);
             Ok(Some(plan_panic_worker()?))
