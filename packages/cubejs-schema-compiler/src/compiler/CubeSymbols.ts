@@ -20,7 +20,7 @@ interface CubeDefinition {
   hierarchies?: Record<string, any>;
   preAggregations?: Record<string, any>;
   joins?: Record<string, any>;
-  accessPolicy?: Record<string, any>;
+  accessPolicy?: any[];
   includes?: any;
   excludes?: any;
   cubes?: any;
@@ -36,7 +36,7 @@ interface SplitViews {
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 export const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
-  // SECURITY_CONTEXT has been deprecated, however security_context (lowecase)
+  // SECURITY_CONTEXT has been deprecated, however security_context (lowercase)
   // is allowed in RBAC policies for query-time attribute matching
   security_context: 'securityContext',
   securityContext: 'securityContext',
@@ -106,10 +106,13 @@ export class CubeSymbols {
   }
 
   public createCube(cubeDefinition: CubeDefinition) {
+    let preAggregations: any;
+    let joins: any;
     let measures: any;
     let dimensions: any;
     let segments: any;
     let hierarchies: any;
+    let accessPolicy: any;
 
     const cubeObject = Object.assign({
       allDefinitions(type: string) {
@@ -122,6 +125,27 @@ export class CubeSymbols {
           return { ...cubeDefinition[type] };
         }
       },
+
+      get preAggregations() {
+        if (!preAggregations) {
+          preAggregations = this.allDefinitions('preAggregations');
+        }
+        return preAggregations;
+      },
+      set preAggregations(v) {
+        // Dont allow to modify
+      },
+
+      get joins() {
+        if (!joins) {
+          joins = this.allDefinitions('joins');
+        }
+        return joins;
+      },
+      set joins(v) {
+        // Dont allow to modify
+      },
+
       get measures() {
         if (!measures) {
           measures = this.allDefinitions('measures');
@@ -159,7 +183,23 @@ export class CubeSymbols {
         return hierarchies;
       },
       set hierarchies(v) {
-        //
+        // Dont allow to modify
+      },
+
+      get accessPolicy() {
+        if (!accessPolicy) {
+          const parentAcls = cubeDefinition.extends ? super.accessPolicy : [];
+          accessPolicy = [...(parentAcls || []), ...(cubeDefinition.accessPolicy || [])];
+        }
+        // Schema validator expects accessPolicy to be not empty if defined
+        if (accessPolicy.length) {
+          return accessPolicy;
+        } else {
+          return undefined;
+        }
+      },
+      set accessPolicy(v) {
+        // Dont allow to modify
       }
     },
     cubeDefinition);
