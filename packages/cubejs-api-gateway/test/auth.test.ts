@@ -3,7 +3,7 @@ import express, { Application as ExpressApplication, RequestHandler } from 'expr
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import {getEnv, pausePromise} from '@cubejs-backend/shared';
+import { getEnv, pausePromise } from '@cubejs-backend/shared';
 
 import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request } from '../src';
 import { AdapterApiMock, DataSourceStorageMock } from './mocks';

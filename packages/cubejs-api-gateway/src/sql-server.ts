@@ -108,12 +108,10 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
-      contextToApiScopes: async ({ securityContext }) => {
-        return this.apiGateway.contextToApiScopesFn(
-          securityContext,
-          getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()
-        );
-      },
+      contextToApiScopes: async ({ securityContext }) => this.apiGateway.contextToApiScopesFn(
+        securityContext,
+        getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()
+      ),
       checkAuth: async ({ request, token }) => {
         const { securityContext } = await this.apiGateway.checkAuthFn(request, token);
 
