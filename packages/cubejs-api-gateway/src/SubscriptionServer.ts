@@ -53,7 +53,7 @@ export class SubscriptionServer {
       }
 
       if (message.authorization) {
-        authContext = { isSubscription: true };
+        authContext = { isSubscription: true, protocol: 'ws' };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
         const acceptanceResult = await this.contextAcceptor(authContext);
         if (!acceptanceResult.accepted) {

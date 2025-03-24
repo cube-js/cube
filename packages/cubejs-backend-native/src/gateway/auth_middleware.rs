@@ -2,6 +2,7 @@ use crate::gateway::http_error::HttpError;
 use crate::gateway::state::ApiGatewayStateRef;
 use crate::gateway::{GatewayAuthContextRef, GatewayAuthService, GatewayCheckAuthRequest};
 use axum::extract::State;
+use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 
 #[derive(Debug, Clone)]
@@ -12,6 +13,18 @@ pub struct AuthExtension {
 impl AuthExtension {
     pub fn auth_context(&self) -> &GatewayAuthContextRef {
         &self.auth_context
+    }
+}
+
+fn parse_token(header_value: &HeaderValue) -> Result<&str, HttpError> {
+    let trimmed = header_value.to_str()?.trim();
+
+    if let Some(stripped) = trimmed.strip_prefix("Bearer ") {
+        Ok(stripped)
+    } else if let Some(stripped) = trimmed.strip_prefix("bearer ") {
+        Ok(stripped)
+    } else {
+        Ok(trimmed)
     }
 }
 
@@ -26,6 +39,8 @@ pub async fn gateway_auth_middleware(
         ));
     };
 
+    let bearer_token = parse_token(token_header_value)?;
+
     let auth = state
         .injector_ref()
         .get_service_typed::<dyn GatewayAuthService>()
@@ -35,7 +50,7 @@ pub async fn gateway_auth_middleware(
         GatewayCheckAuthRequest {
             protocol: "http".to_string(),
         },
-        token_header_value.to_str()?.to_string(),
+        bearer_token.to_string(),
     );
 
     let auth_response = auth_fut

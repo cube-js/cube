@@ -121,8 +121,7 @@ impl SqlAuthService for NodeBridgeAuthService {
 
 #[derive(Debug, Serialize)]
 struct CheckAuthTransportRequest {
-    request: TransportRequest,
-    req: GatewayCheckAuthRequest,
+    request: GatewayCheckAuthRequest,
     token: String,
 }
 
@@ -154,19 +153,13 @@ type ContextToApiScopesTransportResponse = Vec<String>;
 impl GatewayAuthService for NodeBridgeAuthService {
     async fn authenticate(
         &self,
-        req: GatewayCheckAuthRequest,
+        request: GatewayCheckAuthRequest,
         token: String,
     ) -> Result<GatewayAuthenticateResponse, CubeError> {
         trace!("[auth] Request ->");
 
-        let request_id = Uuid::new_v4().to_string();
-
         let extra = serde_json::to_string(&CheckAuthTransportRequest {
-            request: TransportRequest {
-                id: format!("{}-span-1", request_id),
-                meta: None,
-            },
-            req,
+            request,
             token: token.clone(),
         })?;
         let response: CheckAuthTransportResponse = call_js_with_channel_as_callback(

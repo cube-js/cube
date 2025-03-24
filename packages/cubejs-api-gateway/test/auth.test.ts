@@ -30,11 +30,9 @@ class ApiGatewayOpenAPI extends ApiGateway {
   public async shutdownSQLServer(): Promise<void> {
     try {
       await this.sqlServer.shutdown('fast');
-    } catch (error) {
-      console.log(`Error while shutting down server: ${error}`);
+    } finally {
+      this.isRunning = null;
     }
-
-    this.isRunning = null;
   }
 }
 
@@ -110,16 +108,50 @@ describe('test authorization with native gateway', () => {
   });
 
   afterAll(async () => {
-    await apiGateway.shutdownSQLServer();
+    try {
+      await apiGateway.shutdownSQLServer();
+    } catch (error) {
+      // TODO: Figure out, why ApiGatewayServer cannot shutdown!?
+      console.log(`Error while shutting down server: ${error}`);
+    }
   });
 
-  it('default authorization', async () => {
+  it('default authorization - success', async () => {
     const token = generateAuthToken({ uid: 5, });
 
     await request(app)
       .get('/cubejs-api/v2/stream')
       .set('Authorization', `${token}`)
       .expect(501);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    // We should not call js handler, request should go into rust code
+    expect(handlerMock.mock.calls.length).toEqual(0);
+
+    await apiGateway.shutdownSQLServer();
+  });
+
+  it('default authorization - wrong secret', async () => {
+    const badToken = generateAuthToken({ uid: 5, }, {}, 'bad');
+
+    await request(app)
+      .get('/cubejs-api/v2/stream')
+      .set('Authorization', `${badToken}`)
+      .expect(403);
+
+    // No bad logs
+    expect(loggerMock.mock.calls.length).toEqual(0);
+    // We should not call js handler, request should go into rust code
+    expect(handlerMock.mock.calls.length).toEqual(0);
+
+    await apiGateway.shutdownSQLServer();
+  });
+
+  it('default authorization - missing auth header', async () => {
+    await request(app)
+      .get('/cubejs-api/v2/stream')
+      .expect(403);
 
     // No bad logs
     expect(loggerMock.mock.calls.length).toEqual(0);

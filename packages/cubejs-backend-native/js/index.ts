@@ -43,8 +43,10 @@ export interface ContextToApiScopesPayload {
 
 export type ContextToApiScopesResponse = string[];
 
+export interface CheckAuthPayloadRequestMeta extends BaseMeta {}
+
 export interface CheckAuthPayload {
-  request: Request<undefined>,
+  request: Request<CheckAuthPayloadRequestMeta>,
   token: string,
 }
 

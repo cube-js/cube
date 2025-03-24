@@ -23,7 +23,7 @@ pub async fn stream_handler_v2(
     Ok((
         StatusCode::NOT_IMPLEMENTED,
         Json(HandlerResponse {
-            message: "Not implemented".to_string(),
+            message: "/v2/stream is not implemented".to_string(),
         }),
     ))
 }

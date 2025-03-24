@@ -31,7 +31,7 @@ pub struct GatewayContextToApiScopesResponse {
 pub trait GatewayAuthService: Send + Sync + Debug {
     async fn authenticate(
         &self,
-        request: GatewayCheckAuthRequest,
+        req: GatewayCheckAuthRequest,
         token: String,
     ) -> Result<GatewayAuthenticateResponse, CubeError>;
 
