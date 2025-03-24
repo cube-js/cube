@@ -3,20 +3,6 @@ import { downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
 
 export const OSS_DRIVER_VERSION = '1.0.2';
 
-function acceptedByEnv() {
-  const acceptStatus = getEnv('databrickAcceptPolicy');
-  if (acceptStatus) {
-    console.log('You accepted Terms & Conditions for JDBC driver from DataBricks by CUBEJS_DB_DATABRICKS_ACCEPT_POLICY');
-  }
-
-  if (acceptStatus === false) {
-    console.log('You declined Terms & Conditions for JDBC driver from DataBricks by CUBEJS_DB_DATABRICKS_ACCEPT_POLICY');
-    console.log('Installation will be skipped');
-  }
-
-  return acceptStatus;
-}
-
 /**
  * In the beginning of 2025 Databricks released their open-source version of JDBC driver and encourage
  * all users to migrate to it as company plans to focus on improving and evolving it over legacy simba driver.
@@ -25,25 +11,22 @@ function acceptedByEnv() {
  * Java Runtime Environment (JRE) 11.0 or above. CI testing is supported on JRE 11, 17, and 21.
  */
 export async function downloadJDBCDriver(): Promise<string | null> {
-  const driverAccepted = acceptedByEnv();
+  // TODO: Just to throw a console warning that this ENV is obsolete and could be safely removed
+  getEnv('databrickAcceptPolicy');
 
-  if (driverAccepted) {
-    console.log(`Downloading databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`);
+  console.log(`Downloading databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`);
 
-    await downloadAndExtractFile(
-      `https://repo1.maven.org/maven2/com/databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss/databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
-      {
-        showProgress: true,
-        cwd: path.resolve(path.join(__dirname, '..', 'download')),
-        noExtract: true,
-        dstFileName: `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
-      }
-    );
+  await downloadAndExtractFile(
+    `https://repo1.maven.org/maven2/com/databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss/databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
+    {
+      showProgress: true,
+      cwd: path.resolve(path.join(__dirname, '..', 'download')),
+      noExtract: true,
+      dstFileName: `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`,
+    }
+  );
 
-    console.log(`Release notes: https://mvnrepository.com/artifact/com.databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss`);
+  console.log(`Release notes: https://mvnrepository.com/artifact/com.databricks/databricks-jdbc/${OSS_DRIVER_VERSION}-oss`);
 
-    return path.resolve(path.join(__dirname, '..', 'download', `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`));
-  }
-
-  return null;
+  return path.resolve(path.join(__dirname, '..', 'download', `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`));
 }
