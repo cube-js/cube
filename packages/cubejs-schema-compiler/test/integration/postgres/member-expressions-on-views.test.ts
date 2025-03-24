@@ -3,7 +3,7 @@ import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
 
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('Member expressions on views', () => {
@@ -270,7 +270,7 @@ describe('Member expressions on views', () => {
   let cubeEvaluator: CubeEvaluator;
 
   beforeAll(async () => {
-    ({ compiler, joinGraph, cubeEvaluator } = prepareCompiler(model));
+    ({ compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model));
     await compiler.compile();
   });
 

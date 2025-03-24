@@ -23,7 +23,7 @@ cubes:
       - name: time
         sql: "{CUBE}.timestamp"
         type: time
-    `, { yamlExtension: true });
+    `);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -448,7 +448,7 @@ cubes:
         rollingWindow:
           trailing: 7 day
           offset: start
-    `, { yamlExtension: true });
+    `);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -493,7 +493,6 @@ cubes:
           - name: count
             type: count
     `,
-    {},
     {
       compileContext: {
         authInfo: null,

@@ -1,9 +1,9 @@
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaWithCustomGranularities, createCubeSchemaWithAccessPolicy } from './utils';
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler(
+    const { compiler, cubeEvaluator } = prepareJsCompiler(
       createCubeSchema({
         name: 'CubeA',
         preAggregations: `
@@ -169,7 +169,7 @@ describe('Schema Testing', () => {
   it('invalid schema', async () => {
     const logger = jest.fn();
 
-    const { compiler } = prepareCompiler(
+    const { compiler } = prepareJsCompiler(
       createCubeSchema({
         name: 'CubeA',
         preAggregations: `
@@ -213,7 +213,7 @@ describe('Schema Testing', () => {
   });
 
   it('visibility modifier', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false
@@ -250,7 +250,7 @@ describe('Schema Testing', () => {
   });
 
   it('dimensions', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false,
@@ -269,7 +269,7 @@ describe('Schema Testing', () => {
   });
 
   it('descriptions', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false,
@@ -295,7 +295,7 @@ describe('Schema Testing', () => {
   });
 
   it('custom granularities in meta', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchemaWithCustomGranularities('orders')
     ]);
     await compiler.compile();
@@ -331,7 +331,7 @@ describe('Schema Testing', () => {
   });
 
   it('join types', async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler([
+    const { compiler, cubeEvaluator } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         joins: `{
@@ -369,7 +369,7 @@ describe('Schema Testing', () => {
   });
 
   it('valid schema with accessPolicy', async () => {
-    const { compiler } = prepareCompiler([
+    const { compiler } = prepareJsCompiler([
       createCubeSchemaWithAccessPolicy('ProtectedCube'),
     ]);
     await compiler.compile();

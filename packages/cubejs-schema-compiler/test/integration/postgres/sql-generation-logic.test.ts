@@ -1,12 +1,12 @@
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -306,7 +306,7 @@ describe('SQL Generation', () => {
     });
   `);
 
-  const aliasedCubesCompilers = /** @type Compilers */ prepareCompiler(`
+  const aliasedCubesCompilers = /** @type Compilers */ prepareJsCompiler(`
     cube('LeftLongLongLongLongLongLongLongLongLongLongNameCube', {
       sql: 'SELECT * FROM LEFT_TABLE',
       sqlAlias: 'left',

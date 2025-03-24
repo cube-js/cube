@@ -1,4 +1,4 @@
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('Test Speed', () => {
   it('100 cube', async () => {
@@ -55,7 +55,7 @@ describe('Test Speed', () => {
 
     const startTime = +new Date();
     for (let i = 0; i < 10; i++) {
-      const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(cubeString);
+      const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(cubeString);
       const result = await compiler.compile();
     }
     const endTime = +new Date();

@@ -1,6 +1,6 @@
 import { CompileError } from '../../../src/compiler/CompileError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { prepareCompiler as originalPrepareCompiler } from '../../../src/compiler/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
@@ -8,7 +8,7 @@ describe('DataSchemaCompiler', () => {
   jest.setTimeout(200000);
 
   it('gutter', async () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -43,7 +43,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('error', async () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube({}, {
       measures: {}
     })
@@ -59,7 +59,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('duplicate member', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -135,14 +135,14 @@ describe('DataSchemaCompiler', () => {
     `;
 
     it('Should compile without error, allowJsDuplicatePropsInSchema = false, valid schema', () => {
-      const { compiler } = prepareCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
+      const { compiler } = prepareJsCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
       });
     });
 
     it('Should throw error, allowJsDuplicatePropsInSchema = false, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
+      const { compiler } = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
         throw new Error();
@@ -153,7 +153,7 @@ describe('DataSchemaCompiler', () => {
     });
 
     it('Should compile without error, allowJsDuplicatePropsInSchema = true, invalid schema', () => {
-      const { compiler } = prepareCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
+      const { compiler } = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
       return compiler.compile().then(() => {
         compiler.throwIfAnyErrors();
       });
@@ -189,7 +189,7 @@ describe('DataSchemaCompiler', () => {
       it('Should compile 200 schemas in less than 2500ms * 10', async () => {
         const repeats = 200;
 
-        const compilerWith = prepareCompiler(schema, { allowJsDuplicatePropsInSchema: false });
+        const compilerWith = prepareJsCompiler(schema, { allowJsDuplicatePropsInSchema: false });
         const start = new Date().getTime();
         for (let i = 0; i < repeats; i++) {
           delete compilerWith.compiler.compilePromise; // Reset compile result
@@ -204,7 +204,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('calculated metrics', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -272,7 +272,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('static dimension case', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -326,7 +326,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('filtered dates', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(`
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -435,7 +435,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('contexts', async () => {
-    const { compiler, contextEvaluator } = prepareCompiler(`
+    const { compiler, contextEvaluator } = prepareJsCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -468,7 +468,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('views should not contain own members', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     view('Visitors', {
       dimensions: {
         id: {
@@ -488,10 +488,10 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('foreign cubes', () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
     cube('Visitors', {
       sql: 'select * from visitors',
-      
+
       dimensions: {
         foo: {
           type: 'number',
@@ -499,10 +499,10 @@ describe('DataSchemaCompiler', () => {
         }
       }
     });
-    
+
     cube('Foreign', {
       sql: 'select * from foreign',
-      
+
       dimensions: {
         bar: {
           type: 'number',

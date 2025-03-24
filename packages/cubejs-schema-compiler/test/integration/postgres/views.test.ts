@@ -1,6 +1,6 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 // import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 // TODO: move into utils
@@ -25,7 +25,7 @@ describe('Views in YAML', () => {
 describe('Views in JS', () => {
   jest.setTimeout(200000);
 
-  const prepareCompilerResult = prepareCompiler(`
+  const prepareCompilerResult = prepareJsCompiler(`
     cube(\`orders\`, {
       sql: \`SELECT 1 as id, 1 as customer_id, '2022-01-01' as timestamp\`,
 
