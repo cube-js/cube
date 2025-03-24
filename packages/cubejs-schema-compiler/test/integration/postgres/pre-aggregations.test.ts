@@ -1,14 +1,14 @@
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
 
   // language=JavaScript
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}

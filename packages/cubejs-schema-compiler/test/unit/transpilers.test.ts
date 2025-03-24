@@ -2,14 +2,14 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 import { ImportExportTranspiler } from '../../src/compiler/transpilers';
 import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 
 describe('Transpilers', () => {
   it('CubeCheckDuplicatePropTranspiler', async () => {
     try {
-      const { compiler } = prepareCompiler(`
+      const { compiler } = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'select * from test',
           dimensions: {
@@ -38,7 +38,7 @@ describe('Transpilers', () => {
   });
 
   it('CubePropContextTranspiler', async () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
         let { securityContext } = COMPILE_CONTEXT;
 
         cube(\`Test\`, {
