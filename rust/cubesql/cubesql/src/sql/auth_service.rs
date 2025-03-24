@@ -8,6 +8,10 @@ use crate::CubeError;
 // Any type will allow us to split (with downcast) auth context into HTTP (standalone) or Native
 pub trait AuthContext: Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
+
+    fn user(&self) -> Option<String>;
+
+    fn security_context(&self) -> Option<&serde_json::Value>;
 }
 
 pub type AuthContextRef = Arc<dyn AuthContext>;

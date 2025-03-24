@@ -78,6 +78,14 @@ impl AuthContext for NativeSQLAuthContext {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn user(&self) -> Option<&String> {
+        self.user.as_ref()
+    }
+
+    fn security_context(&self) -> Option<&serde_json::Value> {
+        self.security_context.as_ref()
+    }
 }
 
 #[async_trait]
@@ -139,6 +147,14 @@ pub struct NativeGatewayAuthContext {
 impl GatewayAuthContext for NativeGatewayAuthContext {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn user(&self) -> Option<&String> {
+        None
+    }
+
+    fn security_context(&self) -> Option<&serde_json::Value> {
+        self.security_context.as_ref()
     }
 }
 

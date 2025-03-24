@@ -8,6 +8,10 @@ use serde::Serialize;
 // Any type will allow us to split (with downcast) auth context
 pub trait GatewayAuthContext: Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
+
+    fn user(&self) -> Option<&String>;
+
+    fn security_context(&self) -> Option<&serde_json::Value>;
 }
 
 pub type GatewayAuthContextRef = Arc<dyn GatewayAuthContext>;
