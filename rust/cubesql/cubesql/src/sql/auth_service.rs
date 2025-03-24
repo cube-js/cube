@@ -9,7 +9,7 @@ use serde_json::Value;
 pub trait AuthContext: Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
 
-    fn user(&self) -> Option<String>;
+    fn user(&self) -> Option<&String>;
 
     fn security_context(&self) -> Option<&serde_json::Value>;
 }
@@ -27,7 +27,7 @@ impl AuthContext for HttpAuthContext {
         self
     }
 
-    fn user(&self) -> Option<String> {
+    fn user(&self) -> Option<&String> {
         None
     }
 
