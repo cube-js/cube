@@ -23,7 +23,7 @@ pub struct GatewayAuthenticateResponse {
 
 #[derive(Debug, Serialize)]
 pub struct GatewayCheckAuthRequest {
-    pub(crate) protocol: String,
+    pub protocol: String,
 }
 
 #[derive(Debug)]
