@@ -14,6 +14,10 @@ export type ToString = { toString(): string };
 interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
+  sql?: string | (() => string);
+  // eslint-disable-next-line camelcase
+  sql_table?: string | (() => string);
+  sqlTable?: string | (() => string);
   measures?: Record<string, any>;
   dimensions?: Record<string, any>;
   segments?: Record<string, any>;
@@ -206,11 +210,21 @@ export class CubeSymbols {
 
     if (cubeDefinition.extends) {
       const superCube = this.resolveSymbolsCall(cubeDefinition.extends, (name: string) => this.cubeReferenceProxy(name));
-      Object.setPrototypeOf(
-        cubeObject,
-        // eslint-disable-next-line no-underscore-dangle
-        superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube
-      );
+      // eslint-disable-next-line no-underscore-dangle
+      const parentCube = superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube;
+      Object.setPrototypeOf(cubeObject, parentCube);
+
+      // We have 2 different properties that are mutually exclusive: `sqlTable` & `sql`
+      // And if in extending cube one of them is defined - we need to hide the other from parent cube definition
+      if (cubeDefinition.sql_table && parentCube.sql) {
+        cubeObject.sql = undefined;
+      } else if (cubeDefinition.sqlTable && parentCube.sql) {
+        cubeObject.sql = undefined;
+      } else if (cubeDefinition.sql && parentCube.sql_table) {
+        cubeObject.sql_table = undefined;
+      } else if (cubeDefinition.sql && parentCube.sqlTable) {
+        cubeObject.sqlTable = undefined;
+      }
     }
 
     return cubeObject;
