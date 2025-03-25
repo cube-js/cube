@@ -1,5 +1,5 @@
 cube('orders', {
-  sql_table: 'public.orders',
+  sql: `SELECT * FROM orders`,
 
   dimensions: {
     id: {
