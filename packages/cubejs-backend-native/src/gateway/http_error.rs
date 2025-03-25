@@ -38,7 +38,7 @@ impl HttpError {
     }
 
     /// CubeError may contain unsafe error message, when it's internal error
-    /// More ever, we cannot map this error to HTTP status code
+    /// We cannot map this error to HTTP status code, that's why we pass it as argument
     pub fn from_user_with_status_code(error: CubeError, code: HttpErrorCode) -> Self {
         Self {
             code: match error.cause {
