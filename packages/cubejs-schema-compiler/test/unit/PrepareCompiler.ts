@@ -5,6 +5,11 @@ export type CompileContent = {
   fileName: string;
 };
 
+export const prepareCompiler = (content: CompileContent | CompileContent[], options = {}) => originalPrepareCompiler({
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve(Array.isArray(content) ? content : [content]),
+}, { adapter: 'postgres', ...options });
+
 export const prepareJsCompiler = (content, options = {}) => originalPrepareCompiler({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
@@ -18,11 +23,6 @@ export const prepareYamlCompiler = (content, options = {}) => originalPrepareCom
     { fileName: 'main.yml', content }
   ])
 }, { adapter: 'postgres', ...options });
-
-// export const prepareCompiler = (content: CompileContent | CompileContent[], options) => originalPrepareCompiler({
-//   localPath: () => __dirname,
-//   dataSchemaFiles: () => Promise.resolve(Array.isArray(content) ? content : [content]),
-// }, { adapter: 'postgres', ...options });
 
 export const prepareCube = (cubeName, cube, options = {}) => {
   const fileName = `${cubeName}.js`;

@@ -1,5 +1,9 @@
-import { prepareJsCompiler } from './PrepareCompiler';
+import fs from 'fs';
+import path from 'path';
+import { prepareCompiler, prepareJsCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaWithCustomGranularities, createCubeSchemaWithAccessPolicy } from './utils';
+
+const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'accessPolicy'];
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
@@ -378,5 +382,319 @@ describe('Schema Testing', () => {
     ]);
     await compiler.compile();
     compiler.throwIfAnyErrors();
+  });
+
+  describe('Inheritance', () => {
+    it('CubeB.js correctly extends cubeA.js (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = 'cube(\'ordersExt\', { extends: orders })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.js correctly extends cubeA.js (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.js'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.yml (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = `
+    cubes:
+      - name: ordersExt
+        extends: orders
+      `;
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.yml (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.yml'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.js (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = `
+    cubes:
+      - name: ordersExt
+        extends: orders
+      `;
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.js (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.yml'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
+
+    it('CubeB.js correctly extends cubeA.yml (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = 'cube(\'ordersExt\', { extends: orders })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.js correctly extends cubeA.yml (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.js'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
   });
 });
