@@ -396,12 +396,70 @@ describe('Schema Testing', () => {
     }
   });
 
-  it('valid schema with accessPolicy', async () => {
-    const { compiler } = prepareJsCompiler([
-      createCubeSchemaWithAccessPolicy('ProtectedCube'),
-    ]);
-    await compiler.compile();
-    compiler.throwIfAnyErrors();
+  describe('Access Policies', () => {
+    it('valid schema with accessPolicy', async () => {
+      const { compiler } = prepareJsCompiler([
+        createCubeSchemaWithAccessPolicy('ProtectedCube'),
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+    });
+
+    it('throw errors for nonexistent policy members with paths', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_nonexist_acl.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/orders.other cannot be resolved. There's no such member or cube/);
+      }
+    });
+
+    it('throw errors for incorrect policy members with paths', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_incorrect_acl.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Paths aren't allowed in the accessPolicy policy but 'order_users.name' provided as a filter member reference for orders/);
+      }
+    });
   });
 
   describe('Views', () => {
@@ -435,6 +493,7 @@ describe('Schema Testing', () => {
 
       try {
         await compiler.compile();
+        throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Paths aren't allowed in cube includes but 'nonexistent2\.via\.path' provided as include member/);
         expect(e.toString()).toMatch(/Member 'nonexistent1' is included in 'orders_view' but not defined in any cube/);
@@ -442,7 +501,7 @@ describe('Schema Testing', () => {
       }
     });
 
-    it('throws errors for incorrect referenced excludes members', async () => {
+    it('throws errors for incorrect referenced excludes members with paths', async () => {
       const orders = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
         'utf8'
@@ -456,7 +515,7 @@ describe('Schema Testing', () => {
                 excludes:
                   - id
                   - status
-                  - nonexistent3
+                  - nonexistent3.ext
                   - nonexistent4
       `;
 
@@ -473,9 +532,9 @@ describe('Schema Testing', () => {
 
       try {
         await compiler.compile();
+        throw new Error('should throw earlier');
       } catch (e: any) {
-        expect(e.toString()).toMatch(/Member 'nonexistent3' is included in 'orders_view' but not defined in any cube/);
-        expect(e.toString()).toMatch(/Member 'nonexistent4' is included in 'orders_view' but not defined in any cube/);
+        expect(e.toString()).toMatch(/Paths aren't allowed in cube excludes but 'nonexistent3.ext' provided as exclude member/);
       }
     });
 
@@ -509,6 +568,7 @@ describe('Schema Testing', () => {
 
       try {
         await compiler.compile();
+        throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Paths aren't allowed in cube excludes but 'nonexistent5\.via\.path' provided as exclude member/);
       }
@@ -550,6 +610,7 @@ describe('Schema Testing', () => {
 
       try {
         await compiler.compile();
+        throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Included member 'count' conflicts with existing member of 'orders_view'\. Please consider excluding this member or assigning it an alias/);
         expect(e.toString()).toMatch(/Included member 'id' conflicts with existing member of 'orders_view'\. Please consider excluding this member or assigning it an alias/);
