@@ -1164,9 +1164,22 @@ const variables: Record<string, (...args: any) => any> = {
   }: {
     dataSource: string,
   }) => (
-    process.env[
-      keyByDataSource('CUBEJS_DB_CLICKHOUSE_READONLY', dataSource)
-    ]
+    get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_READONLY', dataSource))
+      .default('false')
+      .asBool()
+  ),
+
+  /**
+   * ClickHouse compression flag.
+   */
+  clickhouseCompression: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    get(keyByDataSource('CUBEJS_DB_CLICKHOUSE_COMPRESSION', dataSource))
+      .default('false')
+      .asBool()
   ),
 
   /** ****************************************************************
