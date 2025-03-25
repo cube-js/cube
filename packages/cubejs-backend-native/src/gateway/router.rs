@@ -4,9 +4,11 @@ use crate::gateway::state::ApiGatewayStateRef;
 use axum::routing::{get, MethodRouter};
 use axum::Router;
 
+pub type RApiGatewayRouter = Router<ApiGatewayStateRef>;
+
 #[derive(Debug, Clone)]
 pub struct ApiGatewayRouterBuilder {
-    router: Router<ApiGatewayStateRef>,
+    router: RApiGatewayRouter,
 }
 
 impl ApiGatewayRouterBuilder {
@@ -29,7 +31,7 @@ impl ApiGatewayRouterBuilder {
         }
     }
 
-    pub fn build(self) -> Router<ApiGatewayStateRef> {
+    pub fn build(self) -> RApiGatewayRouter {
         self.router
     }
 }

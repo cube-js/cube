@@ -11,6 +11,6 @@ pub use auth_service::{
     GatewayAuthContext, GatewayAuthContextRef, GatewayAuthService, GatewayAuthenticateResponse,
     GatewayCheckAuthRequest,
 };
-pub use router::ApiGatewayRouterBuilder;
+pub use router::{ApiGatewayRouterBuilder, RApiGatewayRouter};
 pub use server::{ApiGatewayServer, ApiGatewayServerImpl};
-pub use state::ApiGatewayState;
+pub use state::{ApiGatewayState, ApiGatewayStateRef};
