@@ -696,5 +696,88 @@ describe('Schema Testing', () => {
         expect(cubeB[c]).toMatchSnapshot();
       });
     });
+
+    it('CubeB.js correctly extends cubeA.yml (with sql override)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = 'cube(\'ordersExt\', { extends: orders, sql: "SELECT * FROM other_orders" })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+
+      expect(cubeB.sql).toBeTruthy();
+      expect(cubeB.sqlTable).toBeFalsy();
+    });
+
+    it('CubeB.yml correctly extends cubeA.js (with sql_table override)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = `
+    cubes:
+      - name: ordersExt
+        sql_table: orders_override
+        extends: orders
+      `;
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+
+      expect(cubeB.sqlTable).toBeTruthy();
+      expect(cubeB.sql).toBeFalsy();
+    });
   });
 });
