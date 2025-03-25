@@ -1,13 +1,17 @@
 use std::{any::Any, env, fmt::Debug, sync::Arc};
 
-use async_trait::async_trait;
-
 use crate::CubeError;
+use async_trait::async_trait;
+use serde_json::Value;
 
 // We cannot use generic here. It's why there is this trait
 // Any type will allow us to split (with downcast) auth context into HTTP (standalone) or Native
 pub trait AuthContext: Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
+
+    fn user(&self) -> Option<&String>;
+
+    fn security_context(&self) -> Option<&serde_json::Value>;
 }
 
 pub type AuthContextRef = Arc<dyn AuthContext>;
@@ -21,6 +25,14 @@ pub struct HttpAuthContext {
 impl AuthContext for HttpAuthContext {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn user(&self) -> Option<&String> {
+        None
+    }
+
+    fn security_context(&self) -> Option<&Value> {
+        None
     }
 }
 

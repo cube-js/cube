@@ -8,12 +8,12 @@ use cubesql::config::ConfigObj;
 use cubesql::sql::{Session, SessionManager};
 use cubesql::CubeError;
 
-use crate::auth::NativeAuthContext;
+use crate::auth::NativeSQLAuthContext;
 use crate::config::NodeCubeServices;
 
 pub async fn create_session(
     services: &NodeCubeServices,
-    native_auth_ctx: Arc<NativeAuthContext>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
 ) -> Result<Arc<Session>, CubeError> {
     let config = services
         .injector()
@@ -53,7 +53,7 @@ pub async fn create_session(
 
 pub async fn with_session<T, F, Fut>(
     services: &NodeCubeServices,
-    native_auth_ctx: Arc<NativeAuthContext>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
     f: F,
 ) -> Result<T, CubeError>
 where

@@ -103,6 +103,22 @@ function interfaceMethods() {
         dataSourceToSqlGenerator: {},
       };
     }),
+    contextToApiScopes: jest.fn(async ({ request, token }) => {
+      console.log('[js] contextToApiScopes', {
+        request,
+        token,
+      });
+
+      return ['data', 'meta', 'graphql'];
+    }),
+    checkAuth: jest.fn(async ({ request, token }) => {
+      console.log('[js] checkAuth', {
+        request,
+        token,
+      });
+
+      throw new Error('checkAuth is not implemented');
+    }),
     checkSqlAuth: jest.fn(async ({ request, user }) => {
       console.log('[js] checkSqlAuth', {
         request,

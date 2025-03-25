@@ -1,6 +1,6 @@
-use crate::gateway::{ApiGatewayRouterBuilder, ApiGatewayState};
+use crate::gateway::state::ApiGatewayStateRef;
+use crate::gateway::ApiGatewayRouterBuilder;
 use async_trait::async_trait;
-use cubesql::config::injection::Injector;
 use cubesql::config::processing_loop::{ProcessingLoop, ShutdownMode};
 use cubesql::CubeError;
 use std::sync::Arc;
@@ -34,13 +34,11 @@ impl ApiGatewayServerImpl {
     pub fn new(
         router_builder: ApiGatewayRouterBuilder,
         address: String,
-        injector: Arc<Injector>,
+        state: ApiGatewayStateRef,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
 
-        let router = router_builder
-            .build()
-            .with_state(ApiGatewayState::new(injector));
+        let router = router_builder.build().with_state(state);
 
         Arc::new(Self {
             inner_factory_state: Mutex::new(Some(InnerFactoryState {
@@ -87,7 +85,13 @@ impl ProcessingLoop for ApiGatewayServerImpl {
 
     async fn stop_processing(&self, _mode: ShutdownMode) -> Result<(), CubeError> {
         // ShutdownMode was added for Postgres protocol and its use here has not yet been considered.
-        self.close_socket_tx.send(true)?;
+        self.close_socket_tx.send(true).map_err(|err| {
+            CubeError::internal(format!(
+                "Failed to send close signal to ApiGatewayServer: {}",
+                err
+            ))
+        })?;
+
         Ok(())
     }
 }
