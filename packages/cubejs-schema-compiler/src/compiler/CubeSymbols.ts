@@ -131,8 +131,16 @@ export class CubeSymbols {
       },
 
       get preAggregations() {
+        // For preAggregations order is important, and destructing parents cube pre-aggs first will lead to
+        // unexpected results, so we can not use common approach with allDefinitions('preAggregations') here.
         if (!preAggregations) {
-          preAggregations = this.allDefinitions('preAggregations');
+          const parentPreAggregations = cubeDefinition.extends ? super.preAggregations : null;
+
+          if (parentPreAggregations) {
+            preAggregations = { ...cubeDefinition.preAggregations, ...parentPreAggregations, ...cubeDefinition.preAggregations };
+          } else {
+            preAggregations = { ...cubeDefinition.preAggregations };
+          }
         }
         return preAggregations;
       },
