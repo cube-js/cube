@@ -747,7 +747,6 @@ dependencies = [
  "async-channel",
  "async-trait",
  "axum",
- "bytes",
  "convert_case 0.6.0",
  "cubenativeutils",
  "cubeorchestrator",
@@ -762,15 +761,12 @@ dependencies = [
  "minijinja",
  "neon",
  "once_cell",
- "pin-project",
  "pyo3",
  "pyo3-asyncio",
- "regex",
  "serde",
  "serde_json",
  "simple_logger",
  "tokio",
- "tower 0.5.2",
  "uuid 1.6.1",
 ]
 
