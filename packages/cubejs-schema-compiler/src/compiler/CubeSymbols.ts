@@ -23,6 +23,8 @@ interface CubeDefinition {
   segments?: Record<string, any>;
   hierarchies?: Record<string, any>;
   preAggregations?: Record<string, any>;
+  // eslint-disable-next-line camelcase
+  pre_aggregations?: Record<string, any>;
   joins?: Record<string, any>;
   accessPolicy?: any[];
   includes?: any;
@@ -135,11 +137,13 @@ export class CubeSymbols {
         // unexpected results, so we can not use common approach with allDefinitions('preAggregations') here.
         if (!preAggregations) {
           const parentPreAggregations = cubeDefinition.extends ? super.preAggregations : null;
+          // Unfortunately, cube is not camelized yet at this point :(
+          const localPreAggregations = cubeDefinition.preAggregations || cubeDefinition.pre_aggregations;
 
           if (parentPreAggregations) {
-            preAggregations = { ...cubeDefinition.preAggregations, ...parentPreAggregations, ...cubeDefinition.preAggregations };
+            preAggregations = { ...localPreAggregations, ...parentPreAggregations, ...localPreAggregations };
           } else {
-            preAggregations = { ...cubeDefinition.preAggregations };
+            preAggregations = { ...localPreAggregations };
           }
         }
         return preAggregations;
@@ -224,9 +228,10 @@ export class CubeSymbols {
 
       // We have 2 different properties that are mutually exclusive: `sqlTable` & `sql`
       // And if in extending cube one of them is defined - we need to hide the other from parent cube definition
-      if (cubeDefinition.sqlTable && parentCube.sql) {
+      // Unfortunately, cube is not camelized yet at this point :(
+      if ((cubeDefinition.sqlTable || cubeDefinition.sql_table) && parentCube.sql) {
         cubeObject.sql = undefined;
-      } else if (cubeDefinition.sql && parentCube.sqlTable) {
+      } else if (cubeDefinition.sql && (parentCube.sqlTable || parentCube.sql_table)) {
         cubeObject.sqlTable = undefined;
       }
     }
