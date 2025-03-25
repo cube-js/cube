@@ -224,12 +224,8 @@ export class CubeSymbols {
 
       // We have 2 different properties that are mutually exclusive: `sqlTable` & `sql`
       // And if in extending cube one of them is defined - we need to hide the other from parent cube definition
-      if (cubeDefinition.sql_table && parentCube.sql) {
+      if (cubeDefinition.sqlTable && parentCube.sql) {
         cubeObject.sql = undefined;
-      } else if (cubeDefinition.sqlTable && parentCube.sql) {
-        cubeObject.sql = undefined;
-      } else if (cubeDefinition.sql && parentCube.sql_table) {
-        cubeObject.sql_table = undefined;
       } else if (cubeDefinition.sql && parentCube.sqlTable) {
         cubeObject.sqlTable = undefined;
       }
