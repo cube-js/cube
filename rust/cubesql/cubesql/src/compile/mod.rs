@@ -14474,6 +14474,42 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_datetrunc_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        // BigQuery
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATE_TRUNC('week', k.order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(k.customer_gender) = LOWER('unknown')
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATETRUNC".to_string(), "DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %})".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATETIME_TRUNC("));
+        assert!(sql.contains("WEEK(MONDAY)"));
+    }
+
+    #[tokio::test]
     async fn test_datediff_push_down() {
         if !Rewriter::sql_push_down_enabled() {
             return;
