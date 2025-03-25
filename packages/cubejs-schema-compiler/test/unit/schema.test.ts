@@ -376,12 +376,185 @@ describe('Schema Testing', () => {
     });
   });
 
+  it('throws an error on duplicate member names', async () => {
+    const orders = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/orders_dup_members.js'),
+      'utf8'
+    );
+
+    const { compiler } = prepareCompiler([
+      {
+        content: orders,
+        fileName: 'orders.js',
+      },
+    ]);
+
+    try {
+      await compiler.compile();
+    } catch (e: any) {
+      expect(e.toString()).toMatch(/status defined more than once/);
+    }
+  });
+
   it('valid schema with accessPolicy', async () => {
     const { compiler } = prepareJsCompiler([
       createCubeSchemaWithAccessPolicy('ProtectedCube'),
     ]);
     await compiler.compile();
     compiler.throwIfAnyErrors();
+  });
+
+  describe('Views', () => {
+    it('throws errors for incorrect referenced includes members', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes:
+                  - id
+                  - status
+                  - nonexistent1
+                  - nonexistent2.via.path
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Paths aren't allowed in cube includes but 'nonexistent2\.via\.path' provided as include member/);
+        expect(e.toString()).toMatch(/Member 'nonexistent1' is included in 'orders_view' but not defined in any cube/);
+        expect(e.toString()).toMatch(/Member 'nonexistent2\.via\.path' is included in 'orders_view' but not defined in any cube/);
+      }
+    });
+
+    it('throws errors for incorrect referenced excludes members', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes: "*"
+                excludes:
+                  - id
+                  - status
+                  - nonexistent3
+                  - nonexistent4
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Member 'nonexistent3' is included in 'orders_view' but not defined in any cube/);
+        expect(e.toString()).toMatch(/Member 'nonexistent4' is included in 'orders_view' but not defined in any cube/);
+      }
+    });
+
+    it('throws errors for incorrect referenced excludes members with path', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes: "*"
+                excludes:
+                  - id
+                  - status
+                  - nonexistent5.via.path
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Paths aren't allowed in cube excludes but 'nonexistent5\.via\.path' provided as exclude member/);
+      }
+    });
+
+    it('throws errors for conflicting members of included cubes', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes: "*"
+              - join_path: orders.order_users
+                includes: "*"
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Included member 'count' conflicts with existing member of 'orders_view'\. Please consider excluding this member or assigning it an alias/);
+        expect(e.toString()).toMatch(/Included member 'id' conflicts with existing member of 'orders_view'\. Please consider excluding this member or assigning it an alias/);
+      }
+    });
   });
 
   describe('Inheritance', () => {
