@@ -15,7 +15,7 @@
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "test": "npm run unit",
-    "unit": "CUBE_JS_NATIVE_API_GATEWAY_INTERNAL=true jest --coverage dist/test",
+    "unit": "CUBE_JS_NATIVE_API_GATEWAY_INTERNAL=true jest --coverage --forceExit dist/test",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",

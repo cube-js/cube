@@ -1,6 +1,5 @@
 import {
   setupLogger,
-  resetLogger,
   registerInterface,
   shutdownInterface,
   execSql,
@@ -15,7 +14,7 @@ import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
 import type { ApiGateway } from './gateway';
-import type { CheckAuthFn, CheckSQLAuthFn, ExtendedRequestContext, CanSwitchSQLUserFn } from './interfaces';
+import type { CheckSQLAuthFn, ExtendedRequestContext, CanSwitchSQLUserFn } from './interfaces';
 
 export type SQLServerOptions = {
   checkSqlAuth?: CheckSQLAuthFn,
@@ -381,9 +380,5 @@ export class SQLServer {
 
   public async shutdown(mode: ShutdownMode): Promise<void> {
     await shutdownInterface(this.sqlInterfaceInstance!, mode);
-
-    resetLogger(
-      process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
-    );
   }
 }
