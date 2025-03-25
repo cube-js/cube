@@ -19,12 +19,20 @@ impl AuthExtension {
 fn parse_token(header_value: &HeaderValue) -> Result<&str, HttpError> {
     let trimmed = header_value.to_str()?.trim();
 
-    if let Some(stripped) = trimmed.strip_prefix("Bearer ") {
-        Ok(stripped)
+    let stripped = if let Some(stripped) = trimmed.strip_prefix("Bearer ") {
+        stripped
     } else if let Some(stripped) = trimmed.strip_prefix("bearer ") {
-        Ok(stripped)
+        stripped
     } else {
-        Ok(trimmed)
+        trimmed
+    };
+
+    if stripped.is_empty() {
+        Err(HttpError::unauthorized(
+            "Value for authorization header cannot be empty".to_string(),
+        ))
+    } else {
+        Ok(stripped)
     }
 }
 
