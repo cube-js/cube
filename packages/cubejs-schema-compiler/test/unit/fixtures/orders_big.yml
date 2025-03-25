@@ -78,6 +78,16 @@ cubes:
                 operator: equals
                 values:
                   - "{ securityContext.currentDate }"
+            - and:
+              - member: "{CUBE}.completed_at"
+                operator: notInDateRange
+                values:
+                  - 2022-01-01
+                  - "{ security_context.currentDate }"
+              - member: "completed_at"
+                operator: equals
+                values:
+                  - "{ securityContext.currentDate }"
         memberLevel:
           includes:
             - status
