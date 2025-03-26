@@ -148,12 +148,12 @@ export class BaseMeasure {
     const { rollingWindow } = definition;
     if (rollingWindow.type === 'shifted') {
       if (rollingWindow.mode === 'to_date') {
-        return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity, rollingWindow.length);
+        return this.query.rollingWindowToDateJoinConditionWithShift(rollingWindow.granularity, rollingWindow.length);
       }
       if (rollingWindow.mode === 'last') {
         return this.query.rollingWindowLastJoinCondition(rollingWindow.granularity, rollingWindow.length);
       }
-      return this.query.rollingWindowDateJoinCondition(
+      return this.query.rollingWindowDateJoinConditionWithShift(
         rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset, rollingWindow.length
       );
     }

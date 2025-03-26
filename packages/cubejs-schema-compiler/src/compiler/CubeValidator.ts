@@ -202,7 +202,7 @@ const Shifted = {
   mode: Joi.any().valid('to_date', 'fixed', 'last'),
   trailing: timeInterval,
   leading: timeInterval,
-  offset: Joi.any().valid('start', 'end'),
+  offset: Joi.any().valid('start', 'end', 'none'),
   granularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter','year'),
 };
 
