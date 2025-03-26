@@ -302,6 +302,7 @@ jobs:
 
   build-native-linux:
     runs-on: ubuntu-24.04
+    needs: [latest-tag-sha]
     timeout-minutes: 60
     name: "Build native linux (Python: ${{ matrix.python-version }})"
     strategy:
@@ -470,6 +471,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_CURRENT }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
