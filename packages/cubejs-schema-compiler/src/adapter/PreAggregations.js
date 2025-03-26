@@ -1256,11 +1256,8 @@ export class PreAggregations {
 
     const from = this.query.joinSql(toJoin);
 
-    const segmentFilters = this.query.segments.map(
-      s => this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })
-    );
     const replacedFilters =
-      filters || segmentFilters
+      filters || this.query.segments
         .concat(this.query.filters).concat(
           this.query.timeDimensions.map(dimension => dimension.dateRange && ({
             filterToWhere: () => this.query.timeRangeFilter(
