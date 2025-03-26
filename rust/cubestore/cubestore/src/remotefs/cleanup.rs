@@ -4,7 +4,9 @@ use crate::remotefs::RemoteFs;
 use crate::{app_metrics, CubeError};
 use chrono::Utc;
 use datafusion::cube_ext;
+use datafusion::parquet::file::reader::{FileReader, SerializedFileReader};
 use std::collections::HashSet;
+use std::fs::{DirEntry, File};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::time::Duration;
@@ -219,27 +221,11 @@ impl RemoteFsCleanup {
                         if !file_name.ends_with(".parquet") {
                             continue;
                         }
-
-                        let should_deleted = if let Ok(metadata) = entry.metadata() {
-                            match metadata.created() {
-                                Ok(created) => {
-                                    if created
-                                        .elapsed()
-                                        .map_or(true, |e| e < cleanup_local_files_delay)
-                                    {
-                                        false
-                                    } else {
-                                        true
-                                    }
-                                }
-                                Err(e) => {
-                                    log::error!(
-                                        "error while getting created time for file {:?}:{}",
-                                        entry.file_name(),
-                                        e
-                                    );
-                                    false
-                                }
+                        let should_deleted = if let Some(created) = get_timestamp(&entry) {
+                            if created < cleanup_local_files_delay {
+                                false
+                            } else {
+                                true
                             }
                         } else {
                             false
@@ -285,6 +271,38 @@ impl RemoteFsCleanup {
             }
         }
     }
+}
+
+fn get_timestamp(entry: &DirEntry) -> Option<Duration> {
+    let path = entry.path();
+    let file = match File::open(&path) {
+        Ok(file) => file,
+        Err(e) => {
+            log::error!("Error opening file {:?}: {}", path, e);
+            return None;
+        }
+    };
+    let reader = match SerializedFileReader::new(file) {
+        Ok(reader) => reader,
+        Err(e) => {
+            log::error!("Error reading Parquet file {:?}: {}", path, e);
+            return None;
+        }
+    };
+    let metadata = reader.metadata().file_metadata().key_value_metadata();
+    if let Some(key_values) = metadata {
+        let created = key_values
+            .iter()
+            .find(|key_value| key_value.key == "created_at");
+        if let Some(created) = created {
+            if let Some(value) = created.value.as_ref() {
+                if let Ok(timestamp) = value.parse::<u64>() {
+                    return Some(Duration::from_secs(timestamp));
+                }
+            }
+        }
+    }
+    None
 }
 #[cfg(test)]
 mod test {
