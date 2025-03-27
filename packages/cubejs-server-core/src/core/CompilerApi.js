@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import R from 'ramda';
 import { v4 as uuidv4, parse as uuidParse } from 'uuid';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { NativeInstance } from '@cubejs-backend/native';
@@ -109,9 +108,9 @@ export class CompilerApi {
   async createQueryFactory(compilers) {
     const { cubeEvaluator } = compilers;
 
-    const cubeToQueryClass = R.fromPairs(
+    const cubeToQueryClass = Object.fromEntries(
       await Promise.all(
-        cubeEvaluator.cubeNames().map(async cube => {
+        cubeEvaluator.cubeNames().map(async (cube) => {
           const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
           const dbType = await this.getDbType(dataSource);
           const dialectClass = this.getDialectClass(dataSource, dbType);
