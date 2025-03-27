@@ -3947,19 +3947,22 @@ async fn planning_join_with_partitioned_index(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "ClusterSend, partitions: [[1, 3]]"
+        "CoalescePartitions\
+        \n  ClusterSend, partitions: [[1, 3]]"
     );
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
-        "Worker\
-           \n  Projection, [order_id, customer_name]\
-           \n    MergeJoin, on: [customer_id@1 = customer_id@0]\
-           \n      MergeSort\
-           \n        Scan, index: #mi0:1:[1]:sort_on[customer_id], fields: [order_id, customer_id]\
-           \n          Empty\
-           \n      MergeSort\
-           \n        Scan, index: #mi0:3:[3]:sort_on[customer_id], fields: *\
-           \n          Empty",
+        "CoalescePartitions\
+        \n  Worker\
+        \n    CoalescePartitions\
+        \n      Projection, [order_id, customer_name]\
+        \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
+        \n          Scan, index: #mi0:1:[1]:sort_on[customer_id], fields: [order_id, customer_id]\
+        \n            Sort\
+        \n              Empty\
+        \n          Scan, index: #mi0:3:[3]:sort_on[customer_id], fields: *\
+        \n            Sort\
+        \n              Empty"
     );
 }
 
