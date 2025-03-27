@@ -1,5 +1,6 @@
 use log::{debug, error};
 use reqwest;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{configuration, Error};
