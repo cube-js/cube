@@ -1,7 +1,7 @@
 import R from 'ramda';
 import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
-import crypto from 'crypto';
+import { xxh3 } from '@node-rs/xxhash';
 import { Required } from '@cubejs-backend/shared';
 import {
   PreAggregationDescription,
@@ -127,10 +127,7 @@ function getPreAggsJobsList(
  * Returns MD5 hash token of the job object.
  */
 function getPreAggJobToken(job: PreAggJob) {
-  return crypto
-    .createHash('md5')
-    .update(JSON.stringify(job))
-    .digest('hex');
+  return xxh3.xxh64(JSON.stringify(job)).toString(16);
 }
 
 export class RefreshScheduler {
