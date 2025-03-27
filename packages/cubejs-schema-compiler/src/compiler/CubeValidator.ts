@@ -42,6 +42,30 @@ function formatStatePath(state: Joi.State): string {
   return '<unknown path>';
 }
 
+function condition(fun, then, otherwise) {
+  return Joi.alternatives().conditional(
+    Joi.ref('.'), {
+      is: Joi.custom((value, helper) => (fun(value) ? value : helper.message({}))),
+      then,
+      otherwise
+    }
+  );
+}
+
+function defined(a) {
+  return typeof a !== 'undefined';
+}
+
+function inherit(a, b) {
+  return Joi.object().keys({ ...a, ...b });
+}
+
+function requireOneOf(...keys) {
+  return Joi.alternatives().try(
+    ...(keys.map((k) => Joi.object().keys({ [k]: Joi.exist().required() })))
+  );
+}
+
 const regexTimeInterval = Joi.string().custom((value, helper) => {
   if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)s?$/)) {
     return value;
@@ -165,10 +189,11 @@ const BaseDimensionWithoutSubQuery = {
   })
 };
 
-const BaseDimension = Object.assign({
+const BaseDimension = {
   subQuery: Joi.boolean().strict(),
-  propagateFiltersToSubQuery: Joi.boolean().strict()
-}, BaseDimensionWithoutSubQuery);
+  propagateFiltersToSubQuery: Joi.boolean().strict(),
+  ...BaseDimensionWithoutSubQuery
+};
 
 const FixedRollingWindow = {
   type: Joi.string().valid('fixed'),
@@ -233,30 +258,6 @@ const BaseMeasure = {
   ),
   meta: Joi.any()
 };
-
-function condition(fun, then, otherwise) {
-  return Joi.alternatives().conditional(
-    Joi.ref('.'), {
-      is: Joi.custom((value, helper) => (fun(value) ? value : helper.message({}))),
-      then,
-      otherwise
-    }
-  );
-}
-
-function defined(a) {
-  return typeof a !== 'undefined';
-}
-
-function inherit(a, b) {
-  return Joi.object().keys(Object.assign({}, a, b));
-}
-
-function requireOneOf(...keys) {
-  return Joi.alternatives().try(
-    ...(keys.map((k) => Joi.object().keys({ [k]: Joi.exist().required() })))
-  );
-}
 
 const PreAggregationRefreshKeySchema = condition(
   (s) => defined(s.sql),
@@ -605,6 +606,47 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
   ]
 ));
 
+const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().try(
+  inherit(BaseDimensionWithoutSubQuery, {
+    case: Joi.object().keys({
+      when: Joi.array().items(Joi.object().keys({
+        sql: Joi.func().required(),
+        label: Joi.alternatives([
+          Joi.string(),
+          Joi.object().keys({
+            sql: Joi.func().required()
+          })
+        ])
+      })),
+      else: Joi.object().keys({
+        label: Joi.alternatives([
+          Joi.string(),
+          Joi.object().keys({
+            sql: Joi.func().required()
+          })
+        ])
+      })
+    }).required()
+  }),
+  inherit(BaseDimensionWithoutSubQuery, {
+    latitude: Joi.object().keys({
+      sql: Joi.func().required()
+    }).required(),
+    longitude: Joi.object().keys({
+      sql: Joi.func().required()
+    }).required()
+  }),
+  inherit(BaseDimension, {
+    sql: Joi.func().required(),
+  }),
+  inherit(BaseDimension, {
+    multiStage: Joi.boolean().valid(true),
+    type: Joi.any().valid('number').required(),
+    sql: Joi.func().required(),
+    addGroupBy: Joi.func(),
+  })
+));
+
 const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
   aliases: Joi.array().items(Joi.string()),
   sql: Joi.func().required(),
@@ -713,46 +755,7 @@ const baseSchema = {
     ).required()
   })),
   measures: MeasuresSchema,
-  dimensions: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
-    inherit(BaseDimensionWithoutSubQuery, {
-      case: Joi.object().keys({
-        when: Joi.array().items(Joi.object().keys({
-          sql: Joi.func().required(),
-          label: Joi.alternatives([
-            Joi.string(),
-            Joi.object().keys({
-              sql: Joi.func().required()
-            })
-          ])
-        })),
-        else: Joi.object().keys({
-          label: Joi.alternatives([
-            Joi.string(),
-            Joi.object().keys({
-              sql: Joi.func().required()
-            })
-          ])
-        })
-      }).required()
-    }),
-    inherit(BaseDimensionWithoutSubQuery, {
-      latitude: Joi.object().keys({
-        sql: Joi.func().required()
-      }).required(),
-      longitude: Joi.object().keys({
-        sql: Joi.func().required()
-      }).required()
-    }),
-    inherit(BaseDimension, {
-      sql: Joi.func().required()
-    }),
-    inherit(BaseDimension, {
-      multiStage: Joi.boolean().valid(true),
-      type: Joi.any().valid('number').required(),
-      sql: Joi.func().required(),
-      addGroupBy: Joi.func(),
-    })
-  )),
+  dimensions: DimensionsSchema,
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
   folders: Joi.array().items(Joi.object().keys({
@@ -765,14 +768,16 @@ const baseSchema = {
   accessPolicy: Joi.array().items(RolePolicySchema.required()),
 };
 
+const hierarchySchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
+  title: Joi.string(),
+  public: Joi.boolean().strict(),
+  levels: Joi.func()
+}));
+
 const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
-  hierarchies: Joi.object().pattern(identifierRegex, Joi.object().keys({
-    title: Joi.string(),
-    public: Joi.boolean().strict(),
-    levels: Joi.func()
-  }))
+  hierarchies: hierarchySchema,
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
@@ -801,7 +806,7 @@ const viewSchema = inherit(baseSchema, {
     })
   ),
   accessPolicy: Joi.array().items(RolePolicySchema.required()),
-  hierarchies: Joi.any()
+  hierarchies: hierarchySchema,
 });
 
 function formatErrorMessageFromDetails(explain, d) {
