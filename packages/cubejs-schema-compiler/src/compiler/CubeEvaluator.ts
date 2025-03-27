@@ -28,7 +28,7 @@ export type DimensionDefinition = {
 };
 
 export type TimeShiftDefinition = {
-  timeDimension: Function,
+  timeDimension: (...args: Array<unknown>) => { toString(): string },
   interval: string,
   type: 'next' | 'prior',
 };
@@ -48,9 +48,9 @@ export type MeasureDefinition = {
   primaryKey?: true,
   drillFilters?: any,
   multiStage?: boolean,
-  groupBy?: Function,
-  reduceBy?: Function,
-  addGroupBy?: Function,
+  groupBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
+  reduceBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
+  addGroupBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
   timeShift?: TimeShiftDefinition[],
   groupByReferences?: string[],
   reduceByReferences?: string[],
