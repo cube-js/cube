@@ -9,6 +9,8 @@ export class BaseSegment {
 
   public readonly isMemberExpression: boolean = false;
 
+  public readonly joinHint: Array<string> = [];
+
   public constructor(
     protected readonly query: BaseQuery,
     public readonly segment: string | any
@@ -19,6 +21,16 @@ export class BaseSegment {
       // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = segment.expressionName || `${segment.cubeName}.${segment.name}`;
       this.isMemberExpression = !!segment.definition;
+    } else {
+      // TODO move this `as` to static types
+      const segmentPath = segment as string;
+      const parts = segmentPath.split('.');
+      if (parts.length > 2) {
+        // Measure path contains join path
+        const hint = parts.slice(0, -1);
+        this.segment = parts.slice(-2).join('.');
+        this.joinHint = hint;
+      }
     }
   }
 
