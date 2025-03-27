@@ -22,10 +22,6 @@ cubes:
       - name: status
         sql: status
         type: string
-
-      - name: city
-        sql: city
-        type: string
     hierarchies:
       - name: orders_hierarchy
         levels:

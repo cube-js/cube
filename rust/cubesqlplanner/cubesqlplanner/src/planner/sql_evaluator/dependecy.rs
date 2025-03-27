@@ -6,13 +6,13 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum CubeDepProperty {
     CubeDependency(CubeDependency),
     SymbolDependency(Rc<MemberSymbol>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CubeDependency {
     pub cube_symbol: Rc<MemberSymbol>,
     pub sql_fn: Option<Rc<MemberSymbol>>,
@@ -36,7 +36,7 @@ impl CubeDependency {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ContextSymbolDep {
     SecurityContext,
     FilterParams,
@@ -44,7 +44,7 @@ pub enum ContextSymbolDep {
     SqlUtils,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Dependency {
     SymbolDependency(Rc<MemberSymbol>),
     CubeDependency(CubeDependency),
@@ -76,14 +76,7 @@ impl<'a> DependenciesBuilder<'a> {
             vec![]
         };
 
-        let mut childs = Vec::new();
-        for (i, dep) in call_deps.iter().enumerate() {
-            childs.push(vec![]);
-            if let Some(parent) = dep.parent {
-                childs[parent].push(i);
-            }
-        }
-
+        let childs = self.deduplicate_deps_and_make_childs_tree(&call_deps)?;
         let mut result = Vec::new();
 
         for (i, dep) in call_deps.iter().enumerate() {
@@ -105,6 +98,34 @@ impl<'a> DependenciesBuilder<'a> {
         }
 
         Ok(result)
+    }
+
+    fn deduplicate_deps_and_make_childs_tree(
+        &self,
+        call_deps: &Vec<CallDep>,
+    ) -> Result<Vec<Vec<usize>>, CubeError> {
+        let mut childs_tree = Vec::new();
+        let mut deduplicate_index_map = HashMap::<usize, usize>::new();
+        let mut deduplicate_map = HashMap::<CallDep, usize>::new();
+        for (i, dep) in call_deps.iter().enumerate() {
+            //If subcube is used twice in function, then call_deps can hold duplicated dependencies
+            //(for exampls in function ${Orders.ProductsAlt.name} || '_' || ${Orders.ProductsAlt.ProductCategories.name} ProductsAlt appeared twice in call_deps))
+            let self_index = if let Some(exists_index) = deduplicate_map.get(&dep) {
+                deduplicate_index_map.insert(i, *exists_index);
+                *exists_index
+            } else {
+                deduplicate_map.insert(dep.clone(), i);
+                i
+            };
+
+            childs_tree.push(vec![]);
+            if let Some(parent) = dep.parent {
+                let deduplecated_parent = deduplicate_index_map.get(&parent).unwrap_or(&parent);
+                childs_tree[*deduplecated_parent].push(self_index);
+            }
+        }
+
+        Ok(childs_tree)
     }
 
     fn build_cube_dependency(

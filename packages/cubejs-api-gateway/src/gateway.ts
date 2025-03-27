@@ -8,6 +8,7 @@ import structuredClone from '@ungap/structured-clone';
 import {
   getEnv,
   getRealType,
+  parseLocalDate,
   QueryAlias,
 } from '@cubejs-backend/shared';
 import {
@@ -33,6 +34,7 @@ import {
   QueryType as QueryTypeEnum, ResultType
 } from './types/enums';
 import {
+  BaseRequest,
   RequestContext,
   ExtendedRequestContext,
   Request,
@@ -80,7 +82,9 @@ import {
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
-  normalizeQueryPreAggregations, remapToQueryAdapterFormat,
+  normalizeQueryPreAggregations,
+  preAggsJobsRequestSchema,
+  remapToQueryAdapterFormat,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -116,8 +120,10 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
-// Prepared CheckAuthFn, default or from config: always async, returns nothing
-type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<void>;
+// Prepared CheckAuthFn, default or from config: always async
+type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<{
+  securityContext: any;
+}>;
 
 class ApiGateway {
   protected readonly refreshScheduler: any;
@@ -144,9 +150,9 @@ class ApiGateway {
 
   public readonly checkAuthSystemFn: PreparedCheckAuthFn;
 
-  protected readonly contextToApiScopesFn: ContextToApiScopesFn;
+  public readonly contextToApiScopesFn: ContextToApiScopesFn;
 
-  protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
+  public readonly contextToApiScopesDefFn: ContextToApiScopesFn =
     async () => ['graphql', 'meta', 'data'];
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
@@ -324,6 +330,18 @@ class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/sql`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      // TODO parse req.query with zod/joi/...
+
+      if (req.query.format === 'sql') {
+        await this.sql4sql({
+          query: req.query.query,
+          disablePostProcessing: req.query.disable_post_processing === 'true',
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+        return;
+      }
+
       await this.sql({
         query: req.query.query,
         context: req.context,
@@ -332,6 +350,18 @@ class ApiGateway {
     }));
 
     app.post(`${this.basePath}/v1/sql`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      // TODO parse req.body with zod/joi/...
+
+      if (req.body.format === 'sql') {
+        await this.sql4sql({
+          query: req.body.query,
+          disablePostProcessing: req.body.disable_post_processing,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+        return;
+      }
+
       await this.sql({
         query: req.body.query,
         context: req.context,
@@ -381,16 +411,26 @@ class ApiGateway {
       `${this.basePath}/v1/cubesql`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
+        const { query } = req.body;
+
+        const requestStarted = new Date();
+
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Transfer-Encoding', 'chunked');
 
         try {
+          await this.assertApiScope('data', req.context?.securityContext);
+
           await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext);
         } catch (e: any) {
           this.handleError({
             e,
+            query: {
+              sql: query,
+            },
             context: req.context,
-            res: this.resToResultFn(res)
+            res: this.resToResultFn(res),
+            requestStarted
           });
         }
       })
@@ -444,6 +484,7 @@ class ApiGateway {
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, systemAsyncHandler(async (req, res) => {
         await this.getPreAggregations({
           cacheOnly: !!req.query.cacheOnly,
+          metaOnly: !!req.query.metaOnly,
           context: req.context,
           res: this.resToResultFn(res)
         });
@@ -505,18 +546,22 @@ class ApiGateway {
     }
 
     if (getEnv('nativeApiGateway')) {
-      const proxyMiddleware = createProxyMiddleware<Request, Response>({
-        target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
-        changeOrigin: true,
-      });
-
-      app.use(
-        `${this.basePath}/v2`,
-        proxyMiddleware as any
-      );
+      this.enableNativeApiGateway(app);
     }
 
     app.use(this.handleErrorMiddleware);
+  }
+
+  protected enableNativeApiGateway(app: ExpressApplication) {
+    const proxyMiddleware = createProxyMiddleware<Request, Response>({
+      target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
+      changeOrigin: true,
+    });
+
+    app.use(
+      `${this.basePath}/v2`,
+      proxyMiddleware as any
+    );
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
@@ -623,7 +668,7 @@ class ApiGateway {
     }
   }
 
-  public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
+  public async getPreAggregations({ cacheOnly, metaOnly, context, res }: { cacheOnly?: boolean, metaOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
       const compilerApi = await this.getCompilerApi(context);
@@ -639,6 +684,7 @@ class ApiGateway {
               preAggregations: preAggregations.map(p => ({
                 id: p.id,
                 cacheOnly,
+                metaOnly
               }))
             },
           )
@@ -733,8 +779,8 @@ class ApiGateway {
             preAggregations: [{ id: preAggregationId }]
           }
         );
-      const { partitions } = (preAggregationPartitions && preAggregationPartitions[0] || {});
-      const preAggregationPartition = partitions && partitions.find(p => p?.tableName === versionEntry.table_name);
+      const { partitions } = (preAggregationPartitions?.[0] || {});
+      const preAggregationPartition = partitions?.find(p => p?.tableName === versionEntry.table_name);
 
       res({
         preview: preAggregationPartition && await orchestratorApi.getPreAggregationPreview(
@@ -808,7 +854,6 @@ class ApiGateway {
    *   ]
    * }
    * ```
-   * TODO (buntarb): selector object validator.
    */
   private async preAggregationsJobs(req: Request, res: ExpressResponse) {
     const response = this.resToResultFn(res);
@@ -818,41 +863,18 @@ class ApiGateway {
     let result;
     try {
       await this.assertApiScope('jobs', req?.context?.securityContext);
+
+      if (!query || Object.keys(query).length === 0) {
+        throw new UserError('No job description provided');
+      }
+
+      const { error } = preAggsJobsRequestSchema.validate(query);
+      if (error) {
+        throw new UserError(`Invalid Job query format: ${error.message || error.toString()}`);
+      }
+
       switch (query.action) {
         case 'post':
-          if (
-            !(<PreAggsSelector>query.selector).timezones ||
-            (<PreAggsSelector>query.selector).timezones.length === 0
-          ) {
-            throw new UserError(
-              'A user\'s selector must contain at least one time zone.'
-            );
-          }
-          if (
-            !(<PreAggsSelector>query.selector).contexts ||
-            (
-              <{securityContext: any}[]>(
-                <PreAggsSelector>query.selector
-              ).contexts
-            ).length === 0
-          ) {
-            throw new UserError(
-              'A user\'s selector must contain at least one context element.'
-            );
-          } else {
-            let e = false;
-            (<{securityContext: any}[]>(
-              <PreAggsSelector>query.selector
-            ).contexts).forEach((c) => {
-              if (!c.securityContext) e = true;
-            });
-            if (e) {
-              throw new UserError(
-                'Every context element must contain the ' +
-                '\'securityContext\' property.'
-              );
-            }
-          }
           result = await this.preAggregationsJobsPOST(
             context,
             <PreAggsSelector>query.selector
@@ -860,7 +882,7 @@ class ApiGateway {
           if (result.length === 0) {
             throw new UserError(
               'A user\'s selector doesn\'t match any of the ' +
-              'pre-aggregations described by the Cube schemas.'
+              'pre-aggregations defined in the data model.'
             );
           }
           break;
@@ -891,30 +913,38 @@ class ApiGateway {
     selector: PreAggsSelector,
   ): Promise<string[]> {
     let jobs: string[] = [];
-    if (!selector.contexts?.length) {
-      jobs = await this.postPreAggregationsBuildJobs(
-        context,
-        selector,
-      );
-    } else {
-      const promise = Promise.all(
-        selector.contexts.map(async (config) => {
-          const ctx = <RequestContext>{
-            ...context,
-            ...config,
-          };
-          const _jobs = await this.postPreAggregationsBuildJobs(
-            ctx,
-            selector,
-          );
-          return _jobs;
-        })
-      );
-      const resolve = await promise;
-      resolve.forEach((_jobs) => {
-        jobs = jobs.concat(_jobs);
-      });
+
+    // There might be a few contexts but dateRange if present is still the same
+    // so let's normalize it only once.
+    // It's expected that selector.dateRange is provided in local time (without timezone)
+    // At the same time it is ok to get timestamps with `Z` (in UTC).
+    if (selector.dateRange) {
+      const start = parseLocalDate([{ val: selector.dateRange[0] }], 'UTC');
+      const end = parseLocalDate([{ val: selector.dateRange[1] }], 'UTC');
+      if (!start || !end) {
+        throw new UserError(`Cannot parse selector date range ${selector.dateRange}`);
+      }
+      selector.dateRange = [start, end];
     }
+
+    const promise = Promise.all(
+      selector.contexts.map(async (config) => {
+        const ctx = <RequestContext>{
+          ...context,
+          ...config,
+        };
+        const _jobs = await this.postPreAggregationsBuildJobs(
+          ctx,
+          selector,
+        );
+        return _jobs;
+      })
+    );
+    const resolve = await promise;
+    resolve.forEach((_jobs) => {
+      jobs = jobs.concat(_jobs);
+    });
+
     return jobs;
   }
 
@@ -926,7 +956,7 @@ class ApiGateway {
     selector: PreAggsSelector
   ): Promise<string[]> {
     const compiler = await this.getCompilerApi(context);
-    const { timezones } = selector;
+    const { timezones, dateRange } = selector;
     const preaggs = await compiler.preAggregations({
       dataSources: selector.dataSources,
       cubes: selector.cubes,
@@ -942,12 +972,13 @@ class ApiGateway {
           {
             metadata: undefined,
             timezones,
+            dateRange,
             preAggregations: preaggs.map(p => ({
               id: p.id,
-              cacheOnly: undefined, // boolean
+              cacheOnly: false,
               partitions: undefined, // string[]
             })),
-            forceBuildPreAggregations: undefined,
+            forceBuildPreAggregations: false,
             throwErrors: false,
           }
         );
@@ -1269,6 +1300,27 @@ class ApiGateway {
     }
 
     return [queryType, normalizedQueries, queryNormalizationResult.map((it) => remapToQueryAdapterFormat(it.normalizedQuery))];
+  }
+
+  protected async sql4sql({
+    query,
+    disablePostProcessing,
+    context,
+    res,
+  }: {query: string, disablePostProcessing: boolean} & BaseRequest) {
+    try {
+      await this.assertApiScope('data', context.securityContext);
+
+      const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
+      res({ sql: result });
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query,
+        res,
+      });
+    }
   }
 
   public async sql({
@@ -2204,6 +2256,10 @@ class ApiGateway {
 
         showWarningAboutNotObject = true;
       }
+
+      return {
+        securityContext: req.securityContext
+      };
     };
   }
 
@@ -2287,6 +2343,10 @@ class ApiGateway {
         // @todo Move it to 401 or 400
         throw new CubejsHandlerError(403, 'Forbidden', 'Authorization header isn\'t set');
       }
+
+      return {
+        securityContext: req.securityContext
+      };
     };
   }
 
@@ -2297,6 +2357,7 @@ class ApiGateway {
 
     if (this.playgroundAuthSecret) {
       const systemCheckAuthFn = this.createCheckAuthSystemFn();
+
       return async (ctx, authorization) => {
         // TODO: separate two auth workflows
         try {
@@ -2308,6 +2369,10 @@ class ApiGateway {
             throw mainAuthError;
           }
         }
+
+        return {
+          securityContext: ctx.securityContext,
+        };
       };
     }
 
@@ -2325,6 +2390,10 @@ class ApiGateway {
 
     return async (ctx, authorization) => {
       await systemCheckAuthFn(ctx, authorization);
+
+      return {
+        securityContext: ctx.securityContext
+      };
     };
   }
 

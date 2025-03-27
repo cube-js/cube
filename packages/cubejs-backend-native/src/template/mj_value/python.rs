@@ -64,7 +64,11 @@ pub fn from_minijinja_value(from: &mjv::Value) -> Result<CLRepr, mj::Error> {
             Ok(CLRepr::Array(arr))
         }
         mjv::ValueKind::Map => {
-            let mut obj = CLReprObject::new();
+            let mut obj = CLReprObject::new(if from.is_kwargs() {
+                CLReprObjectKind::KWargs
+            } else {
+                CLReprObjectKind::Object
+            });
 
             for key in from.try_iter()? {
                 let value = if let Ok(v) = from.get_item(&key) {

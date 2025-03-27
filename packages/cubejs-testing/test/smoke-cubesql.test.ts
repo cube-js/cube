@@ -147,6 +147,107 @@ describe('SQL API', () => {
 
       expect(rows).toBe(ROWS_LIMIT);
     });
+
+    describe('sql4sql', () => {
+      async function generateSql(query: string, disablePostPprocessing: boolean = false) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/sql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token,
+          },
+          body: JSON.stringify({
+            query,
+            format: 'sql',
+            disable_post_processing: disablePostPprocessing,
+          }),
+        });
+        const { status, statusText, headers } = response;
+        const body = await response.json();
+
+        // To stabilize responses
+        delete body.requestId;
+        headers.delete('date');
+        headers.delete('etag');
+
+        return {
+          status,
+          statusText,
+          headers,
+          body,
+        };
+      }
+
+      it('regular query', async () => {
+        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders;`)).toMatchSnapshot();
+      });
+
+      it('regular query with missing column', async () => {
+        expect(await generateSql(`SELECT SUM(foobar) AS total FROM Orders;`)).toMatchSnapshot();
+      });
+
+      it('regular query with parameters', async () => {
+        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders WHERE status = 'foo';`)).toMatchSnapshot();
+      });
+
+      it('strictly post-processing', async () => {
+        expect(await generateSql(`SELECT version();`)).toMatchSnapshot();
+      });
+
+      it('strictly post-processing with disabled post-processing', async () => {
+        expect(await generateSql(`SELECT version();`, true)).toMatchSnapshot();
+      });
+
+      it('double aggregation post-processing', async () => {
+        expect(await generateSql(`
+          SELECT AVG(total)
+          FROM (
+            SELECT
+              status,
+              SUM(totalAmount) AS total
+            FROM Orders
+            GROUP BY 1
+          ) t
+        `)).toMatchSnapshot();
+      });
+
+      it('double aggregation post-processing with disabled post-processing', async () => {
+        expect(await generateSql(`
+          SELECT AVG(total)
+          FROM (
+            SELECT
+              status,
+              SUM(totalAmount) AS total
+            FROM Orders
+            GROUP BY 1
+          ) t
+        `, true)).toMatchSnapshot();
+      });
+
+      it('wrapper', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = UPPER(status)
+        `)).toMatchSnapshot();
+      });
+
+      it('wrapper with parameters', async () => {
+        expect(await generateSql(`
+          SELECT
+            SUM(totalAmount) AS total
+          FROM Orders
+          WHERE LOWER(status) = 'foo'
+        `)).toMatchSnapshot();
+      });
+
+      it('set variable', async () => {
+        expect(await generateSql(`
+          SET MyVariable = 'Foo'
+        `)).toMatchSnapshot();
+      });
+    });
   });
 
   describe('Postgres (Auth)', () => {
@@ -659,6 +760,41 @@ filter_subq AS (
 
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('query-view-deep-joins');
+    });
+
+    test('wrapper with duplicated members', async () => {
+      const query = `
+        SELECT
+          "foo",
+          "bar",
+          CASE
+            WHEN "bar" = 'new'
+            THEN 1
+            ELSE 0
+            END
+            AS "bar_expr"
+        FROM (
+          SELECT
+            "rows"."foo" AS "foo",
+            "rows"."bar" AS "bar"
+          FROM (
+            SELECT
+              "status" AS "foo",
+              "status" AS "bar"
+            FROM Orders
+          ) "rows"
+          GROUP BY
+            "foo",
+            "bar"
+        ) "_"
+        ORDER BY
+          "bar_expr"
+          LIMIT 1
+        ;
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('wrapper-duplicated-members');
     });
   });
 });

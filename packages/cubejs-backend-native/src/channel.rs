@@ -398,7 +398,9 @@ impl SqlGenerator for NodeSqlGenerator {
 impl Drop for NodeSqlGenerator {
     fn drop(&mut self) {
         let channel = self.channel.clone();
-        let sql_generator_obj = self.sql_generator_obj.take().unwrap();
+        // Safety: Safe, because on_track take is used only for dropping
+        let sql_generator_obj = self.sql_generator_obj.take().expect("Unable to take sql_generator_object while dropping NodeSqlGenerator, it was already taken");
+
         channel.send(move |mut cx| {
             let _ = match Arc::try_unwrap(sql_generator_obj) {
                 Ok(v) => v.into_inner(&mut cx),

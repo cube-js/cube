@@ -57,10 +57,6 @@ export class PreAggregations {
   }
 
   preAggregationCubes() {
-    if (getEnv('nativeSqlPlanner')) {
-      // No join defined in Tesseract
-      return [];
-    }
     const { join } = this.query;
     return join.joins.map(j => j.originalTo).concat([join.root]);
   }
@@ -604,6 +600,9 @@ export class PreAggregations {
      */
     const expandTimeDimension = (timeDimension) => {
       const [dimension, resolvedGranularity] = timeDimension;
+      if (!resolvedGranularity) {
+        return [[dimension, '*']]; // Any granularity should fit
+      }
       return expandGranularity(dimension, resolvedGranularity)
         .map((newGranularity) => [dimension, newGranularity]);
     };
@@ -638,7 +637,13 @@ export class PreAggregations {
 
       const timeDimensionsMatch = (timeDimensionsList, doBackAlias) => R.allPass(
         timeDimensionsList.map(
-          tds => R.anyPass(tds.map(td => R.contains(td)))
+          tds => R.anyPass(tds.map(td => {
+            if (td[1] === '*') {
+              return R.any(tdtc => tdtc[0] === td[0]); // need to match the dimension at least
+            } else {
+              return R.contains(td);
+            }
+          }))
         )
       )(
         doBackAlias ?

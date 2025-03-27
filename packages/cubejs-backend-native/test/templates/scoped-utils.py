@@ -26,6 +26,16 @@ def arg_sum_map(obj):
   return obj['field_a'] + obj['field_b']
 
 @context_func
+def arg_kwargs(**kwargs):
+    kwargs_str = ",".join(f"{key}={value}" for key, value in sorted(kwargs.items()))
+
+    return "arg1: " + arg1 + ", arg2: " + arg2 + ", kwarg:(" + kwargs_str + ")"
+
+@context_func
+def arg_named_arguments(arg1, arg2):
+    return "arg1: " + arg1 + ", arg2: " + arg2
+
+@context_func
 def arg_seq(a):
   return a
 

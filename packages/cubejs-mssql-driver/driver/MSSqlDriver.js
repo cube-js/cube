@@ -82,11 +82,19 @@ class MSSqlDriver extends BaseDriver {
     this.initialConnectPromise = this.connectionPool.connect();
   }
 
+  /**
+   * Returns the configurable driver options
+   * Note: It returns the unprefixed option names.
+   * In case of using multisources options need to be prefixed manually.
+   */
   static driverEnvVariables() {
-    // TODO (buntarb): check how this method can/must be used with split
-    // names by the data source.
     return [
-      'CUBEJS_DB_HOST', 'CUBEJS_DB_NAME', 'CUBEJS_DB_PORT', 'CUBEJS_DB_USER', 'CUBEJS_DB_PASS', 'CUBEJS_DB_DOMAIN'
+      'CUBEJS_DB_HOST',
+      'CUBEJS_DB_NAME',
+      'CUBEJS_DB_PORT',
+      'CUBEJS_DB_USER',
+      'CUBEJS_DB_PASS',
+      'CUBEJS_DB_DOMAIN',
     ];
   }
 
@@ -97,8 +105,8 @@ class MSSqlDriver extends BaseDriver {
   /**
    * Executes query in streaming mode.
    *
-   * @param {string} query 
-   * @param {Array} values 
+   * @param {string} query
+   * @param {Array} values
    * @param {{ highWaterMark: number? }} options
    * @return {Promise<StreamTableDataWithTypes>}
    */
@@ -151,7 +159,7 @@ class MSSqlDriver extends BaseDriver {
    *     scale: number?,
    *     precision: number?
    *   }
-   * }} fields 
+   * }} fields
    */
   mapFields(fields) {
     return Object.keys(fields).map((field) => {

@@ -1,9 +1,9 @@
-import { DateRange, extendMoment } from 'moment-range';
-import { unitOfTime } from 'moment-timezone';
+import type { unitOfTime } from 'moment-timezone';
+import type { DateRange } from 'moment-range';
+import Moment from 'moment-timezone';
+import { extendMoment } from 'moment-range';
 
-const Moment = require('moment-timezone');
-
-const moment = extendMoment(Moment);
+const moment = extendMoment(Moment as any);
 
 export type QueryDateRange = [string, string];
 type SqlInterval = string;
@@ -78,31 +78,17 @@ export function subtractInterval(date: moment.Moment, interval: ParsedInterval):
  */
 export const alignToOrigin = (startDate: moment.Moment, interval: ParsedInterval, origin: moment.Moment): moment.Moment => {
   let alignedDate = startDate.clone();
-  let intervalOp;
-  let isIntervalNegative = false;
-
-  let offsetDate = addInterval(origin, interval);
-
-  // The easiest way to check the interval sign
-  if (offsetDate.isBefore(origin)) {
-    isIntervalNegative = true;
-  }
-
-  offsetDate = origin.clone();
+  let offsetDate = origin.clone();
 
   if (startDate.isBefore(origin)) {
-    intervalOp = isIntervalNegative ? addInterval : subtractInterval;
-
     while (offsetDate.isAfter(startDate)) {
-      offsetDate = intervalOp(offsetDate, interval);
+      offsetDate = subtractInterval(offsetDate, interval);
     }
     alignedDate = offsetDate;
   } else {
-    intervalOp = isIntervalNegative ? subtractInterval : addInterval;
-
     while (offsetDate.isBefore(startDate)) {
       alignedDate = offsetDate.clone();
-      offsetDate = intervalOp(offsetDate, interval);
+      offsetDate = addInterval(offsetDate, interval);
     }
 
     if (offsetDate.isSame(startDate)) {
@@ -192,7 +178,13 @@ export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
 
 export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
 
-export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
+/**
+ * Takes timestamp, treat it as time in provided timezone and returns the corresponding timestamp in UTC
+ */
+export const localTimestampToUtc = (timezone: string, timestampFormat: string, timestamp?: string): string | null => {
+  if (!timestamp) {
+    return null;
+  }
   if (timestamp.length === 23 || timestamp.length === 26) {
     const zone = moment.tz.zone(timezone);
     if (!zone) {
@@ -217,8 +209,14 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
       return inDbTimeZoneDate.toJSON().replace('Z', '');
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSSSS') {
+      const value = inDbTimeZoneDate.toJSON();
+      if (value.endsWith('999Z')) {
+        // emulate microseconds
+        return value.replace('Z', '999');
+      }
+
       // emulate microseconds
-      return inDbTimeZoneDate.toJSON().replace('Z', '000');
+      return value.replace('Z', '000');
     }
   }
 
@@ -227,7 +225,13 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
 };
 
-export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
+/**
+ * Takes timestamp in UTC, shift it into provided timezone and returns the corresponding timestamp in UTC
+ */
+export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, timestamp?: string): string | null => {
+  if (!timestamp) {
+    return null;
+  }
   if (timestamp.length === 23) {
     const zone = moment.tz.zone(timezone);
     if (!zone) {
@@ -236,27 +240,56 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
     const parsedTime = Date.parse(`${timestamp}Z`);
     // TODO parsedTime might be incorrect offset for conversion
     const offset = zone.utcOffset(parsedTime);
-    const inDbTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
+    const localTimeZoneDate = new Date(parsedTime - offset * 60 * 1000);
     if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
-      return inDbTimeZoneDate.toJSON();
+      return localTimeZoneDate.toJSON();
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
-      return inDbTimeZoneDate.toJSON().replace('Z', '');
+      return localTimeZoneDate.toJSON().replace('Z', '');
     }
   }
 
   return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
 };
 
-export const extractDate = (data: any): string | null => {
+export const parseLocalDate = (data: { [key: string]: string }[] | null | undefined, timezone: string, timestampFormat: string = 'YYYY-MM-DDTHH:mm:ss.SSS'): string | null => {
   if (!data) {
     return null;
   }
   data = JSON.parse(JSON.stringify(data));
-  const value = data[0] && data[0][Object.keys(data[0])[0]];
+  const value = data?.[0]?.[Object.keys(data[0])[0]];
   if (!value) {
-    return value;
+    return null;
   }
-  return moment.tz(value, 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+
+  const zone = moment.tz.zone(timezone);
+  if (!zone) {
+    throw new Error(`Unknown timezone: ${timezone}`);
+  }
+
+  // Most common formats
+  const formats = [
+    moment.ISO_8601,
+    'YYYY-MM-DD HH:mm:ss',
+    'YYYY-MM-DD HH:mm:ss.SSS',
+    'YYYY-MM-DDTHH:mm:ss.SSS',
+    'YYYY-MM-DDTHH:mm:ss'
+  ];
+
+  let parsedMoment;
+
+  if (value.includes('Z') || /([+-]\d{2}:?\d{2})$/.test(value.trim())) {
+    // We have timezone info
+    parsedMoment = moment(value, formats, true);
+  } else {
+    // If no tz info - use provided timezone
+    parsedMoment = moment.tz(value, formats, true, timezone);
+  }
+
+  if (!parsedMoment.isValid()) {
+    return null;
+  }
+
+  return parsedMoment.tz(timezone).format(timestampFormat);
 };
 
 export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, seconds: number): Date => {

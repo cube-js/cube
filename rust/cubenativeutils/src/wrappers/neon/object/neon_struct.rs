@@ -74,13 +74,13 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
         &self,
     ) -> Result<Vec<NativeObjectHandle<NeonInnerTypes<C>>>, CubeError> {
         let neon_array = self.object.map_neon_object(|cx, neon_object| {
-            let neon_array = neon_object
-                .get_own_property_names(cx)
-                .map_err(|_| CubeError::internal(format!("Cannot get own properties not found")))?;
+            let neon_array = neon_object.get_own_property_names(cx).map_err(|_| {
+                CubeError::internal("Cannot get own properties not found".to_string())
+            })?;
 
             neon_array
                 .to_vec(cx)
-                .map_err(|_| CubeError::internal(format!("Failed to convert array")))
+                .map_err(|_| CubeError::internal("Failed to convert array".to_string()))
         })??;
         Ok(neon_array
             .into_iter()
@@ -102,7 +102,7 @@ impl<C: Context<'static> + 'static> NativeStruct<NeonInnerTypes<C>> for NeonStru
                 .get::<JsFunction, _, _>(cx, method)
                 .map_err(|_| CubeError::internal(format!("Method `{}` not found", method)))?;
             neon_method
-                .call(cx, neon_object.clone(), neon_args)
+                .call(cx, *neon_object, neon_args)
                 .map_err(|err| {
                     CubeError::internal(format!(
                         "Failed to call method `{} {} {:?}",

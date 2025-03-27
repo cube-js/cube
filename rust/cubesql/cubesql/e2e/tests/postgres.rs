@@ -109,7 +109,7 @@ impl PostgresIntegrationTestSuite {
         client
     }
 
-    async fn print_query_result<'a>(
+    async fn print_query_result(
         &self,
         res: Vec<Row>,
         with_description: bool,
@@ -134,7 +134,7 @@ impl PostgresIntegrationTestSuite {
         for row in res.into_iter() {
             let mut values: Vec<String> = Vec::new();
 
-            for (idx, column) in row.columns().into_iter().enumerate() {
+            for (idx, column) in row.columns().iter().enumerate() {
                 if !description_done {
                     description.push(format!(
                         "{} type: {} ({})",
@@ -1272,7 +1272,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 let columns = rows.first().unwrap().columns();
                 assert_eq!(
                     columns
-                        .into_iter()
+                        .iter()
                         .map(|col| col.type_().oid())
                         .collect::<Vec<u32>>(),
                     vec![1184, 1114]

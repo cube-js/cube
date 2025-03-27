@@ -3,6 +3,128 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.24](/compare/v1.2.23...v1.2.24) (2025-03-18)
+
+### Bug Fixes
+
+- **cubesql:** Disable projection_push_down DF optimizer (#9356) a15442c, closes #9356
+
+### Features
+
+- Implement disable_post_processing in /v1/sql (#9331) c336b10, closes #9331
+
+## [1.2.23](https://github.com/cube-js/cube/compare/v1.2.22...v1.2.23) (2025-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.22](https://github.com/cube-js/cube/compare/v1.2.21...v1.2.22) (2025-03-14)
+
+### Bug Fixes
+
+- **cubesql:** Functions without arguments alias as plain function name ([#9338](https://github.com/cube-js/cube/issues/9338)) ([de10c23](https://github.com/cube-js/cube/commit/de10c233bf84ef11eb0af272ea296881651dafd1))
+
+## [1.2.21](https://github.com/cube-js/cube/compare/v1.2.20...v1.2.21) (2025-03-11)
+
+### Bug Fixes
+
+- **cubejs-native:** cubesql query logger span_id ([#9325](https://github.com/cube-js/cube/issues/9325)) ([568d306](https://github.com/cube-js/cube/commit/568d306a9b97672caf69543077e7863fc773af41))
+
+### Features
+
+- **cubesql:** Move dimensions-only projections to dimensions for push-to-Cube wrapper ([#9318](https://github.com/cube-js/cube/issues/9318)) ([ca62aa0](https://github.com/cube-js/cube/commit/ca62aa0e747b88c2754f3a758c7a959ee52b0c81))
+
+## [1.2.20](/compare/v1.2.19...v1.2.20) (2025-03-10)
+
+### Features
+
+- Add SQL queries support in /v1/sql endpoint (#9301) 7eba663, closes #9301
+
+## [1.2.19](https://github.com/cube-js/cube/compare/v1.2.18...v1.2.19) (2025-03-08)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.17](/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+### Bug Fixes
+
+- **cubesql:** Use pushdown-pullup scheme for FilterSimplifyReplacer (#9278) ab5a64e, closes #9278
+
+## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
+
+### Bug Fixes
+
+- **cubejs-native:** sql over http drop sessions, correct error ([#9297](https://github.com/cube-js/cube/issues/9297)) ([6fad670](https://github.com/cube-js/cube/commit/6fad670c722fd91e29d950a36659ac4630cef64a))
+
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.13](https://github.com/cube-js/cube/compare/v1.2.12...v1.2.13) (2025-02-26)
+
+### Bug Fixes
+
+- **cubesql:** Split `__user` WHERE predicate into separate filter node ([#8812](https://github.com/cube-js/cube/issues/8812)) ([83baf7b](https://github.com/cube-js/cube/commit/83baf7bf5f83108fd6c3dd134a8739968e781f92))
+
+## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
+
+### Bug Fixes
+
+- **cubesql:** Generate typed null literals ([#9238](https://github.com/cube-js/cube/issues/9238)) ([1dfa10d](https://github.com/cube-js/cube/commit/1dfa10d7128841f24c5d94cd1c5bdd2c742ff9de))
+- **cubesql:** Match CubeScan timestamp literal types to member types ([#9275](https://github.com/cube-js/cube/issues/9275)) ([4a4e82b](https://github.com/cube-js/cube/commit/4a4e82ba602fc024a262a22ac65e3fcb7a4bba5c))
+
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+### Bug Fixes
+
+- **cubesql:** Break cost symmetry for (non)-push-to-Cube WrappedSelect ([#9155](https://github.com/cube-js/cube/issues/9155)) ([2c0e443](https://github.com/cube-js/cube/commit/2c0e443dc18379490e35a3d83b3888f66e12ade0))
+- **cubesql:** Generate proper projection wrapper for duplicated members in CubeScanNode ([#9233](https://github.com/cube-js/cube/issues/9233)) ([aba6430](https://github.com/cube-js/cube/commit/aba643082acc440cf5b3fe9828c2c38ac1a833c9))
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix sql generation for rolling_window queries with multiple time dimensions ([#9124](https://github.com/cube-js/cube/issues/9124)) ([52a664e](https://github.com/cube-js/cube/commit/52a664e4d0643d78464f75cc48c4a1f686455ebe))
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+### Features
+
+- **cubeclient:** Add `short_title` to dimensions and measures ([#9256](https://github.com/cube-js/cube/issues/9256)) ([584b3dc](https://github.com/cube-js/cube/commit/584b3dcefedb7c01b849e7f18a59445bd3542b7e))
+
+## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.2.6](https://github.com/cube-js/cube/compare/v1.2.5...v1.2.6) (2025-02-18)
+
+### Bug Fixes
+
+- **schema-compiler:** Correct models transpilation in native in multitenant environments ([#9234](https://github.com/cube-js/cube/issues/9234)) ([84f90c0](https://github.com/cube-js/cube/commit/84f90c07ee3827e6f3652dd6c9fab0993ecc8150))
+
+### Performance Improvements
+
+- **cubesql:** Avoid allocations in MetaContext methods ([#9228](https://github.com/cube-js/cube/issues/9228)) ([ba753d0](https://github.com/cube-js/cube/commit/ba753d0d43927b50d5cf8faf5f09de3e53bec3db))
+
 ## [1.2.4](/compare/v1.2.3...v1.2.4) (2025-02-11)
 
 ### Features

@@ -1,7 +1,7 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
-use convert_case::{Case, Casing};
+use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
 use std::rc::Rc;
@@ -10,6 +10,18 @@ use std::rc::Rc;
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
 }
+pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
+    name: "LowerUpper",
+    condition: |s, _| {
+        s.get(0) == Some(&"_")
+            && s.get(1)
+                .map(|c| c.to_uppercase() != c.to_lowercase() && *c == c.to_uppercase())
+                == Some(true)
+    },
+    arg: None,
+    start: 0,
+    len: 0,
+};
 
 impl PlanSqlTemplates {
     pub fn new(render: Rc<dyn SqlTemplatesRender>) -> Self {
@@ -17,7 +29,16 @@ impl PlanSqlTemplates {
     }
 
     pub fn alias_name(name: &str) -> String {
-        name.to_case(Case::Snake).replace(".", "__")
+        let res = name
+            .with_boundaries(&[
+                UNDERSCORE_UPPER_BOUND,
+                Boundary::LOWER_UPPER,
+                Boundary::DIGIT_UPPER,
+                Boundary::ACRONYM,
+            ])
+            .to_case(Case::Snake)
+            .replace(".", "__");
+        res
     }
 
     pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
@@ -32,6 +53,10 @@ impl PlanSqlTemplates {
             Self::alias_name(name),
             suffix
         )
+    }
+
+    pub fn quote_string(&self, string: &str) -> Result<String, CubeError> {
+        Ok(format!("'{}'", string))
     }
 
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
@@ -273,6 +298,18 @@ impl PlanSqlTemplates {
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render
             .render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn case(
+        &self,
+        expr: Option<String>,
+        when_then: Vec<(String, String)>,
+        else_expr: Option<String>,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/case",
+            context! { expr => expr, when_then => when_then, else_expr => else_expr },
+        )
     }
 
     pub fn scalar_function(

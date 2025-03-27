@@ -111,7 +111,7 @@ export class MSSqlDbRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    const version = process.env.TEST_MSSQL_VERSION || '2017-latest';
+    const version = process.env.TEST_MSSQL_VERSION || '2019-latest';
 
     return new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
       .withEnvironment({

@@ -1,5 +1,5 @@
 use crate::cross::clrepr::CLReprObject;
-use crate::cross::{CLRepr, StringType};
+use crate::cross::{CLRepr, CLReprObjectKind, StringType};
 use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
 use pyo3::types::{
     PyBool, PyComplex, PyDate, PyDict, PyFloat, PyFrame, PyFunction, PyInt, PyList, PySequence,
@@ -16,15 +16,9 @@ pub enum PythonRef {
     PyExternalFunction(Py<PyFunction>),
 }
 
-pub trait CLReprPython: Sized {
-    fn from_python_ref(v: &PyAny) -> Result<Self, PyErr>;
-    fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr>;
-    fn into_py(self, py: Python) -> Result<PyObject, PyErr>;
-}
-
-impl CLReprPython for CLRepr {
+impl CLRepr {
     /// Convert python value to CLRepr
-    fn from_python_ref(v: &PyAny) -> Result<Self, PyErr> {
+    pub fn from_python_ref(v: &PyAny) -> Result<Self, PyErr> {
         if v.is_none() {
             return Ok(Self::Null);
         }
@@ -47,7 +41,7 @@ impl CLReprPython for CLRepr {
             Self::Int(i)
         } else if v.get_type().is_subclass_of::<PyDict>()? {
             let d = v.downcast::<PyDict>()?;
-            let mut obj = CLReprObject::new();
+            let mut obj = CLReprObject::new(CLReprObjectKind::Object);
 
             for (k, v) in d.iter() {
                 if k.get_type().is_subclass_of::<PyString>()? {
@@ -126,6 +120,16 @@ impl CLReprPython for CLRepr {
         })
     }
 
+    fn into_py_dict_impl(obj: CLReprObject, py: Python) -> Result<&PyDict, PyErr> {
+        let r = PyDict::new(py);
+
+        for (k, v) in obj.into_iter() {
+            r.set_item(k, Self::into_py_impl(v, py)?)?;
+        }
+
+        Ok(r)
+    }
+
     fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr> {
         Ok(match from {
             CLRepr::String(v, _) => PyString::new(py, &v).to_object(py),
@@ -155,11 +159,7 @@ impl CLReprPython for CLRepr {
                 PyTuple::new(py, elements).to_object(py)
             }
             CLRepr::Object(obj) => {
-                let r = PyDict::new(py);
-
-                for (k, v) in obj.into_iter() {
-                    r.set_item(k, Self::into_py_impl(v, py)?)?;
-                }
+                let r = Self::into_py_dict_impl(obj, py)?;
 
                 r.to_object(py)
             }
@@ -189,7 +189,19 @@ impl CLReprPython for CLRepr {
         })
     }
 
-    fn into_py(self, py: Python) -> Result<PyObject, PyErr> {
+    pub fn into_py_dict(self, py: Python) -> Result<&PyDict, PyErr> {
+        Ok(match self {
+            CLRepr::Object(obj) => Self::into_py_dict_impl(obj, py)?,
+            other => {
+                return Err(PyErr::new::<PyNotImplementedError, _>(format!(
+                    "Unable to convert {:?} into PyDict",
+                    other.kind()
+                )))
+            }
+        })
+    }
+
+    pub fn into_py(self, py: Python) -> Result<PyObject, PyErr> {
         Self::into_py_impl(self, py)
     }
 }

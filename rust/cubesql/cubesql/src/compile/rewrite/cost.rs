@@ -4,7 +4,7 @@ use crate::{
     compile::rewrite::{
         rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
         DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-        TimeDimensionGranularity, WrappedSelectUngroupedScan,
+        TimeDimensionGranularity, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
@@ -14,11 +14,15 @@ use indexmap::IndexSet;
 #[derive(Debug)]
 pub struct BestCubePlan {
     meta_context: Arc<MetaContext>,
+    penalize_post_processing: bool,
 }
 
 impl BestCubePlan {
-    pub fn new(meta_context: Arc<MetaContext>) -> Self {
-        Self { meta_context }
+    pub fn new(meta_context: Arc<MetaContext>, penalize_post_processing: bool) -> Self {
+        Self {
+            meta_context,
+            penalize_post_processing,
+        }
     }
 
     pub fn initial_cost(&self, enode: &LogicalPlanLanguage, top_down: bool) -> CubePlanCost {
@@ -104,6 +108,8 @@ impl BestCubePlan {
             LogicalPlanLanguage::OrderReplacer(_) => 1,
             LogicalPlanLanguage::MemberReplacer(_) => 1,
             LogicalPlanLanguage::FilterReplacer(_) => 1,
+            LogicalPlanLanguage::FilterSimplifyPushDownReplacer(_) => 1,
+            LogicalPlanLanguage::FilterSimplifyPullUpReplacer(_) => 1,
             LogicalPlanLanguage::TimeDimensionDateRangeReplacer(_) => 1,
             LogicalPlanLanguage::InnerAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::OuterProjectionSplitReplacer(_) => 1,
@@ -143,7 +149,7 @@ impl BestCubePlan {
 
         let time_dimensions_used_as_dimensions = match enode {
             LogicalPlanLanguage::DimensionName(DimensionName(name)) => {
-                if let Some(dimension) = self.meta_context.find_dimension_with_name(name.clone()) {
+                if let Some(dimension) = self.meta_context.find_dimension_with_name(name) {
                     if dimension.is_time() {
                         1
                     } else {
@@ -189,6 +195,11 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        let wrapped_select_non_push_to_cube = match enode {
+            LogicalPlanLanguage::WrappedSelectPushToCube(WrappedSelectPushToCube(false)) => 1,
+            _ => 0,
+        };
+
         let wrapped_select_ungrouped_scan = match enode {
             LogicalPlanLanguage::WrappedSelectUngroupedScan(WrappedSelectUngroupedScan(true)) => 1,
             _ => 0,
@@ -201,6 +212,8 @@ impl BestCubePlan {
 
         CubePlanCost {
             replacers: this_replacers,
+            // Will be filled in finalize
+            penalized_ast_size_outside_wrapper: 0,
             table_scans,
             filters,
             filter_members,
@@ -218,6 +231,7 @@ impl BestCubePlan {
             ungrouped_aggregates: 0,
             wrapper_nodes,
             joins,
+            wrapped_select_non_push_to_cube,
             wrapped_select_ungrouped_scan,
             empty_wrappers: 0,
             ast_size_outside_wrapper: 0,
@@ -231,8 +245,15 @@ impl BestCubePlan {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct CubePlanCostOptions {
+    top_down: bool,
+    penalize_post_processing: bool,
+}
+
 /// This cost struct maintains following structural relationships:
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
+/// - `penalized_ast_size_outside_wrapper` > other nodes - this is used to force "no post processing" mode, only CubeScan and CubeScanWrapped are expected as result
 /// - `table_scans` > other nodes - having table scan means not detected cube scan
 /// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
@@ -243,10 +264,12 @@ impl BestCubePlan {
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
 /// - `non_pushed_down_window` > `wrapper_nodes` - prefer to always push down window functions
 /// - `non_pushed_down_limit_sort` > `wrapper_nodes` - prefer to always push down limit-sort expressions
+/// - `wrapped_select_non_push_to_cube` > `wrapped_select_ungrouped_scan` - otherwise cost would prefer any aggregation, even non-push-to-Cube
 /// - match errors by priority - optimize for more specific errors
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
     replacers: i64,
+    penalized_ast_size_outside_wrapper: usize,
     table_scans: i64,
     empty_wrappers: i64,
     non_detected_cube_scans: i64,
@@ -260,6 +283,7 @@ pub struct CubePlanCost {
     joins: usize,
     wrapper_nodes: i64,
     ast_size_outside_wrapper: usize,
+    wrapped_select_non_push_to_cube: usize,
     wrapped_select_ungrouped_scan: usize,
     filters: i64,
     structure_points: i64,
@@ -343,11 +367,11 @@ impl CubePlanCostAndState {
         }
     }
 
-    pub fn finalize(&self, enode: &LogicalPlanLanguage) -> Self {
+    pub fn finalize(&self, enode: &LogicalPlanLanguage, options: CubePlanCostOptions) -> Self {
         Self {
             cost: self
                 .cost
-                .finalize(&self.state, &self.sort_state, enode, false),
+                .finalize(&self.state, &self.sort_state, enode, options),
             state: self.state.clone(),
             sort_state: self.sort_state.clone(),
         }
@@ -358,6 +382,8 @@ impl CubePlanCost {
     pub fn add_child(&self, other: &Self) -> Self {
         Self {
             replacers: self.replacers + other.replacers,
+            // Will be filled in finalize
+            penalized_ast_size_outside_wrapper: 0,
             table_scans: self.table_scans + other.table_scans,
             filters: self.filters + other.filters,
             non_detected_cube_scans: (if other.cube_members == 0 {
@@ -386,6 +412,8 @@ impl CubePlanCost {
                 + other.ast_size_outside_wrapper,
             ungrouped_aggregates: self.ungrouped_aggregates + other.ungrouped_aggregates,
             wrapper_nodes: self.wrapper_nodes + other.wrapper_nodes,
+            wrapped_select_non_push_to_cube: self.wrapped_select_non_push_to_cube
+                + other.wrapped_select_non_push_to_cube,
             wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan
                 + other.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes + other.cube_scan_nodes,
@@ -407,10 +435,22 @@ impl CubePlanCost {
         state: &CubePlanState,
         sort_state: &SortState,
         enode: &LogicalPlanLanguage,
-        top_down: bool,
+        options: CubePlanCostOptions,
     ) -> Self {
+        let ast_size_outside_wrapper = match state {
+            CubePlanState::Wrapped => 0,
+            CubePlanState::Unwrapped(size) => *size,
+            CubePlanState::Wrapper => 0,
+        } + self.ast_size_outside_wrapper;
+        let penalized_ast_size_outside_wrapper = if options.penalize_post_processing {
+            ast_size_outside_wrapper
+        } else {
+            0
+        };
+
         Self {
             replacers: self.replacers,
+            penalized_ast_size_outside_wrapper,
             table_scans: self.table_scans,
             filters: self.filters,
             non_detected_cube_scans: match state {
@@ -428,7 +468,7 @@ impl CubePlanCost {
             },
             non_pushed_down_limit_sort: match sort_state {
                 SortState::DirectChild => self.non_pushed_down_limit_sort,
-                SortState::Current if top_down => self.non_pushed_down_limit_sort,
+                SortState::Current if options.top_down => self.non_pushed_down_limit_sort,
                 _ => 0,
             },
             // Don't track state here: we want representation that have fewer wrappers with zero members _in total_
@@ -437,11 +477,7 @@ impl CubePlanCost {
             errors: self.errors,
             structure_points: self.structure_points,
             joins: self.joins,
-            ast_size_outside_wrapper: match state {
-                CubePlanState::Wrapped => 0,
-                CubePlanState::Unwrapped(size) => *size,
-                CubePlanState::Wrapper => 0,
-            } + self.ast_size_outside_wrapper,
+            ast_size_outside_wrapper,
             empty_wrappers: match state {
                 CubePlanState::Wrapped => 0,
                 CubePlanState::Unwrapped(_) => 0,
@@ -472,6 +508,7 @@ impl CubePlanCost {
             } + self.ungrouped_aggregates,
             unwrapped_subqueries: self.unwrapped_subqueries,
             wrapper_nodes: self.wrapper_nodes,
+            wrapped_select_non_push_to_cube: self.wrapped_select_non_push_to_cube,
             wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes,
             ast_size_without_alias: self.ast_size_without_alias,
@@ -525,7 +562,13 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 let child = costs(*id);
                 cost.add_child(&child)
             })
-            .finalize(enode);
+            .finalize(
+                enode,
+                CubePlanCostOptions {
+                    top_down: false,
+                    penalize_post_processing: self.penalize_post_processing,
+                },
+            );
         res
     }
 }
@@ -712,7 +755,7 @@ where
         let mut ids = HashMap::<IdWithState<L, S>, Id>::default();
         let mut todo = node
             .children()
-            .into_iter()
+            .iter()
             .map(|id| IdWithState::new(*id, Arc::clone(&state)))
             .collect::<Vec<_>>();
 
@@ -867,6 +910,15 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
         node: &LogicalPlanLanguage,
         state: &CubePlanTopDownState,
     ) -> CubePlanCost {
-        CubePlanCost::finalize(&cost, &state.wrapped, &state.limit, node, true)
+        CubePlanCost::finalize(
+            &cost,
+            &state.wrapped,
+            &state.limit,
+            node,
+            CubePlanCostOptions {
+                top_down: true,
+                penalize_post_processing: self.penalize_post_processing,
+            },
+        )
     }
 }

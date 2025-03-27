@@ -27,13 +27,30 @@ export interface Request<Meta> {
 }
 
 export interface CheckAuthResponse {
+  securityContext: any,
+}
+
+export interface CheckSQLAuthResponse {
   password: string | null,
   superuser: boolean,
   securityContext: any,
   skipPasswordCheck?: boolean,
 }
 
+export interface ContextToApiScopesPayload {
+  securityContext: any,
+}
+
+export type ContextToApiScopesResponse = string[];
+
+export interface CheckAuthPayloadRequestMeta extends BaseMeta {}
+
 export interface CheckAuthPayload {
+  request: Request<CheckAuthPayloadRequestMeta>,
+  token: string,
+}
+
+export interface CheckSQLAuthPayload {
   request: Request<undefined>,
   user: string | null,
   password: string | null,
@@ -88,7 +105,9 @@ export interface CanSwitchUserPayload {
 
 export type SQLInterfaceOptions = {
   pgPort?: number,
+  contextToApiScopes: (payload: ContextToApiScopesPayload) => ContextToApiScopesResponse | Promise<ContextToApiScopesResponse>,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
+  checkSqlAuth: (payload: CheckSQLAuthPayload) => CheckSQLAuthResponse | Promise<CheckSQLAuthResponse>,
   load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
   meta: (payload: MetaPayload) => unknown | Promise<unknown>,
@@ -101,11 +120,43 @@ export type SQLInterfaceOptions = {
   gatewayPort?: number,
 };
 
+export interface TransformConfig {
+  fileName: string;
+  transpilers: string[];
+  compilerId: string;
+  metaData?: {
+    cubeNames: string[];
+    cubeSymbols: Record<string, Record<string, boolean>>;
+    contextSymbols: Record<string, string>;
+  }
+}
+
+export interface TransformResponse {
+  code: string;
+  errors: string[];
+  warnings: string[];
+}
+
 export type DBResponsePrimitive =
   null |
   boolean |
   number |
   string;
+
+// TODO type this better, to make it proper disjoint union
+export type Sql4SqlOk = {
+  sql: string,
+    values: Array<string | null>,
+};
+export type Sql4SqlError = { error: string };
+export type Sql4SqlCommon = {
+  query_type: {
+    regular: boolean;
+    post_processing: boolean;
+    pushdown: boolean;
+  }
+};
+export type Sql4SqlResponse = Sql4SqlCommon & (Sql4SqlOk | Sql4SqlError);
 
 let loadedNative: any = null;
 
@@ -275,7 +326,23 @@ function wrapNativeFunctionWithStream(
       if (!!response && !!response.stream) {
         response.stream.destroy(e);
       }
-      writerOrChannel.reject(errorString(e));
+
+      try {
+        writerOrChannel.reject(errorString(e));
+      } catch (rejectError) {
+        // This is async function, just for usability, it's return value is not expected anywhere
+        // Rust part does not care for returned promises, so we should take care here to avoid unhandled rejections
+        // `writerOrChannel.reject` can throw when channel is already dropped by Rust side
+        // This can happen directly, when drop happened between creating channel and calling `reject`,
+        // or indirectly, when drop happened between creating channel and calling `resolve`, resolve raised an exception
+        // that was caught here
+        // There's nothing we can do, or should do with this: there's nobody to respond to
+        if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+          console.debug('[js] writerOrChannel.reject exception', {
+            e: rejectError,
+          });
+        }
+      }
     }
   };
 }
@@ -285,6 +352,12 @@ type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel): void => {
   const native = loadNative();
   native.setupLogger({ logger: wrapNativeFunctionWithChannelCallback(logger), logLevel });
+};
+
+/// Reset local to default implementation, which uses STDOUT
+export const resetLogger = (logLevel: LogLevel): void => {
+  const native = loadNative();
+  native.resetLogger({ logLevel });
 };
 
 export const isFallbackBuild = (): boolean => {
@@ -299,8 +372,16 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('Argument options must be an object');
   }
 
+  if (typeof options.contextToApiScopes !== 'function') {
+    throw new Error('options.contextToApiScopes must be a function');
+  }
+
   if (typeof options.checkAuth !== 'function') {
     throw new Error('options.checkAuth must be a function');
+  }
+
+  if (typeof options.checkSqlAuth !== 'function') {
+    throw new Error('options.checkSqlAuth must be a function');
   }
 
   if (typeof options.load !== 'function') {
@@ -330,7 +411,9 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
   const native = loadNative();
   return native.registerInterface({
     ...options,
+    contextToApiScopes: wrapNativeFunctionWithChannelCallback(options.contextToApiScopes),
     checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
+    checkSqlAuth: wrapNativeFunctionWithChannelCallback(options.checkSqlAuth),
     load: wrapNativeFunctionWithChannelCallback(options.load),
     sql: wrapNativeFunctionWithChannelCallback(options.sql),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
@@ -354,6 +437,13 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   const native = loadNative();
 
   await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+// TODO parse result from native code
+export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> => {
+  const native = loadNative();
+
+  return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): String => {
@@ -403,6 +493,16 @@ export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[]
   const native = loadNative();
 
   return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
+};
+
+export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+  const native = loadNative();
+
+  if (native.transpileJs) {
+    return native.transpileJs(content, metadata);
+  }
+
+  throw new Error('TranspileJs native implementation not found!');
 };
 
 export interface PyConfiguration {

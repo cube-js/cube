@@ -179,19 +179,19 @@ impl ConnectionError {
 
 impl From<CubeError> for ConnectionError {
     fn from(e: CubeError) -> Self {
-        ConnectionError::Cube(e.into(), None)
+        ConnectionError::Cube(e, None)
     }
 }
 
 impl From<CompilationError> for ConnectionError {
     fn from(e: CompilationError) -> Self {
-        ConnectionError::CompilationError(e.into(), None)
+        ConnectionError::CompilationError(e, None)
     }
 }
 
 impl From<ProtocolError> for ConnectionError {
     fn from(e: ProtocolError) -> Self {
-        ConnectionError::Protocol(e.into(), None)
+        ConnectionError::Protocol(e, None)
     }
 }
 
@@ -803,7 +803,7 @@ impl AsyncPostgresShim {
             Ok((user, auth_context)) => {
                 let database = parameters
                     .get("database")
-                    .map(|v| v.clone())
+                    .cloned()
                     .unwrap_or("db".to_string());
                 self.session.state.set_database(Some(database));
                 self.session.state.set_user(Some(user));
@@ -1056,7 +1056,7 @@ impl AsyncPostgresShim {
             )
         })?;
 
-        let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
+        let format = body.result_formats.first().copied().unwrap_or(Format::Text);
         let portal = match source_statement {
             PreparedStatement::Empty { .. } => {
                 drop(statements_guard);
@@ -1792,8 +1792,7 @@ impl AsyncPostgresShim {
         let cache_entry = self.get_cache_entry().await?;
         let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
 
-        let statements =
-            parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL, qtrace)?;
+        let statements = parse_sql_to_statements(query, DatabaseProtocol::PostgreSQL, qtrace)?;
 
         if statements.len() == 0 {
             self.write(protocol::EmptyQuery::new()).await?;

@@ -1,6 +1,6 @@
 # Cube Cloud for Sheets
 
-Cube Cloud for Sheets is a native [Google Sheets][link-google-sheets] add-on for
+Cube Cloud for Sheets is the native [Google Sheets][link-google-sheets] add-on for
 Cube Cloud.
 
 <SuccessBox>
@@ -10,12 +10,20 @@ above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
 
-After [installing](#installation) and [authenticating](#authentication) this
-add-on, you will be able to [create reports via pivot
-table](#create-reports-via-pivot-table) and work with [saved
+After [configuring](#configuration), [installing](#installation), and
+[authenticating](#authentication) this add-on, you will be able to [create
+reports via pivot table](#create-reports-via-pivot-table) and work with [saved
 reports](#work-with-saved-reports).
 
-<YouTubeVideo url="https://www.youtube.com/embed/qPp9hroqd4g"/>
+<YouTubeVideo
+  url="https://www.youtube.com/embed/qPp9hroqd4g"
+  aspectRatio={4/2.56}
+/>
+
+## Configuration
+
+Cube Cloud for Sheets uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
 
 ## Installation
 
@@ -39,20 +47,18 @@ document, open the <Btn>Extensions</Btn> menu, and check that there is the
 
 ## Authentication
 
-You need to authenticate Cube Cloud for Sheets to retrieve data from your
-semantic layer in Cube Cloud. To do so, open the sidebar by going to the
-<Btn>Extensions</Btn> menu and choosing <Btn>Cube Cloud for Sheets → Open
-Sidebar</Btn>. Then, click <Btn>Sign in</Btn>.
+You need to authenticate Cube Cloud for Sheets to retrieve data from Cube Cloud.
+To do so, open the sidebar by going to the <Btn>Extensions</Btn> menu and choosing
+<Btn>Cube Cloud for Sheets → Open Sidebar</Btn>. Then, click <Btn>Sign in</Btn>.
 
 <Screenshot
   src="https://ucarecdn.com/d47c8faa-97ed-4ce1-ba0e-99b7add1ab61/"
   highlight="inset(15% 0 55% 76.5% round 10px)"
 />
 
-A modal window with an authentication prompt will open. Choose the deployments
-within your Cube Cloud account that you want to work with in Google Sheets and
-click <Btn>Authorize</Btn>. Once you see the `Access Granted` message, close the
-modal window.
+A modal window with an authentication prompt will appear. Choose the deployments
+that you want to work with in Google Sheets and click <Btn>Authorize</Btn>.
+Once you see the `Access Granted` message, close the modal window.
 
 If you want to revoke the authentication, open the add-on menu and click
 <Btn>Sign out</Btn>.
@@ -62,11 +68,11 @@ If you want to revoke the authentication, open the add-on menu and click
 To create a report, go to the add-on menu and click <Btn>Create report via pivot
 table</Btn>. Then, select a Cube Cloud deployment from the drop-down. Finally,
 you can start building a query by selecting a view and its members in the UI that
-looks and feel exactly like [Playground][ref-playground].
+looks and feels like [Playground][ref-playground].
 
 <InfoBox>
 
-Google Cloud for Sheets only works with [views][ref-views] rather than cubes.
+Google Cloud for Sheets works only with [views][ref-views], not cubes.
 
 </InfoBox>
 
@@ -117,3 +123,4 @@ Click <Btn>Edit</Btn> to chnage the query or the location.
 [ref-playground]: /product/workspace/playground
 [ref-views]: /product/data-modeling/concepts#views
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-sql-api-enabled]: /product/apis-integrations/sql-api#cube-cloud

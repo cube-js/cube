@@ -16,7 +16,7 @@ type TransferContent = {
   content: string;
   transpilers: string[];
   cubeNames: string[];
-  cubeSymbolsNames: Record<string, Record<string, boolean>>;
+  cubeSymbols: Record<string, Record<string, boolean>>;
 };
 
 const cubeDictionary = new LightweightNodeCubeDictionary();
@@ -32,7 +32,7 @@ const transpilers = {
 
 const transpile = (data: TransferContent) => {
   cubeDictionary.setCubeNames(data.cubeNames);
-  cubeSymbols.setSymbols(data.cubeSymbolsNames);
+  cubeSymbols.setSymbols(data.cubeSymbols);
 
   const ast = parse(
     data.content,
@@ -43,15 +43,15 @@ const transpile = (data: TransferContent) => {
     },
   );
 
+  errorsReport.inFile(data);
   data.transpilers.forEach(transpilerName => {
     if (transpilers[transpilerName]) {
-      errorsReport.inFile(data);
       babelTraverse(ast, transpilers[transpilerName].traverseObject(errorsReport));
-      errorsReport.exitFile();
     } else {
       throw new Error(`Transpiler ${transpilerName} not supported`);
     }
   });
+  errorsReport.exitFile();
 
   const content = babelGenerator(ast, {}, data.content).code;
 

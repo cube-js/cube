@@ -4,27 +4,21 @@
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
 
+import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
-import {
+  DatabaseStructure,
   DriverCapabilities,
+  GenericDataBaseType,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
   QueryTablesResult,
-  UnloadOptions,
-  GenericDataBaseType,
   TableColumn,
-  DatabaseStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import {
-  JDBCDriver,
-  JDBCDriverConfiguration,
-} from '@cubejs-backend/jdbc-driver';
+import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
+import { extractUidFromJdbcUrl, resolveJDBCDriver } from './helpers';
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -132,7 +126,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Show warning message flag.
    */
-  private showSparkProtocolWarn: boolean;
+  private readonly showSparkProtocolWarn: boolean;
 
   /**
    * Driver Configuration.
@@ -429,8 +423,7 @@ export class DatabricksDriver extends JDBCDriver {
         metadata[database] = {};
       }
 
-      const columns = await this.tableColumnTypes(`${database}.${tableName}`);
-      metadata[database][tableName] = columns;
+      metadata[database][tableName] = await this.tableColumnTypes(`${database}.${tableName}`);
     }));
 
     return metadata;
@@ -703,6 +696,9 @@ export class DatabricksDriver extends JDBCDriver {
     // wasbs://real-container-name@account.blob.core.windows.net
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
+    const prefix = url.pathname.slice(1);
+    const delimiter = (prefix && !prefix.endsWith('/')) ? '/' : '';
+    const objectSearchPrefix = `${prefix}${delimiter}${tableName}`;
 
     if (this.config.bucketType === 'azure') {
       const {
@@ -716,7 +712,7 @@ export class DatabricksDriver extends JDBCDriver {
         // Databricks uses different bucket address form, so we need to transform it
         // to the one understandable by extractFilesFromAzure implementation
         `${url.host}/${url.username}`,
-        tableName,
+        objectSearchPrefix,
       );
     } else if (this.config.bucketType === 's3') {
       return this.extractUnloadedFilesFromS3(
@@ -728,7 +724,7 @@ export class DatabricksDriver extends JDBCDriver {
           region: this.config.awsRegion || '',
         },
         url.host,
-        tableName,
+        objectSearchPrefix,
       );
     } else {
       throw new Error(`Unsupported export bucket type: ${

@@ -127,7 +127,7 @@ impl FullKeyAggregateQueryPlanner {
                 .collect::<Result<Vec<_>, _>>()?;
             let alias = references_builder
                 .resolve_alias_for_member(&member.full_name(), &dimensions_source);
-            select_builder.add_projection_coalesce_member(member, references, alias);
+            select_builder.add_projection_coalesce_member(member, references, alias)?;
         }
 
         for member in BaseMemberHelper::iter_as_base_member(&outer_measures) {

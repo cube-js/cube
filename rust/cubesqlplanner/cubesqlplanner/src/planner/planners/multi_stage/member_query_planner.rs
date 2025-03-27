@@ -375,6 +375,7 @@ impl MultiStageMemberQueryPlanner {
             self.description.state().time_dimensions_filters().clone(),
             self.description.state().dimensions_filters().clone(),
             self.description.state().measures_filters().clone(),
+            vec![], //TODO May be we should push down segments on some cases
             vec![],
             None,
             None,
@@ -387,6 +388,7 @@ impl MultiStageMemberQueryPlanner {
         if self.description.member().has_aggregates_on_top() {
             node_factory.set_count_approx_as_state(true);
         }
+        node_factory.set_ungrouped_measure(self.description.member().is_ungrupped());
 
         if cte_query_properties
             .full_key_aggregate_measures()?

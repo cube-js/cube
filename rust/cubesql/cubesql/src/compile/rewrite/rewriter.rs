@@ -15,6 +15,7 @@ use crate::{
         CubeContext,
     },
     config::ConfigObj,
+    sql::database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR,
     sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
     transport::{MetaContext, SpanId},
     CubeError,
@@ -208,7 +209,7 @@ impl Rewriter {
         .with_iter_limit(
             env::var("CUBESQL_REWRITE_MAX_ITERATIONS")
                 .map(|v| v.parse::<usize>().unwrap())
-                .unwrap_or(300),
+                .unwrap_or(500),
         )
         .with_node_limit(
             env::var("CUBESQL_REWRITE_MAX_NODES")
@@ -344,15 +345,26 @@ impl Rewriter {
             .rewrite_rules(cache_entry, true)
             .await?;
 
+        let penalize_post_processing = self
+            .cube_context
+            .session_state
+            .get_variable(CUBESQL_PENALIZE_POST_PROCESSING_VAR)
+            .map(|v| v.value);
+        let penalize_post_processing = match penalize_post_processing {
+            Some(ScalarValue::Boolean(val)) => val.unwrap_or(false),
+            _ => false,
+        };
+
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
             tokio::task::spawn_blocking(move || {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
+                // TODO maybe check replacers and penalized_ast_size_outside_wrapper right after extraction?
                 let best = if top_down_extractor {
                     let mut extractor = TopDownExtractor::new(
                         &runner.egraph,
-                        BestCubePlan::new(cube_context.meta.clone()),
+                        BestCubePlan::new(cube_context.meta.clone(), penalize_post_processing),
                         CubePlanTopDownState::new(),
                     );
                     let Some((best_cost, best)) = extractor.find_best(root) else {
@@ -363,19 +375,20 @@ impl Rewriter {
                 } else {
                     let extractor = Extractor::new(
                         &runner.egraph,
-                        BestCubePlan::new(cube_context.meta.clone()),
+                        BestCubePlan::new(cube_context.meta.clone(), penalize_post_processing),
                     );
                     let (best_cost, best) = extractor.find_best(root);
                     log::debug!("Best cost: {:#?}", best_cost);
                     best
                 };
                 let qtrace_best_graph = if Qtrace::is_enabled() {
-                    best.as_ref().iter().cloned().collect()
+                    best.as_ref().to_vec()
                 } else {
                     vec![]
                 };
                 let new_root = Id::from(best.as_ref().len() - 1);
                 log::debug!("Best: {}", best.pretty(120));
+                // TODO maybe pass penalize_post_processing here as well, to break with sane error
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
@@ -473,20 +486,16 @@ impl Rewriter {
         eval_stable_functions: bool,
     ) -> Vec<CubeRewrite> {
         let sql_push_down = Self::sql_push_down_enabled();
-        let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(
-                meta_context.clone(),
-                config_obj.clone(),
-                sql_push_down,
-            )),
-            Box::new(FilterRules::new(
+        let rules: &[&dyn RewriteRules] = &[
+            &MemberRules::new(meta_context.clone(), config_obj.clone(), sql_push_down),
+            &FilterRules::new(
                 meta_context.clone(),
                 config_obj.clone(),
                 eval_stable_functions,
-            )),
-            Box::new(DateRules::new(config_obj.clone())),
-            Box::new(OrderRules::new()),
-            Box::new(CommonRules::new(config_obj.clone())),
+            ),
+            &DateRules::new(config_obj.clone()),
+            &OrderRules::new(),
+            &CommonRules::new(config_obj.clone()),
         ];
         let mut rewrites = Vec::new();
         for r in rules {

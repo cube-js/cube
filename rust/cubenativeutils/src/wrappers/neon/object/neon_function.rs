@@ -39,7 +39,7 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
             let null = cx.null();
             neon_object
                 .call(cx, null, neon_args)
-                .map_err(|_| CubeError::internal(format!("Failed to call function ")))
+                .map_err(|_| CubeError::internal("Failed to call function ".to_string()))
         })??;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
@@ -54,7 +54,7 @@ impl<C: Context<'static> + 'static> NativeFunction<NeonInnerTypes<C>> for NeonFu
                     let res = neon_object
                         .to_string(cx)
                         .map_err(|_| {
-                            CubeError::internal(format!("Can't convert function to string"))
+                            CubeError::internal("Can't convert function to string".to_string())
                         })?
                         .value(cx);
                     Ok(res)

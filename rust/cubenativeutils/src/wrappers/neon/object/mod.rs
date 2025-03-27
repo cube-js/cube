@@ -29,7 +29,7 @@ impl<C: Context<'static> + 'static, V: Value + 'static> NeonTypeHandle<C, V> {
     }
 
     pub fn get_object(&self) -> Handle<'static, V> {
-        self.object.clone()
+        self.object
     }
 
     pub fn get_object_ref(&self) -> &Handle<'static, V> {
@@ -73,7 +73,7 @@ impl<C: Context<'static>, V: Value + 'static> Clone for NeonTypeHandle<C, V> {
     fn clone(&self) -> Self {
         Self {
             context: self.context.clone(),
-            object: self.object.clone(),
+            object: self.object,
         }
     }
 }
@@ -89,7 +89,7 @@ impl<C: Context<'static> + 'static> NeonObject<C> {
     }
 
     pub fn get_object(&self) -> Handle<'static, JsValue> {
-        self.object.clone()
+        self.object
     }
 
     pub fn get_object_ref(&self) -> &Handle<'static, JsValue> {
@@ -169,7 +169,7 @@ impl<C: Context<'static>> Clone for NeonObject<C> {
     fn clone(&self) -> Self {
         Self {
             context: self.context.clone(),
-            object: self.object.clone(),
+            object: self.object,
         }
     }
 }

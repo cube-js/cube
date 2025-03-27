@@ -127,6 +127,8 @@ components:
           type: "string"
         title:
           type: "string"
+        shortTitle:
+          type: "string"
         description:
           type: "string"
         type:
@@ -149,6 +151,8 @@ components:
         name:
           type: "string"
         title:
+          type: "string"
+        shortTitle:
           type: "string"
         description:
           type: "string"

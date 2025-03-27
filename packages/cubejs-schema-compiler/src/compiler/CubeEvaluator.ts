@@ -58,6 +58,13 @@ export type MeasureDefinition = {
   timeShiftReferences?: TimeShiftDefinitionReference[],
 };
 
+export type PreAggregationFilters = {
+  dataSources?: string[],
+  cubes?: string[],
+  preAggregationIds?: string[],
+  scheduled?: boolean,
+};
+
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, any> = {};
 
@@ -238,6 +245,11 @@ export class CubeEvaluator extends CubeSymbols {
     if (cube.isView && (cube.includedMembers || []).length) {
       const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
       const includedCubeNames: string[] = R.uniq(includedMemberPaths.map(it => it.split('.')[0]));
+      // Path to name (which can be prefixed or aliased) map for hierarchy
+      const hierarchyPathToName = cube.includedMembers.filter(it => it.type === 'hierarchies').reduce((acc, it) => ({
+        ...acc,
+        [it.memberPath]: it.name
+      }), {});
       const includedHierarchyNames = cube.includedMembers.filter(it => it.type === 'hierarchies').map(it => it.memberPath.split('.')[1]);
 
       for (const cubeName of includedCubeNames) {
@@ -258,10 +270,16 @@ export class CubeEvaluator extends CubeSymbols {
                 }
 
                 return null;
-              }).filter(Boolean);
+              })
+                .filter(Boolean);
 
+              const name = hierarchyPathToName[[cubeName, it.name].join('.')];
+              if (!name) {
+                throw new UserError(`Hierarchy '${it.name}' not found in cube '${cubeName}'`);
+              }
               return {
                 ...it,
+                name,
                 levels
               };
             })
@@ -473,15 +491,8 @@ export class CubeEvaluator extends CubeSymbols {
 
   /**
    * Returns pre-aggregations filtered by the specified selector.
-   * @param {{
-   *  scheduled: boolean,
-   *  dataSource: Array<string>,
-   *  cubes: Array<string>,
-   *  preAggregationIds: Array<string>
-   * }} filter pre-aggregations selector
-   * @returns {*}
    */
-  public preAggregations(filter) {
+  public preAggregations(filter: PreAggregationFilters) {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
@@ -590,9 +601,7 @@ export class CubeEvaluator extends CubeSymbols {
 
   public isInstanceOfType(type: 'measures' | 'dimensions' | 'segments', path: string | string[]): boolean {
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
-    const symbol = this.evaluatedCubes[cubeAndName[0]] &&
-      this.evaluatedCubes[cubeAndName[0]][type] &&
-      this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+    const symbol = this.evaluatedCubes[cubeAndName[0]]?.[type]?.[cubeAndName[1]];
     return symbol !== undefined;
   }
 
@@ -644,7 +653,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public isRbacEnabledForCube(cube: any): boolean {
-    return cube.accessPolicy && cube.accessPolicy.length;
+    return cube.accessPolicy?.length;
   }
 
   public isRbacEnabled(): boolean {
