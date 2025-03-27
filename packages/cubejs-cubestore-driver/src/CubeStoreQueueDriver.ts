@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { xxh3 } from '@node-rs/xxhash';
 import {
   QueueDriverInterface,
   QueueDriverConnectionInterface,
@@ -22,7 +22,7 @@ import { CubeStoreDriver } from './CubeStoreDriver';
 
 function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
   processUid = processUid || getProcessUid();
-  const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
+  const hash = xxh3.xxh128(JSON.stringify(queryKey)).toString(16);
 
   if (typeof queryKey === 'object' && queryKey.persistent) {
     return `${hash}@${processUid}` as any;
