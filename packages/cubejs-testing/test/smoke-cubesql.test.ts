@@ -179,23 +179,23 @@ describe('SQL API', () => {
       }
 
       it('regular query', async () => {
-        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders;`)).toMatchSnapshot();
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders;')).toMatchSnapshot();
       });
 
       it('regular query with missing column', async () => {
-        expect(await generateSql(`SELECT SUM(foobar) AS total FROM Orders;`)).toMatchSnapshot();
+        expect(await generateSql('SELECT SUM(foobar) AS total FROM Orders;')).toMatchSnapshot();
       });
 
       it('regular query with parameters', async () => {
-        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders WHERE status = 'foo';`)).toMatchSnapshot();
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders WHERE status = \'foo\';')).toMatchSnapshot();
       });
 
       it('strictly post-processing', async () => {
-        expect(await generateSql(`SELECT version();`)).toMatchSnapshot();
+        expect(await generateSql('SELECT version();')).toMatchSnapshot();
       });
 
       it('strictly post-processing with disabled post-processing', async () => {
-        expect(await generateSql(`SELECT version();`, true)).toMatchSnapshot();
+        expect(await generateSql('SELECT version();', true)).toMatchSnapshot();
       });
 
       it('double aggregation post-processing', async () => {
