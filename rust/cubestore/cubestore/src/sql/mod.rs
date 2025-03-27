@@ -992,38 +992,37 @@ impl SqlService for SqlServiceImpl {
                     ))
                 }
             }
-            // TODO upgrade DF
-            // CubeStoreStatement::Statement(Statement::CreatePartitionedIndex {
-            //     name,
-            //     columns,
-            //     if_not_exists,
-            // }) => {
-            //     app_metrics::DATA_QUERIES.add_with_tags(
-            //         1,
-            //         Some(&vec![metrics::format_tag(
-            //             "command",
-            //             "create_partitioned_index",
-            //         )]),
-            //     );
-            //
-            //     if name.0.len() != 2 {
-            //         return Err(CubeError::user(format!(
-            //             "Expected name for PARTITIONED INDEX in the form '<SCHEMA>.<INDEX>', found: {}",
-            //             name
-            //         )));
-            //     }
-            //     let schema = &name.0[0].value;
-            //     let index = &name.0[1].value;
-            //     let res = self
-            //         .create_partitioned_index(
-            //             schema.to_string(),
-            //             index.to_string(),
-            //             columns,
-            //             if_not_exists,
-            //         )
-            //         .await?;
-            //     Ok(Arc::new(DataFrame::from(vec![res])))
-            // }
+            CubeStoreStatement::Statement(Statement::CreatePartitionedIndex {
+                name,
+                columns,
+                if_not_exists,
+            }) => {
+                app_metrics::DATA_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag(
+                        "command",
+                        "create_partitioned_index",
+                    )]),
+                );
+
+                if name.0.len() != 2 {
+                    return Err(CubeError::user(format!(
+                        "Expected name for PARTITIONED INDEX in the form '<SCHEMA>.<INDEX>', found: {}",
+                        name
+                    )));
+                }
+                let schema = &name.0[0].value;
+                let index = &name.0[1].value;
+                let res = self
+                    .create_partitioned_index(
+                        schema.to_string(),
+                        index.to_string(),
+                        columns,
+                        if_not_exists,
+                    )
+                    .await?;
+                Ok(Arc::new(DataFrame::from(vec![res])))
+            }
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
             }) => {
@@ -1040,13 +1039,12 @@ impl SqlService for SqlServiceImpl {
                         self.db.drop_table(table.get_id()).await?;
                         &"drop_table"
                     }
-                    // TODO upgrade DF
-                    // ObjectType::PartitionedIndex => {
-                    //     let schema = names[0].0[0].value.clone();
-                    //     let name = names[0].0[1].value.clone();
-                    //     self.db.drop_partitioned_index(schema, name).await?;
-                    //     &"drop_partitioned_index"
-                    // }
+                    ObjectType::PartitionedIndex => {
+                        let schema = names[0].0[0].value.clone();
+                        let name = names[0].0[1].value.clone();
+                        self.db.drop_partitioned_index(schema, name).await?;
+                        &"drop_partitioned_index"
+                    }
                     _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
                 };
 
