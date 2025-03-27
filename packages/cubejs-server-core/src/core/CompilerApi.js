@@ -1,8 +1,9 @@
 import crypto from 'crypto';
 import R from 'ramda';
+import { v4 as uuidv4, parse as uuidParse } from 'uuid';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
-import { v4 as uuidv4, parse as uuidParse, stringify as uuidStringify } from 'uuid';
 import { NativeInstance } from '@cubejs-backend/native';
+import { asyncDebounce } from '@cubejs-backend/shared';
 
 export class CompilerApi {
   /**
@@ -29,6 +30,7 @@ export class CompilerApi {
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
     this.nativeInstance = this.createNativeInstance();
+    this.compileSchemaDebounced = asyncDebounce(this.compileSchema.bind(this));
   }
 
   setGraphQLSchema(schema) {
@@ -59,7 +61,7 @@ export class CompilerApi {
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      this.compilers = this.compileSchema(compilerVersion, requestId).catch(e => {
+      this.compilers = this.compileSchemaDebounced(compilerVersion, requestId).catch(e => {
         this.compilers = undefined;
         throw e;
       });
@@ -125,7 +127,7 @@ export class CompilerApi {
   }
 
   getDialectClass(dataSource = 'default', dbType) {
-    return this.dialectClass && this.dialectClass({ dataSource, dbType });
+    return this.dialectClass?.({ dataSource, dbType });
   }
 
   async getSqlGenerator(query, dataSource) {
@@ -171,8 +173,8 @@ export class CompilerApi {
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
       lambdaQueries: sqlGenerator.buildLambdaQuery(),
-      timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
-      timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
+      timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
+      timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
       order: sqlGenerator.order,
       cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
       preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
@@ -206,7 +208,7 @@ export class CompilerApi {
   }
 
   roleMeetsConditions(evaluatedConditions) {
-    if (evaluatedConditions && evaluatedConditions.length) {
+    if (evaluatedConditions?.length) {
       return evaluatedConditions.reduce((a, b) => {
         if (typeof b !== 'boolean') {
           throw new Error(`Access policy condition must return boolean, got ${JSON.stringify(b)}`);
