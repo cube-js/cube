@@ -65,6 +65,40 @@ export type PreAggregationFilters = {
   scheduled?: boolean,
 };
 
+type PreAggregationDefinition = {
+  allowNonStrictDateRangeMatch?: boolean,
+  timeDimensionReference?: () => { toString(): string },
+  granularity: string,
+  timeDimensionReferences: Array<{ dimension: () => { toString(): string }, granularity: string }>,
+  dimensionReferences: () => Array<{ toString(): string }>,
+  segmentReferences: () => Array<{ toString(): string }>,
+  measureReferences: () => Array<{ toString(): string }>,
+  rollupReferences: () => Array<{ toString(): string }>,
+};
+
+type PreAggregationTimeDimensionReference = {
+  dimension: string,
+  granularity: string,
+};
+
+type PreAggregationReferences = {
+  allowNonStrictDateRangeMatch?: boolean,
+  dimensions: Array<string>,
+  measures: Array<string>,
+  timeDimensions: Array<PreAggregationTimeDimensionReference>,
+  rollups: Array<string>,
+};
+
+type PreAggregationInfo = {
+  id: string,
+  preAggregationName: string,
+  preAggregation: unknown,
+  cube: string,
+  references: PreAggregationReferences,
+  refreshKey: unknown,
+  indexesReferences: unknown,
+};
+
 export class CubeEvaluator extends CubeSymbols {
   public evaluatedCubes: Record<string, any> = {};
 
@@ -492,7 +526,7 @@ export class CubeEvaluator extends CubeSymbols {
   /**
    * Returns pre-aggregations filtered by the specified selector.
    */
-  public preAggregations(filter: PreAggregationFilters) {
+  public preAggregations(filter: PreAggregationFilters): Array<PreAggregationInfo> {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
@@ -510,7 +544,7 @@ export class CubeEvaluator extends CubeSymbols {
           )
         )
       ))
-      .map(cube => {
+      .flatMap(cube => {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
           .filter(
@@ -547,11 +581,10 @@ export class CubeEvaluator extends CubeSymbols {
               }, {})
             };
           });
-      })
-      .reduce((a, b) => a.concat(b), []);
+      });
   }
 
-  public scheduledPreAggregations() {
+  public scheduledPreAggregations(): Array<PreAggregationInfo> {
     return this.preAggregations({ scheduled: true });
   }
 
@@ -704,8 +737,8 @@ export class CubeEvaluator extends CubeSymbols {
     return { cubeReferencesUsed, pathReferencesUsed, evaluatedSql };
   }
 
-  protected evaluatePreAggregationReferences(cube, aggregation) {
-    const timeDimensions: any = [];
+  protected evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinition): PreAggregationReferences {
+    const timeDimensions: Array<PreAggregationTimeDimensionReference> = [];
 
     if (aggregation.timeDimensionReference) {
       timeDimensions.push({
