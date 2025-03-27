@@ -1013,5 +1013,32 @@ describe('Schema Testing', () => {
       expect(cubeB.sqlTable).toBeTruthy();
       expect(cubeB.sql).toBeFalsy();
     });
+
+    it('throws error for member without type in cubeB extending cubeA', async () => {
+      const cubes = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/invalid_cubes.yaml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: cubes,
+          fileName: 'invalid_cubes.yaml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/"measures\.parent_meas_no_type\.sql" is required/);
+        expect(e.toString()).toMatch(/"measures\.parent_meas_no_type\.type" is required/);
+        expect(e.toString()).toMatch(/"measures\.parent_meas_bad_type\.type" must be one of/);
+        expect(e.toString()).toMatch(/"dimensions\.parent_dim_no_type" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.parent_dim_no_sql" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.child_dim_no_type" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.child_dim_bad_type" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.child_dim_no_sql" does not match any of the allowed types/);
+      }
+    });
   });
 });
