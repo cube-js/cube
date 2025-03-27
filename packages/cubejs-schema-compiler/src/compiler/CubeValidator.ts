@@ -883,7 +883,11 @@ export class CubeValidator {
   }
 
   public validate(cube, errorReporter: ErrorReporter) {
-    const result = cube.isView ? viewSchema.validate(cube) : cubeSchema.validate(cube);
+    const options = {
+      nonEnumerables: true,
+      abortEarly: false, // This will allow all errors to be reported, not just the first one
+    };
+    const result = cube.isView ? viewSchema.validate(cube, options) : cubeSchema.validate(cube, options);
 
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error), result.error);
