@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { xxh3 } from '@node-rs/xxhash';
 import R from 'ramda';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { v4 as uuidv4, parse as uuidParse, stringify as uuidStringify } from 'uuid';
@@ -55,7 +55,7 @@ export class CompilerApi {
 
     if (this.options.devServer || this.options.fastReload) {
       const files = await this.repository.dataSchemaFiles();
-      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
+      compilerVersion += `_${xxh3.xxh64(JSON.stringify(files)).toString(16)}`;
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
@@ -224,7 +224,7 @@ export class CompilerApi {
 
   hashRequestContext(context) {
     if (!context.__hash) {
-      context.__hash = crypto.createHash('md5').update(JSON.stringify(context)).digest('hex');
+      context.__hash = xxh3.xxh64(JSON.stringify(context)).toString(16);
     }
     return context.__hash;
   }
@@ -505,7 +505,7 @@ export class CompilerApi {
     const visibiliyMask = JSON.stringify(isMemberVisibleInContext, Object.keys(isMemberVisibleInContext).sort());
     // This hash will be returned along the modified meta config and can be used
     // to distinguish between different "schema versions" after DAP visibility is applied
-    const visibilityMaskHash = crypto.createHash('sha256').update(visibiliyMask).digest('hex');
+    const visibilityMaskHash = xxh3.xxh64(visibiliyMask).toString(16);
 
     return {
       cubes: cubes
@@ -523,10 +523,7 @@ export class CompilerApi {
   }
 
   mixInVisibilityMaskHash(compilerId, visibilityMaskHash) {
-    const uuidBytes = uuidParse(compilerId);
-    const hashBytes = Buffer.from(visibilityMaskHash, 'hex');
-    return uuidv4({ random: crypto.createHash('sha256').update(uuidBytes).update(hashBytes).digest()
-      .subarray(0, 16) });
+    return uuidv4({ random: Buffer.from(xxh3.xxh64(`${compilerId}${visibilityMaskHash}`).toString()) });
   }
 
   async metaConfig(requestContext, options = {}) {
@@ -542,8 +539,8 @@ export class CompilerApi {
       return {
         cubes: patchedCubes,
         // This compilerId is primarily used by the cubejs-backend-native or caching purposes.
-        // By default it doesn't account for member visibility changes introduced above by DAP.
-        // Here we're modifying the originila compilerId in a way that it's distinct for
+        // By default, it doesn't account for member visibility changes introduced above by DAP.
+        // Here we're modifying the original compilerId in a way that it's distinct for
         // distinct schema versions while still being a valid UUID.
         compilerId: visibilityMaskHash ? this.mixInVisibilityMaskHash(compilers.compilerId, visibilityMaskHash) : compilers.compilerId,
       };

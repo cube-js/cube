@@ -37,6 +37,7 @@
     "@cubejs-backend/schema-compiler": "1.2.30",
     "@cubejs-backend/shared": "1.2.30",
     "@cubejs-backend/templates": "1.2.30",
+    "@node-rs/xxhash": "^1.7.6",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
     "fs-extra": "^8.1.0",
