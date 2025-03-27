@@ -337,7 +337,7 @@ export class DataSchemaCompiler {
   }
 
   compileFile(
-    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules
+    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules, { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (compiledFiles[file.fileName]) {
       return;
@@ -370,10 +370,15 @@ export class DataSchemaCompiler {
     }
   }
 
-  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
-    const err = syntaxCheck(file.content, file.fileName);
-    if (err) {
-      errorsReport.error(err.toString());
+  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck } = { doSyntaxCheck: false }) {
+    if (doSyntaxCheck) {
+      // There is no need to run syntax check for data model files
+      // because they were checked during transpilation/transformation phase
+      // Only external files (included modules) might need syntax check
+      const err = syntaxCheck(file.content, file.fileName);
+      if (err) {
+        errorsReport.error(err.toString());
+      }
     }
 
     try {
@@ -424,6 +429,8 @@ export class DataSchemaCompiler {
               contexts,
               toCompile,
               compiledFiles,
+              [],
+              { doSyntaxCheck: true }
             );
             exports[foundFile.fileName] = exports[foundFile.fileName] || {};
             return exports[foundFile.fileName];
