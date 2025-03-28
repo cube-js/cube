@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         # Current docker version + next LTS
-        node-version: [20.x, 22.x]
+        node-version: [22.x]
         # Don't forget to update build-native-release
         python-version: [3.11]
         transpile-worker-threads: [false, true]
@@ -116,6 +116,7 @@ jobs:
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        if: (matrix.node-version == '22.x')
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./packages/*/coverage/*
@@ -139,10 +140,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 20.x
+      - name: Install Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -274,10 +275,10 @@ jobs:
           workspaces: ./packages/cubejs-backend-native
           key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
           shared-key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
-      - name: Install Node.js 20
+      - name: Install Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
@@ -306,7 +307,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
       fail-fast: false
 
     steps:
@@ -394,7 +395,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate', 'mongobi', 'firebolt', 'dremio', 'vertica'
@@ -481,7 +482,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 20.x ]
+        node-version: [ 22.x ]
         python-version: [ 3.11 ]
       fail-fast: false
 
@@ -609,7 +610,7 @@ jobs:
           - 5000:5000
     strategy:
       matrix:
-        node-version: [ 20 ]
+        node-version: [ 22 ]
         target: [ "x86_64-unknown-linux-gnu" ]
         dockerfile:
           - dev.Dockerfile
