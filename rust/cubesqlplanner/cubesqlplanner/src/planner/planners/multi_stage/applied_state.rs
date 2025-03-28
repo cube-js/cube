@@ -174,6 +174,7 @@ impl MultiStageAppliedState {
             member_name,
             &self.time_dimensions_filters,
             &operator,
+            None,
             &values,
             &None,
         );
@@ -190,6 +191,7 @@ impl MultiStageAppliedState {
             member_name,
             &self.time_dimensions_filters,
             &operator,
+            None,
             &values,
             &None,
         );
@@ -207,6 +209,25 @@ impl MultiStageAppliedState {
             member_name,
             &self.time_dimensions_filters,
             &operator,
+            None,
+            &vec![],
+            &Some(replacement_values),
+        );
+    }
+
+    pub fn replace_range_to_subquery_in_date_filter(
+        &mut self,
+        member_name: &String,
+        new_from: String,
+        new_to: String,
+    ) {
+        let operator = FilterOperator::InDateRange;
+        let replacement_values = vec![Some(new_from), Some(new_to)];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            Some(true),
             &vec![],
             &Some(replacement_values),
         );
@@ -217,6 +238,7 @@ impl MultiStageAppliedState {
         member_name: &String,
         filters: &Vec<FilterItem>,
         operator: &FilterOperator,
+        use_raw_values: Option<bool>,
         additional_values: &Vec<Option<String>>,
         replacement_values: &Option<Vec<Option<String>>>,
     ) -> Vec<FilterItem> {
@@ -230,6 +252,7 @@ impl MultiStageAppliedState {
                             member_name,
                             filters,
                             operator,
+                            use_raw_values,
                             additional_values,
                             replacement_values,
                         ),
@@ -246,7 +269,8 @@ impl MultiStageAppliedState {
                             itm.values().clone()
                         };
                         values.extend(additional_values.iter().cloned());
-                        itm.change_operator(operator.clone(), values)
+                        let use_raw_values = use_raw_values.unwrap_or(itm.use_raw_values());
+                        itm.change_operator(operator.clone(), values, use_raw_values)
                     } else {
                         itm.clone()
                     };

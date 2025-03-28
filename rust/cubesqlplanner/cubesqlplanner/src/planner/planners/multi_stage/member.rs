@@ -60,9 +60,16 @@ impl MultiStageTimeShift {
 }
 
 #[derive(Clone)]
+pub struct TimeSeriesDescription {
+    pub time_dimension: Rc<BaseTimeDimension>,
+    pub date_range_cte: Option<String>,
+}
+
+#[derive(Clone)]
 pub enum MultiStageLeafMemberType {
     Measure,
-    TimeSeries(Rc<BaseTimeDimension>),
+    TimeSeries(Rc<TimeSeriesDescription>),
+    TimeSeriesGetRange(Rc<BaseTimeDimension>),
 }
 
 #[derive(Clone)]

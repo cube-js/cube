@@ -285,14 +285,20 @@ impl SqlCall {
                     values: None,
                 })
             }
-            FilterItem::Item(filter) => Some(NativeFilterItem {
-                or: None,
-                and: None,
-                member: Some(filter.member_name()),
-                dimension: None,
-                operator: Some(filter.filter_operator().to_string()),
-                values: Some(filter.values().clone()),
-            }),
+            FilterItem::Item(filter) => {
+                if filter.use_raw_values() {
+                    None
+                } else {
+                    Some(NativeFilterItem {
+                        or: None,
+                        and: None,
+                        member: Some(filter.member_name()),
+                        dimension: None,
+                        operator: Some(filter.filter_operator().to_string()),
+                        values: Some(filter.values().clone()),
+                    })
+                }
+            }
             FilterItem::Segment(_) => None,
         }
     }
