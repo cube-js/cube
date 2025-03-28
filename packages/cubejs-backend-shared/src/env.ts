@@ -226,6 +226,9 @@ const variables: Record<string, (...args: any) => any> = {
   transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
     .default('false')
     .asBoolStrict(),
+  allowNonStrictDateRangeMatching: () => get('CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH')
+    .default('true')
+    .asBoolStrict(),
   transpilationWorkerThreadsCount: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS_COUNT')
     .default('0')
     .asInt(),
