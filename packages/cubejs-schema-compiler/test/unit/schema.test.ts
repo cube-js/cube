@@ -1014,7 +1014,7 @@ describe('Schema Testing', () => {
       expect(cubeB.sql).toBeFalsy();
     });
 
-    it('throws error for member without type in cubeB extending cubeA', async () => {
+    it('throws errors for invalid members in both cubes (parent and child)', async () => {
       const cubes = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/invalid_cubes.yaml'),
         'utf8'
