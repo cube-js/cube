@@ -2,6 +2,7 @@ use super::{Schema, SchemaColumn};
 use crate::planner::{
     query_tools::QueryTools,
     sql_templates::{PlanSqlTemplates, TemplateProjectionColumn},
+    Granularity,
 };
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -11,7 +12,7 @@ pub struct TimeSeries {
     #[allow(dead_code)]
     time_dimension_name: String,
     date_range: TimeSeriesDateRange,
-    granularity: String,
+    granularity: Granularity,
     schema: Rc<Schema>,
 }
 
@@ -25,7 +26,7 @@ impl TimeSeries {
         query_tools: Rc<QueryTools>,
         time_dimension_name: String,
         date_range: TimeSeriesDateRange,
-        granularity: String,
+        granularity: Granularity,
     ) -> Self {
         let column = SchemaColumn::new(format!("date_from"), Some(time_dimension_name.clone()));
         let schema = Rc::new(Schema::new(vec![column]));
@@ -88,7 +89,11 @@ impl TimeSeries {
                     (format!("({})", from), format!("({})", to))
                 }
             };
-            templates.generated_time_series_select(&from_date, &to_date, &self.granularity)
+            templates.generated_time_series_select(
+                &from_date,
+                &to_date,
+                &self.granularity.granularity_interval(),
+            )
         } else {
             let (from_date, to_date) = match &self.date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => {
@@ -100,10 +105,18 @@ impl TimeSeries {
                     ));
                 }
             };
-            let series = self.query_tools.base_tools().generate_time_series(
-                self.granularity.clone(),
-                vec![from_date.clone(), to_date.clone()],
-            )?;
+            let series = if self.granularity.is_predefined_granularity() {
+                self.query_tools.base_tools().generate_time_series(
+                    self.granularity.granularity().clone(),
+                    vec![from_date.clone(), to_date.clone()],
+                )?
+            } else {
+                self.query_tools.base_tools().generate_custom_time_series(
+                    self.granularity.granularity_interval().clone(),
+                    vec![from_date.clone(), to_date.clone()],
+                    self.granularity.origin_local_formatted(),
+                )?
+            };
             templates.time_series_select(from_date.clone(), to_date.clone(), series)
         }
     }

@@ -2,6 +2,7 @@ use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::planners::multi_stage::MultiStageTimeShift;
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
+use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -96,14 +97,15 @@ impl MultiStageAppliedState {
         &mut self,
         time_dimension: &Rc<BaseTimeDimension>,
         new_granularity: Option<String>,
-    ) {
+    ) -> Result<(), CubeError> {
         if let Some(time_dimension) = self
             .time_dimensions
             .iter_mut()
             .find(|dim| dim.full_name() == time_dimension.full_name())
         {
-            *time_dimension = time_dimension.change_granularity(new_granularity);
+            *time_dimension = time_dimension.change_granularity(new_granularity)?;
         }
+        Ok(())
     }
 
     pub fn remove_filter_for_member(&mut self, member_name: &String) {

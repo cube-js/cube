@@ -1,10 +1,13 @@
+use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::planner::BaseTimeDimension;
+use crate::planner::Granularity;
+use chrono::prelude::*;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::rc::Rc;
-
-use super::BaseTimeDimension;
 
 pub struct GranularityHelper {}
 
@@ -98,6 +101,10 @@ impl GranularityHelper {
         }
     }
 
+    pub fn is_predefined_granularity(granularity: &str) -> bool {
+        Self::standard_granularity_parents().contains_key(granularity)
+    }
+
     pub fn standard_granularity_parents() -> &'static HashMap<String, Vec<String>> {
         lazy_static! {
             static ref STANDARD_GRANULARITIES_PARENTS: HashMap<String, Vec<String>> = {
@@ -171,5 +178,73 @@ impl GranularityHelper {
             };
         }
         &STANDARD_GRANULARITIES_PARENTS
+    }
+
+    pub fn parse_date_time_in_tz(date: &str, timezone: &Tz) -> Result<DateTime<Tz>, CubeError> {
+        let local_dt = Self::parse_date_time(date)?;
+        if let Some(result) = timezone.from_local_datetime(&local_dt).single() {
+            Ok(result)
+        } else {
+            Err(CubeError::user(format!(
+                "Error while parsing date `{date}` in timezone `{timezone}`"
+            )))
+        }
+    }
+
+    pub fn parse_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
+        let formats = &[
+            "%Y-%m-%d",
+            "%Y-%m-%d %H:%M:%S%.f",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S%.f",
+            "%Y-%m-%dT%H:%M:%S",
+        ];
+
+        for format in formats {
+            if let Ok(dt) = NaiveDateTime::parse_from_str(date, format) {
+                return Ok(dt);
+            }
+        }
+
+        if let Ok(d) = NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+            return Ok(d.and_hms_opt(0, 0, 0).unwrap());
+        }
+
+        Err(CubeError::user(format!("Can't parse date: '{}'", date)))
+    }
+
+    pub fn make_granularity_obj(
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        timezone: Tz,
+        cube_name: &String,
+        name: &String,
+        granularity: Option<String>,
+    ) -> Result<Option<Granularity>, CubeError> {
+        let granularity_obj = if let Some(granularity) = &granularity {
+            if !Self::is_predefined_granularity(&granularity) {
+                let path = vec![
+                    cube_name.clone(),
+                    name.clone(),
+                    "granularities".to_string(),
+                    granularity.clone(),
+                ];
+                let granularity_definition = cube_evaluator.resolve_granularity(path)?;
+                Some(Granularity::try_new_custom(
+                    timezone.clone(),
+                    granularity.clone(),
+                    granularity_definition.origin,
+                    granularity_definition.interval,
+                    granularity_definition.offset,
+                )?)
+            } else {
+                Some(Granularity::try_new_predefined(
+                    timezone.clone(),
+                    granularity.clone(),
+                )?)
+            }
+        } else {
+            None
+        };
+        Ok(granularity_obj)
     }
 }

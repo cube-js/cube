@@ -43,7 +43,7 @@ impl SqlNode for TimeDimensionNode {
         )?;
         match node.as_ref() {
             MemberSymbol::TimeDimension(ev) => {
-                let res = if let Some(granularity) = ev.granularity() {
+                let res = if let Some(granularity_obj) = ev.granularity_obj() {
                     let converted_tz = if self
                         .dimensions_with_ignored_timezone
                         .contains(&ev.full_name())
@@ -52,9 +52,31 @@ impl SqlNode for TimeDimensionNode {
                     } else {
                         query_tools.base_tools().convert_tz(input_sql)?
                     };
-                    query_tools
-                        .base_tools()
-                        .time_grouped_column(granularity.clone(), converted_tz)?
+
+                    let res = if granularity_obj.is_natural_aligned() {
+                        if let Some(granularity_offset) = granularity_obj.granularity_offset() {
+                            let dt =
+                                templates.sub_interval(converted_tz, granularity_offset.clone())?;
+                            let dt = query_tools.base_tools().time_grouped_column(
+                                granularity_obj.granularity_from_interval()?,
+                                dt,
+                            )?;
+                            templates.add_interval(dt, granularity_offset.clone())?
+                        } else {
+                            query_tools.base_tools().time_grouped_column(
+                                granularity_obj.granularity().clone(),
+                                converted_tz,
+                            )?
+                        }
+                    } else {
+                        query_tools.base_tools().date_bin(
+                            granularity_obj.granularity_interval().clone(),
+                            converted_tz,
+                            granularity_obj.origin_local_formatted(),
+                        )?
+                    };
+
+                    res
                 } else {
                     input_sql
                 };

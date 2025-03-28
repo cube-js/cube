@@ -20,7 +20,8 @@ import {
   QueryAlias,
   getEnv,
   localTimestampToUtc,
-  timeSeries as timeSeriesBase
+  timeSeries as timeSeriesBase,
+  timeSeriesFromCustomInterval
 } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
@@ -723,6 +724,11 @@ export class BaseQuery {
   // FIXME helper for native generator, maybe should be moved entire to rust
   generateTimeSeries(granularity, dateRange) {
     return timeSeriesBase(granularity, dateRange);
+  }
+
+  // FIXME helper for native generator, maybe should be moved entire to rust
+  generateCustomTimeSeries(granularityInterval, dateRange, origin) {
+    return timeSeriesFromCustomInterval(granularityInterval, dateRange, moment(origin), { timestampPrecision: 3 });
   }
 
   get shouldReuseParams() {
