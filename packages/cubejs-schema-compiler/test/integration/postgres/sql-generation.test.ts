@@ -902,7 +902,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     timeDimensions: [
       {
         dimension: 'visitors.created_at',
-        granularity: 'three_days',
+        granularity: 'month',
         dateRange: ['2017-01-01', '2017-01-10']
       },
       {

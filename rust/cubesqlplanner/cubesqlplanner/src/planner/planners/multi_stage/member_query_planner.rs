@@ -233,7 +233,7 @@ impl MultiStageMemberQueryPlanner {
             QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
         );
 
-        //We also insert render reference for the base dimension of time dimension (i.e. without `_granularit` prefix to let other time dimensions make date_tranc)
+        //We also insert render reference for the base dimension of time dimension (i.e. without `_granularity` prefix to let other time dimensions make date_tranc)
         render_references.insert(
             rolling_window_desc
                 .time_dimension
