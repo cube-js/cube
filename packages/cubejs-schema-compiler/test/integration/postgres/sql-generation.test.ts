@@ -902,7 +902,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     timeDimensions: [
       {
         dimension: 'visitors.created_at',
-        granularity: 'three_days',
+        granularity: 'month',
         dateRange: ['2017-01-01', '2017-01-10']
       },
       {
@@ -919,52 +919,52 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     {
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-01T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: '1',
       visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: '1',
       visitors__created_at_day: '2017-01-03T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: '2',
       visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: '3',
       visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: '5',
       visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: '5',
       visitors__created_at_day: '2017-01-07T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: '5',
       visitors__created_at_day: '2017-01-08T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-09T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     },
     {
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-10T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-10T00:00:00.000Z',
+      visitors__created_at_month: '2017-01-01T00:00:00.000Z',
     }
   ]));
 
@@ -976,12 +976,12 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     timeDimensions: [
       {
         dimension: 'visitors.created_at',
-        granularity: 'three_days',
+        granularity: 'day',
         dateRange: ['2017-01-01', '2017-01-10']
       },
       {
         dimension: 'visitors.created_at',
-        granularity: 'day',
+        granularity: 'week',
         dateRange: ['2017-01-01', '2017-01-10']
       }
     ],
@@ -994,61 +994,61 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       visitors__count_rolling_unbounded: '1',
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-01T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
-    },
-    {
-      visitors__count_rolling_unbounded: '2',
-      visitors__count_rolling_week_to_date: '1',
-      visitors__created_at_day: '2017-01-03T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_week: '2016-12-26T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '2',
       visitors__count_rolling_week_to_date: '1',
       visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-01T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '2',
+      visitors__count_rolling_week_to_date: '1',
+      visitors__created_at_day: '2017-01-03T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '3',
       visitors__count_rolling_week_to_date: '2',
       visitors__created_at_day: '2017-01-04T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '4',
       visitors__count_rolling_week_to_date: '3',
       visitors__created_at_day: '2017-01-05T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: '5',
       visitors__created_at_day: '2017-01-06T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-04T00:00:00.000Z',
-    },
-    {
-      visitors__count_rolling_unbounded: '6',
-      visitors__count_rolling_week_to_date: '5',
-      visitors__created_at_day: '2017-01-08T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: '5',
       visitors__created_at_day: '2017-01-07T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
+    },
+    {
+      visitors__count_rolling_unbounded: '6',
+      visitors__count_rolling_week_to_date: '5',
+      visitors__created_at_day: '2017-01-08T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-02T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-09T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-07T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-09T00:00:00.000Z',
     },
     {
       visitors__count_rolling_unbounded: '6',
       visitors__count_rolling_week_to_date: null,
       visitors__created_at_day: '2017-01-10T00:00:00.000Z',
-      visitors__created_at_three_days: '2017-01-10T00:00:00.000Z',
+      visitors__created_at_week: '2017-01-09T00:00:00.000Z',
     }
   ]));
 

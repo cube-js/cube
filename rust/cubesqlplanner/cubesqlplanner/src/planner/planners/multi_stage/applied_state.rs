@@ -1,7 +1,7 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::planners::multi_stage::MultiStageTimeShift;
-use crate::planner::{BaseDimension, BaseTimeDimension};
+use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -88,15 +88,19 @@ impl MultiStageAppliedState {
         &self.time_dimensions
     }
 
+    pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<BaseTimeDimension>>) {
+        self.time_dimensions = time_dimensions;
+    }
+
     pub fn change_time_dimension_granularity(
         &mut self,
-        dimension_name: &str,
+        time_dimension: &Rc<BaseTimeDimension>,
         new_granularity: Option<String>,
     ) {
         if let Some(time_dimension) = self
             .time_dimensions
             .iter_mut()
-            .find(|dim| dim.member_evaluator().full_name() == dimension_name)
+            .find(|dim| dim.full_name() == time_dimension.full_name())
         {
             *time_dimension = time_dimension.change_granularity(new_granularity);
         }

@@ -1,6 +1,5 @@
 use crate::cube_bridge::measure_definition::TimeShiftReference;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::BaseMember;
 use crate::planner::BaseTimeDimension;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -88,17 +87,18 @@ pub struct ToDateRollingWindow {
 pub enum RollingWindowType {
     Regular(RegularRollingWindow),
     ToDate(ToDateRollingWindow),
+    RunningTotal,
 }
 
 #[derive(Clone)]
 pub struct RollingWindowDescription {
-    pub time_dimension: Rc<dyn BaseMember>,
+    pub time_dimension: Rc<BaseTimeDimension>,
     pub rolling_window: RollingWindowType,
 }
 
 impl RollingWindowDescription {
     pub fn new_regular(
-        time_dimension: Rc<dyn BaseMember>,
+        time_dimension: Rc<BaseTimeDimension>,
         trailing: Option<String>,
         leading: Option<String>,
         offset: String,
@@ -114,17 +114,19 @@ impl RollingWindowDescription {
         }
     }
 
-    pub fn new_to_date(time_dimension: Rc<dyn BaseMember>, granularity: String) -> Self {
+    pub fn new_to_date(time_dimension: Rc<BaseTimeDimension>, granularity: String) -> Self {
         Self {
             time_dimension,
             rolling_window: RollingWindowType::ToDate(ToDateRollingWindow { granularity }),
         }
     }
-}
 
-#[derive(Clone)]
-pub struct RunningTotalDescription {
-    pub time_dimension: Rc<dyn BaseMember>,
+    pub fn new_running_total(time_dimension: Rc<BaseTimeDimension>) -> Self {
+        Self {
+            time_dimension,
+            rolling_window: RollingWindowType::RunningTotal,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -133,7 +135,6 @@ pub enum MultiStageInodeMemberType {
     Aggregate,
     Calculate,
     RollingWindow(RollingWindowDescription),
-    RunningTotal(RunningTotalDescription),
 }
 
 #[derive(Clone)]

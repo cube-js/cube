@@ -2,6 +2,9 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::rc::Rc;
+
+use super::BaseTimeDimension;
 
 pub struct GranularityHelper {}
 
@@ -39,6 +42,29 @@ impl GranularityHelper {
         } else {
             Ok(granularity_b.clone())
         }
+    }
+
+    pub fn find_dimension_with_min_granularity(
+        dimensions: &Vec<Rc<BaseTimeDimension>>,
+    ) -> Result<Rc<BaseTimeDimension>, CubeError> {
+        if dimensions.is_empty() {
+            return Err(CubeError::internal(
+                "No dimensions provided for find_dimension_with_min_granularity".to_string(),
+            ));
+        }
+        let first = Ok(dimensions[0].clone());
+        dimensions.iter().skip(1).fold(first, |acc, d| match acc {
+            Ok(min_dim) => {
+                let min_granularity =
+                    Self::min_granularity(&min_dim.get_granularity(), &d.get_granularity())?;
+                if min_granularity == min_dim.get_granularity() {
+                    Ok(min_dim)
+                } else {
+                    Ok(d.clone())
+                }
+            }
+            Err(e) => Err(e),
+        })
     }
 
     pub fn granularity_from_interval(interval: &Option<String>) -> Option<String> {
