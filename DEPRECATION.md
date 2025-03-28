@@ -63,8 +63,9 @@ features:
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
 | Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
-| Deprecated | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    |           |
-| Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency) | v1.2.7 | |
+| Removed    | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    | v1.3.0    |
+| Deprecated | [`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs_scheduled_refresh_concurrency)                                                   | v1.2.7 |           |
+| Deprecated | [Node.js 20](#nodejs-20)                                                                                                          | v1.3.0    |           |
 
 ### Node.js 8
 
@@ -392,6 +393,13 @@ API](https://cube.dev/docs/product/apis-integrations/orchestration-api) and
 
 Node.js 18 reaches [End of Life on April 30, 2025][link-nodejs-eol]. This means
 no more updates. Please upgrade to Node.js 20 or higher.
+
+### Node.js 20
+
+**Deprecated in Release: v1.3.0**
+
+Node.js 20 is in maintenance mode from [November 22, 2024][link-nodejs-eol]. This means
+no more new features, only security updates. Please upgrade to Node.js 22 or higher.
 
 ### `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`
 
