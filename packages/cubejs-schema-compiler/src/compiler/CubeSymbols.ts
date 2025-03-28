@@ -642,7 +642,7 @@ export class CubeSymbols {
     try {
       const deps: any[] = [];
       this.resolveSymbolsCall(sql, (name) => {
-        deps.push({ name, parent: undefined });
+        deps.push({ name });
         const resolvedSymbol = this.resolveSymbol(
           cubeName,
           name
