@@ -134,6 +134,37 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeFalsy();
   });
 
+  it('view with incorrect included member with alias', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      // it's a hidden field which we use internally
+      isView: true,
+      fileName: 'fileName',
+      cubes: [
+        {
+          joinPath: () => '',
+          prefix: false,
+          includes: [
+            'member-by-name',
+            {
+              name: 'member-by-alias',
+              alias: 'incorrect Alias'
+            }
+          ]
+        }
+      ]
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message: any, _e: any) => {
+        console.log(message);
+      }
+    } as any);
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
   it('refreshKey alternatives', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {

@@ -792,8 +792,8 @@ const viewSchema = inherit(baseSchema, {
         Joi.array().items(Joi.alternatives([
           Joi.string().required(),
           Joi.object().keys({
-            name: Joi.string().required(),
-            alias: Joi.string()
+            name: identifier.required(),
+            alias: identifier
           })
         ]))
       ]).required(),
