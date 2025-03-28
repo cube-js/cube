@@ -132,6 +132,10 @@ impl BaseDimension {
         self.member_evaluator.clone()
     }
 
+    pub fn definition(&self) -> Option<Rc<dyn DimensionDefinition>> {
+        self.definition.clone()
+    }
+
     pub fn sql_call(&self) -> Result<Rc<SqlCall>, CubeError> {
         match self.member_evaluator.as_ref() {
             MemberSymbol::Dimension(d) => {

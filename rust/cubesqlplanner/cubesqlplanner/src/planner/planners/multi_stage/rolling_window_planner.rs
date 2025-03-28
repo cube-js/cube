@@ -315,7 +315,7 @@ impl RollingWindowPlanner {
             GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
         let result_granularity = GranularityHelper::min_granularity(
             &window_granularity,
-            &time_dimension.get_granularity(),
+            &time_dimension.resolve_granularity()?,
         )?;
 
         let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
@@ -325,12 +325,19 @@ impl RollingWindowPlanner {
                 self.make_time_seires_from_to_dates_suqueries_conditions("time_series")?;
             new_state.replace_range_to_subquery_in_date_filter(&time_dimension_base_name, from, to);
         } else if time_dimension.get_date_range().is_some() && result_granularity.is_some() {
-            let granularity = time_dimension.get_granularity().unwrap();
+            let granularity = time_dimension.get_granularity_obj().clone().unwrap();
             let date_range = time_dimension.get_date_range().unwrap();
-            let series = self
-                .query_tools
-                .base_tools()
-                .generate_time_series(granularity, date_range.clone())?;
+            let series = if granularity.is_predefined_granularity() {
+                self.query_tools
+                    .base_tools()
+                    .generate_time_series(granularity.granularity().clone(), date_range.clone())?
+            } else {
+                self.query_tools.base_tools().generate_custom_time_series(
+                    granularity.granularity_interval().clone(),
+                    date_range.clone(),
+                    granularity.origin_local_formatted(),
+                )?
+            };
             if !series.is_empty() {
                 let new_from_date = series.first().unwrap()[0].clone();
                 let new_to_date = series.last().unwrap()[1].clone();
@@ -341,7 +348,7 @@ impl RollingWindowPlanner {
                 );
             }
         }
-        let new_time_dimension = time_dimension.change_granularity(result_granularity.clone());
+        let new_time_dimension = time_dimension.change_granularity(result_granularity.clone())?;
         //We keep only one time_dimension in the leaf query because, even if time_dimension values have different granularity, in the leaf query we need to group by the lowest granularity.
         new_state.set_time_dimensions(vec![new_time_dimension]);
 

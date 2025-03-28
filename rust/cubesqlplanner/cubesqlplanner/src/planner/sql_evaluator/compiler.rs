@@ -8,19 +8,22 @@ use super::{
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    timezone: Tz,
     /* (type, name) */
     members: HashMap<(String, String), Rc<MemberSymbol>>,
 }
 
 impl Compiler {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>, timezone: Tz) -> Self {
         Self {
             cube_evaluator,
+            timezone,
             members: HashMap::new(),
         }
     }
@@ -94,7 +97,8 @@ impl Compiler {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
+        let dep_builder =
+            DependenciesBuilder::new(self, self.cube_evaluator.clone(), self.timezone.clone());
         let deps = dep_builder.build(cube_name.clone(), member_sql.clone())?;
         let sql_call = SqlCall::new(member_sql, deps);
         Ok(Rc::new(sql_call))

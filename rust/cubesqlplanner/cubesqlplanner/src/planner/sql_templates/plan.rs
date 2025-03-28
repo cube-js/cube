@@ -55,6 +55,27 @@ impl PlanSqlTemplates {
         )
     }
 
+    //FIXME duplicated with filter templates
+    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/add_interval",
+            context! {
+                date => date,
+                interval => interval
+            },
+        )
+    }
+
+    pub fn sub_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/sub_interval",
+            context! {
+                date => date,
+                interval => interval
+            },
+        )
+    }
+
     pub fn quote_string(&self, string: &str) -> Result<String, CubeError> {
         Ok(format!("'{}'", string))
     }
@@ -338,7 +359,6 @@ impl PlanSqlTemplates {
         end: &str,
         granularity: &str,
     ) -> Result<String, CubeError> {
-        let granularity = format!("1 {}", granularity);
         self.render.render_template(
             "statements/generated_time_series_select",
             context! { start => start, end => end, granularity => granularity },
