@@ -282,7 +282,7 @@ export class CubeSymbols {
   }
 
   protected prepareIncludes(cube: CubeDefinition, errorReporter: ErrorReporter, splitViews: SplitViews) {
-    if (!cube.includes && !cube.cubes) {
+    if (!cube.cubes) {
       return;
     }
 
@@ -324,18 +324,8 @@ export class CubeSymbols {
         cubeIncludes = this.membersFromCubes(cube, cubes, type, errorReporter, splitViews, memberSets) || [];
       }
 
-      // This is the deprecated approach
-      const includes = cube.includes && this.membersFromIncludeExclude(cube.includes, cube.name, type) || [];
-      const excludes = cube.excludes && this.membersFromIncludeExclude(cube.excludes, cube.name, type) || [];
-
-      // cube includes will take precedence in case of member clash
-      const finalIncludes = this.diffByMember(
-        this.diffByMember(includes, cubeIncludes).concat(cubeIncludes),
-        excludes
-      );
-
       if (type === 'hierarchies') {
-        for (const member of finalIncludes) {
+        for (const member of cubeIncludes) {
           const path = member.member.split('.');
           const cubeName = path[path.length - 2];
           const hierarchyName = path[path.length - 1];
@@ -350,10 +340,10 @@ export class CubeSymbols {
         }
       }
 
-      const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
+      const includeMembers = this.generateIncludeMembers(cubeIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
 
-      cube.includedMembers = [...(cube.includedMembers || []), ...Array.from(new Set(finalIncludes.map((it: any) => {
+      cube.includedMembers = [...(cube.includedMembers || []), ...Array.from(new Set(cubeIncludes.map((it: any) => {
         const split = it.member.split('.');
         const memberPath = this.pathFromArray([split[split.length - 2], split[split.length - 1]]);
         return {
@@ -463,22 +453,6 @@ export class CubeSymbols {
     }
 
     return includes.filter(include => !excludesMap.has(include.member));
-  }
-
-  protected membersFromIncludeExclude(referencesFn: (...args: Array<unknown>) => Array<ToString>, cubeName: string, type: string) {
-    const references = this.evaluateReferences(cubeName, referencesFn);
-    return R.unnest(references.map((ref: string) => {
-      const path = ref.split('.');
-      if (path.length === 1) {
-        const membersObj = this.symbols[path[0]]?.cubeObj()?.[type] || {};
-        return Object.keys(membersObj).map(memberName => ({ member: `${ref}.${memberName}` }));
-      } else if (path.length === 2) {
-        const resolvedMember = this.getResolvedMember(type, path[0], path[1]);
-        return resolvedMember ? [{ member: ref }] : undefined;
-      } else {
-        throw new Error(`Unexpected path length ${path.length} for ${ref}`);
-      }
-    })).filter(Boolean);
   }
 
   protected getResolvedMember(type: string, cubeName: string, memberName: string) {
