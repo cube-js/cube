@@ -57,130 +57,131 @@ describe('Schema Testing', () => {
     return { compiler, cubeEvaluator };
   };
 
-  it('valid schemas', async () => {
-    const { cubeEvaluator } = await schemaCompile();
+  describe('Cubes validations', () => {
+    it('valid schemas', async () => {
+      const { cubeEvaluator } = await schemaCompile();
 
-    expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
-      main: {
-        external: false,
-        scheduledRefresh: true,
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'originalSql',
-        refreshRangeStart: {
-          sql: expect.any(Function),
+      expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+        main: {
+          external: false,
+          scheduledRefresh: true,
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'originalSql',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
         },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
+        countCreatedAt: {
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
         },
-        allowNonStrictDateRangeMatch: true,
-      },
-      countCreatedAt: {
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-      },
-      countCreatedAtWithoutReferences: {
-        // because preview
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        segmentReferences: expect.any(Function),
-        dimensionReferences: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-        allowNonStrictDateRangeMatch: true,
-      }
+        countCreatedAtWithoutReferences: {
+          // because preview
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          segmentReferences: expect.any(Function),
+          dimensionReferences: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
+        }
+      });
     });
-  });
 
-  it('valid schemas (preview flags)', async () => {
-    process.env.CUBEJS_EXTERNAL_DEFAULT = 'true';
-    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    it('valid schemas (preview flags)', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'true';
+      process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
 
-    const { cubeEvaluator } = await schemaCompile();
+      const { cubeEvaluator } = await schemaCompile();
 
-    delete process.env.CUBEJS_EXTERNAL_DEFAULT;
-    delete process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT;
+      delete process.env.CUBEJS_EXTERNAL_DEFAULT;
+      delete process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT;
 
-    expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
-      main: {
-        external: false,
-        scheduledRefresh: true,
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'originalSql',
-        refreshRangeStart: {
-          sql: expect.any(Function),
+      expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+        main: {
+          external: false,
+          scheduledRefresh: true,
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'originalSql',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
         },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
+        countCreatedAt: {
+          // because preview
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
         },
-        allowNonStrictDateRangeMatch: true,
-      },
-      countCreatedAt: {
-        // because preview
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-      },
-      countCreatedAtWithoutReferences: {
-        // because preview
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        segmentReferences: expect.any(Function),
-        dimensionReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-        allowNonStrictDateRangeMatch: true,
-      }
+        countCreatedAtWithoutReferences: {
+          // because preview
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          segmentReferences: expect.any(Function),
+          dimensionReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
+        }
+      });
     });
-  });
 
-  it('invalid schema', async () => {
-    const logger = jest.fn();
+    it('invalid schema', async () => {
+      const logger = jest.fn();
 
-    const { compiler } = prepareJsCompiler(
-      createCubeSchema({
-        name: 'CubeA',
-        preAggregations: `
+      const { compiler } = prepareJsCompiler(
+        createCubeSchema({
+          name: 'CubeA',
+          preAggregations: `
             main: {
                 type: 'originalSql',
                 timeDimension: createdAt,
@@ -199,25 +200,102 @@ describe('Schema Testing', () => {
                 }
             },
           `
-      }),
-      {
-        omitErrors: true,
-        errorReport: {
-          logger,
+        }),
+        {
+          omitErrors: true,
+          errorReport: {
+            logger,
+          }
         }
+      );
+
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      expect(logger.mock.calls.length).toEqual(2);
+      expect(logger.mock.calls[0]).toEqual([
+        'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+      ]);
+      expect(logger.mock.calls[1]).toEqual([
+        'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+      ]);
+    });
+
+    it('throws an error on duplicate member names', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_dup_members.js'),
+        'utf8'
+      );
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/status defined more than once/);
       }
-    );
+    });
 
-    await compiler.compile();
-    compiler.throwIfAnyErrors();
+    it('throws errors for invalid pre-aggregations in yaml data model', async () => {
+      const cubes = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/validate_preaggs.yml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: cubes,
+          fileName: 'validate_preaggs.yml',
+        },
+      ]);
 
-    expect(logger.mock.calls.length).toEqual(2);
-    expect(logger.mock.calls[0]).toEqual([
-      'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
-    ]);
-    expect(logger.mock.calls[1]).toEqual([
-      'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
-    ]);
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/"preAggregations\.autoRollupFail\.maxPreAggregations" must be a number/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.partitionGranularity" must be one of/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.uniqueKeyColumns" must be an array/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupJoinFail" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupLambdaFail\.partitionGranularity" is not allowed/);
+        // TODO preAggregations.rollupFail.timeDimension - should catch that it is an array, currently not catching
+        expect(e.toString()).toMatch(/"preAggregations\.rollupFail2\.timeDimensions" must be an array/);
+      }
+    });
+
+    it('throws errors for invalid pre-aggregations in js data model', async () => {
+      const cubes = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/validate_preaggs.js'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: cubes,
+          fileName: 'validate_preaggs.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/"preAggregations\.autoRollupFail\.maxPreAggregations" must be a number/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.partitionGranularity" must be one of/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.uniqueKeyColumns" must be an array/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupJoinFail" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupLambdaFail\.partitionGranularity" is not allowed/);
+        // TODO preAggregations.rollupFail.timeDimension - should catch that it is an array, currently not catching
+        expect(e.toString()).toMatch(/"preAggregations\.rollupFail2\.timeDimensions" must be an array/);
+      }
+    });
   });
 
   it('visibility modifier', async () => {
@@ -374,26 +452,6 @@ describe('Schema Testing', () => {
       CubeC: { relationship: 'hasMany' },
       CubeD: { relationship: 'belongsTo' }
     });
-  });
-
-  it('throws an error on duplicate member names', async () => {
-    const orders = fs.readFileSync(
-      path.join(process.cwd(), '/test/unit/fixtures/orders_dup_members.js'),
-      'utf8'
-    );
-
-    const { compiler } = prepareCompiler([
-      {
-        content: orders,
-        fileName: 'orders.js',
-      },
-    ]);
-
-    try {
-      await compiler.compile();
-    } catch (e: any) {
-      expect(e.toString()).toMatch(/status defined more than once/);
-    }
   });
 
   describe('Access Policies', () => {
