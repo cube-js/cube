@@ -160,7 +160,6 @@ impl QueryDateTime {
                 aligned = offset.clone();
                 offset = offset.add_interval(interval)?;
             }
-            println!("offset: {:?}, aligned: {:?}", offset, aligned);
 
             if &offset == self {
                 aligned = offset;
