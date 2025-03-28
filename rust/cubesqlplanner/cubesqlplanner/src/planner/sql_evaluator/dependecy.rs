@@ -108,7 +108,7 @@ impl<'a> DependenciesBuilder<'a> {
                 result.push(Dependency::SymbolDependency(
                     self.build_evaluator(&cube_name, &dep.name)?,
                 ));
-            } else if self.check_if_it_cube(&dep.name)? {
+            } else if self.check_cube_exists(&dep.name)? {
                 let dep = self.build_cube_dependency(&cube_name, i, &call_deps, &childs)?;
                 result.push(Dependency::CubeDependency(dep));
             } else {
@@ -150,7 +150,7 @@ impl<'a> DependenciesBuilder<'a> {
         Ok(childs_tree)
     }
 
-    fn check_if_it_cube(&self, cube_name: &String) -> Result<bool, CubeError> {
+    fn check_cube_exists(&self, cube_name: &String) -> Result<bool, CubeError> {
         if self.is_current_cube(cube_name) {
             Ok(true)
         } else {
@@ -232,7 +232,7 @@ impl<'a> DependenciesBuilder<'a> {
             } else {
                 let child_dep = if call_childs[*child_ind].is_empty() {
                     CubeDepProperty::SymbolDependency(self.build_evaluator(&new_cube_name, &name)?)
-                } else if self.check_if_it_cube(name)? {
+                } else if self.check_cube_exists(name)? {
                     CubeDepProperty::CubeDependency(self.build_cube_dependency(
                         &new_cube_name,
                         *child_ind,

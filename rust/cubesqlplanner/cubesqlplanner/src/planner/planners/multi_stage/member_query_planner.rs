@@ -125,7 +125,7 @@ impl MultiStageMemberQueryPlanner {
         let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
 
         let ts_date_range = if templates.supports_generated_time_series() {
-            if let Some(date_range) = time_dimension.get_range_for_time_seiories()? {
+            if let Some(date_range) = time_dimension.get_range_for_time_series()? {
                 TimeSeriesDateRange::Filter(date_range.0.clone(), date_range.1.clone())
             } else {
                 if let Some(date_range_cte) = &time_series_description.date_range_cte {

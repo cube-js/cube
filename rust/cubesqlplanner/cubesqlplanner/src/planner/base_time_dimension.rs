@@ -162,7 +162,7 @@ impl BaseTimeDimension {
         self.date_range.clone()
     }
 
-    pub fn get_range_for_time_seiories(&self) -> Result<Option<(String, String)>, CubeError> {
+    pub fn get_range_for_time_series(&self) -> Result<Option<(String, String)>, CubeError> {
         let res = if let Some(date_range) = &self.date_range {
             if date_range.len() != 2 {
                 return Err(CubeError::user(format!(
