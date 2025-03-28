@@ -688,7 +688,7 @@ jobs:
           file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
-          tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
+          tags: localhost:5000/minusetcortex/cube:${{ matrix.tag }}
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/

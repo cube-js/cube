@@ -123,13 +123,13 @@ jobs:
           file: ./packages/cubejs-docker/dev.Dockerfile
           platforms: linux/amd64
           push: true
-          tags: cubejs/cube:dev
+          tags: minusetcortex/cube:dev
       - name: Update repo description
         uses: peter-evans/dockerhub-description@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: cubejs/cube
+          repository: minusetcortex/cube
           readme-filepath: ./packages/cubejs-docker/README.md
 
   trigger-test-suites:
@@ -154,7 +154,7 @@ jobs:
               workflow_id: 'test_and_run_test_suites.yml',
               ref: 'main',
               inputs: {
-                'cube-image': 'cubejs/cube:dev',
+                'cube-image': 'minusetcortex/cube:dev',
                 'source-repo': context.repo.repo,
                 'source-pr-url': prUrl,
                 'source-commit-url': commitUrl,

@@ -332,7 +332,7 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          DOCKER_IMAGE=cubejs/cube
+          DOCKER_IMAGE=minusetcortex/cube
           VERSION=noop
 
           if [ "${{ github.event_name }}" = "schedule" ]; then
@@ -411,7 +411,7 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          DOCKER_IMAGE=cubejs/cube
+          DOCKER_IMAGE=minusetcortex/cube
           VERSION=noop
 
           if [ "${{ github.event_name }}" = "schedule" ]; then
@@ -785,7 +785,7 @@ jobs:
               workflow_id: 'test_and_run_test_suites.yml',
               ref: 'main',
               inputs: {
-                'cube-image': 'cubejs/cube:latest',
+                'cube-image': 'minusetcortex/cube:latest',
                 'source-repo': context.repo.repo,
                 'source-pr-url': prUrl,
                 'source-commit-url': commitUrl,
