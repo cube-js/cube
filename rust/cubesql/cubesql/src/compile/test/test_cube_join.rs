@@ -497,8 +497,8 @@ async fn test_join_cubes_on_wrong_field_error() {
     let query = convert_sql_to_cube_query(
         &r#"
             SELECT *
-            FROM KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read)
+            FROM (SELECT customer_gender, has_subscription FROM KibanaSampleDataEcommerce) kibana
+            LEFT JOIN (SELECT read, content FROM Logs) logs ON (kibana.has_subscription = logs.read)
             "#
         .to_string(),
         meta.clone(),
@@ -564,115 +564,5 @@ async fn test_join_cubes_with_aggr_error() {
             • one of the cubes contains a measure\n\
             • the cube on the right contains a filter, sorting or limits\n\
             . Please check logs for additional information.".to_string()
-    )
-}
-
-#[tokio::test]
-async fn test_join_cubes_with_postprocessing() {
-    if !Rewriter::sql_push_down_enabled() {
-        return;
-    }
-    init_testing_logger();
-
-    let logical_plan = convert_select_to_query_plan(
-        r#"
-            SELECT *
-            FROM (SELECT count(count), __cubeJoinField, extract(MONTH from order_date) FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
-            "#
-            .to_string(),
-        DatabaseProtocol::PostgreSQL,
-    )
-        .await
-        .as_logical_plan();
-
-    let cube_scans = logical_plan
-        .find_cube_scans()
-        .iter()
-        .map(|cube| cube.request.clone())
-        .collect::<Vec<V1LoadRequestQuery>>();
-
-    assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-            dimensions: Some(vec![]),
-            segments: Some(vec![]),
-            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                granularity: Some("month".to_string()),
-                date_range: None,
-            }]),
-            order: Some(vec![]),
-            ..Default::default()
-        }),
-        true
-    );
-
-    assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec![]),
-            dimensions: Some(vec!["Logs.read".to_string()]),
-            segments: Some(vec![]),
-            order: Some(vec![]),
-            ungrouped: Some(true),
-            ..Default::default()
-        }),
-        true
-    )
-}
-
-#[tokio::test]
-async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
-    if !Rewriter::sql_push_down_enabled() {
-        return;
-    }
-    init_testing_logger();
-
-    let logical_plan = convert_select_to_query_plan(
-        r#"
-            SELECT *
-            FROM (SELECT count(count), extract(MONTH from order_date), taxful_total_price FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT id, read FROM Logs) Logs ON (KibanaSampleDataEcommerce.taxful_total_price = Logs.id)
-            "#
-            .to_string(),
-        DatabaseProtocol::PostgreSQL,
-    )
-        .await
-        .as_logical_plan();
-
-    let cube_scans = logical_plan
-        .find_cube_scans()
-        .iter()
-        .map(|cube| cube.request.clone())
-        .collect::<Vec<V1LoadRequestQuery>>();
-
-    assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-            dimensions: Some(vec![
-                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-            ]),
-            segments: Some(vec![]),
-            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                granularity: Some("month".to_string()),
-                date_range: None,
-            }]),
-            order: Some(vec![]),
-            ..Default::default()
-        }),
-        true
-    );
-
-    assert_eq!(
-        cube_scans.contains(&V1LoadRequestQuery {
-            measures: Some(vec![]),
-            dimensions: Some(vec!["Logs.id".to_string(), "Logs.read".to_string(),]),
-            segments: Some(vec![]),
-            order: Some(vec![]),
-            ungrouped: Some(true),
-            ..Default::default()
-        }),
-        true
     )
 }

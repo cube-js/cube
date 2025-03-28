@@ -3140,3 +3140,170 @@ async fn test_metabase_introspection_indoption() -> Result<(), CubeError> {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn test_metabase_v0_51_2_introspection_field_indoption() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "test_metabase_v0_51_2_introspection_field_indoption",
+        execute_query(
+            // language=PostgreSQL
+            r#"
+            SELECT
+            c.column_name AS name,
+            c.udt_name AS database_type,
+            c.ordinal_position - 1 AS database_position,
+            c.table_schema AS table_schema,
+            c.table_name AS table_name,
+            pk.column_name IS NOT NULL AS pk,
+            COL_DESCRIPTION(
+                CAST(
+                    CAST(
+                        FORMAT(
+                        '%I.%I',
+                        CAST(c.table_schema AS TEXT),
+                        CAST(c.table_name AS TEXT)
+                        ) AS REGCLASS
+                    ) AS OID
+                ),
+                c.ordinal_position
+            ) AS field_comment,
+            (
+                (column_default IS NULL)
+                OR (LOWER(column_default) = 'null')
+            )
+            AND (is_nullable = 'NO')
+            AND NOT (
+                (
+                (column_default IS NOT NULL)
+                AND (column_default LIKE '%nextval(%')
+                )
+                OR (is_identity <> 'NO')
+            ) AS database_required,
+            (
+                (column_default IS NOT NULL)
+                AND (column_default LIKE '%nextval(%')
+            )
+            OR (is_identity <> 'NO') AS database_is_auto_increment
+            FROM
+            information_schema.columns AS c
+            LEFT JOIN (
+                SELECT
+                tc.table_schema,
+                tc.table_name,
+                kc.column_name
+                FROM
+                information_schema.table_constraints AS tc
+                INNER JOIN information_schema.key_column_usage AS kc ON (tc.constraint_name = kc.constraint_name)
+                AND (tc.table_schema = kc.table_schema)
+                AND (tc.table_name = kc.table_name)
+                WHERE
+                tc.constraint_type = 'PRIMARY KEY'
+            ) AS pk ON (c.table_schema = pk.table_schema)
+            AND (c.table_name = pk.table_name)
+            AND (c.column_name = pk.column_name)
+            WHERE
+            c.table_schema !~ '^information_schema|catalog_history|pg_'
+            AND (c.table_schema IN ('public'))
+            ORDER BY
+            table_schema ASC,
+              table_name ASC,
+              database_position ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_metabase_v0_51_8_introspection() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "test_metabase_v0_51_8_introspection",
+        execute_query(
+            // language=PostgreSQL
+            r#"
+select
+    "c"."column_name" as "name",
+    case
+        when "c"."udt_schema" in ('public', 'pg_catalog')
+        then format('%s', "c"."udt_name")
+        else format('"%s"."%s"', "c"."udt_schema", "c"."udt_name")
+    end as "database-type",
+    "c"."ordinal_position" - 1 as "database-position",
+    "c"."table_schema" as "table-schema",
+    "c"."table_name" as "table-name",
+    "pk"."column_name" is not null as "pk?",
+    col_description(
+        cast(
+            cast(
+                format(
+                    '%I.%I',
+                    cast("c"."table_schema" as text),
+                    cast("c"."table_name" as text)
+                ) as regclass
+            ) as oid
+        ),
+        "c"."ordinal_position"
+    ) as "field-comment",
+    (("column_default" is null) or (lower("column_default") = 'null'))
+    and ("is_nullable" = 'NO')
+    and not (
+        (("column_default" is not null) and ("column_default" like '%nextval(%'))
+        or ("is_identity" <> 'NO')
+    ) as "database-required",
+    (("column_default" is not null) and ("column_default" like '%nextval(%'))
+    or ("is_identity" <> 'NO') as "database-is-auto-increment"
+from "information_schema"."columns" as "c"
+left join
+    (
+        select "tc"."table_schema", "tc"."table_name", "kc"."column_name"
+        from "information_schema"."table_constraints" as "tc"
+        inner join
+            "information_schema"."key_column_usage" as "kc"
+            on ("tc"."constraint_name" = "kc"."constraint_name")
+            and ("tc"."table_schema" = "kc"."table_schema")
+            and ("tc"."table_name" = "kc"."table_name")
+        where "tc"."constraint_type" = 'PRIMARY KEY'
+    ) as "pk"
+    on ("c"."table_schema" = "pk"."table_schema")
+    and ("c"."table_name" = "pk"."table_name")
+    and ("c"."column_name" = "pk"."column_name")
+where
+    c.table_schema !~ '^information_schema|catalog_history|pg_'
+    and ("c"."table_schema" in ('public'))
+union all
+select
+    "pa"."attname" as "name",
+    case
+        when "ptn"."nspname" in ('public', 'pg_catalog')
+        then format('%s', "pt"."typname")
+        else format('"%s"."%s"', "ptn"."nspname", "pt"."typname")
+    end as "database-type",
+    "pa"."attnum" - 1 as "database-position",
+    "pn"."nspname" as "table-schema",
+    "pc"."relname" as "table-name",
+    false as "pk?",
+    null as "field-comment",
+    false as "database-required",
+    false as "database-is-auto-increment"
+from "pg_catalog"."pg_class" as "pc"
+inner join "pg_catalog"."pg_namespace" as "pn" on "pn"."oid" = "pc"."relnamespace"
+inner join "pg_catalog"."pg_attribute" as "pa" on "pa"."attrelid" = "pc"."oid"
+inner join "pg_catalog"."pg_type" as "pt" on "pt"."oid" = "pa"."atttypid"
+inner join "pg_catalog"."pg_namespace" as "ptn" on "ptn"."oid" = "pt"."typnamespace"
+where ("pc"."relkind" = 'm') and ("pa"."attnum" >= 1) and ("pn"."nspname" in ('public'))
+order by "table-schema" asc, "table-name" asc, "database-position" asc
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+    Ok(())
+}

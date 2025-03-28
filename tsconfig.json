@@ -59,6 +59,9 @@
       "path": "packages/cubejs-duckdb-driver"
     },
     {
+      "path": "packages/cubejs-dremio-driver"
+    },
+    {
       "path": "packages/cubejs-questdb-driver"
     },
     {

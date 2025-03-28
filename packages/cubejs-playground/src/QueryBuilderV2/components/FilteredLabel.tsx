@@ -17,10 +17,22 @@ export function FilteredLabel({ text, filter }: FilteredLabelProps) {
 
   filter = filter.toLowerCase();
 
-  const index = lowerText.indexOf(filter);
+  let index = lowerText.indexOf(filter);
 
   if (index === -1) {
-    return <>{text}</>;
+    filter = filter.replace(/\s/g, '_');
+
+    index = lowerText.indexOf(filter);
+
+    if (index === -1) {
+      filter = filter.replace(/_/g, ' ');
+
+      index = lowerText.indexOf(filter);
+
+      if (index === -1) {
+        return <>{text}</>;
+      }
+    }
   }
 
   const startPart = text.slice(0, index);

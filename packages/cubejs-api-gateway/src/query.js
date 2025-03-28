@@ -6,9 +6,10 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
 import { QueryType } from './types/enums';
+import { PreAggsJobsRequest } from "./types/request";
 
 const getQueryGranularity = (queries) => R.pipe(
-  R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
+  R.map(({ timeDimensions }) => timeDimensions[0]?.granularity),
   R.filter(Boolean),
   R.uniq
 )(queries);
@@ -40,7 +41,7 @@ const getPivotQuery = (queryType, queries) => {
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
+const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
 const parsedMemberExpression = Joi.object().keys({
   expression: Joi.array().items(Joi.string()).min(1).required(),
   cubeName: Joi.string().required(),
@@ -96,6 +97,15 @@ const oneCondition = Joi.object().keys({
   and: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
 }).xor('or', 'and');
 
+const subqueryJoin = Joi.object().keys({
+  sql: Joi.string(),
+  // TODO This is _always_ a member expression, maybe pass as parsed, without intermediate string?
+  // TODO there are three different types instead of alternatives for this actually
+  on: Joi.alternatives(Joi.string(), memberExpression, parsedMemberExpression),
+  joinType: Joi.string().valid('LEFT', 'INNER'),
+  alias: Joi.string(),
+});
+
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
   measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
@@ -122,6 +132,7 @@ const querySchema = Joi.object().keys({
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
+  subqueryJoins: Joi.array().items(subqueryJoin),
 });
 
 const normalizeQueryOrder = order => {
@@ -134,6 +145,36 @@ const normalizeQueryOrder = order => {
   }
   return result;
 };
+
+export const preAggsJobsRequestSchema = Joi.object({
+  action: Joi.string().valid('post', 'get').required(),
+  selector: Joi.when('action', {
+    is: 'post',
+    then: Joi.object({
+      contexts: Joi.array().items(
+        Joi.object({
+          securityContext: Joi.required(),
+        })
+      ).min(1).required(),
+      timezones: Joi.array().items(Joi.string()).min(1).required(),
+      dataSources: Joi.array().items(Joi.string()),
+      cubes: Joi.array().items(Joi.string()),
+      preAggregations: Joi.array().items(Joi.string()),
+      dateRange: Joi.array().length(2).items(Joi.string()),
+    }).optional(),
+    otherwise: Joi.forbidden(),
+  }),
+  tokens: Joi.when('action', {
+    is: 'get',
+    then: Joi.array().items(Joi.string()).min(1).required(),
+    otherwise: Joi.forbidden(),
+  }),
+  resType: Joi.when('action', {
+    is: 'get',
+    then: Joi.string().valid('object').optional(),
+    otherwise: Joi.forbidden(),
+  }),
+});
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
@@ -186,9 +227,9 @@ const normalizeQuery = (query, persistent) => {
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
-  const validQuery = query.measures && query.measures.length ||
-    query.dimensions && query.dimensions.length ||
-    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
+  const validQuery = query.measures?.length ||
+    query.dimensions?.length ||
+    query.timeDimensions?.filter(td => !!td.granularity).length;
   if (!validQuery) {
     throw new UserError(
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
@@ -280,6 +321,7 @@ const queryPreAggregationsSchema = Joi.object().keys({
   preAggregations: Joi.array().items(Joi.object().keys({
     id: Joi.string().required(),
     cacheOnly: Joi.boolean(),
+    metaOnly: Joi.boolean(),
     partitions: Joi.array().items(Joi.string()),
     refreshRange: Joi.array().items(Joi.string()).length(2), // TODO: Deprecate after cloud changes
   }))

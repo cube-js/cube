@@ -1,14 +1,19 @@
+import { ReactNode } from 'react';
+
 import { getTypeIcon } from '../utils';
+import { MemberViewType } from '../types';
+import { useShownMemberName } from '../hooks';
 
 import { MemberLabelText } from './MemberLabelText';
 import { MemberBadge } from './Badge';
 
 function StyledTypeIcon(props: {
-  member: 'measure' | 'dimension' | 'timeDimension' | 'missing';
-  type: 'number' | 'string' | 'time' | 'boolean' | 'filter';
+  isMissing?: boolean;
+  memberType: 'measure' | 'dimension' | 'timeDimension' | 'segment';
+  type?: 'number' | 'string' | 'time' | 'boolean' | 'filter';
 }) {
-  const { type, member } = props;
-  const memberColorName = member === 'missing' ? 'danger' : member;
+  const { type, memberType, isMissing } = props;
+  const memberColorName = isMissing ? 'danger' : memberType;
 
   return (
     <span
@@ -18,43 +23,73 @@ function StyledTypeIcon(props: {
         placeSelf: 'center',
       }}
     >
-      {getTypeIcon(type || 'number')}
+      {getTypeIcon(type)}
     </span>
   );
 }
 
 interface MemberLabelProps {
   name: string;
-  member?: 'measure' | 'dimension' | 'timeDimension';
+  memberName?: string;
+  cubeName?: string;
+  memberTitle?: string;
+  cubeTitle?: string;
+  memberViewType?: MemberViewType;
+  isCompact?: boolean;
+  memberType?: 'measure' | 'dimension' | 'timeDimension' | 'segment';
   type?: 'number' | 'string' | 'time' | 'boolean' | 'filter';
+  isMissing?: boolean;
+  children?: ReactNode;
 }
 
 export function MemberLabel(props: MemberLabelProps) {
-  const { name, member, type } = props;
-
+  const {
+    name,
+    cubeName = props.name.split('.')[0],
+    cubeTitle,
+    memberName = props.name.split('.')[1],
+    memberTitle,
+    isCompact,
+    memberType,
+    type,
+    memberViewType,
+    isMissing,
+    children,
+  } = props;
   const arr = name.split('.');
 
+  const { shownMemberName, shownCubeName } = useShownMemberName({
+    cubeName,
+    cubeTitle,
+    memberName,
+    memberTitle,
+    type: memberViewType,
+  });
+
   return (
-    <MemberLabelText data-member={member}>
-      {type && member ? <StyledTypeIcon type={type} member={member} /> : null}
-      {arr.length > 1 ? (
+    <MemberLabelText data-member={memberType} mods={{ missing: isMissing }}>
+      {memberType ? (
+        <StyledTypeIcon isMissing={isMissing} type={type} memberType={memberType} />
+      ) : null}
+      {!isCompact || !cubeName ? (
         <>
           <span data-element="Name">
-            <span data-element="CubeName">{arr[0]}</span>
-            <span data-element="Divider">.</span>
-            <span data-element="MemberName">{arr[1]}</span>
+            <span data-element="CubeName">{shownCubeName}</span>
+            <span data-element="Divider">{memberViewType === 'name' ? '.' : <>&nbsp;</>}</span>
+            <span data-element="MemberName">{shownMemberName}</span>
           </span>
           {arr[2] ? (
             <span data-element="Grouping">
-              <MemberBadge isSpecial type={member}>
+              <MemberBadge isSpecial type={memberType}>
                 {arr[2]}
               </MemberBadge>
             </span>
           ) : null}
         </>
       ) : (
-        <span data-element="MemberName">{name}</span>
+        <span data-element="MemberName">{shownMemberName}</span>
       )}
+      {children}
     </MemberLabelText>
   );
 }

@@ -1,6 +1,6 @@
 import { RefObject, useEffect, useState } from 'react';
 
-export function useHasOverflow(ref: RefObject<HTMLDivElement>) {
+export function useHasOverflow(ref?: RefObject<HTMLDivElement>) {
   const [hasOverflow, setHasOverflow] = useState(false);
 
   useEffect(() => {
@@ -10,6 +10,10 @@ export function useHasOverflow(ref: RefObject<HTMLDivElement>) {
 
       setHasOverflow(hasOverflow);
     };
+
+    if (!ref) {
+      setHasOverflow(false);
+    }
 
     element?.addEventListener('mouseenter', handler);
 

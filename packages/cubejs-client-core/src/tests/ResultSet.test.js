@@ -1418,6 +1418,126 @@ describe('ResultSet', () => {
       ]);
     });
 
+    test('fill missing dates with custom value', () => {
+          const resultSet = new ResultSet({
+            query: {
+              measures: ['Orders.total'],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                  granularity: 'day',
+                  dateRange: ['2020-01-08T00:00:00.000', '2020-01-11T23:59:59.999']
+                }
+              ],
+              filters: [],
+              timezone: 'UTC'
+            },
+            data: [
+              {
+                'Orders.createdAt': '2020-01-08T00:00:00.000',
+                'Orders.total': 1
+              },
+              {
+                'Orders.createdAt': '2020-01-10T00:00:00.000',
+                'Orders.total': 10
+              }
+            ],
+            annotation: {
+              measures: {},
+              dimensions: {},
+              segments: {},
+              timeDimensions: {
+                'Orders.createdAt': {
+                  title: 'Orders Created at',
+                  shortTitle: 'Created at',
+                  type: 'time'
+                }
+              }
+            }
+          });
+
+          expect(resultSet.tablePivot({
+            'fillWithValue': 5
+          })).toEqual([
+            {
+              'Orders.createdAt.day': '2020-01-08T00:00:00.000',
+              'Orders.total': 1
+            },
+            {
+              'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+              'Orders.total': 5
+            },
+            {
+              'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+              'Orders.total': 10
+            },
+            {
+              'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+              'Orders.total': 5
+            }
+          ]);
+        });
+
+    test('fill missing dates with custom string', () => {
+              const resultSet = new ResultSet({
+                query: {
+                  measures: ['Orders.total'],
+                  timeDimensions: [
+                    {
+                      dimension: 'Orders.createdAt',
+                      granularity: 'day',
+                      dateRange: ['2020-01-08T00:00:00.000', '2020-01-11T23:59:59.999']
+                    }
+                  ],
+                  filters: [],
+                  timezone: 'UTC'
+                },
+                data: [
+                  {
+                    'Orders.createdAt': '2020-01-08T00:00:00.000',
+                    'Orders.total': 1
+                  },
+                  {
+                    'Orders.createdAt': '2020-01-10T00:00:00.000',
+                    'Orders.total': 10
+                  }
+                ],
+                annotation: {
+                  measures: {},
+                  dimensions: {},
+                  segments: {},
+                  timeDimensions: {
+                    'Orders.createdAt': {
+                      title: 'Orders Created at',
+                      shortTitle: 'Created at',
+                      type: 'time'
+                    }
+                  }
+                }
+              });
+
+              expect(resultSet.tablePivot({
+                'fillWithValue': 'N/A'
+              })).toEqual([
+                {
+                  'Orders.createdAt.day': '2020-01-08T00:00:00.000',
+                  'Orders.total': 1
+                },
+                {
+                  'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+                  'Orders.total': "N/A"
+                },
+                {
+                  'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+                  'Orders.total': 10
+                },
+                {
+                  'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+                  'Orders.total': "N/A"
+                }
+              ]);
+            });
+
     test('same dimension and time dimension without granularity', () => {
       const resultSet = new ResultSet({
         query: {

@@ -1,10 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7198
-expression: "execute_queries_with_flags(vec![\"SET user = 'good_user'\".to_string(),\n                    \"select current_user\".to_string()],\n                DatabaseProtocol::PostgreSQL).await?.0"
+expression: "execute_queries_with_flags(vec![\"SET user = 'good_user'\".to_string(),\n\"select current_user\".to_string()], DatabaseProtocol::PostgreSQL).await? .0"
 ---
-+----------------+
-| current_user() |
-+----------------+
-| good_user      |
-+----------------+
++--------------+
+| current_user |
++--------------+
+| good_user    |
++--------------+

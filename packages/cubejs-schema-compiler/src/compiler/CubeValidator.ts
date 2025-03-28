@@ -627,18 +627,28 @@ const PolicyFilterSchema = Joi.object().keys({
     'notStartsWith',
     'endsWith',
     'notEndsWith',
+    'in',
+    'notIn',
     'gt',
     'gte',
     'lt',
     'lte',
+    'set',
+    'notSet',
     'inDateRange',
     'notInDateRange',
+    'onTheDate',
     'beforeDate',
     'beforeOrOnDate',
     'afterDate',
     'afterOrOnDate',
+    'measureFilter',
   ).required(),
-  values: Joi.func().required(),
+  values: Joi.when('operator', {
+    is: Joi.valid('set', 'notSet'),
+    then: Joi.func().optional(),
+    otherwise: Joi.func().required()
+  })
 });
 
 const PolicyFilterConditionSchema = Joi.object().keys({
@@ -745,10 +755,12 @@ const baseSchema = {
   )),
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
-  hierarchies: Joi.array().items(Joi.object().keys({
+  folders: Joi.array().items(Joi.object().keys({
     name: Joi.string().required(),
-    title: Joi.string(),
-    levels: Joi.func()
+    includes: Joi.alternatives([
+      Joi.string().valid('*'),
+      Joi.array().items(Joi.string().required())
+    ]).required(),
   })),
   accessPolicy: Joi.array().items(RolePolicySchema.required()),
 };
@@ -756,6 +768,11 @@ const baseSchema = {
 const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
+  hierarchies: Joi.object().pattern(identifierRegex, Joi.object().keys({
+    title: Joi.string(),
+    public: Joi.boolean().strict(),
+    levels: Joi.func()
+  }))
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
@@ -786,6 +803,7 @@ const viewSchema = inherit(baseSchema, {
     })
   ),
   accessPolicy: Joi.array().items(RolePolicySchema.required()),
+  hierarchies: Joi.any()
 });
 
 function formatErrorMessageFromDetails(explain, d) {

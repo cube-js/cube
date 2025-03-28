@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "1.0.2",
+  "version": "1.2.27",
   "engines": {},
   "repository": {
     "type": "git",
@@ -33,6 +33,7 @@
     "@apollo/client": "^3.11.4",
     "@graphiql/toolkit": "^0.4.3",
     "anser": "^2.1.1",
+    "best-effort-json-parser": "^1.1.2",
     "camel-case": "^4.1.2",
     "codesandbox-import-utils": "^2.1.1",
     "cron-validator": "^1.2.1",
@@ -57,6 +58,7 @@
     "react-responsive": "^8.0.1",
     "react-router-dom": "^5.1.2",
     "recharts": "^2.12.7",
+    "recursive-readdir": "2.2.3",
     "sql-formatter": "^3.1.0",
     "throttle-debounce": "^3.0.1",
     "uuid": "^8.3.2",
@@ -65,9 +67,9 @@
   "devDependencies": {
     "@ant-design/compatible": "^1.0.1",
     "@ant-design/icons": "^5.3.5",
-    "@cube-dev/ui-kit": "0.38.0",
-    "@cubejs-client/core": "^1.0.0",
-    "@cubejs-client/react": "^1.0.0",
+    "@cube-dev/ui-kit": "0.52.3",
+    "@cubejs-client/core": "1.2.27",
+    "@cubejs-client/react": "1.2.27",
     "@types/flexsearch": "^0.7.3",
     "@types/node": "^18",
     "@types/react": "^18.3.4",
@@ -96,7 +98,7 @@
   },
   "peerDependencies": {
     "@ant-design/icons": ">=4.7.0",
-    "@cube-dev/ui-kit": ">=0.37.2",
+    "@cube-dev/ui-kit": ">=0.52.3",
     "@cubejs-client/core": ">=0.30.0",
     "@cubejs-client/react": ">=0.30.0",
     "antd": ">=4.16.13",

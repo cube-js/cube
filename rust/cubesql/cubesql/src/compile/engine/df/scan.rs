@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotation};
+use cubeclient::models::{V1LoadRequestQuery, V1LoadResponse};
 pub use datafusion::{
     arrow::{
         array::{
@@ -30,7 +30,7 @@ use std::{
 
 use crate::{
     compile::{
-        engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
+        engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
         rewrite::WrappedSelectType,
         test::find_cube_scans_deep_search,
     },
@@ -52,7 +52,7 @@ use datafusion::{
     logical_plan::JoinType,
     scalar::ScalarValue,
 };
-use serde_json::{json, Value};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MemberField {
@@ -162,7 +162,15 @@ pub struct WrappedSelectNode {
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
     pub distinct: bool,
-    pub ungrouped: bool,
+
+    /// States if this node actually a query to Cube or not.
+    /// When `false` this node will generate SQL on its own, using its fields and templates.
+    /// When `true` this node will generate SQL with load query to JS side of Cube.
+    /// It expects to be flattened: `from` is expected to be ungrouped CubeScan.
+    /// There's no point in doing this for grouped CubeScan, we can just use load query from that CubeScan and SQL API generation on top.
+    /// Load query generated for this case can be grouped when this node is an aggregation.
+    /// Most fields will be rendered as a member expressions in generated load query.
+    pub push_to_cube: bool,
 }
 
 impl WrappedSelectNode {
@@ -183,7 +191,7 @@ impl WrappedSelectNode {
         order_expr: Vec<Expr>,
         alias: Option<String>,
         distinct: bool,
-        ungrouped: bool,
+        push_to_cube: bool,
     ) -> Self {
         Self {
             schema,
@@ -202,7 +210,7 @@ impl WrappedSelectNode {
             order_expr,
             alias,
             distinct,
-            ungrouped,
+            push_to_cube,
         }
     }
 }
@@ -273,11 +281,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             .map(|i| Arc::new(inputs[i].clone()))
             .collect::<Vec<_>>();
         let mut joins_expr = vec![];
-        let join_types = self
-            .joins
-            .iter()
-            .map(|(_, _, t)| t.clone())
-            .collect::<Vec<_>>();
+        let join_types = self.joins.iter().map(|(_, _, t)| *t).collect::<Vec<_>>();
         let mut filter_expr = vec![];
         let mut having_expr = vec![];
         let mut order_expr = vec![];
@@ -324,7 +328,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
 
         Arc::new(WrappedSelectNode::new(
             self.schema.clone(),
-            self.select_type.clone(),
+            self.select_type,
             projection_expr,
             self.subqueries.clone(),
             group_expr,
@@ -344,7 +348,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             order_expr,
             alias,
             self.distinct,
-            self.ungrouped,
+            self.push_to_cube,
         ))
     }
 }
@@ -386,35 +390,32 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     config_obj: self.config_obj.clone(),
                 }))
             } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                return Err(DataFusionError::Internal(format!(
+                    "CubeScanWrapperNode is not executable, SQL should be generated first with QueryEngine::evaluate_wrapped_sql: {:?}",
+                    wrapper_node
+                )));
+            } else if let Some(wrapped_sql_node) =
+                node.as_any().downcast_ref::<CubeScanWrappedSqlNode>()
+            {
                 // TODO
                 // assert_eq!(logical_inputs.len(), 0, "Inconsistent number of inputs");
                 // assert_eq!(physical_inputs.len(), 0, "Inconsistent number of inputs");
                 let scan_node =
-                    find_cube_scans_deep_search(wrapper_node.wrapped_plan.clone(), false)
+                    find_cube_scans_deep_search(wrapped_sql_node.wrapped_plan.clone(), false)
                         .into_iter()
                         .next()
                         .ok_or(DataFusionError::Internal(format!(
                             "No cube scans found in wrapper node: {:?}",
-                            wrapper_node
+                            wrapped_sql_node
                         )))?;
 
-                let schema = SchemaRef::new(wrapper_node.schema().as_ref().into());
+                let schema = SchemaRef::new(wrapped_sql_node.schema().as_ref().into());
                 Some(Arc::new(CubeScanExecutionPlan {
                     schema,
-                    member_fields: wrapper_node.member_fields.as_ref().ok_or_else(|| {
-                        DataFusionError::Internal(format!(
-                            "Member fields are not set for wrapper node. Optimization wasn't performed: {:?}",
-                            wrapper_node
-                        ))
-                    })?.clone(),
+                    member_fields: wrapped_sql_node.member_fields.clone(),
                     transport: self.transport.clone(),
-                    request: wrapper_node.request.clone().unwrap_or(scan_node.request.clone()),
-                    wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
-                        DataFusionError::Internal(format!(
-                            "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
-                            wrapper_node
-                        ))
-                    })?.clone()),
+                    request: wrapped_sql_node.request.clone(),
+                    wrapped_sql: Some(wrapped_sql_node.wrapped_sql.clone()),
                     auth_context: scan_node.auth_context.clone(),
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
@@ -650,27 +651,22 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             )));
         }
 
-        let mut response = JsonValueObject::new(
-            load_data(
-                self.span_id.clone(),
-                request,
-                self.auth_context.clone(),
-                self.transport.clone(),
-                meta.clone(),
-                self.options.clone(),
-                self.wrapped_sql.clone(),
-            )
-            .await?
-            .data,
-        );
-        one_shot_stream.data = Some(
-            transform_response(
-                &mut response,
-                one_shot_stream.schema.clone(),
-                &one_shot_stream.member_fields,
-            )
-            .map_err(|e| DataFusionError::Execution(e.message.to_string()))?,
-        );
+        let response = load_data(
+            self.span_id.clone(),
+            request,
+            self.auth_context.clone(),
+            self.transport.clone(),
+            meta.clone(),
+            self.schema.clone(),
+            self.member_fields.clone(),
+            self.options.clone(),
+            self.wrapped_sql.clone(),
+        )
+        .await?;
+
+        // For now execute method executes only one query at a time, so we
+        // take the first result
+        one_shot_stream.data = Some(response.first().unwrap().clone());
 
         Ok(Box::pin(CubeScanStreamRouter::new(
             None,
@@ -746,11 +742,7 @@ impl CubeScanOneShotStream {
     }
 
     fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
-        if let Some(batch) = self.data.take() {
-            Some(Ok(batch))
-        } else {
-            None
-        }
+        self.data.take().map(Ok)
     }
 }
 
@@ -839,9 +831,11 @@ async fn load_data(
     auth_context: AuthContextRef,
     transport: Arc<dyn TransportService>,
     meta: LoadRequestMeta,
+    schema: SchemaRef,
+    member_fields: Vec<MemberField>,
     options: CubeScanOptions,
     sql_query: Option<SqlQuery>,
-) -> ArrowResult<V1LoadResult> {
+) -> ArrowResult<Vec<RecordBatch>> {
     let no_members_query = request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
         && request.dimensions.as_ref().map(|v| v.len()).unwrap_or(0) == 0
         && request
@@ -859,22 +853,27 @@ async fn load_data(
             data.push(serde_json::Value::Null)
         }
 
-        V1LoadResult::new(
-            V1LoadResultAnnotation {
-                measures: json!(Vec::<serde_json::Value>::new()),
-                dimensions: json!(Vec::<serde_json::Value>::new()),
-                segments: json!(Vec::<serde_json::Value>::new()),
-                time_dimensions: json!(Vec::<serde_json::Value>::new()),
-            },
-            data,
-        )
+        let mut response = JsonValueObject::new(data);
+        let rec = transform_response(&mut response, schema.clone(), &member_fields)
+            .map_err(|e| DataFusionError::Execution(e.message.to_string()))?;
+
+        rec
     } else {
         let result = transport
-            .load(span_id, request, sql_query, auth_context, meta)
-            .await;
-        let mut response = result.map_err(|err| ArrowError::ComputeError(err.to_string()))?;
-        if let Some(data) = response.results.pop() {
-            match (options.max_records, data.data.len()) {
+            .load(
+                span_id,
+                request,
+                sql_query,
+                auth_context,
+                meta,
+                schema,
+                member_fields,
+            )
+            .await
+            .map_err(|err| ArrowError::ComputeError(err.to_string()))?;
+        let response = result.first();
+        if let Some(data) = response.cloned() {
+            match (options.max_records, data.num_rows()) {
                 (Some(max_records), len) if len >= max_records => {
                     return Err(ArrowError::ComputeError(format!("One of the Cube queries exceeded the maximum row limit ({}). JOIN/UNION is not possible as it will produce incorrect results. Try filtering the results more precisely or moving post-processing functions to an outer query.", max_records)));
                 }
@@ -889,7 +888,7 @@ async fn load_data(
         }
     };
 
-    Ok(result)
+    Ok(vec![result])
 }
 
 fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()> {
@@ -898,6 +897,8 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     let auth = one_shot_stream.auth_context.clone();
     let transport = one_shot_stream.transport.clone();
     let meta = one_shot_stream.meta.clone();
+    let schema = one_shot_stream.schema.clone();
+    let member_fields = one_shot_stream.member_fields.clone();
     let options = one_shot_stream.options.clone();
     let wrapped_sql = one_shot_stream.wrapped_sql.clone();
 
@@ -909,22 +910,17 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
             auth,
             transport,
             meta,
+            schema,
+            member_fields,
             options,
             wrapped_sql,
         ))
     })
     .join()
-    .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))?;
+    .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))??;
 
-    let mut response = JsonValueObject::new(res.unwrap().data);
-    one_shot_stream.data = Some(
-        transform_response(
-            &mut response,
-            one_shot_stream.schema.clone(),
-            &one_shot_stream.member_fields,
-        )
-        .map_err(|e| DataFusionError::Execution(e.message.to_string()))?,
-    );
+    let response = res.first();
+    one_shot_stream.data = Some(response.cloned().unwrap());
 
     Ok(())
 }
@@ -976,7 +972,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int16(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int16(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1001,7 +997,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1026,7 +1022,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Int64(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1051,7 +1047,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Float32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Float32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1076,7 +1072,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Float64(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Float64(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1099,7 +1095,7 @@ pub fn transform_response<V: ValueObject>(
                         },
                     },
                     {
-                        (ScalarValue::Boolean(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Boolean(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1127,15 +1123,21 @@ pub fn transform_response<V: ValueObject>(
                                     ))
                                 })?;
                             // TODO switch parsing to microseconds
-                            if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
+                            if timestamp.and_utc().timestamp_millis() > (((1i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
+                            } else if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
+                                builder.append_value(nanos)?;
                             } else {
-                                builder.append_value(timestamp.timestamp_nanos_opt().unwrap())?;
+                                log::error!(
+                                    "Unable to cast timestamp value to nanoseconds: {}",
+                                    timestamp.to_string()
+                                );
+                                builder.append_null()?;
                             }
                         },
                     },
                     {
-                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1163,15 +1165,15 @@ pub fn transform_response<V: ValueObject>(
                                     ))
                                 })?;
                             // TODO switch parsing to microseconds
-                            if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
+                            if timestamp.and_utc().timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
                             } else {
-                                builder.append_value(timestamp.timestamp_millis())?;
+                                builder.append_value(timestamp.and_utc().timestamp_millis())?;
                             }
                         },
                     },
                     {
-                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1211,7 +1213,7 @@ pub fn transform_response<V: ValueObject>(
                         }
                     },
                     {
-                        (ScalarValue::Date32(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::Date32(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1273,7 +1275,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1287,7 +1289,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1301,7 +1303,7 @@ pub fn transform_response<V: ValueObject>(
                         // TODO
                     },
                     {
-                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
+                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(*v)?,
                     }
                 )
             }
@@ -1322,6 +1324,21 @@ pub fn transform_response<V: ValueObject>(
     }
 
     Ok(RecordBatch::try_new(schema.clone(), columns)?)
+}
+
+pub fn convert_transport_response(
+    response: V1LoadResponse,
+    schema: SchemaRef,
+    member_fields: Vec<MemberField>,
+) -> std::result::Result<Vec<RecordBatch>, CubeError> {
+    response
+        .results
+        .into_iter()
+        .map(|r| {
+            let mut response = JsonValueObject::new(r.data.clone());
+            transform_response(&mut response, schema.clone(), &member_fields)
+        })
+        .collect::<std::result::Result<Vec<RecordBatch>, CubeError>>()
 }
 
 #[cfg(test)]
@@ -1387,9 +1404,12 @@ mod tests {
                 _sql_query: Option<SqlQuery>,
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
-            ) -> Result<V1LoadResponse, CubeError> {
+                schema: SchemaRef,
+                member_fields: Vec<MemberField>,
+            ) -> Result<Vec<RecordBatch>, CubeError> {
                 let response = r#"
-                    {
+                {
+                    "results": [{
                         "annotation": {
                             "measures": [],
                             "dimensions": [],
@@ -1403,17 +1423,13 @@ mod tests {
                             {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 4"},
                             {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
                         ]
-                    }
+                    }]
+                }
                 "#;
 
-                let result: V1LoadResult = serde_json::from_str(response).unwrap();
-
-                Ok(V1LoadResponse {
-                    pivot_query: None,
-                    slow_query: None,
-                    query_type: None,
-                    results: vec![result],
-                })
+                let result: V1LoadResponse = serde_json::from_str(response).unwrap();
+                convert_transport_response(result, schema.clone(), member_fields)
+                    .map_err(|err| CubeError::user(err.to_string()))
             }
 
             async fn load_stream(

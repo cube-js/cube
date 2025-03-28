@@ -96,9 +96,9 @@ export class DatabricksQuery extends BaseQuery {
     const [intervalFormatted, timeUnit] = this.formatInterval(interval);
     const beginOfTime = this.dateTimeCast('\'1970-01-01T00:00:00\'');
 
-    return `${this.timeStampCast(`'${origin}'`)} + INTERVAL ${intervalFormatted} *
+    return `${this.dateTimeCast(`'${origin}'`)} + INTERVAL ${intervalFormatted} *
       floor(
-        date_diff(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+        date_diff(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) /
         date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + INTERVAL ${intervalFormatted})
       )`;
   }
@@ -186,6 +186,7 @@ export class DatabricksQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.BTRIM = 'TRIM({% if args[1] is defined %}{{ args[1] }} FROM {% endif %}{{ args[0] }})';
@@ -196,7 +197,8 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.TRUNC = 'CASE WHEN ({{ args[0] }}) >= 0 THEN FLOOR({{ args_concat }}) ELSE CEIL({{ args_concat }}) END';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
-    templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    templates.expressions.extract = '{% if date_part|lower == "epoch" %}unix_timestamp({{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
+    templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
     // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`

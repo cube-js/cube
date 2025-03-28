@@ -21,7 +21,7 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
   typeof message === 'string' ? message : JSON.stringify(message)
 );
 
-export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
+export type WebSocketSendMessageFn = (connectionId: string, message: any) => Promise<void>;
 
 const ensureArray = (value: any) => (Array.isArray(value) ? value : [value]);
 
@@ -55,7 +55,7 @@ export class SubscriptionServer {
   }
 
   public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
-    return (message, { status } = { status: 200 }) => {
+    return async (message, { status } = { status: 200 }) => {
       this.apiGateway.log({
         type: 'Outgoing network usage',
         service: 'api-ws',
@@ -77,7 +77,7 @@ export class SubscriptionServer {
       }
 
       if (message.authorization) {
-        authContext = { isSubscription: true };
+        authContext = { isSubscription: true, protocol: 'ws' };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
         const acceptanceResult = await this.contextAcceptor(authContext);
         if (!acceptanceResult.accepted) {

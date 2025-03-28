@@ -127,10 +127,21 @@ export type DatabaseType =
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
 export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
+
+export type ScheduledRefreshTimeZonesFn = (context: RequestContext) => string[] | Promise<string[]>;
+
+/**
+ * Function that should provide a logic of scheduled returning of
+ * the user background context. Used as a part of a main
+ * configuration object of the Gateway to provide extendability to
+ * this logic.
+ */
+export type ScheduledRefreshContextsFn = () => Promise<UserBackgroundContext[]>;
 
 // internal
 export type DriverOptions = {
@@ -185,6 +196,7 @@ export interface CreateOptions {
   contextToAppId?: ContextToAppIdFn;
   contextToRoles?: ContextToRolesFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuth?: CheckAuthFn;
@@ -199,7 +211,7 @@ export interface CreateOptions {
   schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;
-  scheduledRefreshTimeZones?: string[];
+  scheduledRefreshTimeZones?: string[] | ScheduledRefreshTimeZonesFn;
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
   scheduledRefreshBatchSize?: number;
@@ -220,6 +232,7 @@ export interface CreateOptions {
   serverless?: boolean;
   allowNodeRequire?: boolean;
   semanticLayerSync?: (context: RequestContext) => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
+  fastReload?: boolean;
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {

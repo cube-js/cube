@@ -10,14 +10,14 @@ import {
   InlineTables,
   CacheDriverInterface,
   TableStructure,
-  DriverInterface,
+  DriverInterface, QueryKey,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { PreAggregationDescription } from './PreAggregations';
+import { LoadPreAggregationResult, PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
@@ -29,13 +29,11 @@ type QueryOptions = {
   incremental?: boolean;
 };
 
-export type QueryTuple = [
+export type QueryWithParams = [
   sql: string,
-  params: unknown[],
+  params: string[],
   options?: QueryOptions
 ];
-
-export type QueryWithParams = QueryTuple;
 
 export type Query = {
   requestId?: string;
@@ -78,41 +76,25 @@ export type QueryBody = {
 /**
  * Temp (partition/lambda) table definition.
  */
-export type TempTable = {
-  type: string; // for ex.: "rollup"
-  buildRangeEnd: string;
-  lastUpdatedAt: number;
-  queryKey: unknown;
-  refreshKeyValues: [{
-    'refresh_key': string,
-  }][];
-  targetTableName: string; // full table name (with suffix)
-  lambdaTable?: {
-    name: string,
-    columns: {
-      name: string,
-      type: string,
-      attributes?: string[],
-    }[];
-    csvRows: string;
-  };
-};
+export type TempTable = LoadPreAggregationResult;
 
 /**
  * Pre-aggregation table (stored in the first element) to temp table
  * definition (stored in the second element) link.
  */
 export type PreAggTableToTempTable = [
-  string, // common table name (without sufix)
+  string, // common table name (without suffix)
   TempTable,
 ];
 
+export type PreAggTableToTempTableNames = [string, { targetTableName: string; }];
+
+export type CacheKeyItem = string | string[] | QueryWithParams | QueryWithParams[] | undefined;
+
 export type CacheKey =
-  | string
-  | [
-      query: string | QueryTuple,
-      options?: string[]
-    ];
+  [CacheKeyItem, CacheKeyItem] |
+  [CacheKeyItem, CacheKeyItem, CacheKeyItem] |
+  [CacheKeyItem, CacheKeyItem, CacheKeyItem, CacheKeyItem];
 
 type CacheEntry = {
   time: number;
@@ -195,7 +177,7 @@ export class QueryCache {
   /**
    * Generates from the `queryBody` the final `sql` query and push it to
    * the queue. Returns promise which will be resolved by the different
-   * objects, depend from the original `queryBody` object. For the
+   * objects, depend on the original `queryBody` object. For the
    * persistent queries returns the `stream.Writable` instance.
    *
    * @throw Error
@@ -382,7 +364,7 @@ export class QueryCache {
   }
 
   public static queryCacheKey(queryBody: QueryBody): CacheKey {
-    const key = [
+    const key: CacheKey = [
       queryBody.query,
       queryBody.values,
       (queryBody.preAggregations || []).map(p => p.loadSql)
@@ -392,7 +374,7 @@ export class QueryCache {
     }
     // @ts-ignore
     key.persistent = queryBody.persistent;
-    return <CacheKey>key;
+    return key;
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
@@ -405,8 +387,8 @@ export class QueryCache {
 
   public static replacePreAggregationTableNames(
     queryAndParams: string | QueryWithParams,
-    preAggregationsTablesToTempTables: PreAggTableToTempTable[],
-  ): string | QueryTuple {
+    preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
+  ): string | QueryWithParams {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
       ? queryAndParams
       : [queryAndParams, []];
@@ -428,7 +410,7 @@ export class QueryCache {
    * queries and with the `stream.Writable` instance for the persistent.
    */
   public async queryWithRetryAndRelease(
-    query: string | QueryTuple,
+    query: string | QueryWithParams,
     values: string[],
     {
       cacheKey,
@@ -689,9 +671,9 @@ export class QueryCache {
   }
 
   public startRenewCycle(
-    query: string | QueryTuple,
+    query: string | QueryWithParams,
     values: string[],
-    cacheKeyQueries: (string | QueryTuple)[],
+    cacheKeyQueries: (string | QueryWithParams)[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
@@ -724,9 +706,9 @@ export class QueryCache {
   }
 
   public renewQuery(
-    query: string | QueryTuple,
+    query: string | QueryWithParams,
     values: string[],
-    cacheKeyQueries: (string | QueryTuple)[],
+    cacheKeyQueries: (string | QueryWithParams)[],
     expireSecs: number,
     cacheKey: CacheKey,
     renewalThreshold: any,
@@ -743,7 +725,7 @@ export class QueryCache {
   ) {
     options = options || { dataSource: 'default' };
     return Promise.all(
-      this.loadRefreshKeys(<QueryTuple[]>cacheKeyQueries, expireSecs, options),
+      this.loadRefreshKeys(<QueryWithParams[]>cacheKeyQueries, expireSecs, options),
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
@@ -812,11 +794,11 @@ export class QueryCache {
     }
   ) {
     return cacheKeyQueries.map((q) => {
-      const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
+      const [query, values, queryOptions]: QueryWithParams = Array.isArray(q) ? q : [q, [], {}];
       return this.cacheQueryResult(
         query,
-        <string[]>values,
-        [query, <string[]>values],
+        values,
+        [query, values],
         expireSecs,
         {
           renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
@@ -842,7 +824,7 @@ export class QueryCache {
   ) => this.cacheDriver.withLock(`lock:${key}`, callback, ttl, true);
 
   public async cacheQueryResult(
-    query: string | QueryTuple,
+    query: string | QueryWithParams,
     values: string[],
     cacheKey: CacheKey,
     expiration: number,
@@ -904,7 +886,14 @@ export class QueryCache {
           });
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
-          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+          this.logger('Dropping Cache', {
+            cacheKey,
+            error: e.stack || e,
+            requestId: options.requestId,
+            spanId,
+            primaryQuery,
+            renewCycle
+          });
           this.cacheDriver.remove(redisKey)
             .catch(err => this.logger('Error removing key', {
               cacheKey,
@@ -1037,7 +1026,7 @@ export class QueryCache {
     return null;
   }
 
-  public queryRedisKey(cacheKey): string {
+  public queryRedisKey(cacheKey: CacheKey): string {
     return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey) as any);
   }
 

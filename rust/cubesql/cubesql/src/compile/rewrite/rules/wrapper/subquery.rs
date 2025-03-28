@@ -4,7 +4,8 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        EmptyRelationDerivedSourceTableName, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, EmptyRelationDerivedSourceTableName, LogicalPlanLanguage,
+        WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
     },
     transport::MetaContext,
     var, var_iter, var_list_iter,
@@ -19,27 +20,12 @@ impl WrapperRules {
                 "wrapper-subqueries-wrapped-scan-to-pull",
                 wrapper_pushdown_replacer(
                     cube_scan_wrapper(
-                        wrapper_pullup_replacer(
-                            "?cube_scan_input",
-                            "?inner_alias_to_cube",
-                            "?nner_ungrouped",
-                            "?inner_in_projection",
-                            "?inner_cube_members",
-                        ),
+                        wrapper_pullup_replacer("?cube_scan_input", "?inner_context"),
                         "CubeScanWrapperFinalized:false",
                     ),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    "?context",
                 ),
-                wrapper_pullup_replacer(
-                    "?cube_scan_input",
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                wrapper_pullup_replacer("?cube_scan_input", "?context"),
                 self.transform_check_subquery_wrapped("?cube_scan_input"),
             ),
             transforming_rewrite(
@@ -56,14 +42,22 @@ impl WrapperRules {
                             "?derived_source_table_name",
                             "EmptyRelationIsWrappable:true",
                         ),
-                        "?alias_to_cube",
-                        "WrapperPullupReplacerUngrouped:false",
-                        "WrapperPullupReplacerInProjection:true",
-                        "CubeScanMembers",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "WrapperReplacerContextPushToCube:false",
+                            "WrapperReplacerContextInProjection:true",
+                            "CubeScanMembers",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                        ),
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
-                self.transform_wrap_empty_rel("?derived_source_table_name", "?alias_to_cube"),
+                self.transform_wrap_empty_rel(
+                    "?derived_source_table_name",
+                    "?alias_to_cube",
+                    "?grouped_subqueries",
+                ),
             ),
         ]);
         Self::list_pushdown_pullup_rules(
@@ -77,32 +71,46 @@ impl WrapperRules {
         &self,
         source_table_name_var: &'static str,
         alias_to_cube_var: &'static str,
+        grouped_subqueries_out_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let source_table_name_var = var!(source_table_name_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
+        let grouped_subqueries_out_var = var!(grouped_subqueries_out_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for name in var_iter!(
                 egraph[subst[source_table_name_var]],
                 EmptyRelationDerivedSourceTableName
-            ) {
-                if let Some(name) = name {
-                    if let Some(cube) = meta_context
-                        .cubes
-                        .iter()
-                        .find(|c| c.name.eq_ignore_ascii_case(name))
-                    {
-                        subst.insert(
-                            alias_to_cube_var,
-                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
-                                WrapperPullupReplacerAliasToCube(vec![(
-                                    "".to_string(),
-                                    cube.name.to_string(),
-                                )]),
-                            )),
-                        );
-                        return true;
-                    }
+            )
+            .flatten()
+            {
+                if let Some(cube) = meta_context
+                    .cubes
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(name))
+                {
+                    subst.insert(
+                        alias_to_cube_var,
+                        egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
+                            WrapperReplacerContextAliasToCube(vec![(
+                                "".to_string(),
+                                cube.name.to_string(),
+                            )]),
+                        )),
+                    );
+                    // We don't want to mark current query as a grouped, because we create pullup replacer out of thin air here
+                    // And it would need to match other replacers later
+                    // At the same time, this pullup replacer have no subqueries on its own
+                    // So whoever want to treat this as subquery would introduce it to grouped_subqueries
+                    subst.insert(
+                        grouped_subqueries_out_var,
+                        egraph.add(
+                            LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                                WrapperReplacerContextGroupedSubqueries(vec![]),
+                            ),
+                        ),
+                    );
+                    return true;
                 }
             }
 
@@ -118,7 +126,7 @@ impl WrapperRules {
     ) -> bool {
         for alias_to_cube in var_iter!(
             egraph[subst[alias_to_cube_var]],
-            WrapperPullupReplacerAliasToCube
+            WrapperReplacerContextAliasToCube
         )
         .cloned()
         {

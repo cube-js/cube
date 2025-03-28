@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { driverTest, driverTestFn, driverTestWithError } from './driverTest';
+import { driverTest, driverTestFn, driverTestMulti, driverTestWithError } from './driverTest';
 
 const commonSchemas = [
   'CAST.js',
@@ -189,7 +189,7 @@ export const filteringCustomersCubeThird = driverTest(
     },
     schemas: commonSchemas,
   }
-  
+
 );
 
 export const filteringCustomersEndsWithFilterFirst = driverTest({
@@ -1293,6 +1293,31 @@ export const preAggsCustomersRunningTotal = driverTest({
       'Customers.runningTotal'
     ]
   },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCompareDateRangesByCustomerOverProductNameByMonth = driverTestMulti({
+  name: 'querying ECommerce: compare DateRanges by customer over productName by month',
+  query: [{
+    timeDimensions: [{
+      dimension: 'ECommerce.orderDate',
+      granularity: 'month',
+      compareDateRange: [
+        ['2023-01-01', '2024-01-01'],
+        ['2024-01-01', '2025-01-01']
+      ]
+    }],
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.count'
+    ],
+    order: {
+      'ECommerce.orderDate': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  }],
   schemas: commonSchemas
 });
 

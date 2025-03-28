@@ -1,0 +1,90 @@
+# Querying concurrency
+
+All queries to [data APIs][ref-data-apis] are processed asynchronously via a _query
+queue_. It allows to optimize the load and increase querying performance.
+
+## Query queue
+
+The query queue allows to deduplicate queries to API instances and insulate upstream
+data sources from query spikes. It also allows to execute queries to data sources
+concurrently for increased performance.
+
+By default, Cube uses a _single_ query queue for queries from all API instances and
+the refresh worker to all configured data sources.
+
+<ReferenceBox>
+
+You can read more about the query queue in the [this blog post](https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#query-queue-in-cube).
+
+</ReferenceBox>
+
+### Multiple query queues
+
+You can use the [`context_to_orchestrator_id`][ref-context-to-orchestrator-id]
+configuration option to route queries to multiple queues based on the security
+context.
+
+<WarningBox>
+
+If you're configuring multiple connections to data sources via the [`driver_factory`
+configuration option][ref-driver-factory], you __must__ also configure
+`context_to_orchestrator_id` to ensure that queries are routed to correct queues.
+
+</WarningBox>
+
+## Data sources
+
+Cube supports various kinds of [data sources][ref-data-sources], ranging from cloud
+data warehouses to embedded databases. Each data source scales differently,
+therefore Cube provides sound defaults for each kind of data source out-of-the-box.
+
+### Data source concurrency
+
+By default, Cube uses the following concurrency settings for data sources:
+
+| Data source | Default concurrency |
+| --- | --- |
+| [Amazon Athena][ref-athena] | 10 |
+| [Amazon Redshift][ref-redshift] | 5 |
+| [Apache Pinot][ref-pinot] | 10 |
+| [ClickHouse][ref-clickhouse] | 10 |
+| [Databricks][ref-databricks] | 10 |
+| [Firebolt][ref-firebolt] | 10 |
+| [Google BigQuery][ref-bigquery] | 10 |
+| [Snowflake][ref-snowflake] | 8 |
+| All other data sources | 5 or [less, if specified in the driver][link-github-data-source-concurrency] |
+
+You can use the `CUBEJS_CONCURRENCY` environment variable to adjust the maximum
+number of concurrent queries to a data source. It's recommended to use the default
+configuration unless you're sure that your data source can handle more concurrent
+queries.
+
+### Connection pooling
+
+For data sources that support connection pooling, the maximum number of concurrent
+connections to the database can also be set by using the `CUBEJS_DB_MAX_POOL`
+environment variable. If changing this from the default, you must ensure that the
+new value is greater than the number of concurrent connections used by Cube's query
+queues and the refresh worker.
+
+## Refresh worker
+
+By default, the refresh worker uses the same concurrency settings as API instances.
+However, you can override this behvaior in the refresh worker
+[configuration][ref-preagg-refresh].
+
+
+[ref-data-apis]: /product/apis-integrations
+[ref-data-sources]: /product/configuration/data-sources
+[ref-context-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
+[ref-driver-factory]: /reference/configuration/config#driver_factory
+[ref-preagg-refresh]: /product/caching/refreshing-pre-aggregations#configuration
+[ref-athena]: /product/configuration/data-sources/aws-athena
+[ref-clickhouse]: /product/configuration/data-sources/clickhouse
+[ref-databricks]: /product/configuration/data-sources/databricks-jdbc
+[ref-firebolt]: /product/configuration/data-sources/firebolt
+[ref-pinot]: /product/configuration/data-sources/pinot
+[ref-redshift]: /product/configuration/data-sources/aws-redshift
+[ref-snowflake]: /product/configuration/data-sources/snowflake
+[ref-bigquery]: /product/configuration/data-sources/google-bigquery
+[link-github-data-source-concurrency]: https://github.com/search?q=repo%3Acube-js%2Fcube+getDefaultConcurrency+path%3Apackages%2Fcubejs-&type=code

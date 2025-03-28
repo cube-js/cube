@@ -27,11 +27,11 @@ type Props = {
 
 export default function Header({ selectedKeys }: Props) {
   const isDesktopOrLaptop = useMediaQuery({
-    query: '(min-device-width: 992px)',
+    query: '(min-width: 992px)',
   });
 
   const isMobileOrTable = useMediaQuery({
-    query: '(max-device-width: 991px)',
+    query: '(max-width: 991px)',
   });
 
   return (

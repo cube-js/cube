@@ -4,6 +4,7 @@ import {
   DialogContainer,
   Flex,
   Radio,
+  Panel,
   SearchInput,
   Space,
   tasty,
@@ -11,16 +12,27 @@ import {
   Title,
   CloseIcon,
   TooltipProvider,
+  ResizablePanel,
+  ClearIcon,
 } from '@cube-dev/ui-kit';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { EditOutlined, LoadingOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
-import { validateQuery } from '@cubejs-client/core';
 
-import { useDebouncedValue, useFilteredCubes, useDeepMemo, useEvent } from './hooks';
+import { useDebouncedValue, useFilteredCubes, useEvent, useLocalStorage } from './hooks';
 import { useQueryBuilderContext } from './context';
-import { Panel } from './components/Panel';
 import { EditQueryDialogForm } from './components/EditQueryDialogForm';
 import { SidePanelCubeItem } from './components/SidePanelCubeItem';
+import { validateQuery } from './utils';
+
+const DEFAULT_SIDEBAR_SIZE = 315;
 
 const RadioButton = tasty(Radio.Button, {
   styles: { flexGrow: 1, placeItems: 'stretch' },
@@ -38,18 +50,20 @@ const CountBadge = tasty(Badge, {
 
 type Props = {
   defaultSelectedType?: 'cubes' | 'views';
-  customTypeSwitcher?: React.ReactNode;
+  customTypeSwitcher?: ReactNode;
   showEditQueryButton?: boolean;
+  width?: string;
 };
 
 export function QueryBuilderSidePanel({
   defaultSelectedType = 'cubes',
   customTypeSwitcher = null,
   showEditQueryButton = true,
+  width,
 }: Props) {
   const {
     query,
-    cubes: items = [],
+    cubes: cubesAndViews = [],
     selectCube,
     isQueryEmpty,
     joinableCubes,
@@ -60,7 +74,13 @@ export function QueryBuilderSidePanel({
     setQuery,
     usedCubes,
     usedMembers,
+    queryStats,
+    members,
+    missingCubes,
     apiVersion,
+    isMetaLoading,
+    memberViewType,
+    disableSidebarResizing,
   } = useQueryBuilderContext();
 
   const contentRef = useRef<HTMLDivElement>(null);
@@ -73,36 +93,35 @@ export function QueryBuilderSidePanel({
 
   const [selectedType, setSelectedType] = useState<'cubes' | 'views'>(defaultSelectedType);
 
-  items.sort((a, b) => a.name.localeCompare(b.name));
+  const [sidebarSize, setSidebarSize] = useLocalStorage(
+    'QueryBuilder:Sidebar:size',
+    DEFAULT_SIDEBAR_SIZE
+  );
 
-  // @ts-ignore
-  const cubes = items.filter((item) => item.type === 'cube');
-  // @ts-ignore
-  const views = items.filter((item) => item.type === 'view');
+  const cubes = cubesAndViews.filter((item) => item.type === 'cube');
+  const views = cubesAndViews.filter((item) => item.type === 'view');
 
-  const preparedFilterString = filterString.trim().replaceAll('_', ' ').toLowerCase();
+  const preparedFilterString = filterString.trim().toLowerCase();
   const debouncedFilterString = useDebouncedValue(preparedFilterString, 500);
   const appliedFilterString = preparedFilterString.length < 2 ? '' : debouncedFilterString;
 
-  const allCubes = selectedType === 'cubes' ? cubes : views;
+  const cubesOrViews = selectedType === 'cubes' ? cubes : views;
   const allJoinableCubes =
     selectedType === 'views' && usedCubes.length
-      ? allCubes.filter((cube) => usedCubes[0] === cube.name)
-      : allCubes.filter((cube) => joinableCubes.includes(cube));
+      ? cubesOrViews.filter((cube) => usedCubes[0] === cube.name)
+      : cubesOrViews.filter((cube) => joinableCubes.includes(cube));
 
-  const [openCubes, setOpenCubes] = useState<Set<string>>(
-    isQueryEmpty ? (allCubes.length ? new Set(allCubes[0].name) : new Set()) : new Set(usedCubes)
-  );
+  const [openCubes, setOpenCubes] = useState<Set<string>>(new Set());
 
-  const highlightedCubes = useMemo(() => {
-    if (appliedFilterString) {
-      return usedCubes;
+  useLayoutEffect(() => {
+    if (isQueryEmpty) {
+      setOpenCubes(cubesOrViews.length === 1 ? new Set([cubesOrViews[0].name]) : new Set());
     }
+  }, [cubesOrViews.length, selectedType]);
 
-    return [];
-  }, [appliedFilterString]);
+  const highlightedCubes = appliedFilterString ? usedCubes : [];
 
-  allCubes.sort((a, b) => {
+  cubesOrViews.sort((a, b) => {
     if (highlightedCubes.includes(a.name) && !highlightedCubes.includes(b.name)) {
       return -1;
     }
@@ -111,11 +130,17 @@ export function QueryBuilderSidePanel({
       return 1;
     }
 
-    return a.name.localeCompare(b.name);
+    return memberViewType === 'name'
+      ? a.name.localeCompare(b.name)
+      : a.title.localeCompare(b.title);
   });
 
   // Filtered cubes
-  const { cubes: filteredCubes } = useFilteredCubes(appliedFilterString, allJoinableCubes);
+  const filteredCubes = useFilteredCubes(
+    appliedFilterString,
+    allJoinableCubes,
+    memberViewType
+  ).cubes.map((cube) => cube.name);
 
   const resetScrollAndContentSize = useCallback(() => {
     if (contentRef?.current) {
@@ -217,7 +242,7 @@ export function QueryBuilderSidePanel({
     );
   }, [selectedType, meta, filterString]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (scrollToCubeName) {
       setTimeout(() => {
         const element = containerRef.current?.querySelector(
@@ -229,18 +254,41 @@ export function QueryBuilderSidePanel({
             block: 'start',
           });
         }
-      }, 100);
+      });
 
       setScrollToCubeName(null);
     }
   }, [scrollToCubeName]);
 
+  // Close all disabled cubes to avoid layout shift on deselecting member.
+  useEffect(() => {
+    const currentSize = openCubes.size;
+    const allJoinableCubeNames = allJoinableCubes.map((cube) => cube.name);
+
+    openCubes.forEach((cubeName) => {
+      if (!allJoinableCubeNames.includes(cubeName) && !missingCubes.includes(cubeName)) {
+        openCubes.delete(cubeName);
+      }
+    });
+
+    if (currentSize !== openCubes.size) {
+      setOpenCubes(new Set(openCubes));
+    }
+  }, [openCubes.size, missingCubes.length, allJoinableCubes.length]);
+
+  function resetState(cubeName?: string) {
+    setFilterString('');
+    setViewMode('all');
+
+    if (cubeName) {
+      setOpenCubes(new Set([cubeName]));
+      setScrollToCubeName(cubeName);
+    }
+  }
+
   function onCubeToggle(name: string, isOpen: boolean) {
     if (appliedFilterString || viewMode === 'query') {
-      setFilterString('');
-      setViewMode('all');
-      setOpenCubes(new Set([name]));
-      setScrollToCubeName(name);
+      resetState(name);
 
       return;
     }
@@ -255,42 +303,77 @@ export function QueryBuilderSidePanel({
   }
 
   const onMemberToggle = useEvent((cubeName: string, memberName: string) => {
-    if (
-      appliedFilterString &&
-      !query?.dimensions?.includes(memberName) &&
-      !query?.measures?.includes(memberName)
-    ) {
-      setScrollToCubeName(cubeName);
-      setFilterString('');
-      setViewMode('all');
-      setOpenCubes(new Set([cubeName]));
+    const isTimeDimension = members.dimensions[memberName]?.type === 'time';
+
+    // Always reset state if we click on time dimension
+    if (isTimeDimension || (appliedFilterString && !usedMembers.includes(memberName))) {
+      resetState(cubeName);
     }
   });
 
-  const cubeList = useDeepMemo(() => {
+  const onHierarchyToggle = useEvent((cubeName?: string) => {
+    if (appliedFilterString || viewMode === 'query') {
+      resetState(cubeName);
+    }
+  });
+
+  const cubeList = useMemo(() => {
     return (
-      <Flex gap="1ow" flow="column" padding="0 0 2x 0">
-        {allCubes.map((item) => (
-          <SidePanelCubeItem
-            key={item.name}
-            isNonJoinable={!allJoinableCubes.includes(item)}
-            isOpen={openCubes.has(item.name)}
-            isFiltered={filteredCubes.includes(item)}
-            filterString={appliedFilterString}
-            name={item.name}
-            mode={viewMode}
-            rightIcon={isQueryEmpty ? 'arrow' : 'plus'}
-            onToggle={(isOpen) => {
-              onCubeToggle(item.name, isOpen);
-            }}
-            onMemberToggle={(name) => {
-              onMemberToggle(item.name, name);
-            }}
-          />
-        ))}
+      <Flex gap="1bw" flow="column" padding="0 0 2x 0">
+        {missingCubes
+          .filter((cubeName) => (appliedFilterString ? filteredCubes.includes(cubeName) : true))
+          .map((cubeName) => (
+            <SidePanelCubeItem
+              key={cubeName}
+              isOpen={openCubes.has(cubeName)}
+              filterString={appliedFilterString}
+              cubeName={cubeName}
+              mode={viewMode}
+              rightIcon="arrow"
+              onHierarchyToggle={onHierarchyToggle}
+              onMemberToggle={(name) => {
+                onMemberToggle(cubeName, name);
+              }}
+            />
+          ))}
+        {cubesOrViews
+          .filter((cube) =>
+            appliedFilterString
+              ? // If filter is applied, show only filtered cubes
+                filteredCubes.includes(cube.name)
+              : viewMode === 'query'
+                ? // In query mode, show only used cubes
+                  usedCubes.includes(cube.name)
+                : true
+          )
+          .map((cube) => (
+            <SidePanelCubeItem
+              key={cube.name}
+              isNonJoinable={!allJoinableCubes.includes(cube) && !usedCubes.includes(cube.name)}
+              isOpen={openCubes.has(cube.name)}
+              filterString={appliedFilterString}
+              cubeName={cube.name}
+              mode={viewMode}
+              rightIcon={isQueryEmpty ? 'arrow' : 'plus'}
+              onToggle={(isOpen) => {
+                onCubeToggle(cube.name, isOpen);
+              }}
+              onMemberToggle={(name) => {
+                onMemberToggle(cube.name, name);
+              }}
+              onHierarchyToggle={onHierarchyToggle}
+            />
+          ))}
       </Flex>
     );
-  }, [allCubes, viewMode, meta, openCubes.size, appliedFilterString, usedCubes.join(',')]);
+  }, [
+    viewMode,
+    queryStats,
+    [...openCubes.values()].join(),
+    appliedFilterString,
+    memberViewType,
+    selectedType,
+  ]);
 
   const onApplyQuery = useCallback(async (query) => {
     try {
@@ -310,6 +393,8 @@ export function QueryBuilderSidePanel({
 
       setOpenCubes(new Set(usedCubes));
 
+      setScrollToCubeName(usedCubes[0]);
+
       if (isQueryEmpty) {
         setViewMode('all');
       }
@@ -318,7 +403,7 @@ export function QueryBuilderSidePanel({
 
   const topBar = useMemo(() => {
     return (
-      <Space placeContent="space-between">
+      <Space placeContent="space-between" gap="1x">
         <Space gap="1x">
           {showEditQueryButton ? editQueryButton : null}
           {!usedCubes.length ? (
@@ -336,11 +421,11 @@ export function QueryBuilderSidePanel({
                 icon={viewMode === 'all' ? <StarOutlined /> : <StarFilled />}
                 onPress={() => setViewMode(viewMode === 'all' ? 'query' : 'all')}
               >
-                {viewMode === 'all' ? 'All' : 'Used'} members
+                {viewMode === 'all' ? 'All members' : 'Used only'}
               </Button>
             </TooltipProvider>
           )}
-          {isVerifying && <LoadingOutlined />}
+          {isVerifying || isMetaLoading ? <LoadingOutlined /> : null}
         </Space>
         <Space gap=".5x">
           <TooltipProvider title="Reset the query">
@@ -350,11 +435,12 @@ export function QueryBuilderSidePanel({
               size="small"
               type="secondary"
               theme="danger"
-              icon={<CloseIcon />}
+              icon={<ClearIcon />}
               onPress={() => {
                 clearQuery();
-                selectCube(null);
-                setOpenCubes(new Set());
+                setOpenCubes(
+                  cubesOrViews.length === 1 ? new Set([cubesOrViews[0].name]) : new Set()
+                );
                 resetScrollAndContentSize();
               }}
             >
@@ -364,17 +450,10 @@ export function QueryBuilderSidePanel({
         </Space>
       </Space>
     );
-  }, [viewMode, isQueryEmpty, usedMembers.length, appliedFilterString, isVerifying]);
+  }, [viewMode, isQueryEmpty, isMetaLoading, usedMembers.length, appliedFilterString, isVerifying]);
 
-  return (
-    <Panel
-      ref={containerRef}
-      padding="1x 1x 0 1x"
-      gap="1x"
-      gridRows={`max-content max-content ${
-        appliedFilterString && !filteredCubes.length ? 'max-content ' : ' '
-      } minmax(0, 1fr)`}
-    >
+  const content = (
+    <>
       <DialogContainer isOpen={isPasteDialogOpen} onDismiss={() => setIsPasteDialogOpen(false)}>
         <EditQueryDialogForm
           query={query}
@@ -404,14 +483,49 @@ export function QueryBuilderSidePanel({
         </Space>
       ) : undefined}
 
-      <Panel
-        styles={{
-          margin: '0 -1x',
-          border: 'top',
-        }}
-      >
+      <Panel margin="0 -1x" border="top" flexGrow={1}>
         {cubeList}
       </Panel>
+    </>
+  );
+
+  return disableSidebarResizing ? (
+    <Panel
+      key="disabled-siderbar-resizing"
+      ref={containerRef}
+      isFlex
+      qa="QueryBuilderSidePanel"
+      flow="column"
+      padding="1x 1x 0 1x"
+      gap="1x"
+      border="1ow right"
+      width={width ?? `max ${DEFAULT_SIDEBAR_SIZE}px`}
+      innerStyles={{
+        overflowX: 'clip',
+      }}
+    >
+      {content}
     </Panel>
+  ) : (
+    <ResizablePanel
+      key="resizable-siderbar"
+      ref={containerRef}
+      isFlex
+      qa="QueryBuilderSidePanel"
+      flow="column"
+      direction="right"
+      size={disableSidebarResizing ? DEFAULT_SIDEBAR_SIZE : sidebarSize}
+      isDisabled={disableSidebarResizing}
+      minSize={DEFAULT_SIDEBAR_SIZE}
+      maxSize="35%"
+      padding="1x 1x 0 1x"
+      gap="1x"
+      innerStyles={{
+        overflowX: 'clip',
+      }}
+      onSizeChange={setSidebarSize}
+    >
+      {content}
+    </ResizablePanel>
   );
 }

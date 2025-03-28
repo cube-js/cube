@@ -193,6 +193,17 @@ cube(`all_sales`, {
 });
 ```
 
+<ReferenceBox>
+
+Currently, [`{cube.sql()}` function][ref-cube-sql-func] is not supported in YAML data models.
+Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+
+As a workaround, you can use JavaScript data models, put a SQL query in a
+[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
+the [template context](/reference/python/cube#templatecontext-class).
+
+</ReferenceBox>
+
 Another use case of the Data Blending approach would be when you want to chart
 some measures (business related) together and see how they correlate.
 
@@ -236,3 +247,5 @@ const queries = [
 
 const resultSet = await cubeApi.load(queries);
 ```
+
+[ref-cube-sql-func]: /product/data-modeling/syntax#cubesql-function

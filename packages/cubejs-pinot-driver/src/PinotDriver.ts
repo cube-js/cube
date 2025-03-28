@@ -27,10 +27,18 @@ export type PinotDriverConfiguration = {
   host?: string;
   port?: string;
   user?: string;
+  database?: string;
   basicAuth?: { user: string, password: string };
+  authToken?: string;
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
   queryTimeout?: number;
+  nullHandling?: boolean;
+};
+
+type AuthorizationHeaders = {
+  Authorization: string;
+  database?: string;
 };
 
 type PinotResponse = {
@@ -67,7 +75,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency() {
-    return 2;
+    return 10;
   }
 
   private config: PinotDriverConfiguration;
@@ -92,13 +100,16 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       host: getEnv('dbHost', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
       user: getEnv('dbUser', { dataSource }),
+      database: getEnv('dbName', { dataSource }),
       basicAuth: getEnv('dbPass', { dataSource })
         ? {
           user: getEnv('dbUser', { dataSource }),
           password: getEnv('dbPass', { dataSource }),
         }
         : undefined,
+      authToken: getEnv('pinotAuthToken', { dataSource }),
       ssl: this.getSslOptions(dataSource),
+      nullHandling: getEnv('pinotNullHandling', { dataSource }),
       queryTimeout: getEnv('dbQueryTimeout', { dataSource }),
       ...config
     };
@@ -127,7 +138,17 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     } : value)));
   }
 
-  public authorizationHeaders(): { Authorization?: string } {
+  public authorizationHeaders(): AuthorizationHeaders | {} {
+    if (this.config.authToken) {
+      const res: AuthorizationHeaders = { Authorization: `Bearer ${this.config.authToken}` };
+
+      if (this.config.database) {
+        res.database = this.config.database;
+      }
+
+      return res;
+    }
+
     if (!this.config.basicAuth) {
       return {};
     }
@@ -148,7 +169,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       }),
       body: JSON.stringify({
         sql: query,
-        queryOptions: `useMultistageEngine=true;timeoutMs=${this.config.queryTimeout}`
+        queryOptions: `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout}`
       })
     });
 

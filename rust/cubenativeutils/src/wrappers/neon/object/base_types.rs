@@ -1,75 +1,103 @@
-use super::NeonObject;
+use super::{NeonObject, NeonTypeHandle};
 use crate::wrappers::neon::inner_types::NeonInnerTypes;
+use std::marker::PhantomData;
 
-use crate::wrappers::object::{NativeBoolean, NativeNumber, NativeString, NativeType};
+use crate::wrappers::object::{NativeBoolean, NativeBox, NativeNumber, NativeString, NativeType};
 use cubesql::CubeError;
 use neon::prelude::*;
+use std::ops::Deref;
 
-pub struct NeonString<'cx: 'static, C: Context<'cx>> {
-    object: NeonObject<'cx, C>,
+pub struct NeonString<C: Context<'static>> {
+    object: NeonTypeHandle<C, JsString>,
 }
 
-impl<'cx, C: Context<'cx>> NeonString<'cx, C> {
-    pub fn new(object: NeonObject<'cx, C>) -> Self {
+impl<C: Context<'static>> NeonString<C> {
+    pub fn new(object: NeonTypeHandle<C, JsString>) -> Self {
         Self { object }
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonString<'cx, C> {
-    fn into_object(self) -> NeonObject<'cx, C> {
-        self.object
+impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonString<C> {
+    fn into_object(self) -> NeonObject<C> {
+        self.object.upcast()
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeString<NeonInnerTypes<'cx, C>> for NeonString<'cx, C> {
+impl<C: Context<'static> + 'static> NativeString<NeonInnerTypes<C>> for NeonString<C> {
     fn value(&self) -> Result<String, CubeError> {
         self.object
-            .map_downcast_neon_object::<JsString, _, _>(|cx, object| Ok(object.value(cx)))
+            .map_neon_object::<_, _>(|cx, object| Ok(object.value(cx)))?
     }
 }
 
-pub struct NeonNumber<'cx: 'static, C: Context<'cx>> {
-    object: NeonObject<'cx, C>,
+pub struct NeonNumber<C: Context<'static>> {
+    object: NeonTypeHandle<C, JsNumber>,
 }
 
-impl<'cx, C: Context<'cx>> NeonNumber<'cx, C> {
-    pub fn new(object: NeonObject<'cx, C>) -> Self {
+impl<C: Context<'static>> NeonNumber<C> {
+    pub fn new(object: NeonTypeHandle<C, JsNumber>) -> Self {
         Self { object }
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonNumber<'cx, C> {
-    fn into_object(self) -> NeonObject<'cx, C> {
-        self.object
+impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonNumber<C> {
+    fn into_object(self) -> NeonObject<C> {
+        self.object.upcast()
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeNumber<NeonInnerTypes<'cx, C>> for NeonNumber<'cx, C> {
+impl<C: Context<'static> + 'static> NativeNumber<NeonInnerTypes<C>> for NeonNumber<C> {
     fn value(&self) -> Result<f64, CubeError> {
         self.object
-            .map_downcast_neon_object::<JsNumber, _, _>(|cx, object| Ok(object.value(cx)))
+            .map_neon_object::<_, _>(|cx, object| Ok(object.value(cx)))?
     }
 }
 
-pub struct NeonBoolean<'cx: 'static, C: Context<'cx>> {
-    object: NeonObject<'cx, C>,
+pub struct NeonBoolean<C: Context<'static>> {
+    object: NeonTypeHandle<C, JsBoolean>,
 }
 
-impl<'cx, C: Context<'cx>> NeonBoolean<'cx, C> {
-    pub fn new(object: NeonObject<'cx, C>) -> Self {
+impl<C: Context<'static>> NeonBoolean<C> {
+    pub fn new(object: NeonTypeHandle<C, JsBoolean>) -> Self {
         Self { object }
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonBoolean<'cx, C> {
-    fn into_object(self) -> NeonObject<'cx, C> {
-        self.object
+impl<C: Context<'static> + 'static> NativeType<NeonInnerTypes<C>> for NeonBoolean<C> {
+    fn into_object(self) -> NeonObject<C> {
+        self.object.upcast()
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeBoolean<NeonInnerTypes<'cx, C>> for NeonBoolean<'cx, C> {
+impl<C: Context<'static> + 'static> NativeBoolean<NeonInnerTypes<C>> for NeonBoolean<C> {
     fn value(&self) -> Result<bool, CubeError> {
         self.object
-            .map_downcast_neon_object::<JsBoolean, _, _>(|cx, object| Ok(object.value(cx)))
+            .map_neon_object::<_, _>(|cx, object| Ok(object.value(cx)))?
+    }
+}
+
+pub struct NeonBox<C: Context<'static>, T: 'static> {
+    object: NeonTypeHandle<C, JsBox<T>>,
+    _marker: PhantomData<T>,
+}
+
+impl<C: Context<'static>, T: 'static> NeonBox<C, T> {
+    pub fn new(object: NeonTypeHandle<C, JsBox<T>>) -> Self {
+        Self {
+            object,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<C: Context<'static> + 'static, T: 'static> NativeType<NeonInnerTypes<C>> for NeonBox<C, T> {
+    fn into_object(self) -> NeonObject<C> {
+        self.object.upcast()
+    }
+}
+
+impl<C: Context<'static> + 'static, T: 'static> NativeBox<NeonInnerTypes<C>, T> for NeonBox<C, T> {
+    fn deref_value(&self) -> &T {
+        self.object.get_object_ref().deref()
     }
 }

@@ -2,12 +2,12 @@
 import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
-  QueryOrchestrator,
   ContinueWaitError,
   DriverFactoryByDataSource,
   DriverType,
-  QueryOrchestratorOptions,
   QueryBody,
+  QueryOrchestrator,
+  QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { DatabaseType, RequestContext } from './types';
@@ -88,7 +88,7 @@ export class OrchestratorApi {
         : this.orchestrator.fetchQuery(query);
 
       if (query.isJob) {
-        // We want to immediately resolve and return a jobed build query result
+        // We want to immediately resolve and return a jobbed build query result
         // (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint)
         // because the following stack was optimized for such behavior.
         const job = await fetchQueryPromise;

@@ -4,27 +4,21 @@
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
 
+import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
-import {
+  DatabaseStructure,
   DriverCapabilities,
+  GenericDataBaseType,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
   QueryTablesResult,
-  UnloadOptions,
-  GenericDataBaseType,
   TableColumn,
-  DatabaseStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import {
-  JDBCDriver,
-  JDBCDriverConfiguration,
-} from '@cubejs-backend/jdbc-driver';
+import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
+import { extractUidFromJdbcUrl, resolveJDBCDriver } from './helpers';
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -88,6 +82,21 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Databricks security token (PWD).
      */
     token?: string,
+
+    /**
+     * Azure tenant Id
+     */
+    azureTenantId?: string,
+
+    /**
+     * Azure service principal client Id
+     */
+    azureClientId?: string,
+
+    /**
+     * Azure service principal client secret
+     */
+    azureClientSecret?: string,
   };
 
 type ShowTableRow = {
@@ -117,7 +126,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Show warning message flag.
    */
-  private showSparkProtocolWarn: boolean;
+  private readonly showSparkProtocolWarn: boolean;
 
   /**
    * Driver Configuration.
@@ -132,7 +141,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 10;
   }
 
   /**
@@ -221,6 +230,16 @@ export class DatabricksDriver extends JDBCDriver {
         getEnv('dbExportBucketAzureKey', { dataSource }),
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      // Azure service principal
+      azureTenantId:
+        conf?.azureTenantId ||
+        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+      azureClientId:
+        conf?.azureClientId ||
+        getEnv('dbExportBucketAzureClientId', { dataSource }),
+      azureClientSecret:
+        conf?.azureClientSecret ||
+        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
     };
     if (config.readOnly === undefined) {
       // we can set readonly to true if there is no bucket config provided
@@ -404,8 +423,7 @@ export class DatabricksDriver extends JDBCDriver {
         metadata[database] = {};
       }
 
-      const columns = await this.tableColumnTypes(`${database}.${tableName}`);
-      metadata[database][tableName] = columns;
+      metadata[database][tableName] = await this.tableColumnTypes(`${database}.${tableName}`);
     }));
 
     return metadata;
@@ -678,32 +696,40 @@ export class DatabricksDriver extends JDBCDriver {
     // wasbs://real-container-name@account.blob.core.windows.net
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
+    const prefix = url.pathname.slice(1);
+    const delimiter = (prefix && !prefix.endsWith('/')) ? '/' : '';
+    const objectSearchPrefix = `${prefix}${delimiter}${tableName}`;
 
-    switch (this.config.bucketType) {
-      case 'azure':
-        return this.extractFilesFromAzure(
-          { azureKey: this.config.azureKey || '' },
-          // Databricks uses different bucket address form, so we need to transform it
-          // to the one understandable by extractFilesFromAzure implementation
-          `${url.host}/${url.username}`,
-          tableName,
-        );
-      case 's3':
-        return this.extractUnloadedFilesFromS3(
-          {
-            credentials: {
-              accessKeyId: this.config.awsKey || '',
-              secretAccessKey: this.config.awsSecret || '',
-            },
-            region: this.config.awsRegion || '',
+    if (this.config.bucketType === 'azure') {
+      const {
+        azureKey,
+        azureClientId: clientId,
+        azureTenantId: tenantId,
+        azureClientSecret: clientSecret
+      } = this.config;
+      return this.extractFilesFromAzure(
+        { azureKey, clientId, tenantId, clientSecret },
+        // Databricks uses different bucket address form, so we need to transform it
+        // to the one understandable by extractFilesFromAzure implementation
+        `${url.host}/${url.username}`,
+        objectSearchPrefix,
+      );
+    } else if (this.config.bucketType === 's3') {
+      return this.extractUnloadedFilesFromS3(
+        {
+          credentials: {
+            accessKeyId: this.config.awsKey || '',
+            secretAccessKey: this.config.awsSecret || '',
           },
-          url.host,
-          tableName,
-        );
-      default:
-        throw new Error(`Unsupported export bucket type: ${
-          this.config.bucketType
-        }`);
+          region: this.config.awsRegion || '',
+        },
+        url.host,
+        objectSearchPrefix,
+      );
+    } else {
+      throw new Error(`Unsupported export bucket type: ${
+        this.config.bucketType
+      }`);
     }
   }
 

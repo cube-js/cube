@@ -51,6 +51,10 @@ export class ParamAllocator {
     return `$${paramIndex}$`;
   }
 
+  public getParams() {
+    return this.params;
+  }
+
   // eslint-disable-next-line no-unused-vars
   protected paramPlaceHolder(paramIndex) {
     return '?';

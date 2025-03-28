@@ -6,12 +6,9 @@ pub mod rewriter;
 pub mod rules;
 
 use self::analysis::{LogicalPlanData, MemberNameToExpr};
-use crate::{
-    compile::rewrite::{
-        analysis::{LogicalPlanAnalysis, OriginalExpr},
-        rewriter::{CubeEGraph, CubeRewrite},
-    },
-    CubeError,
+use crate::compile::rewrite::{
+    analysis::{LogicalPlanAnalysis, OriginalExpr},
+    rewriter::{CubeEGraph, CubeRewrite},
 };
 use analysis::MemberNamesToExpr;
 use datafusion::{
@@ -106,6 +103,7 @@ crate::plan_to_language! {
             join_type: JoinType,
             join_constraint: JoinConstraint,
             schema: DFSchemaRef,
+            null_equals_null: bool,
         },
         CrossJoin {
             left: Arc<LogicalPlan>,
@@ -155,6 +153,9 @@ crate::plan_to_language! {
             name: String,
             location: String,
             has_header: bool,
+        },
+        Values {
+            values: Vec<Vec<Expr>>,
         },
         Extension {
             node: Arc<LogicalPlan>,
@@ -282,7 +283,7 @@ crate::plan_to_language! {
             order_expr: Vec<Expr>,
             alias: Option<String>,
             distinct: bool,
-            ungrouped: bool,
+            push_to_cube: bool,
             ungrouped_scan: bool,
         },
         WrappedSelectJoin {
@@ -404,7 +405,10 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
         },
-        FilterSimplifyReplacer {
+        FilterSimplifyPushDownReplacer {
+            filters: Vec<LogicalPlan>,
+        },
+        FilterSimplifyPullUpReplacer {
             filters: Vec<LogicalPlan>,
         },
         OrderReplacer {
@@ -453,19 +457,42 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
-        WrapperPushdownReplacer {
-            member: Arc<LogicalPlan>,
+        WrapperReplacerContext {
             alias_to_cube: Vec<(String, String)>,
-            ungrouped: bool,
+            // When `member` is expression this means that result of this replacer should be used as member expression in load query to Cube.
+            // When `member` is logical plan node this means that logical plan inside allows to push to Cube
+            // Important caveat: it means that result would be used for push to cube *and only there*.
+            // So it's more like "must push to Cube" than "can push to Cube"
+            // This part is important for rewrites like SUM(sumMeasure) => sumMeasure
+            // We can use sumMeasure instead of SUM(sumMeasure) ONLY in with push to Cube
+            // An vice versa, we can't use SUM(sumMeasure) in grouped query to Cube, so it can be allowed ONLY without push to grouped Cube query
+            push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+            // Known qualifiers of grouped subqueries
+            // Used to allow to rewrite columns from them even with push to Cube enabled
+            grouped_subqueries: Vec<String>,
+            // When `member` is logical plan this means it is actually ungrouped, even when push_to_cube is disabled.
+            // When `member` is expression it just acts as a pull-through from pushdown.
+            // It will be filled by every wrapper replacer producer rule, essentially same way as
+            // ungrouped_scan flag in wrapped_select is filled:
+            // fixed false for aggregation, copy inner value for projection.
+            // This flag should make roundtrip from top to bottom and back.
+            ungrouped_scan: bool,
+        },
+        WrapperPushdownReplacer {
+            member: Arc<LogicalPlan>,
+            // Only WrapperReplacerContext should be allowed here
+            // Context be passed from top, by the rule that starts wrapping new logical plan node,
+            // and should make roundtrip from top to bottom and back.
+            context: Arc<LogicalPlan>,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
-            alias_to_cube: Vec<(String, String)>,
-            ungrouped: bool,
-            in_projection: bool,
-            cube_members: Vec<LogicalPlan>,
+            // Only WrapperReplacerContext should be allowed here
+            // Context be passed from top, by the rule that starts wrapping new logical plan node,
+            // and should make roundtrip from top to bottom and back.
+            context: Arc<LogicalPlan>,
         },
         FlattenPushdownReplacer {
             expr: Arc<Expr>,
@@ -490,6 +517,19 @@ crate::plan_to_language! {
         QueryParam {
             index: usize,
         },
+        JoinCheckStage {
+            expr: Arc<Expr>,
+        },
+        JoinCheckPushDown {
+            expr: Arc<Expr>,
+            left_input: Arc<LogicalPlan>,
+            right_input: Arc<LogicalPlan>,
+        },
+        JoinCheckPullUp {
+            expr: Arc<Expr>,
+            left_input: Arc<LogicalPlan>,
+            right_input: Arc<LogicalPlan>,
+        },
     }
 }
 
@@ -499,7 +539,9 @@ crate::plan_to_language! {
 macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
-            LogicalPlanLanguage::$field_variant($field_variant(v)) => Some(v),
+            $crate::compile::rewrite::LogicalPlanLanguage::$field_variant($field_variant(v)) => {
+                Some(v)
+            }
             _ => None,
         })
     }};
@@ -509,7 +551,7 @@ macro_rules! var_iter {
 macro_rules! var_list_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
-            LogicalPlanLanguage::$field_variant(v) => Some(v),
+            $crate::compile::rewrite::LogicalPlanLanguage::$field_variant(v) => Some(v),
             _ => None,
         })
     }};
@@ -519,6 +561,44 @@ macro_rules! var_list_iter {
 macro_rules! var {
     ($var_str:expr) => {
         $var_str.parse().unwrap()
+    };
+}
+
+#[macro_export]
+macro_rules! copy_value {
+    ($egraph:expr, $subst:expr, $ty:ty, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {{
+        let mut found = false;
+        let mut found_value: Option<&$ty> = None;
+        for in_value in $crate::var_iter!($egraph[$subst[$in_var]], $in_kind) {
+            // Typechecking for $in_kind
+            let in_value: &$ty = in_value;
+            if found {
+                // Found many different unified representations of same kind for a single eclass, not safe to copy
+                found_value = None;
+            } else {
+                found = true;
+                found_value = Some(in_value);
+            }
+        }
+        if let Some(found_value) = found_value {
+            let out_value = found_value.clone();
+            $subst.insert(
+                $out_var,
+                $egraph.add($crate::compile::rewrite::LogicalPlanLanguage::$out_kind(
+                    $out_kind(out_value),
+                )),
+            );
+            true
+        } else {
+            false
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! copy_flag {
+    ($egraph:expr, $subst:expr, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {
+        $crate::copy_value!($egraph, $subst, bool, $in_var, $in_kind, $out_var, $out_kind)
     };
 }
 
@@ -584,6 +664,12 @@ pub fn column_name_to_member_vec(
 }
 
 impl LogicalPlanData {
+    // TODO use it instead of find_member_by_alias in more places
+    fn find_member_by_column(&mut self, column: &Column) -> Option<(&MemberNameToExpr, String)> {
+        let name = column.flat_name();
+        self.find_member_by_alias(&name)
+    }
+
     fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
         if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
             Self::do_find_member_by_alias(member_names_to_expr, name)
@@ -608,7 +694,7 @@ impl LogicalPlanData {
         {
             {
                 let column_name = expr_column_name(&expr, &None);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -619,7 +705,7 @@ impl LogicalPlanData {
             }
             {
                 let column_name = expr_column_name_with_relation(&expr, &mut relation);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -1383,7 +1469,7 @@ fn wrapped_select(
     order_expr: impl Display,
     alias: impl Display,
     distinct: impl Display,
-    ungrouped: impl Display,
+    push_to_cube: impl Display,
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
@@ -1403,7 +1489,7 @@ fn wrapped_select(
         order_expr,
         alias,
         distinct,
-        ungrouped,
+        push_to_cube,
         ungrouped_scan
     )
 }
@@ -1444,12 +1530,15 @@ fn wrapped_select_window_expr_empty_tail() -> String {
     wrapped_select_window_expr(Vec::<String>::new())
 }
 
+fn wrapped_select_join(input: impl Display, expr: impl Display, join_type: impl Display) -> String {
+    format!("(WrappedSelectJoin {} {} {})", input, expr, join_type)
+}
+
 #[allow(dead_code)]
 fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectJoins {} {})", left, right)
 }
 
-#[allow(dead_code)]
 fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
 }
@@ -1636,8 +1725,7 @@ fn case_expr<D: Display>(
             "CaseExprWhenThenExpr",
             when_then
                 .into_iter()
-                .map(|(when, then)| vec![when, then])
-                .flatten()
+                .flat_map(|(when, then)| [when, then])
                 .collect(),
         ),
         case_expr_else_expr(else_expr),
@@ -1728,6 +1816,7 @@ fn join(
     right_on: impl Display,
     join_type: impl Display,
     join_constraint: impl Display,
+    null_equals_null: impl Display,
 ) -> String {
     let join_type_prefix = if join_type.to_string().starts_with("?") {
         ""
@@ -1740,7 +1829,7 @@ fn join(
         "JoinJoinConstraint:"
     };
     format!(
-        "(Join {} {} {} {} {}{} {}{})",
+        "(Join {} {} {} {} {}{} {}{} {})",
         left,
         right,
         left_on,
@@ -1749,6 +1838,7 @@ fn join(
         join_type,
         join_constraint_prefix,
         join_constraint,
+        null_equals_null,
     )
 }
 
@@ -1814,8 +1904,12 @@ fn filter_replacer(
     )
 }
 
-fn filter_simplify_replacer(members: impl Display) -> String {
-    format!("(FilterSimplifyReplacer {})", members)
+fn filter_simplify_push_down_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPushDownReplacer {})", members)
+}
+
+fn filter_simplify_pull_up_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPullUpReplacer {})", members)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
@@ -1900,30 +1994,25 @@ fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> Str
     format!("(CaseExprReplacer {} {})", members, alias_to_cube)
 }
 
-fn wrapper_pushdown_replacer(
-    members: impl Display,
+fn wrapper_replacer_context(
     alias_to_cube: impl Display,
-    ungrouped: impl Display,
+    push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
+    grouped_subqueries: impl Display,
+    ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {} {} {} {} {})",
-        members, alias_to_cube, ungrouped, in_projection, cube_members
+        "(WrapperReplacerContext {alias_to_cube} {push_to_cube} {in_projection} {cube_members} {grouped_subqueries} {ungrouped_scan})",
     )
 }
 
-fn wrapper_pullup_replacer(
-    members: impl Display,
-    alias_to_cube: impl Display,
-    ungrouped: impl Display,
-    in_projection: impl Display,
-    cube_members: impl Display,
-) -> String {
-    format!(
-        "(WrapperPullupReplacer {} {} {} {} {})",
-        members, alias_to_cube, ungrouped, in_projection, cube_members
-    )
+fn wrapper_pushdown_replacer(members: impl Display, context: impl Display) -> String {
+    format!("(WrapperPushdownReplacer {members} {context})",)
+}
+
+fn wrapper_pullup_replacer(members: impl Display, context: impl Display) -> String {
+    format!("(WrapperPullupReplacer {members} {context})",)
 }
 
 fn flatten_pushdown_replacer(
@@ -2060,7 +2149,7 @@ fn cube_scan(
     ungrouped: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {} {}))",
+        "(CubeScan {} {} {} {} {} {} {} {} {} {})",
         alias_to_cube,
         members,
         filters,
@@ -2080,6 +2169,18 @@ fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
 
 fn distinct(input: impl Display) -> String {
     format!("(Distinct {})", input)
+}
+
+fn join_check_stage(expr: impl Display) -> String {
+    format!("(JoinCheckStage {expr})")
+}
+
+fn join_check_push_down(expr: impl Display, left: impl Display, right: impl Display) -> String {
+    format!("(JoinCheckPushDown {expr} {left} {right})")
+}
+
+fn join_check_pull_up(expr: impl Display, left: impl Display, right: impl Display) -> String {
+    format!("(JoinCheckPullUp {expr} {left} {right})")
 }
 
 pub fn original_expr_name(egraph: &CubeEGraph, id: Id) -> Option<String> {

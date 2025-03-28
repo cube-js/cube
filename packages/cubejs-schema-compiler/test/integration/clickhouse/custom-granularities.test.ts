@@ -41,9 +41,11 @@ describe('Custom Granularities', () => {
           granularities:
             - name: half_year
               interval: 6 months
+              origin: '2024-01-01' # to keep tests stable across time (year change, etc)
             - name: half_year_by_1st_april
               interval: 6 months
-              offset: 3 months
+              #offset: 3 months
+              origin: '2024-04-01' # to keep tests stable across time (year change, etc)
             - name: two_weeks_by_friday
               interval: 2 weeks
               origin: '2024-08-23'

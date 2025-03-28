@@ -157,7 +157,7 @@ export function QueryBuilderGraphQL() {
                 value={
                   queryError
                     ? // @ts-ignore
-                      queryError?.networkError?.result?.error ?? queryError.toString()
+                      (queryError?.networkError?.result?.error ?? queryError.toString())
                     : JSON.stringify(cleanedRawData, null, 2)
                 }
               />

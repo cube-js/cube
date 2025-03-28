@@ -177,7 +177,7 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
   capabilities() {
     return { unloadWithoutTempTable: true };
   }
-  
+
   queryColumnTypes() {
     return [];
   }
@@ -1531,7 +1531,7 @@ describe('QueryOrchestrator', () => {
         external: true,
       }],
       renewQuery: true,
-      
+
       requestId: 'basic'
     };
     const promise = queryOrchestrator.fetchQuery(query);

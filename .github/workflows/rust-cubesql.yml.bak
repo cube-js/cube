@@ -32,7 +32,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt, clippy
@@ -62,7 +62,11 @@ jobs:
     #  We use host instead of cross container, because it's much faster
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    name: Unit (Rewrite Engine)
+    name: Unit (Rewrite Engine) (CUBESQL_TOP_DOWN_EXTRACTOR=${{ matrix.top-down-extractor }})
+    strategy:
+      matrix:
+        top-down-extractor: ['true', 'false']
+      fail-fast: false
 
     steps:
       - name: Checkout
@@ -90,6 +94,7 @@ jobs:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
           CUBESQL_SQL_PUSH_DOWN: true
+          CUBESQL_TOP_DOWN_EXTRACTOR: ${{ matrix.top-down-extractor }}
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
         run: |
@@ -106,7 +111,8 @@ jobs:
 
   native_linux:
     needs: [lint]
-    runs-on: ubuntu-20.04
+    # Please use minimal possible version of ubuntu, because it produces constraint on glibc
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} with Python ${{ matrix.python-version }}
     strategy:
@@ -133,7 +139,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -239,13 +245,13 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
@@ -322,12 +328,12 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-07-15
+          toolchain: 1.84.1
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}

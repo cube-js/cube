@@ -92,6 +92,135 @@ describe('pre-aggregations', () => {
     expect(cubeEvaluator.cubeFromPath('Orders').preAggregations.ordersRollupJoin.scheduledRefresh).toEqual(undefined);
   });
 
+  it('query rollupLambda', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(
+      `
+        cube(\`Users\`, {
+          sql: \`SELECT * FROM public.users\`,
+
+          preAggregations: {
+            usersRollup: {
+              dimensions: [CUBE.id],
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`string\`,
+              primaryKey: true,
+            },
+
+            name: {
+              sql: \`name\`,
+              type: \`string\`,
+            },
+          },
+        });
+
+        cube('Orders', {
+          sql: \`SELECT * FROM orders\`,
+
+          preAggregations: {
+            ordersRollupLambda: {
+              type: \`rollupLambda\`,
+              rollups: [simple1, simple2],
+            },
+            simple1: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status, Users.name],
+              timeDimension: CUBE.created_at,
+              granularity: 'day',
+              partitionGranularity: 'day',
+              buildRangeStart: {
+                sql: \`SELECT NOW() - INTERVAL '1000 day'\`,
+              },
+              buildRangeEnd: {
+                sql: \`SELECT NOW()\`
+              },
+            },
+            simple2: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.status, Users.name],
+              timeDimension: CUBE.created_at,
+              granularity: 'day',
+              partitionGranularity: 'day',
+              buildRangeStart: {
+                sql: \`SELECT NOW() - INTERVAL '1000 day'\`,
+              },
+              buildRangeEnd: {
+                sql: \`SELECT NOW()\`
+              },
+            },
+          },
+
+          joins: {
+            Users: {
+              relationship: \`belongsTo\`,
+              sql: \`\${CUBE.userId} = \${Users.id}\`,
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`number\`,
+              primaryKey: true,
+            },
+            userId: {
+              sql: \`user_id\`,
+              type: \`number\`,
+            },
+            status: {
+              sql: \`status\`,
+              type: \`string\`,
+            },
+            created_at: {
+              sql: \`created_at\`,
+              type: \`time\`,
+            },
+          },
+        });
+      `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'Orders.count'
+      ],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(queryAndParams[0].includes('undefined')).toBeFalsy();
+    expect(queryAndParams[0].includes('"orders__status" "orders__status"')).toBeTruthy();
+    expect(queryAndParams[0].includes('"users__name" "users__name"')).toBeTruthy();
+    expect(queryAndParams[0].includes('"orders__created_at_day" "orders__created_at_day"')).toBeTruthy();
+    expect(queryAndParams[0].includes('"orders__count" "orders__count"')).toBeTruthy();
+    expect(queryAndParams[0].includes('UNION ALL')).toBeTruthy();
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    expect(preAggregationsDescription.length).toEqual(2);
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('Orders.simple1');
+    expect(preAggregationsDescription[1].preAggregationId).toEqual('Orders.simple2');
+  });
+
   // @link https://github.com/cube-js/cube/issues/6623
   it('view and pre-aggregation granularity', async () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(

@@ -195,6 +195,16 @@ const getQueries = (compiler, joinGraph, cubeEvaluator) => ([
     }],
     timezone: 'America/Los_Angeles',
   }),
+  // no granularity
+  new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    measures: ['cube.totalQuantity', 'cube.totalProfit'],
+    dimensions: ['cube.city'],
+    timeDimensions: [{
+      dimension: 'cube.orderDate',
+      dateRange: ['2020-01-01 00:00:00.000', '2020-03-30 22:50:50.999'],
+    }],
+    timezone: 'America/Los_Angeles',
+  }),
 ]);
 
 describe(
@@ -205,7 +215,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, false, false));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -259,6 +269,15 @@ describe(
         expect(query.indexOf('cube__daily_data')).toEqual(-1);
         expect(query.indexOf('cube__hourly_data')).toEqual(-1);
       });
+
+      it('query with no granularity match MonthlyData', async () => {
+        await compiler.compile();
+        const [,,,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
+        const [query] = request.buildSqlAndParams();
+        expect(query.indexOf('cube__monthly_data')).toBeGreaterThanOrEqual(0);
+        expect(query.indexOf('cube__daily_data')).toEqual(-1);
+        expect(query.indexOf('cube__hourly_data')).toEqual(-1);
+      });
     });
 
     describe('The `DailyData` pre-aggregation with the `allowNonStrictDateRangeMatch` enabled', () => {
@@ -266,7 +285,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(false, true, false));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -294,7 +313,7 @@ describe(
         expect(query.indexOf('cube__hourly_data')).toEqual(-1);
       });
 
-      it('hour query with the `week` granularity match `HourlyData`', async () => {
+      it('hour query with the `week` granularity match `DailyData`', async () => {
         await compiler.compile();
         const [,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
         const [query] = request.buildSqlAndParams();
@@ -320,6 +339,15 @@ describe(
         expect(query.indexOf('cube__daily_data')).toBeGreaterThanOrEqual(0);
         expect(query.indexOf('cube__hourly_data')).toEqual(-1);
       });
+
+      it('query with no granularity match MonthlyData', async () => {
+        await compiler.compile();
+        const [,,,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
+        const [query] = request.buildSqlAndParams();
+        expect(query.indexOf('cube__monthly_data')).toEqual(-1);
+        expect(query.indexOf('cube__daily_data')).toBeGreaterThanOrEqual(0);
+        expect(query.indexOf('cube__hourly_data')).toEqual(-1);
+      });
     });
 
     describe('The `HourlyData` pre-aggregation with the `allowNonStrictDateRangeMatch` enabled', () => {
@@ -327,7 +355,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(false, false, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -381,6 +409,15 @@ describe(
         expect(query.indexOf('cube__daily_data')).toEqual(-1);
         expect(query.indexOf('cube__hourly_data')).toBeGreaterThanOrEqual(0);
       });
+
+      it('query with no granularity match HourlyData', async () => {
+        await compiler.compile();
+        const [,,,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
+        const [query] = request.buildSqlAndParams();
+        expect(query.indexOf('cube__monthly_data')).toEqual(-1);
+        expect(query.indexOf('cube__daily_data')).toEqual(-1);
+        expect(query.indexOf('cube__hourly_data')).toBeGreaterThanOrEqual(0);
+      });
     });
 
     describe('`MonthlyData` and `DailyData` pre-aggregations with the `allowNonStrictDateRangeMatch` enabled', () => {
@@ -388,7 +425,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, true, false));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -449,7 +486,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, false, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -510,7 +547,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(false, true, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);
@@ -571,7 +608,7 @@ describe(
 
       const { compiler, joinGraph, cubeEvaluator } =
         prepareCompiler(getCube(true, true, true));
-      
+
       it('month query with the `month` granularity match `MonthlyData`', async () => {
         await compiler.compile();
         const [request] = getQueries(compiler, joinGraph, cubeEvaluator);

@@ -528,6 +528,7 @@ describe('Cube Validation', () => {
 
     const cubeSymbols = new CubeSymbols();
     cubeSymbols.compile([cubeA], {
+      // @ts-ignore
       inContext: () => false,
       error: (message, _e) => {
         console.log(message);

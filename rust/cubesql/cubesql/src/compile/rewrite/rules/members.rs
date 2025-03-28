@@ -1,11 +1,11 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::{ConstantFolding, LogicalPlanData, MemberNamesToExpr, OriginalExpr},
+        analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
-        cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join, like_expr,
-        limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
+        cube_scan_order_empty_tail, dimension_expr, distinct, expr_column_name, fun_expr, join,
+        like_expr, limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
         literal_member, measure_expr, member_pushdown_replacer, member_replacer,
         merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
@@ -23,9 +23,9 @@ use crate::{
         LimitFetch, LimitSkip, ListType, LiteralExprValue, LiteralMemberRelation,
         LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube,
         MemberErrorError, MemberErrorPriority, MemberPushdownReplacerAliasToCube,
-        MemberReplacerAliasToCube, ProjectionAlias, SegmentName, TableScanSourceTableName,
-        TableScanTableName, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-        VirtualFieldCube, VirtualFieldName,
+        MemberReplacerAliasToCube, ProjectionAlias, SegmentName, TableScanFetch,
+        TableScanProjection, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+        TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
     },
     config::ConfigObj,
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -81,6 +81,9 @@ impl RewriteRules for MemberRules {
                 self.transform_table_scan(
                     "?source_table_name",
                     "?table_name",
+                    "?projection",
+                    "?filters",
+                    "?fetch",
                     "?alias_to_cube",
                     "?cube_scan_members",
                 ),
@@ -134,8 +137,11 @@ impl RewriteRules for MemberRules {
                         "?old_members",
                         "?filters",
                         "?orders",
-                        "?limit",
-                        "?offset",
+                        // If CubeScan already have limit and offset it would be incorrect to push aggregation into it
+                        // Aggregate(CubeScan(limit, offset)) would run aggregation over limited rows
+                        // CubeScan(aggregation, limit, offset) would return limited groups
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
                         "?split",
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
@@ -161,8 +167,8 @@ impl RewriteRules for MemberRules {
                     ),
                     "?filters",
                     "?orders",
-                    "?limit",
-                    "?offset",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
                     "?split",
                     "?new_pushdown_join",
                     "CubeScanWrapped:false",
@@ -234,8 +240,8 @@ impl RewriteRules for MemberRules {
                         "?members",
                         "?filters",
                         "?orders",
-                        "?cube_fetch",
-                        "?offset",
+                        "?inner_fetch",
+                        "?inner_skip",
                         "?split",
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
@@ -254,7 +260,47 @@ impl RewriteRules for MemberRules {
                     "CubeScanWrapped:false",
                     "?ungrouped",
                 ),
-                self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
+                self.push_down_limit(
+                    "?skip",
+                    "?fetch",
+                    "?inner_skip",
+                    "?inner_fetch",
+                    "?new_skip",
+                    "?new_fetch",
+                ),
+            ),
+            transforming_rewrite(
+                "select-distinct-dimensions",
+                distinct(cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?orders",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
+                    "?split",
+                    "?can_pushdown_join",
+                    "CubeScanWrapped:false",
+                    "?left_ungrouped",
+                )),
+                cube_scan(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?orders",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
+                    "?split",
+                    "?can_pushdown_join",
+                    "CubeScanWrapped:false",
+                    "CubeScanUngrouped:false",
+                ),
+                self.select_distinct_dimensions(
+                    "?alias_to_cube",
+                    "?members",
+                    "?filters",
+                    "?left_ungrouped",
+                ),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -382,6 +428,7 @@ impl RewriteRules for MemberRules {
                     "?right_on",
                     "?join_type",
                     "?join_constraint",
+                    "?null_equals_null",
                 ),
                 cross_join(
                     cube_scan(
@@ -547,38 +594,38 @@ impl MemberRules {
                 "member-pushdown-replacer-aggregate-group",
                 ListType::AggregateGroupExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_flat_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-aggr",
                 ListType::AggregateAggrExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_flat_push_down_node_substitute_rules(
                 "member-pushdown-replacer-projection",
                 ListType::ProjectionExpr,
                 ListType::CubeScanMembers,
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
         } else {
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-group",
                 "AggregateGroupExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-aggregate-aggr",
                 "AggregateAggrExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
             rules.extend(replacer_push_down_node_substitute_rules(
                 "member-pushdown-replacer-projection",
                 "ProjectionExpr",
                 "CubeScanMembers",
-                member_replacer_fn.clone(),
+                member_replacer_fn,
             ));
         }
         rules.extend(find_matching_old_member("column", column_expr("?column")));
@@ -1134,15 +1181,49 @@ impl MemberRules {
         &self,
         source_table_name_var: &'static str,
         table_name_var: &'static str,
+        table_scan_projection_var: &'static str,
+        table_scan_filters_var: &'static str,
+        table_scan_fetch_var: &'static str,
         alias_to_cube_var: &'static str,
         cube_scan_members_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let source_table_name_var = var!(source_table_name_var);
         let table_name_var = var!(table_name_var);
+        let table_scan_projection_var = var!(table_scan_projection_var);
+        let table_scan_filters_var = var!(table_scan_filters_var);
+        let table_scan_fetch_var = var!(table_scan_fetch_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let cube_scan_members_var = var!(cube_scan_members_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
+            for table_projection in var_iter!(
+                egraph[subst[table_scan_projection_var]],
+                TableScanProjection
+            ) {
+                if table_projection.is_some() {
+                    // This rule always inserts AllMembersCube, so it does not support projection in TableScan
+                    // TODO support this and enable "push projection to scan" optimizer from DF, it should help many CubeScans without members
+                    return false;
+                }
+            }
+
+            for table_filters in
+                var_list_iter!(egraph[subst[table_scan_filters_var]], TableScanFilters)
+            {
+                if !table_filters.is_empty() {
+                    // This rule always inserts empty filters, so it does not support filters in TableScan
+                    return false;
+                }
+            }
+
+            for table_fetch in var_iter!(egraph[subst[table_scan_fetch_var]], TableScanFetch) {
+                if table_fetch.is_some() {
+                    // This rule always inserts limit:None, so it does not support fetch in TableScan
+                    // TODO support this
+                    return false;
+                }
+            }
+
             for name in var_iter!(
                 egraph[subst[source_table_name_var]],
                 TableScanSourceTableName
@@ -1342,7 +1423,7 @@ impl MemberRules {
                     if !aliases_to_cube.is_empty() && !projection_aliases.is_empty() {
                         // TODO: We could, more generally, cache referenced_columns(referenced_expr), which calls expr_column_name.
                         let mut columns = HashSet::new();
-                        columns.extend(referenced_columns(referenced_expr).into_iter());
+                        columns.extend(referenced_columns(referenced_expr));
 
                         for alias_to_cube in aliases_to_cube {
                             for projection_alias in &projection_aliases {
@@ -1368,7 +1449,7 @@ impl MemberRules {
                                         egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
                                             CubeScanAliasToCube(replaced_alias_to_cube.clone()),
                                         ));
-                                    subst.insert(new_alias_to_cube_var, new_alias_to_cube.clone());
+                                    subst.insert(new_alias_to_cube_var, new_alias_to_cube);
 
                                     let member_pushdown_replacer_alias_to_cube = egraph.add(
                                         LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
@@ -1396,7 +1477,7 @@ impl MemberRules {
         }
     }
 
-    fn replace_alias(
+    pub fn replace_alias(
         alias_to_cube: &Vec<(String, String)>,
         projection_alias: &Option<String>,
     ) -> Vec<(String, String)> {
@@ -1435,6 +1516,70 @@ impl MemberRules {
                     })
                     .collect::<Vec<_>>(),
             )
+    }
+
+    fn select_distinct_dimensions(
+        &self,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filters_var: &'static str,
+        left_ungrouped_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filters_var = var!(filters_var);
+        let left_ungrouped_var = var!(left_ungrouped_var);
+        let meta_context = self.meta_context.clone();
+
+        move |egraph, subst| {
+            let empty_filters = &egraph[subst[filters_var]]
+                .data
+                .is_empty_list
+                .unwrap_or(true);
+            let ungrouped =
+                var_iter!(egraph[subst[left_ungrouped_var]], CubeScanUngrouped).any(|v| *v);
+
+            if !empty_filters && ungrouped {
+                return false;
+            }
+
+            let res = match egraph
+                .index(subst[members_var])
+                .data
+                .member_name_to_expr
+                .as_ref()
+            {
+                Some(names_to_expr) => {
+                    names_to_expr.list.iter().all(|(_, member, _)| {
+                        // we should allow transform for queries with dimensions only,
+                        // as it doesn't make sense for measures
+                        match member {
+                            Member::Dimension { .. } => true,
+                            Member::VirtualField { .. } => true,
+                            Member::LiteralMember { .. } => true,
+                            _ => false,
+                        }
+                    })
+                }
+                None => {
+                    // this might be the case of `SELECT DISTINCT *`
+                    // we need to check that there are only dimensions defined in the referenced cube(s)
+                    var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube)
+                        .cloned()
+                        .all(|alias_to_cube| {
+                            alias_to_cube.iter().all(|(_, cube_name)| {
+                                if let Some(cube) = meta_context.find_cube_with_name(&cube_name) {
+                                    cube.measures.len() == 0 && cube.segments.len() == 0
+                                } else {
+                                    false
+                                }
+                            })
+                        })
+                }
+            };
+
+            res
+        }
     }
 
     fn push_down_non_empty_aggregate(
@@ -1495,8 +1640,8 @@ impl MemberRules {
             }
 
             let mut columns = HashSet::new();
-            columns.extend(referenced_columns(referenced_group_expr).into_iter());
-            columns.extend(referenced_columns(referenced_aggr_expr).into_iter());
+            columns.extend(referenced_columns(referenced_group_expr));
+            columns.extend(referenced_columns(referenced_aggr_expr));
 
             let new_pushdown_join = referenced_aggr_expr.is_empty();
 
@@ -1556,47 +1701,90 @@ impl MemberRules {
         &self,
         skip_var: &'static str,
         fetch_var: &'static str,
+        inner_skip_var: &'static str,
+        inner_fetch_var: &'static str,
         new_skip_var: &'static str,
         new_fetch_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let skip_var = var!(skip_var);
         let fetch_var = var!(fetch_var);
+        let inner_skip_var = var!(inner_skip_var);
+        let inner_fetch_var = var!(inner_fetch_var);
         let new_skip_var = var!(new_skip_var);
         let new_fetch_var = var!(new_fetch_var);
         move |egraph, subst| {
+            // This transform expects only single value in every (eclass, kind)
+            // No two different values of fetch or skip should ever get unified
+
             let mut skip_value = None;
             for skip in var_iter!(egraph[subst[skip_var]], LimitSkip) {
-                if skip.unwrap_or_default() > 0 {
-                    skip_value = *skip;
-                    break;
-                }
+                skip_value = *skip;
+                break;
             }
             let mut fetch_value = None;
             for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
-                if fetch.unwrap_or_default() > 0 {
-                    fetch_value = *fetch;
-                    break;
+                fetch_value = *fetch;
+                break;
+            }
+            // TODO support this case
+            if fetch_value == Some(0) {
+                // Broken and unsupported case for now
+                return false;
+            }
+
+            let mut inner_skip_value = None;
+            for inner_skip in var_iter!(egraph[subst[inner_skip_var]], CubeScanOffset) {
+                inner_skip_value = *inner_skip;
+                break;
+            }
+
+            let mut inner_fetch_value = None;
+            for inner_fetch in var_iter!(egraph[subst[inner_fetch_var]], CubeScanLimit) {
+                inner_fetch_value = *inner_fetch;
+                break;
+            }
+
+            let new_skip = match (skip_value, inner_skip_value) {
+                (None, None) => None,
+                (Some(skip), None) | (None, Some(skip)) => Some(skip),
+                (Some(outer_skip), Some(inner_skip)) => Some(outer_skip + inner_skip),
+            };
+            // No need to set offset=0, it's same as no offset
+            let new_skip = if new_skip != Some(0) { new_skip } else { None };
+            let new_fetch = match (fetch_value, inner_fetch_value) {
+                (None, None) => None,
+                // Inner node have no limit, maybe just offset, result limit is same as for outer node
+                (Some(outer_fetch), None) => Some(outer_fetch),
+                // Outer node have no limit, but may have offset
+                // First, inner offset would apply
+                // Then inner node would limit rows
+                // Then outer offset would apply, which would yield no more than `inner_fetch - outer_skip` rows
+                (None, Some(inner_fetch)) => {
+                    Some(inner_fetch.saturating_sub(skip_value.unwrap_or(0)))
                 }
-            }
+                // Both nodes have a limit
+                // First, inner offset would apply
+                // Then inner node would limit rows
+                // Then outer offset would apply, which would yield no more than `in_limit - out_offset` rows
+                // Then outer limit would apply, which would yield no more than minimal of two
+                (Some(outer_fetch), Some(inner_fetch)) => Some(usize::min(
+                    inner_fetch.saturating_sub(skip_value.unwrap_or(0)),
+                    outer_fetch,
+                )),
+            };
 
-            if skip_value.is_some() || fetch_value.is_some() {
-                subst.insert(
-                    new_skip_var,
-                    egraph.add(LogicalPlanLanguage::CubeScanOffset(CubeScanOffset(
-                        skip_value,
-                    ))),
-                );
-                subst.insert(
-                    new_fetch_var,
-                    egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(
-                        fetch_value,
-                    ))),
-                );
+            subst.insert(
+                new_skip_var,
+                egraph.add(LogicalPlanLanguage::CubeScanOffset(CubeScanOffset(
+                    new_skip,
+                ))),
+            );
+            subst.insert(
+                new_fetch_var,
+                egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(new_fetch))),
+            );
 
-                return true;
-            }
-
-            false
+            true
         }
     }
 
@@ -1875,7 +2063,7 @@ impl MemberRules {
             .cloned()
             {
                 // alias_to_cube at this point is already filtered to a single cube
-                let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                let cube_alias = alias_to_cube.first().unwrap().0 .1.to_string();
                 for cube in var_iter!(egraph[subst[cube_var]], AllMembersCube).cloned() {
                     let column_iter = if default_count {
                         vec![Column::from_name(Self::default_count_measure_name())]
@@ -2028,7 +2216,7 @@ impl MemberRules {
                             .cloned()
                             {
                                 if let Some(measure) =
-                                    meta_context.find_measure_with_name(measure_name.to_string())
+                                    meta_context.find_measure_with_name(&measure_name)
                                 {
                                     let measure_cube_name = measure_name.split(".").next().unwrap();
                                     if let Some(((_, cube_alias), _)) = alias_to_cube
@@ -2067,7 +2255,7 @@ impl MemberRules {
                                 }
 
                                 if let Some(dimension) =
-                                    meta_context.find_dimension_with_name(measure_name.to_string())
+                                    meta_context.find_dimension_with_name(&measure_name)
                                 {
                                     let alias_to_cube = alias_to_cube.clone();
                                     subst.insert(
@@ -2171,7 +2359,7 @@ impl MemberRules {
                                                 call_agg_type,
                                                 alias,
                                                 measure_out_var,
-                                                cube_alias,
+                                                cube_alias.to_string(),
                                                 subst[aggr_expr_var],
                                                 alias_to_cube,
                                                 disable_strict_agg_type_match,
@@ -2278,7 +2466,7 @@ impl MemberRules {
             {
                 for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                     // alias_to_cube at this point is already filtered to a single cube
-                    let alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                    let alias = alias_to_cube.first().unwrap().0 .1.to_string();
                     let alias_expr = Self::add_alias_column(
                         egraph,
                         column.name.to_string(),
@@ -2381,7 +2569,7 @@ impl MemberRules {
             {
                 for alias in var_iter!(egraph[subst[alias_var]], AliasExprAlias).cloned() {
                     // alias_to_cube at this point is already filtered to a single cube
-                    let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
+                    let cube_alias = alias_to_cube.first().unwrap().0 .1.to_string();
                     let alias_expr =
                         Self::add_alias_column(egraph, alias.to_string(), Some(cube_alias.clone()));
                     subst.insert(output_column_var, alias_expr);
@@ -2584,11 +2772,11 @@ impl MemberRules {
                                 continue;
                             }
 
-                            let is_left_order_empty = Some(true)
-                                == egraph[subst[left_order_var]].data.is_empty_list.clone();
+                            let is_left_order_empty =
+                                Some(true) == egraph[subst[left_order_var]].data.is_empty_list;
 
-                            let is_right_order_empty = Some(true)
-                                == egraph[subst[right_order_var]].data.is_empty_list.clone();
+                            let is_right_order_empty =
+                                Some(true) == egraph[subst[right_order_var]].data.is_empty_list;
 
                             if !is_left_order_empty && !is_right_order_empty {
                                 continue;
@@ -2675,77 +2863,14 @@ impl MemberRules {
         let left_aliases_var = var!(left_aliases_var);
         let right_aliases_var = var!(right_aliases_var);
         move |egraph, subst| {
-            if egraph
-                .index(subst[left_aliases_var])
-                .data
-                .member_name_to_expr
-                .is_some()
-            {
-                if egraph
-                    .index(subst[right_aliases_var])
-                    .data
-                    .member_name_to_expr
-                    .is_some()
-                {
-                    let left_join_ons: Vec<Vec<_>> =
-                        var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
-                            .map(|elem| elem.iter().cloned().collect())
-                            .collect();
-                    for left_join_on in left_join_ons {
-                        for join_on in left_join_on {
-                            let member_names_to_expr_left = &mut egraph
-                                .index_mut(subst[left_aliases_var])
-                                .data
-                                .member_name_to_expr
-                                .as_mut()
-                                .unwrap();
-
-                            // TODO: Avoid the join_on.*.clone() calls (should be trivial).
-                            let mut column_name = join_on.name.clone();
-                            if let Some(name) = find_column_by_alias(
-                                &column_name,
-                                member_names_to_expr_left,
-                                &join_on.relation.clone().unwrap_or_default(),
-                            ) {
-                                column_name = name.split(".").last().unwrap().to_string();
-                            }
-
-                            if column_name == "__cubeJoinField" {
-                                let right_join_ons: Vec<Vec<_>> =
-                                    var_iter!(egraph[subst[right_on_var]], JoinRightOn)
-                                        .map(|elem| elem.iter().cloned().collect())
-                                        .collect();
-                                for right_join_on in right_join_ons {
-                                    for join_on in right_join_on.iter() {
-                                        let member_names_to_expr_right = &mut egraph
-                                            .index_mut(subst[right_aliases_var])
-                                            .data
-                                            .member_name_to_expr
-                                            .as_mut()
-                                            .unwrap();
-
-                                        let mut column_name = join_on.name.clone();
-                                        if let Some(name) = find_column_by_alias(
-                                            &column_name,
-                                            member_names_to_expr_right,
-                                            &join_on.relation.clone().unwrap_or_default(),
-                                        ) {
-                                            column_name =
-                                                name.split(".").last().unwrap().to_string();
-                                        }
-
-                                        if column_name == "__cubeJoinField" {
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            false
+            is_proper_cube_join_condition(
+                egraph,
+                subst,
+                left_aliases_var,
+                left_on_var,
+                right_aliases_var,
+                right_on_var,
+            )
         }
     }
 
@@ -2909,18 +3034,111 @@ pub fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option
     }
 }
 
-fn find_column_by_alias(
-    column_name: &String,
-    member_names_to_expr: &mut MemberNamesToExpr,
-    cube_alias: &String,
-) -> Option<String> {
+fn find_column_by_alias<'mn>(
+    column_name: &str,
+    member_names_to_expr: &'mn mut MemberNamesToExpr,
+    cube_alias: &str,
+) -> Option<&'mn str> {
     if let Some((tuple, _)) = LogicalPlanData::do_find_member_by_alias(
         member_names_to_expr,
         &format!("{}.{}", cube_alias, column_name),
     ) {
-        return tuple.0.clone();
+        return tuple.0.as_deref();
     }
     None
+}
+
+fn is_proper_cube_join_condition(
+    egraph: &mut CubeEGraph,
+    subst: &Subst,
+    left_cube_members_var: Var,
+    left_on_var: Var,
+    right_cube_members_var: Var,
+    right_on_var: Var,
+) -> bool {
+    if egraph[subst[left_cube_members_var]]
+        .data
+        .member_name_to_expr
+        .is_none()
+    {
+        return false;
+    }
+
+    if egraph[subst[right_cube_members_var]]
+        .data
+        .member_name_to_expr
+        .is_none()
+    {
+        return false;
+    }
+
+    let left_join_ons = var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
+        .cloned()
+        .collect::<Vec<_>>();
+    let right_join_ons = var_iter!(egraph[subst[right_on_var]], JoinRightOn)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    // For now this allows only exact left.__cubeJoinField = right.__cubeJoinField
+    // TODO implement more complex conditions
+
+    for left_join_on in &left_join_ons {
+        if left_join_on.len() != 1 {
+            continue;
+        }
+
+        let left_join_on = &left_join_on[0];
+
+        let left_member_names_to_expr = &mut egraph[subst[left_cube_members_var]]
+            .data
+            .member_name_to_expr
+            .as_mut()
+            .unwrap();
+
+        let mut left_column_name = left_join_on.name.as_str();
+        if let Some(name) = find_column_by_alias(
+            left_column_name,
+            left_member_names_to_expr,
+            left_join_on.relation.as_deref().unwrap_or_default(),
+        ) {
+            left_column_name = name.rsplit_once(".").unwrap().1;
+        }
+
+        if left_column_name != "__cubeJoinField" {
+            continue;
+        }
+
+        for right_join_on in &right_join_ons {
+            if right_join_on.len() != 1 {
+                continue;
+            }
+
+            let right_join_on = &right_join_on[0];
+
+            let right_member_names_to_expr = &mut egraph[subst[right_cube_members_var]]
+                .data
+                .member_name_to_expr
+                .as_mut()
+                .unwrap();
+
+            let mut right_column_name = right_join_on.name.as_str();
+            if let Some(name) = find_column_by_alias(
+                right_column_name,
+                right_member_names_to_expr,
+                right_join_on.relation.as_deref().unwrap_or_default(),
+            ) {
+                right_column_name = name.rsplit_once(".").unwrap().1;
+            }
+
+            if right_column_name != "__cubeJoinField" {
+                continue;
+            }
+
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]

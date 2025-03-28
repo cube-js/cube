@@ -4,8 +4,8 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage, ScalarUDFExprFun,
-        WrapperPullupReplacerAliasToCube,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context,
+        ScalarUDFExprFun, WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -16,23 +16,8 @@ impl WrapperRules {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-udf",
-                wrapper_pushdown_replacer(
-                    udf_expr_var_arg("?fun", "?args"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                udf_expr_var_arg(
-                    "?fun",
-                    wrapper_pushdown_replacer(
-                        "?args",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
-                ),
+                wrapper_pushdown_replacer(udf_expr_var_arg("?fun", "?args"), "?context"),
+                udf_expr_var_arg("?fun", wrapper_pushdown_replacer("?args", "?context")),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-udf",
@@ -40,89 +25,49 @@ impl WrapperRules {
                     "?fun",
                     wrapper_pullup_replacer(
                         "?args",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                 ),
                 wrapper_pullup_replacer(
                     udf_expr_var_arg("?fun", "?args"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_udf_expr("?fun", "?alias_to_cube"),
             ),
             rewrite(
                 "wrapper-push-down-udf-args",
-                wrapper_pushdown_replacer(
-                    udf_fun_expr_args("?left", "?right"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                wrapper_pushdown_replacer(udf_fun_expr_args("?left", "?right"), "?context"),
                 udf_fun_expr_args(
-                    wrapper_pushdown_replacer(
-                        "?left",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?right",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?left", "?context"),
+                    wrapper_pushdown_replacer("?right", "?context"),
                 ),
             ),
             rewrite(
                 "wrapper-pull-up-udf-args",
                 udf_fun_expr_args(
-                    wrapper_pullup_replacer(
-                        "?left",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
-                    wrapper_pullup_replacer(
-                        "?right",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    wrapper_pullup_replacer("?left", "?context"),
+                    wrapper_pullup_replacer("?right", "?context"),
                 ),
-                wrapper_pullup_replacer(
-                    udf_fun_expr_args("?left", "?right"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                wrapper_pullup_replacer(udf_fun_expr_args("?left", "?right"), "?context"),
             ),
             rewrite(
                 "wrapper-push-down-udf-empty-tail",
-                wrapper_pushdown_replacer(
-                    udf_fun_expr_args_empty_tail(),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                wrapper_pullup_replacer(
-                    udf_fun_expr_args_empty_tail(),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                wrapper_pushdown_replacer(udf_fun_expr_args_empty_tail(), "?context"),
+                wrapper_pullup_replacer(udf_fun_expr_args_empty_tail(), "?context"),
             ),
         ]);
     }
@@ -138,7 +83,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

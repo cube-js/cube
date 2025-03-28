@@ -94,7 +94,13 @@ describe('PreAggregations', () => {
         },
         createdAt: {
           type: 'time',
-          sql: 'created_at'
+          sql: 'created_at',
+          granularities: {
+            hourTenMinOffset: {
+              interval: '1 hour',
+              offset: '10 minutes'
+            }
+          }
         },
         signedUpAt: {
           type: 'time',
@@ -224,11 +230,17 @@ describe('PreAggregations', () => {
           granularity: 'hour',
           partitionGranularity: 'month'
         },
+        countCustomGranularity: {
+          measures: [count],
+          timeDimension: createdAt,
+          granularity: 'hourTenMinOffset'
+        },
         sourceAndIdRollup: {
           measures: [count],
           dimensions: [sourceAndId, source],
           timeDimension: createdAt,
           granularity: 'hour',
+          allowNonStrictDateRangeMatch: true
         },
         visitorsMultiplied: {
           measures: [count],
@@ -541,6 +553,92 @@ describe('PreAggregations', () => {
             visitors__created_at_day: '2017-01-06T00:00:00.000Z',
             visitors__count: '2'
           }
+        ]
+      );
+    });
+  }));
+
+  it('simple pre-aggregation (allowNonStrictDateRangeMatch: true)', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2017-01-01 00:10:00.000', '2017-01-29 22:59:59.999'],
+        granularity: 'hour',
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(queryAndParams[0]).toMatch(/visitors_source_and_id_rollup/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            visitors__count: '1',
+            visitors__created_at_hour: '2017-01-02T16:00:00.000Z',
+          },
+          {
+            visitors__count: '1',
+            visitors__created_at_hour: '2017-01-04T16:00:00.000Z',
+          },
+          {
+            visitors__count: '1',
+            visitors__created_at_hour: '2017-01-05T16:00:00.000Z',
+          },
+          {
+            visitors__count: '2',
+            visitors__created_at_hour: '2017-01-06T16:00:00.000Z',
+          },
+        ]
+      );
+    });
+  }));
+
+  it('simple pre-aggregation with custom granularity (exact match)', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2017-01-01 00:10:00.000', '2017-01-29 22:09:59.999'],
+        granularity: 'hourTenMinOffset',
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(queryAndParams[0]).toMatch(/visitors_count_custom_granularity/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            visitors__count: '1',
+            visitors__created_at_hourTenMinOffset: '2017-01-02T15:10:00.000Z',
+          },
+          {
+            visitors__count: '1',
+            visitors__created_at_hourTenMinOffset: '2017-01-04T15:10:00.000Z',
+          },
+          {
+            visitors__count: '1',
+            visitors__created_at_hourTenMinOffset: '2017-01-05T15:10:00.000Z',
+          },
+          {
+            visitors__count: '2',
+            visitors__created_at_hourTenMinOffset: '2017-01-06T15:10:00.000Z',
+          },
         ]
       );
     });

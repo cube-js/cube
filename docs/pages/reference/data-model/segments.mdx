@@ -6,9 +6,10 @@ redirect_from:
 
 # Segments
 
-Segments are predefined filters. You can use segments to define complex
-filtering logic in SQL. For example, users for one particular city can be
-treated as a segment:
+You can use the `segments` parameter within [cubes][ref-ref-cubes] to define segments.
+Segments are predefined filters. You can use segments to define complex filtering logic in SQL.
+
+For example, users for one particular city can be treated as a segment:
 
 <CodeTabs>
 
@@ -170,7 +171,7 @@ cubes:
 
 ### `public`
 
-The `public` property is used to manage the visibility of a segment. Valid
+The `public` parameter is used to manage the visibility of a segment. Valid
 values for `public` are `true` and `false`. When set to `false`, this segment
 **cannot** be queried through the API. Defaults to `true`.
 
@@ -336,6 +337,7 @@ cubes:
 </CodeTabs>
 
 
+[ref-ref-cubes]: /reference/data-model/cube
 [ref-backend-query]: /product/apis-integrations/rest-api/query-format
 [ref-schema-gen]: /guides/recipes/code-reusability/schema-generation
 [ref-naming]: /product/data-modeling/syntax#naming

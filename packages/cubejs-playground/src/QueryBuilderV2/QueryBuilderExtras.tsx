@@ -9,6 +9,7 @@ import {
   DownIcon,
   Flow,
   Grid,
+  InfoCircleIcon,
   Link,
   NumberInput,
   Radio,
@@ -18,6 +19,7 @@ import {
   tasty,
   Text,
   Title,
+  TooltipProvider,
 } from '@cube-dev/ui-kit';
 import { forwardRef, Key, useEffect, useMemo, useState } from 'react';
 import { DragDropContext, Draggable, Droppable, OnDragEndResponder } from 'react-beautiful-dnd';
@@ -25,12 +27,13 @@ import { TCubeMemberType } from '@cubejs-client/core';
 
 import { useStoredTimezones, useEvent } from './hooks';
 import { MemberLabel } from './components/MemberLabel';
+import { InfoIconButton } from './components/InfoIconButton';
 import { useQueryBuilderContext } from './context';
 import { ORDER_LABEL_BY_TYPE } from './utils/labels';
 import { formatNumber } from './utils/formatters';
 import { TIMEZONES } from './utils/timezones';
 
-const DEFAULT_LIMIT = 5_000;
+const DEFAULT_LIMIT = 0; // no limit
 
 const ALL_TIMEZONES: {
   tzCode: string;
@@ -40,7 +43,7 @@ const ALL_TIMEZONES: {
 }[] = [
   {
     tzCode: '',
-    label: 'UTC (Default)',
+    label: 'UTC (default)',
     name: 'Coordinated Universal Time',
     utc: '+00:00',
   },
@@ -51,8 +54,9 @@ const AVAILABLE_TIMEZONES = ALL_TIMEZONES.map((tz) => tz.tzCode);
 const LIMIT_OPTIONS: { key: number; label: string }[] = [
   { key: 100, label: '100' },
   { key: 1000, label: '1,000' },
-  { key: 5000, label: '5,000 (Default)' },
-  { key: 50000, label: '50,000 (Max)' },
+  { key: 5000, label: '5,000' },
+  { key: 50000, label: '50,000' },
+  { key: 0, label: 'Default limit' },
 ];
 const LIMIT_OPTION_VALUES = LIMIT_OPTIONS.map((option) => option.key) as number[];
 
@@ -188,7 +192,7 @@ export const OrderListItem = forwardRef(function OrderListItem(props: OrderListI
     <OrderListItemStyled ref={ref} key={name} data-member={memberType} {...otherProps}>
       <DragOutlined style={{ fontSize: 16 }} />
 
-      <MemberLabel name={label} member={memberType} />
+      <MemberLabel name={label} memberType={memberType} />
 
       <Radio.ButtonGroup
         aria-label="Sorting"
@@ -315,11 +319,13 @@ export function QueryBuilderExtras() {
     // ungrouped
     const isSelected =
       query.ungrouped ||
+      query.total ||
       query.timezone ||
       query.offset ||
       (query.limit && query.limit !== DEFAULT_LIMIT);
     const selectedCount =
       (query.ungrouped ? 1 : 0) +
+      (query.total ? 1 : 0) +
       (query.timezone ? 1 : 0) +
       (query.limit && query.limit !== DEFAULT_LIMIT ? 1 : 0) +
       (query.offset ? 1 : 0);
@@ -345,14 +351,6 @@ export function QueryBuilderExtras() {
       ? optionsWithStored
       : [timezoneByName(timezone), ...optionsWithStored];
 
-    // limit
-    const limit = query.limit || DEFAULT_LIMIT;
-    const limitOptions = LIMIT_OPTION_VALUES.includes(limit)
-      ? LIMIT_OPTIONS
-      : [{ key: limit, label: formatNumber(limit) }, ...LIMIT_OPTIONS].sort(
-          (a, b) => a.key - b.key
-        );
-
     return (
       <DialogTrigger type="popover" placement="bottom end">
         <Button
@@ -373,9 +371,16 @@ export function QueryBuilderExtras() {
           <Dialog width="36x">
             <Content padding="1x 1.5x" gap="1.5x">
               <Flow gap="1x">
-                <Title level={4} preset="h6">
-                  Query
-                </Title>
+                <Space gap=".25x">
+                  <Title level={4} preset="h6">
+                    Query
+                  </Title>
+                  <InfoIconButton
+                    tooltip="Click to learn more about the query format"
+                    tooltipSuffix=""
+                    to="!https://cube.dev/docs/product/apis-integrations/rest-api/query-format#query-properties"
+                  />
+                </Space>
                 <Checkbox
                   aria-label="Ungrouped"
                   isSelected={query.ungrouped ?? false}
@@ -385,6 +390,16 @@ export function QueryBuilderExtras() {
                   }}
                 >
                   Ungrouped
+                </Checkbox>
+                <Checkbox
+                  aria-label="Show total number of rows"
+                  isSelected={query.total ?? false}
+                  onChange={(total) => {
+                    updateQuery({ total: total || undefined });
+                    close();
+                  }}
+                >
+                  Show total number of rows
                 </Checkbox>
               </Flow>
               <ComboBox
@@ -439,33 +454,9 @@ export function QueryBuilderExtras() {
                   );
                 })}
               </ComboBox>
-              <Select
-                label="Limit"
-                size="small"
-                extra={
-                  limit !== DEFAULT_LIMIT ? (
-                    <Link
-                      onPress={() => {
-                        updateQuery({ limit: undefined });
-                        close();
-                      }}
-                    >
-                      Reset
-                    </Link>
-                  ) : null
-                }
-                selectedKey={String(query.limit)}
-                onSelectionChange={(val: Key) => {
-                  updateQuery(() => ({ limit: Number(val as string) }));
-                  close();
-                }}
-              >
-                {limitOptions.map((option: any) => (
-                  <Select.Item key={option.key} textValue={option.label}>
-                    {option.label}
-                  </Select.Item>
-                ))}
-              </Select>
+
+              <QueryBuilderLimitSelect />
+
               <NumberInput
                 label="Offset"
                 size="small"
@@ -487,13 +478,27 @@ export function QueryBuilderExtras() {
                 onChange={(val) => {
                   updateQuery({ offset: val });
                 }}
+                onKeyDown={(e) => {
+                  // close on Enter
+                  if (e.key === 'Enter') {
+                    close();
+                    e.preventDefault();
+                  }
+                }}
               />
             </Content>
           </Dialog>
         )}
       </DialogTrigger>
     );
-  }, [query.ungrouped, query.timezone, query.offset, storedTimezones.join('::'), query.limit]);
+  }, [
+    query.ungrouped,
+    query.timezone,
+    query.offset,
+    query.total,
+    storedTimezones.join('::'),
+    query.limit,
+  ]);
 
   const orderSelector = useMemo(() => {
     if (!allFields.length) {
@@ -564,5 +569,51 @@ export function QueryBuilderExtras() {
       {orderSelector}
       {optionsPopover}
     </Space>
+  );
+}
+
+export function QueryBuilderLimitSelect() {
+  const { query, updateQuery } = useQueryBuilderContext();
+
+  const limit = query.limit ?? DEFAULT_LIMIT;
+  const limitOptions = LIMIT_OPTION_VALUES.includes(limit)
+    ? LIMIT_OPTIONS
+    : [{ key: limit, label: formatNumber(limit) }, ...LIMIT_OPTIONS].sort((a, b) => a.key - b.key);
+
+  return (
+    <Select
+      label="Limit"
+      size="small"
+      extra={
+        limit !== DEFAULT_LIMIT ? (
+          <Link
+            onPress={() => {
+              updateQuery({ limit: undefined });
+              close();
+            }}
+          >
+            Reset
+          </Link>
+        ) : null
+      }
+      labelSuffix={
+        <InfoIconButton
+          tooltip="Click to learn more about the row limit"
+          tooltipSuffix=""
+          to="!https://cube.dev/docs/product/apis-integrations/queries#row-limit"
+        />
+      }
+      selectedKey={query.limit == null ? '0' : String(query.limit)}
+      onSelectionChange={(val: Key) => {
+        updateQuery(() => ({ limit: val === '0' ? undefined : Number(val as string) }));
+        close();
+      }}
+    >
+      {limitOptions.map((option) => (
+        <Select.Item key={option.key} textValue={option.label}>
+          {option.label}
+        </Select.Item>
+      ))}
+    </Select>
   );
 }

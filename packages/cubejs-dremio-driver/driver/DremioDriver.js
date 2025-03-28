@@ -49,6 +49,14 @@ class DremioDriver extends BaseDriver {
       assertDataSource('default');
 
     this.config = {
+      dbUrl:
+        config.dbUrl ||
+        getEnv('dbUrl', { dataSource }) ||
+        '',
+      dremioAuthToken:
+        config.dremioAuthToken ||
+        getEnv('dremioAuthToken', { dataSource }) ||
+        '',
       host:
         config.host ||
         getEnv('dbHost', { dataSource }) ||
@@ -80,11 +88,20 @@ class DremioDriver extends BaseDriver {
         getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
     };
-    const protocol = (this.config.ssl === true || this.config.ssl === 'true')
-      ? 'https'
-      : 'http';
-    this.config.url =
-      `${protocol}://${this.config.host}:${this.config.port}`;
+
+    if (this.config.dbUrl) {
+      this.config.url = this.config.dbUrl;
+      this.config.apiVersion = '';
+      if (this.config.dremioAuthToken === '') {
+        throw new Error('dremioAuthToken is blank');
+      }
+    } else {
+      const protocol = (this.config.ssl === true || this.config.ssl === 'true')
+        ? 'https'
+        : 'http';
+      this.config.url = `${protocol}://${this.config.host}:${this.config.port}`;
+      this.config.apiVersion = '/api/v3';
+    }
   }
 
   /**
@@ -103,6 +120,20 @@ class DremioDriver extends BaseDriver {
    * @protected
    */
   async getToken() {
+    if (this.config.dremioAuthToken) {
+      const bearerToken = `Bearer ${this.config.dremioAuthToken}`;
+      await axios.get(
+        `${this.config.url}${this.config.apiVersion}/catalog`,
+        {
+          headers: {
+            Authorization: bearerToken
+          },
+        },
+      );
+
+      return bearerToken;
+    }
+
     if (this.authToken && this.authToken.expires > new Date().getTime()) {
       return `_dremio${this.authToken.token}`;
     }
@@ -129,7 +160,7 @@ class DremioDriver extends BaseDriver {
 
     return axios.request({
       method,
-      url: `${this.config.url}${url}`,
+      url: `${this.config.url}${this.config.apiVersion}${url}`,
       headers: {
         Authorization: token
       },
@@ -141,7 +172,7 @@ class DremioDriver extends BaseDriver {
    * @protected
    */
   async getJobStatus(jobId) {
-    const { data } = await this.restDremioQuery('get', `/api/v3/job/${jobId}`);
+    const { data } = await this.restDremioQuery('get', `/job/${jobId}`);
 
     if (data.jobState === 'FAILED') {
       throw new Error(data.errorMessage);
@@ -162,7 +193,7 @@ class DremioDriver extends BaseDriver {
    * @protected
    */
   async getJobResults(jobId, limit = 500, offset = 0) {
-    return this.restDremioQuery('get', `/api/v3/job/${jobId}/results?offset=${offset}&limit=${limit}`);
+    return this.restDremioQuery('get', `/job/${jobId}/results?offset=${offset}&limit=${limit}`);
   }
 
   /**
@@ -171,7 +202,7 @@ class DremioDriver extends BaseDriver {
    * @return {Promise<*>}
    */
   async executeQuery(sql) {
-    const { data } = await this.restDremioQuery('post', '/api/v3/sql', { sql });
+    const { data } = await this.restDremioQuery('post', '/sql', { sql });
     return data.id;
   }
 
@@ -216,7 +247,7 @@ class DremioDriver extends BaseDriver {
   }
 
   async refreshTablesSchema(path) {
-    const { data } = await this.restDremioQuery('get', `/api/v3/catalog/by-path/${path}`);
+    const { data } = await this.restDremioQuery('get', `/catalog/by-path/${path}`);
     if (!data || !data.children) {
       return true;
     }

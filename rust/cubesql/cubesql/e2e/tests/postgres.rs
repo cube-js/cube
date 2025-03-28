@@ -25,17 +25,32 @@ pub struct PostgresIntegrationTestSuite {
     // connection: tokio_postgres::Connection<Socket, NoTlsStream>,
 }
 
+fn get_env_var(env_name: &'static str) -> Option<String> {
+    if let Ok(value) = env::var(env_name) {
+        // Variable can be defined, but be empty on the CI
+        if value.is_empty() {
+            log::warn!("Environment variable {} is declared, but empty", env_name);
+
+            None
+        } else {
+            Some(value)
+        }
+    } else {
+        None
+    }
+}
+
 impl PostgresIntegrationTestSuite {
     pub(crate) async fn before_all() -> AsyncTestConstructorResult {
         let mut env_defined = false;
 
-        if let Ok(testing_cube_token) = env::var("CUBESQL_TESTING_CUBE_TOKEN".to_string()) {
+        if let Some(testing_cube_token) = get_env_var("CUBESQL_TESTING_CUBE_TOKEN") {
             env::set_var("CUBESQL_CUBE_TOKEN", testing_cube_token);
 
             env_defined = true;
         };
 
-        if let Ok(testing_cube_url) = env::var("CUBESQL_TESTING_CUBE_URL".to_string()) {
+        if let Some(testing_cube_url) = get_env_var("CUBESQL_TESTING_CUBE_URL") {
             env::set_var("CUBESQL_CUBE_URL", testing_cube_url);
         } else {
             env_defined = false;
@@ -68,7 +83,7 @@ impl PostgresIntegrationTestSuite {
             services.wait_processing_loops().await.unwrap();
         });
 
-        sleep(Duration::from_millis(1 * 1000)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let client = PostgresIntegrationTestSuite::create_client(
             format!("host=127.0.0.1 port={} user=test password=test", port)
@@ -94,7 +109,7 @@ impl PostgresIntegrationTestSuite {
         client
     }
 
-    async fn print_query_result<'a>(
+    async fn print_query_result(
         &self,
         res: Vec<Row>,
         with_description: bool,
@@ -119,7 +134,7 @@ impl PostgresIntegrationTestSuite {
         for row in res.into_iter() {
             let mut values: Vec<String> = Vec::new();
 
-            for (idx, column) in row.columns().into_iter().enumerate() {
+            for (idx, column) in row.columns().iter().enumerate() {
                 if !description_done {
                     description.push(format!(
                         "{} type: {} ({})",
@@ -127,7 +142,7 @@ impl PostgresIntegrationTestSuite {
                         column.type_().oid(),
                         PgType::get_by_tid(
                             PgTypeId::from_oid(column.type_().oid())
-                                .expect(&format!("Unknown oid {}", column.type_().oid()))
+                                .unwrap_or_else(|| panic!("Unknown oid {}", column.type_().oid()))
                         )
                         .typname,
                     ));
@@ -135,7 +150,7 @@ impl PostgresIntegrationTestSuite {
 
                 // We dont need data when with_rows = false, but it's useful for testing that data type is correct
                 match PgTypeId::from_oid(column.type_().oid())
-                    .expect(&format!("Unknown type oid: {}", column.type_().oid()))
+                    .unwrap_or_else(|| panic!("Unknown type oid: {}", column.type_().oid()))
                 {
                     PgTypeId::INT8 => {
                         let value: Option<i64> = row.get(idx);
@@ -1254,10 +1269,10 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
             |rows| {
                 assert_eq!(rows.len(), 1);
 
-                let columns = rows.get(0).unwrap().columns();
+                let columns = rows.first().unwrap().columns();
                 assert_eq!(
                     columns
-                        .into_iter()
+                        .iter()
                         .map(|col| col.type_().oid())
                         .collect::<Vec<u32>>(),
                     vec![1184, 1114]

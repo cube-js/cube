@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "1.1.0",
+  "version": "1.2.27",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -21,7 +21,8 @@
     "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:server:stream": "CUBESQL_STREAM_MODE=true CUBESQL_LOG_LEVEL=error CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
-    "test:unit": "jest --forceExit",
+    "unit": "jest --forceExit",
+    "test:unit": "yarn run unit",
     "test:cargo": "cargo test",
     "lint": "eslint test/ js/ --ext .ts",
     "lint:fix": "eslint --fix test/ js/ --ext .ts"
@@ -33,7 +34,7 @@
     "dist/js"
   ],
   "devDependencies": {
-    "@cubejs-backend/linter": "^1.0.0",
+    "@cubejs-backend/linter": "1.2.27",
     "@types/jest": "^27",
     "@types/node": "^18",
     "cargo-cp-artifact": "^0.1.9",
@@ -43,8 +44,8 @@
     "uuid": "^8.3.2"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "1.1.0",
-    "@cubejs-backend/shared": "1.0.3",
+    "@cubejs-backend/cubesql": "1.2.27",
+    "@cubejs-backend/shared": "1.2.27",
     "@cubejs-infra/post-installer": "^0.0.7"
   },
   "resources": {

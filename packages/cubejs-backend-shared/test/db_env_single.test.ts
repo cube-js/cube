@@ -618,6 +618,57 @@ describe('Single datasources', () => {
     expect(getEnv('dbExportBucketAzureKey', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("dbExportBucketAzureTenantId")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'default1';
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID = 'default2';
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID;
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureTenantId', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
+  test('getEnv("dbExportBucketAzureClientId")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'default1';
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID = 'default2';
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID;
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureClientId', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
+  test('getEnv("dbExportBucketAzureClientSecret")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'default1';
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET = 'default2';
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET;
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('dbExportBucketAzureClientSecret', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("dbExportIntegration")', () => {
     process.env.CUBEJS_DB_EXPORT_INTEGRATION = 'default1';
     expect(getEnv('dbExportIntegration', { dataSource: 'default' })).toEqual('default1');
@@ -707,34 +758,6 @@ describe('Single datasources', () => {
     expect(getEnv('databricksCatalog', { dataSource: 'default' })).toBeUndefined();
     expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toBeUndefined();
     expect(getEnv('databricksCatalog', { dataSource: 'wrong' })).toBeUndefined();
-  });
-
-  test('getEnv("databrickAcceptPolicy")', () => {
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'true';
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(true);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(true);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(true);
-
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'false';
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(false);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(false);
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(false);
-
-    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'wrong';
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toThrow(
-      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
-    );
-
-    delete process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY;
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toBeUndefined();
   });
 
   test('getEnv("athenaAwsKey")', () => {
@@ -908,20 +931,59 @@ describe('Single datasources', () => {
   });
 
   test('getEnv("clickhouseReadOnly")', () => {
-    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'default1';
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual('default1');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual('default1');
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'true';
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual(true);
 
-    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'default2';
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual('default2');
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual('default2');
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'false';
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual(false);
+
+    process.env.CUBEJS_DB_CLICKHOUSE_READONLY = 'wrong';
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'default' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_READONLY" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
 
     delete process.env.CUBEJS_DB_CLICKHOUSE_READONLY;
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toBeUndefined();
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseReadOnly', { dataSource: 'wrong' })).toEqual(false);
+  });
+
+  test('getEnv("clickhouseCompression")', () => {
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'true';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('clickhouseCompression', { dataSource: 'wrong' })).toEqual(true);
+
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'false';
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'wrong' })).toEqual(false);
+
+    process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION = 'wrong';
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'default' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'postgres' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+    expect(() => getEnv('clickhouseCompression', { dataSource: 'wrong' })).toThrow(
+      'env-var: "CUBEJS_DB_CLICKHOUSE_COMPRESSION" should be either "true", "false", "TRUE", "FALSE", 1, or 0'
+    );
+
+    delete process.env.CUBEJS_DB_CLICKHOUSE_COMPRESSION;
+    expect(getEnv('clickhouseCompression', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('clickhouseCompression', { dataSource: 'wrong' })).toEqual(false);
   });
 
   test('getEnv("elasticApiId")', () => {

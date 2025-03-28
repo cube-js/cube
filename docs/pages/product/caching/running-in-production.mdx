@@ -38,7 +38,7 @@ the [Environment Variables reference][ref-config-env].
 Next, run Cube and tell it to connect to Cube Store running on `localhost` (on
 the default port `3030`):
 
-```bash{outputLines: 2-4}
+```bash
 docker run -p 4000:4000 \
   -e CUBEJS_CUBESTORE_HOST=localhost \
   -v ${PWD}:/cube/conf \
@@ -244,7 +244,7 @@ discouraged and can lead to consistency and data corruption errors.
 <SuccessBox>
 
 Using Azure Blob Storage with Cube Store is only supported in Cube Cloud on
-[Enterprise and above plans](https://cube.dev/pricing).
+[Enterprise and above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
 
@@ -325,6 +325,28 @@ Refresh worker should be able to finish pre-aggregation refresh before
 garbage collection starts. It means that all pre-aggregation partitions
 should be built before any tables are removed.
 
+#### Supported file systems
+
+The garbage collection mechanism relies on the ability of the underlying file
+system to report the creation time of a file.
+
+If the file system does not support getting the creation time, you will see the
+following error message in Cube Store logs:
+
+```
+ERROR [cubestore::remotefs::cleanup] <pid:1>
+error while getting created time for file "<name>.chunk.parquet":
+creation time is not available for the filesystem
+```
+
+<ReferenceBox>
+
+XFS is known to not support getting the creation time of a file.
+Please see [this issue](https://github.com/cube-js/cube/issues/7905#issuecomment-2504212623)
+for possible workarounds.
+
+</ReferenceBox>
+
 ## Security
 
 ### Authentication
@@ -346,13 +368,64 @@ Store operations.
 
 <SuccessBox>
 
-Data-at-rest encryption in Cube Store is only available in Cube Cloud on
-[Enterprise and above plans](https://cube.dev/pricing).
+Data-at-rest encryption in Cube Store is available in Cube Cloud on the
+[Enterprise Premier](https://cube.dev/pricing) product tier.
+It also requires the M [Cube Store Worker tier](/product/deployment/cloud/pricing#cube-store-worker-tiers).
 
 </SuccessBox>
 
 You can provide, rotate, or drop your own [customer-managed keys][ref-cmk] (CMK)
 for Cube Store via the <Btn>Encryption Keys</Btn> page in Cube Cloud.
+
+## Troubleshooting
+
+### Heavy pre-aggregations
+
+When building some pre-aggregations, you might encounter the following error:
+
+```
+Error: Error during create table: CREATE TABLE <REDACTED>
+Error: Query execution timeout after 10 min of waiting
+```
+
+It means that your pre-aggregation is too heavy and takes too long to build.
+
+As a temporary solution, you can increase the timeout for all queies that Cube
+runs against your data source via the `CUBEJS_DB_QUERY_TIMEOUT` environment variable.
+
+However, it is recommended that you optimize your pre-aggregations instead:
+
+* Use an export bucket if your [data source][ref-data-sources] supports it. Cube will then load the pre-aggregation data in a much more efficient way.
+* Use [partitions][ref-pre-agg-partitions]. Cube will then run a separate query to build each partition.
+* Build pre-aggregations [incrementally][ref-pre-agg-incremental]. Cube will then build only the necessary partitions with each pre-aggregation refresh.
+* Set an appropriate [build range][ref-pre-agg-build-range] if you don't need to query the whole date range. Cube will then include only the necessary data in the pre-aggregation.
+* Check that your pre-aggregation includes only necessary dimensions. Each additional dimension usually increases the volume of the pre-aggregation data.
+  * If you include a high cardinality dimension, Cube needs to store a lot of data in the pre-aggregation. For example, if you include the primary key into the pre-aggregation, Cube will effectively need to store a copy of the original table in the pre-aggregation, which is rarely useful.
+  * If a single pre-aggregation is used by queries with different sets of dimensions, consider creating separate pre-aggregations for each set of dimensions. This way, Cube will only include necessary data in each pre-aggregation.
+* Check if you have a heavy calculation in the [`sql` expression][ref-cube-sql] of your cubes (rather than a simple `sql_table` reference). If it's the case, you can build an additional [`original_sql` pre-aggregation][ref-pre-agg-original-sql] and [instruct][ref-pre-agg-use-original-sql] Cube to use it when building other pre-aggregations for this cube.
+
+### MinIO
+
+When using MinIO for persistent storage, you might encounter the following error:
+
+```
+Error: Error during upload of <REDACTED>
+File <REDACTED> can't be listed after upload.
+Either there's Cube Store cluster misconfiguration,
+or storage can't provide the required consistency.
+```
+
+Most likely, it happens because MinIO is not providing strong consistency guarantees,
+as required for Cube Store's [persistent storage](#persistent-storage).
+You can either try configuring MinIO to provide strong consistency or switch to
+using S3 or GCS.
+
+<WarningBox>
+
+The support for MinIO as persistent storage in Cube Store was contributed by the community.
+It's not supported by Cube or the vendor.
+
+</WarningBox>
 
 
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
@@ -361,3 +434,10 @@ for Cube Store via the <Btn>Encryption Keys</Btn> page in Cube Cloud.
 [link-parquet-encryption]: https://parquet.apache.org/docs/file-format/data-pages/encryption/
 [link-aes]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
 [ref-cmk]: /product/workspace/encryption-keys
+[ref-data-sources]: /product/configuration/data-sources
+[ref-pre-agg-partitions]: /product/caching/using-pre-aggregations#partitioning
+[ref-pre-agg-incremental]: /reference/data-model/pre-aggregations#incremental
+[ref-pre-agg-build-range]: /reference/data-model/pre-aggregations#build_range_start-and-build_range_end
+[ref-cube-sql]: /reference/data-model/cube#sql
+[ref-pre-agg-original-sql]: /reference/data-model/pre-aggregations#original_sql
+[ref-pre-agg-use-original-sql]: /reference/data-model/pre-aggregations#use_original_sql_pre_aggregations

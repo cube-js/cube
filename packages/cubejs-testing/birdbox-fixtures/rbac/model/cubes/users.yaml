@@ -19,6 +19,11 @@ cubes:
 
     access_policy:
       - role: "*"
+        row_level:
+          filters:
+            - member: "{CUBE}.city"
+              operator: equals
+              values: ["{ security_context.auth.userAttributes.city }"]
       - role: admin
         conditions:
           # This thing will fail if there's no auth info in the context

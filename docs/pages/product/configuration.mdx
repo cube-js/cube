@@ -152,8 +152,7 @@ Cube can be run in an insecure, development mode by setting the
 mode does the following:
 
 - Disables authentication checks.
-- Disables access control checks based on the [publicity][ref-data-model-publicity]
-of data model entities.
+- Disables [member-level access control][ref-mls].
 - Enables Cube Store in single instance mode.
 - Enables background refresh for in-memory cache and [scheduled
   pre-aggregations][link-scheduled-refresh].
@@ -163,7 +162,7 @@ of data model entities.
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors.
 
-[ref-ref-meta]: /reference/rest-api#v1meta
+[ref-ref-meta]: /product/apis-integrations/rest-api/reference#v1meta
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-gql-api]: /product/apis-integrations/graphql-api
 [ref-sql-api]: /product/apis-integrations/sql-api
@@ -177,6 +176,6 @@ of data model entities.
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-custom-docker-image]: /product/deployment/core#extend-the-docker-image
 [link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/
-[ref-data-model-publicity]: /product/data-modeling/concepts/publicity
+[ref-mls]: /product/auth/member-level-security
 [link-current-python-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L13
 [link-current-nodejs-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L1

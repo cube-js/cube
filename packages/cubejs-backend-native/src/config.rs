@@ -1,5 +1,7 @@
 use crate::gateway::server::ApiGatewayServerImpl;
-use crate::gateway::{ApiGatewayRouterBuilder, ApiGatewayServer};
+use crate::gateway::{
+    ApiGatewayRouterBuilder, ApiGatewayServer, ApiGatewayState, GatewayAuthService,
+};
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use async_trait::async_trait;
 use cubesql::config::injection::Injector;
@@ -72,6 +74,7 @@ impl NodeCubeServices {
                 .injector
                 .get_service_typed::<dyn ApiGatewayServer>()
                 .await;
+
             gateway_server.stop_processing(shutdown_mode).await?;
         }
 
@@ -154,8 +157,14 @@ impl NodeConfiguration for NodeConfigurationImpl {
             .register_typed::<dyn TransportService, _, _, _>(|_| async move { transport })
             .await;
 
+        let auth_to_move = auth.clone();
         injector
-            .register_typed::<dyn SqlAuthService, _, _, _>(|_| async move { auth })
+            .register_typed::<dyn SqlAuthService, _, _, _>(|_| async move { auth_to_move })
+            .await;
+
+        let auth_to_move = auth.clone();
+        injector
+            .register_typed::<dyn GatewayAuthService, _, _, _>(|_| async move { auth_to_move })
             .await;
 
         if let Some(api_gateway_address) = &self.api_gateway_address {
@@ -163,10 +172,12 @@ impl NodeConfiguration for NodeConfigurationImpl {
 
             injector
                 .register_typed::<dyn ApiGatewayServer, _, _, _>(|i| async move {
+                    let state = Arc::new(ApiGatewayState::new(i));
+
                     ApiGatewayServerImpl::new(
-                        ApiGatewayRouterBuilder::new(),
+                        ApiGatewayRouterBuilder::new(state.clone()),
                         api_gateway_address,
-                        i.clone(),
+                        state,
                     )
                 })
                 .await;

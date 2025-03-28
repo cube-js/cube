@@ -4,13 +4,20 @@ import { ListButton } from './ListButton';
 
 export const ListMemberButton = tasty(ListButton, {
   styles: {
+    width: 'initial 100% 100%',
     placeContent: 'center start',
-    color: '#text',
+    color: {
+      '': '#text',
+      missing: '#danger-text',
+    },
     fill: {
       '': '#clear',
       hovered: '#hover',
       selected: '#active',
       'selected & hovered': '#active.8',
+      missing: '#dark.04',
+      'missing & selected': '#danger.2',
+      'missing & hovered & selected': '#danger.16',
     },
 
     '--text-color': {

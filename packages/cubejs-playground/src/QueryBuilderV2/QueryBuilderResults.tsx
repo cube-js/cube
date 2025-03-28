@@ -1,5 +1,4 @@
 import {
-  Badge,
   Button,
   CubeButtonProps,
   Grid,
@@ -15,6 +14,7 @@ import {
   tasty,
   Text,
   Title,
+  Panel,
   CloseIcon,
 } from '@cube-dev/ui-kit';
 import { Key, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -53,17 +53,16 @@ import {
   useListState,
 } from 'react-stately';
 
+import { PREDEFINED_GRANULARITIES } from './values';
 import { formatCurrency, formatNumber } from './utils/formatters';
 import { useDeepMemo, useIntervalEffect } from './hooks';
 import { OutdatedLabel } from './components/OutdatedLabel';
 import { CopyButton } from './components/CopyButton';
-import { Panel } from './components/Panel';
 import { ListMemberButton } from './components/ListMemberButton';
 import { useQueryBuilderContext } from './context';
-import { getTypeIcon } from './utils';
 import { formatDateByGranularity } from './utils/format-date-by-granularity';
 import { MemberBadge } from './components/Badge';
-import { MemberLabelText } from './components/MemberLabelText';
+import { MemberLabel } from './components/MemberLabel';
 import { areQueriesRelated } from './utils/query-helpers';
 import { ORDER_LABEL_BY_TYPE } from './utils/labels';
 
@@ -72,19 +71,6 @@ const StyledTag = tasty(Tag, {
     position: 'static',
   },
 });
-
-function StyledTypeIcon(props: {
-  member: 'measure' | 'dimension' | 'timeDimension';
-  type: 'number' | 'string' | 'time' | 'boolean' | 'filter';
-}) {
-  const { type, member } = props;
-
-  return (
-    <span style={{ display: 'grid', color: `var(--${member}-text-color)`, placeSelf: 'center' }}>
-      {getTypeIcon(type || 'number')}
-    </span>
-  );
-}
 
 const StyledCopyButton = tasty(CopyButton, {
   dontShowToast: true,
@@ -107,6 +93,7 @@ const TableContainer = tasty({
 const TableFooter = tasty(Space, {
   qa: 'ResultsTableFooter',
   styles: {
+    fill: '#white',
     padding: '1x',
     width: '100%',
     placeContent: 'center space-between',
@@ -122,6 +109,9 @@ const OptionsButtonElement = tasty(ListMemberButton, {
     color: '#dark',
     gridColumns: 'auto',
     placeContent: 'center',
+    padding: 0,
+    width: '3.5x',
+    height: '4x',
     margin: '-.5x -.5x -.5x .5x',
     ButtonIcon: { fontSize: '20px' },
   },
@@ -239,9 +229,9 @@ interface OptionsButtonProps extends Omit<CubeButtonProps, 'order'> {
   name: string;
   member: 'dimension' | 'measure' | 'timeDimension';
   order: 'none' | 'asc' | 'desc';
-  onOrderChange: (order?: QueryOrder) => void;
+  onOrderChange?: (order?: QueryOrder) => void;
   onMemberRemove: (member: string) => void;
-  onAddFilter: (member: string) => void;
+  onAddFilter?: (member: string) => void;
   type: 'string' | 'number' | 'time' | 'boolean';
 }
 
@@ -249,59 +239,83 @@ function OptionsButton(props: OptionsButtonProps) {
   const { name, member, type, order, onAddFilter, onOrderChange, onMemberRemove, ...otherProps } =
     props;
 
-  function onAction(key: Key) {
-    switch (key) {
-      case 'none':
-      case 'asc':
-      case 'desc':
-        onOrderChange(key === 'none' ? undefined : key);
-        break;
-      case 'remove':
-        onMemberRemove(name);
-        break;
-      case 'filter':
-        onAddFilter(name);
-        break;
-    }
-  }
+  const onAction = useCallback(
+    (key: Key) => {
+      switch (key) {
+        case 'none':
+        case 'asc':
+        case 'desc':
+          onOrderChange?.(key === 'none' ? undefined : key);
+          break;
+        case 'remove':
+          onMemberRemove(name);
+          break;
+        case 'filter':
+          onAddFilter?.(name);
+          break;
+      }
+    },
+    [onOrderChange, onMemberRemove, onAddFilter, name]
+  );
 
   const disabledKeys = type === 'boolean' ? ['filter'] : [];
+
+  const onMemberRemoveLocal = useCallback(() => onMemberRemove(name), [onMemberRemove, name]);
+
+  if (!onAddFilter && !onOrderChange) {
+    return (
+      <OptionsButtonElement
+        icon={<CloseIcon />}
+        data-member={member}
+        {...otherProps}
+        onPress={onMemberRemoveLocal}
+      />
+    );
+  }
 
   return (
     <MenuTrigger>
       <OptionsButtonElement data-member={member} {...otherProps} />
       <Menu disabledKeys={disabledKeys} onAction={onAction}>
-        <Menu.Section title="Sorting">
-          <Menu.Item key="none" icon={<ClearOutlined style={{ fontSize: 16 }} />}>
-            Do not sort
-          </Menu.Item>
-          <Menu.Item
-            key="asc"
-            icon={<ArrowDownOutlined style={{ fontSize: 16 }} />}
-            textValue="Sort ASC"
-          >
-            Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[0] || 'ASC'}</Text.Strong>
-          </Menu.Item>
-          <Menu.Item
-            key="desc"
-            icon={<ArrowUpOutlined style={{ fontSize: 16 }} />}
-            textValue="Sort DESC"
-          >
-            Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[1] || 'DESC'}</Text.Strong>
-          </Menu.Item>
-        </Menu.Section>
-        <Menu.Section title="actions">
-          <Menu.Item key="filter" icon={<FilterOutlined style={{ fontSize: 16 }} />}>
-            Add filter
-          </Menu.Item>
-          <Menu.Item
-            key="remove"
-            icon={<CloseIcon color="danger-text" />}
-            textValue="Remove member"
-          >
-            <Text color="#danger-text">Remove member</Text>
-          </Menu.Item>
-        </Menu.Section>
+        {[
+          ...(onOrderChange
+            ? [
+                <Menu.Section key="sorting" title="Sorting">
+                  <Menu.Item key="none" icon={<ClearOutlined style={{ fontSize: 16 }} />}>
+                    Do not sort
+                  </Menu.Item>
+                  <Menu.Item
+                    key="asc"
+                    icon={<ArrowDownOutlined style={{ fontSize: 16 }} />}
+                    textValue="Sort ASC"
+                  >
+                    Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[0] || 'ASC'}</Text.Strong>
+                  </Menu.Item>
+                  <Menu.Item
+                    key="desc"
+                    icon={<ArrowUpOutlined style={{ fontSize: 16 }} />}
+                    textValue="Sort DESC"
+                  >
+                    Sort <Text.Strong>{ORDER_LABEL_BY_TYPE[type]?.[1] || 'DESC'}</Text.Strong>
+                  </Menu.Item>
+                </Menu.Section>,
+              ]
+            : []),
+          <Menu.Section key="actions" title="Actions">
+            {onAddFilter && (
+              <Menu.Item key="filter" icon={<FilterOutlined style={{ fontSize: 16 }} />}>
+                Add filter
+              </Menu.Item>
+            )}
+            <Menu.Item
+              key="remove"
+              icon={<CloseIcon color="#danger-text" />}
+              textValue="Remove member"
+            >
+              <Text color="#danger-text">Remove member</Text>
+            </Menu.Item>
+          </Menu.Section>,
+        ]}
       </Menu>
     </MenuTrigger>
   );
@@ -385,7 +399,7 @@ const ColumnHeader = tasty({
     position: 'sticky',
     top: 0,
     display: 'grid',
-    gridColumns: 'auto auto',
+    gridColumns: 'max-content max-content',
     placeContent: 'center space-between',
     placeItems: 'center',
     color: '#dark',
@@ -673,14 +687,15 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     order,
     cubes,
     error,
-    queryStats,
-    selectedCube,
+    usedCubes,
     updateQuery,
     grouping,
+    totalRows,
+    memberViewType,
+    meta,
   } = useQueryBuilderContext();
-  const isCompact =
-    Object.keys(queryStats).length === 1 &&
-    ((selectedCube && selectedCube === queryStats[selectedCube?.name]?.instance) || !selectedCube);
+
+  const isCompact = usedCubes.length === 1;
   const [selectedCell, setSelectedCell] = useState<[number, string] | null>(null);
   const dataRef = useRef<{ [k: string]: string | number }[] | undefined>(EMPTY_DATA);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -710,6 +725,10 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
   useEffect(() => {
     if (tableRef.current) {
       tableRef.current.scrollTop = 0;
+    }
+
+    if (selectedCell) {
+      setSelectedCell(null);
     }
   }, [page]);
 
@@ -851,9 +870,8 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
                   selectedCell &&
                   selectedCell[0] === rowId &&
                   selectedCell[1] === timeDimension.dimension;
-                let value = row[timeDimension.dimension]
-                  ? String(row[timeDimension.dimension])
-                  : undefined;
+                const rawValue = row[timeDimension.dimension + '.' + timeDimension.granularity];
+                let value = rawValue ? String(rawValue) : undefined;
 
                 try {
                   value =
@@ -914,6 +932,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     page,
     selectedCell,
     data,
+    meta,
   ]);
 
   function addFilter(name: string) {
@@ -927,6 +946,8 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
 
     const items = dimensions.map((dimension) => {
       const member = members.dimensions[dimension];
+      const cubeName = dimension.split('.')[0];
+      const cube = cubes.find((cube) => cube.name === cubeName);
 
       return {
         id: dimension,
@@ -937,34 +958,38 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
             data-member={member ? 'dimension' : undefined}
             mods={{ movable: dimensions.length > 1 }}
           >
-            <MemberLabelText data-member={member ? 'dimension' : undefined}>
-              <StyledTypeIcon type={member?.type} member="dimension" />
-              <span>
-                {!isCompact ? (
-                  <>
-                    <span data-element="CubeName">{dimension.split('.')[0]}</span>
-                    <span data-element="Divider">.</span>
-                  </>
-                ) : undefined}
-                <span data-element="MemberName">{dimension.split('.')[1]}</span>
-              </span>
-              {!member && <Badge type="danger">MISSING</Badge>}
+            <MemberLabel
+              isMissing={!member}
+              name={dimension}
+              memberName={member?.name}
+              cubeName={cube?.name}
+              memberTitle={member?.shortTitle}
+              cubeTitle={cube?.title}
+              isCompact={isCompact}
+              memberViewType={memberViewType}
+              memberType="dimension"
+              type={member?.type}
+            >
               {getOrderIcon(order.get(dimension))}
-            </MemberLabelText>
+            </MemberLabel>
 
             <OptionsButton
               name={dimension}
               member="dimension"
               order={order.get(dimension)}
               type={members.dimensions[dimension]?.type || 'string'}
-              onAddFilter={addFilter}
-              onOrderChange={(ord?: QueryOrder) => {
-                if (ord) {
-                  order.set(dimension, ord);
-                } else {
-                  order.remove(dimension);
-                }
-              }}
+              onAddFilter={member ? addFilter : undefined}
+              onOrderChange={
+                member
+                  ? (ord?: QueryOrder) => {
+                      if (ord) {
+                        order.set(dimension, ord);
+                      } else {
+                        order.remove(dimension);
+                      }
+                    }
+                  : undefined
+              }
               onMemberRemove={(name) => dimensionsUpdater?.remove(name)}
             />
           </ColumnHeader>
@@ -990,7 +1015,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
         {(item) => <Item textValue={item.textValue}>{item.rendered}</Item>}
       </ReorderableMemberList>
     );
-  }, [dimensions, order]);
+  }, [dimensions, JSON.stringify(query.order), meta, memberViewType, isCompact]);
 
   const measuresColumns = useDeepMemo(() => {
     if (!measures.length) {
@@ -999,6 +1024,8 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
 
     const items = measures.map((measure) => {
       const member = members.measures[measure];
+      const cubeName = measure.split('.')[0];
+      const cube = cubes.find((cube) => cube.name === cubeName);
 
       return {
         id: measure,
@@ -1009,33 +1036,38 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
             data-member={member ? 'measure' : undefined}
             mods={{ movable: measures.length > 1 }}
           >
-            <MemberLabelText data-member={member ? 'measure' : undefined}>
-              <StyledTypeIcon type={member?.type} member="measure" />
-              <span>
-                {!isCompact ? (
-                  <>
-                    <span data-element="CubeName">{measure.split('.')[0]}</span>
-                    <span data-element="Divider">.</span>
-                  </>
-                ) : undefined}
-                <span data-element="MemberName">{measure.split('.')[1]}</span>
-              </span>
-              {!member && <Badge type="danger">MISSING</Badge>}
+            <MemberLabel
+              isMissing={!member}
+              name={measure}
+              memberName={member?.name}
+              cubeName={cube?.name}
+              memberTitle={member?.shortTitle}
+              cubeTitle={cube?.title}
+              isCompact={isCompact}
+              memberViewType={memberViewType}
+              memberType="measure"
+              type={member?.type ?? 'number'}
+            >
               {getOrderIcon(order.get(measure))}
-            </MemberLabelText>
+            </MemberLabel>
+
             <OptionsButton
               name={measure}
               member="measure"
               order={order.get(measure)}
               type={members.measures[measure]?.type || 'string'}
-              onAddFilter={addFilter}
-              onOrderChange={(ord?: QueryOrder) => {
-                if (ord) {
-                  order.set(measure, ord);
-                } else {
-                  order.remove(measure);
-                }
-              }}
+              onAddFilter={member ? addFilter : undefined}
+              onOrderChange={
+                member
+                  ? (ord?: QueryOrder) => {
+                      if (ord) {
+                        order.set(measure, ord);
+                      } else {
+                        order.remove(measure);
+                      }
+                    }
+                  : undefined
+              }
               onMemberRemove={(name) => measuresUpdater?.remove(name)}
             />
           </ColumnHeader>
@@ -1061,7 +1093,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
         {(item) => <Item textValue={item.textValue}>{item.rendered}</Item>}
       </ReorderableMemberList>
     );
-  }, [measures, order]);
+  }, [measures, JSON.stringify(query.order), meta, memberViewType, isCompact]);
 
   const timeDimensionsColumns = useDeepMemo(() => {
     if (!timeDimensions.length) {
@@ -1071,6 +1103,18 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
     const items = timeDimensions.map((timeDimension) => {
       const member = members.dimensions[timeDimension.dimension];
       const ordering = order.get(timeDimension.dimension);
+      const availableGranularities = [
+        ...((member && 'granularities' in member && member?.granularities?.map((g) => g.name)) ||
+          []),
+        ...PREDEFINED_GRANULARITIES,
+      ];
+      const cubeName = timeDimension.dimension.split('.')[0];
+      const cube = cubes.find((cube) => cube.name === cubeName);
+      const granularity =
+        timeDimension.granularity &&
+        member &&
+        'granularities' in member &&
+        member?.granularities?.find((g) => g.name === timeDimension.granularity);
 
       return {
         id: timeDimension.dimension,
@@ -1081,38 +1125,51 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
             data-member={member ? 'timeDimension' : undefined}
             mods={{ movable: timeDimensions.length > 1 }}
           >
-            <MemberLabelText data-member={member ? 'timeDimension' : undefined}>
-              <StyledTypeIcon type={member?.type} member="timeDimension" />
-              <span>
-                {!isCompact ? (
-                  <>
-                    <span data-element="CubeName">{timeDimension.dimension.split('.')[0]}</span>
-                    <span data-element="Divider">.</span>
-                  </>
-                ) : undefined}
-                <span data-element="MemberName">{timeDimension.dimension.split('.')[1]}</span>
-              </span>
-              {timeDimension.granularity ? (
-                <MemberBadge isSpecial type="timeDimension">
-                  {timeDimension.granularity}
+            <MemberLabel
+              isMissing={!member}
+              name={timeDimension.dimension}
+              memberName={member?.name}
+              cubeName={cube?.name}
+              memberTitle={member?.shortTitle}
+              cubeTitle={cube?.title}
+              isCompact={isCompact}
+              memberViewType={memberViewType}
+              memberType="timeDimension"
+              type={member?.type ?? 'time'}
+            >
+              {granularity ? (
+                <MemberBadge
+                  isSpecial
+                  isMissing={
+                    !availableGranularities.includes(timeDimension.granularity as any) || !member
+                  }
+                  type="timeDimension"
+                >
+                  {memberViewType === 'title'
+                    ? granularity.title
+                    : (timeDimension.granularity ?? timeDimension.granularity)}
                 </MemberBadge>
               ) : undefined}
-              {!member && <Badge type="danger">MISSING</Badge>}
               {getOrderIcon(ordering)}
-            </MemberLabelText>
+            </MemberLabel>
+
             <OptionsButton
               name={timeDimension.dimension}
               member="timeDimension"
               order={ordering}
               type="time"
-              onAddFilter={addFilter}
-              onOrderChange={(ord?: QueryOrder) => {
-                if (ord) {
-                  order.set(timeDimension.dimension, ord);
-                } else {
-                  order.remove(timeDimension.dimension);
-                }
-              }}
+              onAddFilter={member ? addFilter : undefined}
+              onOrderChange={
+                member
+                  ? (ord?: QueryOrder) => {
+                      if (ord) {
+                        order.set(timeDimension.dimension, ord);
+                      } else {
+                        order.remove(timeDimension.dimension);
+                      }
+                    }
+                  : undefined
+              }
               onMemberRemove={(name) => grouping.remove(name)}
             />
           </ColumnHeader>
@@ -1136,7 +1193,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
         {(item) => <Item textValue={item.textValue}>{item.rendered}</Item>}
       </ReorderableMemberList>
     );
-  }, [timeDimensions, order]);
+  }, [timeDimensions, JSON.stringify(query.order), meta, memberViewType, isCompact]);
 
   const timestamp = useMemo(() => {
     return new Date();
@@ -1149,6 +1206,15 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
   useIntervalEffect(() => {
     setTimeDistance(formatDistance(timestamp, new Date(), { addSuffix: true }));
   }, 60 * 1000);
+
+  const noResultsDisclaimer = (
+    <DisclaimerContainer>
+      <Title level={4} gridArea={false}>
+        No results available
+      </Title>
+      <Paragraph>Compose and run a query to see the results.</Paragraph>
+    </DisclaimerContainer>
+  );
 
   return (
     <Panel
@@ -1170,31 +1236,28 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
               {measuresColumns}
               {tableData}
             </GridTable>
-            {!executedQuery ? (
-              <DisclaimerContainer>
-                <Title level={4} gridArea={false}>
-                  Run query to see results here
-                </Title>
-              </DisclaimerContainer>
-            ) : null}
+            {!executedQuery ? noResultsDisclaimer : null}
           </TableContainer>
         </Panel>
       ) : (
-        <DisclaimerContainer>
-          <Title level={4} gridArea={false}>
-            Run query to see results here
-          </Title>
-          <Paragraph>Select dimensions and metrics that you want to see in results.</Paragraph>
-        </DisclaimerContainer>
+        noResultsDisclaimer
       )}
 
       <TableFooter>
         <Space>
           {isLoading ? <LoadingOutlined /> : isResultOutdated ? <OutdatedLabel /> : undefined}
           {executedQuery && !isLoading && isColumnsSelected && queryRelated && (
-            <Space gap="1x">
+            <Space gap=".75x">
               <Text preset="t3m">
-                {data.length ? `${data.length} result${data.length > 1 ? 's' : ''}` : 'No results'}
+                {data.length
+                  ? `${data.length} result${data.length > 1 ? 's' : ''}${
+                      totalRows
+                        ? totalRows === data.length
+                          ? ' in total'
+                          : ` out of ${totalRows} in total`
+                        : ''
+                    }`
+                  : 'No results'}
               </Text>
               <Text preset="t3">received {timeDistance}</Text>
             </Space>

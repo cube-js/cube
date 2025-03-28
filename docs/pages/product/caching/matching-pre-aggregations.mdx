@@ -21,14 +21,18 @@ If you don't know why a query doesn't match a pre-aggregation, check
 
 ## Eligible pre-aggregations
 
-Cube will search for matching pre-aggregations in all cubes that define
-members in the query.
-
-Pre-aggregations are tested in the order they are defined in the data model
+Cube goes through the following steps to determine if there are any pre-aggregations
+matching a query:
+- **Members (e.g., dimensions, measures, etc.) are extracted from the query.**
+If the query contains members of a [view][ref-views], they are substituted by
+respective members of cubes where they are defined. It means that pre-aggregations
+defined for cube members would also match queries with view members. There's no need
+to define additional pre-aggregations for views.
+- Cube looks for pre-aggregations in all cubes that define members in the query.
+- Pre-aggregations are tested in the order they are defined in the data model
 file. However, `rollup` pre-aggregations are tested before `original_sql`
 pre-aggregations.
-
-The first pre-aggregation that matches a query is used.  
+- The first pre-aggregation that [matches](#matching-algorithm) a query is used.  
 
 ## Matching algorithm
 
@@ -47,7 +51,7 @@ checked for additivity.
 - **Does every member of the query exist in the pre-aggregation?** Cube checks
 that the pre-aggregation contains all dimensions, filter dimensions, and leaf
 measures from the query.
-- **Are any query measures multiplied in the cube's data schema?** Cube checks
+- **Are any query measures multiplied in the cube's data model?** Cube checks
 if any measures are multiplied via a [`one_to_many`
 relationship][ref-schema-joins-rel] between cubes in the query.
 - **Does the query specify granularity for its time dimension?** Cube checks
@@ -130,3 +134,4 @@ configuration option.
 [ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [ref-primary-key]: /reference/data-model/dimensions#primary_key
 [ref-custom-granularity]: /reference/data-model/dimensions#granularities
+[ref-views]: /product/data-modeling/concepts#views
