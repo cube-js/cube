@@ -4,12 +4,12 @@ import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
-import { camelizeCube } from './utils';
+import { camelizeCube, findCyclesInGraph, topologicalSort } from './utils';
 import { BaseQuery } from '../adapter';
 
 import type { ErrorReporter } from './ErrorReporter';
 
-interface CubeDefinition {
+export interface CubeDefinition {
   name: string;
   extends?: string;
   measures?: Record<string, any>;
@@ -34,7 +34,7 @@ interface SplitViews {
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 export const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
-  // SECURITY_CONTEXT has been deprecated, however security_context (lowecase)
+  // SECURITY_CONTEXT has been deprecated, however security_context (lowercase)
   // is allowed in RBAC policies for query-time attribute matching
   security_context: 'securityContext',
   securityContext: 'securityContext',
@@ -45,20 +45,32 @@ export const CONTEXT_SYMBOLS = {
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
+export type CubeDef = any;
+
+/**
+ * Tuple of 2 node names
+ * Treat it as first node depends on the last
+ */
+export type GraphEdge = [string, string];
+
 export class CubeSymbols {
   public symbols: Record<string | symbol, any>;
 
-  private builtCubes: Record<string, any>;
+  private readonly builtCubes: Record<string, any>;
 
   private cubeDefinitions: Record<string, CubeDefinition>;
 
-  private funcArgumentsValues: Record<string, string[]>;
+  private readonly funcArgumentsValues: Record<string, string[]>;
 
   public cubeList: any[];
 
-  private evaluateViews: boolean;
+  private readonly evaluateViews: boolean;
 
   private resolveSymbolsCallContext: any;
+
+  private readonly viewDuplicateCheckerFn: (cube: any, memberType: string, memberName: string) => boolean;
+
+  private readonly cubeDuplicateNamesCheckerFn: (cube: any) => string[];
 
   public constructor(evaluateViews = false) {
     this.symbols = {};
@@ -67,21 +79,23 @@ export class CubeSymbols {
     this.funcArgumentsValues = {};
     this.cubeList = [];
     this.evaluateViews = evaluateViews;
+
+    if (getEnv('caseInsensitiveDuplicatesCheck')) {
+      this.cubeDuplicateNamesCheckerFn = this.cubeDuplicateNamesCheckerCaseInsensitive;
+      this.viewDuplicateCheckerFn = this.viewDuplicateCheckerCaseInsensitive;
+    } else {
+      this.cubeDuplicateNamesCheckerFn = this.cubeDuplicateNamesCheckerCaseSensitive;
+      this.viewDuplicateCheckerFn = this.viewDuplicateCheckerCaseSensitive;
+    }
   }
 
   public compile(cubes: CubeDefinition[], errorReporter: ErrorReporter) {
-    // @ts-ignore
-    this.cubeDefinitions = R.pipe(
-      // @ts-ignore
-      R.map((c: CubeDefinition) => [c.name, c]),
-      R.fromPairs
-      // @ts-ignore
-    )(cubes);
-    this.cubeList = cubes.map(c => (c.name ? this.getCubeDefinition(c.name) : this.createCube(c)));
-    // TODO support actual dependency sorting to allow using views inside views
-    const sortedByDependency = R.pipe(
-      R.sortBy((c: CubeDefinition) => !!c.isView),
-    )(cubes);
+    this.cubeDefinitions = Object.fromEntries(cubes.map((c) => [c.name, c]));
+    this.cubeList = cubes.map(c => this.getCubeDefinition(c.name));
+
+    // Sorting matters only for views evaluation
+    const sortedByDependency = this.evaluateViews ? topologicalSort(this.prepareDepsGraph(cubes)) : cubes;
+
     for (const cube of sortedByDependency) {
       const splitViews: SplitViews = {};
       this.symbols[cube.name] = this.transform(cube.name, errorReporter.inContext(`${cube.name} cube`), splitViews);
@@ -91,6 +105,102 @@ export class CubeSymbols {
         this.symbols[viewName] = splitViews[viewName];
       }
     }
+  }
+
+  private prepareDepsGraph(cubes: CubeDefinition[]): [Map<string, CubeDef>, GraphEdge[]] {
+    const graphNodes = new Map<string, CubeDef>();
+    const adjacencyList = new Map<string, Set<string>>(); // To search for cycles
+
+    const addEdge = (from: string, to: string) => {
+      if (!adjacencyList.has(from)) {
+        adjacencyList.set(from, new Set());
+      }
+      adjacencyList.get(from)!.add(to);
+    };
+
+    for (const cube of cubes) {
+      graphNodes.set(cube.name, cube);
+
+      if (cube.isView) {
+        cube.cubes?.forEach(c => {
+          const jp = c.joinPath || c.join_path; // View is not camelized yet
+          if (jp) {
+            // It's enough to ref the very first level, as everything else will be evaluated on its own
+            let cubeJoinPath;
+            const fa = this.funcArguments(jp);
+            if (fa?.length > 0) {
+              [cubeJoinPath] = fa;
+            } else { // It's a function without params so it's safe to call it without further processing
+              const res = jp.apply(null);
+              if (typeof res === 'string') {
+                [cubeJoinPath] = res.split('.');
+              }
+            }
+            addEdge(cube.name, cubeJoinPath);
+          }
+        });
+
+        // Legacy-style includes
+        if (typeof cube.includes === 'function') {
+          const refs = this.funcArguments(cube.includes);
+          refs.forEach(ref => {
+            addEdge(cube.name, ref);
+          });
+        }
+      } else if (cube.joins && Object.keys(cube.joins).length > 0) {
+        Object.keys(cube.joins).forEach(j => {
+          addEdge(cube.name, j);
+        });
+      } else {
+        adjacencyList.set(cube.name, new Set());
+      }
+    }
+
+    const cycles = findCyclesInGraph(adjacencyList);
+
+    for (const cycle of cycles) {
+      const cycleSet = new Set(cycle);
+
+      // Validate that cycle doesn't have views
+      if (cycle.some(node => graphNodes.get(node)?.isView)) {
+        throw new UserError(`A view cannot be part of a dependency loop. Please review your cube definitions ${cycle.join(', ')} and ensure that no views are included in loops.`);
+      }
+
+      // Let's find external dependencies (who refers to the loop)
+      const externalNodes = new Set<string>();
+      for (const [from, toSet] of adjacencyList.entries()) {
+        if (!cycleSet.has(from)) {
+          for (const to of toSet) {
+            if (cycleSet.has(to)) {
+              externalNodes.add(from);
+            }
+          }
+        }
+      }
+
+      // Remove all edges inside the loop
+      for (const node of cycle) {
+        adjacencyList.set(node, new Set([...adjacencyList.get(node)!].filter(n => !cycleSet.has(n))));
+      }
+
+      // If there are external dependencies, point them to every node in the loop
+      if (externalNodes.size > 0) {
+        for (const external of externalNodes) {
+          for (const cube of cycle) {
+            addEdge(external, cube);
+          }
+        }
+      }
+    }
+
+    const graphEdges: GraphEdge[] = [];
+    for (const [from, toSet] of adjacencyList) {
+      for (const to of toSet) {
+        graphEdges.push([from, to]);
+      }
+    }
+
+    return [graphNodes, graphEdges];
   }
 
   public getCubeDefinition(cubeName: string) {
@@ -175,23 +285,6 @@ export class CubeSymbols {
 
   protected transform(cubeName: string, errorReporter: ErrorReporter, splitViews: SplitViews) {
     const cube = this.getCubeDefinition(cubeName);
-    const duplicateNames = R.compose(
-      R.map((nameToDefinitions: any) => nameToDefinitions[0]),
-      R.toPairs,
-      R.filter((definitionsByName: any) => definitionsByName.length > 1),
-      R.groupBy((nameToDefinition: any) => nameToDefinition[0]),
-      R.unnest,
-      R.map(R.toPairs),
-      // @ts-ignore
-      R.filter((v: any) => !!v)
-      // @ts-ignore
-    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
-
-    // @ts-ignore
-    if (duplicateNames.length > 0) {
-      // @ts-ignore
-      errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
-    }
 
     camelizeCube(cube);
 
@@ -210,13 +303,50 @@ export class CubeSymbols {
       this.prepareIncludes(cube, errorReporter, splitViews);
     }
 
-    return Object.assign(
-      { cubeName: () => cube.name, cubeObj: () => cube },
-      cube.measures || {},
-      cube.dimensions || {},
-      cube.segments || {},
-      cube.preAggregations || {}
-    );
+    const duplicateNames = this.cubeDuplicateNamesCheckerFn(cube);
+
+    if (duplicateNames.length > 0) {
+      errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
+    }
+
+    return {
+      cubeName: () => cube.name,
+      cubeObj: () => cube,
+      ...cube.measures || {},
+      ...cube.dimensions || {},
+      ...cube.segments || {},
+      ...cube.preAggregations || {}
+    };
+  }
+
+  private cubeDuplicateNamesCheckerCaseSensitive(cube: any): string[] {
+    // @ts-ignore
+    return R.compose(
+      R.map(([name]) => name),
+      R.toPairs,
+      R.filter((definitionsByName: any) => definitionsByName.length > 1),
+      R.groupBy(([name]: any) => name),
+      R.unnest,
+      R.map(R.toPairs),
+      // @ts-ignore
+      R.filter((v: any) => !!v)
+      // @ts-ignore
+    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
+  }
+
+  private cubeDuplicateNamesCheckerCaseInsensitive(cube: any): string[] {
+    // @ts-ignore
+    return R.compose(
+      R.map(([name]) => name),
+      R.toPairs,
+      R.filter((definitionsByName: any) => definitionsByName.length > 1),
+      R.groupBy(([name]: any) => name.toLowerCase()),
+      R.unnest,
+      R.map(R.toPairs),
+      // @ts-ignore
+      R.filter((v: any) => !!v)
+      // @ts-ignore
+    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
   }
 
   private camelCaseTypes(obj: Object) {
@@ -360,12 +490,20 @@ export class CubeSymbols {
 
   protected applyIncludeMembers(includeMembers: any[], cube: CubeDefinition, type: string, errorReporter: ErrorReporter) {
     for (const [memberName, memberDefinition] of includeMembers) {
-      if (cube[type]?.[memberName]) {
+      if (this.viewDuplicateCheckerFn(cube, type, memberName)) {
         errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member or assigning it an alias.`);
       } else if (type !== 'hierarchies') {
         cube[type][memberName] = memberDefinition;
       }
     }
+  }
+
+  private viewDuplicateCheckerCaseSensitive(cube: any, memberType: string, memberName: string): boolean {
+    return cube[memberType][memberName];
+  }
+
+  private viewDuplicateCheckerCaseInsensitive(cube: any, memberType: string, memberName: string): boolean {
+    return Object.keys(cube[memberType]).map(v => v.toLowerCase()).includes(memberName.toLowerCase());
   }
 
   protected membersFromCubes(parentCube: CubeDefinition, cubes: any[], type: string, errorReporter: ErrorReporter, splitViews: SplitViews, memberSets: any) {
@@ -524,7 +662,7 @@ export class CubeSymbols {
 
   /**
    * This method is mainly used for evaluating RLS conditions and filters.
-   * It allows referencing security_context (lowecase) in dynamic conditions or filter values.
+   * It allows referencing security_context (lowercase) in dynamic conditions or filter values.
    *
    * It currently does not support async calls because inner resolveSymbol and
    * resolveSymbolsCall are sync. Async support may be added later with deeper
