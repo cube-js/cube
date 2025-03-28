@@ -12,3 +12,5 @@ export * from './uncapitalize';
 export * from './uniq-array';
 export * from './graphql-converters';
 export * from './titleize';
+export * from './validate-query';
+export * from './get-member-search-name';

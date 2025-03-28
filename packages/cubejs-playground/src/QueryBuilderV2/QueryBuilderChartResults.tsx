@@ -15,7 +15,7 @@ interface QueryBuilderChartResultsProps {
   containerRef?: RefObject<HTMLDivElement>;
 }
 
-const MAX_HEIGHT = 400;
+const MAX_HEIGHT = 350;
 const MAX_SERIES_LIMIT = 25;
 
 const ChartContainer = tasty({
@@ -57,8 +57,8 @@ export function QueryBuilderChartResults({
         <ChartContainer
           ref={containerRef}
           style={{
-            maxHeight: `${MAX_HEIGHT}px`,
-            height: `${MAX_HEIGHT}px`,
+            maxHeight: MAX_HEIGHT,
+            height: MAX_HEIGHT,
             overflow,
           }}
         >
@@ -76,9 +76,9 @@ export function QueryBuilderChartResults({
     return (
       <Grid height={MAX_HEIGHT} columns="auto" placeContent="center" placeItems="center" gap="2x">
         <Title level={3} gridArea={false}>
-          No data available
+          No results available
         </Title>
-        <Paragraph>Query metrics and dimensions with results to see the chart.</Paragraph>
+        <Paragraph>Compose and run a query to see the results.</Paragraph>
       </Grid>
     );
   }

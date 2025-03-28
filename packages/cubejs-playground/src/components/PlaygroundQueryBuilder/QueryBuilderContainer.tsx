@@ -1,4 +1,4 @@
-import { LockIcon, ThunderboltIcon, Space, Button } from '@cube-dev/ui-kit';
+import { LockIcon, ThunderboltIcon, Panel, Space, Button } from '@cube-dev/ui-kit';
 import { CubeProvider } from '@cubejs-client/react';
 import { Card } from 'antd';
 import { useLayoutEffect } from 'react';
@@ -8,7 +8,6 @@ import styled from 'styled-components';
 import { CubeLoader } from '../../atoms';
 import { useCloud } from '../../cloud';
 import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
-import { Panel } from '../../QueryBuilderV2/components/Panel';
 import {
   RollupDesignerContext,
   useRollupDesignerContext,

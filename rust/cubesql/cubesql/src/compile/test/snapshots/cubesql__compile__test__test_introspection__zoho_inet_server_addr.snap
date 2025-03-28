@@ -2,8 +2,8 @@
 source: cubesql/src/compile/test/test_introspection.rs
 expression: "execute_query(\"\n                select\n                    pg_backend_pid(),\n                    coalesce(cast(inet_server_addr() as text ),'addr'),\n                    current_database()\n                ;\".to_string(),\nDatabaseProtocol::PostgreSQL,).await?"
 ---
-+------------------+---------------------------------------------------------+--------------------+
-| pg_backend_pid() | coalesce(CAST(inet_server_addr() AS Utf8),Utf8("addr")) | current_database() |
-+------------------+---------------------------------------------------------+--------------------+
-| 1                | 127.0.0.1/32                                            | cubedb             |
-+------------------+---------------------------------------------------------+--------------------+
++----------------+-------------------------------------------------------+------------------+
+| pg_backend_pid | coalesce(CAST(inet_server_addr AS Utf8),Utf8("addr")) | current_database |
++----------------+-------------------------------------------------------+------------------+
+| 1              | 127.0.0.1/32                                          | cubedb           |
++----------------+-------------------------------------------------------+------------------+

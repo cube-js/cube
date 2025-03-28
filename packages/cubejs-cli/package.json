@@ -2,7 +2,7 @@
   "name": "cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
-  "version": "1.1.0",
+  "version": "1.2.27",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -30,27 +30,28 @@
     "LICENSE"
   ],
   "dependencies": {
+    "@cubejs-backend/cloud": "1.2.27",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/schema-compiler": "1.1.0",
-    "@cubejs-backend/shared": "1.0.3",
+    "@cubejs-backend/schema-compiler": "1.2.27",
+    "@cubejs-backend/shared": "1.2.27",
     "chalk": "^2.4.2",
     "cli-progress": "^3.10",
     "commander": "^2.19.0",
     "cross-spawn": "^7.0.1",
+    "form-data": "^4.0.0",
     "fs-extra": "^8.1.0",
     "inquirer": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "request": "^2.88.2",
-    "request-promise": "^4.2.5",
-    "semver": "^7.3.2",
+    "node-fetch": "2",
+    "semver": "^7.6.3",
     "source-map-support": "^0.5.19"
   },
   "resolutions": {
     "colors": "1.4.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^1.0.0",
-    "@cubejs-backend/server": "1.1.0",
+    "@cubejs-backend/linter": "1.2.27",
+    "@cubejs-backend/server": "1.2.27",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
@@ -59,8 +60,7 @@
     "@types/jest": "^27",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/node": "^18",
-    "@types/request-promise": "^4.1.46",
-    "@types/semver": "^7.3.4",
+    "@types/semver": "^7.5.8",
     "husky": "^4.2.3",
     "jest": "^27",
     "typescript": "~5.2.2"

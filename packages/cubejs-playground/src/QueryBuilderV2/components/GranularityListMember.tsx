@@ -1,9 +1,9 @@
-import { CalendarEditIcon, CalendarIcon, Text, TooltipProvider } from '@cube-dev/ui-kit';
+import { CalendarEditIcon, CalendarIcon, Text } from '@cube-dev/ui-kit';
 import { useRef } from 'react';
 
-import { useHasOverflow } from '../hooks/index';
-import { titleize } from '../utils/index';
+import { MemberViewType } from '../types';
 
+import { InstanceTooltipProvider } from './InstanceTooltipProvider';
 import { ListMemberButton } from './ListMemberButton';
 
 export interface GranularityListMemberProps {
@@ -11,46 +11,28 @@ export interface GranularityListMemberProps {
   title?: string;
   isCustom?: boolean;
   isSelected: boolean;
+  isMissing?: boolean;
+  memberViewType?: MemberViewType;
   onToggle: () => void;
 }
 
 export function GranularityListMember(props: GranularityListMemberProps) {
-  const { name, title, isCustom, isSelected, onToggle } = props;
+  const { name, title, isCustom, isSelected, isMissing, memberViewType = 'name', onToggle } = props;
   const textRef = useRef<HTMLDivElement>(null);
 
-  const hasOverflow = useHasOverflow(textRef);
-  const isAutoTitle = titleize(name) === title;
-
-  const button = (
-    <ListMemberButton
-      icon={isCustom ? <CalendarEditIcon /> : <CalendarIcon />}
-      data-member="timeDimension"
-      isSelected={isSelected}
-      onPress={onToggle}
-    >
-      <Text ref={textRef} ellipsis>
-        {name}
-      </Text>
-    </ListMemberButton>
-  );
-
-  if (hasOverflow || (!isAutoTitle && isCustom)) {
-    return (
-      <TooltipProvider
-        title={
-          <>
-            <Text preset="t4">{name}</Text>
-            <br />
-            <Text preset="t3">{title}</Text>
-          </>
-        }
-        delay={1000}
-        placement="right"
+  return (
+    <InstanceTooltipProvider name={name} title={title} overflowRef={isCustom ? textRef : undefined}>
+      <ListMemberButton
+        icon={isCustom ? <CalendarEditIcon /> : <CalendarIcon />}
+        data-member="timeDimension"
+        isSelected={isSelected}
+        mods={{ missing: isMissing }}
+        onPress={onToggle}
       >
-        {button}
-      </TooltipProvider>
-    );
-  } else {
-    return button;
-  }
+        <Text ref={textRef} ellipsis>
+          {(memberViewType === 'name' ? name : title) ?? name}
+        </Text>
+      </ListMemberButton>
+    </InstanceTooltipProvider>
+  );
 }

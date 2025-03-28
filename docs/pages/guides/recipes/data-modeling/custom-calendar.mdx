@@ -1,0 +1,221 @@
+# Implementing custom calendars
+
+This recipe explains the implementation of the [4-5-4 calendar][link-454], a common
+retail calendar used in the US and Canada. However, the same approach can be used
+to implement other custom calendars.
+
+Unlike [custom time dimension granularities][ref-custom-granularities], custom
+calendars provide more flexibility and can be used when time units have variable
+lengths, such as the months and quarters in the 4-5-4 calendar. See the [custom
+granularities recipe][ref-custom-granularities-recipe] for more information.
+
+## Use case
+
+The 4-5-4 calendar ensures sales comparability between years by dividing the year
+into months based on a 4 weeks – 5 weeks – 4 weeks format. The layout of the calendar
+lines up holidays and ensures the same number of Saturdays and Sundays in comparable
+months. Hence, like days are compared to like days for sales reporting purposes.
+
+## Data modeling
+
+The data modeling includes the following steps:
+
+* Create a calendar cube, e.g., `calendar_454`.
+* Extend it a number of times, so there's one calendar cube for every time dimension
+in cubes with facts that needs translation to a custom calendar.
+* Define joins from your cubes with facts to those calendar cubes, e.g., `base_orders`,
+and bring relevant calendar attributes as [proxy dimensions][ref-proxy-dimensions].
+
+The last two steps require a few lines of code but it can totally be optimized with
+a [Jinja macro][ref-jinja-macro] if needed.
+
+### Calendar table
+
+Consider the following calendar cube. It was generated using a large language model
+(LLM) and then tested against the [official calendar][link-454-official-calendar].
+In this example, it's generated on the fly, however, in production, it should be
+materialized as a table using a data transformation tool:
+
+```yaml
+cubes:
+  - name: calendar_454
+    public: false
+    sql: >
+      WITH RECURSIVE fiscal_weeks AS (
+          -- Step 1: Define the start of the fiscal years (Sunday closest to Feb 1st)
+          SELECT 
+              year AS fiscal_year, 
+              CASE 
+                  WHEN strftime('%w', date_trunc('week', make_date(year, 2, 1)))::INTEGER <= 3 
+                  THEN date_trunc('week', make_date(year, 2, 1)) + INTERVAL 6 DAY 
+                  ELSE date_trunc('week', make_date(year, 2, 1) + INTERVAL 7 DAY) + INTERVAL 7 DAY
+              END AS week_start,
+              1 AS week_number,
+              1 AS month_number,
+              1 AS month_week_count
+          FROM range(2015, 2031) t(year)
+          
+          UNION ALL
+          
+          -- Step 2: Generate weeks recursively following the 4-5-4 pattern
+          SELECT 
+              fiscal_year,
+              week_start + INTERVAL 7 DAY AS week_start,
+              week_number + 1,
+              CASE 
+                  WHEN month_number = 12 AND ((month_week_count = 4 AND month_number % 3 = 1) OR 
+                                              (month_week_count = 5 AND month_number % 3 = 2) OR 
+                                              (month_week_count = 4 AND month_number % 3 = 0)) 
+                  THEN 1 
+                  WHEN month_week_count = 4 AND (month_number % 3 = 1) THEN month_number + 1
+                  WHEN month_week_count = 5 AND (month_number % 3 = 2) THEN month_number + 1
+                  WHEN month_week_count = 4 AND (month_number % 3 = 0) THEN month_number + 1
+                  ELSE month_number
+              END AS month_number,
+              CASE 
+                  WHEN month_week_count = 4 AND (month_number % 3 = 1) THEN 1
+                  WHEN month_week_count = 5 AND (month_number % 3 = 2) THEN 1
+                  WHEN month_week_count = 4 AND (month_number % 3 = 0) THEN 1
+                  ELSE month_week_count + 1
+              END AS month_week_count
+          FROM fiscal_weeks
+          WHERE week_number < 52 OR (week_number = 52 AND (fiscal_year % 5 = 2)) -- Account for 53rd week
+      )
+
+      SELECT 
+          fiscal_year,
+          week_number,
+          month_number,
+          make_timestamp(fiscal_year, month_number, 1, 0, 0, 0) AS fiscal_month_date,
+          week_start AS week_start_date,
+          make_timestamp(year(week_start + INTERVAL 6 DAY), 
+              month(week_start + INTERVAL 6 DAY), 
+              day(week_start + INTERVAL 6 DAY), 
+              23, 59, 59.999) AS week_end_date
+      FROM fiscal_weeks
+      ORDER BY fiscal_year, week_number
+
+    dimensions:
+      - name: retail_year
+        sql: fiscal_year
+        type: number
+
+      - name: week_number
+        sql: week_number
+        type: number
+
+      - name: month_number
+        sql: month_number
+        type: number
+
+      - name: retail_month_date
+        sql: fiscal_month_date
+        type: time
+
+      - name: week_start_date
+        sql: week_start_date
+        type: time
+
+      - name: week_end_date
+        sql: week_end_date
+        type: time
+```
+
+As you can see, this cube defines `week_start_date` and `week_end_date` time dimensions
+as the start and end dates of the retail week. They can be used to join this cube to
+cubes with facts.
+
+### Auxiliary calendar cubes
+
+We will also extend the `calendar_454` cube to create auxiliary calendar cubes for
+three time dimensions that we'd like to translate to the 4-5-4 calendar:
+
+```yaml
+cubes:
+  - name: calendar_454__base_orders__created_at
+    extends: calendar_454
+
+  - name: calendar_454__base_orders__completed_at
+    extends: calendar_454
+```
+
+### Cubes with facts
+
+Finally, we define joins from the `base_orders` cube to the auxiliary calendar cubes.
+We also bring the `week_number` and `month_number` attributes as proxy dimensions:
+
+```yaml
+cubes:
+  - name: base_orders
+    sql: SELECT * FROM 's3://cube-tutorial/orders.csv'
+
+    joins:
+      # BEGIN — Joins to calendar tables
+      - name: calendar_454__base_orders__created_at
+        sql: "{CUBE.created_at} BETWEEN {calendar_454__base_orders__created_at.week_start_date} AND {calendar_454__base_orders__created_at.week_end_date}"
+        relationship: many_to_one
+
+      - name: calendar_454__base_orders__completed_at
+        sql: "{CUBE.completed_at} BETWEEN {calendar_454__base_orders__completed_at.week_start_date} AND {calendar_454__base_orders__completed_at.week_end_date}"
+        relationship: many_to_one
+      # END — Joins to calendar tables
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      # BEGIN — Regular time dimension + ones derived from calendar table
+      - name: created_at
+        sql: "{CUBE}.created_at::TIMESTAMP"
+        type: time
+
+      - name: created_at_retail_month
+        sql: "{calendar_454__base_orders__created_at.retail_month_date}"
+        type: time
+
+      - name: created_at_retail_week
+        sql: "{calendar_454__base_orders__created_at.week_number}"
+        type: number
+
+      - name: completed_at
+        sql: "{CUBE}.completed_at::TIMESTAMP"
+        type: time
+
+      - name: completed_at_retail_month
+        sql: "{calendar_454__base_orders__completed_at.retail_month_date}"
+        type: time
+
+      - name: completed_at_retail_week
+        sql: "{calendar_454__base_orders__completed_at.week_number}"
+        type: number
+      # END — Regular time dimension + ones derived from calendar table
+
+    measures:
+      - name: count
+        type: count
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+```
+
+## Result
+
+Querying this data modal would yield the following result:
+
+<Screenshot src="https://ucarecdn.com/7d7d981c-8ed8-4438-865e-cbcda01c81d8/"/>
+
+
+[link-454]: https://nrf.com/resources/4-5-4-calendar
+[link-454-official-calendar]: https://2fb5c46100c1b71985e2-011e70369171d43105aff38e48482379.ssl.cf1.rackcdn.com/4-5-4%20calendar/3-Year-Calendar-5-27.pdf
+[ref-custom-granularities]: /reference/data-model/dimensions#granularities
+[ref-custom-granularities-recipe]: /guides/recipes/data-modeling/custom-granularity
+[ref-proxy-dimensions]: /product/data-modeling/concepts/calculated-members#proxy-dimensions
+[ref-jinja-macro]: /product/data-modeling/dynamic/jinja#macros

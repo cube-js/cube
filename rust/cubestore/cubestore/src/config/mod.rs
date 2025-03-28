@@ -1358,7 +1358,7 @@ impl Config {
                     Some(60),
                     Some(15),
                 ),
-                cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", true),
+                cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", false),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: env_parse_duration(
                     "CUBESTORE_CACHESTORE_GC_LOOP",
@@ -1547,10 +1547,24 @@ impl Config {
     }
 
     pub fn test(name: &str) -> Config {
-        let query_timeout = 15;
+        Self::make_test_config(Self::test_config_obj(name))
+    }
+
+    /// Possibly there is nothing test-specific about this; its purpose is to be publicly used by Config::test.
+    pub fn make_test_config(config_obj_impl: ConfigObjImpl) -> Config {
         Config {
             injector: Injector::new(),
-            config_obj: Arc::new(ConfigObjImpl {
+            config_obj: Arc::new(config_obj_impl),
+        }
+    }
+
+    /// Constructs the underlying ConfigObjImpl used in `Config::test`, so that you can modify it
+    /// before passing it to Config::make_test_config.
+    pub fn test_config_obj(name: &str) -> ConfigObjImpl {
+        let query_timeout = 15;
+        // Git blame history preserving block
+        {
+            ConfigObjImpl {
                 data_dir: env::current_dir()
                     .unwrap()
                     .join(format!("{}-local-store", name)),
@@ -1654,7 +1668,7 @@ impl Config {
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
                 create_table_max_retries: 3,
-            }),
+            }
         }
     }
 

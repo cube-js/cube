@@ -23,7 +23,7 @@ import { ChartType } from '@cubejs-client/core';
 import { useLocalStorage } from './hooks';
 import { useQueryBuilderContext } from './context';
 import { PivotAxes, PivotOptions } from './Pivot';
-import { ArrowIcon } from './icons/ArrowIcon';
+import { ChevronIcon } from './icons/ChevronIcon';
 import { AccordionCard } from './components/AccordionCard';
 import { OutdatedLabel } from './components/OutdatedLabel';
 import { QueryBuilderChartResults } from './QueryBuilderChartResults';
@@ -117,7 +117,7 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
   const pivotConfigurator = useMemo(() => {
     return pivotConfig ? (
       <DialogTrigger type="popover">
-        <Button size="small" rightIcon={<ArrowIcon direction="bottom" />}>
+        <Button size="small" rightIcon={<ChevronIcon direction="bottom" />}>
           Pivot
         </Button>
         <Dialog border overflow="hidden" width="40x max-content 80x">

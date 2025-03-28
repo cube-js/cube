@@ -76,7 +76,7 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
   },
 
   async applyRowLevelSecurity(query: any) {
-    return query;
+    return { query, denied: false };
   },
 
   async metaConfig() {

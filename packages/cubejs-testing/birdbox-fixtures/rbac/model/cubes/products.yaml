@@ -1,0 +1,28 @@
+cubes:
+  - name: products
+    sql_table: products
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: product_category
+        sql: PRODUCT_CATEGORY
+        type: string
+
+      - name: name
+        sql: NAME
+        type: string
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
+
+    access_policy:
+      - role: some_role

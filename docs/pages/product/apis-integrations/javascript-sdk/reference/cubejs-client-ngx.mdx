@@ -1,0 +1,101 @@
+# `@cubejs-client/ngx`
+
+`@cubejs-client/ngx` provides Angular Module for easy integration Cube into an
+Angular app.
+
+## Installation
+
+First, install `@cubejs-client/ngx` using npm or yarn:
+
+```bash
+npm install --save @cubejs-client/ngx
+# or
+yarn add @cubejs-client/ngx
+```
+
+Now you can add `CubeClientModule` to your **app.module.ts** file:
+
+```typescript
+import { CubeClientModule } from '@cubejs-client/ngx';
+import { environment } from '../../environments/environment';
+
+const cubeOptions = {
+  token: environment.CUBE_API_TOKEN,
+  options: { apiUrl: environment.CUBE_API_URL }
+};
+
+@NgModule({
+  declarations: [
+    ...
+  ],
+  imports: [
+    ...,
+    CubeClientModule.forRoot(cubeOptions)
+  ],
+  providers: [...],
+  bootstrap: [...]
+})
+export class AppModule { }
+```
+
+The `options` object is passed directly to
+[`@cubejs-client/core`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core).
+
+`CubeClientModule` provides `CubeClient`, which you can inject into your
+components or services:
+
+```typescript
+import { CubeClient } from "@cubejs-client/ngx";
+
+export class AppComponent {
+  constructor(private cube: CubeClient) {}
+
+  ngOnInit() {
+    this.cube
+      .load({
+        measures: ["some_measure"],
+      })
+      .subscribe(
+        (resultSet) => {
+          this.data = resultSet.chartPivot();
+        },
+        (err) => console.log("HTTP Error", err)
+      );
+  }
+}
+```
+
+## API
+
+`CubeClient` provides the same API methods as
+[`@cubejs-client/core`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#cubeapi). The
+difference is that instead of Promise it returns an
+[Observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html),
+which passes [`resultSet`](/product/apis-integrations/javascript-sdk/reference/cubejs-client-core#resultset) into the
+callback function.
+
+Also you can use [RxJS Subject](https://rxjs-dev.firebaseapp.com/guide/subject)
+with a query using `watch` method:
+
+```typescript
+private query;
+
+ngOnInit() {
+  this.query = new Subject();
+  this.cube.watch(this.query).subscribe(
+    resultSet => {
+      console.log(resultSet.chartPivot()[0].x);
+      console.log(resultSet.seriesNames()[0]);
+    },
+    err => console.log('HTTP Error', err)
+  );
+}
+
+button1ClickHandler() {
+  this.query.next({ query_1 });
+}
+
+button2ClickHandler() {
+  this.query.next({ query_2 });
+}
+```

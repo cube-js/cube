@@ -11,7 +11,7 @@ use cubesql::{
         },
         sql_generator,
     },
-    transport::MetaContext,
+    transport::{CubeMetaDimension, MetaContext},
 };
 use egg::StopReason;
 use itertools::Itertools;
@@ -77,6 +77,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
             V1CubeMetaMeasure {
                 name: format!("{}.count", cube_name),
                 title: None,
+                short_title: None,
                 description: None,
                 r#type: "number".to_string(),
                 agg_type: Some("count".to_string()),
@@ -85,6 +86,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
             V1CubeMetaMeasure {
                 name: format!("{}.sum", cube_name),
                 title: None,
+                short_title: None,
                 description: None,
                 r#type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
@@ -94,14 +96,14 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
         dimensions: (1..=dims)
             .map(|n| V1CubeMetaDimension {
                 name: format!("{}.n{}", cube_name, n),
-                description: None,
                 r#type: "number".to_string(),
-                granularities: None,
-                meta: None,
+                ..CubeMetaDimension::default()
             })
             .collect(),
         segments: vec![],
         joins: None,
+        folders: None,
+        hierarchies: None,
         meta: None,
     }]
 }

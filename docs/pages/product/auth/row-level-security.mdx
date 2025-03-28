@@ -1,0 +1,46 @@
+# Row-level security
+
+The data model serves as a facade of your data. With row-level security,
+you can define whether some [data model][ref-data-modeling-concepts] facts are exposed
+to end users and can be queried via [APIs & integrations][ref-apis].
+
+Row-level security in Cube is similar to row-level security in SQL databases.
+Defining whether users have access to specific facts from [cubes][ref-cubes] and
+[views][ref-views] is similar to defining access to rows in database tables.
+
+__By default, all rows are *public*,__ meaning that no filtering is applied to
+data model facts when they are accessed by any users.
+
+## Managing row-level access
+
+You can implement row-level access control by applying additional filters conditionally
+in the [`query_rewrite` configuration option][ref-query-rewrite].
+
+### Dynamic data models
+
+You can implement row-level access control at the data model level
+[dynamically][ref-dynamic-data-modeling] by adjusting the [`sql` parameter][ref-cubes-sql]
+of cubes.
+
+## Best practices
+
+### Data access policies
+
+You can use [data access policies][ref-dap] to manage both [member-level][ref-mls]
+and row-level security for different roles. With them, you can define access control
+rules in data model files instead of mixing them together in a single block of code
+in `query_rewrite`.
+
+__It is recommended to use data access policies by default.__ You can also combine
+them with using your own code in `query_rewrite` for specific cases.
+
+
+[ref-data-modeling-concepts]: /product/data-modeling/concepts
+[ref-apis]: /product/apis-integrations
+[ref-cubes]: /product/data-modeling/concepts#cubes
+[ref-views]: /product/data-modeling/concepts#views
+[ref-cubes-sql]: /reference/data-model/cube#sql
+[ref-dynamic-data-modeling]: /product/data-modeling/dynamic
+[ref-query-rewrite]: /reference/configuration/config#query_rewrite
+[ref-dap]: /product/auth/data-access-policies
+[ref-mls]: /product/auth/member-level-security

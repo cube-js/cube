@@ -50,8 +50,8 @@ cube(`users`, {
 Data models cannot access `console.log` due to a separate [VM
 instance][nodejs-vm] that runs it. Suppose you find yourself writing complex
 logic for SQL generation that depends on a lot of external input. In that case,
-you probably want to introduce a helper service outside of `schema` directory
-that you can debug as usual Node.js code.
+you probably want to introduce a helper service outside of the [data model
+directory][ref-schema-path] that you can debug as usual Node.js code.
 
 ## Cube globals (cube and others)
 
@@ -109,8 +109,8 @@ cube(`users`, {
 ## asyncModule
 
 Data models can be externally stored and retrieved through an asynchronous
-operation using the `asyncModule()`. For more information, consult the [Dynamic
-Schema Creation][ref-dynamic-schemas] page.
+operation using the `asyncModule()`. For more information, consult the [dynamic
+data model creation][ref-dynamic-schemas].
 
 ## Context symbols transpile
 
@@ -191,3 +191,4 @@ cube(`users`, {
 [nodejs-require]: https://nodejs.org/api/modules.html#modules_require_id
 [ref-dynamic-schemas]: /product/data-modeling/dynamic
 [self-require]: #require
+[ref-schema-path]: /reference/configuration/config#schema_path

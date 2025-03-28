@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "1.1.0",
+  "version": "1.2.27",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -15,7 +15,7 @@
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "test": "npm run unit",
-    "unit": "jest --coverage dist/test",
+    "unit": "CUBE_JS_NATIVE_API_GATEWAY_INTERNAL=true jest --coverage --forceExit dist/test",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
@@ -27,11 +27,12 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/native": "1.1.0",
-    "@cubejs-backend/shared": "1.0.3",
+    "@cubejs-backend/native": "1.2.27",
+    "@cubejs-backend/shared": "1.2.27",
     "@ungap/structured-clone": "^0.3.4",
     "body-parser": "^1.19.0",
     "chrono-node": "^2.6.2",
+    "express": "^4.21.1",
     "express-graphql": "^0.12.0",
     "graphql": "^15.8.0",
     "graphql-scalars": "^1.10.0",
@@ -42,15 +43,15 @@
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.4",
     "moment": "^2.24.0",
-    "moment-timezone": "^0.5.27",
+    "moment-timezone": "^0.5.46",
     "nexus": "^1.1.0",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.0",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^1.0.0",
-    "@types/express": "^4.17.9",
+    "@cubejs-backend/linter": "1.2.27",
+    "@types/express": "^4.17.21",
     "@types/jest": "^27",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/jwk-to-pem": "^2.0.0",
@@ -59,7 +60,6 @@
     "@types/ramda": "^0.27.32",
     "@types/supertest": "^2.0.10",
     "@types/uuid": "^8.3.1",
-    "express": "^4.17.1",
     "jest": "^27",
     "mysql": "^2.18.1",
     "should": "^13.2.3",
@@ -73,6 +73,10 @@
   "jest": {
     "testEnvironment": "node",
     "collectCoverage": false,
+    "coverageReporters": [
+      "text",
+      "html"
+    ],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
       "dist/src/**/*.js",

@@ -20,7 +20,7 @@ We have the following data model:
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
     sql_table: orders
 
     measures:
@@ -38,7 +38,7 @@ cubes:
 ```
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
   sql_table: `orders`,
 
   measures: {

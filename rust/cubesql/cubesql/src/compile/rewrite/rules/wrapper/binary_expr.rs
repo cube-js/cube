@@ -4,7 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        wrapper_replacer_context, WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -15,29 +15,11 @@ impl WrapperRules {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-binary-expr",
-                wrapper_pushdown_replacer(
-                    binary_expr("?left", "?op", "?right"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                wrapper_pushdown_replacer(binary_expr("?left", "?op", "?right"), "?context"),
                 binary_expr(
-                    wrapper_pushdown_replacer(
-                        "?left",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?left", "?context"),
                     "?op",
-                    wrapper_pushdown_replacer(
-                        "?right",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    wrapper_pushdown_replacer("?right", "?context"),
                 ),
             ),
             transforming_rewrite(
@@ -45,26 +27,38 @@ impl WrapperRules {
                 binary_expr(
                     wrapper_pullup_replacer(
                         "?left",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                     "?op",
                     wrapper_pullup_replacer(
                         "?right",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                        ),
                     ),
                 ),
                 wrapper_pullup_replacer(
                     binary_expr("?left", "?op", "?right"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_binary_expr("?op", "?alias_to_cube"),
             ),
@@ -82,7 +76,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             )
             .cloned()
             {

@@ -1,4 +1,4 @@
-use super::memeber_sql::{MemberSql, NativeMemberSql};
+use super::member_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -17,7 +17,6 @@ pub struct MemberDefinitionStatic {
 
 #[nativebridge::native_bridge(MemberDefinitionStatic)]
 pub trait MemberDefinition {
-    #[optional]
-    #[field]
+    #[nbridge(field, optional)]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }

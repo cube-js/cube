@@ -38,7 +38,6 @@ use tokio::time::error::Elapsed;
 pub mod app_metrics;
 pub mod cachestore;
 pub mod cluster;
-pub mod codegen;
 pub mod config;
 pub mod http;
 pub mod import;

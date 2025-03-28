@@ -1,14 +1,55 @@
-import { ReactNode, createContext, useContext, useCallback, useState, useEffect } from 'react';
+import { FocusableRefValue } from '@react-types/shared';
+import {
+  ReactNode,
+  createContext,
+  useContext,
+  useState,
+  useMemo,
+  useLayoutEffect,
+  useRef,
+  useEffect,
+} from 'react';
 import { Action, tasty, CloseIcon, Styles } from '@cube-dev/ui-kit';
+
+import { useEvent } from '../../hooks';
+
+interface TabData {
+  content: ReactNode;
+  prerender: boolean;
+  keepMounted: boolean;
+}
 
 interface TabsContextValue {
   type?: 'default' | 'card';
   size?: 'normal' | 'large';
   activeKey?: string;
   extra?: ReactNode;
-  setContent: (content?: ReactNode) => void;
+  setTabContent: (id: string, content: TabData | null) => void;
+  prerender?: boolean;
+  keepMounted?: boolean;
   onChange: (key: string) => void;
   onDelete?: (key: string) => void;
+}
+
+interface TabsProps extends Omit<TabsContextValue, 'setTabContent'> {
+  label?: string;
+  children?: ReactNode;
+  styles?: Styles;
+  size?: TabsContextValue['size'];
+}
+
+interface TabProps {
+  id: string;
+  title: ReactNode;
+  children?: ReactNode;
+  isDisabled?: boolean;
+  qa?: string;
+  qaVal?: string;
+  styles?: Styles;
+  size?: TabsContextValue['size'];
+  extra?: ReactNode;
+  prerender?: boolean;
+  keepMounted?: boolean;
 }
 
 const TabsContext = createContext<TabsContextValue | undefined>(undefined);
@@ -23,11 +64,15 @@ const TabsElement = tasty({
     shadow: 'inset 0 -1bw 0 #border',
     width: '100%',
     padding: '0 2x',
+    scrollbarWidth: 'none',
 
     Container: {
       display: 'grid',
       gridAutoFlow: 'column',
-      gap: '0',
+      gap: {
+        '': 0,
+        card: '1bw',
+      },
       placeContent: 'start',
     },
 
@@ -49,6 +94,7 @@ const TabContainer = tasty({
 
 const TabElement = tasty(Action, {
   styles: {
+    position: 'relative',
     preset: {
       '': 't3m',
       '[data-size="large"]': 't2m',
@@ -74,6 +120,7 @@ const TabElement = tasty(Action, {
       '': '#dark-02',
       hovered: '#purple',
       active: '#purple-text',
+      'disabled & !active': '#dark-04',
     },
     borderBottom: {
       '': 'none',
@@ -89,10 +136,26 @@ const TabElement = tasty(Action, {
     width: 'max 100%',
     transition: 'theme, borderBottom',
     whiteSpace: 'nowrap',
+    outline: false,
 
     '@delete-padding': {
       '': '1.5x',
       deletable: '4.5x',
+    },
+
+    '&::before': {
+      content: '""',
+      display: 'block',
+      position: 'absolute',
+      inset: '0 0 -1ow 0',
+      pointerEvents: 'none',
+      radius: 'top',
+      shadow: {
+        '': 'inset 0 0 0 #purple',
+        focused: 'inset 0 0 0 1ow #purple-03',
+      },
+      transition: 'theme',
+      zIndex: 1,
     },
   },
 });
@@ -122,80 +185,133 @@ const TabCloseButton = tasty(Action, {
   children: <CloseIcon />,
 });
 
-interface TabsProps extends Omit<TabsContextValue, 'setContent'> {
-  label?: string;
-  children?: ReactNode;
-  styles?: Styles;
-  size?: TabsContextValue['size'];
-}
-
-interface TabProps {
-  id: string;
-  title: ReactNode;
-  children?: ReactNode;
-  isDisabled?: boolean;
-  qa?: string;
-  styles?: Styles;
-  size?: TabsContextValue['size'];
-  extra?: ReactNode;
-}
-
 export function Tabs(props: TabsProps) {
-  const [content, setContent] = useState<ReactNode>(null);
-  const { label, activeKey, size, type, onChange, onDelete, children, styles, extra } = props;
+  const [contentMap, setContentMap] = useState<Map<string, TabData>>(new Map());
+  const {
+    label,
+    activeKey,
+    size,
+    type,
+    onChange,
+    onDelete,
+    children,
+    styles,
+    extra,
+    prerender,
+    keepMounted,
+  } = props;
 
   const isCardType = type === 'card';
 
+  // Update the content map whenever the activeKey changes
+  const setTabContent = useEvent((id: string, content: TabData | null) => {
+    setContentMap((prev) => {
+      const newMap = new Map(prev);
+      if (content) {
+        newMap.set(id, content);
+      } else {
+        newMap.delete(id);
+      }
+
+      return newMap;
+    });
+  });
+
+  const mods = useMemo(() => ({ card: isCardType, deletable: !!onDelete }), [isCardType, onDelete]);
+
   return (
-    <TabsContext.Provider value={{ activeKey, onChange, onDelete, type, size, setContent }}>
+    <TabsContext.Provider
+      value={{ activeKey, onChange, onDelete, type, size, setTabContent, prerender, keepMounted }}
+    >
       <TabsElement
         qa="Tabs"
         aria-label={label ?? 'Tabs'}
         data-size={size ?? 'normal'}
-        mods={{ card: isCardType }}
+        mods={mods}
         styles={styles}
       >
         <div data-element="Container">{children}</div>
         {extra ? <div data-element="Extra">{extra}</div> : null}
       </TabsElement>
-      {content}
+      {[...contentMap.entries()].map(([id, { content, prerender, keepMounted }]) =>
+        prerender || id === activeKey || keepMounted ? (
+          <div
+            key={id}
+            data-qa="TabPanel"
+            data-qaval={id}
+            style={{
+              display: id === activeKey ? 'contents' : 'none',
+            }}
+          >
+            {content}
+          </div>
+        ) : null
+      )}
     </TabsContext.Provider>
   );
 }
 
 export function Tab(props: TabProps) {
-  const { title, id, isDisabled, qa, styles, children } = props;
-  const { activeKey, size, type, onChange, onDelete, setContent } = useContext(TabsContext) || {};
+  let { title, id, isDisabled, prerender, keepMounted, qa, qaVal, styles, children } = props;
+
+  const ref = useRef<FocusableRefValue>(null);
+
+  const { activeKey, size, type, onChange, onDelete, setTabContent, ...contextProps } =
+    useContext(TabsContext) || ({} as TabsContextValue);
+
+  prerender = prerender ?? contextProps.prerender;
+  keepMounted = keepMounted ?? contextProps.keepMounted;
 
   const isActive = id === activeKey;
 
-  const onDeleteCallback = useCallback(() => {
+  const onDeleteCallback = useEvent(() => {
     onDelete?.(id);
-  }, [onDelete, id]);
-  const onChangeCallback = useCallback(() => {
+  });
+  const onChangeCallback = useEvent(() => {
     onChange?.(id);
-  }, [id]);
+  });
 
   const isCardType = type === 'card';
-  const isDeletable = onDelete && isCardType;
+  const isDeletable = !!onDelete;
+
+  useLayoutEffect(() => {
+    if (prerender || isActive) {
+      setTabContent?.(id, {
+        content: children,
+        prerender: prerender ?? false,
+        keepMounted: keepMounted ?? false,
+      });
+    } else if (!keepMounted) {
+      setTabContent?.(id, null);
+    }
+  }, [children, isActive, keepMounted, prerender, setTabContent]);
+
+  useLayoutEffect(() => {
+    return () => {
+      setTabContent?.(id, null);
+    };
+  }, []);
+
+  const mods = useMemo(
+    () => ({ card: isCardType, active: isActive, deletable: isDeletable, disabled: isDisabled }),
+    [isCardType, isActive, isDeletable, isDisabled]
+  );
 
   useEffect(() => {
-    if (isActive) {
-      setContent?.(children || null);
+    if (ref.current && isActive) {
+      ref.current.UNSAFE_getDOMNode()?.scrollIntoView?.();
     }
-  }, [activeKey, children]);
+  }, [isActive]);
 
   return (
-    <TabContainer>
+    <TabContainer mods={mods}>
       <TabElement
-        qa={`Tab-${id}` ?? qa}
+        ref={ref}
+        qa={qa ?? `Tab-${id}`}
+        qaVal={qaVal}
         isDisabled={isDisabled}
         styles={styles}
-        mods={{
-          active: isActive,
-          card: isCardType,
-          deletable: isDeletable,
-        }}
+        mods={mods}
         data-size={size}
         onPress={onChangeCallback}
       >

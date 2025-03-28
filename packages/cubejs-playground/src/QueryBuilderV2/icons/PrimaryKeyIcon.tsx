@@ -10,7 +10,7 @@ export const PrimaryKeyIcon = memo(({ color }: { color?: string }) => {
         viewBox="0 0 16 16"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        style={{ color: 'var(--dark-02-color)' }}
+        style={{ color: color ? `var(--${color}-color)` : 'var(--dark-02-color)' }}
       >
         <path
           fillRule="evenodd"

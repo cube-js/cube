@@ -47,7 +47,7 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public timestampFormat() {
-    return moment.HTML5_FMT.DATETIME_LOCAL_MS;
+    return 'YYYY-MM-DDTHH:mm:ss.SSS';
   }
 
   public dateTimeCast(value) {
@@ -71,7 +71,7 @@ export class CubeStoreQuery extends BaseQuery {
    * intervals relative to origin timestamp point.
    */
   public dateBin(interval: string, source: string, origin: string): string {
-    return `DATE_BIN(INTERVAL ${this.formatInterval(interval)}, ${this.timeStampCast(source)}, ${this.timeStampCast(`'${origin}'`)})`;
+    return `DATE_BIN(INTERVAL ${this.formatInterval(interval)}, ${this.dateTimeCast(source)}, ${this.dateTimeCast(`'${origin}'`)})`;
   }
 
   /**

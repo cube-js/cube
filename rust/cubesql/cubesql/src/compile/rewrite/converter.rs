@@ -16,19 +16,20 @@ use crate::{
             DimensionName, EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
-            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn,
-            LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, QueryParamIndex,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            SubqueryTypes, TableScanFetch, TableScanProjection, TableScanSourceTableName,
-            TableScanTableName, TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, TryCastExprDataType, UnionAlias, WindowFunctionExprFun,
-            WindowFunctionExprWindowFrame, WrappedSelectAlias, WrappedSelectDistinct,
-            WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
-            WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
+            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
+            JoinNullEqualsNull, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
+            LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
+            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
+            ProjectionSplit, QueryParamIndex, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            ValuesValues, WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
+            WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
+            WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
+            WrappedSelectType,
         },
         CubeContext,
     },
@@ -49,7 +50,7 @@ use datafusion::{
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
         replace_col_to_expr, Column, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct,
         EmptyRelation, Expr, ExprRewritable, ExprRewriter, GroupingSet, Like, Limit, LogicalPlan,
-        LogicalPlanBuilder, TableScan, Union,
+        LogicalPlanBuilder, Repartition, Subquery, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
@@ -351,8 +352,7 @@ impl LogicalPlanToLanguageConverter {
                 let expr = add_expr_list_node!(graph, expr, query_params, CaseExprExpr, flat_list);
                 let when_then_expr = when_then_expr
                     .iter()
-                    .map(|(when, then)| vec![when, then])
-                    .flatten()
+                    .flat_map(|(when, then)| [when, then])
                     .collect::<Vec<_>>();
                 let when_then_expr = add_expr_list_node!(
                     graph,
@@ -654,6 +654,8 @@ impl LogicalPlanToLanguageConverter {
                 let join_type = add_data_node!(self, node.join_type, JoinJoinType);
                 let join_constraint =
                     add_data_node!(self, node.join_constraint, JoinJoinConstraint);
+                let null_equals_null =
+                    add_data_node!(self, node.null_equals_null, JoinNullEqualsNull);
                 self.graph.add(LogicalPlanLanguage::Join([
                     left,
                     right,
@@ -661,6 +663,7 @@ impl LogicalPlanToLanguageConverter {
                     right_on,
                     join_type,
                     join_constraint,
+                    null_equals_null,
                 ]))
             }
             LogicalPlan::CrossJoin(node) => {
@@ -768,11 +771,12 @@ impl LogicalPlanToLanguageConverter {
                 self.graph
                     .add(LogicalPlanLanguage::Limit([skip, fetch, input]))
             }
+            LogicalPlan::Values(values) => {
+                let values = add_data_node!(self, values.values, ValuesValues);
+                self.graph.add(LogicalPlanLanguage::Values([values]))
+            }
             LogicalPlan::CreateExternalTable { .. } => {
                 panic!("CreateExternalTable is not supported");
-            }
-            LogicalPlan::Values { .. } => {
-                panic!("Values is not supported");
             }
             LogicalPlan::Explain { .. } => {
                 panic!("Explain is not supported");
@@ -782,12 +786,7 @@ impl LogicalPlanToLanguageConverter {
             }
             // TODO
             LogicalPlan::Extension(ext) => {
-                if let Some(_cube_scan) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
-                    todo!("LogicalPlanLanguage::Extension");
-                    // self.graph.add(LogicalPlanLanguage::Extension([]))
-                } else {
-                    panic!("Unsupported extension node: {}", ext.node.schema());
-                }
+                panic!("Unsupported extension node: {}", ext.node.schema());
             }
             LogicalPlan::Distinct(distinct) => {
                 let input = self.add_logical_plan_replace_params(
@@ -932,7 +931,7 @@ macro_rules! match_expr_list_node {
                     }
                 }
                 _ => {
-                    result.push(to_expr(id.clone())?);
+                    result.push(to_expr(id)?);
                 }
             }
             Ok(())
@@ -988,7 +987,7 @@ pub fn node_to_expr(
 ) -> Result<Expr, CubeError> {
     Ok(match node {
         LogicalPlanLanguage::AliasExpr(params) => {
-            let expr = to_expr(params[0].clone())?;
+            let expr = to_expr(params[0])?;
             let alias = match_data_node!(node_by_id, params[1], AliasExprAlias);
             Expr::Alias(Box::new(expr), alias)
         }
@@ -1011,9 +1010,9 @@ pub fn node_to_expr(
             Expr::Literal(value)
         }
         LogicalPlanLanguage::AnyExpr(params) => {
-            let left = Box::new(to_expr(params[0].clone())?);
+            let left = Box::new(to_expr(params[0])?);
             let op = match_data_node!(node_by_id, params[1], AnyExprOp);
-            let right = Box::new(to_expr(params[2].clone())?);
+            let right = Box::new(to_expr(params[2])?);
             let all = match_data_node!(node_by_id, params[3], AnyExprAll);
             Expr::AnyExpr {
                 left,
@@ -1023,16 +1022,16 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::BinaryExpr(params) => {
-            let left = Box::new(to_expr(params[0].clone())?);
+            let left = Box::new(to_expr(params[0])?);
             let op = match_data_node!(node_by_id, params[1], BinaryExprOp);
-            let right = Box::new(to_expr(params[2].clone())?);
+            let right = Box::new(to_expr(params[2])?);
             Expr::BinaryExpr { left, op, right }
         }
         LogicalPlanLanguage::LikeExpr(params) => {
             let like_type = match_data_node!(node_by_id, params[0], LikeExprLikeType);
             let negated = match_data_node!(node_by_id, params[1], LikeExprNegated);
-            let expr = Box::new(to_expr(params[2].clone())?);
-            let pattern = Box::new(to_expr(params[3].clone())?);
+            let expr = Box::new(to_expr(params[2])?);
+            let pattern = Box::new(to_expr(params[3])?);
             let escape_char = match_data_node!(node_by_id, params[4], LikeExprEscapeChar);
             let like_expr = Like {
                 negated,
@@ -1047,26 +1046,26 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::NotExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::Not(expr)
         }
         LogicalPlanLanguage::IsNotNullExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::IsNotNull(expr)
         }
         LogicalPlanLanguage::IsNullExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::IsNull(expr)
         }
         LogicalPlanLanguage::NegativeExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::Negative(expr)
         }
         LogicalPlanLanguage::BetweenExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let negated = match_data_node!(node_by_id, params[1], BetweenExprNegated);
-            let low = Box::new(to_expr(params[2].clone())?);
-            let high = Box::new(to_expr(params[3].clone())?);
+            let low = Box::new(to_expr(params[2])?);
+            let high = Box::new(to_expr(params[3])?);
             Expr::Between {
                 expr,
                 negated,
@@ -1096,17 +1095,17 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::CastExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let data_type = match_data_node!(node_by_id, params[1], CastExprDataType);
             Expr::Cast { expr, data_type }
         }
         LogicalPlanLanguage::TryCastExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let data_type = match_data_node!(node_by_id, params[1], TryCastExprDataType);
             Expr::TryCast { expr, data_type }
         }
         LogicalPlanLanguage::SortExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let asc = match_data_node!(node_by_id, params[1], SortExprAsc);
             let nulls_first = match_data_node!(node_by_id, params[2], SortExprNullsFirst);
             Expr::Sort {
@@ -1188,7 +1187,7 @@ pub fn node_to_expr(
             Expr::TableUDF { fun, args }
         }
         LogicalPlanLanguage::InListExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let list = match_expr_list_node!(node_by_id, to_expr, params[1], InListExprList);
             let negated = match_data_node!(node_by_id, params[2], InListExprNegated);
             Expr::InList {
@@ -1209,8 +1208,8 @@ pub fn node_to_expr(
             ));
         }
         LogicalPlanLanguage::InSubqueryExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
-            let subquery = Box::new(to_expr(params[1].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
+            let subquery = Box::new(to_expr(params[1])?);
             let negated = match_data_node!(node_by_id, params[2], InSubqueryExprNegated);
             Expr::InSubquery {
                 expr,
@@ -1351,10 +1350,18 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Join(params) => {
                 let left_on = match_data_node!(node_by_id, params[2], JoinLeftOn);
                 let right_on = match_data_node!(node_by_id, params[3], JoinRightOn);
-                let left = self.to_logical_plan(params[0]);
-                let right = self.to_logical_plan(params[1]);
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
 
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                // It's OK to join two grouped queries: expected row count is not that high, so
+                // SQL API can, potentially, evaluate it completely
+                // We don't really want it, so cost function should make WrappedSelect preferable
+                // but still, we don't want to hard error on that
+                // But if any one of join sides is ungroued, SQL API does not have much of a choice
+                // but to process every row from ungrouped query, and that's Not Good
+                if Self::have_ungrouped_cube_scan_inside(&left)
+                    || Self::have_ungrouped_cube_scan_inside(&right)
+                {
                     if left_on.iter().any(|c| c.name == "__cubeJoinField")
                         || right_on.iter().any(|c| c.name == "__cubeJoinField")
                     {
@@ -1371,8 +1378,8 @@ impl LanguageToLogicalPlanConverter {
                     }
                 }
 
-                let left = Arc::new(left?);
-                let right = Arc::new(right?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
 
                 let join_type = match_data_node!(node_by_id, params[4], JoinJoinType);
                 let join_constraint = match_data_node!(node_by_id, params[5], JoinJoinConstraint);
@@ -1382,19 +1389,31 @@ impl LanguageToLogicalPlanConverter {
                     &join_type,
                 )?);
 
+                let null_equals_null = match_data_node!(node_by_id, params[6], JoinNullEqualsNull);
+
                 LogicalPlan::Join(Join {
                     left,
                     right,
-                    on: left_on.into_iter().zip_eq(right_on.into_iter()).collect(),
+                    on: left_on.into_iter().zip_eq(right_on).collect(),
                     join_type,
                     join_constraint,
                     schema,
-                    // TODO: Pass to Graph
-                    null_equals_null: true,
+                    null_equals_null,
                 })
             }
             LogicalPlanLanguage::CrossJoin(params) => {
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
+
+                // See comment in Join conversion
+                // Note that DF can generate Filter(CrossJoin(...)) for complex join conditions
+                // But, from memory or dataset perspective it's the same: DF would buffer left side completely
+                // And then iterate over right side, evaluting predicate
+                // Regular join would use hash partitioning here, so it would be quicker, and utilize less CPU,
+                // but transfer and buffering will be the same
+                if Self::have_ungrouped_cube_scan_inside(&left)
+                    || Self::have_ungrouped_cube_scan_inside(&right)
+                {
                     return Err(CubeError::internal(
                         "Can not join Cubes. This is most likely due to one of the following reasons:\n\
                         • one of the cubes contains a group by\n\
@@ -1403,8 +1422,8 @@ impl LanguageToLogicalPlanConverter {
                     ));
                 }
 
-                let left = Arc::new(self.to_logical_plan(params[0])?);
-                let right = Arc::new(self.to_logical_plan(params[1])?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
                 let schema = Arc::new(left.schema().join(right.schema())?);
 
                 LogicalPlan::CrossJoin(CrossJoin {
@@ -1526,558 +1545,504 @@ impl LanguageToLogicalPlanConverter {
             //     panic!("Analyze is not supported");
             // }
             LogicalPlanLanguage::Extension(params) => {
-                let node = match self.best_expr.index(params[0]) {
-                    LogicalPlanLanguage::CubeScan(cube_scan_params) => {
-                        let alias_to_cube =
-                            match_data_node!(node_by_id, cube_scan_params[0], CubeScanAliasToCube);
-                        let members =
-                            match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
-                        let order =
-                            match_list_node!(node_by_id, cube_scan_params[3], CubeScanOrder);
-                        let wrapped =
-                            match_data_node!(node_by_id, cube_scan_params[8], CubeScanWrapped);
-                        // TODO filters
-                        // TODO
-                        let mut query = V1LoadRequestQuery::new();
-                        let mut fields = Vec::new();
-                        let mut query_measures = Vec::new();
-                        let mut query_time_dimensions = Vec::new();
-                        let mut query_order = Vec::new();
-                        let mut query_dimensions = Vec::new();
+                panic!("Unexpected extension node: {:?}", params[0])
+            }
+            LogicalPlanLanguage::CubeScan(cube_scan_params) => {
+                let alias_to_cube =
+                    match_data_node!(node_by_id, cube_scan_params[0], CubeScanAliasToCube);
+                let members = match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
+                let order = match_list_node!(node_by_id, cube_scan_params[3], CubeScanOrder);
+                let wrapped = match_data_node!(node_by_id, cube_scan_params[8], CubeScanWrapped);
+                // TODO filters
+                // TODO
+                let mut query = V1LoadRequestQuery::new();
+                let mut fields = Vec::new();
+                let mut query_measures = Vec::new();
+                let mut query_time_dimensions = Vec::new();
+                let mut query_order = Vec::new();
+                let mut query_dimensions = Vec::new();
 
-                        for m in members {
-                            match m {
-                                LogicalPlanLanguage::Measure(measure_params) => {
-                                    let measure = match_data_node!(
-                                        node_by_id,
-                                        measure_params[0],
-                                        MeasureName
-                                    );
-                                    let expr = self.to_expr(measure_params[1])?;
-                                    query_measures.push(measure.to_string());
-                                    let data_type = self
-                                        .cube_context
-                                        .meta
-                                        .find_df_data_type(measure.to_string())
-                                        .ok_or(CubeError::internal(format!(
-                                            "Can't find measure '{}'",
-                                            measure
-                                        )))?;
-                                    fields.push((
-                                        DFField::new(
-                                            expr_relation(&expr),
-                                            &expr_name(&expr)?,
-                                            data_type,
-                                            true,
-                                        ),
-                                        MemberField::Member(measure.to_string()),
-                                    ));
-                                }
-                                LogicalPlanLanguage::TimeDimension(params) => {
-                                    let dimension =
-                                        match_data_node!(node_by_id, params[0], TimeDimensionName);
-                                    let granularity = match_data_node!(
-                                        node_by_id,
-                                        params[1],
-                                        TimeDimensionGranularity
-                                    );
-                                    let date_range = match_data_node!(
-                                        node_by_id,
-                                        params[2],
-                                        TimeDimensionDateRange
-                                    );
-                                    let expr = self.to_expr(params[3])?;
-                                    let query_time_dimension = V1LoadRequestQueryTimeDimension {
-                                        dimension: dimension.to_string(),
-                                        granularity: granularity.clone(),
-                                        date_range: date_range.map(|date_range| {
-                                            serde_json::Value::Array(
-                                                date_range
-                                                    .into_iter()
-                                                    .map(|d| serde_json::Value::String(d))
-                                                    .collect(),
-                                            )
-                                        }),
-                                    };
-                                    if !query_time_dimensions.contains(&query_time_dimension) {
-                                        query_time_dimensions.push(query_time_dimension);
-                                    }
-                                    if let Some(granularity) = &granularity {
-                                        fields.push((
-                                            DFField::new(
-                                                expr_relation(&expr),
-                                                // TODO empty schema
-                                                &expr_name(&expr)?,
-                                                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                                                true,
-                                            ),
-                                            MemberField::Member(format!(
-                                                "{}.{}",
-                                                dimension, granularity
-                                            )),
-                                        ));
-                                    }
-                                }
-                                LogicalPlanLanguage::Dimension(params) => {
-                                    let dimension =
-                                        match_data_node!(node_by_id, params[0], DimensionName);
-                                    let expr = self.to_expr(params[1])?;
-                                    let data_type = self
-                                        .cube_context
-                                        .meta
-                                        .find_df_data_type(dimension.to_string())
-                                        .ok_or(CubeError::internal(format!(
-                                            "Can't find dimension '{}'",
-                                            dimension
-                                        )))?;
-                                    query_dimensions.push(dimension.to_string());
-                                    fields.push((
-                                        DFField::new(
-                                            expr_relation(&expr),
-                                            // TODO empty schema
-                                            &expr_name(&expr)?,
-                                            data_type,
-                                            true,
-                                        ),
-                                        MemberField::Member(dimension),
-                                    ));
-                                }
-                                LogicalPlanLanguage::Segment(params) => {
-                                    let expr = self.to_expr(params[1])?;
-                                    fields.push((
-                                        DFField::new(
-                                            expr_relation(&expr),
-                                            // TODO empty schema
-                                            &expr_name(&expr)?,
-                                            DataType::Boolean,
-                                            true,
-                                        ),
-                                        MemberField::Literal(ScalarValue::Boolean(None)),
-                                    ));
-                                }
-                                LogicalPlanLanguage::ChangeUser(params) => {
-                                    let expr = self.to_expr(params[1])?;
-                                    fields.push((
-                                        DFField::new(
-                                            expr_relation(&expr),
-                                            // TODO empty schema
-                                            &expr_name(&expr)?,
-                                            DataType::Utf8,
-                                            true,
-                                        ),
-                                        MemberField::Literal(ScalarValue::Utf8(None)),
-                                    ));
-                                }
-                                LogicalPlanLanguage::LiteralMember(params) => {
-                                    let value =
-                                        match_data_node!(node_by_id, params[0], LiteralMemberValue);
-                                    let expr = self.to_expr(params[1])?;
-                                    let relation = match_data_node!(
-                                        node_by_id,
-                                        params[2],
-                                        LiteralMemberRelation
-                                    );
-                                    fields.push((
-                                        DFField::new(
-                                            relation.as_deref(),
-                                            &expr_name(&expr)?,
-                                            value.get_datatype(),
-                                            true,
-                                        ),
-                                        MemberField::Literal(value),
-                                    ));
-                                }
-                                LogicalPlanLanguage::VirtualField(params) => {
-                                    let expr = self.to_expr(params[2])?;
-                                    fields.push((
-                                        DFField::new(
-                                            expr_relation(&expr),
-                                            // TODO empty schema
-                                            &expr_name(&expr)?,
-                                            DataType::Utf8,
-                                            true,
-                                        ),
-                                        MemberField::Literal(ScalarValue::Utf8(None)),
-                                    ));
-                                }
-                                LogicalPlanLanguage::MemberError(params) => {
-                                    let error =
-                                        match_data_node!(node_by_id, params[0], MemberErrorError);
-                                    return Err(CubeError::user(error.to_string()));
-                                }
-                                LogicalPlanLanguage::AllMembers(_) => {
-                                    if !wrapped {
-                                        return Err(CubeError::internal(
-                                            "Can't detect Cube query and it may be not supported yet"
-                                                .to_string(),
-                                        ));
-                                    } else {
-                                        for (alias, cube) in alias_to_cube.iter() {
-                                            let cube = self
-                                                .cube_context
-                                                .meta
-                                                .find_cube_with_name(cube)
-                                                .ok_or_else(|| {
-                                                    CubeError::user(format!(
-                                                        "Can't find cube '{}'",
-                                                        cube
-                                                    ))
-                                                })?;
-                                            for column in cube.get_columns() {
-                                                if self.cube_context.meta.is_synthetic_field(
-                                                    column.member_name().to_string(),
-                                                ) {
-                                                    fields.push((
-                                                        DFField::new(
-                                                            Some(&alias),
-                                                            column.get_name(),
-                                                            column.get_column_type().to_arrow(),
-                                                            true,
-                                                        ),
-                                                        MemberField::Literal(ScalarValue::Utf8(
-                                                            None,
-                                                        )),
-                                                    ));
-                                                } else {
-                                                    fields.push((
-                                                        DFField::new(
-                                                            Some(&alias),
-                                                            column.get_name(),
-                                                            column.get_column_type().to_arrow(),
-                                                            true,
-                                                        ),
-                                                        MemberField::Member(
-                                                            column.member_name().to_string(),
-                                                        ),
-                                                    ));
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                x => panic!("Expected dimension but found {:?}", x),
-                            }
-                        }
-
-                        let filters =
-                            match_list_node!(node_by_id, cube_scan_params[2], CubeScanFilters);
-
-                        fn to_filter(
-                            query_time_dimensions: &mut Vec<V1LoadRequestQueryTimeDimension>,
-                            filters: Vec<LogicalPlanLanguage>,
-                            node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
-                            is_in_or: bool,
-                        ) -> Result<
-                            (
-                                Vec<V1LoadRequestQueryFilterItem>,
-                                Vec<String>,
-                                Option<String>,
-                            ),
-                            CubeError,
-                        > {
-                            let mut result = Vec::new();
-                            let mut segments_result = Vec::new();
-                            let mut change_user_result = Vec::new();
-
-                            for f in filters {
-                                match f {
-                                    LogicalPlanLanguage::FilterOp(params) => {
-                                        let filters = match_list_node!(
-                                            node_by_id,
-                                            params[0],
-                                            FilterOpFilters
-                                        );
-                                        let op =
-                                            match_data_node!(node_by_id, params[1], FilterOpOp);
-                                        let is_and_op = op == "and";
-                                        let (filters, segments, change_user) = to_filter(
-                                            query_time_dimensions,
-                                            filters,
-                                            node_by_id,
-                                            !is_in_or || !is_and_op,
-                                        )?;
-                                        match op.as_str() {
-                                            "and" => {
-                                                result.push(V1LoadRequestQueryFilterItem {
-                                                    member: None,
-                                                    operator: None,
-                                                    values: None,
-                                                    or: None,
-                                                    and: Some(
-                                                        filters
-                                                            .into_iter()
-                                                            .map(|f| serde_json::json!(f))
-                                                            .collect(),
-                                                    ),
-                                                });
-                                                segments_result.extend(segments);
-
-                                                if change_user.is_some() {
-                                                    change_user_result.extend(change_user);
-                                                }
-                                            }
-                                            "or" => {
-                                                result.push(V1LoadRequestQueryFilterItem {
-                                                    member: None,
-                                                    operator: None,
-                                                    values: None,
-                                                    or: Some(
-                                                        filters
-                                                            .into_iter()
-                                                            .map(|f| serde_json::json!(f))
-                                                            .collect(),
-                                                    ),
-                                                    and: None,
-                                                });
-                                                if !segments.is_empty() {
-                                                    return Err(CubeError::internal(
-                                                        "Can't use OR operator with segments"
-                                                            .to_string(),
-                                                    ));
-                                                }
-
-                                                if change_user.is_some() {
-                                                    return Err(CubeError::internal(
-                                                        "Can't use OR operator with __user column"
-                                                            .to_string(),
-                                                    ));
-                                                }
-                                            }
-                                            x => panic!("Unsupported filter operator: {}", x),
-                                        }
-                                    }
-                                    LogicalPlanLanguage::FilterMember(params) => {
-                                        let member = match_data_node!(
-                                            node_by_id,
-                                            params[0],
-                                            FilterMemberMember
-                                        );
-                                        let op =
-                                            match_data_node!(node_by_id, params[1], FilterMemberOp);
-                                        let values = match_data_node!(
-                                            node_by_id,
-                                            params[2],
-                                            FilterMemberValues
-                                        );
-                                        if !is_in_or && op == "inDateRange" {
-                                            let existing_time_dimension =
-                                                query_time_dimensions.iter_mut().find_map(|td| {
-                                                    if td.dimension == member
-                                                        && td.date_range.is_none()
-                                                    {
-                                                        td.date_range = Some(json!(values));
-                                                        Some(td)
-                                                    } else {
-                                                        None
-                                                    }
-                                                });
-                                            if existing_time_dimension.is_none() {
-                                                let dimension = V1LoadRequestQueryTimeDimension {
-                                                    dimension: member.to_string(),
-                                                    granularity: None,
-                                                    date_range: Some(json!(values)),
-                                                };
-                                                query_time_dimensions.push(dimension);
-                                            }
-                                        } else {
-                                            result.push(V1LoadRequestQueryFilterItem {
-                                                member: Some(member),
-                                                operator: Some(op),
-                                                values: if !values.is_empty() {
-                                                    Some(values)
-                                                } else {
-                                                    None
-                                                },
-                                                or: None,
-                                                and: None,
-                                            });
-                                        }
-                                    }
-                                    LogicalPlanLanguage::SegmentMember(params) => {
-                                        let member = match_data_node!(
-                                            node_by_id,
-                                            params[0],
-                                            SegmentMemberMember
-                                        );
-                                        segments_result.push(member);
-                                    }
-                                    LogicalPlanLanguage::ChangeUserMember(params) => {
-                                        let member = match_data_node!(
-                                            node_by_id,
-                                            params[0],
-                                            ChangeUserMemberValue
-                                        );
-                                        change_user_result.push(member);
-                                    }
-                                    x => panic!("Expected filter but found {:?}", x),
-                                }
-                            }
-
-                            if change_user_result.len() > 1 {
-                                return Err(CubeError::internal(
-                                    "Unable to use multiple __user in one Cube query".to_string(),
-                                ));
-                            }
-
-                            Ok((result, segments_result, change_user_result.pop()))
-                        }
-
-                        let (filters, segments, change_user) =
-                            to_filter(&mut query_time_dimensions, filters, node_by_id, false)?;
-
-                        query.filters = if filters.len() > 0 {
-                            Some(filters)
-                        } else {
-                            None
-                        };
-
-                        query.segments = Some(segments);
-
-                        for o in order {
-                            let order_params = match_params!(o, Order);
-                            let order_member =
-                                match_data_node!(node_by_id, order_params[0], OrderMember);
-                            let order_asc = match_data_node!(node_by_id, order_params[1], OrderAsc);
-                            query_order.push(vec![
-                                order_member,
-                                if order_asc {
-                                    "asc".to_string()
-                                } else {
-                                    "desc".to_string()
-                                },
-                            ])
-                        }
-
-                        if !wrapped && fields.len() == 0 {
-                            return Err(CubeError::internal(
-                                "Can't detect Cube query and it may be not supported yet"
-                                    .to_string(),
+                for m in members {
+                    match m {
+                        LogicalPlanLanguage::Measure(measure_params) => {
+                            let measure =
+                                match_data_node!(node_by_id, measure_params[0], MeasureName);
+                            let expr = self.to_expr(measure_params[1])?;
+                            query_measures.push(measure.to_string());
+                            let data_type =
+                                self.cube_context.meta.find_df_data_type(&measure).ok_or(
+                                    CubeError::internal(format!(
+                                        "Can't find measure '{}'",
+                                        measure
+                                    )),
+                                )?;
+                            fields.push((
+                                DFField::new(
+                                    expr_relation(&expr),
+                                    &expr_name(&expr)?,
+                                    data_type,
+                                    true,
+                                ),
+                                MemberField::Member(measure.to_string()),
                             ));
                         }
-
-                        query.measures = Some(query_measures.into_iter().unique().collect());
-                        query.dimensions = Some(query_dimensions.into_iter().unique().collect());
-                        query.time_dimensions = if query_time_dimensions.len() > 0 {
-                            Some(
-                                query_time_dimensions
-                                    .into_iter()
-                                    .unique_by(|td| {
-                                        (
-                                            td.dimension.to_string(),
-                                            td.granularity.clone(),
-                                            td.date_range
-                                                .as_ref()
-                                                .map(|range| serde_json::to_string(range).unwrap()),
-                                        )
-                                    })
-                                    .collect(),
-                            )
-                        } else {
-                            None
-                        };
-
-                        let cube_scan_query_limit = self
-                            .cube_context
-                            .sessions
-                            .server
-                            .config_obj
-                            .non_streaming_query_max_row_limit()
-                            as usize;
-                        let fail_on_max_limit_hit = env::var("CUBESQL_FAIL_ON_MAX_LIMIT_HIT")
-                            .map(|v| v.to_lowercase() == "true")
-                            .unwrap_or(false);
-                        let mut limit_was_changed = false;
-                        query.limit = match match_data_node!(
-                            node_by_id,
-                            cube_scan_params[4],
-                            CubeScanLimit
-                        ) {
-                            Some(n) => {
-                                if n > cube_scan_query_limit {
-                                    limit_was_changed = true;
-                                }
-                                Some(n)
+                        LogicalPlanLanguage::TimeDimension(params) => {
+                            let dimension =
+                                match_data_node!(node_by_id, params[0], TimeDimensionName);
+                            let granularity =
+                                match_data_node!(node_by_id, params[1], TimeDimensionGranularity);
+                            let date_range =
+                                match_data_node!(node_by_id, params[2], TimeDimensionDateRange);
+                            let expr = self.to_expr(params[3])?;
+                            let query_time_dimension = V1LoadRequestQueryTimeDimension {
+                                dimension: dimension.to_string(),
+                                granularity: granularity.clone(),
+                                date_range: date_range.map(|date_range| {
+                                    serde_json::Value::Array(
+                                        date_range
+                                            .into_iter()
+                                            .map(|d| serde_json::Value::String(d))
+                                            .collect(),
+                                    )
+                                }),
+                            };
+                            if !query_time_dimensions.contains(&query_time_dimension) {
+                                query_time_dimensions.push(query_time_dimension);
                             }
-                            None => {
-                                if fail_on_max_limit_hit {
-                                    limit_was_changed = true;
-                                    Some(cube_scan_query_limit)
+                            if let Some(granularity) = &granularity {
+                                fields.push((
+                                    DFField::new(
+                                        expr_relation(&expr),
+                                        // TODO empty schema
+                                        &expr_name(&expr)?,
+                                        DataType::Timestamp(TimeUnit::Nanosecond, None),
+                                        true,
+                                    ),
+                                    MemberField::Member(format!("{}.{}", dimension, granularity)),
+                                ));
+                            }
+                        }
+                        LogicalPlanLanguage::Dimension(params) => {
+                            let dimension = match_data_node!(node_by_id, params[0], DimensionName);
+                            let expr = self.to_expr(params[1])?;
+                            let data_type =
+                                self.cube_context.meta.find_df_data_type(&dimension).ok_or(
+                                    CubeError::internal(format!(
+                                        "Can't find dimension '{}'",
+                                        dimension
+                                    )),
+                                )?;
+                            query_dimensions.push(dimension.to_string());
+                            fields.push((
+                                DFField::new(
+                                    expr_relation(&expr),
+                                    // TODO empty schema
+                                    &expr_name(&expr)?,
+                                    data_type,
+                                    true,
+                                ),
+                                MemberField::Member(dimension),
+                            ));
+                        }
+                        LogicalPlanLanguage::Segment(params) => {
+                            let expr = self.to_expr(params[1])?;
+                            fields.push((
+                                DFField::new(
+                                    expr_relation(&expr),
+                                    // TODO empty schema
+                                    &expr_name(&expr)?,
+                                    DataType::Boolean,
+                                    true,
+                                ),
+                                MemberField::Literal(ScalarValue::Boolean(None)),
+                            ));
+                        }
+                        LogicalPlanLanguage::ChangeUser(params) => {
+                            let expr = self.to_expr(params[1])?;
+                            fields.push((
+                                DFField::new(
+                                    expr_relation(&expr),
+                                    // TODO empty schema
+                                    &expr_name(&expr)?,
+                                    DataType::Utf8,
+                                    true,
+                                ),
+                                MemberField::Literal(ScalarValue::Utf8(None)),
+                            ));
+                        }
+                        LogicalPlanLanguage::LiteralMember(params) => {
+                            let value = match_data_node!(node_by_id, params[0], LiteralMemberValue);
+                            let expr = self.to_expr(params[1])?;
+                            let relation =
+                                match_data_node!(node_by_id, params[2], LiteralMemberRelation);
+                            fields.push((
+                                DFField::new(
+                                    relation.as_deref(),
+                                    &expr_name(&expr)?,
+                                    value.get_datatype(),
+                                    true,
+                                ),
+                                MemberField::Literal(value),
+                            ));
+                        }
+                        LogicalPlanLanguage::VirtualField(params) => {
+                            let expr = self.to_expr(params[2])?;
+                            fields.push((
+                                DFField::new(
+                                    expr_relation(&expr),
+                                    // TODO empty schema
+                                    &expr_name(&expr)?,
+                                    DataType::Utf8,
+                                    true,
+                                ),
+                                MemberField::Literal(ScalarValue::Utf8(None)),
+                            ));
+                        }
+                        LogicalPlanLanguage::MemberError(params) => {
+                            let error = match_data_node!(node_by_id, params[0], MemberErrorError);
+                            return Err(CubeError::user(error.to_string()));
+                        }
+                        LogicalPlanLanguage::AllMembers(_) => {
+                            if !wrapped {
+                                return Err(CubeError::internal(
+                                    "Can't detect Cube query and it may be not supported yet"
+                                        .to_string(),
+                                ));
+                            } else {
+                                for (alias, cube) in alias_to_cube.iter() {
+                                    let cube = self
+                                        .cube_context
+                                        .meta
+                                        .find_cube_with_name(cube)
+                                        .ok_or_else(|| {
+                                            CubeError::user(format!("Can't find cube '{}'", cube))
+                                        })?;
+                                    for column in cube.get_columns() {
+                                        if self
+                                            .cube_context
+                                            .meta
+                                            .is_synthetic_field(column.member_name())
+                                        {
+                                            fields.push((
+                                                DFField::new(
+                                                    Some(&alias),
+                                                    column.get_name(),
+                                                    column.get_column_type().to_arrow(),
+                                                    true,
+                                                ),
+                                                MemberField::Literal(ScalarValue::Utf8(None)),
+                                            ));
+                                        } else {
+                                            fields.push((
+                                                DFField::new(
+                                                    Some(&alias),
+                                                    column.get_name(),
+                                                    column.get_column_type().to_arrow(),
+                                                    true,
+                                                ),
+                                                MemberField::Member(
+                                                    column.member_name().to_string(),
+                                                ),
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        x => panic!("Expected dimension but found {:?}", x),
+                    }
+                }
+
+                let filters = match_list_node!(node_by_id, cube_scan_params[2], CubeScanFilters);
+
+                fn to_filter(
+                    query_time_dimensions: &mut Vec<V1LoadRequestQueryTimeDimension>,
+                    filters: Vec<LogicalPlanLanguage>,
+                    node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+                    is_in_or: bool,
+                ) -> Result<
+                    (
+                        Vec<V1LoadRequestQueryFilterItem>,
+                        Vec<String>,
+                        Option<String>,
+                    ),
+                    CubeError,
+                > {
+                    let mut result = Vec::new();
+                    let mut segments_result = Vec::new();
+                    let mut change_user_result = Vec::new();
+
+                    for f in filters {
+                        match f {
+                            LogicalPlanLanguage::FilterOp(params) => {
+                                let filters =
+                                    match_list_node!(node_by_id, params[0], FilterOpFilters);
+                                let op = match_data_node!(node_by_id, params[1], FilterOpOp);
+                                let is_and_op = op == "and";
+                                let (filters, segments, change_user) = to_filter(
+                                    query_time_dimensions,
+                                    filters,
+                                    node_by_id,
+                                    !is_in_or || !is_and_op,
+                                )?;
+                                match op.as_str() {
+                                    "and" => {
+                                        result.push(V1LoadRequestQueryFilterItem {
+                                            member: None,
+                                            operator: None,
+                                            values: None,
+                                            or: None,
+                                            and: Some(
+                                                filters
+                                                    .into_iter()
+                                                    .map(|f| serde_json::json!(f))
+                                                    .collect(),
+                                            ),
+                                        });
+                                        segments_result.extend(segments);
+
+                                        if change_user.is_some() {
+                                            change_user_result.extend(change_user);
+                                        }
+                                    }
+                                    "or" => {
+                                        result.push(V1LoadRequestQueryFilterItem {
+                                            member: None,
+                                            operator: None,
+                                            values: None,
+                                            or: Some(
+                                                filters
+                                                    .into_iter()
+                                                    .map(|f| serde_json::json!(f))
+                                                    .collect(),
+                                            ),
+                                            and: None,
+                                        });
+                                        if !segments.is_empty() {
+                                            return Err(CubeError::internal(
+                                                "Can't use OR operator with segments".to_string(),
+                                            ));
+                                        }
+
+                                        if change_user.is_some() {
+                                            return Err(CubeError::internal(
+                                                "Can't use OR operator with __user column"
+                                                    .to_string(),
+                                            ));
+                                        }
+                                    }
+                                    x => panic!("Unsupported filter operator: {}", x),
+                                }
+                            }
+                            LogicalPlanLanguage::FilterMember(params) => {
+                                let member =
+                                    match_data_node!(node_by_id, params[0], FilterMemberMember);
+                                let op = match_data_node!(node_by_id, params[1], FilterMemberOp);
+                                let values =
+                                    match_data_node!(node_by_id, params[2], FilterMemberValues);
+                                if !is_in_or && op == "inDateRange" {
+                                    let existing_time_dimensions: Vec<_> = query_time_dimensions
+                                        .iter_mut()
+                                        .filter_map(|td| {
+                                            if td.dimension == member && td.date_range.is_none() {
+                                                td.date_range = Some(json!(values));
+                                                Some(td)
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .collect();
+                                    if existing_time_dimensions.len() == 0 {
+                                        let dimension = V1LoadRequestQueryTimeDimension {
+                                            dimension: member.to_string(),
+                                            granularity: None,
+                                            date_range: Some(json!(values)),
+                                        };
+                                        query_time_dimensions.push(dimension);
+                                    }
                                 } else {
-                                    None
+                                    result.push(V1LoadRequestQueryFilterItem {
+                                        member: Some(member),
+                                        operator: Some(op),
+                                        values: if !values.is_empty() {
+                                            Some(values)
+                                        } else {
+                                            None
+                                        },
+                                        or: None,
+                                        and: None,
+                                    });
                                 }
                             }
+                            LogicalPlanLanguage::SegmentMember(params) => {
+                                let member =
+                                    match_data_node!(node_by_id, params[0], SegmentMemberMember);
+                                segments_result.push(member);
+                            }
+                            LogicalPlanLanguage::ChangeUserMember(params) => {
+                                let member =
+                                    match_data_node!(node_by_id, params[0], ChangeUserMemberValue);
+                                change_user_result.push(member);
+                            }
+                            x => panic!("Expected filter but found {:?}", x),
                         }
-                        .map(|n| n as i32);
+                    }
 
-                        let max_records = if fail_on_max_limit_hit && limit_was_changed {
-                            Some(cube_scan_query_limit)
+                    if change_user_result.len() > 1 {
+                        return Err(CubeError::internal(
+                            "Unable to use multiple __user in one Cube query".to_string(),
+                        ));
+                    }
+
+                    Ok((result, segments_result, change_user_result.pop()))
+                }
+
+                let (filters, segments, change_user) =
+                    to_filter(&mut query_time_dimensions, filters, node_by_id, false)?;
+
+                query.filters = if filters.len() > 0 {
+                    Some(filters)
+                } else {
+                    None
+                };
+
+                query.segments = Some(segments);
+
+                for o in order {
+                    let order_params = match_params!(o, Order);
+                    let order_member = match_data_node!(node_by_id, order_params[0], OrderMember);
+                    let order_asc = match_data_node!(node_by_id, order_params[1], OrderAsc);
+                    query_order.push(vec![
+                        order_member,
+                        if order_asc {
+                            "asc".to_string()
                         } else {
-                            None
-                        };
+                            "desc".to_string()
+                        },
+                    ])
+                }
 
-                        let offset =
-                            match_data_node!(node_by_id, cube_scan_params[5], CubeScanOffset)
-                                .map(|offset| offset as i32);
-                        if offset.is_some() {
-                            query.offset = offset;
-                        }
+                if !wrapped && fields.len() == 0 {
+                    return Err(CubeError::internal(
+                        "Can't detect Cube query and it may be not supported yet".to_string(),
+                    ));
+                }
 
-                        fields = fields
+                query.measures = Some(query_measures.into_iter().unique().collect());
+                query.dimensions = Some(query_dimensions.into_iter().unique().collect());
+                query.time_dimensions = if query_time_dimensions.len() > 0 {
+                    Some(
+                        query_time_dimensions
                             .into_iter()
-                            .unique_by(|(f, _)| f.qualified_name())
-                            .collect();
+                            .unique_by(|td| {
+                                (
+                                    td.dimension.to_string(),
+                                    td.granularity.clone(),
+                                    td.date_range
+                                        .as_ref()
+                                        .map(|range| serde_json::to_string(range).unwrap()),
+                                )
+                            })
+                            .collect(),
+                    )
+                } else {
+                    None
+                };
 
-                        let ungrouped =
-                            match_data_node!(node_by_id, cube_scan_params[9], CubeScanUngrouped);
-
-                        if ungrouped {
-                            query.ungrouped = Some(true);
+                let cube_scan_query_limit =
+                    self.cube_context
+                        .sessions
+                        .server
+                        .config_obj
+                        .non_streaming_query_max_row_limit() as usize;
+                let fail_on_max_limit_hit = env::var("CUBESQL_FAIL_ON_MAX_LIMIT_HIT")
+                    .map(|v| v.to_lowercase() == "true")
+                    .unwrap_or(false);
+                let mut limit_was_changed = false;
+                query.limit =
+                    match match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit) {
+                        Some(n) => {
+                            if n > cube_scan_query_limit {
+                                limit_was_changed = true;
+                            }
+                            Some(n)
                         }
-
-                        query.order = if !query_order.is_empty() {
-                            Some(query_order)
-                        } else {
-                            // If no order was specified in client SQL,
-                            // there should be no order implicitly added.
-                            // in case when CUBESQL_SQL_NO_IMPLICIT_ORDER it is set to true - no implicit order is
-                            // added for all queries.
-                            // We need to return empty array so the processing in
-                            // BaseQuery.js won't automatically add default order
-
-                            let cube_no_implicit_order = self
-                                .cube_context
-                                .sessions
-                                .server
-                                .config_obj
-                                .no_implicit_order();
-
-                            if cube_no_implicit_order || query.ungrouped == Some(true) {
-                                Some(vec![])
+                        None => {
+                            if fail_on_max_limit_hit {
+                                limit_was_changed = true;
+                                Some(cube_scan_query_limit)
                             } else {
                                 None
                             }
-                        };
-
-                        let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
-
-                        Arc::new(CubeScanNode::new(
-                            Arc::new(DFSchema::new_with_metadata(
-                                fields.into_iter().map(|(f, _)| f).collect(),
-                                HashMap::new(),
-                            )?),
-                            member_fields,
-                            query,
-                            self.auth_context.clone(),
-                            CubeScanOptions {
-                                change_user,
-                                max_records,
-                            },
-                            alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
-                            self.span_id.clone(),
-                        ))
+                        }
                     }
-                    x => panic!("Unexpected extension node: {:?}", x),
+                    .map(|n| n as i32);
+
+                let max_records = if fail_on_max_limit_hit && limit_was_changed {
+                    Some(cube_scan_query_limit)
+                } else {
+                    None
                 };
+
+                let offset = match_data_node!(node_by_id, cube_scan_params[5], CubeScanOffset)
+                    .map(|offset| offset as i32);
+                if offset.is_some() {
+                    query.offset = offset;
+                }
+
+                fields = fields
+                    .into_iter()
+                    .unique_by(|(f, _)| f.qualified_name())
+                    .collect();
+
+                let ungrouped =
+                    match_data_node!(node_by_id, cube_scan_params[9], CubeScanUngrouped);
+
+                if ungrouped {
+                    query.ungrouped = Some(true);
+                }
+
+                query.order = if !query_order.is_empty() {
+                    Some(query_order)
+                } else {
+                    // If no order was specified in client SQL,
+                    // there should be no order implicitly added.
+                    // in case when CUBESQL_SQL_NO_IMPLICIT_ORDER it is set to true - no implicit order is
+                    // added for all queries.
+                    // We need to return empty array so the processing in
+                    // BaseQuery.js won't automatically add default order
+
+                    let cube_no_implicit_order = self
+                        .cube_context
+                        .sessions
+                        .server
+                        .config_obj
+                        .no_implicit_order();
+
+                    if cube_no_implicit_order || query.ungrouped == Some(true) {
+                        Some(vec![])
+                    } else {
+                        None
+                    }
+                };
+
+                let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
+
+                let node = Arc::new(CubeScanNode::new(
+                    Arc::new(DFSchema::new_with_metadata(
+                        fields.into_iter().map(|(f, _)| f).collect(),
+                        HashMap::new(),
+                    )?),
+                    member_fields,
+                    query,
+                    self.auth_context.clone(),
+                    CubeScanOptions {
+                        change_user,
+                        max_records,
+                    },
+                    alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
+                    self.span_id.clone(),
+                ));
 
                 LogicalPlan::Extension(Extension { node })
             }
@@ -2141,7 +2106,8 @@ impl LanguageToLogicalPlanConverter {
                     match_expr_list_node!(node_by_id, to_expr, params[12], WrappedSelectOrderExpr);
                 let alias = match_data_node!(node_by_id, params[13], WrappedSelectAlias);
                 let distinct = match_data_node!(node_by_id, params[14], WrappedSelectDistinct);
-                let ungrouped = match_data_node!(node_by_id, params[15], WrappedSelectUngrouped);
+                let push_to_cube =
+                    match_data_node!(node_by_id, params[15], WrappedSelectPushToCube);
 
                 let filter_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(
@@ -2173,6 +2139,11 @@ impl LanguageToLogicalPlanConverter {
                     from.schema()
                         .fields()
                         .iter()
+                        .chain(
+                            joins
+                                .iter()
+                                .flat_map(|(j, _, _)| j.schema().fields().iter()),
+                        )
                         .map(|f| Expr::Column(f.qualified_column()))
                         .collect::<Vec<_>>()
                 } else {
@@ -2210,7 +2181,14 @@ impl LanguageToLogicalPlanConverter {
                 for subquery in subqueries.iter() {
                     subqueries_schema.merge(subquery.schema());
                 }
-                let schema_with_subqueries = from.schema().join(&subqueries_schema)?;
+                let mut joins_schema = DFSchema::empty();
+                for join in joins.iter() {
+                    joins_schema.merge(join.0.schema());
+                }
+                let schema_with_subqueries = from
+                    .schema()
+                    .join(&subqueries_schema)?
+                    .join(&joins_schema)?;
 
                 let without_window_fields = exprlist_to_fields_from_schema(
                     all_expr_without_window.iter(),
@@ -2307,7 +2285,7 @@ impl LanguageToLogicalPlanConverter {
                         order_expr_rebased,
                         alias,
                         distinct,
-                        ungrouped,
+                        push_to_cube,
                     )),
                 })
             }
@@ -2336,22 +2314,53 @@ impl LanguageToLogicalPlanConverter {
 
                 LogicalPlan::Distinct(Distinct { input })
             }
+            LogicalPlanLanguage::Values(values) => {
+                let values = match_data_node!(node_by_id, values[0], ValuesValues);
+
+                LogicalPlanBuilder::values(values)?.build()?
+            }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })
     }
 
-    fn is_cube_scan_node(&self, node_id: Id) -> bool {
-        let node_by_id = &self.best_expr;
-        match node_by_id.index(node_id) {
-            LogicalPlanLanguage::Extension(params) => match node_by_id.index(params[0]) {
-                LogicalPlanLanguage::CubeScan(_) => return true,
-                _ => (),
-            },
-            LogicalPlanLanguage::CubeScanWrapper(_) => return true,
-            _ => (),
+    fn have_ungrouped_cube_scan_inside(node: &LogicalPlan) -> bool {
+        match node {
+            LogicalPlan::Projection(Projection { input, .. })
+            | LogicalPlan::Filter(Filter { input, .. })
+            | LogicalPlan::Window(Window { input, .. })
+            | LogicalPlan::Aggregate(Aggregate { input, .. })
+            | LogicalPlan::Sort(Sort { input, .. })
+            | LogicalPlan::Repartition(Repartition { input, .. })
+            | LogicalPlan::Limit(Limit { input, .. }) => {
+                Self::have_ungrouped_cube_scan_inside(input)
+            }
+            LogicalPlan::Join(Join { left, right, .. })
+            | LogicalPlan::CrossJoin(CrossJoin { left, right, .. }) => {
+                Self::have_ungrouped_cube_scan_inside(left)
+                    || Self::have_ungrouped_cube_scan_inside(right)
+            }
+            LogicalPlan::Union(Union { inputs, .. }) => {
+                inputs.iter().any(Self::have_ungrouped_cube_scan_inside)
+            }
+            LogicalPlan::Subquery(Subquery {
+                input, subqueries, ..
+            }) => {
+                Self::have_ungrouped_cube_scan_inside(input)
+                    || subqueries.iter().any(Self::have_ungrouped_cube_scan_inside)
+            }
+            LogicalPlan::Extension(Extension { node }) => {
+                if let Some(cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
+                    cube_scan.request.ungrouped == Some(true)
+                } else if let Some(cube_scan_wrapper) =
+                    node.as_any().downcast_ref::<CubeScanWrapperNode>()
+                {
+                    cube_scan_wrapper.has_ungrouped_scan()
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
-
-        return false;
     }
 }
 

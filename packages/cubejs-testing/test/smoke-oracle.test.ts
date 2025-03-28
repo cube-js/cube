@@ -1,18 +1,12 @@
-import { StartedTestContainer } from 'testcontainers';
-import { OracleDBRunner } from '@cubejs-backend/testing-shared';
-import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterAll, beforeAll, expect, jest } from '@jest/globals';
-import { pausePromise } from '@cubejs-backend/shared';
-import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import { expect } from '@jest/globals';
 
 // todo: @ovr fix me please
 describe('oracle', () => {
-//   jest.setTimeout(60 * 5 * 100000);
-//   let db: StartedTestContainer;
-//   let birdbox: BirdBox;
-//   let client: CubejsApi;
+  //   jest.setTimeout(60 * 5 * 100000);
+  //   let db: StartedTestContainer;
+  //   let birdbox: BirdBox;
+  //   let client: CubejsApi;
 
   //   beforeAll(async () => {
   //     db = await OracleDBRunner.startContainer({});
@@ -48,7 +42,7 @@ describe('oracle', () => {
   //   });
 
   // test('query measure', () => testQueryMeasure(client));
-  
+
   test('query measure', () => {
     expect([{ 'Orders.totalAmount': 1700 }]).toMatchSnapshot('query');
   });

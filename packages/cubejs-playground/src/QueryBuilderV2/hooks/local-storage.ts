@@ -91,7 +91,7 @@ export function useLocalStorage<T = any>(
 
     storage.subscribe(key, (value: T) => {
       // @ts-ignore
-      setValue(typeof defaultValue === 'function' ? defaultValue(value) : value ?? defaultValue);
+      setValue(typeof defaultValue === 'function' ? defaultValue(value) : (value ?? defaultValue));
     });
 
     return () => {

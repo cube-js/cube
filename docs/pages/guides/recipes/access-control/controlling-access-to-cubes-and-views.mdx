@@ -52,9 +52,15 @@ cubes:
 views:
   - name: total_revenue_per_customer
     public: {{ COMPILE_CONTEXT['securityContext']['isFinance'] }}
-    includes:
-      - orders.total_revenue
-      - users.company
+
+    cubes:
+      - join_path: orders
+        includes:
+          - total_revenue
+
+      - join_path: orders.users
+        includes:
+          - company
 ```
 
 ```javascript
@@ -75,12 +81,25 @@ cube(`users`, {
 });
 
 // total_revenue_per_customer.js
-view("total_revenue_per_customer", {
+view(`total_revenue_per_customer`, {
   description: `Total revenue per customer`,
   public: COMPILE_CONTEXT.securityContext.isFinance,
 
-  includes: [orders.total_revenue, users.company],
-});
+  cubes: [
+    {
+      join_path: orders,
+      includes: [
+        `total_revenue`
+      ]
+    },
+    {
+      join_path: orders.users,
+      includes: [
+        `company`
+      ]
+    }
+  ]
+})
 ```
 
 </CodeTabs>
@@ -90,7 +109,7 @@ view("total_revenue_per_customer", {
 After generating a JWT with a `department` claim set to `finance`, we can send
 it as part of a cURL command:
 
-```bash{outputLines: 2-3}
+```bash
 curl \
   -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXBhcnRtZW50IjoiZmluYW5jZSIsImV4cCI6MTY2NzMzNzI1MH0.njfL7GMDNlzKaJDZA0OQ_b2u2JhuSm-WjnS0yVfB8NA" \
   http://localhost:4000/cubejs-api/v1/meta

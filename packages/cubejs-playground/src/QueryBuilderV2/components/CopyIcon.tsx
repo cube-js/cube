@@ -1,5 +1,5 @@
-import { CheckOutlined, CopyOutlined } from '@ant-design/icons';
-import { Styles, tasty } from '@cube-dev/ui-kit';
+import { CheckOutlined } from '@ant-design/icons';
+import { Styles, tasty, CopyIcon as CopyIconUIKit } from '@cube-dev/ui-kit';
 import { memo, useRef } from 'react';
 
 import { useDebouncedCallback } from '../hooks';
@@ -45,7 +45,7 @@ const CopyIconElement = tasty({
       copied: '0.1s',
     },
   },
-  children: <CopyOutlined />,
+  children: <CopyIconUIKit />,
 });
 
 const CopiedIconElement = tasty({

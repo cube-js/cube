@@ -48,7 +48,7 @@ interface Args {
   log: Log,
 }
 
-export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'trino' | 'oracle' | 'duckdb' | 'snowflake';
+export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'trino' | 'oracle' | 'duckdb' | 'snowflake' | 'vertica';
 
 export type Schemas = string[];
 
@@ -103,6 +103,7 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
   questdb: 'postgresql',
   redshift: 'postgresql',
   'databricks-jdbc': 'databricks-jdbc',
+  vertica: 'vertica',
   prestodb: 'postgresql',
   mssql: 'mssql',
   trino: 'postgresql',
@@ -262,7 +263,7 @@ export async function startBirdBoxFromContainer(
         if (pid !== null) {
           process.kill(pid, signal);
         } else {
-          process.stdout.write(`[Birdbox] Cannot kill Cube instance running in TEST_CUBE_HOST mode without TEST_CUBE_PID defined\n`);
+          process.stdout.write('[Birdbox] Cannot kill Cube instance running in TEST_CUBE_HOST mode without TEST_CUBE_PID defined\n');
           throw new Error('Attempted to use killCube while running with TEST_CUBE_HOST');
         }
       },
@@ -541,9 +542,15 @@ export async function startBirdBoxFromCli(
   }
 
   if (options.cubejsConfig) {
+    const configType = options.cubejsConfig.split('.').at(-1);
+    for (const configFile of ['cube.js', 'cube.py']) {
+      if (fs.existsSync(path.join(testDir, configFile))) {
+        fs.removeSync(path.join(testDir, configFile));
+      }
+    }
     fs.copySync(
       path.join(process.cwd(), 'birdbox-fixtures', options.cubejsConfig),
-      path.join(testDir, 'cube.js')
+      path.join(testDir, `cube.${configType}`)
     );
   }
 

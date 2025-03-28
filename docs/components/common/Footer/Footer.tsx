@@ -54,10 +54,6 @@ const RESOURCES_LINKS = [
     link: "https://cube.dev/blog/",
   },
   {
-    label: "Examples",
-    link: "https://cube.dev/examples",
-  },
-  {
     label: "Community",
     link: "https://cube.dev/community",
   },

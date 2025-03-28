@@ -163,7 +163,7 @@ async fn test_change_user_via_filter_or() {
         convert_sql_to_cube_query(
             &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
             meta.clone(),
-            get_test_session(DatabaseProtocol::PostgreSQL, meta).await
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         ).await;
 
     // TODO: We need to propagate error to result, to assert message
@@ -258,6 +258,7 @@ FROM
     KibanaSampleDataEcommerce
 WHERE
     __user = 'gopher'
+    AND LOWER(customer_gender) = 'test'
 GROUP BY 1
 ;
         "#
@@ -271,6 +272,6 @@ GROUP BY 1
     let sql_query = load_calls[0].sql_query.as_ref().unwrap();
     // This should be placed from load meta to query by TestConnectionTransport::sql
     // It would mean that SQL generation used changed user
-    assert!(sql_query.sql.contains(r#""changeUser":"gopher""#));
+    assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
 }

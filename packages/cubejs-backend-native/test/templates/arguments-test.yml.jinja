@@ -15,3 +15,8 @@ test:
   arg_seq_2: {{ arg_seq(my_sequence_2) }}
   arg_sum_tuple: {{ arg_sum_tuple(my_int_tuple) }}
   arg_sum_map: {{ arg_sum_map(my_map) }}
+  arg_kwargs1: {{ arg_kwargs("first value", "second value", three="3 arg") }}
+  arg_kwargs2: {{ arg_kwargs("first value", "second value", three="3 arg", four="4 arg") }}
+  arg_kwargs3: {{ arg_kwargs("first value", "second value", three="3 arg", four="4 arg", five="5 arg") }}
+  arg_named_arguments1: {{ arg_named_arguments(arg2="2 arg", arg1="1 arg") }}
+  arg_named_arguments2: {{ arg_named_arguments(arg1="1 arg", arg2="2 arg") }}

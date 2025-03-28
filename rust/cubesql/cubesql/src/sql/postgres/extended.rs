@@ -58,6 +58,13 @@ pub enum PreparedStatement {
         description: Option<protocol::RowDescription>,
         span_id: Option<Arc<SpanId>>,
     },
+    Error {
+        /// Prepared statement can be declared from SQL or protocol (Parser)
+        from_sql: bool,
+        sql: String,
+        created: DateTime<Utc>,
+        span_id: Option<Arc<SpanId>>,
+    },
 }
 
 impl PreparedStatement {
@@ -65,6 +72,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { created, .. } => created,
             PreparedStatement::Query { created, .. } => created,
+            PreparedStatement::Error { created, .. } => created,
         }
     }
 
@@ -73,13 +81,15 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { .. } => "".to_string(),
             PreparedStatement::Query { query, .. } => query.to_string(),
+            PreparedStatement::Error { sql, .. } => sql.clone(),
         }
     }
 
     pub fn get_from_sql(&self) -> bool {
         match self {
-            PreparedStatement::Empty { from_sql, .. } => from_sql.clone(),
-            PreparedStatement::Query { from_sql, .. } => from_sql.clone(),
+            PreparedStatement::Empty { from_sql, .. } => *from_sql,
+            PreparedStatement::Query { from_sql, .. } => *from_sql,
+            PreparedStatement::Error { from_sql, .. } => *from_sql,
         }
     }
 
@@ -87,6 +97,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { .. } => None,
             PreparedStatement::Query { parameters, .. } => Some(&parameters.parameters),
+            PreparedStatement::Error { .. } => None,
         }
     }
 
@@ -103,6 +114,10 @@ impl PreparedStatement {
 
                 Ok(statement)
             }
+            PreparedStatement::Error { .. } => Err(CubeError::internal(
+                "It's not possible to bind errored prepared statements (it's a bug)".to_string(),
+            )
+            .into()),
         }
     }
 
@@ -110,6 +125,7 @@ impl PreparedStatement {
         match self {
             PreparedStatement::Empty { span_id, .. } => span_id.clone(),
             PreparedStatement::Query { span_id, .. } => span_id.clone(),
+            PreparedStatement::Error { span_id, .. } => span_id.clone(),
         }
     }
 }
@@ -283,7 +299,7 @@ impl Portal {
     }
 
     pub fn get_format(&self) -> protocol::Format {
-        self.format.clone()
+        self.format
     }
 
     fn hand_execution_frame_state<'a>(
@@ -385,7 +401,7 @@ impl Portal {
 
                 batch
             } else {
-                *left = *left - batch.num_rows();
+                *left -= batch.num_rows();
                 batch
             }
         };

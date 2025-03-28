@@ -23,8 +23,8 @@ impl Dialect for MySqlDialectWithBackTicks {
         // See https://dev.mysql.com/doc/refman/8.0/en/identifiers.html.
         // We don't yet support identifiers beginning with numbers, as that
         // makes it hard to distinguish numeric literals.
-        ('a'..='z').contains(&ch)
-            || ('A'..='Z').contains(&ch)
+        ch.is_ascii_lowercase()
+            || ch.is_ascii_uppercase()
             || ch == '_'
             || ch == '$'
             || ch == '@'
@@ -32,7 +32,7 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 
     fn is_identifier_part(&self, ch: char) -> bool {
-        self.is_identifier_start(ch) || ('0'..='9').contains(&ch)
+        self.is_identifier_start(ch) || ch.is_ascii_digit()
     }
 }
 
@@ -41,16 +41,16 @@ static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn parse_sql_to_statements(
-    query: &String,
+    query: &str,
     protocol: DatabaseProtocol,
     qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Vec<Statement>> {
-    let original_query = query.clone();
+    let original_query = query;
 
     log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
-    let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
+    let query = query.replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
     let query = query.replace("ORDER BY TABLE_TYPE, TABLE_SCHEMA, TABLE_NAME", "");
     // @todo Implement CONVERT function
     let query = query.replace("CONVERT (CASE DATA_TYPE WHEN 'year' THEN NUMERIC_SCALE WHEN 'tinyint' THEN 0 ELSE NUMERIC_SCALE END, UNSIGNED INTEGER)", "0");
@@ -60,7 +60,7 @@ pub fn parse_sql_to_statements(
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
-    // DBEver
+    // DBeaver
     let query = query.replace(
         "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
         "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
@@ -247,13 +247,14 @@ pub fn parse_sql_to_statements(
     };
 
     parse_result.map_err(|err| {
-        CompilationError::user(format!("Unable to parse: {:?}", err))
-            .with_meta(Some(HashMap::from([("query".to_string(), original_query)])))
+        CompilationError::user(format!("Unable to parse: {:?}", err)).with_meta(Some(
+            HashMap::from([("query".to_string(), original_query.to_string())]),
+        ))
     })
 }
 
 pub fn parse_sql_to_statement(
-    query: &String,
+    query: &str,
     protocol: DatabaseProtocol,
     qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Statement> {
@@ -274,7 +275,10 @@ pub fn parse_sql_to_statement(
                     ))
                 };
 
-                Err(err.with_meta(Some(HashMap::from([("query".to_string(), query.clone())]))))
+                Err(err.with_meta(Some(HashMap::from([(
+                    "query".to_string(),
+                    query.to_string(),
+                )]))))
             }
         }
     }
@@ -293,11 +297,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -310,11 +312,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 
@@ -349,11 +349,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Invalid query, no statements was specified")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Invalid query, no statements was specified")),
         }
     }
 
@@ -366,11 +364,9 @@ mod tests {
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
-            Err(err) => assert_eq!(
-                true,
-                err.to_string()
-                    .contains("Multiple statements was specified in one query")
-            ),
+            Err(err) => assert!(err
+                .to_string()
+                .contains("Multiple statements was specified in one query")),
         }
     }
 
