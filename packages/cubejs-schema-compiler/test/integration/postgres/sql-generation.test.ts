@@ -902,7 +902,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     timeDimensions: [
       {
         dimension: 'visitors.created_at',
-        granularity: 'month',
+        granularity: 'three_days',
         dateRange: ['2017-01-01', '2017-01-10']
       },
       {
@@ -1095,7 +1095,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
   ]));
 
-  if (!getEnv('nativeSqlPlanner')) {
+  if (getEnv('nativeSqlPlanner')) {
     it('rolling count without date range', async () => {
       await runQueryTest({
         measures: [
