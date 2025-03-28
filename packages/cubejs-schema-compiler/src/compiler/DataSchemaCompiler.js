@@ -201,8 +201,8 @@ export class DataSchemaCompiler {
   }
 
   async transpileFile(file, errorsReport, options) {
-    if (R.endsWith('.jinja', file.fileName) ||
-      (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName))
+    if (file.fileName.endsWith('.jinja') ||
+      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       // TODO do Jinja syntax check with jinja compiler
       && file.content.match(JINJA_SYNTAX)
     ) {
@@ -216,9 +216,9 @@ export class DataSchemaCompiler {
       this.yamlCompiler.getJinjaEngine().loadTemplate(file.fileName, file.content);
 
       return file;
-    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       return file;
-    } else if (R.endsWith('.js', file.fileName)) {
+    } else if (file.fileName.endsWith('.js')) {
       return this.transpileJsFile(file, errorsReport, options);
     } else {
       return file;
@@ -247,7 +247,7 @@ export class DataSchemaCompiler {
         errorsReport.addWarnings(res.warnings);
         errorsReport.exitFile();
 
-        return Object.assign({}, file, { content: res.code });
+        return { ...file, content: res.code };
       } else if (getEnv('transpilationWorkerThreads')) {
         const data = {
           fileName: file.fileName,
@@ -261,7 +261,7 @@ export class DataSchemaCompiler {
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
-        return Object.assign({}, file, { content: res.content });
+        return { ...file, content: res.content };
       } else {
         const ast = parse(
           file.content,
@@ -279,7 +279,7 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
-        return Object.assign({}, file, { content });
+        return { ...file, content };
       }
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
@@ -337,7 +337,7 @@ export class DataSchemaCompiler {
   }
 
   compileFile(
-    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules
+    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules, { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (compiledFiles[file.fileName]) {
       return;
@@ -345,11 +345,11 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
-    if (R.endsWith('.js', file.fileName)) {
-      this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
-    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName) ||
+    if (file.fileName.endsWith('.js')) {
+      this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck });
+    } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
       (
-        R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)
+        file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')
         // TODO do Jinja syntax check with jinja compiler
       ) && file.content.match(JINJA_SYNTAX)
     ) {
@@ -365,15 +365,20 @@ export class DataSchemaCompiler {
         this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
         this.pythonContext
       ));
-    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }
   }
 
-  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
-    const err = syntaxCheck(file.content, file.fileName);
-    if (err) {
-      errorsReport.error(err.toString());
+  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck } = { doSyntaxCheck: false }) {
+    if (doSyntaxCheck) {
+      // There is no need to run syntax check for data model files
+      // because they were checked during transpilation/transformation phase
+      // Only external files (included modules) might need syntax check
+      const err = syntaxCheck(file.content, file.fileName);
+      if (err) {
+        errorsReport.error(err.toString());
+      }
     }
 
     try {
@@ -381,15 +386,15 @@ export class DataSchemaCompiler {
         view: (name, cube) => (
           !cube ?
             this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
-            cubes.push(Object.assign({}, cube, { name, fileName: file.fileName, isView: true }))
+            cubes.push({ ...cube, name, fileName: file.fileName, isView: true })
         ),
         cube:
           (name, cube) => (
             !cube ?
               this.cubeFactory({ ...name, fileName: file.fileName }) :
-              cubes.push(Object.assign({}, cube, { name, fileName: file.fileName }))
+              cubes.push({ ...cube, name, fileName: file.fileName })
           ),
-        context: (name, context) => contexts.push(Object.assign({}, context, { name, fileName: file.fileName })),
+        context: (name, context) => contexts.push({ ...context, name, fileName: file.fileName }),
         addExport: (obj) => {
           exports[file.fileName] = exports[file.fileName] || {};
           exports[file.fileName] = Object.assign(exports[file.fileName], obj);
@@ -424,6 +429,8 @@ export class DataSchemaCompiler {
               contexts,
               toCompile,
               compiledFiles,
+              [],
+              { doSyntaxCheck: true }
             );
             exports[foundFile.fileName] = exports[foundFile.fileName] || {};
             return exports[foundFile.fileName];
@@ -469,7 +476,7 @@ export class DataSchemaCompiler {
       path.resolve('node_modules', path.dirname(currentFile.fileName), modulePath) :
       path.resolve('node_modules', modulePath);
 
-    if (absPath.indexOf(nodeModulesPath) !== 0) {
+    if (!absPath.startsWith(nodeModulesPath)) {
       if (this.allowNodeRequire) {
         return null;
       }
