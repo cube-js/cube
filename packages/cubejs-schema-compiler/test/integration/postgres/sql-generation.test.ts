@@ -1095,28 +1095,33 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
   ]));
 
-  it('rolling count without date range', async () => {
-    if (!getEnv('nativeSqlPlanner')) return;
-    await runQueryTest({
-      measures: [
-        'visitors.countRollingThreeMonth'
-      ],
-      timeDimensions: [{
-        dimension: 'visitors.created_at',
-        granularity: 'month',
-      }],
-      order: [{
-        id: 'visitors.created_at'
-      }],
-      timezone: 'America/Los_Angeles'
-    }, [
-      { visitors__created_at_month: '2016-09-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
-      { visitors__created_at_month: '2016-10-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
-      { visitors__created_at_month: '2016-11-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
-      { visitors__created_at_month: '2016-12-01T00:00:00.000Z', visitors__count_rolling_three_month: null },
-      { visitors__created_at_month: '2017-01-01T00:00:00.000Z', visitors__count_rolling_three_month: '5' },
-    ]);
-  });
+  if (!getEnv('nativeSqlPlanner')) {
+    it('rolling count without date range', async () => {
+      await runQueryTest({
+        measures: [
+          'visitors.countRollingThreeMonth'
+        ],
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: 'month',
+        }],
+        order: [{
+          id: 'visitors.created_at'
+        }],
+        timezone: 'America/Los_Angeles'
+      }, [
+        { visitors__created_at_month: '2016-09-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_at_month: '2016-10-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_at_month: '2016-11-01T00:00:00.000Z', visitors__count_rolling_three_month: '1' },
+        { visitors__created_at_month: '2016-12-01T00:00:00.000Z', visitors__count_rolling_three_month: null },
+        { visitors__created_at_month: '2017-01-01T00:00:00.000Z', visitors__count_rolling_three_month: '5' },
+      ]);
+    });
+  } else {
+    it.skip('rolling count without date range', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
 
   it('rolling qtd', async () => runQueryTest({
     measures: [
