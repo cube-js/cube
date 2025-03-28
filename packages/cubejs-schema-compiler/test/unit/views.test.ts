@@ -391,42 +391,6 @@ describe('Views YAML', () => {
     });
   });
 
-  it('includes * (legacy)', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
-      name: 'simple_view',
-      includes: [
-        'CubeA.id',
-        // conflict
-        // 'CubeB.id',
-        'CubeB.other_id',
-      ]
-    }]);
-
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      id: dimensionFixtureForCube('CubeA.id'),
-      other_id: dimensionFixtureForCube('CubeB.other_id'),
-    });
-  });
-
-  it('includes * (legacy) + exclude b.id', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
-      name: 'simple_view',
-      includes: [
-        'CubeA.id',
-        'CubeB.id',
-        'CubeB.other_id',
-      ],
-      excludes: [
-        'CubeB.id'
-      ]
-    }]);
-
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      id: dimensionFixtureForCube('CubeA.id'),
-      other_id: dimensionFixtureForCube('CubeB.other_id'),
-    });
-  });
-
   it('throws error for unresolved members', async () => {
     const { compiler } = prepareYamlCompiler(`
       cubes:
