@@ -27,7 +27,7 @@
     "@types/cli-progress": "^3.9.1",
     "@types/decompress": "^4.2.7",
     "@types/jest": "^27",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "@types/node-fetch": "^2.5.8",
     "@types/shelljs": "^0.8.5",
     "@types/throttle-debounce": "^2.1.0",

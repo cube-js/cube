@@ -37,7 +37,7 @@
     "@cubejs-backend/linter": "1.2.33",
     "@types/generic-pool": "^3.8.2",
     "@types/jest": "^27",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "jest": "^27",
     "testcontainers": "^10.13.0",
     "typescript": "~5.2.2"

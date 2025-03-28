@@ -29,7 +29,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "1.2.33",
     "@cubejs-backend/shared": "1.2.33",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "generic-pool": "^3.8.2",
     "moment": "^2.29.1",
     "mysql2": "^3.11.5"

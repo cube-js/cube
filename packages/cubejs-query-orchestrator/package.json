@@ -41,7 +41,7 @@
     "@cubejs-backend/linter": "1.2.33",
     "@types/generic-pool": "^3.8.2",
     "@types/jest": "^27",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "@types/ramda": "^0.27.32",
     "@types/uuid": "^8.3.0",
     "jest": "^27",

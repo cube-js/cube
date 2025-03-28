@@ -79,7 +79,7 @@
     "@cubejs-client/ws-transport": "1.2.33",
     "@jest/globals": "^27",
     "@types/jest": "^27",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "dotenv": "^16.0.3",
     "fs-extra": "^11.1.1",
     "jest": "^27",
