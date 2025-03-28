@@ -3443,18 +3443,18 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
       compiler: joinedSchemaCompilers.compiler,
     },
-      {
-        measures: ['B.bval_sum', 'B.count'],
-        dimensions: ['B.aid'],
-        filters: [{
-          member: 'C.did',
-          operator: 'lt',
-          values: ['10']
-        }],
-        order: [{
-          'B.bval_sum': 'desc'
-        }]
-      });
+    {
+      measures: ['B.bval_sum', 'B.count'],
+      dimensions: ['B.aid'],
+      filters: [{
+        member: 'C.did',
+        operator: 'lt',
+        values: ['10']
+      }],
+      order: [{
+        'B.bval_sum': 'desc'
+      }]
+    });
     const sql = query.buildSqlAndParams();
     return dbRunner
       .testQuery(sql)
