@@ -107,6 +107,7 @@ type ApiScopes =
   'graphql' |
   'meta' |
   'data' |
+  'sql' |
   'jobs';
 
 export {

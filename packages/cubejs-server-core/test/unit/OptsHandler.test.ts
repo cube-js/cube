@@ -1140,7 +1140,7 @@ describe('OptsHandler class', () => {
     const permissions = await gateway.contextToApiScopesFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
-    expect(permissions).toEqual(['graphql', 'meta', 'data']);
+    expect(permissions).toEqual(['graphql', 'meta', 'data', 'sql']);
   });
 
   test('must set env api scopes if fn not specified', async () => {

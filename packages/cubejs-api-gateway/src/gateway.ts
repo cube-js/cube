@@ -153,7 +153,7 @@ class ApiGateway {
   public readonly contextToApiScopesFn: ContextToApiScopesFn;
 
   public readonly contextToApiScopesDefFn: ContextToApiScopesFn =
-    async () => ['graphql', 'meta', 'data'];
+    async () => ['graphql', 'meta', 'data', 'sql'];
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
@@ -1309,7 +1309,7 @@ class ApiGateway {
     res,
   }: {query: string, disablePostProcessing: boolean} & BaseRequest) {
     try {
-      await this.assertApiScope('data', context.securityContext);
+      await this.assertApiScope('sql', context.securityContext);
 
       const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
       res({ sql: result });
@@ -1337,7 +1337,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertApiScope('data', context.securityContext);
+      await this.assertApiScope('sql', context.securityContext);
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context, disableLimitEnforcing, memberExpressions);
@@ -2413,7 +2413,7 @@ class ApiGateway {
           );
         } else {
           scopes.forEach((p) => {
-            if (['graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+            if (['graphql', 'meta', 'data', 'sql', 'jobs'].indexOf(p) === -1) {
               throw new Error(
                 `A user-defined contextToApiScopes function returns a wrong scope: ${p}`
               );
