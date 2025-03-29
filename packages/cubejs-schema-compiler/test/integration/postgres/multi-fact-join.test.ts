@@ -2,13 +2,13 @@ import {
   getEnv,
 } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('Multi-fact join', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
 cube(\`orders\`, {
   sql: \`
     SELECT 79 AS id, 1 AS amount, 1 AS city_id UNION ALL

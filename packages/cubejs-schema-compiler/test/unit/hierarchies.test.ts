@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Cube hierarchies', () => {
   it('base cases', async () => {
@@ -164,7 +164,7 @@ describe('Cube hierarchies', () => {
       path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
       'utf8'
     );
-    const { compiler, metaTransformer } = prepareCompiler(modelContent);
+    const { compiler, metaTransformer } = prepareJsCompiler(modelContent);
 
     await compiler.compile();
 

@@ -1,5 +1,5 @@
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { MSSqlDbRunner } from './MSSqlDbRunner';
 
 describe('MSSqlCumulativeMeasures', () => {
@@ -11,19 +11,19 @@ describe('MSSqlCumulativeMeasures', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from ##visitors
       \`,
-      
+
       joins: {},
 
       measures: {
         count: {
           type: 'count'
         },
-        
+
         unboundedCount: {
           type: 'count',
           rollingWindow: {
@@ -47,7 +47,7 @@ describe('MSSqlCumulativeMeasures', () => {
           sql: 'created_at'
         },
       },
-      
+
       preAggregations: {}
     })
     `);

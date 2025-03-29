@@ -1,8 +1,8 @@
 import { MongoBiQuery } from '../../src/adapter/MongoBiQuery';
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('MongoBiQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors

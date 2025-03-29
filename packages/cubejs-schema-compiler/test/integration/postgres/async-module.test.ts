@@ -1,12 +1,12 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('AsyncModule', () => {
   jest.setTimeout(200000);
 
   it('gutter', async () => {
-    const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
+    const { joinGraph, cubeEvaluator, compiler } = prepareJsCompiler(`
     const fetch = require('node-fetch');
 
     asyncModule(async () => {
@@ -57,7 +57,7 @@ describe('AsyncModule', () => {
   });
 
   it('import local node module', async () => {
-    const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
+    const { joinGraph, cubeEvaluator, compiler } = prepareJsCompiler(`
     import { foo } from '../../test/unit/TestHelperForImport.js';
 
     cube(foo(), {
