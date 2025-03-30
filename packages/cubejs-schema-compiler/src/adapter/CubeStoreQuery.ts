@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, getEnv } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
@@ -30,6 +30,13 @@ type RollingWindow = {
 };
 
 export class CubeStoreQuery extends BaseQuery {
+  private readonly cubeStoreRollingWindowJoin: boolean;
+
+  public constructor(compilers, options) {
+    super(compilers, options);
+    this.cubeStoreRollingWindowJoin = getEnv('cubeStoreRollingWindowJoin');
+  }
+
   public newFilter(filter) {
     return new CubeStoreFilter(this, filter);
   }
@@ -55,10 +62,16 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
+    if (this.cubeStoreRollingWindowJoin) {
+      return super.subtractInterval(date, interval);
+    }
     return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
   public addInterval(date: string, interval: string) {
+    if (this.cubeStoreRollingWindowJoin) {
+      return super.addInterval(date, interval);
+    }
     return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
@@ -179,7 +192,7 @@ export class CubeStoreQuery extends BaseQuery {
     cumulativeMeasures: Array<[boolean, BaseMeasure]>,
     preAggregationForQuery: any
   ) {
-    if (!cumulativeMeasures.length) {
+    if (this.cubeStoreRollingWindowJoin || !cumulativeMeasures.length) {
       return super.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
     }
     const cumulativeMeasuresWithoutMultiplied = cumulativeMeasures.map(([_, measure]) => measure);
