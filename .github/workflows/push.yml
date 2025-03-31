@@ -54,6 +54,7 @@ jobs:
     strategy:
       matrix:
         # Current docker version + next LTS
+        # TODO: Add 24 after it's been released
         node-version: [22.x]
         # Don't forget to update build-native-release
         python-version: [3.11]
