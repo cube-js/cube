@@ -1,15 +1,18 @@
 use super::{
     MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
-    MultiStageQueryDescription, RollingWindowDescription,
+    MultiStageQueryDescription, RollingWindowDescription, TimeSeriesDescription,
 };
 use crate::plan::{
     Cte, Expr, From, JoinBuilder, JoinCondition, MemberExpression, OrderBy, QualifiedColumnName,
-    QueryPlan, Schema, SelectBuilder, TimeSeries,
+    QueryPlan, Schema, SelectBuilder, TimeSeries, TimeSeriesDateRange,
 };
-use crate::planner::planners::{multi_stage::RollingWindowType, OrderPlanner, QueryPlanner};
+use crate::planner::planners::{
+    multi_stage::RollingWindowType, OrderPlanner, QueryPlanner, SimpleQueryPlanner,
+};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, BaseTimeDimension};
 use cubenativeutils::CubeError;
@@ -52,27 +55,102 @@ impl MultiStageMemberQueryPlanner {
                 super::MultiStageLeafMemberType::TimeSeries(time_dimension) => {
                     self.plan_time_series_query(time_dimension.clone())
                 }
+                super::MultiStageLeafMemberType::TimeSeriesGetRange(time_dimension) => {
+                    self.plan_time_series_get_range_query(time_dimension.clone())
+                }
             },
         }
     }
 
-    fn plan_time_series_query(
+    fn plan_time_series_get_range_query(
         &self,
         time_dimension: Rc<BaseTimeDimension>,
     ) -> Result<Rc<Cte>, CubeError> {
-        let granularity = time_dimension.get_granularity().unwrap(); //FIXME remove this unwrap
-        let date_range = time_dimension.get_date_range().unwrap(); //FIXME remove this unwrap
-        let from_date = date_range[0].clone();
-        let to_date = date_range[1].clone();
-        let seria = self
-            .query_tools
-            .base_tools()
-            .generate_time_series(granularity, date_range.clone())?;
+        let cte_query_properties = QueryProperties::try_new_from_precompiled(
+            self.query_tools.clone(),
+            vec![],
+            vec![],
+            vec![time_dimension.clone()],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            None,
+            None,
+            true,
+            true,
+        )?;
+        let mut context_factory = SqlNodesFactory::new();
+        let simple_query_planer = SimpleQueryPlanner::new(
+            self.query_tools.clone(),
+            cte_query_properties,
+            SqlNodesFactory::new(),
+        );
+        let (mut select_builder, render_references) = simple_query_planer.make_select_builder()?;
+        let args = vec![time_dimension.clone().as_base_member()];
+        select_builder.add_projection_function_expression(
+            "MAX",
+            args.clone(),
+            "date_to".to_string(),
+        );
+
+        select_builder.add_projection_function_expression(
+            "MIN",
+            args.clone(),
+            "date_from".to_string(),
+        );
+        context_factory.set_render_references(render_references);
+        let select = Rc::new(select_builder.build(context_factory));
+        let query_plan = Rc::new(QueryPlan::Select(select));
+        Ok(Rc::new(Cte::new(
+            query_plan,
+            format!("time_series_get_range"),
+        )))
+    }
+
+    fn plan_time_series_query(
+        &self,
+        time_series_description: Rc<TimeSeriesDescription>,
+    ) -> Result<Rc<Cte>, CubeError> {
+        let time_dimension = time_series_description.time_dimension.clone();
+        let granularity_obj = if let Some(granularity_obj) = time_dimension.get_granularity_obj() {
+            granularity_obj.clone()
+        } else {
+            return Err(CubeError::user(
+                "Time dimension granularity is required for rolling window".to_string(),
+            ));
+        };
+
+        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+
+        let ts_date_range = if templates.supports_generated_time_series() {
+            if let Some(date_range) = time_dimension.get_range_for_time_series()? {
+                TimeSeriesDateRange::Filter(date_range.0.clone(), date_range.1.clone())
+            } else {
+                if let Some(date_range_cte) = &time_series_description.date_range_cte {
+                    TimeSeriesDateRange::Generated(date_range_cte.clone())
+                } else {
+                    return Err(CubeError::internal(
+                        "Date range cte is required for time series without date range".to_string(),
+                    ));
+                }
+            }
+        } else {
+            if let Some(date_range) = time_dimension.get_date_range() {
+                TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
+            } else {
+                return Err(CubeError::internal(
+                    "Date range is required for time series without date range".to_string(),
+                ));
+            }
+        };
+
         let time_seira = TimeSeries::new(
+            self.query_tools.clone(),
             time_dimension.full_name(),
-            Some(from_date),
-            Some(to_date),
-            seria,
+            ts_date_range,
+            granularity_obj,
         );
         let query_plan = Rc::new(QueryPlan::TimeSeries(Rc::new(time_seira)));
         Ok(Rc::new(Cte::new(query_plan, format!("time_series"))))
@@ -86,7 +164,7 @@ impl MultiStageMemberQueryPlanner {
     ) -> Result<Rc<Cte>, CubeError> {
         let inputs = self.input_cte_aliases();
         assert!(inputs.len() == 2);
-        let dimensions = self.all_dimensions();
+        let all_dimensions = self.all_dimensions();
 
         let root_alias = format!("time_series");
         let cte_schema = cte_schemas.get(&inputs[0]).unwrap().clone();
@@ -100,8 +178,8 @@ impl MultiStageMemberQueryPlanner {
         let input = &inputs[1];
         let alias = format!("rolling_source");
         let rolling_base_cte_schema = cte_schemas.get(input).unwrap().clone();
-        let time_dimension_alias =
-            rolling_base_cte_schema.resolve_member_alias(&rolling_window_desc.time_dimension);
+        let time_dimension_alias = rolling_base_cte_schema
+            .resolve_member_alias(&rolling_window_desc.time_dimension.clone().as_base_member());
         let on = match &rolling_window_desc.rolling_window {
             RollingWindowType::Regular(regular_rolling_window) => {
                 JoinCondition::new_regular_rolling_join(
@@ -126,6 +204,13 @@ impl MultiStageMemberQueryPlanner {
                     self.query_tools.clone(),
                 )
             }
+            RollingWindowType::RunningTotal => JoinCondition::new_rolling_total_join(
+                root_alias.clone(),
+                Expr::Reference(QualifiedColumnName::new(
+                    Some(alias.clone()),
+                    time_dimension_alias,
+                )),
+            ),
         };
         join_builder.left_join_table_reference(
             input.clone(),
@@ -139,7 +224,7 @@ impl MultiStageMemberQueryPlanner {
         let group_by = if self.description.member().is_ungrupped() {
             vec![]
         } else {
-            dimensions
+            all_dimensions
                 .iter()
                 .map(|dim| Expr::Member(MemberExpression::new(dim.clone())))
                 .collect_vec()
@@ -155,7 +240,29 @@ impl MultiStageMemberQueryPlanner {
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut render_references = HashMap::new();
         let mut select_builder = SelectBuilder::new(from.clone());
-        for dim in dimensions.iter() {
+
+        //We insert render reference for main time dimension (with the some granularity as in time series to avoid unnessesary date_tranc)
+        render_references.insert(
+            rolling_window_desc.time_dimension.full_name(),
+            QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
+        );
+
+        //We also insert render reference for the base dimension of time dimension (i.e. without `_granularity` prefix to let other time dimensions make date_tranc)
+        render_references.insert(
+            rolling_window_desc
+                .time_dimension
+                .base_dimension()
+                .full_name(),
+            QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
+        );
+
+        for dim in self.description.state().time_dimensions().iter() {
+            let alias =
+                references_builder.resolve_alias_for_member(&dim.full_name(), &Some(alias.clone()));
+            context_factory.add_dimensions_with_ignored_timezone(dim.full_name());
+            select_builder.add_projection_member(&dim.clone().as_base_member(), alias);
+        }
+        for dim in self.description.state().dimensions().iter() {
             if dim.full_name() == rolling_window_desc.time_dimension.full_name() {
                 render_references.insert(
                     dim.full_name(),
@@ -170,7 +277,7 @@ impl MultiStageMemberQueryPlanner {
             }
             let alias =
                 references_builder.resolve_alias_for_member(&dim.full_name(), &Some(alias.clone()));
-            select_builder.add_projection_member(&dim, alias);
+            select_builder.add_projection_member(&dim.clone().as_base_member(), alias);
         }
 
         let query_member = self.query_member_as_base_member()?;

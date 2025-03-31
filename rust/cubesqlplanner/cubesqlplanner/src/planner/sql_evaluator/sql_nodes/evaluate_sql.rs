@@ -32,16 +32,7 @@ impl SqlNode for EvaluateSqlNode {
                 templates,
             ),
             MemberSymbol::TimeDimension(ev) => {
-                let input_sql =
-                    visitor.apply(&ev.base_symbol(), node_processor.clone(), templates)?;
-                let res = if let Some(granularity) = ev.granularity() {
-                    let converted_tz = query_tools.base_tools().convert_tz(input_sql)?;
-                    query_tools
-                        .base_tools()
-                        .time_grouped_column(granularity.clone(), converted_tz)?
-                } else {
-                    input_sql
-                };
+                let res = visitor.apply(&ev.base_symbol(), node_processor.clone(), templates)?;
                 Ok(res)
             }
             MemberSymbol::Measure(ev) => {

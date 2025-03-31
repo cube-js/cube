@@ -1,4 +1,6 @@
-use super::dependecy::{ContextSymbolDep, CubeDepProperty, CubeDependency, Dependency};
+use super::dependecy::{
+    ContextSymbolDep, CubeDepProperty, CubeDependency, Dependency, TimeDimensionDependency,
+};
 use super::sql_nodes::SqlNode;
 use super::{symbols::MemberSymbol, SqlEvaluatorVisitor};
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
@@ -61,6 +63,7 @@ impl SqlCall {
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
                 }
+                Dependency::TimeDimensionDependency(dep) => result.push(dep.base_symbol.clone()),
                 Dependency::ContextDependency(_) => {}
             }
         }
@@ -70,6 +73,9 @@ impl SqlCall {
         for dep in self.deps.iter() {
             match dep {
                 Dependency::SymbolDependency(dep) => result.push((dep.clone(), vec![])),
+                Dependency::TimeDimensionDependency(dep) => {
+                    result.push((dep.base_symbol.clone(), vec![]))
+                }
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, vec![], result)
                 }
@@ -88,6 +94,7 @@ impl SqlCall {
         for dep in self.deps.iter() {
             match dep {
                 Dependency::SymbolDependency(_) => {}
+                Dependency::TimeDimensionDependency(_) => {}
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_cube_deps_from_cube_dep(cube_dep, result)
                 }
@@ -104,6 +111,9 @@ impl SqlCall {
         for (_, v) in cube_dep.properties.iter() {
             match v {
                 CubeDepProperty::SymbolDependency(dep) => result.push(dep.clone()),
+                CubeDepProperty::TimeDimensionDependency(dep) => {
+                    result.push(dep.base_symbol.clone())
+                }
                 CubeDepProperty::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
                 }
@@ -127,6 +137,9 @@ impl SqlCall {
         for (_, v) in cube_dep.properties.iter() {
             match v {
                 CubeDepProperty::SymbolDependency(dep) => result.push((dep.clone(), path.clone())),
+                CubeDepProperty::TimeDimensionDependency(dep) => {
+                    result.push((dep.base_symbol.clone(), path.clone()))
+                }
                 CubeDepProperty::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, path.clone(), result)
                 }
@@ -161,6 +174,9 @@ impl SqlCall {
                 node_processor.clone(),
                 templates,
             )?)),
+            Dependency::TimeDimensionDependency(dep) => {
+                self.evaluate_time_dimesion_dep(dep, visitor, node_processor.clone(), templates)
+            }
             Dependency::CubeDependency(dep) => self.evaluate_cube_dep(
                 dep,
                 visitor,
@@ -195,6 +211,14 @@ impl SqlCall {
                 CubeDepProperty::SymbolDependency(dep) => {
                     MemberSqlArg::String(visitor.apply(&dep, node_processor.clone(), templates)?)
                 }
+
+                CubeDepProperty::TimeDimensionDependency(dep) => self.evaluate_time_dimesion_dep(
+                    dep,
+                    visitor,
+                    node_processor.clone(),
+                    templates,
+                )?,
+
                 CubeDepProperty::CubeDependency(dep) => self.evaluate_cube_dep(
                     &dep,
                     visitor,
@@ -204,6 +228,21 @@ impl SqlCall {
                 )?,
             };
             res.properties.insert(k.clone(), prop_res);
+        }
+        Ok(MemberSqlArg::Struct(res))
+    }
+
+    fn evaluate_time_dimesion_dep(
+        &self,
+        dep: &TimeDimensionDependency,
+        visitor: &SqlEvaluatorVisitor,
+        node_processor: Rc<dyn SqlNode>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<MemberSqlArg, CubeError> {
+        let mut res = MemberSqlStruct::default();
+        for (k, v) in dep.granularities.iter() {
+            let arg = MemberSqlArg::String(visitor.apply(&v, node_processor.clone(), templates)?);
+            res.properties.insert(k.clone(), arg);
         }
         Ok(MemberSqlArg::Struct(res))
     }
@@ -285,14 +324,20 @@ impl SqlCall {
                     values: None,
                 })
             }
-            FilterItem::Item(filter) => Some(NativeFilterItem {
-                or: None,
-                and: None,
-                member: Some(filter.member_name()),
-                dimension: None,
-                operator: Some(filter.filter_operator().to_string()),
-                values: Some(filter.values().clone()),
-            }),
+            FilterItem::Item(filter) => {
+                if filter.use_raw_values() {
+                    None
+                } else {
+                    Some(NativeFilterItem {
+                        or: None,
+                        and: None,
+                        member: Some(filter.member_name()),
+                        dimension: None,
+                        operator: Some(filter.filter_operator().to_string()),
+                        values: Some(filter.values().clone()),
+                    })
+                }
+            }
             FilterItem::Segment(_) => None,
         }
     }

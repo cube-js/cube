@@ -123,7 +123,7 @@ pub struct QueryTools {
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     evaluator_compiler: Rc<RefCell<Compiler>>,
     cached_data: RefCell<QueryToolsCachedData>,
-    timezone: Option<Tz>,
+    timezone: Tz,
 }
 
 impl QueryTools {
@@ -134,16 +134,17 @@ impl QueryTools {
         timezone_name: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
-        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(cube_evaluator.clone())));
         let timezone = if let Some(timezone) = timezone_name {
-            Some(
-                timezone
-                    .parse::<Tz>()
-                    .map_err(|_| CubeError::user(format!("Incorrect timezone {}", timezone)))?,
-            )
+            timezone
+                .parse::<Tz>()
+                .map_err(|_| CubeError::user(format!("Incorrect timezone {}", timezone)))?
         } else {
-            None
+            Tz::UTC
         };
+        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
+            cube_evaluator.clone(),
+            timezone.clone(),
+        )));
         let sql_templates = PlanSqlTemplates::new(templates_render.clone());
         Ok(Rc::new(Self {
             cube_evaluator,
@@ -169,8 +170,8 @@ impl QueryTools {
         &self.join_graph
     }
 
-    pub fn timezone(&self) -> &Option<Tz> {
-        &self.timezone
+    pub fn timezone(&self) -> Tz {
+        self.timezone
     }
 
     pub fn cached_data(&self) -> Ref<'_, QueryToolsCachedData> {

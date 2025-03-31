@@ -1,7 +1,8 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::planners::multi_stage::MultiStageTimeShift;
-use crate::planner::{BaseDimension, BaseTimeDimension};
+use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
+use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -88,18 +89,23 @@ impl MultiStageAppliedState {
         &self.time_dimensions
     }
 
+    pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<BaseTimeDimension>>) {
+        self.time_dimensions = time_dimensions;
+    }
+
     pub fn change_time_dimension_granularity(
         &mut self,
-        dimension_name: &str,
+        time_dimension: &Rc<BaseTimeDimension>,
         new_granularity: Option<String>,
-    ) {
+    ) -> Result<(), CubeError> {
         if let Some(time_dimension) = self
             .time_dimensions
             .iter_mut()
-            .find(|dim| dim.member_evaluator().full_name() == dimension_name)
+            .find(|dim| dim.full_name() == time_dimension.full_name())
         {
-            *time_dimension = time_dimension.change_granularity(new_granularity);
+            *time_dimension = time_dimension.change_granularity(new_granularity)?;
         }
+        Ok(())
     }
 
     pub fn remove_filter_for_member(&mut self, member_name: &String) {
@@ -174,6 +180,7 @@ impl MultiStageAppliedState {
             member_name,
             &self.time_dimensions_filters,
             &operator,
+            None,
             &values,
             &None,
         );
@@ -190,6 +197,7 @@ impl MultiStageAppliedState {
             member_name,
             &self.time_dimensions_filters,
             &operator,
+            None,
             &values,
             &None,
         );
@@ -207,6 +215,25 @@ impl MultiStageAppliedState {
             member_name,
             &self.time_dimensions_filters,
             &operator,
+            None,
+            &vec![],
+            &Some(replacement_values),
+        );
+    }
+
+    pub fn replace_range_to_subquery_in_date_filter(
+        &mut self,
+        member_name: &String,
+        new_from: String,
+        new_to: String,
+    ) {
+        let operator = FilterOperator::InDateRange;
+        let replacement_values = vec![Some(new_from), Some(new_to)];
+        self.time_dimensions_filters = self.change_date_range_filter_impl(
+            member_name,
+            &self.time_dimensions_filters,
+            &operator,
+            Some(true),
             &vec![],
             &Some(replacement_values),
         );
@@ -217,6 +244,7 @@ impl MultiStageAppliedState {
         member_name: &String,
         filters: &Vec<FilterItem>,
         operator: &FilterOperator,
+        use_raw_values: Option<bool>,
         additional_values: &Vec<Option<String>>,
         replacement_values: &Option<Vec<Option<String>>>,
     ) -> Vec<FilterItem> {
@@ -230,6 +258,7 @@ impl MultiStageAppliedState {
                             member_name,
                             filters,
                             operator,
+                            use_raw_values,
                             additional_values,
                             replacement_values,
                         ),
@@ -246,7 +275,8 @@ impl MultiStageAppliedState {
                             itm.values().clone()
                         };
                         values.extend(additional_values.iter().cloned());
-                        itm.change_operator(operator.clone(), values)
+                        let use_raw_values = use_raw_values.unwrap_or(itm.use_raw_values());
+                        itm.change_operator(operator.clone(), values, use_raw_values)
                     } else {
                         itm.clone()
                     };
