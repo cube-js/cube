@@ -77,9 +77,10 @@ the values should be the start and end days of the month, i.e.,
 `['2020-01-01T00:00:00.000', '2020-01-31T23:59:59.999']`; when the granularity
 is `day`, the values should be the start and end hours of the day, i.e.,
 `['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']`. Date ranges are
-inclusive, and the minimum granularity is `second`. Use the
-[`allow_non_strict_date_range_match`][ref-non-strict-date-range-match] to allow
-a pre-aggregation to match a non-strict date range anyway.
+inclusive, and the minimum granularity is `second`. By default, this is ensured
+via the [`allow_non_strict_date_range_match`][ref-non-strict-date-range-match]
+parameter of pre-aggregations: it allows to match _non-strict date ranges_ and is
+set to `true` by default.
 - **The time zone in the query must match the time zone of a pre-aggregation.**
 You can configure a list of time zones that pre-aggregations will be built for
 using the [`scheduled_refresh_time_zones`][ref-conf-scheduled-refresh-time-zones]
