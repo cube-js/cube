@@ -16,7 +16,7 @@ export class PackageFetcher {
 
   protected repoArchivePath: string;
 
-  public constructor(private repo: Repository) {
+  public constructor(private readonly repo: Repository) {
     this.tmpFolderPath = path.resolve('.', 'node_modules', '.tmp');
 
     this.init();
@@ -53,7 +53,7 @@ export class PackageFetcher {
     (await proxyFetch(url)).body.pipe(writer);
 
     return new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
+      writer.on('finish', resolve as () => void);
       writer.on('error', reject);
     });
   }
