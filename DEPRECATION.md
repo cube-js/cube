@@ -394,15 +394,21 @@ API](https://cube.dev/docs/product/apis-integrations/orchestration-api) and
 Node.js 18 reaches [End of Life on April 30, 2025][link-nodejs-eol]. This means
 no more updates. Please upgrade to Node.js 20 or higher.
 
+### `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`
+
+**Deprecated in Release: v1.2.7**
+
+This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
+
+### Node.js 18
+
+**Removed in Release: v1.3.0**
+
+[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
 ### Node.js 20
 
 **Deprecated in Release: v1.3.0**
 
 Node.js 20 is in maintenance mode from [November 22, 2024][link-nodejs-eol]. This means
 no more new features, only security updates. Please upgrade to Node.js 22 or higher.
-
-### `CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`
-
-**Deprecated in Release: v1.2.7**
-
-This environment variable was renamed to [`CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID`](https://cube.dev/docs/reference/configuration/environment-variables#cubejs_scheduled_refresh_queries_per_app_id). Please use the new name.
