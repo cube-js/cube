@@ -110,7 +110,11 @@ export class DataSchemaCompiler {
       );
     }
 
-    const transpile = async () => {
+    /**
+     * @param stage Number
+     * @returns {Promise<*>}
+     */
+    const transpile = async (stage) => {
       let cubeNames;
       let cubeSymbols;
       let transpilerNames;
@@ -145,7 +149,7 @@ export class DataSchemaCompiler {
           content: ';',
         };
 
-        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId });
+        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId })));
       } else if (transpilationWorkerThreads) {
@@ -157,17 +161,17 @@ export class DataSchemaCompiler {
       return results.filter(f => !!f);
     };
 
-    const compilePhase = async (compilers) => this.compileCubeFiles(compilers, await transpile(), errorsReport);
+    const compilePhase = async (compilers, stage) => this.compileCubeFiles(compilers, await transpile(stage), errorsReport);
 
-    return compilePhase({ cubeCompilers: this.cubeNameCompilers })
-      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }))
+    return compilePhase({ cubeCompilers: this.cubeNameCompilers }, 0)
+      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }, 1))
       .then(() => (this.viewCompilationGate.shouldCompileViews() ?
-        compilePhase({ cubeCompilers: this.viewCompilers })
+        compilePhase({ cubeCompilers: this.viewCompilers }, 2)
         : Promise.resolve()))
       .then(() => compilePhase({
         cubeCompilers: this.cubeCompilers,
         contextCompilers: this.contextCompilers,
-      }))
+      }, 3))
       .then(() => {
         if (transpilationNative) {
           // Clean up cache
@@ -179,7 +183,7 @@ export class DataSchemaCompiler {
           return this.transpileJsFile(
             dummyFile,
             errorsReport,
-            { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId }
+            { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId, stage: 0 }
           );
         } else if (transpilationWorkerThreads && this.workerPool) {
           this.workerPool.terminate();
@@ -227,7 +231,7 @@ export class DataSchemaCompiler {
     }
   }
 
-  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId }) {
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }) {
     try {
       if (getEnv('transpilationNative')) {
         const reqData = {
@@ -239,6 +243,7 @@ export class DataSchemaCompiler {
               cubeNames,
               cubeSymbols,
               contextSymbols,
+              stage
             },
           }),
         };

@@ -128,6 +128,7 @@ export interface TransformConfig {
     cubeNames: string[];
     cubeSymbols: Record<string, Record<string, boolean>>;
     contextSymbols: Record<string, string>;
+    stage: 0 | 1 | 2 | 3;
   }
 }
 
