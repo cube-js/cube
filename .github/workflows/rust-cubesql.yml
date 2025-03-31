@@ -113,12 +113,15 @@ jobs:
     strategy:
       matrix:
         # Current used version + 1 LTS
-        # TODO: Add 24 after it's been released
+        # TODO: Add 24 after it's been released (don't forget to uncomment excludes below!)
         node-version: [22]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         # minimize number of jobs
         exclude:
+# TODO: uncomment after adding v24
+#          - node-version: 22
+#            target: "aarch64-unknown-linux-gnu"
           - python-version: 3.10
             target: "aarch64-unknown-linux-gnu"
           - python-version: 3.11
