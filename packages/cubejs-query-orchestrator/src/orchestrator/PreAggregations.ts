@@ -29,6 +29,7 @@ export function version(cacheKey) {
   let result = '';
 
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
+  // TODO: switch to use '@node-rs/xxhash' instead of crypto
   const digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
 
   let residue = 0;
