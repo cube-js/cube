@@ -147,6 +147,19 @@ CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID=<AZURE_CLIENT_ID>
 CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET=<AZURE_CLIENT_SECRET>
 ```
 
+#### Google Cloud Storage
+
+To use Google Cloud Storage as an export bucket, follow [the Databricks guide on
+connecting to Google Cloud Storage][databricks-docs-uc-gcs].
+
+[Create the service account][databricks-docs-uc-gcs-service-account] and replace the access key as follows:
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET=gs://my-bucket-on-gcs
+CUBEJS_DB_EXPORT_BUCKET_TYPE=gcs
+CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
+```
+
 ## SSL/TLS
 
 Cube does not require any additional configuration to enable SSL/TLS for
@@ -173,6 +186,8 @@ bucket][self-preaggs-export-bucket] **must be** configured.
   https://docs.databricks.com/data/data-sources/azure/azure-storage.html
 [databricks-docs-uc-s3]:
   https://docs.databricks.com/en/connect/unity-catalog/index.html
+[databricks-docs-uc-gcs]:
+  https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage.html
 [databricks-docs-jdbc-url]:
   https://docs.databricks.com/integrations/bi/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url
 [databricks-docs-pat]:
