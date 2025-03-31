@@ -103,6 +103,11 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Azure service principal client secret
      */
     azureClientSecret?: string,
+
+    /**
+     * GCS credentials JSON content
+     */
+    gcsCredentials?: string,
   };
 
 type ShowTableRow = {
@@ -209,7 +214,7 @@ export class DatabricksDriver extends JDBCDriver {
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: ['s3', 'azure'], dataSource }),
+        getEnv('dbExportBucketType', { supported: ['s3', 'azure', 'gcs'], dataSource }),
       exportBucket:
         conf?.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -246,6 +251,10 @@ export class DatabricksDriver extends JDBCDriver {
       azureClientSecret:
         conf?.azureClientSecret ||
         getEnv('dbExportBucketAzureClientSecret', { dataSource }),
+      // GCS credentials
+      gcsCredentials:
+        conf?.gcsCredentials ||
+        getEnv('dbExportGCSCredentials', { dataSource }),
     };
     if (config.readOnly === undefined) {
       // we can set readonly to true if there is no bucket config provided
@@ -643,16 +652,19 @@ export class DatabricksDriver extends JDBCDriver {
    * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions) {
-    if (!['azure', 's3'].includes(this.config.bucketType as string)) {
+    if (!['azure', 's3', 'gcs'].includes(this.config.bucketType as string)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
       }`);
     }
+    // Construct a fully qualified table name with proper quoting
+    // 1. Quotes are needed to handle special characters in identifiers, e.g. `my-table`
+    // 2. Table name may include schema (e.g. 'schema.table'), so we split and quote each part, e.g. `schema`.`table`
     const tableFullName = `${
       this.config.catalog
-        ? `${this.config.catalog}.`
+        ? `${this.quoteIdentifier(this.config.catalog)}.`
         : ''
-    }${tableName}`;
+    }${tableName.split('.').map(part => this.quoteIdentifier(part)).join('.')}`;
     const types = options.query
       ? await this.unloadWithSql(
         tableFullName,
@@ -733,6 +745,12 @@ export class DatabricksDriver extends JDBCDriver {
         url.host,
         objectSearchPrefix,
       );
+    } else if (this.config.bucketType === 'gcs') {
+      return this.extractFilesFromGCS(
+        { credentials: this.config.gcsCredentials },
+        url.host,
+        objectSearchPrefix,
+      );
     } else {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
@@ -769,6 +787,9 @@ export class DatabricksDriver extends JDBCDriver {
    *
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
+   * For Google cloud storage you can configure storage credentials and create an external location to access it
+   * (https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/storage-credentials
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/external-locations)
    */
   private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[], columns: ColumnInfo[]) {
     let select = sql;
