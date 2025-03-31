@@ -1625,11 +1625,16 @@ impl MemberRules {
                     if *ungrouped {
                         continue;
                     }
-                    let Some(empty_filters) = &egraph.index(subst[filters_var]).data.is_empty_list
+                    let Some(filter_operators) =
+                        &egraph.index(subst[filters_var]).data.filter_operators
                     else {
                         return false;
                     };
-                    if !empty_filters {
+                    let only_allowed_filters = filter_operators.iter().all(|(member, _op)| {
+                        // TODO this should allow even more, like dimensions and segments
+                        member == "__user"
+                    });
+                    if !only_allowed_filters {
                         return false;
                     }
                     if referenced_aggr_expr.len() == 0 {
