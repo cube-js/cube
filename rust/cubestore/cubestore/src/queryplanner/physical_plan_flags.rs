@@ -1,9 +1,9 @@
-use datafusion::logical_expr::{Operator, UserDefinedLogicalNode};
+use datafusion::logical_expr::Operator;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::expressions::{BinaryExpr, CastExpr, Column, Literal, TryCastExpr};
 use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::repartition::RepartitionExec;
-use datafusion::physical_plan::union::UnionExec;
+use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::{ExecutionPlan, InputOrderMode, PhysicalExpr};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -37,8 +37,9 @@ impl PhysicalPlanFlags {
     fn physical_plan_flags_fill(p: &dyn ExecutionPlan, flags: &mut PhysicalPlanFlags) {
         let a = p.as_any();
         if let Some(agg) = a.downcast_ref::<AggregateExec>() {
-            let is_final_hash_agg_without_groups =
-                agg.mode() == &AggregateMode::Final && agg.group_expr().expr().len() == 0;
+            let is_final_hash_agg_without_groups = agg.mode() == &AggregateMode::Final
+                && agg.input_order_mode() == &InputOrderMode::Linear
+                && agg.group_expr().expr().len() == 0;
 
             let is_full_inplace_agg = agg.mode() == &AggregateMode::Single
                 && agg.input_order_mode() == &InputOrderMode::Sorted;
@@ -63,19 +64,21 @@ impl PhysicalPlanFlags {
             let predicate = f.predicate();
             let predicate_column_groups = extract_columns_with_operators(predicate.as_ref());
             let input = f.input();
+            let input_as_any = input.as_any();
 
-            let maybe_input_exec = input
-                .as_any()
-                .downcast_ref::<RepartitionExec>()
+            let maybe_input_exec = input_as_any
+                .downcast_ref::<CoalescePartitionsExec>()
                 .map(|exec| exec.input().as_any())
                 .or_else(|| {
                     input
                         .as_any()
-                        .downcast_ref::<RepartitionExec>()
+                        .downcast_ref::<SortPreservingMergeExec>()
                         .map(|exec| exec.input().as_any())
                 });
 
-            if let Some(input_exec_any) = maybe_input_exec {
+            // Left "if true" in DF upgrade branch to keep indentation and reduce conflicts.
+            if true {
+                let input_exec_any = maybe_input_exec.unwrap_or(input_as_any);
                 if let Some(cte) = input_exec_any.downcast_ref::<CubeTableExec>() {
                     let sort_key_size = cte.index_snapshot.index.row.sort_key_size() as usize;
                     let index_columns =
