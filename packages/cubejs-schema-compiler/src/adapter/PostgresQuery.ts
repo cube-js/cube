@@ -24,7 +24,7 @@ export class PostgresQuery extends BaseQuery {
   }
 
   public convertTz(field: string): string {
-    return `(${field}::timestamptz AT TIME ZONE '${this.timezone}')`;
+    return `((${field})::timestamptz AT TIME ZONE '${this.timezone}')`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string): string {
