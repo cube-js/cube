@@ -2845,6 +2845,9 @@ export class BaseQuery {
       return evaluateSql === '*' ? '1' : evaluateSql;
     }
     if (this.ungrouped) {
+      if (this.safeEvaluateSymbolContext().ungroupedAliases?.[measurePath]) {
+        evaluateSql = this.safeEvaluateSymbolContext().ungroupedAliases[measurePath];
+      }
       if ((this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative || {})[measurePath]) {
         evaluateSql = this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative[measurePath];
       }
