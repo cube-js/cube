@@ -1,6 +1,6 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
-use crate::planner::planners::multi_stage::MultiStageTimeShift;
+use crate::planner::sql_evaluator::MeasureTimeShift;
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -17,7 +17,7 @@ pub struct MultiStageAppliedState {
     dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
     segments: Vec<FilterItem>,
-    time_shifts: HashMap<String, String>,
+    time_shifts: HashMap<String, MeasureTimeShift>,
 }
 
 impl MultiStageAppliedState {
@@ -62,14 +62,18 @@ impl MultiStageAppliedState {
             .collect_vec();
     }
 
-    pub fn add_time_shifts(&mut self, time_shifts: Vec<MultiStageTimeShift>) {
+    pub fn add_time_shifts(&mut self, time_shifts: Vec<MeasureTimeShift>) {
         for ts in time_shifts.into_iter() {
-            self.time_shifts
-                .insert(ts.time_dimension.clone(), ts.interval.clone());
+            if let Some(exists) = self.time_shifts.get_mut(&ts.dimension.full_name()) {
+                exists.interval += ts.interval;
+            } else {
+                self.time_shifts
+                    .insert(ts.dimension.full_name(), ts);
+            }
         }
     }
 
-    pub fn time_shifts(&self) -> &HashMap<String, String> {
+    pub fn time_shifts(&self) -> &HashMap<String, MeasureTimeShift> {
         &self.time_shifts
     }
 
