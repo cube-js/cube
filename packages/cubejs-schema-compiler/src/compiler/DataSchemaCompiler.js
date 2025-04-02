@@ -236,6 +236,7 @@ export class DataSchemaCompiler {
       if (getEnv('transpilationNative')) {
         const reqData = {
           fileName: file.fileName,
+          fileContent: file.content,
           transpilers: transpilerNames,
           compilerId,
           ...(cubeNames && {
@@ -249,7 +250,7 @@ export class DataSchemaCompiler {
         };
 
         errorsReport.inFile(file);
-        const res = await transpileJs(file.content, reqData);
+        const res = await transpileJs(reqData);
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
         errorsReport.exitFile();

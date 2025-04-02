@@ -122,6 +122,7 @@ export type SQLInterfaceOptions = {
 
 export interface TransformConfig {
   fileName: string;
+  fileContent: string;
   transpilers: string[];
   compilerId: string;
   metaData?: {
@@ -496,11 +497,11 @@ export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[]
   return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
 };
 
-export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+export const transpileJs = async (transpileRequest: TransformConfig): Promise<TransformResponse> => {
   const native = loadNative();
 
   if (native.transpileJs) {
-    return native.transpileJs(content, metadata);
+    return native.transpileJs(transpileRequest);
   }
 
   throw new Error('TranspileJs native implementation not found!');
