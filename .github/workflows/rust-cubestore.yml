@@ -49,6 +49,7 @@ jobs:
           sudo apt list --all-versions cmake
           sudo find / -name cmake -type f -executable
           which cmake
+          cmake --version
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
