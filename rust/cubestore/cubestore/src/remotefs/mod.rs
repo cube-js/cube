@@ -256,9 +256,18 @@ impl RemoteFs for LocalDirRemoteFs {
                 .await
                 .map_err(|e| {
                     CubeError::internal(format!(
-                        "Rename {} -> {}: {}",
+                        "Copy {} -> {}: {}",
                         temp_upload_path,
                         local_path.to_string_lossy(),
+                        e
+                    ))
+                })?;
+            fs::remove_file(&temp_upload_path)
+                .await
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Remove {}: {}",
+                        temp_upload_path,
                         e
                     ))
                 })?;
