@@ -41,8 +41,6 @@ jobs:
           sudo rm -rf /usr/local/bin/cmake
           sudo rm -rf /usr/local/share/cmake*
           which cmake
-          ls -l /home/runner/work/_temp/
-          cat /home/runner/work/_temp/*.sh
           cmake --version
       - name: Checkout
         uses: actions/checkout@v4
