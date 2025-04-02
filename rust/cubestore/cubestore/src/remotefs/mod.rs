@@ -264,13 +264,7 @@ impl RemoteFs for LocalDirRemoteFs {
                 })?;
             fs::remove_file(&temp_upload_path)
                 .await
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Remove {}: {}",
-                        temp_upload_path,
-                        e
-                    ))
-                })?;
+                .map_err(|e| CubeError::internal(format!("Remove {temp_upload_path}: {e}")))?;
         }
         Ok(fs::metadata(local_path).await?.len())
     }
