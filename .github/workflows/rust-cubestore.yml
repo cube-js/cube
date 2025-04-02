@@ -27,6 +27,8 @@ jobs:
       fail-fast: false
       matrix:
         rust: [nightly-2024-01-29]
+    container:
+      image: cubejs/rust-cross:${{ matrix.target }}-15082024
     env:
       RUST: ${{ matrix.rust }}
     steps:
