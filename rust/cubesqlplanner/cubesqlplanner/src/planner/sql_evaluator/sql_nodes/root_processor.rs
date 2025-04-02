@@ -9,6 +9,7 @@ use std::rc::Rc;
 
 pub struct RootSqlNode {
     dimension_processor: Rc<dyn SqlNode>,
+    time_dimesions_processor: Rc<dyn SqlNode>,
     measure_processor: Rc<dyn SqlNode>,
     cube_name_processor: Rc<dyn SqlNode>,
     default_processor: Rc<dyn SqlNode>,
@@ -17,12 +18,14 @@ pub struct RootSqlNode {
 impl RootSqlNode {
     pub fn new(
         dimension_processor: Rc<dyn SqlNode>,
+        time_dimesions_processor: Rc<dyn SqlNode>,
         measure_processor: Rc<dyn SqlNode>,
         cube_name_processor: Rc<dyn SqlNode>,
         default_processor: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {
             dimension_processor,
+            time_dimesions_processor,
             measure_processor,
             cube_name_processor,
             default_processor,
@@ -57,6 +60,13 @@ impl SqlNode for RootSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(_) => self.dimension_processor.to_sql(
+                visitor,
+                node,
+                query_tools.clone(),
+                node_processor.clone(),
+                templates,
+            )?,
+            MemberSymbol::TimeDimension(_) => self.time_dimesions_processor.to_sql(
                 visitor,
                 node,
                 query_tools.clone(),

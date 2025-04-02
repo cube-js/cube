@@ -88,6 +88,31 @@ impl RegularRollingWindowJoinCondition {
     }
 }
 
+pub struct RollingTotalJoinCondition {
+    time_series_source: String,
+    time_dimension: Expr,
+}
+
+impl RollingTotalJoinCondition {
+    pub fn new(time_series_source: String, time_dimension: Expr) -> Self {
+        Self {
+            time_series_source,
+            time_dimension,
+        }
+    }
+
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
+        let date_column = self.time_dimension.to_sql(templates, context)?;
+        let date_to =
+            templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
+        let result = format!("{date_column} <= {date_to}");
+        Ok(result)
+    }
+}
 pub struct ToDateRollingWindowJoinCondition {
     time_series_source: String,
     granularity: String,
@@ -116,8 +141,6 @@ impl ToDateRollingWindowJoinCondition {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         let date_column = self.time_dimension.to_sql(templates, context)?;
-
-        //(dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
 
         let date_from =
             templates.column_reference(&Some(self.time_series_source.clone()), "date_to")?;
@@ -192,6 +215,7 @@ pub enum JoinCondition {
     BaseJoinCondition(Rc<dyn BaseJoinCondition>),
     RegularRollingWindowJoinCondition(RegularRollingWindowJoinCondition),
     ToDateRollingWindowJoinCondition(ToDateRollingWindowJoinCondition),
+    RollingTotalJoinCondition(RollingTotalJoinCondition),
 }
 
 impl JoinCondition {
@@ -229,6 +253,13 @@ impl JoinCondition {
         ))
     }
 
+    pub fn new_rolling_total_join(time_series_source: String, time_dimension: Expr) -> Self {
+        Self::RollingTotalJoinCondition(RollingTotalJoinCondition::new(
+            time_series_source,
+            time_dimension,
+        ))
+    }
+
     pub fn new_base_join(base: Rc<dyn BaseJoinCondition>) -> Self {
         Self::BaseJoinCondition(base)
     }
@@ -247,6 +278,7 @@ impl JoinCondition {
             JoinCondition::ToDateRollingWindowJoinCondition(cond) => {
                 cond.to_sql(templates, context)
             }
+            JoinCondition::RollingTotalJoinCondition(cond) => cond.to_sql(templates, context),
         }
     }
 }

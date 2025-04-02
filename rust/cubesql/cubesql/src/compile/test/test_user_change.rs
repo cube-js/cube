@@ -275,3 +275,66 @@ GROUP BY 1
     assert!(sql_query.sql.contains(r#""changeUser": "gopher""#));
     assert_eq!(load_calls[0].meta.change_user(), Some("gopher".to_string()));
 }
+
+/// Repeated aggregation should be flattened even in presence of __user filter
+#[tokio::test]
+async fn flatten_aggregation_into_user_change() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+  dim_str0
+FROM
+  (
+    SELECT
+      dim_str0
+    FROM
+      (
+        SELECT
+          dim_str0,
+          AVG(avgPrice)
+        FROM
+          MultiTypeCube
+        WHERE
+          __user = 'gopher'
+        GROUP BY
+          1
+      ) t
+    GROUP BY
+      dim_str0
+  ) AS t
+GROUP BY
+  dim_str0
+ORDER BY
+  dim_str0 ASC
+LIMIT
+  1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    // This query should rewrite completely as CubeScan
+    let logical_plan = query_plan.as_logical_plan();
+    let cube_scan = logical_plan.expect_root_cube_scan();
+
+    assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+    assert_eq!(
+        cube_scan.request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string(),]),
+            order: Some(vec![vec![
+                "MultiTypeCube.dim_str0".to_string(),
+                "asc".to_string(),
+            ],],),
+            limit: Some(1),
+            ..Default::default()
+        }
+    )
+}

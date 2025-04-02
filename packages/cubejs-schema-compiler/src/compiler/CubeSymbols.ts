@@ -640,35 +640,30 @@ export class CubeSymbols {
 
   protected resolveSymbolsCallDeps(cubeName, sql) {
     try {
-      return this.resolveSymbolsCallDeps2(cubeName, sql);
+      const deps: any[] = [];
+      this.resolveSymbolsCall(sql, (name) => {
+        deps.push({ name });
+        const resolvedSymbol = this.resolveSymbol(
+          cubeName,
+          name
+        );
+        if (resolvedSymbol._objectWithResolvedProperties) {
+          return resolvedSymbol;
+        }
+        return '';
+      }, {
+        depsResolveFn: (name, parent) => {
+          deps.push({ name, parent });
+          return deps.length - 1;
+        },
+        currResolveIndexFn: () => deps.length - 1,
+        contextSymbols: this.depsContextSymbols(),
+
+      });
+      return deps;
     } catch (e) {
-      console.log(e);
       return [];
     }
-  }
-
-  protected resolveSymbolsCallDeps2(cubeName, sql) {
-    const deps: any[] = [];
-    this.resolveSymbolsCall(sql, (name) => {
-      deps.push({ name, undefined });
-      const resolvedSymbol = this.resolveSymbol(
-        cubeName,
-        name
-      );
-      if (resolvedSymbol._objectWithResolvedProperties) {
-        return resolvedSymbol;
-      }
-      return '';
-    }, {
-      depsResolveFn: (name, parent) => {
-        deps.push({ name, parent });
-        return deps.length - 1;
-      },
-      currResolveIndexFn: () => deps.length - 1,
-      contextSymbols: this.depsContextSymbols(),
-
-    });
-    return deps;
   }
 
   protected depsContextSymbols() {
@@ -719,7 +714,6 @@ export class CubeSymbols {
 
   public resolveSymbol(cubeName, name) {
     const { sqlResolveFn, contextSymbols, collectJoinHints, depsResolveFn, currResolveIndexFn } = this.resolveSymbolsCallContext || {};
-
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
     }
@@ -758,6 +752,9 @@ export class CubeSymbols {
         const parentIndex = currResolveIndexFn();
         cube = this.cubeDependenciesProxy(parentIndex, newCubeName);
         return cube;
+      } else if (this.symbols[cubeName] && this.symbols[cubeName][name] && this.symbols[cubeName][name].type === 'time') {
+        const parentIndex = currResolveIndexFn();
+        return this.timeDimDependenciesProxy(parentIndex);
       }
     }
     return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
@@ -877,6 +874,10 @@ export class CubeSymbols {
         }
         if (cube[propertyName]) {
           depsResolveFn(propertyName, parentIndex);
+          if (cube[propertyName].type === 'time') {
+            return this.timeDimDependenciesProxy(parentIndex);
+          }
+
           return '';
         }
         if (self.symbols[propertyName]) {
@@ -885,6 +886,25 @@ export class CubeSymbols {
         }
         if (typeof propertyName === 'string') {
           throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
+        }
+        return undefined;
+      }
+    });
+  }
+
+  protected timeDimDependenciesProxy(parentIndex) {
+    const self = this;
+    const { depsResolveFn } = self.resolveSymbolsCallContext || {};
+    return new Proxy({}, {
+      get: (v, propertyName) => {
+        if (propertyName === '_objectWithResolvedProperties') {
+          return true;
+        }
+        if (propertyName === 'toString') {
+          return () => '';
+        }
+        if (typeof propertyName === 'string') {
+          depsResolveFn(propertyName, parentIndex);
         }
         return undefined;
       }

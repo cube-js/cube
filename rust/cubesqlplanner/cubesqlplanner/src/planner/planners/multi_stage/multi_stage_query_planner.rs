@@ -1,17 +1,17 @@
-use super::multi_stage::{
+use super::{
     MultiStageAppliedState, MultiStageInodeMember, MultiStageInodeMemberType,
     MultiStageLeafMemberType, MultiStageMember, MultiStageMemberQueryPlanner, MultiStageMemberType,
-    MultiStageQueryDescription, MultiStageTimeShift, RollingWindowDescription,
+    MultiStageQueryDescription, MultiStageTimeShift, RollingWindowPlanner,
 };
-use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::plan::{Cte, From, Schema, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::BaseMember;
+use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure};
-use crate::planner::{BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -20,11 +20,16 @@ use std::rc::Rc;
 pub struct MultiStageQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
+    rolling_window_planner: RollingWindowPlanner,
 }
 
 impl MultiStageQueryPlanner {
     pub fn new(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
+            rolling_window_planner: RollingWindowPlanner::new(
+                query_tools.clone(),
+                query_properties.clone(),
+            ),
             query_tools,
             query_properties,
         }
@@ -34,7 +39,7 @@ impl MultiStageQueryPlanner {
             .query_properties
             .all_members(false)
             .into_iter()
-            .filter_map(|memb| -> Option<Result<_, CubeError>> {
+            .filter_map(|memb: Rc<dyn BaseMember>| -> Option<Result<_, CubeError>> {
                 match has_multi_stage_members(&memb.member_evaluator(), false) {
                     Ok(true) => Some(Ok(memb)),
                     Ok(false) => None,
@@ -156,235 +161,6 @@ impl MultiStageQueryPlanner {
         Ok(inode)
     }
 
-    fn add_time_series(
-        &self,
-        time_dimension: Rc<BaseTimeDimension>,
-        state: Rc<MultiStageAppliedState>,
-        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-    ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-        let description =
-            if let Some(description) = descriptions.iter().find(|d| d.alias() == "time_series") {
-                description.clone()
-            } else {
-                let time_series_node = MultiStageQueryDescription::new(
-                    MultiStageMember::new(
-                        MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeries(
-                            time_dimension.clone(),
-                        )),
-                        time_dimension.member_evaluator(),
-                        true,
-                        false,
-                    ),
-                    state.clone(),
-                    vec![],
-                    "time_series".to_string(),
-                );
-                descriptions.push(time_series_node.clone());
-                time_series_node
-            };
-        Ok(description)
-    }
-
-    fn add_rolling_window_base(
-        &self,
-        member: Rc<MemberSymbol>,
-        state: Rc<MultiStageAppliedState>,
-        ungrouped: bool,
-        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-    ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-        let alias = format!("cte_{}", descriptions.len());
-        let description = MultiStageQueryDescription::new(
-            MultiStageMember::new(
-                MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
-                member,
-                self.query_properties.ungrouped() || ungrouped,
-                true,
-            ),
-            state,
-            vec![],
-            alias.clone(),
-        );
-        descriptions.push(description.clone());
-        Ok(description)
-    }
-
-    fn get_to_date_rolling_granularity(
-        &self,
-        rolling_window: &RollingWindow,
-    ) -> Result<Option<String>, CubeError> {
-        let is_to_date = rolling_window
-            .rolling_type
-            .as_ref()
-            .map_or(false, |tp| tp == "to_date");
-
-        if is_to_date {
-            if let Some(granularity) = &rolling_window.granularity {
-                Ok(Some(granularity.clone()))
-            } else {
-                Err(CubeError::user(format!(
-                    "Granularity required for to_date rolling window"
-                )))
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn make_rolling_base_state(
-        &self,
-        time_dimension: Rc<BaseTimeDimension>,
-        rolling_window: &RollingWindow,
-        state: Rc<MultiStageAppliedState>,
-    ) -> Result<Rc<MultiStageAppliedState>, CubeError> {
-        let time_dimension_name = time_dimension.member_evaluator().full_name();
-        let mut new_state = state.clone_state();
-        let trailing_granularity =
-            GranularityHelper::granularity_from_interval(&rolling_window.trailing);
-        let leading_granularity =
-            GranularityHelper::granularity_from_interval(&rolling_window.leading);
-        let window_granularity =
-            GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
-        let result_granularity = GranularityHelper::min_granularity(
-            &window_granularity,
-            &time_dimension.get_granularity(),
-        )?;
-
-        if time_dimension.get_date_range().is_some() && result_granularity.is_some() {
-            let granularity = time_dimension.get_granularity().unwrap(); //FIXME remove this unwrap
-            let date_range = time_dimension.get_date_range().unwrap(); //FIXME remove this unwrap
-            let series = self
-                .query_tools
-                .base_tools()
-                .generate_time_series(granularity, date_range.clone())?;
-            if !series.is_empty() {
-                let new_from_date = series.first().unwrap()[0].clone();
-                let new_to_date = series.last().unwrap()[1].clone();
-                new_state.replace_range_in_date_filter(
-                    &time_dimension_name,
-                    new_from_date,
-                    new_to_date,
-                );
-            }
-        }
-
-        new_state
-            .change_time_dimension_granularity(&time_dimension_name, result_granularity.clone());
-
-        if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
-            new_state.replace_to_date_date_range_filter(&time_dimension_name, &granularity);
-        } else {
-            new_state.replace_regular_date_range_filter(
-                &time_dimension_name,
-                rolling_window.trailing.clone(),
-                rolling_window.leading.clone(),
-            );
-        }
-
-        Ok(Rc::new(new_state))
-    }
-
-    fn try_make_rolling_window(
-        &self,
-        member: Rc<MemberSymbol>,
-        state: Rc<MultiStageAppliedState>,
-        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
-    ) -> Result<Option<Rc<MultiStageQueryDescription>>, CubeError> {
-        if let Some(measure) = BaseMeasure::try_new(member.clone(), self.query_tools.clone())? {
-            if measure.is_cumulative() {
-                let rolling_window = if let Some(rolling_window) = measure.rolling_window() {
-                    rolling_window.clone()
-                } else {
-                    RollingWindow {
-                        trailing: Some("unbounded".to_string()),
-                        leading: None,
-                        offset: None,
-                        rolling_type: None,
-                        granularity: None,
-                    }
-                };
-                let ungrouped = match member.as_ref() {
-                    MemberSymbol::Measure(measure_symbol) => {
-                        measure_symbol.is_rolling_window() && !measure_symbol.is_addictive()
-                    }
-                    _ => false,
-                };
-                let time_dimensions = self.query_properties.time_dimensions();
-                if time_dimensions.len() == 0 {
-                    let rolling_base = self.add_rolling_window_base(
-                        member.clone(),
-                        state.clone(),
-                        ungrouped,
-                        descriptions,
-                    )?;
-                    return Ok(Some(rolling_base));
-                }
-                if time_dimensions.len() != 1 {
-                    return Err(CubeError::internal(
-                        "Rolling window requires one time dimension".to_string(),
-                    ));
-                }
-                let time_dimension = time_dimensions[0].clone();
-
-                let input = vec![
-                    self.add_time_series(time_dimension.clone(), state.clone(), descriptions)?,
-                    self.add_rolling_window_base(
-                        member.clone(),
-                        self.make_rolling_base_state(
-                            time_dimension.clone(),
-                            &rolling_window,
-                            state.clone(),
-                        )?,
-                        ungrouped,
-                        descriptions,
-                    )?,
-                ];
-
-                let time_dimension = time_dimensions[0].clone();
-
-                let alias = format!("cte_{}", descriptions.len());
-
-                let rolling_window_descr = if let Some(granularity) =
-                    self.get_to_date_rolling_granularity(&rolling_window)?
-                {
-                    RollingWindowDescription::new_to_date(time_dimension, granularity)
-                } else {
-                    RollingWindowDescription::new_regular(
-                        time_dimension,
-                        rolling_window.trailing.clone(),
-                        rolling_window.leading.clone(),
-                        rolling_window.offset.clone().unwrap_or("end".to_string()),
-                    )
-                };
-
-                let inode_member = MultiStageInodeMember::new(
-                    MultiStageInodeMemberType::RollingWindow(rolling_window_descr),
-                    vec![],
-                    vec![],
-                    None,
-                    vec![],
-                );
-
-                let description = MultiStageQueryDescription::new(
-                    MultiStageMember::new(
-                        MultiStageMemberType::Inode(inode_member),
-                        member,
-                        self.query_properties.ungrouped(),
-                        false,
-                    ),
-                    state.clone(),
-                    input,
-                    alias.clone(),
-                );
-                descriptions.push(description.clone());
-                Ok(Some(description))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
     fn make_queries_descriptions(
         &self,
         member: Rc<MemberSymbol>,
@@ -399,9 +175,11 @@ impl MultiStageQueryPlanner {
             return Ok(exists.clone());
         };
 
-        if let Some(rolling_window_query) =
-            self.try_make_rolling_window(member.clone(), state.clone(), descriptions)?
-        {
+        if let Some(rolling_window_query) = self.rolling_window_planner.try_plan_rolling_window(
+            member.clone(),
+            state.clone(),
+            descriptions,
+        )? {
             return Ok(rolling_window_query);
         }
 

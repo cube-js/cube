@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix BigQuery DATETIME_TRUNC() week processing ([#9380](https://github.com/cube-js/cube/issues/9380)) ([6c8564f](https://github.com/cube-js/cube/commit/6c8564ffc15e5e930fa2160be642ea3f3cb7b888))
+- **schema-compiler:** Fix date alignment for week-based custom granularities ([#9405](https://github.com/cube-js/cube/issues/9405)) ([8b6c490](https://github.com/cube-js/cube/commit/8b6c4906e2c49fb2c04abc381f6fdb3105309eaf))
+- **schema-compiler:** Fix model validation for aliased included members for views ([#9398](https://github.com/cube-js/cube/issues/9398)) ([f5e69f7](https://github.com/cube-js/cube/commit/f5e69f76e7268812aa776a20588875d85077b3bf))
+- **schema-compiler:** Skip syntax check for transpiled files ([#9395](https://github.com/cube-js/cube/issues/9395)) ([c624e88](https://github.com/cube-js/cube/commit/c624e88d4793c917bb43c3099a7c9d128b517b8a))
+- **tesseract:** Support rolling window with multiple granularities ([#9382](https://github.com/cube-js/cube/issues/9382)) ([6ff9331](https://github.com/cube-js/cube/commit/6ff9331729af59e45385608057fa0e99688cfcbe))
+
+### Features
+
+- **tesseract:** Custom granularities support ([#9400](https://github.com/cube-js/cube/issues/9400)) ([dc93e40](https://github.com/cube-js/cube/commit/dc93e4022d4c2741d0aafcdb1007a69c6181f232))
+- **tesseract:** Support for rolling window without date range ([#9364](https://github.com/cube-js/cube/issues/9364)) ([fd94b02](https://github.com/cube-js/cube/commit/fd94b02b8bba286a67264057f9259769215239a9))
+
 ## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

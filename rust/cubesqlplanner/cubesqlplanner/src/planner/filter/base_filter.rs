@@ -26,6 +26,7 @@ pub struct BaseFilter {
     filter_type: FilterType,
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,
+    use_raw_values: bool,
     templates: FilterTemplates,
 }
 
@@ -66,6 +67,7 @@ impl BaseFilter {
             filter_operator,
             values,
             templates,
+            use_raw_values: false,
         }))
     }
 
@@ -73,6 +75,7 @@ impl BaseFilter {
         &self,
         filter_operator: FilterOperator,
         values: Vec<Option<String>>,
+        use_raw_values: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
             query_tools: self.query_tools.clone(),
@@ -81,6 +84,7 @@ impl BaseFilter {
             filter_operator,
             values,
             templates: self.templates.clone(),
+            use_raw_values,
         })
     }
 
@@ -94,6 +98,10 @@ impl BaseFilter {
 
     pub fn filter_operator(&self) -> &FilterOperator {
         &self.filter_operator
+    }
+
+    pub fn use_raw_values(&self) -> bool {
+        self.use_raw_values
     }
 
     pub fn member_name(&self) -> String {
@@ -265,19 +273,19 @@ impl BaseFilter {
         date: String,
         interval: &Option<String>,
         is_sub: bool,
-    ) -> Result<String, CubeError> {
+    ) -> Result<Option<String>, CubeError> {
         if let Some(interval) = interval {
             if interval != "unbounded" {
                 if is_sub {
-                    self.templates.sub_interval(date, interval.clone())
+                    Ok(Some(self.templates.sub_interval(date, interval.clone())?))
                 } else {
-                    self.templates.add_interval(date, interval.clone())
+                    Ok(Some(self.templates.add_interval(date, interval.clone())?))
                 }
             } else {
-                Ok(date.to_string())
+                Ok(None)
             }
         } else {
-            Ok(date.to_string())
+            Ok(Some(date.to_string()))
         }
     }
 
@@ -287,20 +295,29 @@ impl BaseFilter {
         let from = if self.values.len() >= 3 {
             self.extend_date_range_bound(from, &self.values[2], true)?
         } else {
-            from
+            Some(from)
         };
 
         let to = if self.values.len() >= 4 {
             self.extend_date_range_bound(to, &self.values[3], false)?
         } else {
-            to
+            Some(to)
         };
 
         let date_field = self
             .query_tools
             .base_tools()
             .convert_tz(member_sql.to_string())?;
-        self.templates.time_range_filter(date_field, from, to)
+        if let (Some(from), Some(to)) = (&from, &to) {
+            self.templates
+                .time_range_filter(date_field, from.clone(), to.clone())
+        } else if let Some(from) = &from {
+            self.templates.gte(date_field, from.clone())
+        } else if let Some(to) = &to {
+            self.templates.lte(date_field, to.clone())
+        } else {
+            self.templates.always_true()
+        }
     }
 
     fn to_date_rolling_window_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
@@ -432,6 +449,9 @@ impl BaseFilter {
         value: &String,
         use_db_time_zone: bool,
     ) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.clone());
+        }
         let from = self.format_from_date(value)?;
 
         let res = if use_db_time_zone && &from != FROM_PARTITION_RANGE {
@@ -447,6 +467,9 @@ impl BaseFilter {
         value: &String,
         use_db_time_zone: bool,
     ) -> Result<String, CubeError> {
+        if self.use_raw_values {
+            return Ok(value.clone());
+        }
         let from = self.format_to_date(value)?;
 
         let res = if use_db_time_zone && &from != TO_PARTITION_RANGE {
@@ -552,6 +575,9 @@ impl BaseFilter {
     }
 
     fn allocate_timestamp_param(&self, param: &str) -> String {
+        if self.use_raw_values {
+            return param.to_string();
+        }
         let placeholder = self.query_tools.allocate_param(param);
         format!("{}::timestamptz", placeholder)
     }

@@ -246,6 +246,7 @@ deployment.
   - `mistral`
   - `openai`
   - `openai-compatible` (any provider with an OpenAI-compatible API; support may vary)
+  - `snowflake`
   - `together-ai`
   - `x-ai`
 
@@ -339,6 +340,26 @@ See below for required variables by provider (required unless noted):
 
 - `CUBE_CLOUD_AI_OPENAI_COMPATIBLE_API_KEY`
 - `CUBE_CLOUD_AI_OPENAI_COMPATIBLE_BASE_URL`
+
+#### Snowflake Cortex
+
+<WarningBox>
+  We recommend using `claude-3-5-sonnet` (or any newer Claude models available)
+  on Snowflake Cortex with the Cube AI API. Other models may work but are not fully tested or supported.
+</WarningBox>
+
+<InfoBox>
+The Snowflake Cortex LLM REST API uses key pair authentication. 
+Please follow the steps in [Snowflake's documentation](https://docs.snowflake.com/en/user-guide/key-pair-auth#configuring-key-pair-authentication) to generate
+a key and assign it to a Snowflake user.
+
+We recommend creating a separate Snowflake user with limited permissions for
+use with the Cube AI API.
+</InfoBox>
+
+- `CUBE_CLOUD_AI_SNOWFLAKE_ACCOUNT`
+- `CUBE_CLOUD_AI_SNOWFLAKE_USERNAME`
+- `CUBE_CLOUD_AI_SNOWFLAKE_PRIVATE_KEY`
 
 #### Together AI
 

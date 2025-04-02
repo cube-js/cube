@@ -1,8 +1,8 @@
 use super::{
     AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     GeoDimensionSqlNode, MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode,
-    RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeShiftSqlNode,
-    UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
+    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
 use std::collections::{HashMap, HashSet};
@@ -21,6 +21,7 @@ pub struct SqlNodesFactory {
     multi_stage_rank: Option<Vec<String>>,   //partition_by
     multi_stage_window: Option<Vec<String>>, //partition_by
     rolling_window: bool,
+    dimensions_with_ignored_timezone: HashSet<String>,
 }
 
 impl SqlNodesFactory {
@@ -37,6 +38,7 @@ impl SqlNodesFactory {
             multi_stage_rank: None,
             multi_stage_window: None,
             rolling_window: false,
+            dimensions_with_ignored_timezone: HashSet::new(),
         }
     }
 
@@ -66,6 +68,10 @@ impl SqlNodesFactory {
 
     pub fn add_render_reference(&mut self, key: String, value: QualifiedColumnName) {
         self.render_references.insert(key, value);
+    }
+
+    pub fn add_dimensions_with_ignored_timezone(&mut self, value: String) {
+        self.dimensions_with_ignored_timezone.insert(value);
     }
 
     pub fn set_multi_stage_rank(&mut self, partition_by: Vec<String>) {
@@ -121,6 +127,7 @@ impl SqlNodesFactory {
 
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
+            self.time_dimension_processor(evaluate_sql_processor.clone()),
             measure_processor.clone(),
             auto_prefix_processor.clone(),
             evaluate_sql_processor.clone(),
@@ -179,6 +186,8 @@ impl SqlNodesFactory {
     }
 
     fn dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        let input: Rc<dyn SqlNode> =
+            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
         let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
         let input: Rc<dyn SqlNode> = CaseDimensionSqlNode::new(input);
 
@@ -190,6 +199,13 @@ impl SqlNodesFactory {
         } else {
             input
         };
+
+        input
+    }
+
+    fn time_dimension_processor(&self, input: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        let input: Rc<dyn SqlNode> =
+            TimeDimensionNode::new(self.dimensions_with_ignored_timezone.clone(), input);
 
         input
     }
