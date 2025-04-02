@@ -544,6 +544,8 @@ pub fn create_logger(log_level: log::Level) -> SimpleLogger {
     SimpleLogger::new()
         .with_level(log::Level::Error.to_level_filter())
         .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("cube_xmla", log_level.to_level_filter())
+        .with_module_level("cube_xmla_engine", log_level.to_level_filter())
         .with_module_level("cubejs_native", log_level.to_level_filter())
         .with_module_level("datafusion", log::Level::Warn.to_level_filter())
         .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
