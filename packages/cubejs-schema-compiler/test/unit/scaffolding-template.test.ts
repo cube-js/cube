@@ -178,8 +178,8 @@ describe('ScaffoldingTemplate', () => {
         ['public', 'customers'],
         'public.accounts',
       ]).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
-      })
+        expect(it.content).toMatchSnapshot(it.fileName);
+      });
     });
 
     it('template with snake case', () => {
@@ -187,13 +187,13 @@ describe('ScaffoldingTemplate', () => {
         snakeCase: true,
       });
 
-        template.generateFilesByTableNames([
-          'public.orders',
-          ['public', 'customers'],
-          'public.accounts',
-        ]).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
-      })
+      template.generateFilesByTableNames([
+        'public.orders',
+        ['public', 'customers'],
+        'public.accounts',
+      ]).forEach((it) => {
+        expect(it.content).toMatchSnapshot(it.fileName);
+      });
     });
 
     it('escaping back tick', () => {
@@ -226,8 +226,8 @@ describe('ScaffoldingTemplate', () => {
       );
 
       template.generateFilesByTableNames(['public.someOrders']).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
-      })
+        expect(it.content).toMatchSnapshot(it.fileName);
+      });
     });
 
     it('big query nested fields', () => {
@@ -255,7 +255,7 @@ describe('ScaffoldingTemplate', () => {
       );
 
       template.generateFilesByTableNames(['public.orders'])
-        .forEach((it) => expect(it.content).toMatchSnapshot(it.fileName))
+        .forEach((it) => expect(it.content).toMatchSnapshot(it.fileName));
     });
 
     it('should add options if passed', () => {
@@ -287,7 +287,7 @@ describe('ScaffoldingTemplate', () => {
       );
 
       template.generateFilesByTableNames(['public.orders'], schemaContext).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
+        expect(it.content).toMatchSnapshot(it.fileName);
       });
     });
 
@@ -302,8 +302,8 @@ describe('ScaffoldingTemplate', () => {
       );
 
       template.generateFilesByTableNames(['public.orders', 'public.customers']).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
-      })
+        expect(it.content).toMatchSnapshot(it.fileName);
+      });
     });
   });
 
@@ -319,7 +319,7 @@ describe('ScaffoldingTemplate', () => {
         ['public', 'customers'],
         'public.accounts',
       ]).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
+        expect(it.content).toMatchSnapshot(it.fileName);
       });
     });
 
@@ -338,8 +338,8 @@ describe('ScaffoldingTemplate', () => {
       );
 
       template.generateFilesByTableNames(['public.accounts']).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
-      })
+        expect(it.content).toMatchSnapshot(it.fileName);
+      });
     });
 
     it('generates schema with a catalog', () => {
@@ -358,8 +358,8 @@ describe('ScaffoldingTemplate', () => {
       );
 
       template.generateFilesByTableNames(['public.accounts']).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
-      })
+        expect(it.content).toMatchSnapshot(it.fileName);
+      });
     });
 
     it('uses dimension refs instead of table columns for join sql', () => {
@@ -373,8 +373,8 @@ describe('ScaffoldingTemplate', () => {
       );
 
       template.generateFilesByTableNames(['public.orders', 'public.customers']).forEach((it) => {
-        expect(it.content).toMatchSnapshot(it.fileName)
-      })
+        expect(it.content).toMatchSnapshot(it.fileName);
+      });
     });
   });
 });
