@@ -55,6 +55,27 @@ impl PlanSqlTemplates {
         )
     }
 
+    //FIXME duplicated with filter templates
+    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/add_interval",
+            context! {
+                date => date,
+                interval => interval
+            },
+        )
+    }
+
+    pub fn sub_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/sub_interval",
+            context! {
+                date => date,
+                interval => interval
+            },
+        )
+    }
+
     pub fn quote_string(&self, string: &str) -> Result<String, CubeError> {
         Ok(format!("'{}'", string))
     }
@@ -158,6 +179,16 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn max(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template("functions/MAX", context! { args_concat => expr })
+    }
+
+    pub fn min(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template("functions/MIN", context! { args_concat => expr })
+    }
+
     pub fn concat_strings(&self, strings: &Vec<String>) -> Result<String, CubeError> {
         self.render.render_template(
             "expressions/concat_strings",
@@ -188,8 +219,8 @@ impl PlanSqlTemplates {
 
     pub fn time_series_select(
         &self,
-        from_date: Option<String>,
-        to_date: Option<String>,
+        from_date: String,
+        to_date: String,
         seria: Vec<Vec<String>>,
     ) -> Result<String, CubeError> {
         self.render.render_template(
@@ -198,6 +229,28 @@ impl PlanSqlTemplates {
                 from_date => from_date,
                 to_date => to_date,
                 seria => seria
+            },
+        )
+    }
+
+    pub fn time_series_get_range(
+        &self,
+        max_expr: &str,
+        min_expr: &str,
+        max_name: &str,
+        min_name: &str,
+        from: &str,
+    ) -> Result<String, CubeError> {
+        let quoted_min_name = self.quote_identifier(min_name)?;
+        let quoted_max_name = self.quote_identifier(max_name)?;
+        self.render.render_template(
+            "expressions/time_series_get_range",
+            context! {
+                max_expr => max_expr,
+                min_expr => min_expr,
+                from_prepared => from,
+                quoted_min_name => quoted_min_name,
+                quoted_max_name => quoted_max_name
             },
         )
     }
@@ -293,6 +346,23 @@ impl PlanSqlTemplates {
     pub fn supports_is_not_distinct_from(&self) -> bool {
         self.render
             .contains_template("operators/is_not_distinct_from")
+    }
+
+    pub fn supports_generated_time_series(&self) -> bool {
+        self.render
+            .contains_template("statements/generated_time_series_select")
+    }
+
+    pub fn generated_time_series_select(
+        &self,
+        start: &str,
+        end: &str,
+        granularity: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/generated_time_series_select",
+            context! { start => start, end => end, granularity => granularity },
+        )
     }
 
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {

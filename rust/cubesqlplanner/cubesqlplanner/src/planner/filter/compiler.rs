@@ -43,7 +43,7 @@ impl<'a> FilterCompiler<'a> {
         if let Some(date_range) = item.get_date_range() {
             let filter = BaseFilter::try_new(
                 self.query_tools.clone(),
-                item.member_evaluator(),
+                item.base_member_evaluator(),
                 FilterType::Dimension,
                 FilterOperator::InDateRange,
                 Some(date_range.into_iter().map(|v| Some(v)).collect()),

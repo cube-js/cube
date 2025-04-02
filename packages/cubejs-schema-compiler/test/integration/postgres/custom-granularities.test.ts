@@ -47,6 +47,9 @@ describe('Custom Granularities', () => {
             - name: two_weeks_by_friday
               interval: 2 weeks
               origin: '2024-08-23'
+            - name: one_week_by_friday_by_offset
+              interval: 1 week
+              offset: 4 days
             - name: one_hour_by_5min_offset
               interval: 1 hour
               offset: 5 minutes
@@ -118,6 +121,43 @@ describe('Custom Granularities', () => {
       {
         orders__count: '1',
         orders__created_at_half_year: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }
+  ));
+
+  it('works with one_week_by_friday_by_offset custom granularity w/o dimensions query', async () => dbRunner.runQueryTest(
+    {
+      measures: ['orders.count'],
+      timeDimensions: [{
+        dimension: 'orders.createdAt',
+        granularity: 'one_week_by_friday_by_offset',
+        dateRange: ['2024-01-01', '2024-03-01']
+      }],
+      dimensions: [],
+      filters: [],
+      timezone: 'Europe/London'
+    },
+    [
+      {
+        orders__count: '1',
+        orders__created_at_one_week_by_friday_by_offset: '2023-12-29T00:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_one_week_by_friday_by_offset: '2024-01-12T00:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_one_week_by_friday_by_offset: '2024-01-26T00:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_one_week_by_friday_by_offset: '2024-02-09T00:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_one_week_by_friday_by_offset: '2024-02-23T00:00:00.000Z',
       },
     ],
     { joinGraph, cubeEvaluator, compiler }

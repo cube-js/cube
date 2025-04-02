@@ -1,14 +1,20 @@
 use super::MemberSymbol;
+use crate::planner::time_dimension::Granularity;
 use std::rc::Rc;
 
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
     full_name: String,
     granularity: Option<String>,
+    granularity_obj: Option<Granularity>,
 }
 
 impl TimeDimensionSymbol {
-    pub fn new(base_symbol: Rc<MemberSymbol>, granularity: Option<String>) -> Self {
+    pub fn new(
+        base_symbol: Rc<MemberSymbol>,
+        granularity: Option<String>,
+        granularity_obj: Option<Granularity>,
+    ) -> Self {
         let name_suffix = if let Some(granularity) = &granularity {
             granularity.clone()
         } else {
@@ -18,6 +24,7 @@ impl TimeDimensionSymbol {
         Self {
             base_symbol,
             granularity,
+            granularity_obj,
             full_name,
         }
     }
@@ -28,6 +35,10 @@ impl TimeDimensionSymbol {
 
     pub fn granularity(&self) -> &Option<String> {
         &self.granularity
+    }
+
+    pub fn granularity_obj(&self) -> &Option<Granularity> {
+        &self.granularity_obj
     }
 
     pub fn full_name(&self) -> String {
