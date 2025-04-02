@@ -250,12 +250,14 @@ export class DataSchemaCompiler {
         };
 
         errorsReport.inFile(file);
-        const res = await transpileJs(reqData);
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
+        const res = await transpileJs([reqData]);
+        errorsReport.addErrors(res[0].errors);
+        errorsReport.addWarnings(res[0].warnings);
         errorsReport.exitFile();
 
-        return { ...file, content: res.code };
+        return { ...file, content: res[0].code };
       } else if (getEnv('transpilationWorkerThreads')) {
         const data = {
           fileName: file.fileName,
