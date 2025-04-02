@@ -34,8 +34,6 @@ jobs:
         run: |
           echo "Before"
           df -h
-          sudo apt list --all-versions cmake
-          sudo find / -name cmake
           sudo apt-get remove -y 'php.*'
           sudo apt-get remove -y '^mongodb-.*'
           sudo apt-get remove -y '^mysql-.*'
@@ -48,6 +46,9 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           echo "After"
           df -h
+          sudo apt list --all-versions cmake
+          sudo find / -name cmake -type f -executable
+          which cmake
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
