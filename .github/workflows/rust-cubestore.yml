@@ -51,6 +51,7 @@ jobs:
           which cmake
           cmake --version
           sudo apt install -y cmake
+          sudo rm -rf /usr/local/bin/cmake
           sudo find / -name cmake -type f -executable
           which cmake
           cmake --version
