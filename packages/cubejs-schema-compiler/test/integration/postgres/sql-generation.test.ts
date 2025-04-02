@@ -666,6 +666,92 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         }
       }
     });
+
+    cube('UngroupedMeasureWithFilter1', {
+      sql: \`
+        SELECT
+          1 AS id,
+          1 AS sum
+      \`,
+      sqlAlias: 'umwf1',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        },
+        sum_filter: {
+          sql: \`sum\`,
+          type: 'sum',
+          filters: [{sql: \`\${UngroupedMeasureWithFilter3.id} = 1\`}]
+        }
+      },
+      joins: {
+        UngroupedMeasureWithFilter2: {
+          sql: \`\${CUBE.id} = \${UngroupedMeasureWithFilter2.id}\`,
+          relationship: \`one_to_many\`
+        },
+        UngroupedMeasureWithFilter3: {
+          sql: \`\${CUBE.id} = \${UngroupedMeasureWithFilter3.id}\`,
+          relationship: \`many_to_one\`
+        }
+      }
+    });
+
+    cube('UngroupedMeasureWithFilter2', {
+      sql: \`
+        SELECT
+          1 AS id
+      \`,
+      sqlAlias: 'umwf2',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        }
+      }
+    });
+
+    cube('UngroupedMeasureWithFilter3', {
+      sql: \`
+        SELECT
+          1 AS id
+      \`,
+      sqlAlias: 'umwf3',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        }
+      }
+    });
+
+    view('UngroupedMeasureWithFilter_View', {
+      cubes: [{
+        join_path: 'UngroupedMeasureWithFilter1',
+        includes: ['sum_filter']
+      }, {
+        join_path: 'UngroupedMeasureWithFilter1.UngroupedMeasureWithFilter2',
+        includes: ['count']
+      }]
+    })
     `);
 
   it('simple join', async () => {
@@ -3610,4 +3696,16 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       [{ visitors__id_case: 0 }]
     );
   });
+
+  it('ungrouped measure with filter', async () => runQueryTest({
+    measures: [
+      'UngroupedMeasureWithFilter_View.sum_filter',
+      'UngroupedMeasureWithFilter_View.count'
+    ],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [{
+    ungrouped_measure_with_filter__view__count: 1,
+    ungrouped_measure_with_filter__view__sum_filter: 1
+  }]));
 });
