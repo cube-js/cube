@@ -28,7 +28,7 @@ jobs:
       matrix:
         rust: [nightly-2024-01-29]
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-15082024
+      image: cubejs/rust-builder:bookworm-llvm-18
     env:
       RUST: ${{ matrix.rust }}
     steps:
