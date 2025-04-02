@@ -64,6 +64,7 @@ impl BestCubePlan {
 
         let joins = match enode {
             LogicalPlanLanguage::Join(_) => 1,
+            LogicalPlanLanguage::CrossJoin(_) => 1,
             _ => 0,
         };
 
