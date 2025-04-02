@@ -252,7 +252,7 @@ impl RemoteFs for LocalDirRemoteFs {
                         e
                     ))
                 })?;
-            fs::rename(&temp_upload_path, local_path.clone())
+            fs::copy(&temp_upload_path, local_path.clone())
                 .await
                 .map_err(|e| {
                     CubeError::internal(format!(
