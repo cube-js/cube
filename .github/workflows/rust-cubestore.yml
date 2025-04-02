@@ -34,6 +34,8 @@ jobs:
         run: |
           echo "Before"
           df -h
+          sudo apt list --all-versions cmake
+          sudo find / -name cmake
           sudo apt-get remove -y 'php.*'
           sudo apt-get remove -y '^mongodb-.*'
           sudo apt-get remove -y '^mysql-.*'
