@@ -51,7 +51,7 @@ jobs:
           which cmake
           cmake --version
           ls -l /usr/local/bin/cmake
-          cat /home/runner/work/_temp/2bf03699-44f8-4058-bfb0-46747884765b.sh
+#          cat /home/runner/work/_temp/2bf03699-44f8-4058-bfb0-46747884765b.sh
           sudo apt install -y cmake
           ls -l /usr/bin/cmake
           sudo rm -rf /usr/local/bin/cmake
