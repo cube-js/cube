@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+### Bug Fixes
+
+- **cubesql:** Penalize CrossJoins in favor of wrapper ([#9414](https://github.com/cube-js/cube/issues/9414)) ([a48963d](https://github.com/cube-js/cube/commit/a48963d03cb16e0dc3d110ae398fe3b05447209d))
+
 ## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
 
 ### Bug Fixes
