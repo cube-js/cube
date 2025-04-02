@@ -53,7 +53,7 @@ impl ReferencesBuilder {
     ) -> Result<(), CubeError> {
         let member_name = member.full_name();
         if references.contains_key(&member_name) {
-            return Ok(())
+            return Ok(());
         }
         if let Some(reference) = self.find_reference_for_member(&member_name, strict_source) {
             references.insert(member_name.clone(), reference);

@@ -28,7 +28,7 @@ impl MultiStageAppliedState {
         dimensions_filters: Vec<FilterItem>,
         measures_filters: Vec<FilterItem>,
         segments: Vec<FilterItem>,
-        ) -> Rc<Self> {
+    ) -> Rc<Self> {
         Rc::new(Self {
             time_dimensions,
             dimensions,

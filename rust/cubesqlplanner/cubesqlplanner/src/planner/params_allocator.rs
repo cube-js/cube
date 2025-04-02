@@ -19,7 +19,7 @@ impl ParamsAllocator {
         ParamsAllocator {
             sql_templates,
             params: Vec::new(),
-            export_annotated_sql
+            export_annotated_sql,
         }
     }
 
