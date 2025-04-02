@@ -692,9 +692,11 @@ export class BaseQuery {
       rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
-      ungrouped: this.options.ungrouped
+      ungrouped: this.options.ungrouped,
+      exportAnnotatedSql: exportAnnotatedSql === true
 
     };
+
     const buildResult = nativeBuildSqlAndParams(queryParams);
 
     if (buildResult.error) {

@@ -57,6 +57,7 @@ impl MultiStageQueryPlanner {
             self.query_properties.time_dimensions_filters().clone(),
             self.query_properties.dimensions_filters().clone(),
             self.query_properties.measures_filters().clone(),
+            self.query_properties.segments().clone()
         );
 
         let top_level_ctes = multi_stage_members
@@ -188,7 +189,7 @@ impl MultiStageQueryPlanner {
         let description = if childs.is_empty() || !has_multi_stage_members {
             if has_multi_stage_members {
                 return Err(CubeError::internal(format!(
-                    "Leaf multi stage query cannot contain multi stage member"
+                    "Leaf multi stage query cannot contain multi stage member 2"
                 )));
             }
 

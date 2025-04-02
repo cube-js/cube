@@ -59,6 +59,8 @@ pub struct BaseQueryOptionsStatic {
     pub row_limit: Option<String>,
     pub offset: Option<String>,
     pub ungrouped: Option<bool>,
+    #[serde(rename = "exportAnnotatedSql")]
+    pub export_annotated_sql: bool,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

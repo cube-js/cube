@@ -16,6 +16,7 @@ pub struct MultiStageAppliedState {
     time_dimensions_filters: Vec<FilterItem>,
     dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
+    segments: Vec<FilterItem>,
     time_shifts: HashMap<String, String>,
 }
 
@@ -26,13 +27,15 @@ impl MultiStageAppliedState {
         time_dimensions_filters: Vec<FilterItem>,
         dimensions_filters: Vec<FilterItem>,
         measures_filters: Vec<FilterItem>,
-    ) -> Rc<Self> {
+        segments: Vec<FilterItem>,
+        ) -> Rc<Self> {
         Rc::new(Self {
             time_dimensions,
             dimensions,
             time_dimensions_filters,
             dimensions_filters,
             measures_filters,
+            segments,
             time_shifts: HashMap::new(),
         })
     }
@@ -44,6 +47,7 @@ impl MultiStageAppliedState {
             time_dimensions_filters: self.time_dimensions_filters.clone(),
             dimensions_filters: self.dimensions_filters.clone(),
             measures_filters: self.measures_filters.clone(),
+            segments: self.segments.clone(),
             time_shifts: self.time_shifts.clone(),
         }
     }
@@ -75,6 +79,10 @@ impl MultiStageAppliedState {
 
     pub fn dimensions_filters(&self) -> &Vec<FilterItem> {
         &self.dimensions_filters
+    }
+
+    pub fn segments(&self) -> &Vec<FilterItem> {
+        &self.segments
     }
 
     pub fn measures_filters(&self) -> &Vec<FilterItem> {
