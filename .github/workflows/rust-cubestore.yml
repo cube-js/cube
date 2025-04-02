@@ -32,19 +32,6 @@ jobs:
     env:
       RUST: ${{ matrix.rust }}
     steps:
-      - name: Maximize build space (disk space limitations)
-        run: |
-          sudo apt list --all-versions cmake
-          which cmake
-          cmake --version
-          ls -l /usr/local/bin/cmake
-          sudo apt install -y cmake
-          ls -l /usr/bin/cmake
-          sudo rm -rf /usr/local/bin/cmake
-          sudo rm -rf /usr/local/share/cmake*
-          which cmake
-          echo $PATH
-          cmake --version
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
