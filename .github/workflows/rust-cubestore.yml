@@ -41,6 +41,7 @@ jobs:
           sudo rm -rf /usr/local/bin/cmake
           sudo rm -rf /usr/local/share/cmake*
           which cmake
+          echo $PATH
           cmake --version
       - name: Checkout
         uses: actions/checkout@v4
