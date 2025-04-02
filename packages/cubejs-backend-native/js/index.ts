@@ -497,11 +497,11 @@ export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[]
   return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
 };
 
-export const transpileJs = async (transpileRequest: TransformConfig): Promise<TransformResponse> => {
+export const transpileJs = async (transpileRequests: TransformConfig[]): Promise<TransformResponse[]> => {
   const native = loadNative();
 
   if (native.transpileJs) {
-    return native.transpileJs(transpileRequest);
+    return native.transpileJs(transpileRequests);
   }
 
   throw new Error('TranspileJs native implementation not found!');
