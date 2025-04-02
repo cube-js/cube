@@ -47,14 +47,13 @@ jobs:
           echo "After"
           df -h
           sudo apt list --all-versions cmake
-          sudo find / -name cmake -type f -executable
           which cmake
           cmake --version
           ls -l /usr/local/bin/cmake
           sudo apt install -y cmake
           ls -l /usr/bin/cmake
           sudo rm -rf /usr/local/bin/cmake
-          sudo find / -name cmake -type f -executable
+          sudo rm -rf /usr/local/share/cmake*
           which cmake
           cmake --version
       - name: Checkout
