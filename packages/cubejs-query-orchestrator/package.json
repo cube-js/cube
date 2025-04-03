@@ -34,7 +34,7 @@
     "@cubejs-backend/shared": "1.2.27",
     "csv-write-stream": "^2.0.0",
     "generic-pool": "^3.8.2",
-    "lru-cache": "^5.1.1",
+    "lru-cache": "^11.1.0",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
