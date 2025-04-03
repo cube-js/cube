@@ -224,6 +224,7 @@ impl RemoteFs for LocalDirRemoteFs {
                         e
                     ))
                 })?;
+            debug!("Copy {temp_upload_path} => {dest}");
             fs::copy(&temp_upload_path, dest.clone())
                 .await
                 .map_err(|e| {
@@ -237,6 +238,7 @@ impl RemoteFs for LocalDirRemoteFs {
         }
         if has_remote {
             let size = fs::metadata(&temp_upload_path).await?.len();
+            debug!("Size from {temp_upload_path} is {size}");
             self.check_upload_file(remote_path.clone(), size).await?;
         }
 
