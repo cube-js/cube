@@ -44,7 +44,6 @@ use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::row::{RowConverter, SortField};
 use datafusion::cube_ext;
-use datafusion::execution::TaskContext;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
 use deepsize::DeepSizeOf;
 use futures::future::join_all;

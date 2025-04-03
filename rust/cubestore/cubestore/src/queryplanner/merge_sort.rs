@@ -1,10 +1,9 @@
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    build_compare, make_comparator, ArrayRef, BooleanArray, DynComparator, RecordBatch,
+    make_comparator, ArrayRef, BooleanArray, DynComparator, RecordBatch,
 };
 use datafusion::arrow::compute::{filter_record_batch, SortOptions};
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::expressions::Column;
@@ -56,7 +55,7 @@ impl LastRowByUniqueKeyExec {
 }
 
 impl DisplayAs for LastRowByUniqueKeyExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "LastRowByUniqueKeyExec")
     }
 }

@@ -12,7 +12,7 @@ use crate::metastore::{
 };
 use crate::metastore::{Column, ColumnType, MetaStore};
 use crate::sql::cache::SqlResultCache;
-use crate::sql::{normalize_for_column_name, normalize_for_source_name, normalize_for_schema_table_or_index_name};
+use crate::sql::{normalize_for_column_name, normalize_for_schema_table_or_index_name};
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef};
 use crate::telemetry::incoming_traffic_agent_event;
 use crate::CubeError;

@@ -21,11 +21,11 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use datafusion::arrow::datatypes::{Field, SchemaRef};
+use datafusion::arrow::datatypes::Field;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+    DisplayAs, DisplayFormatType, ExecutionPlan,
     PlanProperties, SendableRecordBatchStream,
 };
 use flatbuffers::bitflags::_core::any::Any;
@@ -48,7 +48,7 @@ use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTabl
 use crate::queryplanner::rolling::RollingWindowAggregateSerialized;
 use crate::queryplanner::serialized_plan::PreSerializedPlan;
 use crate::queryplanner::serialized_plan::{
-    IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
+    IndexSnapshot, InlineSnapshot, PartitionSnapshot,
 };
 use crate::queryplanner::topk::{plan_topk, DummyTopKLowerExec};
 use crate::queryplanner::topk::{ClusterAggregateTopKUpper, ClusterAggregateTopKLower};
@@ -67,7 +67,6 @@ use datafusion::logical_expr::{
     expr, logical_plan, Aggregate, BinaryExpr, Expr, Extension, FetchType, Filter, InvariantLevel, Join, Limit, LogicalPlan, Operator, Projection, SkipType, Sort, SortExpr, SubqueryAlias, TableScan, Union, Unnest, UserDefinedLogicalNode
 };
 use datafusion::physical_expr::{Distribution, LexRequirement};
-use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_planner::{ExtensionPlanner, PhysicalPlanner};
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
 use serde_derive::Deserialize;
@@ -683,9 +682,6 @@ fn sort_to_column_names(sort_exprs: &Vec<SortExpr>, input: &LogicalPlan) -> (Vec
                         return (Vec::new(), true);
                     }
                 }
-            }
-            _ => {
-                return (Vec::new(), true);
             }
         }
     }
@@ -1906,7 +1902,7 @@ pub mod tests {
 
     use async_trait::async_trait;
     use datafusion::arrow::datatypes::{DataType, Field, Schema as ArrowSchema};
-    use datafusion::datasource::{DefaultTableSource, TableProvider};
+    use datafusion::datasource::DefaultTableSource;
     use datafusion::sql::parser::Statement as DFStatement;
     use datafusion::sql::planner::{ContextProvider, SqlToRel};
     use itertools::Itertools;
