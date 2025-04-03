@@ -307,12 +307,17 @@ export class BaseQuery {
   }
 
   prebuildJoin() {
-    /* if (!this.useNativeSqlPlanner) { We still need this join for the follback to preaggregation to work properly. This condition should be returned after the tesseract starts working with pre-aggregations
+    if (this.useNativeSqlPlanner) {
       // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
+      // But we need this join for a fallback when using pre-aggregations. So we’ll try to obtain the join but ignore any errors (which may occur if the query is a multi-fact one).
+      try {
+        this.join = this.joinGraph.buildJoin(this.allJoinHints);
+      } catch (e) {
+        // Ignore
+      }
+    } else {
       this.join = this.joinGraph.buildJoin(this.allJoinHints);
-    } */
-
-    this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    }
   }
 
   cacheValue(key, fn, { contextPropNames, inputProps, cache } = {}) {
@@ -391,7 +396,7 @@ export class BaseQuery {
   initUngrouped() {
     this.ungrouped = this.options.ungrouped;
     if (this.ungrouped) {
-      if (!this.options.allowUngroupedWithoutPrimaryKey) {
+      if (!this.options.allowUngroupedWithoutPrimaryKey && this.join) {
         const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
         const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
         const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
