@@ -3,6 +3,7 @@ import { CubeMembers, SchemaContext } from '../ScaffoldingTemplate';
 import {
   CubeDescriptor,
   DatabaseSchema,
+  Dimension,
   MemberType,
   ScaffoldingSchema,
   TableName,
@@ -103,7 +104,7 @@ export abstract class BaseSchemaFormatter {
       : undefined;
   }
 
-  protected memberName(member) {
+  protected memberName(member: { title: string }) {
     const title = member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase();
 
     if (this.options.snakeCase) {
@@ -156,12 +157,12 @@ export abstract class BaseSchemaFormatter {
     const joins = tableSchema.joins
       .map((j) => {
         const thisTableColumnRef = j.thisTableColumnIncludedAsDimension
-          ? this.cubeReference(`CUBE.${j.thisTableColumn}`)
+          ? this.cubeReference(`CUBE.${this.memberName({ title: j.thisTableColumn })}`)
           : `${this.cubeReference('CUBE')}.${this.escapeName(
             j.thisTableColumn
           )}`;
         const columnToJoinRef = j.columnToJoinIncludedAsDimension
-          ? this.cubeReference(`${j.cubeToJoin}.${j.columnToJoin}`)
+          ? this.cubeReference(`${j.cubeToJoin}.${this.memberName({ title: j.columnToJoin })}`)
           : `${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`;
 
         return ({

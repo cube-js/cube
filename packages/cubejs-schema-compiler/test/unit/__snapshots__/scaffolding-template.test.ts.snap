@@ -426,7 +426,7 @@ exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of
     },
     
     customerkey: {
-      sql: \`customerkey\`,
+      sql: \`\${CUBE}.\\"customerKey\\"\`,
       type: \`string\`
     }
   },
@@ -674,7 +674,7 @@ exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table
         primary_key: true
 
       - name: customerkey
-        sql: customerkey
+        sql: \\"{CUBE}.\\\\\\"customerKey\\\\\\"\\"
         type: string
 
     measures:

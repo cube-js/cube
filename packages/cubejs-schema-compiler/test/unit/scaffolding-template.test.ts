@@ -110,7 +110,7 @@ const schemasWithPrimaryAndForeignKeys = {
         attributes: []
       },
       {
-        name: 'customerkey',
+        name: 'customerKey',
         type: 'string',
         attributes: [],
         foreign_keys: [
