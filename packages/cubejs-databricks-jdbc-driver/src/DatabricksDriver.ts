@@ -657,14 +657,11 @@ export class DatabricksDriver extends JDBCDriver {
         this.config.bucketType
       }`);
     }
-    // Construct a fully qualified table name with proper quoting
-    // 1. Quotes are needed to handle special characters in identifiers, e.g. `my-table`
-    // 2. Table name may include schema (e.g. 'schema.table'), so we split and quote each part, e.g. `schema`.`table`
     const tableFullName = `${
       this.config.catalog
-        ? `${this.quoteIdentifier(this.config.catalog)}.`
+        ? `${this.config.catalog}.`
         : ''
-    }${tableName.split('.').map(part => this.quoteIdentifier(part)).join('.')}`;
+    }${tableName}`;
     const types = options.query
       ? await this.unloadWithSql(
         tableFullName,
