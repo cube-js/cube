@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import { pipeline } from 'stream';
 import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
@@ -909,7 +909,7 @@ export class QueryCache {
             inMemoryValue.renewalKey !== renewalKey
           ) || renewedAgo > expiration * 1000 || renewedAgo > inMemoryCacheDisablePeriod
         ) {
-          this.memoryCache.del(redisKey);
+          this.memoryCache.delete(redisKey);
         } else {
           this.logger('Found in memory cache entry', {
             cacheKey,
