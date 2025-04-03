@@ -235,7 +235,10 @@ impl RemoteFs for LocalDirRemoteFs {
                         e
                     ))
                 })?;
-            debug!("Copied {copy_res} bytes from {temp_upload_path} to {}", dest.display());
+            debug!(
+                "Copied {copy_res} bytes from {temp_upload_path} to {}",
+                dest.display()
+            );
         }
         if has_remote {
             let size = fs::metadata(&temp_upload_path).await?.len();
