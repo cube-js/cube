@@ -224,7 +224,7 @@ impl RemoteFs for LocalDirRemoteFs {
                         e
                     ))
                 })?;
-            debug!("Copy {temp_upload_path} => {dest}");
+            debug!("Copy {temp_upload_path} => {}", dest.display());
             fs::copy(&temp_upload_path, dest.clone())
                 .await
                 .map_err(|e| {
