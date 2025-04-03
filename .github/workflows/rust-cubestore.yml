@@ -36,6 +36,7 @@ jobs:
         run: |
           mount
           df -h
+          echo $TMPDIR
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
@@ -59,14 +60,21 @@ jobs:
           cargo fmt --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
       - name: Run cargo build
         run: |
-          cargo build --manifest-path rust/cubestore/Cargo.toml -j 4
+          cargo build --manifest-path rust/cubestore/Cargo.toml
+      - name: Debug logs
+        run: |
+          mount
+          df -h
+      - name: Run cargo test --no-run
+        run: |
+          cargo test --manifest-path rust/cubestore/Cargo.toml --no-run
       - name: Debug logs
         run: |
           mount
           df -h
       - name: Run cargo test
         run: |
-          cargo test --manifest-path rust/cubestore/Cargo.toml -j 1
+          cargo test --manifest-path rust/cubestore/Cargo.toml
 
   docker-image-latest:
     name: Build only :latest image
