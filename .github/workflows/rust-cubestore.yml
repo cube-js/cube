@@ -32,6 +32,9 @@ jobs:
     env:
       RUST: ${{ matrix.rust }}
     steps:
+      - name: Prepare directories
+        # See TMPDIR comment below
+        run: mkdir /__w/tmp
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
@@ -57,6 +60,11 @@ jobs:
         run: |
           cargo build --manifest-path rust/cubestore/Cargo.toml
       - name: Run cargo test
+        env:
+          # LocalDirRemoteFs expect that std::env::temp_dir and its local dir is on same FS, to use `rename`
+          # On Unix it's controlled by TMPDIR
+          # When using `container` in GHA checkout will be located in `/__w`, and that's a separate mount from `/tmp`
+          TMPDIR: /__w/tmp
         run: |
           cargo test --manifest-path rust/cubestore/Cargo.toml
 
