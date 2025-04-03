@@ -32,6 +32,8 @@ jobs:
     env:
       RUST: ${{ matrix.rust }}
     steps:
+      - name: Debug logs
+        run: mount
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
