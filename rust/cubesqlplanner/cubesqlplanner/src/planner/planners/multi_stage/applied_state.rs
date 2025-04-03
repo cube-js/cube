@@ -67,8 +67,7 @@ impl MultiStageAppliedState {
             if let Some(exists) = self.time_shifts.get_mut(&ts.dimension.full_name()) {
                 exists.interval += ts.interval;
             } else {
-                self.time_shifts
-                    .insert(ts.dimension.full_name(), ts);
+                self.time_shifts.insert(ts.dimension.full_name(), ts);
             }
         }
     }
