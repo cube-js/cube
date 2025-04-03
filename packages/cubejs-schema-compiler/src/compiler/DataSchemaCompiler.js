@@ -30,7 +30,8 @@ const getThreadsCount = () => {
 
   const cpuCount = os.cpus()?.length;
   if (cpuCount) {
-    return Math.max(1, cpuCount - 1);
+    // there's no practical boost above 5 threads even if you have more cores.
+    return Math.min(Math.max(1, cpuCount - 1), 5);
   }
 
   return 3; // Default (like the workerpool do)
