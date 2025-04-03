@@ -227,7 +227,7 @@ export class BaseQuery {
       dimensions: this.options.dimensions,
       timeDimensions: this.options.timeDimensions,
       filters: this.options.filters,
-      egments: this.options.segments,
+      segments: this.options.segments,
       order: this.options.order,
       contextSymbols: this.options.contextSymbols,
       timezone: this.options.timezone,
