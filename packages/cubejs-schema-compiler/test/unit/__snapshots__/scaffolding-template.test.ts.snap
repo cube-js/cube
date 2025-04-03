@@ -1,0 +1,693 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ScaffoldingTemplate JavaScript formatter big query nested fields: orders.js 1`] = `
+"cube(\`orders\`, {
+  sql_table: \`public.orders\`,
+  
+  joins: {
+    
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primary_key: true
+    },
+    
+    some_dimension_inside: {
+      sql: \`\${CUBE}.some.dimension.inside\`,
+      type: \`string\`,
+      title: \`Some.dimension.inside\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter escaping back tick: some_orders.js 1`] = `
+"cube(\`some_orders\`, {
+  sql_table: \`public.\\\\\`someOrders\\\\\`\`,
+  
+  joins: {
+    
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primary_key: true
+    },
+    
+    somedimension: {
+      sql: \`\${CUBE}.\\\\\`someDimension\\\\\`\`,
+      type: \`string\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    amount: {
+      sql: \`amount\`,
+      type: \`sum\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter should add options if passed: orders.js 1`] = `
+"cube(\`orders\`, {
+  sql_table: \`public.orders\`,
+  
+  data_source: \`testDataSource\`,
+  
+  joins: {
+    
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primary_key: true
+    },
+    
+    some_dimension_inside: {
+      sql: \`\${CUBE}.some.dimension.inside\`,
+      type: \`string\`,
+      title: \`Some.dimension.inside\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter template with snake case: accounts.js 1`] = `
+"cube(\`accounts\`, {
+  sql_table: \`public.accounts\`,
+  
+  joins: {
+    
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primary_key: true
+    },
+    
+    username: {
+      sql: \`username\`,
+      type: \`string\`
+    },
+    
+    password: {
+      sql: \`password\`,
+      type: \`string\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    failure_count: {
+      sql: \`failure_count\`,
+      type: \`sum\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter template with snake case: customers.js 1`] = `
+"cube(\`customers\`, {
+  sql_table: \`public.customers\`,
+  
+  joins: {
+    accounts: {
+      sql: \`\${CUBE}.account_id = \${accounts.id}\`,
+      relationship: \`many_to_one\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primary_key: true
+    },
+    
+    name: {
+      sql: \`name\`,
+      type: \`string\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    visit_count: {
+      sql: \`visit_count\`,
+      type: \`sum\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter template with snake case: orders.js 1`] = `
+"cube(\`orders\`, {
+  sql_table: \`public.orders\`,
+  
+  joins: {
+    customers: {
+      sql: \`\${CUBE}.\\"customerId\\" = \${customers.id}\`,
+      relationship: \`many_to_one\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primary_key: true
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    amount: {
+      sql: \`amount\`,
+      type: \`sum\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter template: Accounts.js 1`] = `
+"cube(\`Accounts\`, {
+  sql: \`SELECT * FROM public.accounts\`,
+  
+  joins: {
+    
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    username: {
+      sql: \`username\`,
+      type: \`string\`
+    },
+    
+    password: {
+      sql: \`password\`,
+      type: \`string\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    failureCount: {
+      sql: \`failure_count\`,
+      type: \`sum\`
+    }
+  },
+  
+  preAggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter template: Customers.js 1`] = `
+"cube(\`Customers\`, {
+  sql: \`SELECT * FROM public.customers\`,
+  
+  joins: {
+    Accounts: {
+      sql: \`\${CUBE}.account_id = \${Accounts.id}\`,
+      relationship: \`belongsTo\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    name: {
+      sql: \`name\`,
+      type: \`string\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    visitCount: {
+      sql: \`visit_count\`,
+      type: \`sum\`
+    }
+  },
+  
+  preAggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter template: Orders.js 1`] = `
+"cube(\`Orders\`, {
+  sql: \`SELECT * FROM public.orders\`,
+  
+  joins: {
+    Customers: {
+      sql: \`\${CUBE}.\\"customerId\\" = \${Customers.id}\`,
+      relationship: \`belongsTo\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    amount: {
+      sql: \`amount\`,
+      type: \`sum\`
+    }
+  },
+  
+  preAggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of table columns for join sql: customers.js 1`] = `
+"cube(\`customers\`, {
+  sql_table: \`public.customers\`,
+  
+  joins: {
+    
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`string\`,
+      primary_key: true
+    },
+    
+    name: {
+      sql: \`name\`,
+      type: \`string\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate JavaScript formatter uses dimension refs instead of table columns for join sql: orders.js 1`] = `
+"cube(\`orders\`, {
+  sql_table: \`public.orders\`,
+  
+  joins: {
+    customers: {
+      sql: \`\${CUBE.customerkey} = \${customers.id}\`,
+      relationship: \`many_to_one\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primary_key: true
+    },
+    
+    test: {
+      sql: \`test\`,
+      type: \`number\`,
+      primary_key: true
+    },
+    
+    customerkey: {
+      sql: \`\${CUBE}.\\"customerKey\\"\`,
+      type: \`string\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    amount: {
+      sql: \`amount\`,
+      type: \`sum\`
+    }
+  },
+  
+  pre_aggregations: {
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  }
+});
+"
+`;
+
+exports[`ScaffoldingTemplate Yaml formatter generates schema for MySQL driver: accounts.yml 1`] = `
+"cubes:
+  - name: accounts
+    sql_table: public.accounts
+
+    joins: []
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: username
+        sql: username
+        type: string
+
+      - name: password
+        sql: password
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: failure_count
+        sql: failure_count
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+"
+`;
+
+exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: accounts.yml 1`] = `
+"cubes:
+  - name: accounts
+    sql_table: public.accounts
+
+    joins: []
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: username
+        sql: username
+        type: string
+
+      - name: password
+        sql: password
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: failure_count
+        sql: failure_count
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+"
+`;
+
+exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: customers.yml 1`] = `
+"cubes:
+  - name: customers
+    sql_table: public.customers
+
+    joins:
+      - name: accounts
+        sql: \\"{CUBE}.account_id = {accounts.id}\\"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: visit_count
+        sql: visit_count
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+"
+`;
+
+exports[`ScaffoldingTemplate Yaml formatter generates schema for base driver: orders.yml 1`] = `
+"cubes:
+  - name: orders
+    sql_table: public.orders
+
+    joins:
+      - name: customers
+        sql: \\"{CUBE}.\\\\\\"customerId\\\\\\" = {customers.id}\\"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+
+      - name: amount
+        sql: amount
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+"
+`;
+
+exports[`ScaffoldingTemplate Yaml formatter generates schema with a catalog: accounts.yml 1`] = `
+"cubes:
+  - name: accounts
+    sql_table: hello_catalog.public.accounts
+
+    joins: []
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: username
+        sql: username
+        type: string
+
+      - name: password
+        sql: password
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: failure_count
+        sql: failure_count
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+"
+`;
+
+exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table columns for join sql: customers.yml 1`] = `
+"cubes:
+  - name: customers
+    sql_table: public.customers
+
+    joins: []
+
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+"
+`;
+
+exports[`ScaffoldingTemplate Yaml formatter uses dimension refs instead of table columns for join sql: orders.yml 1`] = `
+"cubes:
+  - name: orders
+    sql_table: public.orders
+
+    joins:
+      - name: customers
+        sql: \\"{CUBE.customerkey} = {customers.id}\\"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: test
+        sql: test
+        type: number
+        primary_key: true
+
+      - name: customerkey
+        sql: \\"{CUBE}.\\\\\\"customerKey\\\\\\"\\"
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: amount
+        sql: amount
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+"
+`;
