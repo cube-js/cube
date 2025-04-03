@@ -3,18 +3,17 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
 };
-use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cmp::{PartialEq, Eq};
-
 
 #[derive(Clone)]
 pub struct MeasureOrderBy {
@@ -51,9 +50,7 @@ impl PartialEq for MeasureTimeShift {
     }
 }
 
-impl Eq for MeasureTimeShift {
-
-}
+impl Eq for MeasureTimeShift {}
 
 #[derive(Clone)]
 pub struct MeasureSymbol {
@@ -383,34 +380,42 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let time_shifts = if let Some(time_shift_references) = &definition.static_data().time_shift_references {
-            let mut shifts: HashMap<String, MeasureTimeShift> = HashMap::new();
-            for shift_ref in time_shift_references.iter() {
-                let interval = shift_ref.interval.parse::<SqlInterval>()?;
-                let interval = if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
-                    -interval 
-                } else {
-                    interval
-                };
-                let dimension = compiler.add_dimension_evaluator(shift_ref.time_dimension.clone())?;
-                let dimension = find_owned_by_cube_child(&dimension)?;
-                let dimension_name = dimension.full_name();
-                if let Some(exists) = shifts.get(&dimension_name) {
-                    if exists.interval != interval {
-                        return Err(CubeError::user(format!("Different time shifts for one dimension {} not allowed", dimension_name)))
-                    }
-                } else {
-                    shifts.insert(dimension_name, MeasureTimeShift {
-                        interval: interval.clone(),
-                        dimension: dimension.clone()
-                    });
-
-                };
-            }
-            shifts.into_values().collect_vec()
-        } else {
-            vec![]
-        };
+        let time_shifts =
+            if let Some(time_shift_references) = &definition.static_data().time_shift_references {
+                let mut shifts: HashMap<String, MeasureTimeShift> = HashMap::new();
+                for shift_ref in time_shift_references.iter() {
+                    let interval = shift_ref.interval.parse::<SqlInterval>()?;
+                    let interval =
+                        if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
+                            -interval
+                        } else {
+                            interval
+                        };
+                    let dimension =
+                        compiler.add_dimension_evaluator(shift_ref.time_dimension.clone())?;
+                    let dimension = find_owned_by_cube_child(&dimension)?;
+                    let dimension_name = dimension.full_name();
+                    if let Some(exists) = shifts.get(&dimension_name) {
+                        if exists.interval != interval {
+                            return Err(CubeError::user(format!(
+                                "Different time shifts for one dimension {} not allowed",
+                                dimension_name
+                            )));
+                        }
+                    } else {
+                        shifts.insert(
+                            dimension_name,
+                            MeasureTimeShift {
+                                interval: interval.clone(),
+                                dimension: dimension.clone(),
+                            },
+                        );
+                    };
+                }
+                shifts.into_values().collect_vec()
+            } else {
+                vec![]
+            };
 
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_name,

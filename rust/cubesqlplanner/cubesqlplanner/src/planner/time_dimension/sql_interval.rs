@@ -1,7 +1,7 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::ops::{Add, AddAssign, Neg, Sub};
 use std::str::FromStr;
-use std::ops::{Add, Sub, Neg, AddAssign};
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub struct SqlInterval {
@@ -152,7 +152,7 @@ impl Neg for SqlInterval {
             -self.second,
         )
     }
-}   
+}
 
 impl Default for SqlInterval {
     fn default() -> Self {
@@ -210,8 +210,17 @@ mod tests {
     }
     #[test]
     fn test_arithmetic() {
-        assert_eq!(SqlInterval::new(1, 3, 4, 2, 4, 2, 1) + SqlInterval::new(1, 3, 4, 2, 4, 2, 1), SqlInterval::new(2, 6, 8, 4, 8, 4, 2));
-        assert_eq!(SqlInterval::new(1, 3, 4, 2, 4, 2, 1) - SqlInterval::new(1, 4, 4, 2, 2, 2, 1), SqlInterval::new(0, -1, 0, 0, 2, 0, 0));
-        assert_eq!(-SqlInterval::new(1, 3, -4, 2, 4, 2, 1), SqlInterval::new(-1, -3, 4, -2, -4, -2, -1));
+        assert_eq!(
+            SqlInterval::new(1, 3, 4, 2, 4, 2, 1) + SqlInterval::new(1, 3, 4, 2, 4, 2, 1),
+            SqlInterval::new(2, 6, 8, 4, 8, 4, 2)
+        );
+        assert_eq!(
+            SqlInterval::new(1, 3, 4, 2, 4, 2, 1) - SqlInterval::new(1, 4, 4, 2, 2, 2, 1),
+            SqlInterval::new(0, -1, 0, 0, 2, 0, 0)
+        );
+        assert_eq!(
+            -SqlInterval::new(1, 3, -4, 2, 4, 2, 1),
+            SqlInterval::new(-1, -3, 4, -2, -4, -2, -1)
+        );
     }
 }

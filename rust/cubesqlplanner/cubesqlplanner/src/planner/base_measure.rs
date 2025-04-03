@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{MemberExpressionSymbol, MemberSymbol, SqlCall, MeasureTimeShift};
+use super::sql_evaluator::{MeasureTimeShift, MemberExpressionSymbol, MemberSymbol, SqlCall};
 use super::{evaluate_with_context, BaseMember, BaseMemberHelper, VisitorContext};
 use crate::cube_bridge::measure_definition::{
     MeasureDefinition, RollingWindow, TimeShiftReference,
@@ -8,7 +8,6 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
-
 
 pub struct BaseMeasure {
     measure: String,
@@ -219,9 +218,7 @@ impl BaseMeasure {
 
     pub fn time_shifts(&self) -> Vec<MeasureTimeShift> {
         match self.member_evaluator.as_ref() {
-            MemberSymbol::Measure(measure_symbol) => {
-                measure_symbol.time_shifts().clone()
-            },
+            MemberSymbol::Measure(measure_symbol) => measure_symbol.time_shifts().clone(),
             _ => vec![],
         }
     }
