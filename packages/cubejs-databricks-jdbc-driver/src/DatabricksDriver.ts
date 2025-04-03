@@ -749,8 +749,11 @@ export class DatabricksDriver extends JDBCDriver {
       return this.extractFilesFromGCS(
         { credentials: this.config.gcsCredentials },
         url.host,
-        objectSearchPrefix,
-      );
+        objectSearchPrefix+".csv",
+      ).then(files => files.filter(file => 
+        decodeURIComponent(new URL(file).pathname).endsWith('.csv') || 
+        decodeURIComponent(new URL(file).pathname).endsWith('.csv.gz')
+      ));
     } else {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
