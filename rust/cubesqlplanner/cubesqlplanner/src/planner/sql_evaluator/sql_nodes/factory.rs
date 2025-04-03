@@ -5,12 +5,13 @@ use super::{
     TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
+use crate::planner::sql_evaluator::MeasureTimeShift;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct SqlNodesFactory {
-    time_shifts: HashMap<String, String>,
+    time_shifts: HashMap<String, MeasureTimeShift>,
     ungrouped: bool,
     ungrouped_measure: bool,
     count_approx_as_state: bool,
@@ -42,7 +43,7 @@ impl SqlNodesFactory {
         }
     }
 
-    pub fn set_time_shifts(&mut self, time_shifts: HashMap<String, String>) {
+    pub fn set_time_shifts(&mut self, time_shifts: HashMap<String, MeasureTimeShift>) {
         self.time_shifts = time_shifts;
     }
 
