@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import vm from 'vm';
 import fs from 'fs';
 import os from 'os';
@@ -63,6 +64,7 @@ export class DataSchemaCompiler {
     this.pythonContext = null;
     this.workerPool = null;
     this.compilerId = options.compilerId;
+    this.compiledScriptCache = options.compiledScriptCache;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -452,6 +454,18 @@ export class DataSchemaCompiler {
     }
   }
 
+  getJsScript(file) {
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+
+    if (this.compiledScriptCache.has(cacheKey)) {
+      return this.compiledScriptCache.get(cacheKey);
+    }
+
+    const script = new vm.Script(file.content, { filename: file.fileName, timeout: 15000 });
+    this.compiledScriptCache.set(cacheKey, script);
+    return script;
+  }
+
   compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck } = { doSyntaxCheck: false }) {
     if (doSyntaxCheck) {
       // There is no need to run syntax check for data model files
@@ -464,7 +478,9 @@ export class DataSchemaCompiler {
     }
 
     try {
-      vm.runInNewContext(file.content, {
+      const script = this.getJsScript(file);
+
+      script.runInNewContext({
         view: (name, cube) => (
           !cube ?
             this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :

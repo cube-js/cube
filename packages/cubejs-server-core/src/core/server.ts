@@ -714,6 +714,9 @@ export class CubejsServerCore {
         standalone: this.standalone,
         allowNodeRequire: options.allowNodeRequire,
         fastReload: options.fastReload || getEnv('fastReload'),
+        compilerCacheSize: this.options.compilerCacheSize || 250,
+        maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
+        updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive
       },
     );
   }

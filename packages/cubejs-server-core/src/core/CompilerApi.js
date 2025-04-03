@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import R from 'ramda';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
-import { v4 as uuidv4, parse as uuidParse, stringify as uuidStringify } from 'uuid';
+import { v4 as uuidv4, parse as uuidParse } from 'uuid';
+import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
 
 export class CompilerApi {
@@ -29,6 +30,11 @@ export class CompilerApi {
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
     this.nativeInstance = this.createNativeInstance();
+    this.compiledScriptCache = new LRUCache({
+      max: options.compilerCacheSize || 250,
+      ttl: options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+    });
   }
 
   setGraphQLSchema(schema) {
@@ -83,6 +89,7 @@ export class CompilerApi {
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
         standalone: this.standalone,
         nativeInstance: this.nativeInstance,
+        compiledScriptCache: this.compiledScriptCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
