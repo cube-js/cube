@@ -1192,6 +1192,34 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("databrickAcceptPolicy")', () => {
+    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'true';
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(true);
+
+    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'false';
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toEqual(false);
+
+    process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'wrong';
+    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toThrow(
+      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
+    );
+    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toThrow(
+      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
+    );
+    expect(() => getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toThrow(
+      'env-var: "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY" should be either "true", "false", "TRUE", or "FALSE"'
+    );
+
+    delete process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY;
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('databrickAcceptPolicy', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("athenaAwsKey")', () => {
     process.env.CUBEJS_AWS_KEY = 'default1';
     process.env.CUBEJS_DS_POSTGRES_AWS_KEY = 'postgres1';
