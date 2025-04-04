@@ -324,8 +324,6 @@ export class DataSchemaCompiler {
         };
 
         errorsReport.inFile(file);
-        errorsReport.addErrors(res.errors);
-        errorsReport.addWarnings(res.warnings);
         const res = await transpileJs([reqData]);
         errorsReport.addErrors(res[0].errors);
         errorsReport.addWarnings(res[0].warnings);
