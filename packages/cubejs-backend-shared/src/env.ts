@@ -233,6 +233,9 @@ const variables: Record<string, (...args: any) => any> = {
   transpilationNative: () => get('CUBEJS_TRANSPILATION_NATIVE')
     .default('false')
     .asBoolStrict(),
+  caseInsensitiveDuplicatesCheck: () => get('CUBEJS_CASE_INSENSITIVE_DUPLICATES_CHECK')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -1987,7 +1990,13 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  fastReload: () => get('CUBEJS_FAST_RELOAD_ENABLED')
+    .default('false')
+    .asBoolStrict(),
+
+  // ***************************************************
   // Deprecated section
+  // ***************************************************
 
   // Support for Redis as queue & cache driver was removed in 0.36
   // This code is used to detect Redis and throw an error
@@ -2011,9 +2020,6 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  fastReload: () => get('CUBEJS_FAST_RELOAD_ENABLED')
-    .default('false')
-    .asBoolStrict(),
 };
 
 type Vars = typeof variables;
