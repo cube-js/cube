@@ -237,6 +237,7 @@ deployment.
   - `anthropic`
   - `azure`
   - `cohere`
+  - `databricks`
   - `deepseek`
   - `fireworks`
   - `google-generative-ai`
@@ -280,6 +281,16 @@ See below for required variables by provider (required unless noted):
 
 - `CUBE_CLOUD_AI_COHERE_API_KEY`
 - `CUBE_CLOUD_AI_COHERE_BASE_URL` - uses a different URL prefix for API calls, such as if you are using behind a proxy (optional)
+
+#### Databricks
+
+<InfoBox>
+  The AI API uses [Databricks Foundation Model APIs](https://docs.databricks.com/aws/en/large-language-models/llm-serving-intro). 
+  Currently only `databricks-claude-3-7-sonnet` is supported, although other models may also work.
+</InfoBox>
+
+- `CUBE_CLOUD_AI_DATABRICKS_HOST` - for example, `your-instance-id.cloud.databricks.com` (do not include `https://`)
+- `CUBE_CLOUD_AI_DATABRICKS_TOKEN` - your personal access token
 
 #### DeepSeek
 
