@@ -1,11 +1,16 @@
 import 'source-map-support/register';
 
 import { displayCLIError } from '@cubejs-backend/shared';
-import { resolveJDBCDriver } from './helpers';
+
+import fs from 'fs';
+import path from 'path';
+import { downloadJDBCDriver } from './installer';
 
 (async () => {
   try {
-    await resolveJDBCDriver();
+    if (!fs.existsSync(path.join(__dirname, '..', 'download', 'SparkJDBC42.jar'))) {
+      await downloadJDBCDriver();
+    }
   } catch (e: any) {
     await displayCLIError(e, 'Cube.js Databricks JDBC Installer');
   }

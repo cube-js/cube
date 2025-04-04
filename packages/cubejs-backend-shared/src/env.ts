@@ -952,15 +952,9 @@ const variables: Record<string, (...args: any) => any> = {
    * Accept Databricks policy flag. This environment variable doesn't
    * need to be split by the data source.
    */
-  databrickAcceptPolicy: () => {
-    const val = get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict();
-
-    if (val !== undefined) {
-      console.warn(
-        'The CUBEJS_DB_DATABRICKS_ACCEPT_POLICY is not needed anymore. Please, remove it'
-      );
-    }
-  },
+  databrickAcceptPolicy: () => (
+    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
+  ),
 
   /**
    * Databricks jdbc-connection url.
