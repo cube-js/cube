@@ -4,7 +4,7 @@ import { getEnv, } from '@cubejs-backend/shared';
 
 import { BaseDriver, InlineTable, } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryWithParams } from './QueryCache';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
@@ -282,8 +282,8 @@ export class PreAggregations {
     this.getQueueEventsBus = options.getQueueEventsBus;
     this.touchCache = new LRUCache({
       max: getEnv('touchPreAggregationCacheMaxCount'),
-      maxAge: getEnv('touchPreAggregationCacheMaxAge') * 1000,
-      stale: false,
+      ttl: getEnv('touchPreAggregationCacheMaxAge') * 1000,
+      allowStale: false,
       updateAgeOnGet: false
     });
   }
@@ -330,7 +330,7 @@ export class PreAggregations {
         this.touchTablePersistTime
       );
     } catch (e: unknown) {
-      this.touchCache.del(tableName);
+      this.touchCache.delete(tableName);
 
       throw e;
     }

@@ -1,4 +1,4 @@
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import { QueryCache } from '../adapter/QueryCache';
 
 export class CompilerCache extends QueryCache {
@@ -11,13 +11,13 @@ export class CompilerCache extends QueryCache {
 
     this.queryCache = new LRUCache({
       max: maxQueryCacheSize || 10000,
-      maxAge: (maxQueryCacheAge * 1000) || 1000 * 60 * 10,
+      ttl: (maxQueryCacheAge * 1000) || 1000 * 60 * 10,
       updateAgeOnGet: true
     });
 
     this.rbacCache = new LRUCache({
       max: 10000,
-      maxAge: 1000 * 60 * 5, // 5 minutes
+      ttl: 1000 * 60 * 5, // 5 minutes
     });
   }
 
