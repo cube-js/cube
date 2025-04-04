@@ -79,7 +79,13 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "verbose": true,
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "html",
+      "cobertura"
+    ],
+    "coverageDirectory": "coverage/",
     "roots": [
       "<rootDir>/dist/test/"
     ],
