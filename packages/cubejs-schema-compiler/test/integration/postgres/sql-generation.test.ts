@@ -1,5 +1,6 @@
 import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
+import type { BaseQuery } from '../../../src';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
@@ -666,6 +667,92 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         }
       }
     });
+
+    cube('UngroupedMeasureWithFilter1', {
+      sql: \`
+        SELECT
+          1 AS id,
+          1 AS sum
+      \`,
+      sqlAlias: 'umwf1',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        },
+        sum_filter: {
+          sql: \`sum\`,
+          type: 'sum',
+          filters: [{sql: \`\${UngroupedMeasureWithFilter3.id} = 1\`}]
+        }
+      },
+      joins: {
+        UngroupedMeasureWithFilter2: {
+          sql: \`\${CUBE.id} = \${UngroupedMeasureWithFilter2.id}\`,
+          relationship: \`one_to_many\`
+        },
+        UngroupedMeasureWithFilter3: {
+          sql: \`\${CUBE.id} = \${UngroupedMeasureWithFilter3.id}\`,
+          relationship: \`many_to_one\`
+        }
+      }
+    });
+
+    cube('UngroupedMeasureWithFilter2', {
+      sql: \`
+        SELECT
+          1 AS id
+      \`,
+      sqlAlias: 'umwf2',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        }
+      }
+    });
+
+    cube('UngroupedMeasureWithFilter3', {
+      sql: \`
+        SELECT
+          1 AS id
+      \`,
+      sqlAlias: 'umwf3',
+      dimensions: {
+        id: {
+          sql: \`id\`,
+          type: 'number',
+          primaryKey: true
+        }
+      },
+      measures: {
+        count: {
+          type: 'count',
+        }
+      }
+    });
+
+    view('UngroupedMeasureWithFilter_View', {
+      cubes: [{
+        join_path: 'UngroupedMeasureWithFilter1',
+        includes: ['sum_filter']
+      }, {
+        join_path: 'UngroupedMeasureWithFilter1.UngroupedMeasureWithFilter2',
+        includes: ['count']
+      }]
+    })
     `);
 
   it('simple join', async () => {
@@ -737,6 +824,27 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     expect(res).toEqual(
       expectedResult
     );
+  }
+
+  type QueryWithParams = [string, Array<unknown>];
+
+  async function testWithPreAgg(
+    preAggregationsDescription: { loadSql: QueryWithParams, invalidateKeyQueries: Array<QueryWithParams> },
+    query: BaseQuery,
+  ) {
+    const preAggSql = preAggregationsDescription
+      .loadSql[0]
+      // Without `ON COMMIT DROP` temp tables are session-bound, and can live across multiple transactions
+      .replace(/CREATE TABLE (.+) AS SELECT/, 'CREATE TEMP TABLE $1 ON COMMIT DROP AS SELECT');
+    const preAggParams = preAggregationsDescription.loadSql[1];
+
+    const queries = [
+      ...preAggregationsDescription.invalidateKeyQueries,
+      [preAggSql, preAggParams],
+      query.buildSqlAndParams(),
+    ];
+
+    return dbRunner.testQueries(queries);
   }
 
   it('simple join total', async () => runQueryTest({
@@ -1892,6 +2000,40 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
+  /// Test that query with segment member expression, that references dimension, that is covered by pre-agg
+  /// would _not_ trigger stuff like `path.split is not a function` due to unexpected member expression
+  it('pre-aggregation with segment member expression', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      segments: [
+        {
+          // eslint-disable-next-line no-new-func
+          expression: new Function(
+            'visitor_checkins',
+            // eslint-disable-next-line no-template-curly-in-string
+            'return `${visitor_checkins.source} IS NOT NULL`'
+          ),
+          expressionName: 'source_is_some',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: '${visitor_checkins.source} IS NOT NULL',
+          cubeName: 'visitor_checkins',
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      order: [],
+      preAggregationsSchema: ''
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
+
+    const res = await testWithPreAgg(preAggregationsDescription, query);
+    expect(res).toEqual(
+      // Empty result set, only segments in query
+      [{}]
+    );
+  });
+
   it('join rollup pre-aggregation', async () => {
     await compiler.compile();
 
@@ -1926,21 +2068,17 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
-    return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
-      [preAggregationsDescription.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), preAggregationsDescription.loadSql[1]],
-      query.buildSqlAndParams()
-    ])).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [
-          {
-            vc__source: 'google',
-            visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-            visitors__per_visitor_revenue: '100'
-          }
-        ]
-      );
-    });
+    const res = await testWithPreAgg(preAggregationsDescription, query);
+    console.log(JSON.stringify(res));
+    expect(res).toEqual(
+      [
+        {
+          vc__source: 'google',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__per_visitor_revenue: '100'
+        }
+      ]
+    );
   });
 
   it('join rollup total pre-aggregation', async () => {
@@ -1971,22 +2109,15 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
-    return dbRunner.testQueries(preAggregationsDescription.invalidateKeyQueries.concat([
-      [
-        preAggregationsDescription.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'),
-        preAggregationsDescription.loadSql[1]
-      ],
-      query.buildSqlAndParams()
-    ])).then(res => {
-      console.log(JSON.stringify(res));
-      expect(res).toEqual(
-        [{
-          vc__source: 'google',
-          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
-          visitors__visitor_revenue: '100'
-        }]
-      );
-    });
+    const res = await testWithPreAgg(preAggregationsDescription, query);
+    console.log(JSON.stringify(res));
+    expect(res).toEqual(
+      [{
+        vc__source: 'google',
+        visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+        visitors__visitor_revenue: '100'
+      }]
+    );
   });
 
   it('security context', async () => {
@@ -3610,4 +3741,16 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       [{ visitors__id_case: 0 }]
     );
   });
+
+  it('ungrouped measure with filter', async () => runQueryTest({
+    measures: [
+      'UngroupedMeasureWithFilter_View.sum_filter',
+      'UngroupedMeasureWithFilter_View.count'
+    ],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [{
+    ungrouped_measure_with_filter__view__count: 1,
+    ungrouped_measure_with_filter__view__sum_filter: 1
+  }]));
 });
