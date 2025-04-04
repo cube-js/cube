@@ -1110,14 +1110,20 @@ refreshes.
 
 ### `allow_non_strict_date_range_match`
 
-The `allow_non_strict_date_range_match` property can be used to allow queries to
-match this pre-aggregation when using non-strict date ranges.
-By default Cube checks if requested date range exactly matches pre-aggregation granularity.
-For example if you're requesting half of a day or your date range filter is just one millisecond off for daily granularity pre-aggregation Cube would not use such a pre-aggregation by default.
-Use this flag to lift this strict check.
-This is useful
-when using a visualization tools such as Tableau or [Apache
-Superset][ref-config-downstream-superset] that use loose date ranges by default.
+The `allow_non_strict_date_range_match` parameter is used to allow queries to match a
+pre-aggregation even if a query contains a _non-strict date range_. It is set to `true`
+by default via the [`CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`][ref-env-allow-non-strict]
+environment variable.
+
+If this flag is set to `false`, Cube would check if requested date range exactly matches
+pre-aggregation granularity. For example, if you're requesting half of a day or your date
+range filter is just one millisecond off for a pre-aggregation with the daily granularity,
+Cube would not use such a pre-aggregation.
+
+With this flag set to `true`, that strict check is lifted. It allows queries from BI tools
+to still match pre-aggregations at the cost of a slight potential data discrepancy.
+This is convenient when using Cube with visualization tools such as [Tableau][ref-config-downstream-tableau]
+or [Apache Superset][ref-config-downstream-superset] that use loose date ranges.
 
 <CodeTabs>
 
@@ -1767,3 +1773,5 @@ cubes:
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
 [ref-ref-cubes]: /reference/data-model/cube
 [ref-custom-granularity]: /reference/data-model/dimensions#granularities
+[ref-env-allow-non-strict]: /reference/configuration/environment-variables#cubejs-pre-aggregations-allow-non-strict-date-range-match
+[ref-config-downstream-tableau]: /product/configuration/visualization-tools/tableau
