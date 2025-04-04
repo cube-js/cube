@@ -82,7 +82,14 @@
     "testMatch": [
       "<rootDir>/dist/test/*.(test|spec).(ts|js)"
     ],
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "html",
+      "cobertura"
+    ],
+    "coverageDirectory": "coverage/"
   },
   "oclif": {
     "commands": "./dist/src/command",

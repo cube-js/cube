@@ -1,8 +1,12 @@
 coverage:
+  round: down
+  range: "70...100"
   status:
     project:
       default:
         informational: true
+        target: auto
+        threshold: 2%
     patch:
       default:
         informational: true

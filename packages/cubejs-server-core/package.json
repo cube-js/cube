@@ -84,10 +84,11 @@
     "setupFilesAfterEnv": [
       "<rootDir>/dist/test/setup.js"
     ],
-    "collectCoverage": false,
+    "collectCoverage": true,
     "coverageReporters": [
       "text",
-      "html"
+      "html",
+      "cobertura"
     ],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [

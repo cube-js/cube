@@ -66,7 +66,14 @@
     "typescript": "~5.2.2"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "html",
+      "cobertura"
+    ],
+    "coverageDirectory": "coverage/"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
