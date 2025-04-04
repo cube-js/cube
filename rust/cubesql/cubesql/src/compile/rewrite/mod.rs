@@ -1419,9 +1419,13 @@ fn window_fun_expr_var_arg(
 }
 
 fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "AggregateUDFExprFun:"
+    };
     format!(
-        "(AggregateUDFExpr {} {})",
-        fun_name,
+        "(AggregateUDFExpr {prefix}{fun_name} {})",
         list_expr("AggregateUDFExprArgs", args),
     )
 }
@@ -1774,6 +1778,10 @@ fn literal_float(literal_float: f64) -> String {
 
 fn literal_bool(literal_bool: bool) -> String {
     format!("(LiteralExpr LiteralExprValue:b:{})", literal_bool)
+}
+
+fn literal_null() -> String {
+    format!("(LiteralExpr LiteralExprValue:null)")
 }
 
 fn projection(
