@@ -10,6 +10,8 @@ export class BaseDimension {
 
   public readonly isMemberExpression: boolean = false;
 
+  public readonly joinHint: Array<string> = [];
+
   public constructor(
     protected readonly query: BaseQuery,
     public readonly dimension: any
@@ -20,6 +22,18 @@ export class BaseDimension {
       // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = dimension.expressionName || `${dimension.cubeName}.${dimension.name}`;
       this.isMemberExpression = !!dimension.definition;
+    } else {
+      // TODO move this `as` to static types
+      const dimensionPath = dimension as string | null;
+      if (dimensionPath !== null) {
+        const parts = dimensionPath.split('.');
+        if (parts.length > 2) {
+          // Measure path contains join path
+          const hint = parts.slice(0, -1);
+          this.dimension = parts.slice(-2).join('.');
+          this.joinHint = hint;
+        }
+      }
     }
   }
 

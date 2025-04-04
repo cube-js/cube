@@ -28,7 +28,7 @@ export type DimensionDefinition = {
 };
 
 export type TimeShiftDefinition = {
-  timeDimension: Function,
+  timeDimension: (...args: Array<unknown>) => { toString(): string },
   interval: string,
   type: 'next' | 'prior',
 };
@@ -48,9 +48,9 @@ export type MeasureDefinition = {
   primaryKey?: true,
   drillFilters?: any,
   multiStage?: boolean,
-  groupBy?: Function,
-  reduceBy?: Function,
-  addGroupBy?: Function,
+  groupBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
+  reduceBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
+  addGroupBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
   timeShift?: TimeShiftDefinition[],
   groupByReferences?: string[],
   reduceByReferences?: string[],
@@ -63,6 +63,41 @@ export type PreAggregationFilters = {
   cubes?: string[],
   preAggregationIds?: string[],
   scheduled?: boolean,
+};
+
+type PreAggregationDefinition = {
+  allowNonStrictDateRangeMatch?: boolean,
+  timeDimensionReference?: () => { toString(): string },
+  granularity: string,
+  timeDimensionReferences: Array<{ dimension: () => { toString(): string }, granularity: string }>,
+  dimensionReferences: () => Array<{ toString(): string }>,
+  segmentReferences: () => Array<{ toString(): string }>,
+  measureReferences: () => Array<{ toString(): string }>,
+  rollupReferences: () => Array<{ toString(): string }>,
+};
+
+type PreAggregationTimeDimensionReference = {
+  dimension: string,
+  granularity: string,
+};
+
+/// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
+type PreAggregationReferences = {
+  allowNonStrictDateRangeMatch?: boolean,
+  dimensions: Array<string>,
+  measures: Array<string>,
+  timeDimensions: Array<PreAggregationTimeDimensionReference>,
+  rollups: Array<string>,
+};
+
+type PreAggregationInfo = {
+  id: string,
+  preAggregationName: string,
+  preAggregation: unknown,
+  cube: string,
+  references: PreAggregationReferences,
+  refreshKey: unknown,
+  indexesReferences: unknown,
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -492,7 +527,7 @@ export class CubeEvaluator extends CubeSymbols {
   /**
    * Returns pre-aggregations filtered by the specified selector.
    */
-  public preAggregations(filter: PreAggregationFilters) {
+  public preAggregations(filter: PreAggregationFilters): Array<PreAggregationInfo> {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
@@ -510,7 +545,7 @@ export class CubeEvaluator extends CubeSymbols {
           )
         )
       ))
-      .map(cube => {
+      .flatMap(cube => {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
           .filter(
@@ -547,11 +582,10 @@ export class CubeEvaluator extends CubeSymbols {
               }, {})
             };
           });
-      })
-      .reduce((a, b) => a.concat(b), []);
+      });
   }
 
-  public scheduledPreAggregations() {
+  public scheduledPreAggregations(): Array<PreAggregationInfo> {
     return this.preAggregations({ scheduled: true });
   }
 
@@ -704,19 +738,19 @@ export class CubeEvaluator extends CubeSymbols {
     return { cubeReferencesUsed, pathReferencesUsed, evaluatedSql };
   }
 
-  protected evaluatePreAggregationReferences(cube, aggregation) {
-    const timeDimensions: any = [];
+  protected evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinition): PreAggregationReferences {
+    const timeDimensions: Array<PreAggregationTimeDimensionReference> = [];
 
     if (aggregation.timeDimensionReference) {
       timeDimensions.push({
-        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
+        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference, { collectJoinHints: true }),
         granularity: aggregation.granularity
       });
     } else if (aggregation.timeDimensionReferences) {
       // eslint-disable-next-line guard-for-in
       for (const timeDimensionReference of aggregation.timeDimensionReferences) {
         timeDimensions.push({
-          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension),
+          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension, { collectJoinHints: true }),
           granularity: timeDimensionReference.granularity
         });
       }
@@ -725,12 +759,12 @@ export class CubeEvaluator extends CubeSymbols {
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
-        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
+        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences, { collectJoinHints: true }) || [])
           .concat(
-            aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences) || []
+            aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences, { collectJoinHints: true }) || []
           ),
       measures:
-        aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
+        (aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences, { collectJoinHints: true }) || []),
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
