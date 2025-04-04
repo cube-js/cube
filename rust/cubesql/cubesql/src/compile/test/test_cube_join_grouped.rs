@@ -843,3 +843,59 @@ GROUP BY
         .sql
         .contains(r#"CAST(${MultiTypeCube.dim_str1} AS STRING)"#));
 }
+
+/// Simple query, but complex join condition representation with
+/// CrossJoin(CubeScan, CubeScan) is penalized, and Wrapper is preferred
+#[tokio::test]
+async fn test_crossjoin_extraction() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT "t0"."measure"
+FROM
+    MultiTypeCube
+    INNER JOIN (
+        SELECT
+            dim_str0,
+            AVG(avgPrice) AS "measure"
+        FROM
+            MultiTypeCube
+        GROUP BY 1
+    ) "t0"
+    ON (MultiTypeCube.dim_str0 IS NOT DISTINCT FROM "t0".dim_str0)
+LIMIT 1
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+
+    assert_eq!(request.ungrouped, Some(true));
+
+    assert_eq!(request.subquery_joins.as_ref().unwrap().len(), 1);
+
+    let subquery = &request.subquery_joins.unwrap()[0];
+
+    assert!(!subquery.sql.contains("ungrouped"));
+    assert_eq!(subquery.join_type, "INNER");
+    assert!(subquery
+        .on
+        .contains(r#"${MultiTypeCube.dim_str0} IS NOT DISTINCT FROM \"t0\".\"dim_str0\""#));
+}

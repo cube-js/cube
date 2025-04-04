@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+### Bug Fixes
+
+- **schema-compiler:** Respect ungrouped alias in measures ([#9411](https://github.com/cube-js/cube/issues/9411)) ([f0829d7](https://github.com/cube-js/cube/commit/f0829d730c284a1e53c833cd53ccf8d37b08e095))
+- **schema-compiler:** Use segments as-is in rollupPreAggregation ([#9391](https://github.com/cube-js/cube/issues/9391)) ([cb7b643](https://github.com/cube-js/cube/commit/cb7b6438da199daf0b07fb2dd6f5087ed259f71f))
+
 ## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
 
 ### Bug Fixes
