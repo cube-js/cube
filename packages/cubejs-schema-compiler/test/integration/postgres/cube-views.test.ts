@@ -200,8 +200,19 @@ cube(\`ProductCategories\`, {
 });
 
 view(\`OrdersView\`, {
-  includes: [Orders],
-  excludes: [Orders.createdAt],
+  cubes: [{
+    join_path: Orders,
+    includes: '*',
+    excludes: ['createdAt']
+  }, {
+    join_path: Orders.Products,
+    includes: '*',
+    prefix: true
+  }, {
+    join_path: Orders.Products.ProductCategories,
+    includes: '*',
+    prefix: true
+  }],
 
   measures: {
     productCategoryCount: {
@@ -231,10 +242,6 @@ view(\`OrdersView\`, {
       type: \`string\`
     },
   }
-});
-
-view(\`OrdersView2\`, {
-  includes: [Orders.count],
 });
 
 view(\`OrdersView3\`, {
