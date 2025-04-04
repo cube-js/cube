@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.30](/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+### Features
+
+- **schema-compiler:** generate join sql using dimension refs when po… (#9413) 8fc4f7c, closes #9413
+
 ## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
 
 **Note:** Version bump only for package @cubejs-backend/shared
