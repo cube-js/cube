@@ -534,6 +534,10 @@ impl QueryProperties {
         }
     }
 
+    pub fn segments(&self) -> &Vec<FilterItem> {
+        &self.segments
+    }
+
     pub fn all_dimensions_and_measures(
         &self,
         measures: &Vec<Rc<BaseMeasure>>,

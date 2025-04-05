@@ -113,7 +113,7 @@ impl BaseMember for BaseMeasure {
     }
 
     fn full_name(&self) -> String {
-        format!("{}.{}", self.cube_name, self.name)
+        self.member_evaluator.full_name()
     }
 
     fn cube_name(&self) -> &String {
@@ -149,6 +149,24 @@ impl BaseMeasure {
                     name: s.name().clone(),
                     time_shifts,
                     default_alias,
+                }))
+            }
+            MemberSymbol::MemberExpression(expression_symbol) => {
+                let full_name = expression_symbol.full_name();
+                let cube_name = expression_symbol.cube_name().clone();
+                let name = expression_symbol.name().clone();
+                let member_expression_definition = expression_symbol.definition().clone();
+                let default_alias = PlanSqlTemplates::alias_name(&name);
+                Some(Rc::new(Self {
+                    measure: full_name,
+                    query_tools: query_tools.clone(),
+                    member_evaluator: evaluation_node,
+                    definition: None,
+                    cube_name,
+                    name,
+                    member_expression_definition,
+                    default_alias,
+                    time_shifts: vec![],
                 }))
             }
             _ => None,

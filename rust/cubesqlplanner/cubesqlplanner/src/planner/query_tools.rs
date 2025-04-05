@@ -132,6 +132,7 @@ impl QueryTools {
         base_tools: Rc<dyn BaseTools>,
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
+        export_annotated_sql: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
         let timezone = if let Some(timezone) = timezone_name {
@@ -151,7 +152,10 @@ impl QueryTools {
             base_tools,
             join_graph,
             templates_render,
-            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(sql_templates))),
+            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(
+                sql_templates,
+                export_annotated_sql,
+            ))),
             evaluator_compiler,
             cached_data: RefCell::new(QueryToolsCachedData::new()),
             timezone,

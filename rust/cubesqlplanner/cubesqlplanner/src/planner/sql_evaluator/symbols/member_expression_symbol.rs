@@ -68,4 +68,8 @@ impl MemberExpressionSymbol {
     pub fn name(&self) -> &String {
         &self.name
     }
+
+    pub fn definition(&self) -> &Option<String> {
+        &self.definition
+    }
 }
