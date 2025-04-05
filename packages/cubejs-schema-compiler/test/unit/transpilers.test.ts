@@ -1,9 +1,9 @@
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('Transpilers', () => {
   it('CubeCheckDuplicatePropTranspiler', async () => {
     try {
-      const { compiler } = prepareCompiler(`
+      const { compiler } = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'select * from test',
           dimensions: {
@@ -32,7 +32,7 @@ describe('Transpilers', () => {
   });
 
   it('CubePropContextTranspiler', async () => {
-    const { compiler } = prepareCompiler(`
+    const { compiler } = prepareJsCompiler(`
         let { securityContext } = COMPILE_CONTEXT;
 
         cube(\`Test\`, {

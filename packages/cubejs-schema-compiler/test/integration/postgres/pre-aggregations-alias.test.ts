@@ -1,19 +1,19 @@
 import R from 'ramda';
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('PreAggregationsAlias', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
   cube(\`visitors\`, {
     sql: \`
     select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
     \`,
     sqlAlias: 'vis',
-    
+
     joins: {
       visitor_checkins: {
         relationship: 'hasMany',
@@ -21,7 +21,7 @@ describe('PreAggregationsAlias', () => {
       }
     },
 
-    measures: { 
+    measures: {
       count: {
         type: 'count'
       },
@@ -29,22 +29,22 @@ describe('PreAggregationsAlias', () => {
         sql: 'id',
         type: 'sum'
       },
-      
+
       checkinsTotal: {
         sql: \`\${checkinsCount}\`,
         type: 'sum'
       },
-      
+
       uniqueSourceCount: {
         sql: 'source',
         type: 'countDistinct'
       },
-      
+
       countDistinctApprox: {
         sql: 'id',
         type: 'countDistinctApprox'
       },
-      
+
       ratio: {
         sql: \`\${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
         type: 'number'
@@ -72,13 +72,13 @@ describe('PreAggregationsAlias', () => {
         propagateFiltersToSubQuery: true
       }
     },
-    
+
     segments: {
       google: {
         sql: \`source = 'google'\`
       }
     },
-    
+
     preAggregations: {
       default: {
         sqlAlias: 'visitors_alias_d',
@@ -93,17 +93,17 @@ describe('PreAggregationsAlias', () => {
         },
         partitionGranularity: 'day',
         timeDimensionReference: createdAt
-      }, 
+      },
     }
   })
-  
-  
+
+
   cube(\`rollup_visitors\`, {
     sql: \`
     select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
     \`,
     sqlAlias: 'rvis',
-    
+
     joins: {
       visitor_checkins: {
         relationship: 'hasMany',
@@ -111,7 +111,7 @@ describe('PreAggregationsAlias', () => {
       }
     },
 
-    measures: { 
+    measures: {
       count: {
         type: 'count'
       },
@@ -119,22 +119,22 @@ describe('PreAggregationsAlias', () => {
         sql: 'id',
         type: 'sum'
       },
-      
+
       checkinsTotal: {
         sql: \`\${checkinsCount}\`,
         type: 'sum'
       },
-      
+
       uniqueSourceCount: {
         sql: 'source',
         type: 'countDistinct'
       },
-      
+
       countDistinctApprox: {
         sql: 'id',
         type: 'countDistinctApprox'
       },
-      
+
       ratio: {
         sql: \`\${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
         type: 'number'
@@ -162,19 +162,19 @@ describe('PreAggregationsAlias', () => {
         propagateFiltersToSubQuery: true
       }
     },
-    
+
     segments: {
       google: {
         sql: \`source = 'google'\`
       }
     },
-    
-    preAggregations: { 
+
+    preAggregations: {
       veryVeryLongTableNameForPreAggregation: {
         sqlAlias: 'rollupalias',
         type: 'rollup',
-        timeDimensionReference: createdAt, 
-        granularity: 'day', 
+        timeDimensionReference: createdAt,
+        granularity: 'day',
         measureReferences: [count, revenue],
         dimensionReferences: [source],
       },
@@ -186,7 +186,7 @@ describe('PreAggregationsAlias', () => {
     select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
     \`,
     sqlAlias: 'rvis',
-    
+
     joins: {
       visitor_checkins: {
         relationship: 'hasMany',
@@ -194,7 +194,7 @@ describe('PreAggregationsAlias', () => {
       }
     },
 
-    measures: { 
+    measures: {
       count: {
         type: 'count'
       },
@@ -202,22 +202,22 @@ describe('PreAggregationsAlias', () => {
         sql: 'id',
         type: 'sum'
       },
-      
+
       checkinsTotal: {
         sql: \`\${checkinsCount}\`,
         type: 'sum'
       },
-      
+
       uniqueSourceCount: {
         sql: 'source',
         type: 'countDistinct'
       },
-      
+
       countDistinctApprox: {
         sql: 'id',
         type: 'countDistinctApprox'
       },
-      
+
       ratio: {
         sql: \`\${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
         type: 'number'
@@ -245,20 +245,20 @@ describe('PreAggregationsAlias', () => {
         propagateFiltersToSubQuery: true
       }
     },
-    
+
     segments: {
       google: {
         sql: \`source = 'google'\`
       }
     },
-    
-    preAggregations: { 
+
+    preAggregations: {
       veryVeryLongTableNameForPreAggregation: {
         sqlAlias: 'rollupalias',
         type: 'rollup',
-        timeDimensionReference: createdAt, 
+        timeDimensionReference: createdAt,
         partitionGranularity: 'month',
-        granularity: 'day', 
+        granularity: 'day',
         measureReferences: [count, revenue],
         dimensionReferences: [source],
       },
@@ -269,7 +269,7 @@ describe('PreAggregationsAlias', () => {
     sql: \`
     select * from visitor_checkins
     \`,
-     
+
     sqlAlias: 'vc',
 
     measures: {
@@ -297,15 +297,15 @@ describe('PreAggregationsAlias', () => {
         sql: 'created_at'
       }
     },
-    
+
     preAggregations: {
       main: {
         type: 'originalSql',
         sqlAlias: 'pma',
-      }, 
+      },
     }
   })
-  
+
   cube('GoogleVisitors', {
     refreshKey: {
       immutable: true,
@@ -314,7 +314,7 @@ describe('PreAggregationsAlias', () => {
     sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
     sqlAlias: 'googlevis',
   })
-   
+
   cube('GoogleVisitorsLongName', {
     refreshKey: {
       immutable: true,
@@ -323,7 +323,7 @@ describe('PreAggregationsAlias', () => {
     sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
     sqlAlias: 'veryVeryVeryVeryVeryVeryLongSqlAliasForTestItOnPostgresqlDataBase',
   })
-   
+
     `);
 
   function replaceTableName(query, preAggregation, suffix) {

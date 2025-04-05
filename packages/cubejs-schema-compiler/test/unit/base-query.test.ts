@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError, CubeStoreQuery } from '../../src';
-import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import {
   createCubeSchema,
   createCubeSchemaWithCustomGranularities,
@@ -34,7 +34,7 @@ describe('SQL Generation', () => {
   });
 
   describe('Common - JS - syntax sugar', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         sqlTable: 'card_tbl'
@@ -420,7 +420,7 @@ describe('SQL Generation', () => {
   });
 
   describe('Custom granularities', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchemaWithCustomGranularities('orders')
     );
 
@@ -933,7 +933,7 @@ describe('SQL Generation', () => {
   });
 
   describe('Base joins', () => {
-    const compilers = /** @type Compilers */ prepareCompiler([
+    const compilers = /** @type Compilers */ prepareJsCompiler([
       createCubeSchema({
         name: 'cardsA',
         sqlTable: 'card_tbl',
@@ -1001,7 +1001,7 @@ describe('SQL Generation', () => {
     });
   });
   describe('Common - JS', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1224,7 +1224,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey from schema', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1430,7 +1430,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey only cube (immutable)', () => {
-    /** @type Compilers */ prepareCompiler(
+    /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1454,7 +1454,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey only cube (every)', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1539,7 +1539,7 @@ describe('SQL Generation', () => {
   });
 
   it('refreshKey (sql + every) in cube', async () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1588,7 +1588,7 @@ describe('SQL Generation', () => {
   });
 
   it('refreshKey (sql + every) in preAggregation', async () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: '',
@@ -2331,7 +2331,7 @@ describe('SQL Generation', () => {
 
 describe('Class unit tests', () => {
   it('Test BaseQuery with unaliased cube', async () => {
-    const set = /** @type Compilers */ prepareCompiler(`
+    const set = /** @type Compilers */ prepareJsCompiler(`
       cube('CamelCaseCube', {
         sql: 'SELECT * FROM TABLE_NAME',
         measures: {
@@ -2378,7 +2378,7 @@ describe('Class unit tests', () => {
   });
 
   it('Test BaseQuery with aliased cube', async () => {
-    const set = /** @type Compilers */ prepareCompiler(`
+    const set = /** @type Compilers */ prepareJsCompiler(`
       cube('CamelCaseCube', {
         sql: 'SELECT * FROM TABLE_NAME',
         sqlAlias: 'T1',
@@ -2427,7 +2427,7 @@ describe('Class unit tests', () => {
   });
 
   it('Test BaseQuery columns order for the query with the sub-query', async () => {
-    const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+    const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();
     await joinedSchemaCompilers.compiler.compile();
     const query = new BaseQuery({

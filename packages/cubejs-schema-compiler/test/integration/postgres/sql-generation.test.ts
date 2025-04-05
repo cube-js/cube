@@ -4,14 +4,14 @@ import type { BaseQuery } from '../../../src';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -3641,7 +3641,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   // ));
 
   it('columns order for the query with the sub-query', async () => {
-    const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+    const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();
     const query = new PostgresQuery({
       joinGraph: joinedSchemaCompilers.joinGraph,

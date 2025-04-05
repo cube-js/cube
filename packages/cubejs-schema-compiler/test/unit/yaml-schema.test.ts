@@ -108,7 +108,7 @@ describe('Yaml Schema Testing', () => {
 
       throw new Error('compile must return an error');
     } catch (e: any) {
-      expect(e.message).toContain('Users cube: (title = null) must be a string');
+      expect(e.message).toContain('Users cube: "title" must be a string');
     }
   });
 
