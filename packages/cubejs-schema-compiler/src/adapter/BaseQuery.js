@@ -643,7 +643,7 @@ export class BaseQuery {
     }
 
     if (this.useNativeSqlPlanner) {
-      let isRelatedToPreAggregation = false;
+/*       let isRelatedToPreAggregation = false;
       if (this.options.preAggregationQuery) {
         isRelatedToPreAggregation = true;
       } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
@@ -663,7 +663,7 @@ export class BaseQuery {
 
       if (isRelatedToPreAggregation) {
         return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
-      }
+      } */
 
       return this.buildSqlAndParamsRust(exportAnnotatedSql);
     }
@@ -703,8 +703,8 @@ export class BaseQuery {
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
       ungrouped: this.options.ungrouped,
-      exportAnnotatedSql: exportAnnotatedSql === true
-
+      exportAnnotatedSql: exportAnnotatedSql === true,
+      preAggregationQuery: this.options.preAggregationQuery
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);

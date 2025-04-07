@@ -3,6 +3,7 @@ use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::plan::optimizer::pre_aggregation::PreAggregationOptimizer;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
@@ -82,6 +83,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let physical_plan = physical_plan_builder.build(logical_plan)?;
 
         let sql = physical_plan.to_sql(&templates)?;
+        //let plan = query_planner.plan()?;
+        //let optimized_plan = self.optimize(plan)?;
+
+        //let sql = optimized_plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
 
         let res = self.context.empty_array()?;
@@ -91,4 +96,18 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
         Ok(result)
     }
+
+/*     fn optimize(&self, plan: Rc<Select>) -> Result<Rc<Select>, CubeError> {
+        let result = if !self.request.is_pre_aggregation_query() {
+            let pre_aggregation_optimizer = PreAggregationOptimizer::new(self.query_tools.clone());
+            if let Some(result) = pre_aggregation_optimizer.try_optimize(plan.clone())? {
+                result
+            } else {
+                plan.clone()
+            }
+        } else {
+            plan.clone()
+        };
+        Ok(result)
+    } */
 }

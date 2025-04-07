@@ -559,7 +559,7 @@ export class PreAggregations {
             transformedQuery.filterDimensionsSingleValueEqual || {},
           )
         ));
-
+    
     const backAlias = (references) => references.map(r => (
       Array.isArray(r) ?
         [transformedQuery.allBackAliasMembers[r[0]] || r[0], r[1]] :
