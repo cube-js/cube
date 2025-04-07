@@ -230,11 +230,11 @@ describe('PreAggregations', () => {
           granularity: 'hour',
           partitionGranularity: 'month'
         },
-        countCustomGranularity: {
+/*         countCustomGranularity: {
           measures: [count],
           timeDimension: createdAt,
           granularity: 'hourTenMinOffset'
-        },
+        }, */
         sourceAndIdRollup: {
           measures: [count],
           dimensions: [sourceAndId, source],
@@ -517,7 +517,7 @@ describe('PreAggregations', () => {
     });
     `);
 
-  it('simple pre-aggregation', () => compiler.compile().then(() => {
+  it('simple pre-aggregation 1', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'
@@ -533,6 +533,13 @@ describe('PreAggregations', () => {
       }],
       preAggregationsSchema: ''
     });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    console.log("!!!! pre aggrs", query.preAggregations?.preAggregationForQuery);
+    console.log("!!!! pre aggrs fun", query.preAggregations?.preAggregationForQuery.preAggregation);
+    console.log("!!!! pre aggrs fun 2", query.preAggregations?.preAggregationForQuery.preAggregation.dimensionReferences.toString());
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(

@@ -4,10 +4,14 @@ use super::dimension_definition::{
 };
 use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::pre_aggregation_description::{
+    NativePreAggregationDescription, PreAggregationDescription,
+};
 use super::segment_definition::{NativeSegmentDefinition, SegmentDefinition};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
+use cubenativeutils::wrappers::NativeArray;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -51,4 +55,9 @@ pub trait CubeEvaluator {
         sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<CallDep>, CubeError>;
     fn resolve_granularity(&self, path: Vec<String>) -> Result<GranularityDefinition, CubeError>;
+    #[nbridge(vec)]
+    fn pre_aggregations_for_cube_as_array(
+        &self,
+        cube_name: String,
+    ) -> Result<Vec<Rc<dyn PreAggregationDescription>>, CubeError>;
 }
