@@ -48,7 +48,12 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
-    "collectCoverage": false,
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "html",
+      "cobertura"
+    ],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
       "dist/src/**/*.js",

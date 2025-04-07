@@ -53,10 +53,11 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "collectCoverage": false,
+    "collectCoverage": true,
     "coverageReporters": [
       "text",
-      "html"
+      "html",
+      "cobertura"
     ],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
