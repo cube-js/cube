@@ -14659,6 +14659,7 @@ ORDER BY "source"."str0" ASC
             .contains("DATEADD(day, 7,"));
 
         // BigQuery
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[2] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[2] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
             SELECT DATEADD(DAY, 7, order_date) AS d
@@ -14668,9 +14669,7 @@ ORDER BY "source"."str0" ASC
             "
             .to_string(),
             DatabaseProtocol::PostgreSQL,
-            vec![
-                ("functions/DATEADD".to_string(), "DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})".to_string()),
-            ],
+            bq_templates.clone(),
         )
         .await;
 
@@ -14682,8 +14681,34 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("DATETIME_ADD(CAST("));
+        println!("{}", sql);
+        assert!(sql.contains("TIMESTAMP_ADD("));
         assert!(sql.contains("INTERVAL 7 day)"));
+
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEADD(MONTH, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            bq_templates,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        println!("{}", sql);
+        assert!(sql.contains("TIMESTAMP(DATETIME_ADD(DATETIME("));
+        assert!(sql.contains("INTERVAL 7 MONTH)"));
 
         // Postgres
         let query_plan = convert_select_to_query_plan_customized(
@@ -14696,7 +14721,7 @@ ORDER BY "source"."str0" ASC
             .to_string(),
             DatabaseProtocol::PostgreSQL,
             vec![(
-                "functions/DATEADD".to_string(),
+                "functions/DATE_ADD".to_string(),
                 "({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)".to_string(),
             )],
         )
