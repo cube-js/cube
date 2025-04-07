@@ -35,6 +35,20 @@ export class CompilerApi {
       ttl: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive
     });
+
+    // proactively free up old cache values occasionally
+    if (this.options.maxCompilerCacheKeepAlive) {
+      this.compiledScriptCacheInterval = setInterval(
+        () => this.compiledScriptCache.purgeStale(),
+        this.options.maxCompilerCacheKeepAlive
+      );
+    }
+  }
+
+  dispose() {
+    if (this.compiledScriptCacheInterval) {
+      clearInterval(this.compiledScriptCacheInterval);
+    }
   }
 
   setGraphQLSchema(schema) {

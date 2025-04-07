@@ -204,7 +204,9 @@ export class CubejsServerCore {
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: this.options.compilerCacheSize || 250,
       ttl: this.options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: this.options.updateCompilerCacheKeepAlive
+      updateAgeOnGet: this.options.updateCompilerCacheKeepAlive,
+      // needed to clear the setInterval timer for proactive cache internal cleanups
+      dispose: (v) => v.dispose(),
     });
 
     if (this.options.contextToAppId) {
