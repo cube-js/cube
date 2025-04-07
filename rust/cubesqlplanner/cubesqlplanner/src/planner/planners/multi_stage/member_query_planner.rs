@@ -80,6 +80,7 @@ impl MultiStageMemberQueryPlanner {
             None,
             true,
             true,
+            false,
         )?;
         let mut context_factory = SqlNodesFactory::new();
         let simple_query_planer = SimpleQueryPlanner::new(
@@ -488,6 +489,7 @@ impl MultiStageMemberQueryPlanner {
             None,
             true,
             self.description.member().is_ungrupped(),
+            false,
         )?;
 
         let mut node_factory = SqlNodesFactory::new();

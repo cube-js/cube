@@ -2,6 +2,7 @@ use super::MemberSymbol;
 use crate::planner::time_dimension::Granularity;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
     full_name: String,
