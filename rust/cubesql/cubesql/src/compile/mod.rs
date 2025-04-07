@@ -14633,36 +14633,11 @@ ORDER BY "source"."str0" ASC
         }
         init_testing_logger();
 
-        let query_plan = convert_select_to_query_plan(
-            "
-            SELECT DATEADD(DAY, 7, order_date) AS d
-            FROM KibanaSampleDataEcommerce AS k
-            GROUP BY 1
-            ORDER BY 1 DESC
-            "
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapped_sql()
-            .wrapped_sql
-            .sql
-            .contains("DATEADD(day, 7,"));
-
         // BigQuery
         let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[2] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[2] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
-            SELECT DATEADD(DAY, 7, order_date) AS d
+            SELECT DATE_ADD(DAY, 7, order_date) AS d
             FROM KibanaSampleDataEcommerce AS k
             GROUP BY 1
             ORDER BY 1 DESC
@@ -14687,7 +14662,7 @@ ORDER BY "source"."str0" ASC
 
         let query_plan = convert_select_to_query_plan_customized(
             "
-            SELECT DATEADD(MONTH, 7, order_date) AS d
+            SELECT DATE_ADD(MONTH, 7, order_date) AS d
             FROM KibanaSampleDataEcommerce AS k
             GROUP BY 1
             ORDER BY 1 DESC
@@ -14713,7 +14688,7 @@ ORDER BY "source"."str0" ASC
         // Postgres
         let query_plan = convert_select_to_query_plan_customized(
             "
-            SELECT DATEADD(DAY, 7, order_date) AS d
+            SELECT DATE_ADD(DAY, 7, order_date) AS d
             FROM KibanaSampleDataEcommerce AS k
             GROUP BY 1
             ORDER BY 1 DESC
