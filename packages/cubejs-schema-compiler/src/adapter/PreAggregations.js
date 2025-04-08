@@ -169,13 +169,18 @@ export class PreAggregations {
         const timeDimensionsReference =
           foundPreAggregation.preAggregation.rollupLambdaTimeDimensionsReference ||
           foundPreAggregation.references.timeDimensions;
+        const timeDimensionReference = timeDimensionsReference[0];
 
-        if (td.dimension === timeDimensionsReference[0].dimension) {
+        // timeDimensionsReference[*].dimension can contain full join path, so we should trim it
+        // TODO check full join path match here
+        const timeDimensionReferenceDimension = this.query.cubeEvaluator.joinHintFromPath(timeDimensionReference.dimension).path;
+
+        if (td.dimension === timeDimensionReferenceDimension) {
           return true;
         }
 
         // Handling for views
-        return td.dimension === allBackAliasMembers[timeDimensionsReference[0].dimension];
+        return td.dimension === allBackAliasMembers[timeDimensionReferenceDimension];
       });
 
     const filters = preAggregation.partitionGranularity && this.query.filters.filter(td => {
@@ -485,6 +490,10 @@ export class PreAggregations {
    * @returns {function(preagg: Object): boolean}
    */
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
+    // TODO this needs to check not only members list, but their join paths as well:
+    //  query can have same members as pre-agg, but different calculated join path
+    //  `refs` will come from preagg references, and would contain full join paths
+
     /**
      * Returns an array of 2-elements arrays with the dimension and granularity
      * sorted by the concatenated dimension + granularity key.
@@ -1061,22 +1070,35 @@ export class PreAggregations {
   }
 
   rollupPreAggregationQuery(cube, aggregation) {
+    // `this.evaluateAllReferences` will retain not only members, but their join path as well, and pass join hints
+    // to subquery. Otherwise, members in subquery would regenerate new join tree from clean state,
+    // and it can be different from expected by join path in pre-aggregation declaration
     const references = this.evaluateAllReferences(cube, aggregation);
     const cubeQuery = this.query.newSubQueryForCube(cube, {});
-    return this.query.newSubQueryForCube(
-      cube,
-      {
-        rowLimit: null,
-        offset: null,
-        measures: references.measures,
-        dimensions: references.dimensions,
-        timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
-        preAggregationQuery: true,
-        useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-        ungrouped: cubeQuery.preAggregationAllowUngroupingWithPrimaryKey(cube, aggregation) &&
-          !!references.dimensions.find(d => this.query.cubeEvaluator.dimensionByPath(d).primaryKey)
-      }
-    );
+    return this.query.newSubQueryForCube(cube, {
+      rowLimit: null,
+      offset: null,
+      measures: references.measures,
+      dimensions: references.dimensions,
+      timeDimensions: this.mergePartitionTimeDimensions(
+        references,
+        aggregation.partitionTimeDimensions
+      ),
+      preAggregationQuery: true,
+      useOriginalSqlPreAggregationsInPreAggregation:
+        aggregation.useOriginalSqlPreAggregations,
+      ungrouped:
+        cubeQuery.preAggregationAllowUngroupingWithPrimaryKey(
+          cube,
+          aggregation
+        ) &&
+        !!references.dimensions.find((d) => {
+          // `d` can contain full join path, so we should trim it
+          // TODO check full join path match here
+          const trimmedDimension = this.query.cubeEvaluator.joinHintFromPath(d).path;
+          return this.query.cubeEvaluator.dimensionByPath(trimmedDimension).primaryKey;
+        }),
+    });
   }
 
   autoRollupPreAggregationQuery(cube, aggregation) {
@@ -1101,6 +1123,7 @@ export class PreAggregations {
     }
     return aggregation.timeDimensions.map(d => {
       const toMerge = partitionTimeDimensions.find(
+        // Both qd and d comes from PreaggregationReferences
         qd => qd.dimension === d.dimension
       );
       return toMerge ? { ...d, dateRange: toMerge.dateRange, boundaryDateRange: toMerge.boundaryDateRange } : d;
@@ -1119,6 +1142,13 @@ export class PreAggregations {
       .toLowerCase();
   }
 
+  /**
+   *
+   * @param {string} cube
+   * @param aggregation
+   * @param {string} [preAggregationName]
+   * @returns {PreAggregationReferences}
+   */
   evaluateAllReferences(cube, aggregation, preAggregationName) {
     const evaluateReferences = () => {
       const references = this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
