@@ -21406,14 +21406,7 @@ nopt@^6.0.0:
   dependencies:
     abbrev "^1.0.0"
 
-nopt@^7.0.0, nopt@^7.2.0:
-  version "7.2.0"
-  resolved "https://registry.yarnpkg.com/nopt/-/nopt-7.2.0.tgz#067378c68116f602f552876194fd11f1292503d7"
-  integrity sha512-CVDtwCdhYIvnAzFoJ6NJ6dX3oga9/HyciQDnG1vQDjSLMeKLJ4A93ZqYKDrgYSr1FBY5/hMYC+2VCi24pgpkGA==
-  dependencies:
-    abbrev "^2.0.0"
-
-nopt@^7.2.1:
+nopt@^7.0.0, nopt@^7.2.0, nopt@^7.2.1:
   version "7.2.1"
   resolved "https://registry.yarnpkg.com/nopt/-/nopt-7.2.1.tgz#1cac0eab9b8e97c9093338446eddd40b2c8ca1e7"
   integrity sha512-taM24ViiimT/XntxbPyJQzCG+p4EKOpgD3mxFwW38mGjVUrfERQOeY4EDHjdnptttfHuHQXFx+lTP08Q+mLa/w==
