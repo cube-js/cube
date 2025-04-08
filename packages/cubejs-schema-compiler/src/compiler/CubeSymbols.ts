@@ -9,9 +9,11 @@ import { BaseQuery } from '../adapter';
 
 import type { ErrorReporter } from './ErrorReporter';
 
+export type ToString = { toString(): string };
+
 interface CubeDefinition {
   name: string;
-  extends?: string;
+  extends?: (...args: Array<unknown>) => { __cubeName: string };
   measures?: Record<string, any>;
   dimensions?: Record<string, any>;
   segments?: Record<string, any>;
@@ -292,7 +294,8 @@ export class CubeSymbols {
         // If the hierarchy is included all members from it should be included as well
         // Extend `includes` with members from hierarchies that should be auto-included
         const cubes = type === 'dimensions' ? cube.cubes.map((it) => {
-          const fullPath = this.evaluateReferences(null, it.joinPath, { collectJoinHints: true });
+          // TODO recheck `it.joinPath` typing
+          const fullPath = this.evaluateReferences(null, it.joinPath as () => ToString, { collectJoinHints: true });
           const split = fullPath.split('.');
           const cubeRef = split[split.length - 1];
 
@@ -332,7 +335,8 @@ export class CubeSymbols {
           const hierarchy = this.getResolvedMember(type, cubeName, hierarchyName);
 
           if (hierarchy) {
-            const levels = this.evaluateReferences(cubeName, this.getResolvedMember('hierarchies', cubeName, hierarchyName).levels, { originalSorting: true });
+            // TODO recheck `this.getResolvedMember(...).levels` typing
+            const levels = this.evaluateReferences(cubeName, this.getResolvedMember('hierarchies', cubeName, hierarchyName).levels as () => Array<ToString>, { originalSorting: true });
 
             levels.forEach((level) => autoIncludeMembers.add(level));
           }
@@ -370,7 +374,8 @@ export class CubeSymbols {
 
   protected membersFromCubes(parentCube: CubeDefinition, cubes: any[], type: string, errorReporter: ErrorReporter, splitViews: SplitViews, memberSets: any) {
     return R.unnest(cubes.map(cubeInclude => {
-      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath, { collectJoinHints: true });
+      // TODO recheck `cubeInclude.joinPath` typing
+      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath as () => ToString, { collectJoinHints: true });
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
@@ -453,7 +458,7 @@ export class CubeSymbols {
     return includes.filter(include => !excludesMap.has(include.member));
   }
 
-  protected membersFromIncludeExclude(referencesFn: any, cubeName: string, type: string) {
+  protected membersFromIncludeExclude(referencesFn: (...args: Array<unknown>) => Array<ToString>, cubeName: string, type: string) {
     const references = this.evaluateReferences(cubeName, referencesFn);
     return R.unnest(references.map((ref: string) => {
       const path = ref.split('.');
@@ -550,7 +555,12 @@ export class CubeSymbols {
     return res;
   }
 
-  protected evaluateReferences(cube, referencesFn, options: any = {}) {
+  protected evaluateReferences<T extends ToString | Array<ToString>>(
+    cube: string | null,
+    referencesFn: (...args: Array<unknown>) => T,
+    options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
+  ):
+  T extends Array<ToString> ? Array<string> : T extends ToString ? string : string | Array<string> {
     const cubeEvaluator = this;
 
     const fullPath = (joinHints, path) => {
@@ -561,7 +571,7 @@ export class CubeSymbols {
       }
     };
 
-    const arrayOrSingle = cubeEvaluator.resolveSymbolsCall(referencesFn, (name) => {
+    const arrayOrSingle: T = cubeEvaluator.resolveSymbolsCall(referencesFn, (name) => {
       const referencedCube = cubeEvaluator.symbols[name] && name || cube;
       const resolvedSymbol =
         cubeEvaluator.resolveSymbol(
@@ -582,25 +592,35 @@ export class CubeSymbols {
       collectJoinHints: options.collectJoinHints,
     });
     if (!Array.isArray(arrayOrSingle)) {
-      return arrayOrSingle.toString();
+      // arrayOrSingle is of type `T`, and we just checked that it is not an array
+      // Which means it `T` be an object with `toString`, and result must be `string`
+      // For any branch of return type that can can contain just an object it's OK to return string
+      return arrayOrSingle.toString() as any;
     }
 
-    const references = arrayOrSingle.map(p => p.toString());
-    return options.originalSorting ? references : R.sortBy(R.identity, references);
+    const references: Array<string> = arrayOrSingle.map(p => p.toString());
+    // arrayOrSingle is of type `T`, and we just checked that it is an array
+    // Which means that both `T` and result must be arrays
+    // For any branch of return type that can contain array it's OK to return array
+    return options.originalSorting ? references : R.sortBy(R.identity, references) as any;
   }
 
   public pathFromArray(array) {
     return array.join('.');
   }
 
-  protected resolveSymbolsCall(func, nameResolver, context?: any) {
+  protected resolveSymbolsCall<T>(
+    func: (...args: Array<unknown>) => T | DynamicReference<T>,
+    nameResolver: (id: string) => unknown,
+    context?: unknown,
+  ): T {
     const oldContext = this.resolveSymbolsCallContext;
     this.resolveSymbolsCallContext = context;
     try {
       // eslint-disable-next-line prefer-spread
-      let res = func.apply(null, this.funcArguments(func).map((id) => nameResolver(id.trim())));
+      const res = func.apply(null, this.funcArguments(func).map((id) => nameResolver(id.trim())));
       if (res instanceof DynamicReference) {
-        res = res.fn.apply(null, res.memberNames.map((id) => nameResolver(id.trim())));
+        return res.fn.apply(null, res.memberNames.map((id) => nameResolver(id.trim())));
       }
       return res;
     } finally {
