@@ -203,7 +203,6 @@ cubes:
 
 views:
   - name: customers_view
-
     cubes:
       - join_path: customers
         includes:
@@ -379,6 +378,28 @@ views:
     },
 
     [{ orders__cagr_2023: '-0.90000000000000000000' }]));
+  } else {
+    it.skip('member expression multi stage with time dimension segment', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('multi stage duplicated time shift over view and origin cube', async () => runQueryTest({
+      measures: [
+        'orders_view.cagr_1_y'
+      ],
+      timeDimensions: [
+        {
+          dimension: 'orders_view.date',
+          dateRange: ['2022-01-01', '2022-10-31'],
+        },
+      ],
+
+      timezone: 'America/Los_Angeles'
+    },
+
+    [{ orders_view__cagr_1_y: '-0.90000000000000000000' }]));
   } else {
     it.skip('member expression multi stage with time dimension segment', () => {
       // Skipping because it works only in Tesseract

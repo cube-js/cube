@@ -1,62 +1,6 @@
-use crate::cube_bridge::measure_definition::TimeShiftReference;
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
 use crate::planner::BaseTimeDimension;
-use cubenativeutils::CubeError;
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::rc::Rc;
-
-#[derive(Clone, Debug)]
-pub struct MultiStageTimeShift {
-    pub interval: String,
-    pub time_dimension: String,
-}
-
-lazy_static! {
-    static ref INTERVAL_MATCH_RE: Regex =
-        Regex::new(r"^(-?\d+) (second|minute|hour|day|week|month|quarter|year)s?$").unwrap();
-}
-impl MultiStageTimeShift {
-    pub fn try_from_reference(reference: &TimeShiftReference) -> Result<Self, CubeError> {
-        let parsed_interval =
-            if let Some(captures) = INTERVAL_MATCH_RE.captures(&reference.interval) {
-                let duration = if let Some(duration) = captures.get(1) {
-                    duration.as_str().parse::<i64>().ok()
-                } else {
-                    None
-                };
-                let granularity = if let Some(granularity) = captures.get(2) {
-                    Some(granularity.as_str().to_owned())
-                } else {
-                    None
-                };
-                if let Some((duration, granularity)) = duration.zip(granularity) {
-                    Some((duration, granularity))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-        if let Some((duration, granularity)) = parsed_interval {
-            let duration = if reference.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
-                duration * (-1)
-            } else {
-                duration
-            };
-
-            Ok(Self {
-                interval: format!("{duration} {granularity}"),
-                time_dimension: reference.time_dimension.clone(),
-            })
-        } else {
-            Err(CubeError::user(format!(
-                "Invalid interval: {}",
-                reference.interval
-            )))
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct TimeSeriesDescription {
@@ -143,7 +87,7 @@ pub struct MultiStageInodeMember {
     reduce_by: Vec<String>,
     add_group_by: Vec<String>,
     group_by: Option<Vec<String>>,
-    time_shifts: Vec<MultiStageTimeShift>,
+    time_shifts: Vec<MeasureTimeShift>,
 }
 
 impl MultiStageInodeMember {
@@ -152,7 +96,7 @@ impl MultiStageInodeMember {
         reduce_by: Vec<String>,
         add_group_by: Vec<String>,
         group_by: Option<Vec<String>>,
-        time_shifts: Vec<MultiStageTimeShift>,
+        time_shifts: Vec<MeasureTimeShift>,
     ) -> Self {
         Self {
             inode_type,
@@ -179,7 +123,7 @@ impl MultiStageInodeMember {
         &self.group_by
     }
 
-    pub fn time_shifts(&self) -> &Vec<MultiStageTimeShift> {
+    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
         &self.time_shifts
     }
 }

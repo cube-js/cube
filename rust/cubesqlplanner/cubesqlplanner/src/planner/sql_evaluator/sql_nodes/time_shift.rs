@@ -1,7 +1,7 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
+use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -9,16 +9,16 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct TimeShiftSqlNode {
-    shifts: HashMap<String, String>,
+    shifts: HashMap<String, MeasureTimeShift>,
     input: Rc<dyn SqlNode>,
 }
 
 impl TimeShiftSqlNode {
-    pub fn new(shifts: HashMap<String, String>, input: Rc<dyn SqlNode>) -> Rc<Self> {
+    pub fn new(shifts: HashMap<String, MeasureTimeShift>, input: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self { shifts, input })
     }
 
-    pub fn shifts(&self) -> &HashMap<String, String> {
+    pub fn shifts(&self) -> &HashMap<String, MeasureTimeShift> {
         &self.shifts
     }
 
@@ -46,6 +46,7 @@ impl SqlNode for TimeShiftSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 if let Some(shift) = self.shifts.get(&ev.full_name()) {
+                    let shift = shift.interval.to_sql();
                     format!("({input} + interval '{shift}')")
                 } else {
                     input
