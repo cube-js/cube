@@ -12858,19 +12858,11 @@ cli-highlight@^2.1.10:
     parse5-htmlparser2-tree-adapter "^6.0.0"
     yargs "^16.0.0"
 
-cli-progress@^3.10:
+cli-progress@^3.10, cli-progress@^3.4.0, cli-progress@^3.9.0:
   version "3.10.0"
   resolved "https://registry.yarnpkg.com/cli-progress/-/cli-progress-3.10.0.tgz#63fd9d6343c598c93542fdfa3563a8b59887d78a"
   integrity sha512-kLORQrhYCAtUPLZxqsAt2YJGOvRdt34+O6jl5cQGb7iF3dM55FQZlTR+rQyIK9JUcO9bBMwZsTlND+3dmFU2Cw==
   dependencies:
-    string-width "^4.2.0"
-
-cli-progress@^3.4.0, cli-progress@^3.9.0:
-  version "3.9.1"
-  resolved "https://registry.yarnpkg.com/cli-progress/-/cli-progress-3.9.1.tgz#a22eba6a20f53289fdd05d5ee8cb2cc8c28f866e"
-  integrity sha512-AXxiCe2a0Lm0VN+9L0jzmfQSkcZm5EYspfqXKaSIQKqIk+0hnkZ3/v1E9B39mkD6vYhKih3c/RPsJBSwq9O99Q==
-  dependencies:
-    colors "^1.1.2"
     string-width "^4.2.0"
 
 cli-spinners@2.6.1, cli-spinners@^2.5.0:
