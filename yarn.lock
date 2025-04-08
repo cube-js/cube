@@ -9620,14 +9620,7 @@
     "@types/tedious" "*"
     tarn "^3.0.1"
 
-"@types/mysql@^2.15.15", "@types/mysql@^2.15.19":
-  version "2.15.19"
-  resolved "https://registry.yarnpkg.com/@types/mysql/-/mysql-2.15.19.tgz#d158927bb7c1a78f77e56de861a3b15cae0e7aed"
-  integrity sha512-wSRg2QZv14CWcZXkgdvHbbV2ACufNy5EgI8mBBxnJIptchv7DBy/h53VMa2jDhyo0C9MO4iowE6z9vF8Ja1DkQ==
-  dependencies:
-    "@types/node" "*"
-
-"@types/mysql@^2.15.21":
+"@types/mysql@^2.15.15", "@types/mysql@^2.15.19", "@types/mysql@^2.15.21":
   version "2.15.21"
   resolved "https://registry.yarnpkg.com/@types/mysql/-/mysql-2.15.21.tgz#7516cba7f9d077f980100c85fd500c8210bd5e45"
   integrity sha512-NPotx5CVful7yB+qZbWtXL2fA4e7aEHkihHLjklc6ID8aq7bhguHgeIoC1EmSNTAuCgI6ZXrjt2ZSaXnYX0EUg==
