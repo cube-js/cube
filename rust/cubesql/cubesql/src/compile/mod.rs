@@ -14624,21 +14624,46 @@ ORDER BY "source"."str0" ASC
         assert!(sql.contains("EXTRACT(EPOCH FROM"));
     }
 
-    // redshift-dateadd-[literal-date32-]to-interval rewrites DATEADD to DATE_ADD
     #[tokio::test]
-    #[ignore]
     async fn test_dateadd_push_down() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
         init_testing_logger();
 
-        // BigQuery
-        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[2] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[2] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
+        // Redshift function DATEADD
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        // redshift-dateadd-[literal-date32-]to-interval rewrites DATEADD to DATE_ADD
+        assert!(sql.contains("DATE_ADD("));
+        assert!(sql.contains("INTERVAL '7 DAY')"));
+
+        // BigQuery + Postgres DATE_ADD + DAYS
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
-            SELECT DATE_ADD(DAY, 7, order_date) AS d
+            SELECT DATE_ADD(order_date, INTERVAL '7 DAYS') AS d
             FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
             GROUP BY 1
             ORDER BY 1 DESC
             "
@@ -14656,14 +14681,42 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        println!("{}", sql);
         assert!(sql.contains("TIMESTAMP_ADD("));
-        assert!(sql.contains("INTERVAL 7 day)"));
+        assert!(sql.contains("INTERVAL 7 DAY)"));
 
+        // BigQuery + Redshift DATEADD + DAYS
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
-            SELECT DATE_ADD(MONTH, 7, order_date) AS d
+            SELECT DATEADD(DAY, 7, order_date) AS d
             FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            bq_templates.clone(),
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("TIMESTAMP_ADD("));
+        assert!(sql.contains("INTERVAL 7 DAY)"));
+
+        // BigQuery + Postgres DATE_ADD + MONTHS
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATE_ADD(order_date, INTERVAL '7 MONTHS') AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
             GROUP BY 1
             ORDER BY 1 DESC
             "
@@ -14681,24 +14734,22 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        println!("{}", sql);
         assert!(sql.contains("TIMESTAMP(DATETIME_ADD(DATETIME("));
         assert!(sql.contains("INTERVAL 7 MONTH)"));
 
-        // Postgres
+        // BigQuery + Redshift DATEADD + MONTHS
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
-            SELECT DATE_ADD(DAY, 7, order_date) AS d
+            SELECT DATEADD(MONTH, 7, order_date) AS d
             FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
             GROUP BY 1
             ORDER BY 1 DESC
             "
             .to_string(),
             DatabaseProtocol::PostgreSQL,
-            vec![(
-                "functions/DATE_ADD".to_string(),
-                "({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)".to_string(),
-            )],
+            bq_templates.clone(),
         )
         .await;
 
@@ -14710,7 +14761,34 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("+ '7 day'::interval"));
+        assert!(sql.contains("TIMESTAMP(DATETIME_ADD(DATETIME("));
+        assert!(sql.contains("INTERVAL 7 MONTH)"));
+
+        // Postgres DATE_ADD
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATE_ADD(order_date, INTERVAL '7 DAYS') AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATE_ADD("));
+        assert!(sql.contains("INTERVAL '7 DAY'"));
     }
 
     #[tokio::test]
