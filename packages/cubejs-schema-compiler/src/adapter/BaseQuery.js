@@ -307,16 +307,16 @@ export class BaseQuery {
   }
 
   prebuildJoin() {
-    if (this.useNativeSqlPlanner) {
-      // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
-      // But we need this join for a fallback when using pre-aggregations. So we’ll try to obtain the join but ignore any errors (which may occur if the query is a multi-fact one).
-      try {
-        this.join = this.joinGraph.buildJoin(this.allJoinHints);
-      } catch (e) {
-        // Ignore
-      }
-    } else {
+    try {
+      // TODO allJoinHints should contain join hints form pre-agg
       this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    } catch (e) {
+      if (this.useNativeSqlPlanner) {
+        // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
+        // But we need this join for a fallback when using pre-aggregations. So we’ll try to obtain the join but ignore any errors (which may occur if the query is a multi-fact one).
+      } else {
+        throw e;
+      }
     }
   }
 
@@ -363,6 +363,10 @@ export class BaseQuery {
     return this.collectedCubeNames;
   }
 
+  /**
+   *
+   * @returns {Array<Array<string>>}
+   */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
       this.collectedJoinHints = this.collectJoinHints();
@@ -1203,7 +1207,16 @@ export class BaseQuery {
 
   collectAllMultiStageMembers(allMemberChildren) {
     const allMembers = R.uniq(R.flatten(Object.keys(allMemberChildren).map(k => [k].concat(allMemberChildren[k]))));
-    return R.fromPairs(allMembers.map(m => ([m, this.memberInstanceByPath(m).isMultiStage()])));
+    return R.fromPairs(allMembers.map(m => {
+      // When `m` is coming from `collectAllMemberChildren`, it can contain `granularities.customGranularityName` in path
+      // And it would mess up with join hints detection
+      const trimmedPath = this
+        .cubeEvaluator
+        .parsePathAnyType(m)
+        .slice(0, 2)
+        .join('.');
+      return [m, this.memberInstanceByPath(trimmedPath).isMultiStage()];
+    }));
   }
 
   memberInstanceByPath(m) {
@@ -1992,7 +2005,7 @@ export class BaseQuery {
     );
 
     if (shouldBuildJoinForMeasureSelect) {
-      const joinHints = this.collectFrom(measures, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      const joinHints = this.collectJoinHintsFromMembers(measures);
       const measuresJoin = this.joinGraph.buildJoin(joinHints);
       if (measuresJoin.multiplicationFactor[keyCubeName]) {
         throw new UserError(
@@ -2046,6 +2059,11 @@ export class BaseQuery {
       (!this.safeEvaluateSymbolContext().ungrouped && this.aggregateSubQueryGroupByClause() || '');
   }
 
+  /**
+   * @param {Array<BaseMeasure>} measures
+   * @param {string} keyCubeName
+   * @returns {boolean}
+   */
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
     // When member expression references view, it would have to collect join hints from view
     // Consider join A->B, as many-to-one, so B is multiplied and A is not, and member expression like SUM(AB_view.dimB)
@@ -2067,7 +2085,11 @@ export class BaseQuery {
         .filter(member => member.definition().ownedByCube);
 
       const cubes = this.collectFrom(nonViewMembers, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
-      const joinHints = this.collectFrom(nonViewMembers, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      // Not using `collectJoinHintsFromMembers([measure])` because it would collect too many join hints from view
+      const joinHints = [
+        measure.joinHint,
+        ...this.collectJoinHintsFromMembers(nonViewMembers),
+      ];
       if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
         const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
@@ -2186,12 +2208,29 @@ export class BaseQuery {
     );
   }
 
+  /**
+   *
+   * @param {boolean} [excludeTimeDimensions=false]
+   * @returns {Array<Array<string>>}
+   */
   collectJoinHints(excludeTimeDimensions = false) {
-    return this.collectFromMembers(
-      excludeTimeDimensions,
-      this.collectJoinHintsFor.bind(this),
-      'collectJoinHintsFor'
-    );
+    const membersToCollectFrom = this.allMembersConcat(excludeTimeDimensions)
+      .concat(this.join ? this.join.joins.map(j => ({
+        getMembers: () => [{
+          path: () => null,
+          cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
+          definition: () => j.join,
+        }]
+      })) : []);
+
+    return this.collectJoinHintsFromMembers(membersToCollectFrom);
+  }
+
+  collectJoinHintsFromMembers(members) {
+    return [
+      ...members.map(m => m.joinHint).filter(h => h?.length > 0),
+      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers'),
+    ];
   }
 
   collectFromMembers(excludeTimeDimensions, fn, methodName) {
@@ -2206,6 +2245,11 @@ export class BaseQuery {
     return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
+  /**
+   *
+   * @param {boolean} excludeTimeDimensions
+   * @returns {Array<BaseMeasure | BaseDimension | BaseSegment>}
+   */
   allMembersConcat(excludeTimeDimensions) {
     return this.measures
       .concat(this.dimensions)
