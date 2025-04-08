@@ -13,6 +13,8 @@ export class BaseMeasure {
 
   protected readonly patchedMeasure: MeasureDefinition | null = null;
 
+  public readonly joinHint: Array<string> = [];
+
   protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{sql: Function}>): MeasureDefinition {
     const source = this.query.cubeEvaluator.measureByPath(sourceMeasure);
 
@@ -123,6 +125,12 @@ export class BaseMeasure {
           measure.expression.addFilters,
         );
       }
+    } else {
+      // TODO move this `as` to static types
+      const measurePath = measure as string;
+      const { path, joinHint } = this.query.cubeEvaluator.joinHintFromPath(measurePath);
+      this.measure = path;
+      this.joinHint = joinHint;
     }
   }
 
