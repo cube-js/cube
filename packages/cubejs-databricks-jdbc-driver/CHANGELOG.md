@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
 ## [1.2.30](https://github.com/cube-js/cube/compare/v1.2.29...v1.2.30) (2025-04-04)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
