@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.32](https://github.com/cube-js/cube/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+### Bug Fixes
+
+- **schema-compiler:** Use join paths from pre-aggregation declaration instead of building join tree from scratch ([#9431](https://github.com/cube-js/cube/issues/9431)) ([aea3a6c](https://github.com/cube-js/cube/commit/aea3a6c02886f495b00751e5e12dcd0ef3099441))
+- **tesseract:** Fix issues with member expressions over multi stage ([#9416](https://github.com/cube-js/cube/issues/9416)) ([14ae6a4](https://github.com/cube-js/cube/commit/14ae6a46ca215da8be8c4f5fb12b8f3c01948639))
+
 ## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
 
 ### Bug Fixes
