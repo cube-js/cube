@@ -26,6 +26,8 @@ import {
 import { DatabricksQuery } from './DatabricksQuery';
 import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
 
+const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
+
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     /**
@@ -214,7 +216,7 @@ export class DatabricksDriver extends JDBCDriver {
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: ['s3', 'azure', 'gcs'], dataSource }),
+        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket:
         conf?.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -652,7 +654,7 @@ export class DatabricksDriver extends JDBCDriver {
    * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions) {
-    if (!['azure', 's3', 'gcs'].includes(this.config.bucketType as string)) {
+    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
       }`);
