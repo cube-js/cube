@@ -2491,10 +2491,47 @@ impl CubeScanWrapperNode {
                                 if DATE_PART_REGEX.is_match(date_part) {
                                     Ok(Some(date_part.to_string()))
                                 } else {
-                                    Err(date_part_err(date_part))
+                                    Err(date_part_err(date_part.to_string()))
                                 }
                             }
-                            _ => Err(date_part_err(&args[0].to_string())),
+                            _ => Err(date_part_err(args[0].to_string())),
+                        },
+                        "date_add" => match &args[1] {
+                            Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
+                                let days = (*interval >> 32) as i32;
+                                let ms = (*interval & 0xFFFF_FFFF) as i32;
+
+                                if days != 0 && ms == 0 {
+                                    Ok(Some("DAY".to_string()))
+                                } else if ms != 0 && days == 0 {
+                                    Ok(Some("MILLISECOND".to_string()))
+                                } else {
+                                    Err(DataFusionError::Internal(format!(
+                                        "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
+                                    )))
+                                }
+                            }
+                            Expr::Literal(ScalarValue::IntervalYearMonth(Some(_months))) => {
+                                Ok(Some("MONTH".to_string()))
+                            }
+                            Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
+                                let months = (interval >> 96) as i32;
+                                let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
+                                let nanos = *interval as i64;
+
+                                if months != 0 && days == 0 && nanos == 0 {
+                                    Ok(Some("MONTH".to_string()))
+                                } else if days != 0 && months == 0 && nanos == 0 {
+                                    Ok(Some("DAY".to_string()))
+                                } else if nanos != 0 && months == 0 && days == 0 {
+                                    Ok(Some("NANOSECOND".to_string()))
+                                } else {
+                                    Err(DataFusionError::Internal(format!(
+                                        "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
+                                    )))
+                                }
+                            }
+                            _ => Err(date_part_err(args[1].to_string())),
                         },
                         _ => Ok(None),
                     }?;
@@ -2506,6 +2543,43 @@ impl CubeScanWrapperNode {
                             _ => Err(DataFusionError::Internal(format!(
                                 "Can't generate SQL for scalar function: interval must be Int64"
                             ))),
+                        },
+                        "date_add" => match &args[1] {
+                            Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
+                                let days = (*interval >> 32) as i32;
+                                let ms = (*interval & 0xFFFF_FFFF) as i32;
+
+                                if days != 0 && ms == 0 {
+                                    Ok(Some(days.to_string()))
+                                } else if ms != 0 && days == 0 {
+                                    Ok(Some(ms.to_string()))
+                                } else {
+                                    Err(DataFusionError::Internal(format!(
+                                        "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
+                                    )))
+                                }
+                            }
+                            Expr::Literal(ScalarValue::IntervalYearMonth(Some(months))) => {
+                                Ok(Some(months.to_string()))
+                            }
+                            Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
+                                let months = (interval >> 96) as i32;
+                                let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
+                                let nanos = *interval as i64;
+
+                                if months != 0 && days == 0 && nanos == 0 {
+                                    Ok(Some(months.to_string()))
+                                } else if days != 0 && months == 0 && nanos == 0 {
+                                    Ok(Some(days.to_string()))
+                                } else if nanos != 0 && months == 0 && days == 0 {
+                                    Ok(Some(nanos.to_string()))
+                                } else {
+                                    Err(DataFusionError::Internal(format!(
+                                        "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
+                                    )))
+                                }
+                            }
+                            _ => Err(date_part_err(args[1].to_string())),
                         },
                         _ => Ok(None),
                     }?;
