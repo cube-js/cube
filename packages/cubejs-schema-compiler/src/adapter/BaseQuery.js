@@ -2501,7 +2501,7 @@ export class BaseQuery {
 
   pushMemberNameForCollectionIfNecessary(cubeName, name) {
     const pathFromArray = this.cubeEvaluator.pathFromArray([cubeName, name]);
-    if (this.cubeEvaluator.byPathAnyType(pathFromArray).ownedByCube) {
+    if (!this.cubeEvaluator.getCubeDefinition(cubeName).isView) {
       const joinHints = this.cubeEvaluator.joinHints();
       if (joinHints && joinHints.length) {
         joinHints.forEach(cube => this.pushCubeNameForCollectionIfNecessary(cube));
