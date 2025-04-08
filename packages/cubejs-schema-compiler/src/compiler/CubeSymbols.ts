@@ -9,6 +9,8 @@ import { BaseQuery } from '../adapter';
 
 import type { ErrorReporter } from './ErrorReporter';
 
+export type ToString = { toString(): string };
+
 interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
@@ -293,7 +295,7 @@ export class CubeSymbols {
         // Extend `includes` with members from hierarchies that should be auto-included
         const cubes = type === 'dimensions' ? cube.cubes.map((it) => {
           // TODO recheck `it.joinPath` typing
-          const fullPath = this.evaluateReferences(null, it.joinPath as () => { toString(): string }, { collectJoinHints: true });
+          const fullPath = this.evaluateReferences(null, it.joinPath as () => ToString, { collectJoinHints: true });
           const split = fullPath.split('.');
           const cubeRef = split[split.length - 1];
 
@@ -334,7 +336,7 @@ export class CubeSymbols {
 
           if (hierarchy) {
             // TODO recheck `this.getResolvedMember(...).levels` typing
-            const levels = this.evaluateReferences(cubeName, this.getResolvedMember('hierarchies', cubeName, hierarchyName).levels as () => Array<{ toString(): string }>, { originalSorting: true });
+            const levels = this.evaluateReferences(cubeName, this.getResolvedMember('hierarchies', cubeName, hierarchyName).levels as () => Array<ToString>, { originalSorting: true });
 
             levels.forEach((level) => autoIncludeMembers.add(level));
           }
@@ -373,7 +375,7 @@ export class CubeSymbols {
   protected membersFromCubes(parentCube: CubeDefinition, cubes: any[], type: string, errorReporter: ErrorReporter, splitViews: SplitViews, memberSets: any) {
     return R.unnest(cubes.map(cubeInclude => {
       // TODO recheck `cubeInclude.joinPath` typing
-      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath as () => { toString(): string }, { collectJoinHints: true });
+      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath as () => ToString, { collectJoinHints: true });
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
@@ -456,7 +458,7 @@ export class CubeSymbols {
     return includes.filter(include => !excludesMap.has(include.member));
   }
 
-  protected membersFromIncludeExclude(referencesFn: (...args: Array<unknown>) => Array<{ toString(): string }>, cubeName: string, type: string) {
+  protected membersFromIncludeExclude(referencesFn: (...args: Array<unknown>) => Array<ToString>, cubeName: string, type: string) {
     const references = this.evaluateReferences(cubeName, referencesFn);
     return R.unnest(references.map((ref: string) => {
       const path = ref.split('.');
@@ -553,11 +555,12 @@ export class CubeSymbols {
     return res;
   }
 
-  protected evaluateReferences<T extends { toString(): string } | Array<{ toString(): string }>>(
+  protected evaluateReferences<T extends ToString | Array<ToString>>(
     cube: string | null,
     referencesFn: (...args: Array<unknown>) => T,
-    options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}):
-  T extends Array<{ toString(): string }> ? Array<string> : T extends { toString(): string } ? string : string | Array<string> {
+    options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
+  ):
+  T extends Array<ToString> ? Array<string> : T extends ToString ? string : string | Array<string> {
     const cubeEvaluator = this;
 
     const fullPath = (joinHints, path) => {

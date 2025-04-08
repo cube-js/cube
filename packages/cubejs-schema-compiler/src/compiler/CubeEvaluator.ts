@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
 
-import { CubeSymbols } from './CubeSymbols';
+import { CubeSymbols, type ToString } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
@@ -28,7 +28,7 @@ export type DimensionDefinition = {
 };
 
 export type TimeShiftDefinition = {
-  timeDimension: (...args: Array<unknown>) => { toString(): string },
+  timeDimension: (...args: Array<unknown>) => ToString,
   interval: string,
   type: 'next' | 'prior',
 };
@@ -48,9 +48,9 @@ export type MeasureDefinition = {
   primaryKey?: true,
   drillFilters?: any,
   multiStage?: boolean,
-  groupBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
-  reduceBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
-  addGroupBy?: (...args: Array<unknown>) => Array<{ toString(): string }>,
+  groupBy?: (...args: Array<unknown>) => Array<ToString>,
+  reduceBy?: (...args: Array<unknown>) => Array<ToString>,
+  addGroupBy?: (...args: Array<unknown>) => Array<ToString>,
   timeShift?: TimeShiftDefinition[],
   groupByReferences?: string[],
   reduceByReferences?: string[],
@@ -67,13 +67,13 @@ export type PreAggregationFilters = {
 
 type PreAggregationDefinition = {
   allowNonStrictDateRangeMatch?: boolean,
-  timeDimensionReference?: () => { toString(): string },
+  timeDimensionReference?: () => ToString,
   granularity: string,
-  timeDimensionReferences: Array<{ dimension: () => { toString(): string }, granularity: string }>,
-  dimensionReferences: () => Array<{ toString(): string }>,
-  segmentReferences: () => Array<{ toString(): string }>,
-  measureReferences: () => Array<{ toString(): string }>,
-  rollupReferences: () => Array<{ toString(): string }>,
+  timeDimensionReferences: Array<{ dimension: () => ToString, granularity: string }>,
+  dimensionReferences: () => Array<ToString>,
+  segmentReferences: () => Array<ToString>,
+  measureReferences: () => Array<ToString>,
+  rollupReferences: () => Array<ToString>,
 };
 
 type PreAggregationTimeDimensionReference = {
