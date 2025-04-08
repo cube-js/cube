@@ -30,6 +30,7 @@
     "@cubejs-backend/native": "1.2.30",
     "@cubejs-backend/shared": "1.2.30",
     "@ungap/structured-clone": "^0.3.4",
+    "assert-never": "^1.4.0",
     "body-parser": "^1.19.0",
     "chrono-node": "^2.6.2",
     "express": "^4.21.1",
