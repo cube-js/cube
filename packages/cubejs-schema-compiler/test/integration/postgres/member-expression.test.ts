@@ -5,7 +5,7 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
-describe('Member Expression 2', () => {
+describe('Member Expression Multistage', () => {
   jest.setTimeout(200000);
 
   const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`

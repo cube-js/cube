@@ -503,7 +503,7 @@ impl MultiStageMemberQueryPlanner {
             .has_multi_stage_measures()
         {
             return Err(CubeError::internal(format!(
-                "Leaf multi stage query cannot contain multi stage member 1"
+                "Leaf multi stage query cannot contain multi stage member"
             )));
         }
 

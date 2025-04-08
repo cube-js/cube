@@ -189,7 +189,7 @@ impl MultiStageQueryPlanner {
         let description = if childs.is_empty() || !has_multi_stage_members {
             if has_multi_stage_members {
                 return Err(CubeError::internal(format!(
-                    "Leaf multi stage query cannot contain multi stage member 2"
+                    "Leaf multi stage query cannot contain multi stage member"
                 )));
             }
 
