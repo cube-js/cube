@@ -11787,15 +11787,7 @@ babel-plugin-polyfill-corejs2@^0.4.6:
     "@babel/helper-define-polyfill-provider" "^0.4.3"
     semver "^6.3.1"
 
-babel-plugin-polyfill-corejs3@^0.10.4:
-  version "0.10.4"
-  resolved "https://registry.yarnpkg.com/babel-plugin-polyfill-corejs3/-/babel-plugin-polyfill-corejs3-0.10.4.tgz#789ac82405ad664c20476d0233b485281deb9c77"
-  integrity sha512-25J6I8NGfa5YkCDogHRID3fVCadIR8/pGl1/spvCkzb6lVn6SR3ojpx9nOn9iEBcUsjY24AmdKm5khcfKdylcg==
-  dependencies:
-    "@babel/helper-define-polyfill-provider" "^0.6.1"
-    core-js-compat "^3.36.1"
-
-babel-plugin-polyfill-corejs3@^0.10.6:
+babel-plugin-polyfill-corejs3@^0.10.4, babel-plugin-polyfill-corejs3@^0.10.6:
   version "0.10.6"
   resolved "https://registry.yarnpkg.com/babel-plugin-polyfill-corejs3/-/babel-plugin-polyfill-corejs3-0.10.6.tgz#2deda57caef50f59c525aeb4964d3b2f867710c7"
   integrity sha512-b37+KR2i/khY5sKmWNVQAnitvquQbNdWy6lJdsr0kmquCKEEUgMKK4SboVM3HtfnZilfjr4MMQ7vY58FVWDtIA==
