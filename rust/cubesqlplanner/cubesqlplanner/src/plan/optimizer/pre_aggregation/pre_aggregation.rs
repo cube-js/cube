@@ -74,7 +74,10 @@ impl PreAggregationOptimizer {
         let dimensions_match = self.is_dimensions_match(select_meta, pre_aggregation)?;
         let time_dimension_match = &self.is_time_dimensions_match(select_meta, pre_aggregation)?;
         println!("pre aggr: {}, dimensions_match: {:?}, time_dimension_match: {:?}", pre_aggregation.name, dimensions_match, time_dimension_match);
-        let pre_aggr_match = dimensions_match.combine(&time_dimension_match);
+        let pre_aggr_dimension_match = dimensions_match.combine(&time_dimension_match);
+        if matches!(pre_aggr_dimension_match, DimensionMatchType::None) {
+            return Ok(false);
+        }
         
         Ok(false)
     }
