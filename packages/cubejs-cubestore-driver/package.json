@@ -30,6 +30,7 @@
     "@cubejs-backend/cubestore": "1.2.30",
     "@cubejs-backend/native": "1.2.30",
     "@cubejs-backend/shared": "1.2.30",
+    "@node-rs/xxhash": "^1.7.6",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "23.3.3",
     "fs-extra": "^9.1.0",

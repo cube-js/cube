@@ -32,6 +32,7 @@
     "@cubejs-backend/base-driver": "1.2.30",
     "@cubejs-backend/cubestore-driver": "1.2.30",
     "@cubejs-backend/shared": "1.2.30",
+    "@node-rs/xxhash": "^1.7.6",
     "csv-write-stream": "^2.0.0",
     "generic-pool": "^3.8.2",
     "lru-cache": "^5.1.1",
