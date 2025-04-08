@@ -11,13 +11,15 @@ lazy_static! {
 pub struct ParamsAllocator {
     sql_templates: PlanSqlTemplates,
     params: Vec<String>,
+    export_annotated_sql: bool,
 }
 
 impl ParamsAllocator {
-    pub fn new(sql_templates: PlanSqlTemplates) -> ParamsAllocator {
+    pub fn new(sql_templates: PlanSqlTemplates, export_annotated_sql: bool) -> ParamsAllocator {
         ParamsAllocator {
             sql_templates,
             params: Vec::new(),
+            export_annotated_sql,
         }
     }
 
@@ -56,13 +58,17 @@ impl ParamsAllocator {
                         param_index_map.insert(ind, index);
                         index
                     };
-                    match self.sql_templates.param(new_index) {
-                        Ok(res) => res,
-                        Err(e) => {
-                            if error.is_none() {
-                                error = Some(e);
+                    if self.export_annotated_sql {
+                        format!("${}$", new_index)
+                    } else {
+                        match self.sql_templates.param(new_index) {
+                            Ok(res) => res,
+                            Err(e) => {
+                                if error.is_none() {
+                                    error = Some(e);
+                                }
+                                "$error$".to_string()
                             }
-                            "$error$".to_string()
                         }
                     }
                 })

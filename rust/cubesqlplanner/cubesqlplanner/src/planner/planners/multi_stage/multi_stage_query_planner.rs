@@ -57,6 +57,7 @@ impl MultiStageQueryPlanner {
             self.query_properties.time_dimensions_filters().clone(),
             self.query_properties.dimensions_filters().clone(),
             self.query_properties.measures_filters().clone(),
+            self.query_properties.segments().clone(),
         );
 
         let top_level_ctes = multi_stage_members

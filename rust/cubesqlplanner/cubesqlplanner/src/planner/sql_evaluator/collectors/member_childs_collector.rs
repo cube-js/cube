@@ -40,6 +40,8 @@ impl TraversalVisitor for MemberChildsCollector {
             match node.as_ref() {
                 MemberSymbol::Measure(_) => Ok(Some(new_state)),
                 MemberSymbol::Dimension(_) => Ok(Some(new_state)),
+                MemberSymbol::TimeDimension(_) => Ok(Some(new_state)),
+                MemberSymbol::MemberExpression(_) => Ok(Some(new_state)),
                 _ => Ok(None),
             }
         } else {

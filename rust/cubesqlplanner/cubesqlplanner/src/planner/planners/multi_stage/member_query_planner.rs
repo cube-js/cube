@@ -11,6 +11,7 @@ use crate::planner::planners::{
 };
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::QueryProperties;
@@ -482,7 +483,7 @@ impl MultiStageMemberQueryPlanner {
             self.description.state().time_dimensions_filters().clone(),
             self.description.state().dimensions_filters().clone(),
             self.description.state().measures_filters().clone(),
-            vec![], //TODO May be we should push down segments on some cases
+            self.description.state().segments().clone(),
             vec![],
             None,
             None,
@@ -585,21 +586,29 @@ impl MultiStageMemberQueryPlanner {
     }
 
     fn query_member_as_base_member(&self) -> Result<Rc<dyn BaseMember>, CubeError> {
-        if let Some(measure) = BaseMeasure::try_new(
-            self.description.member_node().clone(),
-            self.query_tools.clone(),
-        )? {
-            Ok(measure)
-        } else if let Some(dimension) = BaseDimension::try_new(
-            self.description.member_node().clone(),
-            self.query_tools.clone(),
-        )? {
-            Ok(dimension)
-        } else {
-            Err(CubeError::internal(
-                "Expected measure or dimension as multi stage member".to_string(),
-            ))
-        }
+        let res = match self.description.member_node().as_ref() {
+            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => {
+                BaseDimension::try_new_required(
+                    self.description.member_node().clone(),
+                    self.query_tools.clone(),
+                )?
+                .as_base_member()
+            }
+            MemberSymbol::Measure(_) | MemberSymbol::MemberExpression(_) => {
+                // We always treat the member expression as a measure here.
+                BaseMeasure::try_new_required(
+                    self.description.member_node().clone(),
+                    self.query_tools.clone(),
+                )?
+                .as_base_member()
+            }
+            MemberSymbol::CubeName(_) | MemberSymbol::CubeTable(_) => {
+                return Err(CubeError::internal(
+                    "Expected measure or dimension as multi stage member".to_string(),
+                ));
+            }
+        };
+        Ok(res)
     }
 
     fn member_partition_by(
