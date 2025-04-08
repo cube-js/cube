@@ -876,6 +876,8 @@ export class CubejsServerCore {
       clearInterval(this.maxCompilerCacheKeep);
     }
 
+    this.compilerCache.clear();
+
     if (this.scheduledRefreshTimerInterval) {
       await this.scheduledRefreshTimerInterval.cancel();
     }
@@ -919,6 +921,8 @@ export class CubejsServerCore {
   };
 
   public async shutdown() {
+    this.compilerCache.clear();
+
     if (this.devServer) {
       if (!process.env.CI) {
         process.removeListener('uncaughtException', this.onUncaughtException);
