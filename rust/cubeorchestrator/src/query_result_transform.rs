@@ -905,8 +905,8 @@ mod tests {
         "e_commerce_records_us2021__count": "10"
       },
       {
-        "e_commerce_records_us2021__order_date_day": "2020-01-02T00:00:00.000",
-        "e_commerce_records_us2021__count": "8"
+        "e_commerce_records_us2021__order_date_day": null,
+        "e_commerce_records_us2021__count": null
       }
     ],
     "finalResultDefault": [
@@ -917,10 +917,10 @@ mod tests {
         "compareDateRange": "2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999"
       },
       {
-        "ECommerceRecordsUs2021.orderDate.day": "2020-01-02T00:00:00.000",
-        "ECommerceRecordsUs2021.orderDate": "2020-01-02T00:00:00.000",
-        "ECommerceRecordsUs2021.count": "8",
-        "compareDateRange": "2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999"
+        "ECommerceRecordsUs2021.orderDate.day": null,
+        "ECommerceRecordsUs2021.orderDate": null,
+        "ECommerceRecordsUs2021.count": null,
+        "compareDateRange": null
       }
     ],
     "finalResultCompact": {
@@ -938,9 +938,9 @@ mod tests {
           "2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999"
         ],
         [
-          "2020-01-02T00:00:00.000",
-          "2020-01-02T00:00:00.000",
-          "8",
+          null,
+          null,
+          null,
           "2020-01-01T00:00:00.000 - 2020-01-31T23:59:59.999"
         ]
       ]
@@ -2319,15 +2319,15 @@ mod tests {
         let members_map_expected = HashMap::from([
             (
                 "ECommerceRecordsUs2021.orderDate.day".to_string(),
-                DBResponsePrimitive::String("2020-01-02T00:00:00.000".to_string()),
+                DBResponsePrimitive::Null,
             ),
             (
                 "ECommerceRecordsUs2021.orderDate".to_string(),
-                DBResponsePrimitive::String("2020-01-02T00:00:00.000".to_string()),
+                DBResponsePrimitive::Null,
             ),
             (
                 "ECommerceRecordsUs2021.count".to_string(),
-                DBResponsePrimitive::String("8".to_string()),
+                DBResponsePrimitive::Null,
             ),
             (
                 "compareDateRange".to_string(),
