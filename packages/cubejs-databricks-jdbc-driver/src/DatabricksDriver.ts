@@ -4,27 +4,21 @@
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
 
+import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
-import {
+  DatabaseStructure,
   DriverCapabilities,
+  GenericDataBaseType,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
   QueryTablesResult,
-  UnloadOptions,
-  GenericDataBaseType,
   TableColumn,
-  DatabaseStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import {
-  JDBCDriver,
-  JDBCDriverConfiguration,
-} from '@cubejs-backend/jdbc-driver';
+import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
+import { extractUidFromJdbcUrl, resolveJDBCDriver } from './helpers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
@@ -440,8 +434,7 @@ export class DatabricksDriver extends JDBCDriver {
         metadata[database] = {};
       }
 
-      const columns = await this.tableColumnTypes(`${database}.${tableName}`);
-      metadata[database][tableName] = columns;
+      metadata[database][tableName] = await this.tableColumnTypes(`${database}.${tableName}`);
     }));
 
     return metadata;
@@ -538,7 +531,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns table columns types.
    */
   public override async tableColumnTypes(table: string): Promise<TableColumn[]> {
-    let tableFullName = '';
+    let tableFullName: string;
     const tableArray = table.split('.');
 
     if (tableArray.length === 3) {
@@ -748,11 +741,8 @@ export class DatabricksDriver extends JDBCDriver {
       return this.extractFilesFromGCS(
         { credentials: this.config.gcsCredentials },
         url.host,
-        objectSearchPrefix+".csv",
-      ).then(files => files.filter(file => 
-        decodeURIComponent(new URL(file).pathname).endsWith('.csv') || 
-        decodeURIComponent(new URL(file).pathname).endsWith('.csv.gz')
-      ));
+        objectSearchPrefix,
+      );
     } else {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
@@ -779,19 +769,22 @@ export class DatabricksDriver extends JDBCDriver {
    *
    * For Azure blob storage you need to configure account access key in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly)
+   * https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly
    *
    * `fs.azure.account.key.<storage-account-name>.blob.core.windows.net <storage-account-access-key>`
    *
    * For S3 bucket storage you need to configure AWS access key and secret in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly)
+   * https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly
    *
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
+   *
    * For Google cloud storage you can configure storage credentials and create an external location to access it
-   * (https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/storage-credentials
-   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/external-locations)
+   * or configure account service key (legacy)
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/storage-credentials
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/external-locations
+   * https://docs.databricks.com/aws/en/connect/storage/gcs
    */
   private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[], columns: ColumnInfo[]) {
     let select = sql;
@@ -803,15 +796,15 @@ export class DatabricksDriver extends JDBCDriver {
     try {
       await this.query(
         `
-        CREATE TABLE ${tableFullName}
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        CREATE TABLE ${tableFullName}_tmp
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
         OPTIONS (escape = '"')
         AS (${select});
         `,
         params,
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName};`, []);
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
     }
   }
 
@@ -821,30 +814,36 @@ export class DatabricksDriver extends JDBCDriver {
    *
    * For Azure blob storage you need to configure account access key in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly)
+   * https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly
    *
    * `fs.azure.account.key.<storage-account-name>.blob.core.windows.net <storage-account-access-key>`
    *
    * For S3 bucket storage you need to configure AWS access key and secret in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly)
+   * https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly
    *
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
+   *
+   * For Google cloud storage you can configure storage credentials and create an external location to access it
+   * or configure account service key (legacy)
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/storage-credentials
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/external-locations
+   * https://docs.databricks.com/aws/en/connect/storage/gcs
    */
   private async createExternalTableFromTable(tableFullName: string, columns: ColumnInfo[]) {
     try {
       await this.query(
         `
-        CREATE TABLE _${tableFullName}
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        CREATE TABLE ${tableFullName}_tmp
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
         OPTIONS (escape = '"')
         AS SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
         `,
         [],
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS _${tableFullName};`, []);
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
     }
   }
 }
