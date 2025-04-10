@@ -28,16 +28,17 @@ Related to building pre-aggregations:
 - It is possible to build pre-aggregations within 10 minutes at all scale factors.
 - [Conditional partitioning](#conditional-partitioning) can be used to achieve optimal
 partitioning for datasets of different sizes.
+<!--
 - [Surrogate time dimensions](#partitioning-by-surrogate-time-dimensions) can be used
 to partition pre-aggregations that don't have natural time dimensions.
+-->
 
 ## Results
 
 ### Scale factors
 
 The following charts show the median query latency at different QPS levels for
-different scale factors: `SF1` (light blue), `SF10` (dark blue), `SF100` (orange),
-`SF1000` (gray).
+different scale factors.
 
 Q14 demonstrates stable, low-latency performance at all scale factors and QPS levels.
 
@@ -52,6 +53,8 @@ xychart-beta
   line "SF1000" [216, 212, 213, 206, 203, 200, 198, 198, 199, 197]
 ```
 
+_Legend: `SF1` (light blue), `SF10` (dark blue), `SF100` (orange), `SF1000` (gray)._
+
 Q1 demonstrates similar performance to Q14 at all scale factors and QPS levels below 35.
 
 ```mermaid
@@ -64,6 +67,8 @@ xychart-beta
   line "SF100" [314, 316, 303, 333, 393, 363, 364, 651, 580, 495]
   line "SF1000" [308, 293, 302, 372, 315, 318, 373, 375, 395, 708]
 ```
+
+_Legend: `SF1` (light blue), `SF10` (dark blue), `SF100` (orange), `SF1000` (gray)._
 
 This is explained by the fact that Q1 filters by a time dimension with multi-year
 date range:
@@ -166,6 +171,8 @@ xychart-beta
   line "SF1000" [308, 293, 302, 372, 315, 318, 373, 375, 395, 708]
 ```
 
+_Legend: `SF1` (light blue), `SF10` (dark blue), `SF100` (orange), `SF1000` (gray)._
+
 Here's an example generated query:
 
 ```sql
@@ -214,6 +221,8 @@ xychart-beta
   line "SF1000" [301, 280, 288, 290, 303, 317, 308, 347, 470, 1098]
 ```
 
+_Legend: `SF1` (light blue), `SF10` (dark blue), `SF100` (orange), `SF1000` (gray)._
+
 Compare the generated query:
 
 ```sql
@@ -261,6 +270,8 @@ xychart-beta
   line "SF100" [213, 209, 209, 208, 201, 201, 199, 202, 197, 197]
   line "SF1000" [216, 212, 213, 206, 203, 200, 198, 198, 199, 197]
 ```
+
+_Legend: `SF1` (light blue), `SF10` (dark blue), `SF100` (orange), `SF1000` (gray)._
 
 This is explained by the fact that Q14 only filters by a time dimension:
 
@@ -312,6 +323,8 @@ xychart-beta
   y-axis "Query latency, ms" 100 --> 5000
   line "SF1" [444, 471, 609, 1105, 4147, 4358, 4589, 4607, 4599, 4707]
 ```
+
+_Legend: `SF1` (light blue)._
 
 This is explained by the fact that Q19 filters by complex conditions on multiple dimensions:
 
@@ -461,7 +474,7 @@ LIMIT 50000
 xychart-beta
   title "Q1 @ SF1000"
   x-axis "QPS" [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
-  y-axis "Query latency, ms" 100 --> 5000
+  y-axis "Query latency, ms" 100 -> 5000
   line "8 CSWs" [302, 271, 301, 301, 305, 355, 415, 425, 495, 422]
   line "16 CSWs" [340, 313, 310, 294, 337, 317, 507, 436, 627, 877]
 ```
@@ -470,7 +483,7 @@ xychart-beta
 xychart-beta
   title "Q19 @ SF1"
   x-axis "QPS" [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
-  y-axis "Query latency, ms" 100 --> 5000
+  y-axis "Query latency, ms" 100 -> 5000
   line "8 CSWs" [433, 439, 559, 743, 4111, 4348, 4590, 4770, 4814, 4396]
   line "16 CSWs" [898, 698, 1361, 4397, 4628, 4041, 4455, 4303, 4762, 4480]
 ```
@@ -537,6 +550,8 @@ This is not an issue with conditional partitioning:
   refresh_key:
     every: 1 week 
 ```
+
+<!--
 
 #### Partitioning by surrogate time dimensions
 
@@ -612,6 +627,8 @@ def query_rewrite(query: dict, ctx: dict) -> dict:
   query = add_time_dimension_filter('q19', query)
   return query
 ```
+
+-->
 
 
 [link-tpch-spec]: https://www.tpc.org/TPC_Documents_Current_Versions/pdf/TPC-H_v3.0.1.pdf
