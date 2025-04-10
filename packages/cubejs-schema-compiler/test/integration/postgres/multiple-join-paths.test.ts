@@ -4,7 +4,7 @@ import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
 
-describe('View and indirect members', () => {
+describe('Multiple join paths', () => {
   jest.setTimeout(200000);
 
   let compiler: DataSchemaCompiler;
@@ -18,9 +18,10 @@ describe('View and indirect members', () => {
     // ├-->D-->E---┤
     // |           |
     // └-->F-------┘
-    // View would use ADEX path
-    // It should NOT be the shortest one, nor first in join edges declaration
+    // View, pre-aggregations and all interesting parts should use ADEX path
+    // It should NOT be the shortest one from A to X (that's AFX), nor first in join edges declaration (that's ABCX)
     // All join conditions would be essentially `FALSE`, but with different syntax, to be able to test SQL generation
+    // Also, there should be only one way to cover cubes A and D with joins: A->D join
 
     // TODO in this model queries like [A.a_id, X.x_id] become ambiguous, probably we want to handle this better
 
@@ -227,20 +228,6 @@ describe('View and indirect members', () => {
             prefix: false
           },
           {
-            join_path: A.D,
-            includes: [
-              'd_id',
-            ],
-            prefix: false
-          },
-          {
-            join_path: A.D.E,
-            includes: [
-              'e_id',
-            ],
-            prefix: false
-          },
-          {
             join_path: A.D.E.X,
             includes: [
               'x_id',
@@ -259,24 +246,26 @@ describe('View and indirect members', () => {
     await compiler.compile();
   });
 
-  it('should respect join path from view declaration', async () => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: [],
-      dimensions: [
-        'ADEX_view.a_id',
-        'ADEX_view.x_id_ref',
-      ],
+  describe('View and indirect members', () => {
+    it('should respect join path from view declaration', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'ADEX_view.a_id',
+          'ADEX_view.x_id_ref',
+        ],
+      });
+
+      const [sql, _params] = query.buildSqlAndParams();
+
+      expect(sql).toMatch(/ON 'A' = 'D'/);
+      expect(sql).toMatch(/ON 'D' = 'E'/);
+      expect(sql).toMatch(/ON 'E' = 'X'/);
+      expect(sql).not.toMatch(/ON 'A' = 'B'/);
+      expect(sql).not.toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'C' = 'X'/);
+      expect(sql).not.toMatch(/ON 'A' = 'F'/);
+      expect(sql).not.toMatch(/ON 'F' = 'X'/);
     });
-
-    const [sql, _params] = query.buildSqlAndParams();
-
-    expect(sql).toMatch(/ON 'A' = 'D'/);
-    expect(sql).toMatch(/ON 'D' = 'E'/);
-    expect(sql).toMatch(/ON 'E' = 'X'/);
-    expect(sql).not.toMatch(/ON 'A' = 'B'/);
-    expect(sql).not.toMatch(/ON 'B' = 'C'/);
-    expect(sql).not.toMatch(/ON 'C' = 'X'/);
-    expect(sql).not.toMatch(/ON 'A' = 'F'/);
-    expect(sql).not.toMatch(/ON 'F' = 'X'/);
   });
 });
