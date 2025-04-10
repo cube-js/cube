@@ -59,6 +59,16 @@ describe('Multiple join paths', () => {
             type: 'sum',
           },
         },
+
+        preAggregations: {
+          adex: {
+            type: 'rollup',
+            dimensionReferences: [a_id, CUBE.D.E.X.x_id],
+            measureReferences: [a_sum, D.E.X.x_sum],
+            // TODO implement and test segmentReferences
+            // TODO implement and test timeDimensionReference
+          },
+        },
       });
 
       cube('B', {
@@ -266,6 +276,29 @@ describe('Multiple join paths', () => {
       expect(sql).not.toMatch(/ON 'C' = 'X'/);
       expect(sql).not.toMatch(/ON 'A' = 'F'/);
       expect(sql).not.toMatch(/ON 'F' = 'X'/);
+    });
+  });
+
+  describe('PreAggregations join path', () => {
+    it('should respect join path from pre-aggregation declaration', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'A.a_id'
+        ],
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex');
+
+      expect(loadSql[0]).toMatch(/ON 'A' = 'D'/);
+      expect(loadSql[0]).toMatch(/ON 'D' = 'E'/);
+      expect(loadSql[0]).toMatch(/ON 'E' = 'X'/);
+      expect(loadSql[0]).not.toMatch(/ON 'A' = 'B'/);
+      expect(loadSql[0]).not.toMatch(/ON 'B' = 'C'/);
+      expect(loadSql[0]).not.toMatch(/ON 'C' = 'X'/);
+      expect(loadSql[0]).not.toMatch(/ON 'A' = 'F'/);
+      expect(loadSql[0]).not.toMatch(/ON 'F' = 'X'/);
     });
   });
 });
