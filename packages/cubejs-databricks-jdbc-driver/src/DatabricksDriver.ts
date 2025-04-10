@@ -133,7 +133,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Show warning message flag.
    */
-  private showSparkProtocolWarn: boolean;
+  private readonly showSparkProtocolWarn: boolean;
 
   /**
    * Driver Configuration.

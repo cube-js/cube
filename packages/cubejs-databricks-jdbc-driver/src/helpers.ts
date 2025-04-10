@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { downloadJDBCDriver } from './installer';
+import { downloadJDBCDriver, OSS_DRIVER_VERSION } from './installer';
 
 async function fileExistsOr(
   fsPath: string,
@@ -15,16 +15,16 @@ async function fileExistsOr(
 
 export async function resolveJDBCDriver(): Promise<string> {
   return fileExistsOr(
-    path.join(process.cwd(), 'DatabricksJDBC42.jar'),
+    path.join(process.cwd(), `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`),
     async () => fileExistsOr(
-      path.join(__dirname, '..', 'download', 'DatabricksJDBC42.jar'),
+      path.join(__dirname, '..', 'download', `databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar`),
       async () => {
         const pathOrNull = await downloadJDBCDriver();
         if (pathOrNull) {
           return pathOrNull;
         }
         throw new Error(
-          'Please download and place DatabricksJDBC42.jar inside your ' +
+          `Please download and place databricks-jdbc-${OSS_DRIVER_VERSION}-oss.jar inside your ` +
           'project directory'
         );
       }
