@@ -18,7 +18,10 @@ import {
 } from '@cubejs-backend/base-driver';
 import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { extractUidFromJdbcUrl, resolveJDBCDriver } from './helpers';
+import {
+  extractAndRemoveUidPwdFromJdbcUrl,
+  resolveJDBCDriver
+} from './helpers';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
@@ -187,20 +190,20 @@ export class DatabricksDriver extends JDBCDriver {
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
     }
 
+    const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
+
     const config: DatabricksDriverConfiguration = {
       ...conf,
-      url,
+      url: cleanedUrl,
       dbType: 'databricks',
       drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
-        UID: extractUidFromJdbcUrl(url),
-        // PWD-parameter passed to the connection string has higher priority,
-        // so we can set this one to an empty string to avoid a Java error.
+        UID: uid,
         PWD:
           conf?.token ||
           getEnv('databrickToken', { dataSource }) ||
-          '',
+          pwd,
         UserAgentEntry: 'CubeDev_Cube',
       },
       catalog:

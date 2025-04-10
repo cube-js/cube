@@ -32,9 +32,20 @@ export async function resolveJDBCDriver(): Promise<string> {
   );
 }
 
-export function extractUidFromJdbcUrl(jdbcUrl: string): string {
-  const { pathname } = new URL(jdbcUrl);
-  const [_, ...params] = pathname.split(';');
-  const searchParams = new URLSearchParams(params.join('&'));
-  return searchParams.get('UID') || 'token';
+/**
+ * Extract if exist UID and PWD from URL and return UID, PWD and URL without these params
+ * @param jdbcUrl
+ */
+export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [string, string, string] {
+  const uidMatch = jdbcUrl.match(/UID=([^;]*)/);
+  const pwdMatch = jdbcUrl.match(/PWD=([^;]*)/);
+
+  const uid = uidMatch?.[1] || 'token';
+  const pwd = pwdMatch?.[1] || '';
+
+  const cleanedUrl = jdbcUrl
+    .replace(/;?UID=[^;]*/i, '')
+    .replace(/;?PWD=[^;]*/i, '');
+
+  return [uid, pwd, cleanedUrl];
 }
