@@ -91,6 +91,7 @@ export class CubeSymbols {
         // TODO can we define it when cubeList is defined?
         this.cubeList.push(splitViews[viewName]);
         this.symbols[viewName] = splitViews[viewName];
+        this.cubeDefinitions[viewName] = splitViews[viewName];
       }
     }
   }
