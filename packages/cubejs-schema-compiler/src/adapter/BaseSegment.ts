@@ -9,8 +9,6 @@ export class BaseSegment {
 
   public readonly isMemberExpression: boolean = false;
 
-  public readonly joinHint: Array<string> = [];
-
   public constructor(
     protected readonly query: BaseQuery,
     public readonly segment: string | any
@@ -21,12 +19,6 @@ export class BaseSegment {
       // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = segment.expressionName || `${segment.cubeName}.${segment.name}`;
       this.isMemberExpression = !!segment.definition;
-    } else {
-      // TODO move this `as` to static types
-      const segmentPath = segment as string;
-      const { path, joinHint } = this.query.cubeEvaluator.joinHintFromPath(segmentPath);
-      this.segment = path;
-      this.joinHint = joinHint;
     }
   }
 

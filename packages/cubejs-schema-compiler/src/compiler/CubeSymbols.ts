@@ -609,27 +609,6 @@ export class CubeSymbols {
     return array.join('.');
   }
 
-  /**
-   * Split join path to member to join hint and member path: `A.B.C.D.E.dim` => `[A, B, C, D, E]` + `E.dim`
-   * @param path
-   */
-  public joinHintFromPath(path: string): { path: string, joinHint: Array<string> } {
-    const parts = path.split('.');
-    if (parts.length > 2) {
-      // Path contains join path
-      const joinHint = parts.slice(0, -1);
-      return {
-        path: parts.slice(-2).join('.'),
-        joinHint,
-      };
-    } else {
-      return {
-        path,
-        joinHint: [],
-      };
-    }
-  }
-
   protected resolveSymbolsCall<T>(
     func: (...args: Array<unknown>) => T | DynamicReference<T>,
     nameResolver: (id: string) => unknown,

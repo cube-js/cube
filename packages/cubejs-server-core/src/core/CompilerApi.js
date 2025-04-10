@@ -425,11 +425,6 @@ export class CompilerApi {
     }
   }
 
-  /**
-   *
-   * @param {unknown} filter
-   * @returns {Promise<Array<PreAggregationInfo>>}
-   */
   async preAggregations(filter) {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.preAggregations(filter);
