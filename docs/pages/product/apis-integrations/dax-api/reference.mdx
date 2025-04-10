@@ -26,20 +26,20 @@ of the DAX documentation.
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
 | [`AVERAGE`](https://learn.microsoft.com/en-us/dax/average-function-dax) | — | — |
-| [`AVERAGEA`](https://learn.microsoft.com/en-us/dax/averagea-function-dax) | Non-numeric values | — |
+| [`AVERAGEA`](https://learn.microsoft.com/en-us/dax/averagea-function-dax) | — | — |
 | [`AVERAGEX`](https://learn.microsoft.com/en-us/dax/averagex-function-dax) | Non-base table as input table | — |
 | [`COUNT`](https://learn.microsoft.com/en-us/dax/count-function-dax) | — | — |
 | [`COUNTA`](https://learn.microsoft.com/en-us/dax/counta-function-dax) | — | — |
 | [`COUNTAX`](https://learn.microsoft.com/en-us/dax/countax-function-dax) | Non-base table as input table | — |
 | [`COUNTBLANK`](https://learn.microsoft.com/en-us/dax/countblank-function-dax) | — | — |
-| [`COUNTROWS`](https://learn.microsoft.com/en-us/dax/countrows-function-dax) | — | Disregards input table expression and always returns 1 |
+| [`COUNTROWS`](https://learn.microsoft.com/en-us/dax/countrows-function-dax) | — | Disregards input table expression and always returns 50000 |
 | [`COUNTX`](https://learn.microsoft.com/en-us/dax/countx-function-dax) | Non-base table as input table | — |
 | [`DISTINCTCOUNT`](https://learn.microsoft.com/en-us/dax/distinctcount-function-dax) | — | Blanks are ignored |
 | [`DISTINCTCOUNTNOBLANK`](https://learn.microsoft.com/en-us/dax/distinctcountnoblank-function-dax) | — | — |
-| [`MAX`](https://learn.microsoft.com/en-us/dax/max-function-dax) | 2 arguments | Blanks are disregarded instead of being treated as 0 |
+| [`MAX`](https://learn.microsoft.com/en-us/dax/max-function-dax) | — | Blanks are disregarded instead of being treated as 0 in two-argument variant |
 | [`MAXA`](https://learn.microsoft.com/en-us/dax/maxa-function-dax) | — | — |
 | [`MAXX`](https://learn.microsoft.com/en-us/dax/maxx-function-dax) | Non-base table as input table | — |
-| [`MIN`](https://learn.microsoft.com/en-us/dax/min-function-dax) | 2 arguments | Blanks are disregarded instead of being treated as 0 |
+| [`MIN`](https://learn.microsoft.com/en-us/dax/min-function-dax) | — | Blanks are disregarded instead of being treated as 0 in two-argument variant |
 | [`MINA`](https://learn.microsoft.com/en-us/dax/mina-function-dax) | — | — |
 | [`MINX`](https://learn.microsoft.com/en-us/dax/minx-function-dax) | Non-base table as input table | — |
 | [`SUM`](https://learn.microsoft.com/en-us/dax/sum-function-dax) | — | — |
@@ -58,19 +58,19 @@ of the DAX documentation.
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
 | [`DATE`](https://learn.microsoft.com/en-us/dax/date-function-dax) | Non-literal date parts | — |
-| [`DAY`](https://learn.microsoft.com/en-us/dax/day-function-dax) | Text date input | — |
-| [`HOUR`](https://learn.microsoft.com/en-us/dax/hour-function-dax) | Text date input | — |
-| [`MINUTE`](https://learn.microsoft.com/en-us/dax/minute-function-dax) | Text date input | — |
-| [`MONTH`](https://learn.microsoft.com/en-us/dax/month-function-dax) | Text date input | — |
-| [`NOW`](https://learn.microsoft.com/en-us/dax/now-function-dax) | — | Returns datetime in UTC time zone |
-| [`QUARTER`](https://learn.microsoft.com/en-us/dax/quarter-function-dax) | Text date input | — |
-| [`SECOND`](https://learn.microsoft.com/en-us/dax/second-function-dax) | Text date input | — |
-| [`TIME`](https://learn.microsoft.com/en-us/dax/time-function-dax) | Non-literal date parts. Execution outside `DATE(...) + TIME(...)` expression | — |
-| [`TODAY`](https://learn.microsoft.com/en-us/dax/today-function-dax) | — | Returns date in UTC time zone. Time is at 12:00:00 AM; contrary to documentation, Analysis Services returns that time |
-| [`UTCNOW`](https://learn.microsoft.com/en-us/dax/utcnow-function-dax) | — | — |
-| [`UTCTODAY`](https://learn.microsoft.com/en-us/dax/utctoday-function-dax) | — | Time is at 12:00:00 AM; contrary to documentation, Analysis Services returns that time |
-| [`WEEKDAY`](https://learn.microsoft.com/en-us/dax/weekday-function-dax) | Text date input | — |
-| [`YEAR`](https://learn.microsoft.com/en-us/dax/year-function-dax) | Text date input | — |
+| [`DAY`](https://learn.microsoft.com/en-us/dax/day-function-dax) | — | — |
+| [`HOUR`](https://learn.microsoft.com/en-us/dax/hour-function-dax) | — | — |
+| [`MINUTE`](https://learn.microsoft.com/en-us/dax/minute-function-dax) | — | — |
+| [`MONTH`](https://learn.microsoft.com/en-us/dax/month-function-dax) | — | — |
+| [`NOW`](https://learn.microsoft.com/en-us/dax/now-function-dax) | — | Time zone may depend on data warehouse settings |
+| [`QUARTER`](https://learn.microsoft.com/en-us/dax/quarter-function-dax) | — | — |
+| [`SECOND`](https://learn.microsoft.com/en-us/dax/second-function-dax) | — | — |
+| [`TIME`](https://learn.microsoft.com/en-us/dax/time-function-dax) | Non-literal date parts | — |
+| [`TODAY`](https://learn.microsoft.com/en-us/dax/today-function-dax) | — | Time zone may depend on data warehouse settings |
+| [`UTCNOW`](https://learn.microsoft.com/en-us/dax/utcnow-function-dax) | — | Time zone may depend on data warehouse settings |
+| [`UTCTODAY`](https://learn.microsoft.com/en-us/dax/utctoday-function-dax) | — | Time zone may depend on data warehouse settings |
+| [`WEEKDAY`](https://learn.microsoft.com/en-us/dax/weekday-function-dax) | — | — |
+| [`YEAR`](https://learn.microsoft.com/en-us/dax/year-function-dax) | — | — |
 
 ### Filter functions
 
@@ -102,6 +102,18 @@ of the DAX documentation.
 
 No financial functions currently supported.
 
+### INFO functions
+
+<InfoBox>
+
+Learn more in the
+[relevant section](https://learn.microsoft.com/en-us/dax/info-functions-dax)
+of the DAX documentation.
+
+</InfoBox>
+
+No INFO functions currently supported.
+
 ### Information functions
 
 <InfoBox>
@@ -115,7 +127,7 @@ of the DAX documentation.
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
 | [`ISAFTER`](https://learn.microsoft.com/en-us/dax/isafter-function-dax) | — | — |
-| [`ISBLANK`](https://learn.microsoft.com/en-us/dax/isblank-function-dax) | — | Blanks are treated as equivalent to nulls and vice versa |
+| [`ISBLANK`](https://learn.microsoft.com/en-us/dax/isblank-function-dax) | — | — |
 | [`ISEVEN`](https://learn.microsoft.com/en-us/dax/iseven-function-dax) | — | — |
 | [`ISODD`](https://learn.microsoft.com/en-us/dax/isodd-function-dax) | — | — |
 | [`ISONORAFTER`](https://learn.microsoft.com/en-us/dax/isonorafter-function-dax) | — | — |
@@ -136,7 +148,7 @@ of the DAX documentation.
 | --- | --- | --- |
 | [`AND`](https://learn.microsoft.com/en-us/dax/and-function-dax) | — | — |
 | [`FALSE`](https://learn.microsoft.com/en-us/dax/false-function-dax) | — | — |
-| [`IF`](https://learn.microsoft.com/en-us/dax/if-function-dax) | Variant data types | — |
+| [`IF`](https://learn.microsoft.com/en-us/dax/if-function-dax) | — | Coerces results to common type |
 | [`NOT`](https://learn.microsoft.com/en-us/dax/not-function-dax) | — | — |
 | [`OR`](https://learn.microsoft.com/en-us/dax/or-function-dax) | — | — |
 | [`SWITCH`](https://learn.microsoft.com/en-us/dax/switch-function-dax) | — | — |
@@ -159,7 +171,9 @@ of the DAX documentation.
 | [`ASIN`](https://learn.microsoft.com/en-us/dax/asin-function-dax) | — | — |
 | [`ATAN`](https://learn.microsoft.com/en-us/dax/atan-function-dax) | — | — |
 | [`CEILING`](https://learn.microsoft.com/en-us/dax/ceiling-function-dax) | Significance other than 1 | — |
+| [`CONVERT`](https://learn.microsoft.com/en-us/dax/convert-function-dax) | — | — |
 | [`COS`](https://learn.microsoft.com/en-us/dax/cos-function-dax) | — | — |
+| [`DIVIDE`](https://learn.microsoft.com/en-us/dax/divide-function-dax) | — | — |
 | [`EXP`](https://learn.microsoft.com/en-us/dax/exp-function-dax) | — | — |
 | [`FLOOR`](https://learn.microsoft.com/en-us/dax/floor-function-dax) | Significance other than 1 | — |
 | [`INT`](https://learn.microsoft.com/en-us/dax/int-function-dax) | — | — |
@@ -193,7 +207,7 @@ of the DAX documentation.
 
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
-| [`BLANK`](https://learn.microsoft.com/en-us/dax/blank-function-dax) | — | Blanks are treated as equivalent to nulls and vice versa |
+| [`BLANK`](https://learn.microsoft.com/en-us/dax/blank-function-dax) | — | — |
 
 ### Parent and child functions
 
@@ -246,9 +260,12 @@ of the DAX documentation.
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
 | [`ADDCOLUMNS`](https://learn.microsoft.com/en-us/dax/addcolumns-function-dax) | Aggregate expressions | — |
+| [`CURRENTGROUP`](https://learn.microsoft.com/en-us/dax/currentgroup-function-dax) | — | — |
 | <nobr>[`DISTINCT`](https://learn.microsoft.com/en-us/dax/distinct-function-dax) (column)</nobr> | — | — |
 | <nobr>[`DISTINCT`](https://learn.microsoft.com/en-us/dax/distinct-table-function-dax) (table)</nobr> | Filter context for table expressions | — |
+| [`GROUPBY`](https://learn.microsoft.com/en-us/dax/groupby-function-dax) | — | — |
 | [`IGNORE`](https://learn.microsoft.com/en-us/dax/ignore-function-dax) | 2+ arguments | Doesn't modify filter context, silently ignored |
+| [`NATURALINNERJOIN`](https://learn.microsoft.com/en-us/dax/naturalinnerjoin-function-dax) | — | — |
 | [`NATURALLEFTOUTERJOIN`](https://learn.microsoft.com/en-us/dax/naturalleftouterjoin-function-dax) | — | — |
 | [`ROLLUPADDISSUBTOTAL`](https://learn.microsoft.com/en-us/dax/rollupaddissubtotal-function-dax) | `grandtotalFilter` | — |
 | [`ROLLUPGROUP`](https://learn.microsoft.com/en-us/dax/rollupgroup-function-dax) | — | — |
@@ -304,6 +321,7 @@ No time intelligence functions currently supported.
 
 | Function | <nobr>Unsupported features</nobr> | Caveats |
 | --- | --- | --- |
+| [`GROUPCROSSAPPLY`](https://learn.microsoft.com/en-us/dax/groupcrossapply-function-dax) | — | — |
 | [`SAMPLEAXISWITHLOCALMINMAX`](https://learn.microsoft.com/en-us/dax/sampleaxiswithlocalminmax-function-dax) | — | Silently ignored, returning input table expression |
 
 
