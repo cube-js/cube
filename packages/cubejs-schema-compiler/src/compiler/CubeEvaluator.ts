@@ -632,7 +632,7 @@ export class CubeEvaluator extends CubeSymbols {
     return symbol !== undefined;
   }
 
-  public byPathAnyType(path: string[]) {
+  public byPathAnyType(path: string | string[]) {
     if (this.isInstanceOfType('measures', path)) {
       return this.byPath('measures', path);
     }
@@ -645,7 +645,7 @@ export class CubeEvaluator extends CubeSymbols {
       return this.byPath('segments', path);
     }
 
-    throw new UserError(`Can't resolve member '${path.join('.')}'`);
+    throw new UserError(`Can't resolve member '${Array.isArray(path) ? path.join('.') : path}'`);
   }
 
   public byPath(type: 'measures' | 'dimensions' | 'segments', path: string | string[]) {
