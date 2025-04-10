@@ -82,7 +82,6 @@ type PreAggregationTimeDimensionReference = {
   granularity: string,
 };
 
-/// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
 type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
   dimensions: Array<string>,
@@ -744,14 +743,14 @@ export class CubeEvaluator extends CubeSymbols {
 
     if (aggregation.timeDimensionReference) {
       timeDimensions.push({
-        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference, { collectJoinHints: true }),
+        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
         granularity: aggregation.granularity
       });
     } else if (aggregation.timeDimensionReferences) {
       // eslint-disable-next-line guard-for-in
       for (const timeDimensionReference of aggregation.timeDimensionReferences) {
         timeDimensions.push({
-          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension, { collectJoinHints: true }),
+          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension),
           granularity: timeDimensionReference.granularity
         });
       }
@@ -760,12 +759,12 @@ export class CubeEvaluator extends CubeSymbols {
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
-        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences, { collectJoinHints: true }) || [])
+        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
           .concat(
-            aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences, { collectJoinHints: true }) || []
+            aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences) || []
           ),
       measures:
-        (aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences, { collectJoinHints: true }) || []),
+        aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
