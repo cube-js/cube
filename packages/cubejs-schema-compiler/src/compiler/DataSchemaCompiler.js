@@ -172,20 +172,24 @@ export class DataSchemaCompiler {
           .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
 
         const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js'));
-        let jsChunks;
-        if (jsFiles.length < transpilationNativeThreadsCount * transpilationNativeThreadsCount) {
-          jsChunks = [jsFiles];
-        } else {
-          const baseSize = Math.floor(jsFiles.length / transpilationNativeThreadsCount);
-          jsChunks = [];
-          for (let i = 0; i < transpilationNativeThreadsCount; i++) {
-            // For the last part, we take the remaining files so we don't lose the extra ones.
-            const start = i * baseSize;
-            const end = (i === transpilationNativeThreadsCount - 1) ? jsFiles.length : start + baseSize;
-            jsChunks.push(jsFiles.slice(start, end));
+        let JsFilesTasks = [];
+
+        if (jsFiles.length > 0) {
+          let jsChunks;
+          if (jsFiles.length < transpilationNativeThreadsCount * transpilationNativeThreadsCount) {
+            jsChunks = [jsFiles];
+          } else {
+            const baseSize = Math.floor(jsFiles.length / transpilationNativeThreadsCount);
+            jsChunks = [];
+            for (let i = 0; i < transpilationNativeThreadsCount; i++) {
+              // For the last part, we take the remaining files so we don't lose the extra ones.
+              const start = i * baseSize;
+              const end = (i === transpilationNativeThreadsCount - 1) ? jsFiles.length : start + baseSize;
+              jsChunks.push(jsFiles.slice(start, end));
+            }
           }
+          JsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
         }
-        const JsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
 
         results = (await Promise.all([...nonJsFilesTasks, ...JsFilesTasks])).flat();
       } else if (transpilationWorkerThreads) {
