@@ -45,7 +45,9 @@ export class WebSocketServer {
         const resMsg = new TextDecoder().decode(await message.message.getFinalResult());
         message.message = '~XXXXX~';
         messageStr = JSON.stringify(message);
-        messageStr = messageStr.replace('"~XXXXX~"', resMsg);
+        // resMsg may include any symbols and String.replace sometimes might treat them as a special/command symbols,
+        // to prevent this implicit unexpected changes we use replacer function, which returns what we want.
+        messageStr = messageStr.replace('"~XXXXX~"', () => resMsg);
       } else {
         messageStr = JSON.stringify(message);
       }
