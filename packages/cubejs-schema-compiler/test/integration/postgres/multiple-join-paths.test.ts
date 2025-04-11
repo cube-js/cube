@@ -1,5 +1,5 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
@@ -26,7 +26,7 @@ describe('Multiple join paths', () => {
     // TODO in this model queries like [A.a_id, X.x_id] become ambiguous, probably we want to handle this better
 
     // language=JavaScript
-    const prepared = prepareCompiler(`
+    const prepared = prepareJsCompiler(`
       cube('A', {
         sql: 'SELECT 1 AS a_id, 100 AS a_value',
 
