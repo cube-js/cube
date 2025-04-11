@@ -471,6 +471,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 9`] = `
 Object {
   "countCreatedAt": Object {
+    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
@@ -488,6 +489,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.js correctly extends cubeA.yml (with additions) 10`] = `
 Object {
   "countCreatedAt": Object {
+    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
@@ -1143,6 +1145,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 9`] = `
 Object {
   "countCreatedAt": Object {
+    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
@@ -1160,6 +1163,7 @@ Object {
 exports[`Schema Testing Inheritance CubeB.yml correctly extends cubeA.yml (with additions) 10`] = `
 Object {
   "countCreatedAt": Object {
+    "allowNonStrictDateRangeMatch": true,
     "external": true,
     "granularity": "day",
     "measureReferences": [Function],
