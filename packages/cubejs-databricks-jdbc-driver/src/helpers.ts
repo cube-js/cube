@@ -36,9 +36,9 @@ export async function resolveJDBCDriver(): Promise<string> {
  * Extract if exist UID and PWD from URL and return UID, PWD and URL without these params
  * @param jdbcUrl
  */
-export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [string, string, string] {
-  const uidMatch = jdbcUrl.match(/UID=([^;]*)/);
-  const pwdMatch = jdbcUrl.match(/PWD=([^;]*)/);
+export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string, pwd: string, cleanedUrl: string] {
+  const uidMatch = jdbcUrl.match(/UID=([^;]*)/i);
+  const pwdMatch = jdbcUrl.match(/PWD=([^;]*)/i);
 
   const uid = uidMatch?.[1] || 'token';
   const pwd = pwdMatch?.[1] || '';
