@@ -111,6 +111,15 @@ fn filter_push_down(
             )
         }
         LogicalPlan::Filter(Filter { predicate, input }) => {
+            // Current DataFusion version plans complex joins as Filter(CrossJoin)
+            // So for query like `SELECT ... FROM ... JOIN ... ON complex_condition WHERE predicate`
+            // Plan can look like Filter(predicate, Filter(join_condition, CrossJoin))
+            // This optimizer can mess with filter predicates, and break join detection later in rewrites
+            // So, for now, it just completely pessimizes plans like Filter(CrossJoin)
+            if let LogicalPlan::CrossJoin(_) = input.as_ref() {
+                return issue_filter(predicates, plan.clone());
+            }
+
             // When encountering a filter, collect it to our list of predicates,
             // remove the filter from the plan and continue down the plan.
 
