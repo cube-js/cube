@@ -117,15 +117,6 @@ The `COUNT(*)` aggregate function is being mapped to a measure of type
 [count](/reference/data-model/types-and-formats#count) in Cube's
 **Orders** data model file.
 
-## Additional configuration
-
-### Pre-aggregations
-
-To allow queries from Superset to match pre-aggregations in Cube, [the
-`allow_non_strict_date_range_match`
-property][ref-schema-ref-preagg-allownonstrict] must be set to `true` in the
-pre-aggregation definition. This is because Superset uses loose date ranges when
-generating SQL queries.
 
 [ref-getting-started]: /product/getting-started/cloud
 [ref-schema-ref-preagg-allownonstrict]:

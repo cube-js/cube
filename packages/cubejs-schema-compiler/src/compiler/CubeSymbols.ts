@@ -249,6 +249,12 @@ export class CubeSymbols {
           preAggregation.type = 'rollup';
         }
 
+        if (preAggregation.allowNonStrictDateRangeMatch === undefined &&
+          ['originalSql', 'rollupJoin', 'rollup'].includes(preAggregation.type) &&
+          (preAggregation.timeDimension || preAggregation.timeDimensions)) {
+          preAggregation.allowNonStrictDateRangeMatch = getEnv('allowNonStrictDateRangeMatching');
+        }
+
         if (preAggregation.scheduledRefresh === undefined && preAggregation.type !== 'rollupJoin' && preAggregation.type !== 'rollupLambda') {
           preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
         }

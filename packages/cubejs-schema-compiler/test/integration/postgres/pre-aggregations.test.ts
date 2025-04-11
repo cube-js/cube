@@ -234,7 +234,8 @@ describe('PreAggregations', () => {
         countCustomGranularity: {
           measures: [count],
           timeDimension: createdAt,
-          granularity: 'hourTenMinOffset'
+          granularity: 'hourTenMinOffset',
+          allowNonStrictDateRangeMatch: false
         },
         sourceAndIdRollup: {
           measures: [count],

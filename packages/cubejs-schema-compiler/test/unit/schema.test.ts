@@ -69,6 +69,7 @@ describe('Schema Testing', () => {
         refreshRangeEnd: {
           sql: expect.any(Function),
         },
+        allowNonStrictDateRangeMatch: true,
       },
       countCreatedAt: {
         external: true,
@@ -102,6 +103,7 @@ describe('Schema Testing', () => {
         refreshRangeEnd: {
           sql: expect.any(Function),
         },
+        allowNonStrictDateRangeMatch: true,
       }
     });
   });
@@ -128,6 +130,7 @@ describe('Schema Testing', () => {
         refreshRangeEnd: {
           sql: expect.any(Function),
         },
+        allowNonStrictDateRangeMatch: true,
       },
       countCreatedAt: {
         // because preview
@@ -162,6 +165,7 @@ describe('Schema Testing', () => {
         refreshRangeEnd: {
           sql: expect.any(Function),
         },
+        allowNonStrictDateRangeMatch: true,
       }
     });
   });
