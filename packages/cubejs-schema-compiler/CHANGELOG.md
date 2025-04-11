@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.34](https://github.com/cube-js/cube/compare/v1.2.33...v1.2.34) (2025-04-11)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix incorrect bulk transpilation if there are no JS files ([654ce17](https://github.com/cube-js/cube/commit/654ce17286f7ac2e436e9bbbbedbd5e94db4ce22))
+
 ## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
 
 ### Bug Fixes
