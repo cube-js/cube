@@ -97,6 +97,7 @@ impl DimensionSubqueryPlanner {
             None,
             self.query_tools.clone(),
         )?;
+        let measure_expression_full_name = measure.full_name();
 
         let (dimensions_filters, time_dimensions_filters) = if subquery_dimension
             .propagate_filters_to_sub_query()
@@ -118,6 +119,7 @@ impl DimensionSubqueryPlanner {
             vec![],
             time_dimensions_filters,
             dimensions_filters,
+            vec![],
             vec![],
             vec![],
             None,
@@ -143,7 +145,10 @@ impl DimensionSubqueryPlanner {
             })
             .collect_vec();
 
-        if let Some(dim_ref) = sub_query.schema().resolve_member_reference(&dim_full_name) {
+        if let Some(dim_ref) = sub_query
+            .schema()
+            .resolve_member_reference(&measure_expression_full_name)
+        {
             let qualified_column_name =
                 QualifiedColumnName::new(Some(sub_query_alias.clone()), dim_ref);
             self.dimensions_refs
@@ -189,6 +194,9 @@ impl DimensionSubqueryPlanner {
                 Ok(true)
             }
             FilterItem::Item(filter_item) => {
+                Ok(collect_sub_query_dimensions(&filter_item.member_evaluator())?.is_empty())
+            }
+            FilterItem::Segment(filter_item) => {
                 Ok(collect_sub_query_dimensions(&filter_item.member_evaluator())?.is_empty())
             }
         }

@@ -117,6 +117,20 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   }
 
   /**
+   * In Redshift schemas not owned by the current user are not shown in regular information_schema,
+   * so it needs to be queried through the pg_namespace table. Because user might be granted specific
+   * permissions on the concrete schema (like CREATE tables in already existing but not owned pre-aggregation schema).
+   * @override
+   */
+  public override async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    const schemaExistsQuery = `SELECT nspname FROM pg_namespace where nspname = ${this.param(0)}`;
+    const schemas = await this.query(schemaExistsQuery, [schemaName]);
+    if (schemas.length === 0) {
+      await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
+    }
+  }
+
+  /**
    * In Redshift external tables are not shown in regular Postgres information_schema,
    * so it needs to be queried separately.
    * @override

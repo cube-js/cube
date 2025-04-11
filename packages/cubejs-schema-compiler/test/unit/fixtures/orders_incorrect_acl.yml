@@ -1,0 +1,83 @@
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: user_id
+        sql: user_id
+        type: number
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: completed_at
+        sql: completed_at
+        type: time
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+    joins:
+      - name: order_users
+        relationship: many_to_one
+        sql: "${CUBE}.user_id = ${order_users.id}"
+
+    segments:
+      - name: sfUsers
+        description: SF users segment from createCubeSchema
+        sql: "${CUBE}.location = 'San Francisco'"
+
+    hierarchies:
+      - name: hello
+        title: World
+        levels: [status]
+
+    pre_aggregations:
+      - name: countCreatedAt
+        type: rollup
+        measures:
+         - CUBE.count
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month
+        refresh_key:
+          every: 1 hour
+        scheduled_refresh: true
+
+    accessPolicy:
+      - role: common
+        rowLevel:
+          allowAll: true
+      - role: admin
+        conditions:
+          - if: "{ !security_context.isBlocked }"
+        rowLevel:
+          filters:
+            - member: "{CUBE}.order_users.name"
+              operator: equals
+              values: ["completed"]
+            - or:
+              - member: "{CUBE}.created_at"
+                operator: notInDateRange
+                values:
+                  - 2022-01-01
+                  - "{ security_context.currentDate }"
+              - member: "created_at"
+                operator: equals
+                values:
+                  - "{ securityContext.currentDate }"
+        memberLevel:
+          includes:
+            - status

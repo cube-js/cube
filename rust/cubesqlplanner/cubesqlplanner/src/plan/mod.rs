@@ -16,10 +16,12 @@ pub use cte::Cte;
 pub use expression::{Expr, MemberExpression};
 pub use filter::{Filter, FilterGroup, FilterItem};
 pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
-pub use join::{Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition};
+pub use join::{
+    Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition, RollingTotalJoinCondition,
+};
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use schema::{QualifiedColumnName, Schema, SchemaColumn};
 pub use select::{AliasedExpr, Select};
-pub use time_series::TimeSeries;
+pub use time_series::{TimeSeries, TimeSeriesDateRange};
 pub use union::Union;

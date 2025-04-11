@@ -14,6 +14,9 @@ pub struct MetaContext {
     pub cube_to_data_source: HashMap<String, String>,
     pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
     pub compiler_id: Uuid,
+    /// DateTime when MetaContext was created, but it can be used as last schema update when
+    /// CompilerCache is used
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +75,7 @@ impl MetaContext {
             cube_to_data_source,
             data_source_to_sql_generator,
             compiler_id,
+            created_at: chrono::Utc::now(),
         }
     }
 

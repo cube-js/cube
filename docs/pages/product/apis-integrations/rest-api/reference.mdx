@@ -38,7 +38,7 @@ Response
 
 Example request:
 
-```bash{outputLines: 1,3-9,11-15}
+```bash
 # Request with http method GET
 curl \
   -H "Authorization: EXAMPLE-API-TOKEN" \
@@ -119,12 +119,6 @@ If `disable_post_processing` is set to `true`, Cube will try to generate the SQL
 as if the query is run without [post-processing][ref-query-wpp], i.e., if it's run as a
 query with [pushdown][ref-query-wpd].
 
-<WarningBox>
-
-Currently, the `disable_post_processing` parameter is not yet supported.
-
-</WarningBox>
-
 The response will contain a JSON object with the following properties under the `sql` key:
 
 | Property, type | Description |
@@ -149,14 +143,14 @@ the query can't be run without post-processing.
 
 ### Example
 
-Request:
+Request with a query in the REST API format:
 
-```bash{outputLines: 2-6}
+```bash
 curl \
-  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -H "Authorization: TOKEN" \
   -G \
-  --data-urlencode 'query={"measures":["users.count"],
-  "timeDimensions":[{"dimension": "users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
+  --data-urlencode 'query={"measures":["orders.count"]}' \
+  --data-urlencode 'format=rest'  \
   http://localhost:4000/cubejs-api/v1/sql
 ```
 
@@ -166,34 +160,89 @@ Response:
 {
   "sql": {
     "sql": [
-      "SELECT\n      date_trunc('day', (users.created_at::timestamptz AT TIME ZONE 'UTC')) \"users.created_at_date\", count(users.id) \"users.count\"\n    FROM\n      public.users AS users\n  WHERE (users.created_at >= $1::timestamptz AND users.created_at <= $2::timestamptz) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000",
-      ["2019-03-01T00:00:00Z", "2019-03-31T23:59:59Z"]
-    ],
-    "timeDimensionAlias": "users.created_at_date",
-    "timeDimensionField": "users.createdAt",
-    "order": [
-      {
-        "id": "users.createdAt",
-        "desc": false
-      }
-    ],
-    "cacheKeyQueries": {
-      "queries": [
-        ["select max(users.created_at) from public.users AS users", []]
-      ],
-      "renewalThreshold": 21600
-    },
-    "preAggregations": []
+      "SELECT sum(`base_orders__count`) `orders__count` FROM prod_pre_aggregations.base_orders_orders_by_month AS `base_orders__orders_by_month`  LIMIT 10000",
+      []
+    ]
   }
 }
 ```
 
-<InfoBox>
+Request with a query in the SQL API format:
 
-Note that a generated query can contain placeholders, e.g., `?` or `$1`, for parameters
-that Cube passes to an underlying data source driver later when executing the query.
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G \
+  --data-urlencode 'query=SELECT COUNT(*) FROM orders' \
+  --data-urlencode 'format=sql'  \  
+  http://localhost:4000/cubejs-api/v1/sql
+```
 
-</InfoBox>
+Response:
+
+```json
+{
+  "sql": {
+    "status": "ok",
+    "sql": [
+      "SELECT\n      count(\"base_orders\".id) \"count_uint8_1__\"\n    FROM\n      (SELECT * FROM 's3://cube-tutorial/orders.csv') AS \"base_orders\"  LIMIT 50000",
+      []
+    ],
+    "query_type": "regular"
+  }
+}
+```
+
+Request with a query in the SQL API format that is executed with post-processing:
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G \
+  --data-urlencode 'query=SELECT AVG(count) FROM (SELECT COUNT(*) AS count FROM orders) AS table' \
+  --data-urlencode 'format=sql'  \ 
+  http://localhost:4000/cubejs-api/v1/sql
+```
+
+Response:
+
+```json
+{
+  "sql": {
+    "status": "error",
+    "error": "Provided query can not be executed without post-processing.",
+    "query_type": "post_processing"
+  }
+}
+```
+
+Request with a query in the SQL API format that is forced to be executed without
+post-processing, i.e., as a query with pushdown:
+
+```bash
+curl \
+  -H "Authorization: TOKEN" \
+  -G \
+  --data-urlencode 'query=SELECT AVG(count) FROM (SELECT COUNT(*) AS count FROM orders) AS table' \
+  --data-urlencode 'format=sql' \
+  --data-urlencode 'disable_post_processing=true'  \
+  http://localhost:4000/cubejs-api/v1/sql
+```
+
+Response:
+
+```json
+{
+  "sql": {
+    "status": "ok",
+    "sql": [
+      "SELECT \"table\".\"avg_table_count_\" \"avg_table_count_\" \nFROM (\n  SELECT AVG(\"table\".\"count\") \"avg_table_count_\" \n  FROM (\n    SELECT\n          count(\"base_orders\".id) \"count\"\n        FROM\n          (SELECT * FROM 's3://cube-tutorial/orders.csv') AS \"base_orders\" \n  ) AS \"table\"\n) AS \"table\"\nLIMIT 50000",
+      []
+    ],
+    "query_type": "pushdown"
+  }
+}
+```
 
 ## `{base_path}/v1/meta`
 
@@ -216,7 +265,7 @@ Response
 
 Example request:
 
-```bash{outputLines: 2-4}
+```bash
 curl \
   -H "Authorization: EXAMPLE-API-TOKEN" \
   -G \
@@ -279,6 +328,7 @@ Trigger pre-aggregation build jobs or retrieve statuses of such jobs.
 | `selector.datasources`     | Array of data source names which have pre-aggregations defined | ❌       |
 | `selector.cubes`           | Array of cube names which contain pre-aggregations             | ❌       |
 | `selector.preAggregations` | Array of pre-aggregation names                                 | ❌       |
+| `selector.dateRange`       | Date Range tuple ['range-date-start', 'range-date-end']        | ❌       |
 
 To trigger pre-aggregation builds, send a `POST` request with a payload
 including `post` as the `action` and `selector` properties. The response will
@@ -287,7 +337,7 @@ contain an array of `tokens` (identifiers) of triggered jobs.
 Example request triggering builds of all pre-aggregations defined in all cubes
 using an empty security context and a `UTC` timezone:
 
-```bash{outputLines: 2-12}
+```bash
 curl \
   -d '{
     "action": "post",
@@ -305,7 +355,7 @@ curl \
 Example request triggering builds of all pre-aggregations defined in the
 `orders` cube using an empty security context and a `UTC` timezone:
 
-```bash{outputLines: 2-13}
+```bash
 curl \
   -d '{
     "action": "post",
@@ -324,7 +374,7 @@ curl \
 Example request triggering builds of the `main` pre-aggregation defined in the
 `orders` cube using an empty security context and a `UTC` timezone:
 
-```bash{outputLines: 2-13}
+```bash
 curl \
   -d '{
     "action": "post",
@@ -332,6 +382,27 @@ curl \
       "contexts": [{ "securityContext": {} }],
       "timezones": ["UTC"],
       "preAggregations": ["orders.main"]
+    }
+  }' \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  https://localhost:4000/cubejs-api/v1/pre-aggregations/jobs
+```
+
+Example request triggering builds of the `main` pre-aggregation defined in the
+`orders` cube within date range with some security context data
+and an `America/Los_Angeles` timezone:
+
+```bash
+curl \
+  -d '{
+    "action": "post",
+    "selector": {
+      "contexts": [{ "securityContext": { "tenantId": "tenant1" } }],
+      "timezones": ["America/Los_Angeles"],
+      "preAggregations": ["orders.main"],
+      "dateRange": ["2020-01-01", "2020-02-01"]
     }
   }' \
   -H "Authorization: EXAMPLE-API-TOKEN" \
@@ -373,7 +444,7 @@ In the `status` property of the payload, you can get the following statuses:
 
 Example request:
 
-```bash{outputLines: 2-14}
+```bash
 curl \
   -d '{
     "action": "get",
@@ -426,7 +497,7 @@ the connection to the _default_ [data source][ref-datasources].
 
 Example of a successful request:
 
-```bash{outputLines: 2-12}
+```bash
 curl -i http://localhost:4000/readyz
 HTTP/1.1 200 OK
 X-Powered-By: Express
@@ -443,7 +514,7 @@ Keep-Alive: timeout=5
 
 Example of a failed response:
 
-```bash{outputLines: 2-12}
+```bash
 curl -i http://localhost:4000/readyz
 HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express
@@ -465,7 +536,7 @@ existing connections to data sources.
 
 Example of a successful response:
 
-```bash{outputLines: 2-12}
+```bash
 curl -i http://localhost:4000/livez
 HTTP/1.1 200 OK
 X-Powered-By: Express
@@ -482,7 +553,7 @@ Keep-Alive: timeout=5
 
 Example of a failed response:
 
-```bash{outputLines: 2-12}
+```bash
 curl -i http://localhost:4000/livez
 HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express

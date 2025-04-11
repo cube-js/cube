@@ -1,11 +1,11 @@
-import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
 
 describe('pre-aggregations', () => {
   it('rollupJoin scheduledRefresh', async () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
-    const { compiler, cubeEvaluator } = prepareCompiler(
+    const { compiler, cubeEvaluator } = prepareJsCompiler(
       `
         cube(\`Users\`, {
           sql: \`SELECT * FROM public.users\`,
@@ -93,7 +93,7 @@ describe('pre-aggregations', () => {
   });
 
   it('query rollupLambda', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler(
+    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(
       `
         cube(\`Users\`, {
           sql: \`SELECT * FROM public.users\`,

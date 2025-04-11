@@ -1104,7 +1104,7 @@ mod tests {
 
         assert_eq!(
             logical_plan,
-            "Projection: CAST(utctimestamp() AS current_timestamp() AS Timestamp(Nanosecond, None)) AS COL\
+            "Projection: CAST(utctimestamp() AS current_timestamp AS Timestamp(Nanosecond, None)) AS COL\
             \n  EmptyRelation",
         );
     }
@@ -2783,17 +2783,14 @@ limit
 
     #[tokio::test]
     async fn test_select_error() {
-        let variants = [
-            (
-                "SELECT AVG(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
-            ),
+        let variants: &[(&str, _)] = &[
+            // TODO are there any errors that we could test for?
         ];
 
-        for (input_query, expected_error) in variants.iter() {
+        for (input_query, expected_error) in variants {
             let meta = get_test_tenant_ctx();
             let query = convert_sql_to_cube_query(
-                &input_query,
+                input_query,
                 meta.clone(),
                 get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
             )
@@ -7229,11 +7226,14 @@ ORDER BY
 
         fn trivial_member_expr(cube: &str, member: &str, alias: &str) -> String {
             json!({
-                "cube_name": cube,
+                "cubeName": cube,
                 "alias": alias,
-                "cube_params": [cube],
-                "expr": format!("${{{cube}.{member}}}"),
-                "grouping_set": null,
+                "expr": {
+                    "type": "SqlFunction",
+                    "cubeParams": [cube],
+                    "sql": format!("${{{cube}.{member}}}"),
+                },
+                "groupingSet": null,
             })
             .to_string()
         }
@@ -7246,35 +7246,47 @@ ORDER BY
             V1LoadRequestQuery {
                 measures: Some(vec![
                     json!({
-                        "cube_name": "WideCube",
+                        "cubeName": "WideCube",
                         "alias": "max_source_measu",
-                        "cube_params": ["WideCube"],
-                        "expr": "${WideCube.measure1}",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["WideCube"],
+                            "sql": "${WideCube.measure1}",
+                        },
+                        "groupingSet": null,
                     })
                     .to_string(),
                     json!({
-                        "cube_name": "WideCube",
+                        "cubeName": "WideCube",
                         "alias": "max_source_measu_1",
-                        "cube_params": ["WideCube"],
-                        "expr": "${WideCube.measure2}",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["WideCube"],
+                            "sql": "${WideCube.measure2}",
+                        },
+                        "groupingSet": null,
                     })
                     .to_string(),
                     json!({
-                        "cube_name": "WideCube",
+                        "cubeName": "WideCube",
                         "alias": "sum_source_measu",
-                        "cube_params": ["WideCube"],
-                        "expr": "${WideCube.measure3}",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["WideCube"],
+                            "sql": "${WideCube.measure3}",
+                        },
+                        "groupingSet": null,
                     })
                     .to_string(),
                     json!({
-                        "cube_name": "WideCube",
+                        "cubeName": "WideCube",
                         "alias": "max_source_measu_2",
-                        "cube_params": ["WideCube"],
-                        "expr": "${WideCube.measure4}",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["WideCube"],
+                            "sql": "${WideCube.measure4}",
+                        },
+                        "groupingSet": null,
                     })
                     .to_string(),
                 ]),
@@ -7283,11 +7295,14 @@ ORDER BY
                     trivial_member_expr("WideCube", "dim3", "dim3"),
                     trivial_member_expr("WideCube", "dim4", "dim4"),
                     json!({
-                        "cube_name": "WideCube",
+                        "cubeName": "WideCube",
                         "alias": "pivot_grouping",
-                        "cube_params": [],
-                        "expr": "0",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": [],
+                            "sql": "0",
+                        },
+                        "groupingSet": null,
                     })
                     .to_string()
                 ]),
@@ -11807,20 +11822,26 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "ta_1_order_date_",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "((${KibanaSampleDataEcommerce.order_date} = DATE('1994-05-01')) OR (${KibanaSampleDataEcommerce.order_date} = DATE('1996-05-03')))",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": "((${KibanaSampleDataEcommerce.order_date} = DATE('1994-05-01')) OR (${KibanaSampleDataEcommerce.order_date} = DATE('1996-05-03')))",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                 ]),
                 segments: Some(vec![
                     json!({
-                        "cube_name": "Logs",
+                        "cubeName": "Logs",
                         "alias": "lower_ta_2_conte",
-                        "cube_params": ["Logs"],
-                        "expr": "(LOWER(${Logs.content}) = $0$)",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["Logs"],
+                            "sql": "(LOWER(${Logs.content}) = $0$)",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                 ]),
                 order: Some(vec![]),
@@ -12088,34 +12109,46 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "customer_gender",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "${KibanaSampleDataEcommerce.customer_gender}",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": "${KibanaSampleDataEcommerce.customer_gender}",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "cast_dateadd_utf",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "CAST(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') AS DATE)",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": "CAST(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') AS DATE)",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "dateadd_utf8__se",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2000000 MILLISECOND')",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": "DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2000000 MILLISECOND')",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                 ]),
                 segments: Some(vec![
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "dateadd_utf8__da",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') < DATE('2014-06-02'))",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": "(DATE_ADD(${KibanaSampleDataEcommerce.order_date}, INTERVAL '2 DAY') < DATE('2014-06-02'))",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                 ]),
                 order: Some(vec![]),
@@ -12914,29 +12947,38 @@ ORDER BY "source"."str0" ASC
             V1LoadRequestQuery {
                 measures: Some(vec![
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "avg_kibanasample",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "${KibanaSampleDataEcommerce.avgPrice}",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": "${KibanaSampleDataEcommerce.avgPrice}",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                 ]),
                 dimensions: Some(vec![
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "cast_kibanasampl",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "CAST(${KibanaSampleDataEcommerce.order_date} AS DATE)",
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": "CAST(${KibanaSampleDataEcommerce.order_date} AS DATE)",
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                 ]),
                 segments: Some(vec![
                     json!({
-                        "cube_name": "KibanaSampleDataEcommerce",
+                        "cubeName": "KibanaSampleDataEcommerce",
                         "alias": "kibanasampledata",
-                        "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= CAST((NOW() + INTERVAL '-30 DAY') AS DATE)) AND (${{KibanaSampleDataEcommerce.order_date}} < CAST(NOW() AS DATE))) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))"),
-                        "grouping_set": null,
+                        "expr": {
+                            "type": "SqlFunction",
+                            "cubeParams": ["KibanaSampleDataEcommerce"],
+                            "sql": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= CAST((NOW() + INTERVAL '-30 DAY') AS DATE)) AND (${{KibanaSampleDataEcommerce.order_date}} < CAST(NOW() AS DATE))) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))"),
+                        },
+                        "groupingSet": null,
                     }).to_string(),
                 ]),
                 order: Some(vec![]),
@@ -13920,11 +13962,7 @@ ORDER BY "source"."str0" ASC
         // CAST(CAST(ta_1.order_date AS Date32) - CAST(CAST(Utf8("1970-01-01") AS Date32) AS Date32) + Int64(3) AS Decimal(38, 10))
         if Rewriter::sql_push_down_enabled() {
             let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-            if Rewriter::top_down_extractor_enabled() {
-                assert!(sql.contains("LIMIT 1000"));
-            } else {
-                assert!(sql.contains("\"limit\": 1000"));
-            }
+            assert!(sql.contains("LIMIT 1000"));
             assert!(sql.contains("% 7"));
 
             let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -14474,6 +14512,42 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_datetrunc_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        // BigQuery
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATE_TRUNC('week', k.order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(k.customer_gender) = LOWER('unknown')
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATETRUNC".to_string(), "DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %})".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATETIME_TRUNC("));
+        assert!(sql.contains("WEEK(MONDAY)"));
+    }
+
+    #[tokio::test]
     async fn test_datediff_push_down() {
         if !Rewriter::sql_push_down_enabled() {
             return;
@@ -14588,53 +14662,24 @@ ORDER BY "source"."str0" ASC
         assert!(sql.contains("EXTRACT(EPOCH FROM"));
     }
 
-    // redshift-dateadd-[literal-date32-]to-interval rewrites DATEADD to DATE_ADD
     #[tokio::test]
-    #[ignore]
     async fn test_dateadd_push_down() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
         init_testing_logger();
 
+        // Redshift function DATEADD
         let query_plan = convert_select_to_query_plan(
             "
             SELECT DATEADD(DAY, 7, order_date) AS d
             FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
             GROUP BY 1
             ORDER BY 1 DESC
             "
             .to_string(),
             DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapped_sql()
-            .wrapped_sql
-            .sql
-            .contains("DATEADD(day, 7,"));
-
-        // BigQuery
-        let query_plan = convert_select_to_query_plan_customized(
-            "
-            SELECT DATEADD(DAY, 7, order_date) AS d
-            FROM KibanaSampleDataEcommerce AS k
-            GROUP BY 1
-            ORDER BY 1 DESC
-            "
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-            vec![
-                ("functions/DATEADD".to_string(), "DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})".to_string()),
-            ],
         )
         .await;
 
@@ -14646,23 +14691,23 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("DATETIME_ADD(CAST("));
-        assert!(sql.contains("INTERVAL 7 day)"));
+        // redshift-dateadd-[literal-date32-]to-interval rewrites DATEADD to DATE_ADD
+        assert!(sql.contains("DATE_ADD("));
+        assert!(sql.contains("INTERVAL '7 DAY')"));
 
-        // Postgres
+        // BigQuery + Postgres DATE_ADD + DAYS
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
         let query_plan = convert_select_to_query_plan_customized(
             "
-            SELECT DATEADD(DAY, 7, order_date) AS d
+            SELECT DATE_ADD(order_date, INTERVAL '7 DAYS') AS d
             FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
             GROUP BY 1
             ORDER BY 1 DESC
             "
             .to_string(),
             DatabaseProtocol::PostgreSQL,
-            vec![(
-                "functions/DATEADD".to_string(),
-                "({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)".to_string(),
-            )],
+            bq_templates.clone(),
         )
         .await;
 
@@ -14674,7 +14719,114 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("+ '7 day'::interval"));
+        assert!(sql.contains("TIMESTAMP_ADD("));
+        assert!(sql.contains("INTERVAL 7 DAY)"));
+
+        // BigQuery + Redshift DATEADD + DAYS
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            bq_templates.clone(),
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("TIMESTAMP_ADD("));
+        assert!(sql.contains("INTERVAL 7 DAY)"));
+
+        // BigQuery + Postgres DATE_ADD + MONTHS
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATE_ADD(order_date, INTERVAL '7 MONTHS') AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            bq_templates,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("TIMESTAMP(DATETIME_ADD(DATETIME("));
+        assert!(sql.contains("INTERVAL 7 MONTH)"));
+
+        // BigQuery + Redshift DATEADD + MONTHS
+        let bq_templates = vec![("functions/DATE_ADD".to_string(), "{% if date_part|upper in ['YEAR', 'MONTH', 'QUARTER'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}".to_string())];
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEADD(MONTH, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            bq_templates.clone(),
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("TIMESTAMP(DATETIME_ADD(DATETIME("));
+        assert!(sql.contains("INTERVAL 7 MONTH)"));
+
+        // Postgres DATE_ADD
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATE_ADD(order_date, INTERVAL '7 DAYS') AS d
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+        assert!(sql.contains("DATE_ADD("));
+        assert!(sql.contains("INTERVAL '7 DAY'"));
     }
 
     #[tokio::test]
@@ -16019,18 +16171,10 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
-                    date_range: if Rewriter::top_down_extractor_enabled() {
-                        Some(json!(vec![
-                            "2019-01-01T00:00:00.000Z".to_string(),
-                            "2019-01-31T23:59:59.999Z".to_string()
-                        ]))
-                    } else {
-                        // Non-optimal variant with top down extractor disabled
-                        Some(json!(vec![
-                            "2019-01-01 00:00:00.000".to_string(),
-                            "2019-01-31 23:59:59.999".to_string()
-                        ]))
-                    }
+                    date_range: Some(json!(vec![
+                        "2019-01-01T00:00:00.000Z".to_string(),
+                        "2019-01-31T23:59:59.999Z".to_string()
+                    ]))
                 }]),
                 order: Some(vec![]),
                 ..Default::default()

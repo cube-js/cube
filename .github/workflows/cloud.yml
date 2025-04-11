@@ -60,7 +60,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 20.x ]
+        node-version: [ 22.x ]
         db: [ 'athena', 'bigquery', 'snowflake' ]
         target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false

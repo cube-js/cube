@@ -6,9 +6,11 @@ redirect_from:
 
 # Introduction
 
-Cube is a universal semantic layer that makes it easy to connect data silos, create consistent metrics, and make them accessible
-to any data experience your business or your customers needs. Data engineers and application developers use Cube’s developer-friendly platform to organize data from your cloud data warehouses into centralized,
-consistent definitions, and deliver it to every downstream tool via its APIs.
+Cube is a universal semantic layer that represents the next evolution of OLAP technology for the cloud data platform era. Born in the cloud, Cube bridges the gap left when traditional OLAP capabilities from legacy specialized servers were not fully translated to modern cloud data platforms.
+
+As data infrastructure evolved from traditional relational databases to cloud data warehouses, the need for multidimensional analysis, consistent metrics, and performance optimization remained. Cube addresses these challenges by making it easy to connect data silos, create consistent metrics, and make them accessible to any data experience your business or your customers needs.
+
+Data engineers and application developers use Cube's developer-friendly platform to organize data from your cloud data warehouses into centralized, consistent definitions, and deliver it to every downstream tool via its APIs.
 
 Your business data becomes consistent, accurate, easy to access, and, most importantly, trusted.
 Once trusted, the use of data accelerates throughout your organization, delivering better experiences
@@ -17,8 +19,7 @@ to your customers and driving intelligence back into the business.
 <Diagram src="https://ucarecdn.com/8d945f29-e9eb-4e7f-9e9e-29ae7074e195/" />
 
 With Cube, you can build a data model, manage access control and caching, and expose your data to every application
-via REST, GraphQL, and SQL APIs. With these APIs, you can use any charting library to build custom UI,
-connect existing dashboarding and reporting tools, and build AI agents with frameworks like LangChain.
+via REST, GraphQL, and SQL APIs. With these APIs, you can use any charting library to build custom UI, connect existing dashboarding and reporting tools, and build AI-powered data applications.
 
 
 ## Code-first
@@ -37,13 +38,15 @@ That's why everything within Cube, from configurations to data models, is meticu
 
 ## Four layers of semantic layer
 
-We believe that a complete, universal semantic layer should have the following four layers: data model, caching, access controls, and APIs.
+We believe that a complete, universal semantic layer should have the following four layers: data model, caching, access controls, and APIs. These layers address the core challenges that OLAP technology was originally designed to solve, but in a modern, cloud-native way.
 
 ### Data Modeling
 
 **Data modeling framework is a foundational piece of the universal semantic layer.** It helps data teams to centralize data models upstream from
 data consumption tools, such as BIs, embedded analytics applications, or AI agents. It makes your data architecture DRY
-([Don’t Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)) by reducing the repetition of data modeling across multiple presentation layers.
+([Don't Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)) by reducing the repetition of data modeling across multiple presentation layers.
+
+While modern cloud data platforms excel at processing large volumes of data, they lack native support for multidimensional analysis and modeling that traditional OLAP servers provided. Cube brings OLAP-style analytics to these platforms, enabling consistent metric definitions and multidimensional analysis.
 
 **Cube data model is code-first.** Data teams define data models with YAML or JavaScript code.
 The codebase is commonly managed with a version control system. Cube enables git flow for
@@ -66,7 +69,7 @@ from different connected cubes and present them as a single dataset to BI or dat
 
 **One of the benefits of semantic layer is the active security layer.**
 Semantic layer provides a comprehensive real-time understanding and governance of your data.
-When all your data consumption tools access data through the semantic layer, it becomes an ideal place to enforce  access control policies.
+When all your data consumption tools access data through the semantic layer, it becomes an ideal place to enforce access control policies.
 
 Cube provides infrastructure to define different access control policies and patterns,
 including row-level and column-level security, data masking and more. Being a code-first,
@@ -78,10 +81,12 @@ They can range from simple row-level access rules to completely custom data mode
 The semantic layer can serve as a buffer to the data sources, protecting the cloud data warehouses from unnecessary and redundant load.
 Caching optimizes performance and can reduce the cloud data warehouse cost.
 
+While cloud data warehouses have improved query performance through column-oriented storage and distributed processing, they still struggle with complex analytical workloads. This is where Cube's caching layer addresses the performance challenge that traditional OLAP servers were designed to solve.
+
 Cube implements caching through the **aggregate awareness framework called pre-aggregations.**
 Data teams can define pre-aggregates in the data model as rollup tables, including measures and dimensions.
 Cube builds and refreshes these pre-aggregates in the background by executing queries in your cloud data warehouse
-and storing results in Cube Store, Cube’s purpose-built caching engine backed by distributed file storage, such as S3.
+and storing results in Cube Store, Cube's purpose-built caching engine backed by distributed file storage, such as S3.
 Pre-aggregations can be refreshed on schedule or as a part of the workflow orchestration DAG.
 
 When you send a query to Cube, it will use aggregate awareness to see if an existing and fresh pre-aggregate is
@@ -92,6 +97,8 @@ available to serve that query. It can significantly speed up queries and reduce 
 One of the key requirements of the semantic layer is **interoperability with data consumption tools**: BIs, embedded analytics, and AI agents.
 The universal semantic layer cannot require one-off integration with every tool, framework, or library.
 It is not feasible to support the ever-growing number of data consumption tools in a one-to-one model.
+
+Legacy OLAP tools were limited in how they exposed data. Cube provides both modern APIs and support for traditional OLAP interfaces, making it a truly universal semantic layer.
 
 Rather than inventing its own communication language or protocol, **the semantic layer must adhere to existing protocols and
 API standards** to ensure universal interoperability.

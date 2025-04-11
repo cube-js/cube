@@ -27,13 +27,30 @@ export interface Request<Meta> {
 }
 
 export interface CheckAuthResponse {
+  securityContext: any,
+}
+
+export interface CheckSQLAuthResponse {
   password: string | null,
   superuser: boolean,
   securityContext: any,
   skipPasswordCheck?: boolean,
 }
 
+export interface ContextToApiScopesPayload {
+  securityContext: any,
+}
+
+export type ContextToApiScopesResponse = string[];
+
+export interface CheckAuthPayloadRequestMeta extends BaseMeta {}
+
 export interface CheckAuthPayload {
+  request: Request<CheckAuthPayloadRequestMeta>,
+  token: string,
+}
+
+export interface CheckSQLAuthPayload {
   request: Request<undefined>,
   user: string | null,
   password: string | null,
@@ -88,7 +105,9 @@ export interface CanSwitchUserPayload {
 
 export type SQLInterfaceOptions = {
   pgPort?: number,
+  contextToApiScopes: (payload: ContextToApiScopesPayload) => ContextToApiScopesResponse | Promise<ContextToApiScopesResponse>,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
+  checkSqlAuth: (payload: CheckSQLAuthPayload) => CheckSQLAuthResponse | Promise<CheckSQLAuthResponse>,
   load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
   meta: (payload: MetaPayload) => unknown | Promise<unknown>,
@@ -103,12 +122,14 @@ export type SQLInterfaceOptions = {
 
 export interface TransformConfig {
   fileName: string;
+  fileContent: string;
   transpilers: string[];
   compilerId: string;
   metaData?: {
     cubeNames: string[];
     cubeSymbols: Record<string, Record<string, boolean>>;
     contextSymbols: Record<string, string>;
+    stage: 0 | 1 | 2 | 3;
   }
 }
 
@@ -335,6 +356,12 @@ export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel)
   native.setupLogger({ logger: wrapNativeFunctionWithChannelCallback(logger), logLevel });
 };
 
+/// Reset local to default implementation, which uses STDOUT
+export const resetLogger = (logLevel: LogLevel): void => {
+  const native = loadNative();
+  native.resetLogger({ logLevel });
+};
+
 export const isFallbackBuild = (): boolean => {
   const native = loadNative();
   return native.isFallbackBuild();
@@ -347,8 +374,16 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('Argument options must be an object');
   }
 
+  if (typeof options.contextToApiScopes !== 'function') {
+    throw new Error('options.contextToApiScopes must be a function');
+  }
+
   if (typeof options.checkAuth !== 'function') {
     throw new Error('options.checkAuth must be a function');
+  }
+
+  if (typeof options.checkSqlAuth !== 'function') {
+    throw new Error('options.checkSqlAuth must be a function');
   }
 
   if (typeof options.load !== 'function') {
@@ -378,7 +413,9 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
   const native = loadNative();
   return native.registerInterface({
     ...options,
+    contextToApiScopes: wrapNativeFunctionWithChannelCallback(options.contextToApiScopes),
     checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
+    checkSqlAuth: wrapNativeFunctionWithChannelCallback(options.checkSqlAuth),
     load: wrapNativeFunctionWithChannelCallback(options.load),
     sql: wrapNativeFunctionWithChannelCallback(options.sql),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
@@ -405,10 +442,10 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
 };
 
 // TODO parse result from native code
-export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: any): Promise<Sql4SqlResponse> => {
+export const sql4sql = async (instance: SqlInterfaceInstance, sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> => {
   const native = loadNative();
 
-  return native.sql4sql(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
+  return native.sql4sql(instance, sqlQuery, disablePostProcessing, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export const buildSqlAndParams = (cubeEvaluator: any): String => {
@@ -460,11 +497,11 @@ export const getFinalQueryResultMulti = (transformDataArr: Object[], rows: any[]
   return native.getFinalQueryResultMulti(transformDataArr, rows, responseData);
 };
 
-export const transpileJs = async (content: String, metadata: TransformConfig): Promise<TransformResponse> => {
+export const transpileJs = async (transpileRequests: TransformConfig[]): Promise<TransformResponse[]> => {
   const native = loadNative();
 
   if (native.transpileJs) {
-    return native.transpileJs(content, metadata);
+    return native.transpileJs(transpileRequests);
   }
 
   throw new Error('TranspileJs native implementation not found!');

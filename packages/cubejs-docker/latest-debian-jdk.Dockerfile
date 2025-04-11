@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:20.17.0-bookworm-slim as builder
+FROM node:22.14.0-bookworm-slim as builder
 
 WORKDIR /cube
 COPY . .
@@ -22,7 +22,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:20.17.0-bookworm-slim
+FROM node:22.14.0-bookworm-slim
 
 ARG IMAGE_VERSION=unknown
 

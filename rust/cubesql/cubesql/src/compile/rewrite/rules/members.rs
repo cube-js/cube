@@ -1,31 +1,35 @@
 use crate::{
-    compile::rewrite::{
-        agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
-        binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
-        cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
-        cube_scan_order_empty_tail, dimension_expr, distinct, expr_column_name, fun_expr, join,
-        like_expr, limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
-        literal_member, measure_expr, member_pushdown_replacer, member_replacer,
-        merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
-        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
-        rules::{
-            replacer_flat_push_down_node_substitute_rules, replacer_push_down_node,
-            replacer_push_down_node_substitute_rules, utils,
+    compile::{
+        engine::udf::MEASURE_UDAF_NAME,
+        rewrite::{
+            agg_fun_expr, aggregate, alias_expr, all_members,
+            analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
+            binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
+            cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
+            cube_scan_order_empty_tail, dimension_expr, distinct, expr_column_name, fun_expr, join,
+            like_expr, limit, list_concat_pushdown_replacer, list_concat_pushup_replacer,
+            literal_expr, literal_member, measure_expr, member_pushdown_replacer, member_replacer,
+            merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
+            rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
+            rules::{
+                replacer_flat_push_down_node_substitute_rules, replacer_push_down_node,
+                replacer_push_down_node_substitute_rules, utils,
+            },
+            segment_expr, table_scan, time_dimension_expr, transform_original_expr_to_alias,
+            transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
+            udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
+            BinaryExprOp, CastExprDataType, ChangeUserCube, ColumnExprColumn, CubeScanAliasToCube,
+            CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset, CubeScanUngrouped,
+            DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType,
+            LikeExprNegated, LikeType, LimitFetch, LimitSkip, ListType, LiteralExprValue,
+            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+            MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
+            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
+            SegmentName, TableScanFetch, TableScanProjection, TableScanSourceTableName,
+            TableScanTableName, TimeDimensionDateRange, TimeDimensionGranularity,
+            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
-        segment_expr, table_scan, time_dimension_expr, transform_original_expr_to_alias,
-        transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
-        udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
-        AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, BinaryExprOp,
-        CastExprDataType, ChangeUserCube, ColumnExprColumn, CubeScanAliasToCube,
-        CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, DimensionName,
-        JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
-        LimitFetch, LimitSkip, ListType, LiteralExprValue, LiteralMemberRelation,
-        LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube,
-        MemberErrorError, MemberErrorPriority, MemberPushdownReplacerAliasToCube,
-        MemberReplacerAliasToCube, ProjectionAlias, SegmentName, TableScanFetch,
-        TableScanProjection, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-        TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
     },
     config::ConfigObj,
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -123,7 +127,7 @@ impl RewriteRules for MemberRules {
             ),
             self.measure_rewrite(
                 "measure-fun",
-                udaf_expr("?aggr_fun", vec![column_expr("?column")]),
+                udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
                 Some("?column"),
                 None,
                 None,
@@ -646,7 +650,7 @@ impl MemberRules {
         ));
         rules.extend(find_matching_old_member(
             "udaf-fun",
-            udaf_expr("?fun_name", vec![column_expr("?column")]),
+            udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
         ));
         rules.extend(find_matching_old_member_with_count(
             "agg-fun-default-count",
@@ -1099,7 +1103,7 @@ impl MemberRules {
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun",
-            udaf_expr("?fun_name", vec![column_expr("?column")]),
+            udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
             measure_expr("?name", "?old_alias"),
             None,
             None,
@@ -1108,7 +1112,7 @@ impl MemberRules {
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun-on-dimension",
-            udaf_expr("?fun_name", vec![column_expr("?column")]),
+            udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
             dimension_expr("?name", "?old_alias"),
             None,
             None,
@@ -1625,11 +1629,16 @@ impl MemberRules {
                     if *ungrouped {
                         continue;
                     }
-                    let Some(empty_filters) = &egraph.index(subst[filters_var]).data.is_empty_list
+                    let Some(filter_operators) =
+                        &egraph.index(subst[filters_var]).data.filter_operators
                     else {
                         return false;
                     };
-                    if !empty_filters {
+                    let only_allowed_filters = filter_operators.iter().all(|(member, _op)| {
+                        // TODO this should allow even more, like dimensions and segments
+                        member == "__user"
+                    });
+                    if !only_allowed_filters {
                         return false;
                     }
                     if referenced_aggr_expr.len() == 0 {

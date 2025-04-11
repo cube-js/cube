@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "1.2.20",
+  "version": "1.2.33",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -29,19 +29,19 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.2.20",
-    "@cubejs-backend/cubestore-driver": "1.2.20",
-    "@cubejs-backend/shared": "1.2.20",
+    "@cubejs-backend/base-driver": "1.2.33",
+    "@cubejs-backend/cubestore-driver": "1.2.33",
+    "@cubejs-backend/shared": "1.2.33",
     "csv-write-stream": "^2.0.0",
-    "generic-pool": "^3.7.1",
-    "lru-cache": "^5.1.1",
+    "generic-pool": "^3.8.2",
+    "lru-cache": "^11.1.0",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.2.20",
-    "@types/generic-pool": "^3.1.9",
+    "@cubejs-backend/linter": "1.2.33",
+    "@types/generic-pool": "^3.8.2",
     "@types/jest": "^27",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "@types/ramda": "^0.27.32",
     "@types/uuid": "^8.3.0",
     "jest": "^27",
@@ -53,7 +53,12 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "collectCoverage": false,
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "html",
+      "cobertura"
+    ],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
       "dist/src/**/*.js",

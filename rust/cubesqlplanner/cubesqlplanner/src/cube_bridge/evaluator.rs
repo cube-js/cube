@@ -1,7 +1,10 @@
 use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
-use super::dimension_definition::{DimensionDefinition, NativeDimensionDefinition};
+use super::dimension_definition::{
+    DimensionDefinition, GranularityDefinition, NativeDimensionDefinition,
+};
 use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
 use super::member_sql::{MemberSql, NativeMemberSql};
+use super::segment_definition::{NativeSegmentDefinition, SegmentDefinition};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -34,8 +37,10 @@ pub trait CubeEvaluator {
         -> Result<Rc<dyn MeasureDefinition>, CubeError>;
     fn dimension_by_path(
         &self,
-        measure_path: String,
+        dimension_path: String,
     ) -> Result<Rc<dyn DimensionDefinition>, CubeError>;
+    fn segment_by_path(&self, segment_path: String)
+        -> Result<Rc<dyn SegmentDefinition>, CubeError>;
     fn cube_from_path(&self, cube_path: String) -> Result<Rc<dyn CubeDefinition>, CubeError>;
     fn is_measure(&self, path: Vec<String>) -> Result<bool, CubeError>;
     fn is_dimension(&self, path: Vec<String>) -> Result<bool, CubeError>;
@@ -45,4 +50,5 @@ pub trait CubeEvaluator {
         cube_name: String,
         sql: Rc<dyn MemberSql>,
     ) -> Result<Vec<CallDep>, CubeError>;
+    fn resolve_granularity(&self, path: Vec<String>) -> Result<GranularityDefinition, CubeError>;
 }

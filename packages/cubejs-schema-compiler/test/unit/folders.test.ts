@@ -43,6 +43,23 @@ describe('Cube Folders', () => {
     );
   });
 
+  it('throws errors for folder members with path', async () => {
+    const modelContent = fs.readFileSync(
+      path.join(process.cwd(), '/test/unit/fixtures/folders_invalid_path.yml'),
+      'utf8'
+    );
+    // eslint-disable-next-line @typescript-eslint/no-shadow
+    const { compiler } = prepareYamlCompiler(modelContent);
+
+    try {
+      await compiler.compile();
+      throw new Error('should throw earlier');
+    } catch (e: any) {
+      expect(e.toString()).toMatch(/Paths aren't allowed in the 'folders' but 'users.age' has been provided for test_view/);
+      expect(e.toString()).toMatch(/Member 'users.age' included in folder 'folder1' not found/);
+    }
+  });
+
   it('a folder with aliased and prefixed cubes', async () => {
     const view = metaTransformer.cubes.find(
       (it) => it.config.name === 'test_view2'

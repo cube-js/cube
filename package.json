@@ -28,7 +28,7 @@
   "dependencies": {
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.34.0",
-    "lerna": "^8.1.9"
+    "lerna": "^8.2.1"
   },
   "files": [
     "src",
@@ -65,7 +65,8 @@
   },
   "resolutions": {
     "es5-ext": "0.10.53",
-    "@types/node": "^18",
+    "lodash": "^4.17.0",
+    "@types/node": "^20",
     "@types/ramda": "0.27.40",
     "thrift": "0.20.0"
   },

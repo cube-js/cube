@@ -1,12 +1,12 @@
 import { getEnv } from '@cubejs-backend/shared';
 import { BaseQuery, PostgresQuery } from '../../../src/adapter';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('Cube Views', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator, metaTransformer } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator, metaTransformer } = prepareJsCompiler(`
 cube(\`Orders\`, {
   sql: \`
   SELECT 1 as id, 1 as product_id, 'completed' as status, '2022-01-01T00:00:00.000Z'::timestamptz as created_at
@@ -200,8 +200,19 @@ cube(\`ProductCategories\`, {
 });
 
 view(\`OrdersView\`, {
-  includes: [Orders],
-  excludes: [Orders.createdAt],
+  cubes: [{
+    join_path: Orders,
+    includes: '*',
+    excludes: ['createdAt']
+  }, {
+    join_path: Orders.Products,
+    includes: '*',
+    prefix: true
+  }, {
+    join_path: Orders.Products.ProductCategories,
+    includes: '*',
+    prefix: true
+  }],
 
   measures: {
     productCategoryCount: {
@@ -231,10 +242,6 @@ view(\`OrdersView\`, {
       type: \`string\`
     },
   }
-});
-
-view(\`OrdersView2\`, {
-  includes: [Orders.count],
 });
 
 view(\`OrdersView3\`, {

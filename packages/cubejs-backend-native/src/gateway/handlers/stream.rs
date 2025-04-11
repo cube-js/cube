@@ -1,7 +1,10 @@
-use crate::gateway::ApiGatewayState;
+use crate::gateway::auth_middleware::AuthExtension;
+use crate::gateway::http_error::HttpError;
+use crate::gateway::state::ApiGatewayStateRef;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Json;
+use axum::response::IntoResponse;
+use axum::{Extension, Json};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -10,12 +13,17 @@ pub struct HandlerResponse {
 }
 
 pub async fn stream_handler_v2(
-    State(_state): State<ApiGatewayState>,
-) -> (StatusCode, Json<HandlerResponse>) {
-    (
+    State(gateway_state): State<ApiGatewayStateRef>,
+    Extension(auth): Extension<AuthExtension>,
+) -> Result<impl IntoResponse, HttpError> {
+    gateway_state
+        .assert_api_scope(auth.auth_context(), "data")
+        .await?;
+
+    Ok((
         StatusCode::NOT_IMPLEMENTED,
         Json(HandlerResponse {
-            message: "Not implemented".to_string(),
+            message: "/v2/stream is not implemented".to_string(),
         }),
-    )
+    ))
 }

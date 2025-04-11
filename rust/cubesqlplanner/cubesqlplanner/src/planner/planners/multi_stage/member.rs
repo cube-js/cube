@@ -1,68 +1,18 @@
-use crate::cube_bridge::measure_definition::TimeShiftReference;
-use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::BaseMember;
+use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
 use crate::planner::BaseTimeDimension;
-use cubenativeutils::CubeError;
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::rc::Rc;
 
-#[derive(Clone, Debug)]
-pub struct MultiStageTimeShift {
-    pub interval: String,
-    pub time_dimension: String,
-}
-
-lazy_static! {
-    static ref INTERVAL_MATCH_RE: Regex =
-        Regex::new(r"^(-?\d+) (second|minute|hour|day|week|month|quarter|year)s?$").unwrap();
-}
-impl MultiStageTimeShift {
-    pub fn try_from_reference(reference: &TimeShiftReference) -> Result<Self, CubeError> {
-        let parsed_interval =
-            if let Some(captures) = INTERVAL_MATCH_RE.captures(&reference.interval) {
-                let duration = if let Some(duration) = captures.get(1) {
-                    duration.as_str().parse::<i64>().ok()
-                } else {
-                    None
-                };
-                let granularity = if let Some(granularity) = captures.get(2) {
-                    Some(granularity.as_str().to_owned())
-                } else {
-                    None
-                };
-                if let Some((duration, granularity)) = duration.zip(granularity) {
-                    Some((duration, granularity))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-        if let Some((duration, granularity)) = parsed_interval {
-            let duration = if reference.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
-                duration * (-1)
-            } else {
-                duration
-            };
-
-            Ok(Self {
-                interval: format!("{duration} {granularity}"),
-                time_dimension: reference.time_dimension.clone(),
-            })
-        } else {
-            Err(CubeError::user(format!(
-                "Invalid interval: {}",
-                reference.interval
-            )))
-        }
-    }
+#[derive(Clone)]
+pub struct TimeSeriesDescription {
+    pub time_dimension: Rc<BaseTimeDimension>,
+    pub date_range_cte: Option<String>,
 }
 
 #[derive(Clone)]
 pub enum MultiStageLeafMemberType {
     Measure,
-    TimeSeries(Rc<BaseTimeDimension>),
+    TimeSeries(Rc<TimeSeriesDescription>),
+    TimeSeriesGetRange(Rc<BaseTimeDimension>),
 }
 
 #[derive(Clone)]
@@ -81,17 +31,18 @@ pub struct ToDateRollingWindow {
 pub enum RollingWindowType {
     Regular(RegularRollingWindow),
     ToDate(ToDateRollingWindow),
+    RunningTotal,
 }
 
 #[derive(Clone)]
 pub struct RollingWindowDescription {
-    pub time_dimension: Rc<dyn BaseMember>,
+    pub time_dimension: Rc<BaseTimeDimension>,
     pub rolling_window: RollingWindowType,
 }
 
 impl RollingWindowDescription {
     pub fn new_regular(
-        time_dimension: Rc<dyn BaseMember>,
+        time_dimension: Rc<BaseTimeDimension>,
         trailing: Option<String>,
         leading: Option<String>,
         offset: String,
@@ -107,17 +58,19 @@ impl RollingWindowDescription {
         }
     }
 
-    pub fn new_to_date(time_dimension: Rc<dyn BaseMember>, granularity: String) -> Self {
+    pub fn new_to_date(time_dimension: Rc<BaseTimeDimension>, granularity: String) -> Self {
         Self {
             time_dimension,
             rolling_window: RollingWindowType::ToDate(ToDateRollingWindow { granularity }),
         }
     }
-}
 
-#[derive(Clone)]
-pub struct RunningTotalDescription {
-    pub time_dimension: Rc<dyn BaseMember>,
+    pub fn new_running_total(time_dimension: Rc<BaseTimeDimension>) -> Self {
+        Self {
+            time_dimension,
+            rolling_window: RollingWindowType::RunningTotal,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -126,7 +79,6 @@ pub enum MultiStageInodeMemberType {
     Aggregate,
     Calculate,
     RollingWindow(RollingWindowDescription),
-    RunningTotal(RunningTotalDescription),
 }
 
 #[derive(Clone)]
@@ -135,7 +87,7 @@ pub struct MultiStageInodeMember {
     reduce_by: Vec<String>,
     add_group_by: Vec<String>,
     group_by: Option<Vec<String>>,
-    time_shifts: Vec<MultiStageTimeShift>,
+    time_shifts: Vec<MeasureTimeShift>,
 }
 
 impl MultiStageInodeMember {
@@ -144,7 +96,7 @@ impl MultiStageInodeMember {
         reduce_by: Vec<String>,
         add_group_by: Vec<String>,
         group_by: Option<Vec<String>>,
-        time_shifts: Vec<MultiStageTimeShift>,
+        time_shifts: Vec<MeasureTimeShift>,
     ) -> Self {
         Self {
             inode_type,
@@ -171,7 +123,7 @@ impl MultiStageInodeMember {
         &self.group_by
     }
 
-    pub fn time_shifts(&self) -> &Vec<MultiStageTimeShift> {
+    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
         &self.time_shifts
     }
 }

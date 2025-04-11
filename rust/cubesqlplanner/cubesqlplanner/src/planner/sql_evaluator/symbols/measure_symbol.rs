@@ -5,9 +5,14 @@ use crate::cube_bridge::measure_definition::{
 };
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
 use crate::planner::sql_evaluator::{sql_nodes::SqlNode, Compiler, SqlCall, SqlEvaluatorVisitor};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::SqlInterval;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
+use std::cmp::{Eq, PartialEq};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -33,6 +38,20 @@ impl MeasureOrderBy {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct MeasureTimeShift {
+    pub interval: SqlInterval,
+    pub dimension: Rc<MemberSymbol>,
+}
+
+impl PartialEq for MeasureTimeShift {
+    fn eq(&self, other: &Self) -> bool {
+        self.interval == other.interval && self.dimension.full_name() == other.dimension.full_name()
+    }
+}
+
+impl Eq for MeasureTimeShift {}
+
 #[derive(Clone)]
 pub struct MeasureSymbol {
     cube_name: String,
@@ -40,6 +59,7 @@ pub struct MeasureSymbol {
     definition: Rc<dyn MeasureDefinition>,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
+    time_shifts: Vec<MeasureTimeShift>,
     measure_order_by: Vec<MeasureOrderBy>,
     member_sql: Option<Rc<SqlCall>>,
     pk_sqls: Vec<Rc<SqlCall>>,
@@ -55,6 +75,7 @@ impl MeasureSymbol {
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<SqlCall>>,
         measure_drill_filters: Vec<Rc<SqlCall>>,
+        time_shifts: Vec<MeasureTimeShift>,
         measure_order_by: Vec<MeasureOrderBy>,
     ) -> Self {
         Self {
@@ -66,6 +87,7 @@ impl MeasureSymbol {
             measure_filters,
             measure_drill_filters,
             measure_order_by,
+            time_shifts,
             is_splitted_source: false,
         }
     }
@@ -80,6 +102,10 @@ impl MeasureSymbol {
 
     pub fn pk_sqls(&self) -> &Vec<Rc<SqlCall>> {
         &self.pk_sqls
+    }
+
+    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
+        &self.time_shifts
     }
 
     pub fn is_calculated(&self) -> bool {
@@ -354,6 +380,43 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
+        let time_shifts =
+            if let Some(time_shift_references) = &definition.static_data().time_shift_references {
+                let mut shifts: HashMap<String, MeasureTimeShift> = HashMap::new();
+                for shift_ref in time_shift_references.iter() {
+                    let interval = shift_ref.interval.parse::<SqlInterval>()?;
+                    let interval =
+                        if shift_ref.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
+                            -interval
+                        } else {
+                            interval
+                        };
+                    let dimension =
+                        compiler.add_dimension_evaluator(shift_ref.time_dimension.clone())?;
+                    let dimension = find_owned_by_cube_child(&dimension)?;
+                    let dimension_name = dimension.full_name();
+                    if let Some(exists) = shifts.get(&dimension_name) {
+                        if exists.interval != interval {
+                            return Err(CubeError::user(format!(
+                                "Different time shifts for one dimension {} not allowed",
+                                dimension_name
+                            )));
+                        }
+                    } else {
+                        shifts.insert(
+                            dimension_name,
+                            MeasureTimeShift {
+                                interval: interval.clone(),
+                                dimension: dimension.clone(),
+                            },
+                        );
+                    };
+                }
+                shifts.into_values().collect_vec()
+            } else {
+                vec![]
+            };
+
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_name,
             name,
@@ -362,6 +425,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             definition,
             measure_filters,
             measure_drill_filters,
+            time_shifts,
             measure_order_by,
         )))
     }

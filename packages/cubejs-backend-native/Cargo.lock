@@ -209,13 +209,13 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "axum"
-version = "0.7.5"
+version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a6c9af12842a67734c9a2e355436e5d03b22383ed60cf13cd0c18fbfe3dcbcf"
+checksum = "edca88bc138befd0323b20752846e6587272d3b03b0343c8ea28a6f819e6e71f"
 dependencies = [
  "async-trait",
  "axum-core",
- "base64 0.21.5",
+ "base64 0.22.1",
  "bytes",
  "futures-util",
  "http",
@@ -235,10 +235,10 @@ dependencies = [
  "serde_path_to_error",
  "serde_urlencoded",
  "sha1",
- "sync_wrapper 1.0.1",
+ "sync_wrapper",
  "tokio",
  "tokio-tungstenite",
- "tower",
+ "tower 0.5.2",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -246,9 +246,9 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.4.3"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a15c63fd72d41492dc4f497196f5da1fb04fb7529e631d73630d1b491e47a2e3"
+checksum = "09f2bd6146b97ae3359fa0cc6d6b376d9539582c7b4220f041a33ec24c226199"
 dependencies = [
  "async-trait",
  "bytes",
@@ -259,7 +259,7 @@ dependencies = [
  "mime",
  "pin-project-lite",
  "rustversion",
- "sync_wrapper 0.1.2",
+ "sync_wrapper",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -466,9 +466,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.5.0"
+version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2bd12c1caf447e69cd4528f47f94d203fd2582878ecb9e9465484c4148a8223"
+checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "cc"
@@ -714,7 +714,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1a612fc26f762f3837ecf26df2e83ba38f11a8a2#1a612fc26f762f3837ecf26df2e83ba38f11a8a2"
 dependencies = [
  "arrow",
  "chrono",
@@ -747,7 +747,6 @@ dependencies = [
  "async-channel",
  "async-trait",
  "axum",
- "bytes",
  "convert_case 0.6.0",
  "cubenativeutils",
  "cubeorchestrator",
@@ -762,10 +761,8 @@ dependencies = [
  "minijinja",
  "neon",
  "once_cell",
- "pin-project",
  "pyo3",
  "pyo3-asyncio",
- "regex",
  "serde",
  "serde_json",
  "simple_logger",
@@ -890,7 +887,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1a612fc26f762f3837ecf26df2e83ba38f11a8a2#1a612fc26f762f3837ecf26df2e83ba38f11a8a2"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -923,7 +920,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1a612fc26f762f3837ecf26df2e83ba38f11a8a2#1a612fc26f762f3837ecf26df2e83ba38f11a8a2"
 dependencies = [
  "arrow",
  "ordered-float 2.10.1",
@@ -934,7 +931,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1a612fc26f762f3837ecf26df2e83ba38f11a8a2#1a612fc26f762f3837ecf26df2e83ba38f11a8a2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -947,7 +944,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1a612fc26f762f3837ecf26df2e83ba38f11a8a2#1a612fc26f762f3837ecf26df2e83ba38f11a8a2"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -958,7 +955,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1a612fc26f762f3837ecf26df2e83ba38f11a8a2#1a612fc26f762f3837ecf26df2e83ba38f11a8a2"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -1507,7 +1504,7 @@ dependencies = [
  "pin-project-lite",
  "socket2",
  "tokio",
- "tower",
+ "tower 0.4.13",
  "tower-service",
  "tracing",
 ]
@@ -2826,7 +2823,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
- "sync_wrapper 1.0.1",
+ "sync_wrapper",
  "tokio",
  "tokio-rustls",
  "tower-service",
@@ -3340,12 +3337,6 @@ dependencies = [
 
 [[package]]
 name = "sync_wrapper"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
-
-[[package]]
-name = "sync_wrapper"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7065abeca94b6a8a577f9bd45aa0867a2238b74e8eb67cf10d492bc39351394"
@@ -3581,9 +3572,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.21.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c83b561d025642014097b66e6c1bb422783339e0909e4429cde4749d1990bc38"
+checksum = "edc5f74e248dc973e0dbb7b74c7e0d6fcc301c694ff50049504004ef4d0cdcd9"
 dependencies = [
  "futures-util",
  "log",
@@ -3636,20 +3627,35 @@ dependencies = [
  "tokio",
  "tower-layer",
  "tower-service",
+]
+
+[[package]]
+name = "tower"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d039ad9159c98b70ecfd540b2573b97f7f52c3e8d9f8ad57a24b916a536975f9"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "pin-project-lite",
+ "sync_wrapper",
+ "tokio",
+ "tower-layer",
+ "tower-service",
  "tracing",
 ]
 
 [[package]]
 name = "tower-layer"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c20c8dbed6283a09604c3e69b4b7eeb54e298b8a600d4d5ecb5ad39de609f1d0"
+checksum = "121c2a6cda46980bb0fcd1647ffaf6cd3fc79a013de288782836f6df9c48780e"
 
 [[package]]
 name = "tower-service"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
+checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tracing"
@@ -3691,9 +3697,9 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tungstenite"
-version = "0.21.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ef1a641ea34f399a848dea702823bbecfb4c486f911735368f1f137cb8257e1"
+checksum = "18e5b8366ee7a95b16d32197d0b2604b43a0be89dc5fac9f8e96ccafbaedda8a"
 dependencies = [
  "byteorder",
  "bytes",
@@ -3704,7 +3710,6 @@ dependencies = [
  "rand",
  "sha1",
  "thiserror 1.0.69",
- "url",
  "utf-8",
 ]
 

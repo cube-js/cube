@@ -1,13 +1,14 @@
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  // language=JavaScript
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
@@ -233,7 +234,8 @@ describe('PreAggregations', () => {
         countCustomGranularity: {
           measures: [count],
           timeDimension: createdAt,
-          granularity: 'hourTenMinOffset'
+          granularity: 'hourTenMinOffset',
+          allowNonStrictDateRangeMatch: false
         },
         sourceAndIdRollup: {
           measures: [count],
@@ -443,29 +445,6 @@ describe('PreAggregations', () => {
         }
       }
     })
-
-    cube('VisitorView', {
-      sql: \`SELECT 1\`,
-
-      measures: {
-        checkinsTotal: {
-          sql: \`\${visitors.checkinsTotal}\`,
-          type: 'number',
-        }
-      },
-
-      dimensions: {
-        source: {
-          sql: \`\${visitors.source}\`,
-          type: 'string',
-        },
-
-        createdAt: {
-          sql: \`\${visitors.createdAt}\`,
-          type: 'time'
-        }
-      },
-    });
 
     cube('LambdaVisitors', {
       extends: visitors,
@@ -1199,7 +1178,8 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    expect(preAggregationsDescription[0].tableName).toEqual('visitors_default');
+    // For extended cubes pre-aggregations from parents are treated as local
+    expect(preAggregationsDescription[0].tableName).toEqual('reference_original_sql_default');
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(
@@ -2084,20 +2064,20 @@ describe('PreAggregations', () => {
   it('simple view', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
-        'VisitorView.checkinsTotal'
+        'visitors_view.checkinsTotal'
       ],
       dimensions: [
-        'VisitorView.source'
+        'visitors_view.source'
       ],
       timezone: 'America/Los_Angeles',
       preAggregationsSchema: '',
       timeDimensions: [{
-        dimension: 'VisitorView.createdAt',
+        dimension: 'visitors_view.createdAt',
         granularity: 'day',
         dateRange: ['2016-12-30', '2017-01-05']
       }],
       order: [{
-        id: 'VisitorView.createdAt'
+        id: 'visitors_view.createdAt'
       }],
     });
 
@@ -2117,19 +2097,19 @@ describe('PreAggregations', () => {
       expect(res).toEqual(
         [
           {
-            visitor_view__source: 'some',
-            visitor_view__created_at_day: '2017-01-02T00:00:00.000Z',
-            visitor_view__checkins_total: '3'
+            visitors_view__source: 'some',
+            visitors_view__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitors_view__checkins_total: '3'
           },
           {
-            visitor_view__source: 'some',
-            visitor_view__created_at_day: '2017-01-04T00:00:00.000Z',
-            visitor_view__checkins_total: '2'
+            visitors_view__source: 'some',
+            visitors_view__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitors_view__checkins_total: '2'
           },
           {
-            visitor_view__source: 'google',
-            visitor_view__created_at_day: '2017-01-05T00:00:00.000Z',
-            visitor_view__checkins_total: '1'
+            visitors_view__source: 'google',
+            visitors_view__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitors_view__checkins_total: '1'
           }
         ]
       );
@@ -2139,20 +2119,20 @@ describe('PreAggregations', () => {
   it('simple view non matching time-dimension granularity', () => compiler.compile().then(() => {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
-        'VisitorView.checkinsTotal'
+        'visitors_view.checkinsTotal'
       ],
       dimensions: [
-        'VisitorView.source'
+        'visitors_view.source'
       ],
       timezone: 'America/Los_Angeles',
       preAggregationsSchema: '',
       timeDimensions: [{
-        dimension: 'VisitorView.createdAt',
+        dimension: 'visitors_view.createdAt',
         granularity: 'month',
         dateRange: ['2016-12-30', '2017-01-05']
       }],
       order: [{
-        id: 'VisitorView.createdAt'
+        id: 'visitors_view.createdAt'
       }],
     });
 
@@ -2172,14 +2152,14 @@ describe('PreAggregations', () => {
       expect(res).toEqual(
         [
           {
-            visitor_view__source: 'google',
-            visitor_view__created_at_month: '2017-01-01T00:00:00.000Z',
-            visitor_view__checkins_total: '1'
+            visitors_view__source: 'google',
+            visitors_view__created_at_month: '2017-01-01T00:00:00.000Z',
+            visitors_view__checkins_total: '1'
           },
           {
-            visitor_view__source: 'some',
-            visitor_view__created_at_month: '2017-01-01T00:00:00.000Z',
-            visitor_view__checkins_total: '5'
+            visitors_view__source: 'some',
+            visitors_view__created_at_month: '2017-01-01T00:00:00.000Z',
+            visitors_view__checkins_total: '5'
           }
         ]
       );

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/core",
-  "version": "1.2.20",
+  "version": "1.2.33",
   "engines": {},
   "repository": {
     "type": "git",
@@ -44,5 +44,15 @@
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^10.0.0",
     "jest": "^27"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "html",
+      "cobertura"
+    ],
+    "coverageDirectory": "coverage/"
   }
 }

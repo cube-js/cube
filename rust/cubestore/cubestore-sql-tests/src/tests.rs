@@ -2256,6 +2256,7 @@ async fn create_table_with_csv_no_header_and_delimiter(service: Box<dyn SqlClien
 }
 
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
+    // TODO serve this data ourselves
     let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
 
     service

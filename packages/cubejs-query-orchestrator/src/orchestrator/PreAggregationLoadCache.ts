@@ -1,6 +1,6 @@
 import { TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
+import { QueryCache, QueryWithParams } from './QueryCache';
 import {
   PreAggregationDescription,
   PreAggregations,
@@ -189,13 +189,13 @@ export class PreAggregationLoadCache {
   }
 
   public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
-    const [query, values, queryOptions]: QueryTuple = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
+    const [query, values, queryOptions]: QueryWithParams = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
 
     if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
       this.queryResults[this.queryCache.queryRedisKey([query, values])] = await this.queryCache.cacheQueryResult(
         query,
-        <string[]>values,
-        [query, <string[]>values],
+        values,
+        [query, values],
         60 * 60,
         {
           renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold

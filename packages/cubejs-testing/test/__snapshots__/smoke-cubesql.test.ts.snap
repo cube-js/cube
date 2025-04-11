@@ -36,6 +36,64 @@ Object {
 }
 `;
 
+exports[`SQL API Cube SQL over HTTP sql4sql double aggregation post-processing with disabled post-processing 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "query_type": "pushdown",
+      "sql": Array [
+        "SELECT \\"t\\".\\"avg_t_total_\\" \\"avg_t_total_\\" 
+FROM (
+  SELECT AVG(\\"t\\".\\"total\\") \\"avg_t_total_\\" 
+  FROM (
+    SELECT
+          \\"orders\\".status \\"status\\", sum(\\"orders\\".amount) \\"total\\"
+        FROM
+          (
+      select 1 as id, 100 as amount, 'new' status, '2024-01-01'::timestamptz created_at
+      UNION ALL
+      select 2 as id, 200 as amount, 'new' status, '2024-01-02'::timestamptz created_at
+      UNION ALL
+      select 3 as id, 300 as amount, 'processed' status, '2024-01-03'::timestamptz created_at
+      UNION ALL
+      select 4 as id, 500 as amount, 'processed' status, '2024-01-04'::timestamptz created_at
+      UNION ALL
+      select 5 as id, 600 as amount, 'shipped' status, '2024-01-05'::timestamptz created_at
+      ) AS \\"orders\\"  GROUP BY 1
+  ) AS \\"t\\"
+) AS \\"t\\"",
+        Array [],
+      ],
+      "status": "ok",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "878",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
 exports[`SQL API Cube SQL over HTTP sql4sql regular query 1`] = `
 Object {
   "body": Object {
@@ -209,6 +267,42 @@ Object {
 `;
 
 exports[`SQL API Cube SQL over HTTP sql4sql strictly post-processing 1`] = `
+Object {
+  "body": Object {
+    "sql": Object {
+      "error": "Provided query can not be executed without post-processing.",
+      "query_type": "post_processing",
+      "status": "error",
+    },
+  },
+  "headers": Headers {
+    Symbol(map): Object {
+      "access-control-allow-origin": Array [
+        "*",
+      ],
+      "connection": Array [
+        "keep-alive",
+      ],
+      "content-length": Array [
+        "127",
+      ],
+      "content-type": Array [
+        "application/json; charset=utf-8",
+      ],
+      "keep-alive": Array [
+        "timeout=5",
+      ],
+      "x-powered-by": Array [
+        "Express",
+      ],
+    },
+  },
+  "status": 200,
+  "statusText": "OK",
+}
+`;
+
+exports[`SQL API Cube SQL over HTTP sql4sql strictly post-processing with disabled post-processing 1`] = `
 Object {
   "body": Object {
     "sql": Object {
@@ -448,6 +542,40 @@ Array [
   Object {
     "count": "1",
     "status": "shipped",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) measure with ad-hoc filter and original measure: measure-with-ad-hoc-filters-and-original-measure 1`] = `
+Array [
+  Object {
+    "new_amount": 300,
+    "total_amount": 1700,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) measure with ad-hoc filter: measure-with-ad-hoc-filters 1`] = `
+Array [
+  Object {
+    "new_amount": 300,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) measure with replaced aggregation and original measure: measure-with-replaced-aggregation-and-original-measure 1`] = `
+Array [
+  Object {
+    "min_amount": 100,
+    "sum_amount": 1700,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) measure with replaced aggregation: measure-with-replaced-aggregation 1`] = `
+Array [
+  Object {
+    "min_amount": 100,
   },
 ]
 `;

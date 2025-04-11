@@ -24,7 +24,7 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     execution::context::SessionContext,
-    logical_plan::{create_udaf, create_udf},
+    logical_plan::create_udf,
     physical_plan::{
         functions::{
             datetime_expressions::date_trunc, make_scalar_function, make_table_function, Signature,
@@ -2259,14 +2259,66 @@ pub fn create_pg_get_constraintdef_udf() -> ScalarUDF {
     )
 }
 
+pub const MEASURE_UDAF_NAME: &str = "measure";
+
 pub fn create_measure_udaf() -> AggregateUDF {
-    create_udaf(
-        "measure",
-        DataType::Float64,
-        Arc::new(DataType::Float64),
-        Volatility::Immutable,
-        Arc::new(|| todo!("Not implemented")),
-        Arc::new(vec![DataType::Float64]),
+    let signature = Signature::any(1, Volatility::Immutable);
+
+    // MEASURE(cube.measure) should have same type as just cube.measure
+    let return_type: ReturnTypeFunction = Arc::new(move |inputs| {
+        if inputs.len() != 1 {
+            Err(DataFusionError::Internal(format!(
+                "Unexpected argument types for MEASURE: {inputs:?}"
+            )))
+        } else {
+            Ok(Arc::new(inputs[0].clone()))
+        }
+    });
+
+    let accumulator: AccumulatorFunctionImplementation = Arc::new(|| todo!("Not implemented"));
+
+    let state_type = Arc::new(vec![DataType::Float64]);
+    let state_type: StateTypeFunction = Arc::new(move |_| Ok(state_type.clone()));
+
+    AggregateUDF::new(
+        MEASURE_UDAF_NAME,
+        &signature,
+        &return_type,
+        &accumulator,
+        &state_type,
+    )
+}
+
+pub const PATCH_MEASURE_UDAF_NAME: &str = "__patch_measure";
+
+// TODO add sanity check on incoming query to disallow it in input
+pub fn create_patch_measure_udaf() -> AggregateUDF {
+    // TODO actually signature should look like (any, text, boolean)
+    let signature = Signature::any(3, Volatility::Immutable);
+
+    // __PATCH_MEASURE(cube.measure, type, filter) should have same type as just cube.measure
+    let return_type: ReturnTypeFunction = Arc::new(move |inputs| {
+        if inputs.len() != 3 {
+            Err(DataFusionError::Internal(format!(
+                "Unexpected argument types for {PATCH_MEASURE_UDAF_NAME}: {inputs:?}"
+            )))
+        } else {
+            Ok(Arc::new(inputs[0].clone()))
+        }
+    });
+
+    let accumulator: AccumulatorFunctionImplementation =
+        Arc::new(|| todo!("Internal, should not execute"));
+
+    let state_type = Arc::new(vec![DataType::Float64]);
+    let state_type: StateTypeFunction = Arc::new(move |_| Ok(state_type.clone()));
+
+    AggregateUDF::new(
+        PATCH_MEASURE_UDAF_NAME,
+        &signature,
+        &return_type,
+        &accumulator,
+        &state_type,
     )
 }
 

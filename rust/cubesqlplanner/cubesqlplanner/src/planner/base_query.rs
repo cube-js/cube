@@ -27,6 +27,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.base_tools()?,
             options.join_graph()?,
             options.static_data().timezone.clone(),
+            options.static_data().export_annotated_sql,
         )?;
 
         let request = QueryProperties::try_new(query_tools.clone(), options)?;

@@ -52,6 +52,9 @@ impl ReferencesBuilder {
         references: &mut HashMap<String, QualifiedColumnName>,
     ) -> Result<(), CubeError> {
         let member_name = member.full_name();
+        if references.contains_key(&member_name) {
+            return Ok(());
+        }
         if let Some(reference) = self.find_reference_for_member(&member_name, strict_source) {
             references.insert(member_name.clone(), reference);
             return Ok(());
@@ -123,6 +126,9 @@ impl ReferencesBuilder {
                     self.validate_filter_item(itm)?
                 }
             }
+            FilterItem::Segment(segment) => {
+                self.validate_member(segment.member_evaluator().clone(), &None)?
+            }
         }
         Ok(())
     }
@@ -143,6 +149,11 @@ impl ReferencesBuilder {
                     self.resolve_references_for_filter_item(itm, references)?
                 }
             }
+            FilterItem::Segment(segment) => self.resolve_references_for_member(
+                segment.member_evaluator().clone(),
+                &None,
+                references,
+            )?,
         }
         Ok(())
     }
