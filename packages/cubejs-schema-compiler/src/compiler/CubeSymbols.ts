@@ -14,13 +14,19 @@ export type ToString = { toString(): string };
 interface CubeDefinition {
   name: string;
   extends?: (...args: Array<unknown>) => { __cubeName: string };
+  sql?: string | (() => string);
+  // eslint-disable-next-line camelcase
+  sql_table?: string | (() => string);
+  sqlTable?: string | (() => string);
   measures?: Record<string, any>;
   dimensions?: Record<string, any>;
   segments?: Record<string, any>;
   hierarchies?: Record<string, any>;
   preAggregations?: Record<string, any>;
+  // eslint-disable-next-line camelcase
+  pre_aggregations?: Record<string, any>;
   joins?: Record<string, any>;
-  accessPolicy?: Record<string, any>;
+  accessPolicy?: any[];
   includes?: any;
   excludes?: any;
   cubes?: any;
@@ -36,7 +42,7 @@ interface SplitViews {
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 export const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
-  // SECURITY_CONTEXT has been deprecated, however security_context (lowecase)
+  // SECURITY_CONTEXT has been deprecated, however security_context (lowercase)
   // is allowed in RBAC policies for query-time attribute matching
   security_context: 'securityContext',
   securityContext: 'securityContext',
@@ -106,10 +112,13 @@ export class CubeSymbols {
   }
 
   public createCube(cubeDefinition: CubeDefinition) {
+    let preAggregations: any;
+    let joins: any;
     let measures: any;
     let dimensions: any;
     let segments: any;
     let hierarchies: any;
+    let accessPolicy: any;
 
     const cubeObject = Object.assign({
       allDefinitions(type: string) {
@@ -122,6 +131,37 @@ export class CubeSymbols {
           return { ...cubeDefinition[type] };
         }
       },
+
+      get preAggregations() {
+        // For preAggregations order is important, and destructing parents cube pre-aggs first will lead to
+        // unexpected results, so we can not use common approach with allDefinitions('preAggregations') here.
+        if (!preAggregations) {
+          const parentPreAggregations = cubeDefinition.extends ? super.preAggregations : null;
+          // Unfortunately, cube is not camelized yet at this point :(
+          const localPreAggregations = cubeDefinition.preAggregations || cubeDefinition.pre_aggregations;
+
+          if (parentPreAggregations) {
+            preAggregations = { ...localPreAggregations, ...parentPreAggregations, ...localPreAggregations };
+          } else {
+            preAggregations = { ...localPreAggregations };
+          }
+        }
+        return preAggregations;
+      },
+      set preAggregations(v) {
+        // Dont allow to modify
+      },
+
+      get joins() {
+        if (!joins) {
+          joins = this.allDefinitions('joins');
+        }
+        return joins;
+      },
+      set joins(v) {
+        // Dont allow to modify
+      },
+
       get measures() {
         if (!measures) {
           measures = this.allDefinitions('measures');
@@ -159,18 +199,41 @@ export class CubeSymbols {
         return hierarchies;
       },
       set hierarchies(v) {
-        //
+        // Dont allow to modify
+      },
+
+      get accessPolicy() {
+        if (!accessPolicy) {
+          const parentAcls = cubeDefinition.extends ? super.accessPolicy : [];
+          accessPolicy = [...(parentAcls || []), ...(cubeDefinition.accessPolicy || [])];
+        }
+        // Schema validator expects accessPolicy to be not empty if defined
+        if (accessPolicy.length) {
+          return accessPolicy;
+        } else {
+          return undefined;
+        }
+      },
+      set accessPolicy(v) {
+        // Dont allow to modify
       }
     },
     cubeDefinition);
 
     if (cubeDefinition.extends) {
       const superCube = this.resolveSymbolsCall(cubeDefinition.extends, (name: string) => this.cubeReferenceProxy(name));
-      Object.setPrototypeOf(
-        cubeObject,
-        // eslint-disable-next-line no-underscore-dangle
-        superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube
-      );
+      // eslint-disable-next-line no-underscore-dangle
+      const parentCube = superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube;
+      Object.setPrototypeOf(cubeObject, parentCube);
+
+      // We have 2 different properties that are mutually exclusive: `sqlTable` & `sql`
+      // And if in extending cube one of them is defined - we need to hide the other from parent cube definition
+      // Unfortunately, cube is not camelized yet at this point :(
+      if ((cubeDefinition.sqlTable || cubeDefinition.sql_table) && parentCube.sql) {
+        cubeObject.sql = undefined;
+      } else if (cubeDefinition.sql && (parentCube.sqlTable || parentCube.sql_table)) {
+        cubeObject.sqlTable = undefined;
+      }
     }
 
     return cubeObject;

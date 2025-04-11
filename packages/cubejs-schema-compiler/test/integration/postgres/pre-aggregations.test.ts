@@ -1,14 +1,14 @@
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
 
   // language=JavaScript
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
@@ -1178,7 +1178,8 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
-    expect(preAggregationsDescription[0].tableName).toEqual('visitors_default');
+    // For extended cubes pre-aggregations from parents are treated as local
+    expect(preAggregationsDescription[0].tableName).toEqual('reference_original_sql_default');
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(

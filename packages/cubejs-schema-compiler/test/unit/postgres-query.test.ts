@@ -1,9 +1,9 @@
 /* eslint-disable no-restricted-syntax */
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('PostgresQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors

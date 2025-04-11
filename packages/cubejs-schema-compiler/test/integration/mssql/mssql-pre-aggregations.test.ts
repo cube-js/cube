@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { MSSqlDbRunner } from './MSSqlDbRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
 
@@ -13,7 +13,7 @@ describe('MSSqlPreAggregations', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from ##visitors
@@ -175,7 +175,7 @@ describe('MSSqlPreAggregations', () => {
     })
     `);
 
-  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+  const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
   function replaceTableName(query, preAggregation, suffix) {
     const [toReplace, params] = query;

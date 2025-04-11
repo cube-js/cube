@@ -1,6 +1,6 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
-import { MeasureDefinition } from "../compiler/CubeEvaluator";
+import { MeasureDefinition } from '../compiler/CubeEvaluator';
 
 export class BaseMeasure {
   public readonly expression: any;
