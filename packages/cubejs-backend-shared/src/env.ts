@@ -221,7 +221,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
   nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').default('false').asBool(),
   nativeOrchestrator: () => get('CUBEJS_TESSERACT_ORCHESTRATOR')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => get('CUBEJS_TRANSPILATION_WORKER_THREADS')
     .default('false')
