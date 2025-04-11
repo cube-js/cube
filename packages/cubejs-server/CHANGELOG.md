@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Bug Fixes
+
+- **server:** Fix incorrect native result wrapper processing via webSockets ([#9458](https://github.com/cube-js/cube/issues/9458)) ([a4e76c4](https://github.com/cube-js/cube/commit/a4e76c4568bce4c63e5f131f3c7bf800f1cd45fc))
+
 ## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
 
 **Note:** Version bump only for package @cubejs-backend/server
