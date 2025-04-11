@@ -580,7 +580,7 @@ export class CompilerApi {
     );
     return {
       metaConfig: patchedCubes,
-      cubeDefinitions: compilers.metaTransformer?.cubeEvaluator?.cubeDefinitions,
+      cubeDefinitions: compilers.metaTransformer?.cubeEvaluator?.evaluatedCubes,
     };
   }
 
