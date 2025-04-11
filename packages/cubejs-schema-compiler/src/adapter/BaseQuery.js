@@ -4348,6 +4348,11 @@ export class BaseQuery {
     });
   }
 
+  /**
+   *
+   * @param {boolean} excludeSegments
+   * @returns {Array<BaseMeasure | BaseDimension | BaseSegment>}
+   */
   flattenAllMembers(excludeSegments = false) {
     return R.flatten(
       this.measures
@@ -4368,6 +4373,11 @@ export class BaseQuery {
     return this.backAliasMembers(this.flattenAllMembers());
   }
 
+  /**
+   *
+   * @param {Array<BaseMeasure | BaseDimension | BaseSegment>} members
+   * @returns {Record<string, string>}
+   */
   backAliasMembers(members) {
     const query = this;
     return members.map(
