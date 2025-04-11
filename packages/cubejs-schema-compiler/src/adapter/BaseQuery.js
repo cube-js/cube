@@ -4380,7 +4380,7 @@ export class BaseQuery {
    */
   backAliasMembers(members) {
     const query = this;
-    return members.map(
+    return Object.fromEntries(members.flatMap(
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
@@ -4395,10 +4395,8 @@ export class BaseQuery {
             }
             return !nonAliasSeen;
           })
-          .map(d => (
-            { [query.cubeEvaluator.byPathAnyType(d).aliasMember]: memberPath }
-          )).reduce((a, b) => ({ ...a, ...b }), {});
+          .map(d => [query.cubeEvaluator.byPathAnyType(d).aliasMember, memberPath]);
       }
-    ).reduce((a, b) => ({ ...a, ...b }), {});
+    ));
   }
 }
