@@ -1,7 +1,7 @@
 import path from 'path';
 import { downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
 
-export const OSS_DRIVER_VERSION = '1.0.2';
+export const OSS_DRIVER_VERSION = '1.0.3';
 
 /**
  * In the beginning of 2025 Databricks released their open-source version of JDBC driver and encourage
