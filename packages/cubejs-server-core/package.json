@@ -67,7 +67,7 @@
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
     "@types/jsonwebtoken": "^9.0.2",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "@types/node-fetch": "^2.5.7",
     "@types/ramda": "^0.27.34",
     "@types/uuid": "^8.3.0",

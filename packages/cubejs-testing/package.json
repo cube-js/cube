@@ -119,7 +119,7 @@
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^27",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "cypress": "14.0.0",
     "cypress-image-snapshot": "^4.0.1",
     "cypress-localstorage-commands": "^1.4.5",
