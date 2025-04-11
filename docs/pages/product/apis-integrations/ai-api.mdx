@@ -107,10 +107,16 @@ Use the `runQuery` request parameter to have the AI API run the query and report
 }
 ```
 
-The response will be the same as above, followed by a second JSON object representing the response (see the [REST API reference](/product/apis-integrations/rest-api/reference#v1load) for its format).
+The response will be the same as above, possibly followed by a second JSON object representing the response (see the [REST API reference](/product/apis-integrations/rest-api/reference#v1load) for its format).
+
+<WarningBox>
+  In some cases, the AI API will not generate a query, i.e. there will be no `cube_query` key in the first JSON object. 
+  When that happens, there will be no second object generated, as there are no results to show. This is expected and may
+  occur when the model needs more information or doesn't have the necessary fields to run the requested query.
+</WarningBox>
 
 <InfoBox>
-  Note that the response now contains two JSON objects separated by a newline
+  Note that if the AI API generated a query, the response now contains two JSON objects separated by a newline
   (`\n`). You are responsible for parsing these appropriately.
 </InfoBox>
 
