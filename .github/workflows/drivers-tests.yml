@@ -210,6 +210,8 @@ jobs:
         databricks-jdbc-export-bucket-s3-prefix
         databricks-jdbc-export-bucket-azure
         databricks-jdbc-export-bucket-azure-prefix
+        databricks-jdbc-export-bucket-gcs
+        databricks-jdbc-export-bucket-gcs-prefix
         redshift
         redshift-export-bucket-s3
         snowflake
@@ -237,6 +239,8 @@ jobs:
           - databricks-jdbc-export-bucket-s3-prefix
           - databricks-jdbc-export-bucket-azure
           - databricks-jdbc-export-bucket-azure-prefix
+          - databricks-jdbc-export-bucket-gcs
+          - databricks-jdbc-export-bucket-gcs-prefix
           - mssql
           - mysql
           - postgres

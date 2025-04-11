@@ -39,6 +39,24 @@
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
         }
       }
+    },
+    "export-bucket-gcs": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
+          "CUBEJS_DB_EXPORT_BUCKET": "gs://databricks-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
+        }
+      }
+    },
+    "export-bucket-gcs-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
+          "CUBEJS_DB_EXPORT_BUCKET": "gs://databricks-drivers-tests-preaggs/testing_prefix/for_export_buckets",
+          "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
+        }
+      }
     }
   },
   "cube": {
