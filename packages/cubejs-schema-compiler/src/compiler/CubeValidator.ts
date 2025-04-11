@@ -779,8 +779,6 @@ const cubeSchema = inherit(baseSchema, {
 
 const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
-  includes: Joi.func(),
-  excludes: Joi.func(),
   cubes: Joi.array().items(
     Joi.object().keys({
       joinPath: Joi.func().required(),
