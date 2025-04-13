@@ -1,11 +1,11 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('Sub Query Dimensions', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
 cube(\`A\`, {
   sql: \`
     SELECT 79 AS id, 1 AS foo_id UNION ALL
@@ -15,7 +15,7 @@ cube(\`A\`, {
     SELECT 83 AS id, 5 AS foo_id UNION ALL
     SELECT 84 AS id, 6 AS foo_id
   \`,
-  
+
   measures: {
     maxFooId: {
       sql: \`foo_id\`,
@@ -88,7 +88,7 @@ cube(\`C\`, {
     SELECT 793 AS id, 478 AS bar_id, 38.0 AS important_value UNION ALL
     SELECT 794 AS id, 478 AS bar_id, 43.5 AS important_value
   \`,
-  
+
   measures: {
     importantValue: {
       sql: \`important_value\`,

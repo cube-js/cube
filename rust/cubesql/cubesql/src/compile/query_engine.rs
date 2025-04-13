@@ -226,7 +226,6 @@ pub trait QueryEngine {
                 state.auth_context().unwrap(),
                 qtrace,
                 span_id.clone(),
-                self.config_ref().top_down_extractor(),
             )
             .await
             .map_err(|e| match e.cause {
@@ -516,6 +515,7 @@ impl QueryEngine for SqlQueryEngine {
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
+        ctx.register_udaf(create_patch_measure_udaf());
 
         // udtf
         ctx.register_udtf(create_generate_series_udtf());

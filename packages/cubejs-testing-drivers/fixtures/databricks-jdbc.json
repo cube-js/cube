@@ -11,12 +11,50 @@
         }
       }
     },
+    "export-bucket-s3-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "s3://databricks-drivers-tests-preaggs/testing_prefix/for_export_buckets/",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+        }
+      }
+    },
     "export-bucket-azure": {
       "cube": {
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
           "CUBEJS_DB_EXPORT_BUCKET": "abfss://databricks-drivers-tests-preaggs@coreteamdevtest.dfs.core.windows.net",
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
+        }
+      }
+    },
+    "export-bucket-azure-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
+          "CUBEJS_DB_EXPORT_BUCKET": "abfss://databricks-drivers-tests-preaggs@coreteamdevtest.dfs.core.windows.net/testing_prefix/for_export_buckets",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
+        }
+      }
+    },
+    "export-bucket-gcs": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
+          "CUBEJS_DB_EXPORT_BUCKET": "gs://databricks-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
+        }
+      }
+    },
+    "export-bucket-gcs-prefix": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
+          "CUBEJS_DB_EXPORT_BUCKET": "gs://databricks-drivers-tests-preaggs/testing_prefix/for_export_buckets",
+          "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
         }
       }
     }

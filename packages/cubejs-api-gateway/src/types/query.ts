@@ -38,14 +38,34 @@ type LogicalOrFilter = {
   or: (QueryFilter | LogicalAndFilter)[]
 };
 
+export type GroupingSetType = 'Rollup' | 'Cube';
+
 type GroupingSet = {
-    groupType: string,
+    groupType: GroupingSetType,
     id: number,
     subId?: null | number
 };
 
+export type EvalPatchMeasureFilterExpression = {
+  sql: Function,
+};
+
+export type PatchMeasureExpression = {
+  type: 'PatchMeasure',
+  sourceMeasure: string,
+  replaceAggregationType: string | null,
+  addFilters: Array<Array<string>>,
+};
+
+export type EvalPatchMeasureExpression = {
+  type: 'PatchMeasure',
+  sourceMeasure: string,
+  replaceAggregationType: string | null,
+  addFilters: Array<EvalPatchMeasureFilterExpression>,
+};
+
 type ParsedMemberExpression = {
-  expression: string[];
+  expression: string[] | PatchMeasureExpression;
   cubeName: string;
   name: string;
   expressionName: string;
@@ -54,7 +74,33 @@ type ParsedMemberExpression = {
 };
 
 type MemberExpression = Omit<ParsedMemberExpression, 'expression'> & {
-  expression: Function;
+  expression: Function | EvalPatchMeasureExpression;
+};
+
+type InputSqlFunction = {
+  cubeParams: Array<string>,
+  sql: string,
+};
+
+export type InputMemberExpressionSqlFunction = {
+  type: 'SqlFunction'
+} & InputSqlFunction;
+
+export type InputMemberExpressionPatchMeasure = {
+  type: 'PatchMeasure',
+  sourceMeasure: string,
+  replaceAggregationType: string | null,
+  addFilters: Array<InputSqlFunction>,
+};
+
+export type InputMemberExpressionExpr = InputMemberExpressionSqlFunction | InputMemberExpressionPatchMeasure;
+
+// This should be aligned with cubesql side
+export type InputMemberExpression = {
+  cubeName: string,
+  alias: string,
+  expr: InputMemberExpressionExpr,
+  groupingSet: GroupingSet | null,
 };
 
 /**

@@ -96,18 +96,28 @@ navigating to <Btn>Overview → Resources & Logs → Cube API</Btn>:
 
 Cube Cloud provides two update channels:
 
-* **Stable channel.** You should manually update the deployment to one of
-available stable versions.
-* **Latest channel.** On each build, the deployment is automatically updated
-to the most up-to-date version of Cube.
+* <Btn>LTS channel</Btn> for infrequent [long-term support][ref-lts] releases with
+critical fixes.
+* <Btn>Regular channel</Btn> for regular releases, which occur more frequently and
+contain both fixes and new features.
 
 You can view or change the update channel by navigating to <Btn>Settings →
 General → Cube version</Btn>:
 
 <Screenshot
-  src="https://ucarecdn.com/b6ddfc8f-ee37-4b75-8108-ba12c020a9f6/"
-  highlight="inset(53.75% 42.5% 11.25% 20% round 10px)"
+  src="https://ucarecdn.com/3ef5fa36-4b27-437c-aa70-dbc0aa01255d/"
+  highlight="inset(36% 41% 34% 21% round 10px)"
 />
+
+There's an option to <Btn>Upgrade automatically to new patch versions</Btn>, which is
+available for both update channels. When it's turned on, an upgrade will occur if a new
+[patch version][link-semver] is available in the selected channel. To trigger an upgrade,
+deploy a new build to the [production environment][ref-environments-prod] or change its
+settings, e.g., by updating environment variables of the Cube Cloud deployment.
+
+Generally, it's recommended to use the _regular channel_ to get the latest updates.
+You can _pin the version_ to a specific one by turning the <Btn>Upgrade automatically...</Btn>
+toggle off.
 
 ## Resource consumption
 
@@ -140,3 +150,5 @@ resource consumption in different scenarios.
 [ref-playground]: /product/workspace/playground
 [ref-environments]: /product/workspace/environments
 [ref-environments-prod]: /product/workspace/environments#production-environment
+[ref-lts]: /product/distribution#long-term-support
+[link-semver]: https://semver.org

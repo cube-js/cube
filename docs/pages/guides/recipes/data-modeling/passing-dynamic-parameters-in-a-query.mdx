@@ -16,12 +16,17 @@ filter. The trick is to get the value of the city from the user and use it in
 the calculation. In the recipe below, we can learn how to join the data table
 with itself and reshape the dataset!
 
+<WarningBox>
+
+This pattern only allows users to choose from values that already exist in the data set. Rather than injecting arbitrary user input into the query, this method involves filtering the data based on the user's input and utilizing a single value result in a calculation.
+
+</WarningBox>
+
 ## Data modeling
 
-Essentially what we will be doing is cross joining all city values with the rows in the data table. 
-This will duplicate each row for every city in the dataset. Then, we will require the user 
-to choose a city to filter on, and this will bring us back to our original number of rows. What this 
-gives us is a new column in the dataset with the value that the user chose, which we can reference in our metrics. 
+Essentially what we will be doing is allowing the user to select a specific city value, then cross joining that value with the rows in the data table. 
+This will maintain the orginal number of rows in the dataset while adding a new column that has the value that the user chose. 
+This will allow us to use that value in our calculations.
 In this case, we will use that value to filter a single metric so that we can compare that metric with the whole population.
 
 Let's explore the `users` cube data that contains various information about
@@ -35,13 +40,16 @@ users, including city and gender:
 | ... | ...      | ...    | ...             |
 
 To calculate the ratio between the number of women in a particular city and the
-total number of people in the country, we need to define three measures. One of
-them can receive the city value from the filter in a query. Cube will apply this
-filter via the `WHERE` clause to the dataset. So, we need to reshape the dataset
-so that applying this filter wouldn’t affect the calculations. In this use case,
-we can join the data table with itself to multiply the `city` column — applying
-the filter would remove the multiplication while still allowing to access the
-filter value:
+total number of people in the country, we need to define three measures, one of 
+which uses the city value that the user chose. 
+
+In order to prevent filtering the whole dataset with the user-selected value, 
+we will need to define a new dimension that, when filtered on, only filters a specific part of the query. 
+We will use this new filter field along with the [`FILTER_PARAMS`][ref-filter-params] 
+parameter in the sql of the cube. This will allow us to apply to the filter to a subquery 
+rather than the whole query so that it doesn't affect other calculations.
+In this use case, we can join the data table with itself to create a new city_filter 
+column with a single value that the user chose so that we can use it in other calculations.
 
 <CodeTabs>
 
@@ -59,6 +67,7 @@ cubes:
       cities AS (
         SELECT city
         FROM data
+        WHERE {FILTER_PARAMS.users.city.filter('city')}
       ),
       grouped AS (
         SELECT
@@ -77,7 +86,7 @@ cubes:
         sql: id
         type: count
         filters:
-          - sql: "gender = 'female' and city = city_filter" 
+          - sql: "gender = 'female'"
 
       - name: number_of_people_of_any_gender_in_the_city:
         sql: id
@@ -112,6 +121,7 @@ cube(`users`, {
     cities AS (
       SELECT city
       FROM data
+      WHERE ${FILTER_PARAMS.users.city.filter('city')}
     ),
 
     grouped AS (
@@ -161,6 +171,40 @@ cube(`users`, {
 
 </CodeTabs>
 
+The above code shows very clearly what is happening, but it is even simplier to define the sql parameter in the following way:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql: >
+      WITH 
+      city AS (
+        SELECT DISTINCT city AS city_filter
+        FROM public.users
+        WHERE {FILTER_PARAMS.users.city.filter('city')}
+        )
+      SELECT city.city_filter, users.*
+      FROM city, public.users
+```
+
+```javascript
+cube(`users`, {
+  sql: `
+    WITH 
+    city AS (
+      SELECT DISTINCT city AS city_filter
+      FROM public.users
+      WHERE {FILTER_PARAMS.users.city.filter('city')}
+      )
+    SELECT city.city_filter, users.*
+    FROM city, public.users
+  `,
+```
+
+</CodeTabs>
+
 ## Query
 
 To get the ratio result depending on the city, we need to pass the value via a
@@ -204,3 +248,5 @@ Please feel free to check out the
 [full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/passing-dynamic-parameters-in-query)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
+
+[ref-filter-params]: /reference/data-model/context-variables#filter_params

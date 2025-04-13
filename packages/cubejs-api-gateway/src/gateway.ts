@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
+import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
@@ -83,6 +84,7 @@ import {
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryPreAggregations,
+  parseInputMemberExpression,
   preAggsJobsRequestSchema,
   remapToQueryAdapterFormat,
 } from './query';
@@ -120,8 +122,10 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
-// Prepared CheckAuthFn, default or from config: always async, returns nothing
-type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<void>;
+// Prepared CheckAuthFn, default or from config: always async
+type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<{
+  securityContext: any;
+}>;
 
 class ApiGateway {
   protected readonly refreshScheduler: any;
@@ -148,10 +152,10 @@ class ApiGateway {
 
   public readonly checkAuthSystemFn: PreparedCheckAuthFn;
 
-  protected readonly contextToApiScopesFn: ContextToApiScopesFn;
+  public readonly contextToApiScopesFn: ContextToApiScopesFn;
 
-  protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
-    async () => ['graphql', 'meta', 'data'];
+  public readonly contextToApiScopesDefFn: ContextToApiScopesFn =
+    async () => ['graphql', 'meta', 'data', 'sql'];
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
@@ -544,18 +548,22 @@ class ApiGateway {
     }
 
     if (getEnv('nativeApiGateway')) {
-      const proxyMiddleware = createProxyMiddleware<Request, Response>({
-        target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
-        changeOrigin: true,
-      });
-
-      app.use(
-        `${this.basePath}/v2`,
-        proxyMiddleware as any
-      );
+      this.enableNativeApiGateway(app);
     }
 
     app.use(this.handleErrorMiddleware);
+  }
+
+  protected enableNativeApiGateway(app: ExpressApplication) {
+    const proxyMiddleware = createProxyMiddleware<Request, Response>({
+      target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
+      changeOrigin: true,
+    });
+
+    app.use(
+      `${this.basePath}/v2`,
+      proxyMiddleware as any
+    );
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
@@ -1303,7 +1311,7 @@ class ApiGateway {
     res,
   }: {query: string, disablePostProcessing: boolean} & BaseRequest) {
     try {
-      await this.assertApiScope('data', context.securityContext);
+      await this.assertApiScope('sql', context.securityContext);
 
       const result = await this.sqlServer.sql4sql(query, disablePostProcessing, context.securityContext);
       res({ sql: result });
@@ -1331,7 +1339,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertApiScope('data', context.securityContext);
+      await this.assertApiScope('sql', context.securityContext);
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context, disableLimitEnforcing, memberExpressions);
@@ -1386,30 +1394,46 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
-    try {
-      if (memberExpression.startsWith('{')) {
-        const obj = JSON.parse(memberExpression);
-        const args = obj.cube_params;
-        args.push(`return \`${obj.expr}\``);
-
-        const groupingSet = obj.grouping_set ? {
-          groupType: obj.grouping_set.group_type,
-          id: obj.grouping_set.id,
-          subId: obj.grouping_set.sub_id ? obj.grouping_set.sub_id : undefined
-        } : undefined;
-
-        return {
-          cubeName: obj.cube_name,
-          name: obj.alias,
-          expressionName: obj.alias,
-          expression: args,
-          definition: memberExpression,
-          groupingSet,
-        };
-      } else {
-        return memberExpression;
+    if (memberExpression.startsWith('{')) {
+      const obj = parseInputMemberExpression(JSON.parse(memberExpression));
+      let expression: ParsedMemberExpression['expression'];
+      switch (obj.expr.type) {
+        case 'SqlFunction':
+          expression = [
+            ...obj.expr.cubeParams,
+            `return \`${obj.expr.sql}\``,
+          ];
+          break;
+        case 'PatchMeasure':
+          expression = {
+            type: 'PatchMeasure',
+            sourceMeasure: obj.expr.sourceMeasure,
+            replaceAggregationType: obj.expr.replaceAggregationType,
+            addFilters: obj.expr.addFilters.map(filter => [
+              ...filter.cubeParams,
+              `return \`${filter.sql}\``,
+            ]),
+          };
+          break;
+        default:
+          assertNever(obj.expr);
       }
-    } catch {
+
+      const groupingSet = obj.groupingSet ? {
+        groupType: obj.groupingSet.groupType,
+        id: obj.groupingSet.id,
+        subId: obj.groupingSet.subId ? obj.groupingSet.subId : undefined
+      } : undefined;
+
+      return {
+        cubeName: obj.cubeName,
+        name: obj.alias,
+        expressionName: obj.alias,
+        expression,
+        definition: memberExpression,
+        groupingSet,
+      };
+    } else {
       return memberExpression;
     }
   }
@@ -1427,14 +1451,31 @@ class ApiGateway {
     };
   }
 
-  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): string | MemberExpression {
-    const expression = Array.isArray(memberExpression.expression) ?
-      Function.constructor.apply(null, memberExpression.expression) : memberExpression.expression;
+  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): MemberExpression | ParsedMemberExpression {
+    if (typeof memberExpression.expression === 'function') {
+      return memberExpression;
+    }
 
-    return {
-      ...memberExpression,
-      expression,
-    };
+    if (Array.isArray(memberExpression.expression)) {
+      return {
+        ...memberExpression,
+        expression: Function.constructor.apply(null, memberExpression.expression),
+      };
+    }
+
+    if (memberExpression.expression.type === 'PatchMeasure') {
+      return {
+        ...memberExpression,
+        expression: {
+          ...memberExpression.expression,
+          addFilters: memberExpression.expression.addFilters.map(filter => ({
+            sql: Function.constructor.apply(null, filter),
+          })),
+        }
+      };
+    }
+
+    throw new Error(`Unexpected member expression to evaluate: ${memberExpression}`);
   }
 
   public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
@@ -2250,6 +2291,10 @@ class ApiGateway {
 
         showWarningAboutNotObject = true;
       }
+
+      return {
+        securityContext: req.securityContext
+      };
     };
   }
 
@@ -2333,6 +2378,10 @@ class ApiGateway {
         // @todo Move it to 401 or 400
         throw new CubejsHandlerError(403, 'Forbidden', 'Authorization header isn\'t set');
       }
+
+      return {
+        securityContext: req.securityContext
+      };
     };
   }
 
@@ -2343,6 +2392,7 @@ class ApiGateway {
 
     if (this.playgroundAuthSecret) {
       const systemCheckAuthFn = this.createCheckAuthSystemFn();
+
       return async (ctx, authorization) => {
         // TODO: separate two auth workflows
         try {
@@ -2354,6 +2404,10 @@ class ApiGateway {
             throw mainAuthError;
           }
         }
+
+        return {
+          securityContext: ctx.securityContext,
+        };
       };
     }
 
@@ -2371,6 +2425,10 @@ class ApiGateway {
 
     return async (ctx, authorization) => {
       await systemCheckAuthFn(ctx, authorization);
+
+      return {
+        securityContext: ctx.securityContext
+      };
     };
   }
 
@@ -2390,7 +2448,7 @@ class ApiGateway {
           );
         } else {
           scopes.forEach((p) => {
-            if (['graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+            if (['graphql', 'meta', 'data', 'sql', 'jobs'].indexOf(p) === -1) {
               throw new Error(
                 `A user-defined contextToApiScopes function returns a wrong scope: ${p}`
               );

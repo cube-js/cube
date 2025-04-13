@@ -66,7 +66,7 @@
   "resolutions": {
     "es5-ext": "0.10.53",
     "lodash": "^4.17.0",
-    "@types/node": "^18",
+    "@types/node": "^20",
     "@types/ramda": "0.27.40",
     "thrift": "0.20.0"
   },

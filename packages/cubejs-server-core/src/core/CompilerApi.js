@@ -1,7 +1,7 @@
 import crypto from 'crypto';
-import R from 'ramda';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
-import { v4 as uuidv4, parse as uuidParse, stringify as uuidStringify } from 'uuid';
+import { v4 as uuidv4, parse as uuidParse } from 'uuid';
+import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
 
 export class CompilerApi {
@@ -29,6 +29,25 @@ export class CompilerApi {
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
     this.nativeInstance = this.createNativeInstance();
+    this.compiledScriptCache = new LRUCache({
+      max: options.compilerCacheSize || 250,
+      ttl: options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: options.updateCompilerCacheKeepAlive
+    });
+
+    // proactively free up old cache values occasionally
+    if (this.options.maxCompilerCacheKeepAlive) {
+      this.compiledScriptCacheInterval = setInterval(
+        () => this.compiledScriptCache.purgeStale(),
+        this.options.maxCompilerCacheKeepAlive
+      );
+    }
+  }
+
+  dispose() {
+    if (this.compiledScriptCacheInterval) {
+      clearInterval(this.compiledScriptCacheInterval);
+    }
   }
 
   setGraphQLSchema(schema) {
@@ -83,6 +102,7 @@ export class CompilerApi {
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
         standalone: this.standalone,
         nativeInstance: this.nativeInstance,
+        compiledScriptCache: this.compiledScriptCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
 
@@ -107,9 +127,9 @@ export class CompilerApi {
   async createQueryFactory(compilers) {
     const { cubeEvaluator } = compilers;
 
-    const cubeToQueryClass = R.fromPairs(
+    const cubeToQueryClass = Object.fromEntries(
       await Promise.all(
-        cubeEvaluator.cubeNames().map(async cube => {
+        cubeEvaluator.cubeNames().map(async (cube) => {
           const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
           const dbType = await this.getDbType(dataSource);
           const dialectClass = this.getDialectClass(dataSource, dbType);
@@ -125,7 +145,7 @@ export class CompilerApi {
   }
 
   getDialectClass(dataSource = 'default', dbType) {
-    return this.dialectClass && this.dialectClass({ dataSource, dbType });
+    return this.dialectClass?.({ dataSource, dbType });
   }
 
   async getSqlGenerator(query, dataSource) {
@@ -171,8 +191,8 @@ export class CompilerApi {
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
       lambdaQueries: sqlGenerator.buildLambdaQuery(),
-      timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
-      timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
+      timeDimensionAlias: sqlGenerator.timeDimensions[0]?.unescapedAliasName(),
+      timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
       order: sqlGenerator.order,
       cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
       preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
@@ -206,7 +226,7 @@ export class CompilerApi {
   }
 
   roleMeetsConditions(evaluatedConditions) {
-    if (evaluatedConditions && evaluatedConditions.length) {
+    if (evaluatedConditions?.length) {
       return evaluatedConditions.reduce((a, b) => {
         if (typeof b !== 'boolean') {
           throw new Error(`Access policy condition must return boolean, got ${JSON.stringify(b)}`);

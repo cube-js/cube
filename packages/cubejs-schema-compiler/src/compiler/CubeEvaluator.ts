@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
 
-import { CubeSymbols } from './CubeSymbols';
+import { CubeSymbols, type ToString } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
@@ -28,7 +28,7 @@ export type DimensionDefinition = {
 };
 
 export type TimeShiftDefinition = {
-  timeDimension: Function,
+  timeDimension: (...args: Array<unknown>) => ToString,
   interval: string,
   type: 'next' | 'prior',
 };
@@ -48,14 +48,15 @@ export type MeasureDefinition = {
   primaryKey?: true,
   drillFilters?: any,
   multiStage?: boolean,
-  groupBy?: Function,
-  reduceBy?: Function,
-  addGroupBy?: Function,
+  groupBy?: (...args: Array<unknown>) => Array<ToString>,
+  reduceBy?: (...args: Array<unknown>) => Array<ToString>,
+  addGroupBy?: (...args: Array<unknown>) => Array<ToString>,
   timeShift?: TimeShiftDefinition[],
   groupByReferences?: string[],
   reduceByReferences?: string[],
   addGroupByReferences?: string[],
   timeShiftReferences?: TimeShiftDefinitionReference[],
+  patchedFrom?: { cubeName: string, name: string },
 };
 
 export type PreAggregationFilters = {
@@ -63,6 +64,40 @@ export type PreAggregationFilters = {
   cubes?: string[],
   preAggregationIds?: string[],
   scheduled?: boolean,
+};
+
+type PreAggregationDefinition = {
+  allowNonStrictDateRangeMatch?: boolean,
+  timeDimensionReference?: () => ToString,
+  granularity: string,
+  timeDimensionReferences: Array<{ dimension: () => ToString, granularity: string }>,
+  dimensionReferences: () => Array<ToString>,
+  segmentReferences: () => Array<ToString>,
+  measureReferences: () => Array<ToString>,
+  rollupReferences: () => Array<ToString>,
+};
+
+type PreAggregationTimeDimensionReference = {
+  dimension: string,
+  granularity: string,
+};
+
+type PreAggregationReferences = {
+  allowNonStrictDateRangeMatch?: boolean,
+  dimensions: Array<string>,
+  measures: Array<string>,
+  timeDimensions: Array<PreAggregationTimeDimensionReference>,
+  rollups: Array<string>,
+};
+
+type PreAggregationInfo = {
+  id: string,
+  preAggregationName: string,
+  preAggregation: unknown,
+  cube: string,
+  references: PreAggregationReferences,
+  refreshKey: unknown,
+  indexesReferences: unknown,
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -221,25 +256,17 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
-    const uniqueHierarchyNames = new Set();
     if (Object.keys(cube.hierarchies).length) {
-      cube.evaluatedHierarchies = Object.entries(cube.hierarchies).map(([name, hierarchy]) => {
-        if (uniqueHierarchyNames.has(name)) {
-          errorReporter.error(`Duplicate hierarchy name '${name}' in cube '${cube.name}'`);
-        }
-        uniqueHierarchyNames.add(name);
-
-        return ({
-          name,
-          ...(typeof hierarchy === 'object' ? hierarchy : {}),
-          levels: this.evaluateReferences(
-            cube.name,
-            // @ts-ignore
-            hierarchy.levels,
-            { originalSorting: true }
-          )
-        });
-      });
+      cube.evaluatedHierarchies = Object.entries(cube.hierarchies).map(([name, hierarchy]) => ({
+        name,
+        ...(typeof hierarchy === 'object' ? hierarchy : {}),
+        levels: this.evaluateReferences(
+          cube.name,
+          // @ts-ignore
+          hierarchy.levels,
+          { originalSorting: true }
+        )
+      }));
     }
 
     if (cube.isView && (cube.includedMembers || []).length) {
@@ -492,7 +519,7 @@ export class CubeEvaluator extends CubeSymbols {
   /**
    * Returns pre-aggregations filtered by the specified selector.
    */
-  public preAggregations(filter: PreAggregationFilters) {
+  public preAggregations(filter: PreAggregationFilters): Array<PreAggregationInfo> {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
@@ -510,7 +537,7 @@ export class CubeEvaluator extends CubeSymbols {
           )
         )
       ))
-      .map(cube => {
+      .flatMap(cube => {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
           .filter(
@@ -547,11 +574,10 @@ export class CubeEvaluator extends CubeSymbols {
               }, {})
             };
           });
-      })
-      .reduce((a, b) => a.concat(b), []);
+      });
   }
 
-  public scheduledPreAggregations() {
+  public scheduledPreAggregations(): Array<PreAggregationInfo> {
     return this.preAggregations({ scheduled: true });
   }
 
@@ -704,8 +730,8 @@ export class CubeEvaluator extends CubeSymbols {
     return { cubeReferencesUsed, pathReferencesUsed, evaluatedSql };
   }
 
-  protected evaluatePreAggregationReferences(cube, aggregation) {
-    const timeDimensions: any = [];
+  protected evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinition): PreAggregationReferences {
+    const timeDimensions: Array<PreAggregationTimeDimensionReference> = [];
 
     if (aggregation.timeDimensionReference) {
       timeDimensions.push({

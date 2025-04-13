@@ -8,7 +8,7 @@ use serde_json::Map;
 use tokio::sync::Semaphore;
 use uuid::Uuid;
 
-use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
+use crate::auth::{NativeSQLAuthContext, NodeBridgeAuthService, NodeBridgeAuthServiceOptions};
 use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
@@ -30,9 +30,11 @@ use cubesqlplanner::planner::base_query::BaseQuery;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use cubesql::telemetry::LocalReporter;
 use cubesql::{telemetry::ReportingLogger, CubeError};
-
 use neon::prelude::*;
+use neon::result::Throw;
+use simple_logger::SimpleLogger;
 
 pub(crate) struct SQLInterface {
     pub(crate) services: Arc<NodeCubeServices>,
@@ -46,29 +48,35 @@ impl SQLInterface {
     }
 }
 
+fn get_function_from_options(
+    options: Handle<JsObject>,
+    name: &str,
+    cx: &mut FunctionContext,
+) -> Result<Root<JsFunction>, Throw> {
+    let fun = options.get_opt::<JsFunction, _, _>(cx, name)?;
+    if let Some(fun) = fun {
+        Ok(fun.downcast_or_throw::<JsFunction, _>(cx)?.root(cx))
+    } else {
+        cx.throw_error(format!(
+            "{} is required, must be passed as option in registerInterface",
+            name
+        ))
+    }
+}
+
 fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
-    let check_auth = options
-        .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
-        .root(&mut cx);
-    let transport_sql_api_load = options
-        .get::<JsFunction, _, _>(&mut cx, "sqlApiLoad")?
-        .root(&mut cx);
-    let transport_sql = options
-        .get::<JsFunction, _, _>(&mut cx, "sql")?
-        .root(&mut cx);
-    let transport_meta = options
-        .get::<JsFunction, _, _>(&mut cx, "meta")?
-        .root(&mut cx);
-    let transport_log_load_event = options
-        .get::<JsFunction, _, _>(&mut cx, "logLoadEvent")?
-        .root(&mut cx);
-    let transport_sql_generator = options
-        .get::<JsFunction, _, _>(&mut cx, "sqlGenerators")?
-        .root(&mut cx);
-    let transport_can_switch_user_for_session = options
-        .get::<JsFunction, _, _>(&mut cx, "canSwitchUserForSession")?
-        .root(&mut cx);
+
+    let context_to_api_scopes = get_function_from_options(options, "contextToApiScopes", &mut cx)?;
+    let check_auth = get_function_from_options(options, "checkAuth", &mut cx)?;
+    let check_sql_auth = get_function_from_options(options, "checkSqlAuth", &mut cx)?;
+    let transport_sql_api_load = get_function_from_options(options, "sqlApiLoad", &mut cx)?;
+    let transport_sql = get_function_from_options(options, "sql", &mut cx)?;
+    let transport_meta = get_function_from_options(options, "meta", &mut cx)?;
+    let transport_log_load_event = get_function_from_options(options, "logLoadEvent", &mut cx)?;
+    let transport_sql_generator = get_function_from_options(options, "sqlGenerators", &mut cx)?;
+    let transport_can_switch_user_for_session =
+        get_function_from_options(options, "canSwitchUserForSession", &mut cx)?;
 
     let pg_port_handle = options.get_value(&mut cx, "pgPort")?;
     let pg_port = if pg_port_handle.is_a::<JsNumber, _>(&mut cx) {
@@ -101,7 +109,14 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         transport_sql_generator,
         transport_can_switch_user_for_session,
     );
-    let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
+    let auth_service = NodeBridgeAuthService::new(
+        cx.channel(),
+        NodeBridgeAuthServiceOptions {
+            check_auth,
+            check_sql_auth,
+            context_to_api_scopes,
+        },
+    );
 
     std::thread::spawn(move || {
         let config = C::new(NodeConfigurationFactoryOptions {
@@ -179,7 +194,7 @@ const CHUNK_DELIM: &str = "\n";
 
 async fn handle_sql_query(
     services: Arc<NodeCubeServices>,
-    native_auth_ctx: Arc<NativeAuthContext>,
+    native_auth_ctx: Arc<NativeSQLAuthContext>,
     channel: Arc<Channel>,
     stream_methods: WritableStreamMethods,
     sql_query: &str,
@@ -411,7 +426,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let channel = Arc::new(cx.channel());
     let node_stream_arc = Arc::new(node_stream_root);
 
-    let native_auth_ctx = Arc::new(NativeAuthContext {
+    let native_auth_ctx = Arc::new(NativeSQLAuthContext {
         user: Some(String::from("unknown")),
         superuser: false,
         security_context,
@@ -483,16 +498,13 @@ fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     Ok(JsBoolean::new(&mut cx, true))
 }
 
-pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let options = cx.argument::<JsObject>(0)?;
-    let cube_logger = options
-        .get::<JsFunction, _, _>(&mut cx, "logger")?
-        .root(&mut cx);
-
-    let log_level_handle = options.get_value(&mut cx, "logLevel")?;
-    let log_level = if log_level_handle.is_a::<JsString, _>(&mut cx) {
-        let value = log_level_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
-        let log_level = match value.value(&mut cx).as_str() {
+fn get_log_level_from_variable(
+    log_level_handle: Handle<JsValue>,
+    cx: &mut FunctionContext,
+) -> NeonResult<log::Level> {
+    if log_level_handle.is_a::<JsString, _>(cx) {
+        let value = log_level_handle.downcast_or_throw::<JsString, _>(cx)?;
+        let log_level = match value.value(cx).as_str() {
             "error" => log::Level::Error,
             "warn" => log::Level::Warn,
             "info" => log::Level::Info,
@@ -500,12 +512,23 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "trace" => log::Level::Trace,
             x => cx.throw_error(format!("Unrecognized log level: {}", x))?,
         };
-        log_level
-    } else {
-        log::Level::Trace
-    };
 
-    let logger = crate::create_logger(log_level);
+        Ok(log_level)
+    } else {
+        Ok(log::Level::Trace)
+    }
+}
+
+pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let options = cx.argument::<JsObject>(0)?;
+    let cube_logger = options
+        .get::<JsFunction, _, _>(&mut cx, "logger")?
+        .root(&mut cx);
+
+    let log_level_handle = options.get_value(&mut cx, "logLevel")?;
+    let log_level = get_log_level_from_variable(log_level_handle, &mut cx)?;
+
+    let logger = create_logger(log_level);
     log_reroute::reroute_boxed(Box::new(logger));
 
     ReportingLogger::init(
@@ -513,6 +536,39 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         log_level.to_level_filter(),
     )
     .unwrap();
+
+    Ok(cx.undefined())
+}
+
+pub fn create_logger(log_level: log::Level) -> SimpleLogger {
+    SimpleLogger::new()
+        .with_level(log::Level::Error.to_level_filter())
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("cube_xmla", log_level.to_level_filter())
+        .with_module_level("cube_xmla_engine", log_level.to_level_filter())
+        .with_module_level("cubejs_native", log_level.to_level_filter())
+        .with_module_level("datafusion", log::Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
+}
+
+pub fn setup_local_logger(log_level: log::Level) {
+    let logger = create_logger(log_level);
+    log_reroute::reroute_boxed(Box::new(logger));
+
+    ReportingLogger::init(
+        Box::new(LocalReporter::new()),
+        log::Level::Error.to_level_filter(),
+    )
+    .unwrap();
+}
+
+pub fn reset_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let options = cx.argument::<JsObject>(0)?;
+
+    let log_level_handle = options.get_value(&mut cx, "logLevel")?;
+    let log_level = get_log_level_from_variable(log_level_handle, &mut cx)?;
+
+    setup_local_logger(log_level);
 
     Ok(cx.undefined())
 }
@@ -556,6 +612,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     mut cx: ModuleContext,
 ) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
+    cx.export_function("resetLogger", reset_logger)?;
     cx.export_function("registerInterface", register_interface::<C>)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("execSql", exec_sql)?;

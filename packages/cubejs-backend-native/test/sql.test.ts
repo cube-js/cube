@@ -103,8 +103,24 @@ function interfaceMethods() {
         dataSourceToSqlGenerator: {},
       };
     }),
-    checkAuth: jest.fn(async ({ request, user }) => {
+    contextToApiScopes: jest.fn(async ({ request, token }) => {
+      console.log('[js] contextToApiScopes', {
+        request,
+        token,
+      });
+
+      return ['data', 'meta', 'graphql'];
+    }),
+    checkAuth: jest.fn(async ({ request, token }) => {
       console.log('[js] checkAuth', {
+        request,
+        token,
+      });
+
+      throw new Error('checkAuth is not implemented');
+    }),
+    checkSqlAuth: jest.fn(async ({ request, user }) => {
+      console.log('[js] checkSqlAuth', {
         request,
         user,
       });
@@ -146,7 +162,7 @@ describe('SQLInterface', () => {
 
   it('SHOW FULL TABLES FROM `db`', async () => {
     const methods = interfaceMethods();
-    const { checkAuth, meta } = methods;
+    const { checkSqlAuth, meta } = methods;
 
     const instance = await native.registerInterface({
       pgPort: 5555,
@@ -178,9 +194,9 @@ describe('SQLInterface', () => {
           );
         }
 
-        console.log(checkAuth.mock.calls);
-        expect(checkAuth.mock.calls.length).toEqual(1);
-        expect(checkAuth.mock.calls[0][0]).toEqual({
+        console.log(checkSqlAuth.mock.calls);
+        expect(checkSqlAuth.mock.calls.length).toEqual(1);
+        expect(checkSqlAuth.mock.calls[0][0]).toEqual({
           request: {
             id: expect.any(String),
             meta: null,
@@ -195,19 +211,19 @@ describe('SQLInterface', () => {
         user: 'random user',
         password: undefined,
       });
-      checkAuth.mockClear();
+      checkSqlAuth.mockClear();
 
       await testConnectionFailed({
         user: 'allowed_user',
         password: undefined,
       });
-      checkAuth.mockClear();
+      checkSqlAuth.mockClear();
 
       await testConnectionFailed({
         user: 'allowed_user',
         password: 'wrong_password',
       });
-      checkAuth.mockClear();
+      checkSqlAuth.mockClear();
 
       const connection = new Client({
         host: '127.0.0.1',
@@ -236,8 +252,8 @@ describe('SQLInterface', () => {
         ]);
       }
 
-      expect(checkAuth.mock.calls.length).toEqual(1);
-      expect(checkAuth.mock.calls[0][0]).toEqual({
+      expect(checkSqlAuth.mock.calls.length).toEqual(1);
+      expect(checkSqlAuth.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),
           meta: null,

@@ -11,6 +11,12 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::rc::Rc;
 
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct GranularityDefinition {
+    pub interval: String,
+    pub origin: Option<String>,
+    pub offset: Option<String>,
+}
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DimenstionDefinitionStatic {
     #[serde(rename = "type")]

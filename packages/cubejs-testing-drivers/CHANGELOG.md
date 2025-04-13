@@ -3,6 +3,48 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Features
+
+- **databricks-jdbc-driver:** Add export bucket support for Google Cloud Storage ([#9445](https://github.com/cube-js/cube/issues/9445)) ([a247bf9](https://github.com/cube-js/cube/commit/a247bf9ce073aea69ffb592e933fd365eee70fe1))
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.32](/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.30](/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+### Features
+
+- **snowflake-driver:** Ability to use encrypted private keys for auth ([#9371](https://github.com/cube-js/cube/issues/9371)) ([ab54e28](https://github.com/cube-js/cube/commit/ab54e2817dc4e14f0e1ea3b1257b3a08072c954c))
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+### Bug Fixes
+
+- **databricks-jdbc-driver:** Allow paths in s3/azure export buckets ([#9365](https://github.com/cube-js/cube/issues/9365)) ([f133737](https://github.com/cube-js/cube/commit/f1337379c977f920bc6c1864138b23e10616007d))
+
 ## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

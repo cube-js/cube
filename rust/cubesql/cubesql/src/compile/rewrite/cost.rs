@@ -8,7 +8,7 @@ use crate::{
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
-use egg::{Analysis, CostFunction, EGraph, Id, Language, RecExpr};
+use egg::{Analysis, EGraph, Id, Language, RecExpr};
 use indexmap::IndexSet;
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl BestCubePlan {
         }
     }
 
-    pub fn initial_cost(&self, enode: &LogicalPlanLanguage, top_down: bool) -> CubePlanCost {
+    pub fn initial_cost(&self, enode: &LogicalPlanLanguage) -> CubePlanCost {
         let table_scans = match enode {
             LogicalPlanLanguage::TableScan(_) => 1,
             _ => 0,
@@ -52,8 +52,7 @@ impl BestCubePlan {
         };
 
         let non_pushed_down_limit_sort = match enode {
-            LogicalPlanLanguage::Limit(_) if !top_down => 1,
-            LogicalPlanLanguage::Sort(_) if top_down => 1,
+            LogicalPlanLanguage::Sort(_) => 1,
             _ => 0,
         };
 
@@ -64,6 +63,7 @@ impl BestCubePlan {
 
         let joins = match enode {
             LogicalPlanLanguage::Join(_) => 1,
+            LogicalPlanLanguage::CrossJoin(_) => 1,
             _ => 0,
         };
 
@@ -247,7 +247,6 @@ impl BestCubePlan {
 
 #[derive(Clone, Copy)]
 pub struct CubePlanCostOptions {
-    top_down: bool,
     penalize_post_processing: bool,
 }
 
@@ -311,71 +310,11 @@ pub enum CubePlanState {
     Wrapper,
 }
 
-impl CubePlanState {
-    pub fn add_child(&self, other: &Self) -> Self {
-        match (self, other) {
-            (CubePlanState::Wrapper, _) => CubePlanState::Wrapper,
-            (_, CubePlanState::Wrapped) => CubePlanState::Wrapped,
-            (CubePlanState::Wrapped, _) => CubePlanState::Wrapped,
-            (CubePlanState::Unwrapped(a), _) => CubePlanState::Unwrapped(*a),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum SortState {
     None,
     Current,
     DirectChild,
-}
-
-impl SortState {
-    pub fn add_child(&self, other: &Self) -> Self {
-        match (self, other) {
-            (Self::Current, _) => Self::Current,
-            (_, Self::Current) | (Self::DirectChild, _) => Self::DirectChild,
-            _ => Self::None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct CubePlanCostAndState {
-    pub cost: CubePlanCost,
-    pub state: CubePlanState,
-    pub sort_state: SortState,
-}
-
-impl PartialOrd for CubePlanCostAndState {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cost.cmp(&other.cost))
-    }
-}
-
-impl Ord for CubePlanCostAndState {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.cost.cmp(&other.cost)
-    }
-}
-
-impl CubePlanCostAndState {
-    pub fn add_child(&self, other: &Self) -> Self {
-        Self {
-            cost: self.cost.add_child(&other.cost),
-            state: self.state.add_child(&other.state),
-            sort_state: self.sort_state.add_child(&other.sort_state),
-        }
-    }
-
-    pub fn finalize(&self, enode: &LogicalPlanLanguage, options: CubePlanCostOptions) -> Self {
-        Self {
-            cost: self
-                .cost
-                .finalize(&self.state, &self.sort_state, enode, options),
-            state: self.state.clone(),
-            sort_state: self.sort_state.clone(),
-        }
-    }
 }
 
 impl CubePlanCost {
@@ -468,7 +407,7 @@ impl CubePlanCost {
             },
             non_pushed_down_limit_sort: match sort_state {
                 SortState::DirectChild => self.non_pushed_down_limit_sort,
-                SortState::Current if options.top_down => self.non_pushed_down_limit_sort,
+                SortState::Current => self.non_pushed_down_limit_sort,
                 _ => 0,
             },
             // Don't track state here: we want representation that have fewer wrappers with zero members _in total_
@@ -516,60 +455,6 @@ impl CubePlanCost {
             ast_size_inside_wrapper: self.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes,
         }
-    }
-}
-
-impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
-    type Cost = CubePlanCostAndState;
-    fn cost<C>(&mut self, enode: &LogicalPlanLanguage, mut costs: C) -> Self::Cost
-    where
-        C: FnMut(Id) -> Self::Cost,
-    {
-        let ast_size_outside_wrapper = match enode {
-            LogicalPlanLanguage::Aggregate(_) => 1,
-            LogicalPlanLanguage::Projection(_) => 1,
-            LogicalPlanLanguage::Limit(_) => 1,
-            LogicalPlanLanguage::Sort(_) => 1,
-            LogicalPlanLanguage::Filter(_) => 1,
-            LogicalPlanLanguage::Join(_) => 1,
-            LogicalPlanLanguage::CrossJoin(_) => 1,
-            LogicalPlanLanguage::Union(_) => 1,
-            LogicalPlanLanguage::Window(_) => 1,
-            LogicalPlanLanguage::Subquery(_) => 1,
-            LogicalPlanLanguage::Distinct(_) => 1,
-            _ => 0,
-        };
-
-        let cost = self.initial_cost(enode, false);
-        let initial_cost = CubePlanCostAndState {
-            cost,
-            state: match enode {
-                LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(true)) => {
-                    CubePlanState::Wrapped
-                }
-                LogicalPlanLanguage::CubeScanWrapper(_) => CubePlanState::Wrapper,
-                _ => CubePlanState::Unwrapped(ast_size_outside_wrapper),
-            },
-            sort_state: match enode {
-                LogicalPlanLanguage::Sort(_) => SortState::Current,
-                _ => SortState::None,
-            },
-        };
-        let res = enode
-            .children()
-            .iter()
-            .fold(initial_cost.clone(), |cost, id| {
-                let child = costs(*id);
-                cost.add_child(&child)
-            })
-            .finalize(
-                enode,
-                CubePlanCostOptions {
-                    top_down: false,
-                    penalize_post_processing: self.penalize_post_processing,
-                },
-            );
-        res
     }
 }
 
@@ -901,7 +786,7 @@ impl TopDownState<LogicalPlanLanguage> for CubePlanTopDownState {
 
 impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost> for BestCubePlan {
     fn cost(&self, node: &LogicalPlanLanguage) -> CubePlanCost {
-        self.initial_cost(node, true)
+        self.initial_cost(node)
     }
 
     fn finalize(
@@ -916,7 +801,6 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
             &state.limit,
             node,
             CubePlanCostOptions {
-                top_down: true,
                 penalize_post_processing: self.penalize_post_processing,
             },
         )

@@ -223,10 +223,9 @@ under the following tiers:
 ## Total cost examples
 
 The following examples provide insight into the total cost to use Cube Cloud:
-- [Small-scale deployment](#small-scale-deployment) (production cluster, Premium product tier).
-- [Medium-scale deployment](#medium-scale-deployment) (production cluster with auto-scaling, Enterprise product tier).
-- [Large-scale deployment](#large-scale-deployment) (production multi-cluster
-with dedicated infrastructure, Enterprise product tier).
+- [Small-scale deployment](#small-scale-deployment) (production cluster, Premium product tier, S deployment tier).
+- [Medium-scale deployment](#medium-scale-deployment) (production cluster with auto-scaling, Enterprise product tier, S deployment tier).
+- [Large-scale deployment](#large-scale-deployment) (production multi-cluster with dedicated infrastructure, Enterprise product tier, M deployment tier).
 
 ### Small-scale deployment
 
@@ -235,7 +234,7 @@ a couple of teams in Eastern and Pacific time zones.
 
 This organization:
 * Uses the Premium product tier of Cube Cloud.
-* Runs a single Production Cluster that is active 24/7 but never has to auto-scale
+* Runs a single Production Cluster (S tier) that is active 24/7 but never has to auto-scale
 its API instances because the usage is spread evenly with no bursts.
 * Operates on a small volume of data that requires the usage of just 2 Cube Store
 Workers to run queries and refresh pre-aggregations mostly during working hours,
@@ -261,12 +260,12 @@ analytics in its SaaS platform that caters to a vast worldwide customer base.
 
 This organization:
 * Uses the Enterprise product tier of Cube Cloud.
-* Runs two Production Clusters that are active 24/7 and auto-scale up to 8 API instances
+* Runs two Production Clusters (S tier) that are active 24/7 and auto-scale up to 8 API instances
 during a peak hour every day.
 * Operates on a moderate volume of data that requires the usage of 4 Cube Store
 Workers by both Production Clusters to run queries and refresh pre-aggregations 24/7,
 being active approximately 50% of the time.
-* Uses a dedicated Development Instance for testing purposes that is active 12 hours a day.
+* Uses a dedicated Development Instance (S tier) for testing purposes that is active 12 hours a day.
 * Has a team of 5 data engineers who frequently update the data model, with each data engineer
 spending about 4 hours a day in the development mode of the dedicated Development Instance.
 
@@ -287,11 +286,11 @@ its globally distributed workforce, customer base, and (or) partners to operate 
 This organization:
 * Uses the Enterprise product tier of Cube Cloud.
 * Uses [dedicated infrastructure][ref-dedicated-infra].
-* Runs a Production Multi-Cluster that is active 24/7, includes 3 Production Clusters, with each
+* Runs a Production Multi-Cluster that is active 24/7, includes 3 Production Clusters (M tier), with each
 Production Cluster auto-scaling up to 10 API instances during a few peak hours every day.
 * Operates on a large volume of data that requires the usage of 16 Cube Store Workers to run
 queries and refresh pre-aggregations 24/7, being active approximately 50% of the time.
-* Uses a dedicated Development Instance for testing purposes that is active 24 hours a day.
+* Uses a dedicated Development Instance (M tier) for testing purposes that is active 24 hours a day.
 * Has a team of 10 data engineers who frequently update the data model, with each data engineer
 spending about 4 hours a day in the development mode of the dedicated Development Instance.
 * Uses a [Query History tier](#query-history-tiers) with 14-day data retention to inform the work
@@ -300,13 +299,13 @@ of data engineers.
 | Resource                                        | Usage per month                                                                             | CCU per month                                        |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | Dedicated infrastructure                        | 1 region ×<br/>24 hours per day ×<br/>30 days                                               | 720 hours ×<br/>3 CCUs per hour =<br/>**2160 CCUs**  |
-| Production Multi-Cluster                        | 3 Production Clusters ×<br/>24 hours per day ×<br/>30 days                                  | 2160 hours ×<br/>4 CCUs per hour =<br/>**8640 CCUs** |
-| Additional Cube API Instance                    | 3 Production Clusters ×<br/>(10 – 2) API Instances ×<br/>4 hours per day ×<br/>30 days      | 2880 hours ×<br/>1 CCU per hour =<br/>**2880 CCUs**  |
+| Production Multi-Cluster                        | 3 Production Clusters ×<br/>24 hours per day ×<br/>30 days                                  | 2160 hours ×<br/>8 CCUs per hour =<br/>**17280 CCUs** |
+| Additional Cube API Instance                    | 3 Production Clusters ×<br/>(10 – 2) API Instances ×<br/>4 hours per day ×<br/>30 days      | 2880 hours ×<br/>2 CCU per hour =<br/>**5760 CCUs**  |
 | Cube Store Worker                               | 1 Production Multi-Cluster ×<br/>16 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 5760 hours ×<br/>1 CCU per hour =<br/>**5760 CCUs**  |
-| Development Instance                            | 1 Development Instance ×<br/>24 hours per day ×<br/>30 days                                 | 720 hours ×<br/>1 CCU per hour =<br/>**720 CCUs**    |
-| Development Instance<br/>(for development mode) | 10 users ×<br/>4 hours per day ×<br/>30 days                                                | 1200 hours ×<br/>1 CCU per hour =<br/>**1200 CCUs**  |
+| Development Instance                            | 1 Development Instance ×<br/>24 hours per day ×<br/>30 days                                 | 720 hours ×<br/>2 CCU per hour =<br/>**1440 CCUs**    |
+| Development Instance<br/>(for development mode) | 10 users ×<br/>4 hours per day ×<br/>30 days                                                | 1200 hours ×<br/>2 CCU per hour =<br/>**2400 CCUs**  |
 | Query History (M tier)                          | 24 hours per day ×<br/>30 days                                                              | 720 hours ×<br/>5 CCUs per hour =<br/>**3600 CCUs**  |
-| **Total**                                       |                                                                                             | **24960 CCUs**                                       |
+| **Total**                                       |                                                                                             | **38400 CCUs**                                       |
 
 ## Payment terms
 

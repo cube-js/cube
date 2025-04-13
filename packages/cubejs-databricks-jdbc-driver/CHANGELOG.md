@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Features
+
+- **databricks-jdbc-driver:** Add export bucket support for Google Cloud Storage ([#9445](https://github.com/cube-js/cube/issues/9445)) ([a247bf9](https://github.com/cube-js/cube/commit/a247bf9ce073aea69ffb592e933fd365eee70fe1))
+- **databricks-jdbc-driver:** Switch to the latest OSS Databricks JDBC driver ([#9450](https://github.com/cube-js/cube/issues/9450)) ([819edde](https://github.com/cube-js/cube/commit/819eddedc6024963b836d8090f6ca1c3ae1b5966))
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.2.32](https://github.com/cube-js/cube/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.2.30](https://github.com/cube-js/cube/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+### Features
+
+- **databricks-jdbc-driver:** Switch to the latest OSS Databricks JDBC driver ([#9376](https://github.com/cube-js/cube/issues/9376)) ([29fdd61](https://github.com/cube-js/cube/commit/29fdd615f7eb70690f5fc85897e0c93a5a0cc29a))
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+### Bug Fixes
+
+- **databricks-jdbc-driver:** Allow paths in s3/azure export buckets ([#9365](https://github.com/cube-js/cube/issues/9365)) ([f133737](https://github.com/cube-js/cube/commit/f1337379c977f920bc6c1864138b23e10616007d))
+
 ## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

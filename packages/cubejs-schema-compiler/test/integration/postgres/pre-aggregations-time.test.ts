@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import R from 'ramda';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { PostgresDBRunner } from './PostgresDBRunner';
 
 const SCHEMA_VARIANTS = [
@@ -24,7 +24,7 @@ const SCHEMA_VARIANTS = [
           sql: 'created_at'
         },
       },
-      
+
       preAggregations: {
         month: {
           type: 'rollup',
@@ -60,7 +60,7 @@ const SCHEMA_VARIANTS = [
           sql: 'created_at'
         },
       },
-      
+
       preAggregations: {
         month: {
           type: 'rollup',
@@ -90,7 +90,7 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       await dbRunner.tearDown();
     });
 
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(schema);
+    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
 
     function replaceTableName(query, preAggregation, suffix) {
       const [toReplace, params] = query;

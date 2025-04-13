@@ -179,23 +179,23 @@ describe('SQL API', () => {
       }
 
       it('regular query', async () => {
-        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders;`)).toMatchSnapshot();
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders;')).toMatchSnapshot();
       });
 
       it('regular query with missing column', async () => {
-        expect(await generateSql(`SELECT SUM(foobar) AS total FROM Orders;`)).toMatchSnapshot();
+        expect(await generateSql('SELECT SUM(foobar) AS total FROM Orders;')).toMatchSnapshot();
       });
 
       it('regular query with parameters', async () => {
-        expect(await generateSql(`SELECT SUM(totalAmount) AS total FROM Orders WHERE status = 'foo';`)).toMatchSnapshot();
+        expect(await generateSql('SELECT SUM(totalAmount) AS total FROM Orders WHERE status = \'foo\';')).toMatchSnapshot();
       });
 
       it('strictly post-processing', async () => {
-        expect(await generateSql(`SELECT version();`)).toMatchSnapshot();
+        expect(await generateSql('SELECT version();')).toMatchSnapshot();
       });
 
       it('strictly post-processing with disabled post-processing', async () => {
-        expect(await generateSql(`SELECT version();`, true)).toMatchSnapshot();
+        expect(await generateSql('SELECT version();', true)).toMatchSnapshot();
       });
 
       it('double aggregation post-processing', async () => {
@@ -795,6 +795,68 @@ filter_subq AS (
 
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('wrapper-duplicated-members');
+    });
+
+    test('measure with replaced aggregation', async () => {
+      const query = `
+        SELECT
+          MIN(totalAmount) AS min_amount
+        FROM
+          Orders
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('measure-with-replaced-aggregation');
+    });
+
+    test('measure with replaced aggregation and original measure', async () => {
+      const query = `
+        SELECT
+          SUM(totalAmount) AS sum_amount,
+          MIN(totalAmount) AS min_amount
+        FROM
+          Orders
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('measure-with-replaced-aggregation-and-original-measure');
+    });
+
+    test('measure with ad-hoc filter', async () => {
+      const query = `
+      SELECT
+        SUM(
+          CASE status = 'new'
+          WHEN TRUE
+          THEN totalAmount
+          ELSE NULL
+          END
+        ) AS new_amount
+      FROM
+        Orders
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('measure-with-ad-hoc-filters');
+    });
+
+    test('measure with ad-hoc filter and original measure', async () => {
+      const query = `
+      SELECT
+        SUM(totalAmount) AS total_amount,
+        SUM(
+          CASE status = 'new'
+          WHEN TRUE
+          THEN totalAmount
+          ELSE NULL
+          END
+        ) AS new_amount
+      FROM
+        Orders
+      `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('measure-with-ad-hoc-filters-and-original-measure');
     });
   });
 });

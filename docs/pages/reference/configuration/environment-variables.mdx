@@ -217,6 +217,14 @@ Whether the ClickHouse user has read-only access or not.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | N/A                    | N/A                   |
 
+## `CUBEJS_DB_CLICKHOUSE_COMPRESSION`
+
+Whether the ClickHouse client has compression enabled or not.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY`
 
 To accept the license terms for the Databricks JDBC driver, this must be set to
@@ -732,6 +740,14 @@ indefinitely][snowflake-docs-connection-options].
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY`
+
+The content of the private RSA key (encrypted or not).
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| Content of the private RSA key | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`
 
 The password for the private RSA key. Only required for encrypted keys.
@@ -852,7 +868,7 @@ endpoints.
 
 | Possible Values                                                                | Default in Development | Default in Production |
 | ------------------------------------------------------------------------------ | ---------------------- | --------------------- |
-| A comma-delimited string with any combination of [API scopes][ref-rest-scopes] | `meta,data,graphql`    | `meta,data,graphql`   |
+| A comma-delimited string with any combination of [API scopes][ref-rest-scopes] | `meta,data,graphql,sql`| `meta,data,graphql,sql`|
 
 See also the [`context_to_api_scopes` configuration
 option](/reference/configuration/config#context_to_api_scopes).
@@ -1049,6 +1065,16 @@ to use for storing pre-aggregations.
 It can be also set using the [`pre_aggregations_schema` configuration
 option](/reference/configuration/config#pre_aggregations_schema).
 
+## `CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`
+
+If `true`, allows non-strict date range matching for pre-aggregations by default.
+This can be overridden for individual pre-aggregations using the
+[`allow_non_strict_date_range_match`][ref-schema-ref-preagg-allownonstrict] parameter.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                | `true`                |
+
 ## `CUBEJS_REFRESH_WORKER`
 
 If `true`, this instance of Cube will **only** refresh pre-aggregations.
@@ -1069,8 +1095,6 @@ mode](/product/caching/using-pre-aggregations#rollup-only-mode) for details.
 
 It can be also set using the [`orchestrator_options.rollupOnlyMode` configuration
 option](/reference/configuration/config#orchestrator_options).
-
-
 
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 
@@ -1285,9 +1309,33 @@ learn more.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | 86400                  | 86400                 |
 
+## `CUBEJS_TRANSPILATION_WORKER_THREADS`
+
+If `true`, optimizes data model compilation by running critical parts of the
+code in worker threads.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+<ReferenceBox>
+
+See [this issue](https://github.com/cube-js/cube/issues/9285) for details.
+
+</ReferenceBox>
+
 ## `CUBEJS_WEB_SOCKETS`
 
 If `true`, then use WebSocket for data fetching.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
+## `CUBEJS_TESSERACT_ORCHESTRATOR`
+
+If `true`, enables performance optimizations in the query orchestrator,
+such as deserializing Cube Store result sets in native Rust code.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1680,3 +1728,4 @@ The port for a Cube deployment to listen to API connections on.
 [ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming
 [ref-row-limit]: /product/apis-integrations/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
+[ref-schema-ref-preagg-allownonstrict]: /reference/data-model/pre-aggregations#allow_non_strict_date_range_match

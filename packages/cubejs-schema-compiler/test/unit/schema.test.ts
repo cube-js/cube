@@ -1,9 +1,13 @@
-import { prepareCompiler } from './PrepareCompiler';
+import fs from 'fs';
+import path from 'path';
+import { prepareCompiler, prepareJsCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaWithCustomGranularities, createCubeSchemaWithAccessPolicy } from './utils';
+
+const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'accessPolicy'];
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler(
+    const { compiler, cubeEvaluator } = prepareJsCompiler(
       createCubeSchema({
         name: 'CubeA',
         preAggregations: `
@@ -53,126 +57,131 @@ describe('Schema Testing', () => {
     return { compiler, cubeEvaluator };
   };
 
-  it('valid schemas', async () => {
-    const { cubeEvaluator } = await schemaCompile();
+  describe('Cubes validations', () => {
+    it('valid schemas', async () => {
+      const { cubeEvaluator } = await schemaCompile();
 
-    expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
-      main: {
-        external: false,
-        scheduledRefresh: true,
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'originalSql',
-        refreshRangeStart: {
-          sql: expect.any(Function),
+      expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+        main: {
+          external: false,
+          scheduledRefresh: true,
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'originalSql',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
         },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
+        countCreatedAt: {
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
         },
-      },
-      countCreatedAt: {
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-      },
-      countCreatedAtWithoutReferences: {
-        // because preview
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        segmentReferences: expect.any(Function),
-        dimensionReferences: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-      }
+        countCreatedAtWithoutReferences: {
+          // because preview
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          segmentReferences: expect.any(Function),
+          dimensionReferences: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
+        }
+      });
     });
-  });
 
-  it('valid schemas (preview flags)', async () => {
-    process.env.CUBEJS_EXTERNAL_DEFAULT = 'true';
-    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    it('valid schemas (preview flags)', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'true';
+      process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
 
-    const { cubeEvaluator } = await schemaCompile();
+      const { cubeEvaluator } = await schemaCompile();
 
-    delete process.env.CUBEJS_EXTERNAL_DEFAULT;
-    delete process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT;
+      delete process.env.CUBEJS_EXTERNAL_DEFAULT;
+      delete process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT;
 
-    expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
-      main: {
-        external: false,
-        scheduledRefresh: true,
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'originalSql',
-        refreshRangeStart: {
-          sql: expect.any(Function),
+      expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+        main: {
+          external: false,
+          scheduledRefresh: true,
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'originalSql',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
         },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
+        countCreatedAt: {
+          // because preview
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
         },
-      },
-      countCreatedAt: {
-        // because preview
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-      },
-      countCreatedAtWithoutReferences: {
-        // because preview
-        external: true,
-        scheduledRefresh: true,
-        granularity: 'day',
-        measureReferences: expect.any(Function),
-        segmentReferences: expect.any(Function),
-        dimensionReferences: expect.any(Function),
-        timeDimensionReference: expect.any(Function),
-        partitionGranularity: 'month',
-        type: 'rollup',
-        refreshRangeStart: {
-          sql: expect.any(Function),
-        },
-        refreshRangeEnd: {
-          sql: expect.any(Function),
-        },
-      }
+        countCreatedAtWithoutReferences: {
+          // because preview
+          external: true,
+          scheduledRefresh: true,
+          granularity: 'day',
+          measureReferences: expect.any(Function),
+          segmentReferences: expect.any(Function),
+          dimensionReferences: expect.any(Function),
+          timeDimensionReference: expect.any(Function),
+          partitionGranularity: 'month',
+          type: 'rollup',
+          refreshRangeStart: {
+            sql: expect.any(Function),
+          },
+          refreshRangeEnd: {
+            sql: expect.any(Function),
+          },
+          allowNonStrictDateRangeMatch: true,
+        }
+      });
     });
-  });
 
-  it('invalid schema', async () => {
-    const logger = jest.fn();
+    it('invalid schema', async () => {
+      const logger = jest.fn();
 
-    const { compiler } = prepareCompiler(
-      createCubeSchema({
-        name: 'CubeA',
-        preAggregations: `
+      const { compiler } = prepareJsCompiler(
+        createCubeSchema({
+          name: 'CubeA',
+          preAggregations: `
             main: {
                 type: 'originalSql',
                 timeDimension: createdAt,
@@ -191,29 +200,106 @@ describe('Schema Testing', () => {
                 }
             },
           `
-      }),
-      {
-        omitErrors: true,
-        errorReport: {
-          logger,
+        }),
+        {
+          omitErrors: true,
+          errorReport: {
+            logger,
+          }
         }
+      );
+
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      expect(logger.mock.calls.length).toEqual(2);
+      expect(logger.mock.calls[0]).toEqual([
+        'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+      ]);
+      expect(logger.mock.calls[1]).toEqual([
+        'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+      ]);
+    });
+
+    it('throws an error on duplicate member names', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_dup_members.js'),
+        'utf8'
+      );
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/status defined more than once/);
       }
-    );
+    });
 
-    await compiler.compile();
-    compiler.throwIfAnyErrors();
+    it('throws errors for invalid pre-aggregations in yaml data model', async () => {
+      const cubes = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/validate_preaggs.yml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: cubes,
+          fileName: 'validate_preaggs.yml',
+        },
+      ]);
 
-    expect(logger.mock.calls.length).toEqual(2);
-    expect(logger.mock.calls[0]).toEqual([
-      'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
-    ]);
-    expect(logger.mock.calls[1]).toEqual([
-      'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
-    ]);
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/"preAggregations\.autoRollupFail\.maxPreAggregations" must be a number/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.partitionGranularity" must be one of/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.uniqueKeyColumns" must be an array/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupJoinFail" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupLambdaFail\.partitionGranularity" is not allowed/);
+        // TODO preAggregations.rollupFail.timeDimension - should catch that it is an array, currently not catching
+        expect(e.toString()).toMatch(/"preAggregations\.rollupFail2\.timeDimensions" must be an array/);
+      }
+    });
+
+    it('throws errors for invalid pre-aggregations in js data model', async () => {
+      const cubes = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/validate_preaggs.js'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: cubes,
+          fileName: 'validate_preaggs.js',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/"preAggregations\.autoRollupFail\.maxPreAggregations" must be a number/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.partitionGranularity" must be one of/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.uniqueKeyColumns" must be an array/);
+        expect(e.toString()).toMatch(/"preAggregations\.originalSqlFail2\.timeDimension" is required/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupJoinFail" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"preAggregations\.rollupLambdaFail\.partitionGranularity" is not allowed/);
+        // TODO preAggregations.rollupFail.timeDimension - should catch that it is an array, currently not catching
+        expect(e.toString()).toMatch(/"preAggregations\.rollupFail2\.timeDimensions" must be an array/);
+      }
+    });
   });
 
   it('visibility modifier', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false
@@ -250,7 +336,7 @@ describe('Schema Testing', () => {
   });
 
   it('dimensions', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false,
@@ -269,7 +355,7 @@ describe('Schema Testing', () => {
   });
 
   it('descriptions', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false,
@@ -295,7 +381,7 @@ describe('Schema Testing', () => {
   });
 
   it('custom granularities in meta', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const { compiler, metaTransformer } = prepareJsCompiler([
       createCubeSchemaWithCustomGranularities('orders')
     ]);
     await compiler.compile();
@@ -331,7 +417,7 @@ describe('Schema Testing', () => {
   });
 
   it('join types', async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler([
+    const { compiler, cubeEvaluator } = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         joins: `{
@@ -368,11 +454,649 @@ describe('Schema Testing', () => {
     });
   });
 
-  it('valid schema with accessPolicy', async () => {
-    const { compiler } = prepareCompiler([
-      createCubeSchemaWithAccessPolicy('ProtectedCube'),
-    ]);
-    await compiler.compile();
-    compiler.throwIfAnyErrors();
+  describe('Access Policies', () => {
+    it('valid schema with accessPolicy', async () => {
+      const { compiler } = prepareJsCompiler([
+        createCubeSchemaWithAccessPolicy('ProtectedCube'),
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+    });
+
+    it('throw errors for nonexistent policy members with paths', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_nonexist_acl.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/orders.other cannot be resolved. There's no such member or cube/);
+      }
+    });
+
+    it('throw errors for incorrect policy members with paths', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_incorrect_acl.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Paths aren't allowed in the accessPolicy policy but 'order_users.name' provided as a filter member reference for orders/);
+      }
+    });
+  });
+
+  describe('Views', () => {
+    it('throws errors for incorrect referenced includes members', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes:
+                  - id
+                  - status
+                  - nonexistent1
+                  - nonexistent2.via.path
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Paths aren't allowed in cube includes but 'nonexistent2\.via\.path' provided as include member/);
+        expect(e.toString()).toMatch(/Member 'nonexistent1' is included in 'orders_view' but not defined in any cube/);
+        expect(e.toString()).toMatch(/Member 'nonexistent2\.via\.path' is included in 'orders_view' but not defined in any cube/);
+      }
+    });
+
+    it('throws errors for incorrect referenced excludes members with paths', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes: "*"
+                excludes:
+                  - id
+                  - status
+                  - nonexistent3.ext
+                  - nonexistent4
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Paths aren't allowed in cube excludes but 'nonexistent3.ext' provided as exclude member/);
+      }
+    });
+
+    it('throws errors for incorrect referenced excludes members with path', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes: "*"
+                excludes:
+                  - id
+                  - status
+                  - nonexistent5.via.path
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Paths aren't allowed in cube excludes but 'nonexistent5\.via\.path' provided as exclude member/);
+      }
+    });
+
+    it('throws errors for conflicting members of included cubes', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersView = `
+        views:
+          - name: orders_view
+            cubes:
+              - join_path: orders
+                includes: "*"
+              - join_path: orders.order_users
+                includes: "*"
+      `;
+
+      const { compiler } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+        {
+          content: ordersView,
+          fileName: 'order_view.yml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/Included member 'count' conflicts with existing member of 'orders_view'\. Please consider excluding this member or assigning it an alias/);
+        expect(e.toString()).toMatch(/Included member 'id' conflicts with existing member of 'orders_view'\. Please consider excluding this member or assigning it an alias/);
+      }
+    });
+  });
+
+  describe('Inheritance', () => {
+    it('CubeB.js correctly extends cubeA.js (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = 'cube(\'ordersExt\', { extends: orders })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.js correctly extends cubeA.js (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.js'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.yml (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = `
+    cubes:
+      - name: ordersExt
+        extends: orders
+      `;
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.yml (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.yml'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.js (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = `
+    cubes:
+      - name: ordersExt
+        extends: orders
+      `;
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.yml correctly extends cubeA.js (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.yml'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
+
+    it('CubeB.js correctly extends cubeA.yml (no additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = 'cube(\'ordersExt\', { extends: orders })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+    });
+
+    it('CubeB.js correctly extends cubeA.yml (with additions)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_ext.js'),
+        'utf8'
+      );
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toMatchSnapshot();
+        expect(cubeB[c]).toMatchSnapshot();
+      });
+    });
+
+    it('CubeB.js correctly extends cubeA.yml (with sql override)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.yml'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = 'cube(\'ordersExt\', { extends: orders, sql: "SELECT * FROM other_orders" })';
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.yml',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.js',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+
+      expect(cubeB.sql).toBeTruthy();
+      expect(cubeB.sqlTable).toBeFalsy();
+    });
+
+    it('CubeB.yml correctly extends cubeA.js (with sql_table override)', async () => {
+      const orders = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_big.js'),
+        'utf8'
+      );
+      const orderUsers = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
+        'utf8'
+      );
+      const ordersExt = `
+    cubes:
+      - name: ordersExt
+        sql_table: orders_override
+        extends: orders
+      `;
+
+      const { compiler, cubeEvaluator } = prepareCompiler([
+        {
+          content: orders,
+          fileName: 'orders.js',
+        },
+        {
+          content: ordersExt,
+          fileName: 'orders_ext.yml',
+        },
+        {
+          content: orderUsers,
+          fileName: 'order_users.yml',
+        },
+      ]);
+      await compiler.compile();
+      compiler.throwIfAnyErrors();
+
+      const cubeA = cubeEvaluator.cubeFromPath('orders');
+      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+
+      CUBE_COMPONENTS.forEach(c => {
+        expect(cubeA[c]).toEqual(cubeB[c]);
+      });
+
+      expect(cubeB.sqlTable).toBeTruthy();
+      expect(cubeB.sql).toBeFalsy();
+    });
+
+    it('throws errors for invalid members in both cubes (parent and child)', async () => {
+      const cubes = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/invalid_cubes.yaml'),
+        'utf8'
+      );
+      const { compiler } = prepareCompiler([
+        {
+          content: cubes,
+          fileName: 'invalid_cubes.yaml',
+        },
+      ]);
+
+      try {
+        await compiler.compile();
+        throw new Error('should throw earlier');
+      } catch (e: any) {
+        expect(e.toString()).toMatch(/"measures\.parent_meas_no_type\.sql" is required/);
+        expect(e.toString()).toMatch(/"measures\.parent_meas_no_type\.type" is required/);
+        expect(e.toString()).toMatch(/"measures\.parent_meas_bad_type\.type" must be one of/);
+        expect(e.toString()).toMatch(/"dimensions\.parent_dim_no_type" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.parent_dim_no_sql" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.child_dim_no_type" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.child_dim_bad_type" does not match any of the allowed types/);
+        expect(e.toString()).toMatch(/"dimensions\.child_dim_no_sql" does not match any of the allowed types/);
+      }
+    });
   });
 });

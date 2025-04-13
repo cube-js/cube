@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix cubes inheritance ([#9386](https://github.com/cube-js/cube/issues/9386)) ([409d74d](https://github.com/cube-js/cube/commit/409d74db8c5ac5a314e1e3e7b872586f538713d1))
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.2.32](https://github.com/cube-js/cube/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+### Bug Fixes
+
+- **schema-compiler:** Use join paths from pre-aggregation declaration instead of building join tree from scratch ([#9431](https://github.com/cube-js/cube/issues/9431)) ([aea3a6c](https://github.com/cube-js/cube/commit/aea3a6c02886f495b00751e5e12dcd0ef3099441))
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+### Features
+
+- **schema-compiler:** Use LRUCache for js data models compiled vm.Scripts ([#9424](https://github.com/cube-js/cube/issues/9424)) ([e923a0f](https://github.com/cube-js/cube/commit/e923a0fb38f1cdc5bca1256bf868efca46e13cca))
+- **server-core:** Use LRU for OrchestratorStorage ([#9425](https://github.com/cube-js/cube/issues/9425)) ([ede37f8](https://github.com/cube-js/cube/commit/ede37f81efe7e23430be1f65f008f509365d94e6))
+
+## [1.2.30](https://github.com/cube-js/cube/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
 ## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
 
 ### Bug Fixes

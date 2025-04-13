@@ -107,10 +107,20 @@ export class SQLServer {
     this.sqlInterfaceInstance = await registerInterface({
       gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
-      checkAuth: async ({ request, user, password }) => {
+      contextToApiScopes: async ({ securityContext }) => this.apiGateway.contextToApiScopesFn(
+        securityContext,
+        getEnv('defaultApiScope') || await this.apiGateway.contextToApiScopesDefFn()
+      ),
+      checkAuth: async ({ request, token }) => {
+        const { securityContext } = await this.apiGateway.checkAuthFn(request, token);
+
+        return {
+          securityContext
+        };
+      },
+      checkSqlAuth: async ({ request, user, password }) => {
         const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
-        // Strip securityContext to improve speed deserialization
         return {
           password: returnedPassword,
           superuser: superuser || false,

@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+## [1.2.32](https://github.com/cube-js/cube/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+## [1.2.30](https://github.com/cube-js/cube/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+### Features
+
+- **clickhouse-driver:** Allow to enable compression, thanks @Graphmaxer ([#9341](https://github.com/cube-js/cube/issues/9341)) ([78ac7b2](https://github.com/cube-js/cube/commit/78ac7b2d93896bae0903ba5f8e4f055165791962))
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+**Note:** Version bump only for package @cubejs-backend/clickhouse-driver
+
 ## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver
