@@ -429,10 +429,11 @@ impl LocalDirRemoteFs {
                         .to_str()
                         .unwrap()
                         .to_string()
-                        .replace(&remote_dir.to_str().unwrap().to_string(), "")
+                        .replace("\\","/")
+                        .replace(&remote_dir.to_str().unwrap().to_string().replace("\\","/"), "")
                         .trim_start_matches("/")
                         .to_string();
-                    if relative_name.starts_with(&remote_prefix) {
+                    if relative_name.starts_with(&remote_prefix.replace("\\","/")) {
                         result.push(RemoteFile {
                             remote_path: relative_name.to_string(),
                             updated: DateTime::from(metadata.modified()?),
