@@ -127,29 +127,12 @@ export class YamlCompiler {
   private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {
     camelizeCube(cubeObj);
 
-    if (cubeObj.measures) {
-      cubeObj.measures = this.yamlArrayToObj(cubeObj.measures, 'measure', errorsReport);
-    }
-
-    if (cubeObj.dimensions) {
-      cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions, 'dimension', errorsReport);
-    }
-
-    if (cubeObj.segments) {
-      cubeObj.segments = this.yamlArrayToObj(cubeObj.segments, 'segment', errorsReport);
-    }
-
-    if (cubeObj.preAggregations) {
-      cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations, 'preAggregation', errorsReport);
-    }
-
-    if (cubeObj.joins) {
-      cubeObj.joins = this.yamlArrayToObj(cubeObj.joins, 'join', errorsReport);
-    }
-
-    if (cubeObj.hierarchies) {
-      cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies, 'hierarchies', errorsReport);
-    }
+    cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport);
+    cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
+    cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
+    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
+    cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
+    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
