@@ -19,32 +19,36 @@ Array [
 exports[`postgresql-cubestore HTTP Transport #3 Events.count with Events.type order by Events.count DESC: #3 Events.count with Events.type order by Events.count DESC 1`] = `
 Array [
   Object {
-    "Events.count": "513",
-    "Events.type": "PushEvent",
-  },
-  Object {
-    "Events.count": "120",
-    "Events.type": "CreateEvent",
-  },
-  Object {
-    "Events.count": "104",
-    "Events.type": "IssueCommentEvent",
-  },
-  Object {
     "Events.count": "92",
     "Events.type": "WatchEvent",
   },
   Object {
-    "Events.count": "57",
-    "Events.type": "IssuesEvent",
+    "Events.count": "2",
+    "Events.type": "ReleaseEvent",
+  },
+  Object {
+    "Events.count": "513",
+    "Events.type": "PushEvent",
+  },
+  Object {
+    "Events.count": "21",
+    "Events.type": "PullRequestReviewCommentEvent",
   },
   Object {
     "Events.count": "32",
     "Events.type": "PullRequestEvent",
   },
   Object {
-    "Events.count": "21",
-    "Events.type": "ForkEvent",
+    "Events.count": "1",
+    "Events.type": "MemberEvent",
+  },
+  Object {
+    "Events.count": "57",
+    "Events.type": "IssuesEvent",
+  },
+  Object {
+    "Events.count": "104",
+    "Events.type": "IssueCommentEvent",
   },
   Object {
     "Events.count": "21",
@@ -52,19 +56,15 @@ Array [
   },
   Object {
     "Events.count": "21",
-    "Events.type": "PullRequestReviewCommentEvent",
+    "Events.type": "ForkEvent",
   },
   Object {
     "Events.count": "14",
     "Events.type": "DeleteEvent",
   },
   Object {
-    "Events.count": "2",
-    "Events.type": "ReleaseEvent",
-  },
-  Object {
-    "Events.count": "1",
-    "Events.type": "MemberEvent",
+    "Events.count": "120",
+    "Events.type": "CreateEvent",
   },
   Object {
     "Events.count": "1",
@@ -100,32 +100,36 @@ Array [
 exports[`postgresql-cubestore WS Transport #3 Events.count with Events.type order by Events.count DESC: #3 Events.count with Events.type order by Events.count DESC 1`] = `
 Array [
   Object {
-    "Events.count": "513",
-    "Events.type": "PushEvent",
-  },
-  Object {
-    "Events.count": "120",
-    "Events.type": "CreateEvent",
-  },
-  Object {
-    "Events.count": "104",
-    "Events.type": "IssueCommentEvent",
-  },
-  Object {
     "Events.count": "92",
     "Events.type": "WatchEvent",
   },
   Object {
-    "Events.count": "57",
-    "Events.type": "IssuesEvent",
+    "Events.count": "2",
+    "Events.type": "ReleaseEvent",
+  },
+  Object {
+    "Events.count": "513",
+    "Events.type": "PushEvent",
+  },
+  Object {
+    "Events.count": "21",
+    "Events.type": "PullRequestReviewCommentEvent",
   },
   Object {
     "Events.count": "32",
     "Events.type": "PullRequestEvent",
   },
   Object {
-    "Events.count": "21",
-    "Events.type": "ForkEvent",
+    "Events.count": "1",
+    "Events.type": "MemberEvent",
+  },
+  Object {
+    "Events.count": "57",
+    "Events.type": "IssuesEvent",
+  },
+  Object {
+    "Events.count": "104",
+    "Events.type": "IssueCommentEvent",
   },
   Object {
     "Events.count": "21",
@@ -133,19 +137,15 @@ Array [
   },
   Object {
     "Events.count": "21",
-    "Events.type": "PullRequestReviewCommentEvent",
+    "Events.type": "ForkEvent",
   },
   Object {
     "Events.count": "14",
     "Events.type": "DeleteEvent",
   },
   Object {
-    "Events.count": "2",
-    "Events.type": "ReleaseEvent",
-  },
-  Object {
-    "Events.count": "1",
-    "Events.type": "MemberEvent",
+    "Events.count": "120",
+    "Events.type": "CreateEvent",
   },
   Object {
     "Events.count": "1",
