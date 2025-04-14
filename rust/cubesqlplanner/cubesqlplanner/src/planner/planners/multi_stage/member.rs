@@ -136,7 +136,7 @@ pub enum MultiStageMemberType {
 
 pub struct MultiStageMember {
     member_type: MultiStageMemberType,
-    evaluation_node: Rc<MemberSymbol>,
+    member_symbol: Rc<MemberSymbol>,
     is_ungrupped: bool,
     has_aggregates_on_top: bool,
 }
@@ -150,7 +150,7 @@ impl MultiStageMember {
     ) -> Rc<Self> {
         Rc::new(Self {
             member_type,
-            evaluation_node,
+            member_symbol: evaluation_node,
             is_ungrupped,
             has_aggregates_on_top,
         })
@@ -161,11 +161,11 @@ impl MultiStageMember {
     }
 
     pub fn evaluation_node(&self) -> &Rc<MemberSymbol> {
-        &self.evaluation_node
+        &self.member_symbol
     }
 
     pub fn full_name(&self) -> String {
-        self.evaluation_node.full_name()
+        self.member_symbol.full_name()
     }
 
     pub fn is_ungrupped(&self) -> bool {

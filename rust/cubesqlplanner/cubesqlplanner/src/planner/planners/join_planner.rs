@@ -1,7 +1,9 @@
 use super::{CommonUtils, DimensionSubqueryPlanner};
+use crate::cube_bridge::cube_definition;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::join_item::JoinItem;
+use crate::logical_plan::*;
 use crate::plan::{From, JoinBuilder, JoinCondition};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::SqlCall;
@@ -30,6 +32,26 @@ impl JoinPlanner {
     ) -> Result<Rc<From>, CubeError> {
         let join = self.query_tools.join_graph().build_join(join_hints)?;
         self.make_join_node_impl(alias_prefix, join, dimension_subquery_planner)
+    }
+
+    pub fn make_join_logical_plan(
+        &self,
+        join: Rc<dyn JoinDefinition>,
+    ) -> Result<Rc<LogicalJoin>, CubeError> {
+        let root_definition = self.utils.cube_from_path(join.static_data().root.clone())?;
+        let root = Cube::new(root_definition);
+        let joins_definitions = join.joins()?;
+        let mut joins = vec![];
+        for join_definition in joins_definitions.iter() {
+            let cube_definition = self
+                .utils
+                .cube_from_path(join_definition.static_data().original_to.clone())?;
+            let cube = Cube::new(cube_definition);
+            let on_sql = self.compile_join_condition(join_definition.clone())?;
+            joins.push(LogicalJoinItem::CubeJoinItem(CubeJoinItem { cube, on_sql }));
+        }
+
+        Ok(Rc::new(LogicalJoin { root, joins }))
     }
 
     pub fn make_join_node_impl(

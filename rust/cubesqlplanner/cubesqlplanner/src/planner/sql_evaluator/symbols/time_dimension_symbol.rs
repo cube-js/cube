@@ -1,12 +1,17 @@
 use super::MemberSymbol;
 use crate::planner::time_dimension::Granularity;
 use std::rc::Rc;
+use cubenativeutils::CubeError;
+use crate::planner::QueryDateTime;
+use crate::planner::query_tools::QueryTools;
+use chrono_tz::Tz;
 
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
     full_name: String,
     granularity: Option<String>,
     granularity_obj: Option<Granularity>,
+    alias_suffix: String
 }
 
 impl TimeDimensionSymbol {
@@ -26,6 +31,7 @@ impl TimeDimensionSymbol {
             granularity,
             granularity_obj,
             full_name,
+            alias_suffix: name_suffix
         }
     }
 
@@ -43,6 +49,10 @@ impl TimeDimensionSymbol {
 
     pub fn full_name(&self) -> String {
         self.full_name.clone()
+    }
+
+    pub fn alias_suffix(&self) -> String {
+        self.alias_suffix.clone()
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
@@ -63,5 +73,33 @@ impl TimeDimensionSymbol {
 
     pub fn name(&self) -> String {
         self.base_symbol.name()
+    }
+
+    pub fn get_range_for_time_series(&self, date_range: Option<Vec<String>>, tz: Tz) -> Result<Option<(String, String)>, CubeError> {
+        let res = if let Some(date_range) = &date_range {
+            if date_range.len() != 2 {
+                return Err(CubeError::user(format!(
+                    "Invalid date range: {:?}",
+                    date_range
+                )));
+            } else {
+                if let Some(granularity_obj) = &self.granularity_obj {
+                    if !granularity_obj.is_predefined_granularity() {
+                        let start = QueryDateTime::from_date_str(tz, &date_range[0])?;
+                        let start = granularity_obj.align_date_to_origin(start)?;
+                        let end = QueryDateTime::from_date_str(tz, &date_range[1])?;
+
+                        Some((start.to_string(), end.to_string()))
+                    } else {
+                        Some((date_range[0].clone(), date_range[1].clone()))
+                    }
+                } else {
+                    Some((date_range[0].clone(), date_range[1].clone()))
+                }
+            }
+        } else {
+            None
+        };
+        Ok(res)
     }
 }

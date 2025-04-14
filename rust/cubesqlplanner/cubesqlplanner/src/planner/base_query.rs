@@ -9,6 +9,8 @@ use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::NativeType;
 use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle, NativeStruct};
 use cubenativeutils::{CubeError, CubeErrorCauseType};
+use crate::physical_plan_builder::*;
+use crate::logical_plan::*;
 use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
@@ -77,8 +79,14 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let plan = query_planner.plan()?;
+        let logical_plan = query_planner.plan_logical()?;
+        let physical_plan_builder = PhysicalPlanBuilder::new(self.query_tools.clone());
+        println!("!!! logical_plan: {}", pretty_print_rc(&logical_plan));
+        let physical_plan = physical_plan_builder.build(logical_plan)?;
 
-        let sql = plan.to_sql(&templates)?;
+
+        //let sql = plan.to_sql(&templates)?;
+        let sql = physical_plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
 
         let res = self.context.empty_array()?;

@@ -1,4 +1,5 @@
 use super::OrderPlanner;
+use crate::logical_plan::*;
 use crate::plan::{
     Cte, Expr, Filter, From, JoinBuilder, JoinCondition, QualifiedColumnName, Select, SelectBuilder,
 };
@@ -33,6 +34,71 @@ impl FullKeyAggregateQueryPlanner {
             context_factory,
             plan_sql_templates,
         }
+    }
+
+    pub fn plan_logical_source(
+        &self,
+        resolve_multiplied_measures: Option<Rc<ResolveMultipliedMeasures>>,
+        multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
+    ) -> Result<Rc<FullKeyAggregate>, CubeError> {
+        let mut sources = Vec::new();
+        if let Some(resolve_multiplied_measures) = resolve_multiplied_measures {
+            sources.push(FullKeyAggregateSource::ResolveMultipliedMeasures(
+                resolve_multiplied_measures,
+            ));
+        }
+        for subquery in multi_stage_subqueries {
+            sources.push(FullKeyAggregateSource::MultiStageSubqueryRef(subquery));
+        }
+        let join_dimensions = self
+            .query_properties
+            .dimension_symbols()
+            .iter()
+            .chain(self.query_properties.time_dimension_symbols().iter())
+            .cloned()
+            .collect_vec();
+        Ok(Rc::new(FullKeyAggregate {
+            sources,
+            join_dimensions,
+        }))
+    }
+
+    pub fn plan_logical_plan(
+        &self,
+        resolve_multiplied_measures: Option<Rc<ResolveMultipliedMeasures>>,
+        multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
+        all_multistage_members: Vec<Rc<LogicalMultiStageMember>>,
+    ) -> Result<Rc<Query>, CubeError> {
+        let source =
+            self.plan_logical_source(resolve_multiplied_measures, multi_stage_subqueries)?;
+        let multiplied_measures = self
+            .query_properties
+            .full_key_aggregate_measures()?
+            .rendered_as_multiplied_measures
+            .clone();
+        let schema = Rc::new(LogicalSchema {
+            dimensions: self.query_properties.dimension_symbols(),
+            measures: self.query_properties.measure_symbols(),
+            time_dimensions: self.query_properties.time_dimension_symbols(),
+            multiplied_measures,
+        });
+        let logical_filter = Rc::new(LogicalFilter {
+            dimensions_filters: self.query_properties.dimensions_filters().clone(),
+            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+            measures_filter: self.query_properties.measures_filters().clone(),
+            segments: vec![],
+        });
+        let result = FullKeyAggregateQuery {
+            schema,
+            multistage_members: all_multistage_members,
+            filter: logical_filter,
+            offset: self.query_properties.offset(),
+            limit: self.query_properties.row_limit(),
+            ungrouped: self.query_properties.ungrouped(),
+            order_by: self.query_properties.order_by().clone(),
+            source,
+        };
+        Ok(Rc::new(Query::FullKeyAggregateQuery(result)))
     }
 
     pub fn plan(self, joins: Vec<Rc<Select>>, ctes: Vec<Rc<Cte>>) -> Result<Rc<Select>, CubeError> {

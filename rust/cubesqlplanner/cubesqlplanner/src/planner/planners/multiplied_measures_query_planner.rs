@@ -1,5 +1,6 @@
 use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner};
 use crate::cube_bridge::join_definition::JoinDefinition;
+use crate::logical_plan::*;
 use crate::plan::{
     Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
     SelectBuilder,
@@ -11,6 +12,7 @@ use crate::planner::sql_evaluator::collectors::{
 };
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::ReferencesBuilder;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{
     BaseMeasure, BaseMember, BaseMemberHelper, FullKeyAggregateMeasures, QueryProperties,
 };
@@ -45,6 +47,61 @@ impl MultipliedMeasuresQueryPlanner {
         })
     }
 
+    pub fn plan_logical_queries(&self) -> Result<Rc<ResolveMultipliedMeasures>, CubeError> {
+        if self.query_properties.is_simple_query()? {
+            return Err(CubeError::internal(format!(
+                "MultipliedMeasuresQueryPlanner should not be used for simple query"
+            )));
+        }
+
+        let full_key_aggregate_measures = &self.full_key_aggregate_measures;
+
+        let mut regular_measure_subqueries = Vec::new();
+        let mut aggregate_multiplied_subqueries = Vec::new();
+
+        if !full_key_aggregate_measures.regular_measures.is_empty() {
+            let join_multi_fact_groups = self
+                .query_properties
+                .compute_join_multi_fact_groups_with_measures(
+                    &full_key_aggregate_measures.regular_measures,
+                )?;
+            for (i, (join, measures)) in join_multi_fact_groups.iter().enumerate() {
+                let regular_subquery_logical_plan =
+                    self.regular_measures_subquery_logical_plan(measures, join.clone())?;
+                regular_measure_subqueries.push(regular_subquery_logical_plan);
+            }
+        }
+
+        for (cube_name, measures) in full_key_aggregate_measures
+            .multiplied_measures
+            .clone()
+            .into_iter()
+            .into_group_map_by(|m| m.cube_name().clone())
+        {
+            let join_multi_fact_groups = self
+                .query_properties
+                .compute_join_multi_fact_groups_with_measures(&measures)?;
+            if join_multi_fact_groups.len() != 1 {
+                return Err(CubeError::internal(
+                    format!(
+                        "Expected just one multi-fact join group for aggregate measures but got multiple: {}",
+                        join_multi_fact_groups.into_iter().map(|(_, measures)| format!("({})", measures.iter().map(|m| m.full_name()).join(", "))).join(", ")
+                    )
+                ));
+            }
+            let aggregate_subquery_logical_plan = self.aggregate_subquery_logical_plan(
+                &cube_name,
+                &measures,
+                join_multi_fact_groups.into_iter().next().unwrap().0,
+            )?;
+            aggregate_multiplied_subqueries.push(aggregate_subquery_logical_plan);
+        }
+        let result = Rc::new(ResolveMultipliedMeasures {
+            regular_measure_subqueries,
+            aggregate_multiplied_subqueries,
+        });
+        Ok(result)
+    }
     pub fn plan_queries(&self) -> Result<Vec<Rc<Select>>, CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
@@ -96,11 +153,67 @@ impl MultipliedMeasuresQueryPlanner {
             let aggregate_subquery = self.aggregate_subquery(
                 &cube_name,
                 &measures,
+                join_multi_fact_groups.iter().next().unwrap().0.clone(),
+            )?;
+            let aggregate_subquery_logical_plan = self.aggregate_subquery_logical_plan(
+                &cube_name,
+                &measures,
                 join_multi_fact_groups.into_iter().next().unwrap().0,
             )?;
             joins.push(aggregate_subquery);
         }
         Ok(joins)
+    }
+
+    fn aggregate_subquery_logical_plan(
+        &self,
+        key_cube_name: &String,
+        measures: &Vec<Rc<BaseMeasure>>,
+        key_join: Rc<dyn JoinDefinition>,
+    ) -> Result<Rc<AggregateMultipliedSubquery>, CubeError> {
+        let measures_symbols = measures
+            .iter()
+            .map(|m| m.member_evaluator().clone())
+            .collect();
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &measures_symbols,
+            &self.join_planner,
+            &key_join,
+            self.query_tools.clone(),
+        )?;
+
+        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+            &subquery_dimensions,
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+        )?;
+        let subquery_dimension_queries = dimension_subquery_planner.plan_logical_queries(&subquery_dimensions)?;
+
+        let primary_keys_dimensions = self
+            .common_utils
+            .primary_keys_dimensions(key_cube_name)?
+            .into_iter()
+            .map(|d| d.as_base_member())
+            .collect_vec();
+        let keys_subquery =
+            self.key_query_logical_plan(&primary_keys_dimensions, key_join.clone(), key_cube_name)?;
+        let schema = Rc::new(LogicalSchema {
+            time_dimensions: self.query_properties.time_dimension_symbols(),
+            dimensions: self.query_properties.dimension_symbols(),
+            measures: measures_symbols,
+            multiplied_measures: self
+                .full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        });
+        let pk_cube = self.common_utils.cube_from_path(key_cube_name.clone())?;
+        let source = Rc::new(AggregateMultipliedSubquerySouce::Cube(Cube::new(pk_cube)));
+        Ok(Rc::new(AggregateMultipliedSubquery {
+            schema,
+            keys_subquery,
+            dimension_subqueries: subquery_dimension_queries,
+            source,
+        }))
     }
 
     fn aggregate_subquery(
@@ -128,7 +241,9 @@ impl MultipliedMeasuresQueryPlanner {
             .into_iter()
             .map(|d| d.as_base_member())
             .collect_vec();
-        let keys_query = self.key_query(&primary_keys_dimensions, key_join, key_cube_name)?;
+        let keys_query =
+            self.key_query(&primary_keys_dimensions, key_join.clone(), key_cube_name)?;
+
         let keys_query_alias = format!("keys");
         let should_build_join_for_measure_select =
             self.check_should_build_join_for_measure_select(measures, key_cube_name)?;
@@ -141,6 +256,7 @@ impl MultipliedMeasuresQueryPlanner {
             pk_cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.default_alias())));
         let mut ungrouped_measure_references = HashMap::new();
         if should_build_join_for_measure_select {
+            println!("!!!! SHOULD!!!!!");
             let subquery = self.aggregate_subquery_measure_join(
                 key_cube_name,
                 &measures,
@@ -244,7 +360,8 @@ impl MultipliedMeasuresQueryPlanner {
                 .rendered_as_multiplied_measures
                 .clone(),
         );
-        Ok(Rc::new(select_builder.build(context_factory)))
+        let res = Rc::new(select_builder.build(context_factory));
+        Ok(res)
     }
 
     fn check_should_build_join_for_measure_select(
@@ -306,6 +423,62 @@ impl MultipliedMeasuresQueryPlanner {
         Ok(Rc::new(select_builder.build(context_factory)))
     }
 
+    fn regular_measures_subquery_logical_plan(
+        &self,
+        measures: &Vec<Rc<BaseMeasure>>,
+        join: Rc<dyn JoinDefinition>,
+    ) -> Result<Rc<SimpleQuery>, CubeError> {
+        let measures_symbols = measures
+            .iter()
+            .map(|m| m.member_evaluator().clone())
+            .collect();
+        let all_symbols = self.query_properties.get_member_symbols(true, true, false, true, &measures_symbols);
+
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &all_symbols,
+            &self.join_planner,
+            &join,
+            self.query_tools.clone(),
+        )?;
+
+        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+            &subquery_dimensions,
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+        )?;
+        let subquery_dimension_queries = dimension_subquery_planner.plan_logical_queries(&subquery_dimensions)?;
+
+        let source = self.join_planner.make_join_logical_plan(join)?;
+
+        let schema = Rc::new(LogicalSchema {
+            dimensions: self.query_properties.dimension_symbols(),
+            time_dimensions: self.query_properties.time_dimension_symbols(),
+            measures: measures_symbols,
+            multiplied_measures: self
+                .full_key_aggregate_measures
+                .rendered_as_multiplied_measures
+                .clone(),
+        });
+
+        let logical_filter = Rc::new(LogicalFilter {
+            dimensions_filters: self.query_properties.dimensions_filters().clone(),
+            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+            measures_filter: vec![],
+            segments: self.query_properties.segments().clone(),
+        });
+
+        let query = SimpleQuery {
+            schema,
+            filter: logical_filter,
+            offset: self.query_properties.offset(),
+            limit: self.query_properties.row_limit(),
+            ungrouped: self.query_properties.ungrouped(),
+            dimension_subqueries: subquery_dimension_queries,
+            source,
+            order_by: vec![],
+        };
+        Ok(Rc::new(query))
+    }
     fn regular_measures_subquery(
         &self,
         measures: &Vec<Rc<BaseMeasure>>,
@@ -353,6 +526,55 @@ impl MultipliedMeasuresQueryPlanner {
         );
 
         Ok(Rc::new(select_builder.build(context_factory)))
+    }
+
+    fn key_query_logical_plan(
+        &self,
+        dimensions: &Vec<Rc<dyn BaseMember>>,
+        key_join: Rc<dyn JoinDefinition>,
+        key_cube_name: &String,
+    ) -> Result<Rc<KeysSubQuery>, CubeError> {
+        let source = self.join_planner.make_join_logical_plan(key_join.clone())?;
+
+        let dimensions_symbols = dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect();
+
+        let all_symbols = self.query_properties.get_member_symbols(true, true, false, true, &dimensions_symbols);
+
+        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
+            &all_symbols,
+            &self.join_planner,
+            &key_join,
+            self.query_tools.clone(),
+        )?;
+
+        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+            &subquery_dimensions,
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+        )?;
+        let subquery_dimension_queries = dimension_subquery_planner.plan_logical_queries(&subquery_dimensions)?;
+
+        let logical_filter = Rc::new(LogicalFilter {
+            dimensions_filters: self.query_properties.dimensions_filters().clone(),
+            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+            measures_filter: vec![],
+            segments: self.query_properties.segments().clone(),
+        });
+
+        let keys_query = KeysSubQuery {
+            time_dimensions: self.query_properties.time_dimension_symbols(),
+            dimensions: self.query_properties.dimension_symbols(),
+            primary_keys_dimensions: dimensions_symbols,
+            filter: logical_filter,
+            source,
+            dimension_subqueries: subquery_dimension_queries,
+            key_cube_name: key_cube_name.clone(),
+        };
+
+        Ok(Rc::new(keys_query))
     }
 
     fn key_query(
@@ -413,6 +635,7 @@ impl MultipliedMeasuresQueryPlanner {
         select_builder.set_distinct();
         select_builder.set_filter(self.query_properties.all_filters());
 
-        Ok(Rc::new(select_builder.build(context_factory)))
+        let res = Rc::new(select_builder.build(context_factory));
+        Ok(res)
     }
 }

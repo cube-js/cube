@@ -57,9 +57,9 @@ impl BaseMember for BaseTimeDimension {
         &self.dimension.name()
     }
 
-    fn alias_suffix(&self) -> Option<String> {
+    /*     fn alias_suffix(&self) -> Option<String> {
         Some(self.alias_suffix.clone())
-    }
+    } */
 }
 
 impl BaseTimeDimension {

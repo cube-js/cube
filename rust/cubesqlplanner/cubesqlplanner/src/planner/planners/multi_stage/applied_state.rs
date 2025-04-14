@@ -1,6 +1,6 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
-use crate::planner::sql_evaluator::MeasureTimeShift;
+use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -78,6 +78,14 @@ impl MultiStageAppliedState {
 
     pub fn time_dimensions_filters(&self) -> &Vec<FilterItem> {
         &self.time_dimensions_filters
+    }
+
+    pub fn time_dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions.iter().map(|d| d.member_evaluator().clone()).collect()
+    }
+
+    pub fn dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.dimensions.iter().map(|d| d.member_evaluator().clone()).collect()
     }
 
     pub fn dimensions_filters(&self) -> &Vec<FilterItem> {
