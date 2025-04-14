@@ -128,6 +128,83 @@ describe('Yaml Schema Testing', () => {
     }
   });
 
+  it('empty (null) dimensions', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    dimensions:
+    `
+    );
+
+    await compiler.compile();
+  });
+
+  it('empty (null) measures', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    measures:
+    `
+    );
+
+    await compiler.compile();
+  });
+
+  it('empty (null) segments', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    segments:
+    `
+    );
+
+    await compiler.compile();
+  });
+
+  it('empty (null) preAggregations', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    dimensions: []
+    measures: []
+    segments: []
+    preAggregations:
+    joins: []
+    hierarchies: []
+    `
+    );
+
+    await compiler.compile();
+  });
+
+  it('empty (null) joins', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    joins:
+    `
+    );
+
+    await compiler.compile();
+  });
+
+  it('empty (null) hierarchies', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    hierarchies:
+    `
+    );
+
+    await compiler.compile();
+  });
+
   it('unnamed measure', async () => {
     const { compiler } = prepareYamlCompiler(
       `cubes:
