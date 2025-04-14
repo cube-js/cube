@@ -384,15 +384,10 @@ mod tests {
     };
     use datafusion::logical_plan::{col, JoinType, LogicalPlanBuilder};
 
-    fn optimize(plan: &LogicalPlan) -> Result<LogicalPlan> {
+    fn optimize(plan: &LogicalPlan) -> LogicalPlan {
         let rule = SortPushDown::new();
         rule.optimize(plan, &OptimizerConfig::new())
-    }
-
-    fn assert_optimized_plan_eq(plan: LogicalPlan, expected: &str) {
-        let optimized_plan = optimize(&plan).expect("failed to optimize plan");
-        let formatted_plan = format!("{:?}", optimized_plan);
-        assert_eq!(formatted_plan, expected);
+            .expect("failed to optimize plan")
     }
 
     fn sort(expr: Expr, asc: bool, nulls_first: bool) -> Expr {
@@ -417,14 +412,7 @@ mod tests {
             ])?
             .build()?;
 
-        let expected = "\
-              Projection: #t1.c1 AS n1, #t1.c2, #t1.c3 AS n2, alias=t2\
-            \n  Sort: #t1.c2 ASC NULLS LAST, #t1.c3 DESC NULLS FIRST\
-            \n    Projection: #t1.c1, #t1.c2, #t1.c3\
-            \n      TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
@@ -450,16 +438,7 @@ mod tests {
             ])?
             .build()?;
 
-        let expected = "\
-              Projection: #t3.n3, #t3.n4, #t3.n2, alias=t4\
-            \n  Projection: #t2.n1 AS n3, #t2.c2 AS n4, #t2.n2, alias=t3\
-            \n    Projection: #t1.c1 AS n1, #t1.c2, #t1.c3 AS n2, alias=t2\
-            \n      Sort: #t1.c2 ASC NULLS LAST, #t1.c3 DESC NULLS FIRST\
-            \n        Projection: #t1.c1, #t1.c2, #t1.c3\
-            \n          TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
@@ -487,21 +466,12 @@ mod tests {
             ])?
             .build()?;
 
-        let expected = "\
-              Projection: #t3.n3, #t3.n4, #t3.n2, alias=t4\
-            \n  Projection: #t2.n1 AS n3, #t2.c2 AS n4, #t2.n2, alias=t3\
-            \n    Projection: #t1.c1 AS n1, #t1.c2, #t1.c3 AS n2, alias=t2\
-            \n      Sort: #t1.c2 ASC NULLS LAST, #t1.c3 DESC NULLS FIRST\
-            \n        Projection: #t1.c1, #t1.c2, #t1.c3\
-            \n          TableScan: t1 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
     #[test]
-    fn test_sort_down_join() -> Result<()> {
+    fn test_sort_down_join_sort_left() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
@@ -521,18 +491,12 @@ mod tests {
         .sort(vec![sort(col("j1.c1"), true, false)])?
         .build()?;
 
-        let expected = "\
-              Projection: #j1.c1, #j2.c2\
-            \n  Inner Join: #j1.key = #j2.key\
-            \n    Sort: #j1.c1 ASC NULLS LAST\
-            \n      Projection: #j1.key, #j1.c1\
-            \n        TableScan: j1 projection=None\
-            \n    Projection: #j2.key, #j2.c2\
-            \n      TableScan: j2 projection=None\
-        ";
+        insta::assert_debug_snapshot!(optimize(&plan));
+        Ok(())
+    }
 
-        assert_optimized_plan_eq(plan, expected);
-
+    #[test]
+    fn test_sort_down_join_sort_right() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
@@ -552,23 +516,12 @@ mod tests {
         .sort(vec![sort(col("j2.c2"), true, false)])?
         .build()?;
 
-        let expected = "\
-              Projection: #j1.c1, #j2.c2\
-            \n  Sort: #j2.c2 ASC NULLS LAST\
-            \n    Inner Join: #j1.key = #j2.key\
-            \n      Projection: #j1.key, #j1.c1\
-            \n        TableScan: j1 projection=None\
-            \n      Projection: #j2.key, #j2.c2\
-            \n        TableScan: j2 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
-
+        insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())
     }
 
     #[test]
-    fn test_sort_down_cross_join() -> Result<()> {
+    fn test_sort_down_cross_join_sort_left() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
@@ -583,18 +536,12 @@ mod tests {
         .sort(vec![sort(col("j1.c1"), true, false)])?
         .build()?;
 
-        let expected = "\
-              Projection: #j1.c1, #j2.c2\
-            \n  CrossJoin:\
-            \n    Sort: #j1.c1 ASC NULLS LAST\
-            \n      Projection: #j1.key, #j1.c1\
-            \n        TableScan: j1 projection=None\
-            \n    Projection: #j2.key, #j2.c2\
-            \n      TableScan: j2 projection=None\
-        ";
+        insta::assert_debug_snapshot!(optimize(&plan));
+        Ok(())
+    }
 
-        assert_optimized_plan_eq(plan, expected);
-
+    #[test]
+    fn test_sort_down_cross_join_sort_right() -> Result<()> {
         let plan = LogicalPlanBuilder::from(
             LogicalPlanBuilder::from(make_sample_table("j1", vec!["key", "c1"], vec![])?)
                 .project(vec![col("key"), col("c1")])?
@@ -609,17 +556,7 @@ mod tests {
         .sort(vec![sort(col("j2.c2"), true, false)])?
         .build()?;
 
-        let expected = "\
-              Projection: #j1.c1, #j2.c2\
-            \n  Sort: #j2.c2 ASC NULLS LAST\
-            \n    CrossJoin:\
-            \n      Projection: #j1.key, #j1.c1\
-            \n        TableScan: j1 projection=None\
-            \n      Projection: #j2.key, #j2.c2\
-            \n        TableScan: j2 projection=None\
-        ";
-
-        assert_optimized_plan_eq(plan, expected);
+        insta::assert_debug_snapshot!(optimize(&plan));
 
         Ok(())
     }
