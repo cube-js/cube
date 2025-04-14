@@ -3,15 +3,13 @@ use std::{collections::HashMap, sync::Arc};
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::{
-            Aggregate, CrossJoin, Distinct, Join, Limit, Projection, Sort, Subquery, Union, Window,
-        },
+        plan::{Aggregate, Distinct, Limit, Projection, Sort, Subquery, Union, Window},
         Column, DFSchema, Expr, Filter, LogicalPlan,
     },
     optimizer::optimizer::{OptimizerConfig, OptimizerRule},
 };
 
-use super::utils::{get_schema_columns, is_column_expr, plan_has_projections, rewrite};
+use super::utils::{is_column_expr, plan_has_projections, rewrite};
 
 /// Sort Push Down optimizer rule pushes ORDER BY clauses consisting of specific,
 /// mostly simple, expressions down the plan, all the way to the Projection
@@ -165,97 +163,6 @@ fn sort_push_down(
                 input,
                 Some(sort_expr.unwrap_or(expr.clone())),
                 optimizer_config,
-            )
-        }
-        LogicalPlan::Join(Join {
-            left,
-            right,
-            on,
-            join_type,
-            join_constraint,
-            schema,
-            null_equals_null,
-        }) => {
-            // DataFusion preserves the sorting of the joined plans, prioritizing left side.
-            // Taking this into account, we can push Sort down the left plan if Sort references
-            // columns just from the left side.
-            // TODO: check if this is still the case with multiple target partitions
-            if let Some(some_sort_expr) = &sort_expr {
-                let left_columns = get_schema_columns(left.schema());
-                if some_sort_expr.iter().all(|expr| {
-                    if let Expr::Sort { expr, .. } = expr {
-                        if let Expr::Column(column) = expr.as_ref() {
-                            return left_columns.contains(column);
-                        }
-                    }
-                    false
-                }) {
-                    return Ok(LogicalPlan::Join(Join {
-                        left: Arc::new(sort_push_down(
-                            optimizer,
-                            left,
-                            sort_expr,
-                            optimizer_config,
-                        )?),
-                        right: Arc::new(sort_push_down(optimizer, right, None, optimizer_config)?),
-                        on: on.clone(),
-                        join_type: *join_type,
-                        join_constraint: *join_constraint,
-                        schema: schema.clone(),
-                        null_equals_null: *null_equals_null,
-                    }));
-                }
-            }
-
-            issue_sort(
-                sort_expr,
-                LogicalPlan::Join(Join {
-                    left: Arc::new(sort_push_down(optimizer, left, None, optimizer_config)?),
-                    right: Arc::new(sort_push_down(optimizer, right, None, optimizer_config)?),
-                    on: on.clone(),
-                    join_type: *join_type,
-                    join_constraint: *join_constraint,
-                    schema: schema.clone(),
-                    null_equals_null: *null_equals_null,
-                }),
-            )
-        }
-        LogicalPlan::CrossJoin(CrossJoin {
-            left,
-            right,
-            schema,
-        }) => {
-            // See `LogicalPlan::Join` notes above.
-            if let Some(some_sort_expr) = &sort_expr {
-                let left_columns = get_schema_columns(left.schema());
-                if some_sort_expr.iter().all(|expr| {
-                    if let Expr::Sort { expr, .. } = expr {
-                        if let Expr::Column(column) = expr.as_ref() {
-                            return left_columns.contains(column);
-                        }
-                    }
-                    false
-                }) {
-                    return Ok(LogicalPlan::CrossJoin(CrossJoin {
-                        left: Arc::new(sort_push_down(
-                            optimizer,
-                            left,
-                            sort_expr,
-                            optimizer_config,
-                        )?),
-                        right: Arc::new(sort_push_down(optimizer, right, None, optimizer_config)?),
-                        schema: schema.clone(),
-                    }));
-                }
-            }
-
-            issue_sort(
-                sort_expr,
-                LogicalPlan::CrossJoin(CrossJoin {
-                    left: Arc::new(sort_push_down(optimizer, left, None, optimizer_config)?),
-                    right: Arc::new(sort_push_down(optimizer, right, None, optimizer_config)?),
-                    schema: schema.clone(),
-                }),
             )
         }
         LogicalPlan::Union(Union {
