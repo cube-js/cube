@@ -93,7 +93,9 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
             | "max"
             | "count"
             | "count_distinct"
-            | "count_distinct_approx" => true,
+            | "count_distinct_approx"
+            // For number measures new filter should be propagated to leaf measures
+            | "number" => true,
             _ => false,
         }
     }
