@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.1](https://github.com/cube-js/cube/compare/v1.3.0...v1.3.1) (2025-04-14)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix incorrect transpilation of yaml models ([#9465](https://github.com/cube-js/cube/issues/9465)) ([e732fa2](https://github.com/cube-js/cube/commit/e732fa2b8ead0ca605512611eb371b94e0238dec))
+
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Bug Fixes
+
+- **schema-compiler:** Do not drop join hints when view member is not itself owned ([#9444](https://github.com/cube-js/cube/issues/9444)) ([b5ddd11](https://github.com/cube-js/cube/commit/b5ddd115a8ad066bc4399fc2608d1d99d3d863dc))
+- **schema-compiler:** Fix cubes inheritance ([#9386](https://github.com/cube-js/cube/issues/9386)) ([409d74d](https://github.com/cube-js/cube/commit/409d74db8c5ac5a314e1e3e7b872586f538713d1))
+- **schema-compiler:** Fix incorrect native bulk transpilation if there are no JS files ([#9453](https://github.com/cube-js/cube/issues/9453)) ([610820f](https://github.com/cube-js/cube/commit/610820fe15701ad0971b4d317bb112ec7765bb9b))
+
 ## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
 
 ### Bug Fixes
