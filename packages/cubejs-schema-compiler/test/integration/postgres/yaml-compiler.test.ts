@@ -57,6 +57,40 @@ cubes:
     );
   });
 
+  it('simple with json/curly in sql', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: ActiveUsers
+    sql: SELECT 1 as user_id, '2022-01-01'::TIMESTAMP as timestamp, CAST('\\{"key":"value"\\}'::JSON AS TEXT) AS json_col
+
+    dimensions:
+      - name: time
+        sql: "{CUBE}.timestamp"
+        type: time
+      - name: json_col
+        sql: json_col
+        type: string
+    `);
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: ['ActiveUsers.time', 'ActiveUsers.json_col'],
+      timezone: 'UTC'
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual(
+      [{
+        active_users__time: '2022-01-01T00:00:00.000Z',
+        active_users__json_col: '{"key":"value"}',
+      }]
+    );
+  });
+
   it('missed sql', async () => {
     const { compiler } = prepareYamlCompiler(`
 cubes:
