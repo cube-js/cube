@@ -1,6 +1,7 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
 import { MeasureDefinition } from '../compiler/CubeEvaluator';
+import { CubeSymbols } from "../compiler/CubeSymbols";
 
 export class BaseMeasure {
   public readonly expression: any;
@@ -128,7 +129,7 @@ export class BaseMeasure {
     } else {
       // TODO move this `as` to static types
       const measurePath = measure as string;
-      const { path, joinHint } = this.query.cubeEvaluator.joinHintFromPath(measurePath);
+      const { path, joinHint } = CubeSymbols.joinHintFromPath(measurePath);
       this.measure = path;
       this.joinHint = joinHint;
     }
