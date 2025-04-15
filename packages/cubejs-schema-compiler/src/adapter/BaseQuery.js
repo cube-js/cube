@@ -24,6 +24,7 @@ import {
   timeSeriesFromCustomInterval
 } from '@cubejs-backend/shared';
 
+import { CubeSymbols } from "../compiler/CubeSymbols";
 import { UserError } from '../compiler/UserError';
 import { SqlParser } from '../parser/SqlParser';
 import { BaseDimension } from './BaseDimension';
@@ -1411,7 +1412,7 @@ export class BaseQuery {
       // TODO condition should something else instead of rank
       multiStageQuery: !!withQuery.measures.find(d => {
         const { type } = this.newMeasure(d).definition();
-        return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
+        return type === 'rank' || CubeSymbols.isCalculatedMeasureType(type);
       }),
       disableExternalPreAggregations: true,
     };
@@ -2946,7 +2947,7 @@ export class BaseQuery {
           funDef = this.countDistinctApprox(evaluateSql);
         } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
           funDef = `count(distinct ${evaluateSql})`;
-        } else if (BaseQuery.isCalculatedMeasureType(symbol.type)) {
+        } else if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
           // TODO calculated measure type will be ungrouped
           // if (this.multiStageDimensions.length !== this.dimensions.length) {
           //   throw new UserError(`Calculated measure '${measurePath}' uses group_by or reduce_by context modifiers while it isn't allowed`);
@@ -2972,21 +2973,10 @@ export class BaseQuery {
         return this.primaryKeyCount(cubeName, true);
       }
     }
-    if (BaseQuery.isCalculatedMeasureType(symbol.type)) {
+    if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
       return evaluateSql;
     }
     return `${symbol.type}(${evaluateSql})`;
-  }
-
-  static isCalculatedMeasureType(type) {
-    return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
-  }
-
-  /**
-   TODO: support type qualifiers on min and max
-  */
-  static toMemberDataType(type) {
-    return this.isCalculatedMeasureType(type) ? type : 'number';
   }
 
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
@@ -4095,7 +4085,7 @@ export class BaseQuery {
       sqlUtils: {
         convertTz: (field) => field,
       },
-      securityContext: BaseQuery.contextSymbolsProxyFrom({}, allocateParam),
+      securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
     };
   }
 
@@ -4110,41 +4100,7 @@ export class BaseQuery {
   }
 
   contextSymbolsProxy(symbols) {
-    return BaseQuery.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
-  }
-
-  static contextSymbolsProxyFrom(symbols, allocateParam) {
-    return new Proxy(symbols, {
-      get: (target, name) => {
-        const propValue = target[name];
-        const methods = (paramValue) => ({
-          filter: (column) => {
-            if (paramValue) {
-              const value = Array.isArray(paramValue) ?
-                paramValue.map(allocateParam) :
-                allocateParam(paramValue);
-              if (typeof column === 'function') {
-                return column(value);
-              } else {
-                return `${column} = ${value}`;
-              }
-            } else {
-              return '1 = 1';
-            }
-          },
-          requiredFilter: (column) => {
-            if (!paramValue) {
-              throw new UserError(`Filter for ${column} is required`);
-            }
-            return methods(paramValue).filter(column);
-          },
-          unsafeValue: () => paramValue
-        });
-        return methods(target)[name] ||
-          typeof propValue === 'object' && propValue !== null && BaseQuery.contextSymbolsProxyFrom(propValue, allocateParam) ||
-          methods(propValue);
-      }
-    });
+    return CubeSymbols.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
   }
 
   static extractFilterMembers(filter) {
