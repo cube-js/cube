@@ -1,7 +1,8 @@
 module.exports = {
+  "benchmarks": "Benchmarks",
   "recipes": "Recipes",
-  "dbt": "Using Cube with dbt",
-  "designing-metrics": "Designing Metrics",
+  "designing-metrics": "Designing metrics",
   "style-guide": "Style guide",
-  "data-store-cost-saving-guide": "Cost saving guide"
+  "data-store-cost-saving-guide": "Cost saving guide",
+  "dbt": "Using Cube with dbt"
 }
