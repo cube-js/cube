@@ -21,7 +21,7 @@ describe('Pre Aggregation by filter match tests', () => {
     return prepareCube('cube', cube);
   }
 
-  function testPreAggregationMatch(
+  async function testPreAggregationMatch(
     expecting: boolean,
     cubedimensions: Array<String>,
     preAggdimensions: Array<String>,
@@ -60,27 +60,27 @@ describe('Pre Aggregation by filter match tests', () => {
     aaa.sortedDimensions.sort();
     aaa.sortedTimeDimensions = [[aaa.timeDimension, aaa.granularity]];
 
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        dimensions: querydimensions.map(d => `cube.${d}`),
-        measures: ['cube.uniqueField'],
-        timeDimensions: [{
-          dimension: 'cube.created',
-          granularity: 'day',
-          dateRange: { from: '2017-01-01', to: '2017-01-30' }
-        }],
-        timezone: 'America/Los_Angeles',
-        filters,
-        segments: querySegments?.map(s => `cube.${s}`),
-      });
+    await compiler.compile();
 
-      const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
-        PreAggregations.transformQueryToCanUseForm(query),
-        aaa
-      );
-
-      expect(usePreAggregation).toEqual(expecting);
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: querydimensions.map(d => `cube.${d}`),
+      measures: ['cube.uniqueField'],
+      timeDimensions: [{
+        dimension: 'cube.created',
+        granularity: 'day',
+        dateRange: { from: '2017-01-01', to: '2017-01-30' }
+      }],
+      timezone: 'America/Los_Angeles',
+      filters,
+      segments: querySegments?.map(s => `cube.${s}`),
     });
+
+    const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
+      PreAggregations.transformQueryToCanUseForm(query),
+      aaa
+    );
+
+    expect(usePreAggregation).toEqual(expecting);
   }
 
   it('1 Dimension, 1 Filter', () => testPreAggregationMatch(
@@ -147,7 +147,7 @@ describe('Pre Aggregation by filter match tests', () => {
       },
     ]
   ));
-  
+
   it('1 Dimension, 1 Filter, gt', () => testPreAggregationMatch(
     false,
     ['type'],
