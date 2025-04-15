@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/engine/df/optimizers/filter_push_down.rs
+expression: optimize(&plan)
+---
+Projection: #t1.c1, #c2, #t1.c3
+  Filter: #t1.c1 > #t1.c3
+    Projection: #t1.c1, #c2, #t1.c3
+      Filter: #c2 = Int32(5)
+        Projection: #t1.c1, #t1.c2 + Int32(5) AS c2, #t1.c3
+          Filter: #t1.c3 < Int32(5)
+            Projection: #t1.c1, #t1.c2, #t1.c3
+              TableScan: t1 projection=None
