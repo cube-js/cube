@@ -486,7 +486,7 @@ export class PreAggregations {
    * Returns function to determine whether pre-aggregation can be used or not
    * for specified query, or its value for `refs` if specified.
    * @param {Object} transformedQuery transformed query
-   * @param {Object?} refs pre-aggs reference
+   * @param {PreAggregationReferences?} refs pre-aggs reference
    * @returns {function(preagg: Object): boolean}
    */
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
