@@ -313,18 +313,15 @@ impl QueryExecutor for QueryExecutorImpl {
         )?;
         let pre_serialized_plan = Arc::new(pre_serialized_plan);
         let ctx = self.router_context(cluster.clone(), pre_serialized_plan.clone())?;
-        let router_plan = ctx
-            .clone()
-            .state()
-            .create_physical_plan(pre_serialized_plan.logical_plan())
+        // We don't want to use session_state.create_physical_plan(...) because it redundantly
+        // optimizes the logical plan, which has already been optimized before it was put into a
+        // SerializedPlan (and that takes too much time).
+        let session_state = ctx.state();
+        let execution_plan = session_state
+            .query_planner()
+            .create_physical_plan(pre_serialized_plan.logical_plan(), &session_state)
             .await?;
-        Ok((
-            ctx.clone()
-                .state()
-                .create_physical_plan(pre_serialized_plan.logical_plan())
-                .await?,
-            pre_serialized_plan.logical_plan().clone(),
-        ))
+        Ok((execution_plan, pre_serialized_plan.logical_plan().clone()))
     }
 
     async fn worker_plan(
@@ -346,14 +343,13 @@ impl QueryExecutor for QueryExecutorImpl {
             worker_planning_params,
             data_loaded_size,
         )?;
-        let plan_ctx = ctx.clone();
-        Ok((
-            plan_ctx
-                .state()
-                .create_physical_plan(pre_serialized_plan.logical_plan())
-                .await?,
-            pre_serialized_plan.logical_plan().clone(),
-        ))
+        // We don't want to use session_state.create_physical_plan(...); see comment in router_plan.
+        let session_state = ctx.state();
+        let execution_plan = session_state
+            .query_planner()
+            .create_physical_plan(pre_serialized_plan.logical_plan(), &session_state)
+            .await?;
+        Ok((execution_plan, pre_serialized_plan.logical_plan().clone()))
     }
 
     async fn pp_worker_plan(
