@@ -227,8 +227,6 @@ jobs:
       DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
     strategy:
       matrix:
-        node:
-          - 20.x
         database:
           - athena-export-bucket-s3
           - bigquery-export-bucket-gcs
