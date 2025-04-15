@@ -468,7 +468,7 @@ export class CubeEvaluator extends CubeSymbols {
           ownedByCube = false;
         }
         // Aliases one to one some another member as in case of views
-        if (!ownedByCube && !member.filters && BaseQuery.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+        if (!ownedByCube && !member.filters && CubeSymbols.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
           aliasMember = this.pathFromArray(pathReferencesUsed[0]);
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);

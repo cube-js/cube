@@ -5,7 +5,6 @@ import { camelize } from 'inflection';
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
-import { BaseQuery } from '../adapter';
 
 import type { ErrorReporter } from './ErrorReporter';
 
@@ -536,7 +535,7 @@ export class CubeSymbols {
       if (type === 'measures') {
         memberDefinition = {
           sql,
-          type: BaseQuery.toMemberDataType(resolvedMember.type),
+          type: CubeSymbols.toMemberDataType(resolvedMember.type),
           aggType: resolvedMember.type,
           meta: resolvedMember.meta,
           title: resolvedMember.title,
@@ -755,7 +754,7 @@ export class CubeSymbols {
     return Object.assign({
       filterParams: this.filtersProxyDep(),
       filterGroup: this.filterGroupFunctionDep(),
-      securityContext: BaseQuery.contextSymbolsProxyFrom({}, (param) => param),
+      securityContext: CubeSymbols.contextSymbolsProxyFrom({}, (param) => param),
       sqlUtils: {
         convertTz: (f) => f
 
@@ -998,5 +997,50 @@ export class CubeSymbols {
 
   public isCurrentCube(name) {
     return CURRENT_CUBE_CONSTANTS.indexOf(name) >= 0;
+  }
+
+  public static isCalculatedMeasureType(type: string): boolean {
+    return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
+  }
+
+  /**
+   TODO: support type qualifiers on min and max
+   */
+  public static toMemberDataType(type: string): string {
+    return this.isCalculatedMeasureType(type) ? type : 'number';
+  }
+
+  public static contextSymbolsProxyFrom(symbols: object, allocateParam: (param: unknown) => unknown): object {
+    return new Proxy(symbols, {
+      get: (target, name) => {
+        const propValue = target[name];
+        const methods = (paramValue) => ({
+          filter: (column) => {
+            if (paramValue) {
+              const value = Array.isArray(paramValue) ?
+                paramValue.map(allocateParam) :
+                allocateParam(paramValue);
+              if (typeof column === 'function') {
+                return column(value);
+              } else {
+                return `${column} = ${value}`;
+              }
+            } else {
+              return '1 = 1';
+            }
+          },
+          requiredFilter: (column) => {
+            if (!paramValue) {
+              throw new UserError(`Filter for ${column} is required`);
+            }
+            return methods(paramValue).filter(column);
+          },
+          unsafeValue: () => paramValue
+        });
+        return methods(target)[name] ||
+          typeof propValue === 'object' && propValue !== null && CubeSymbols.contextSymbolsProxyFrom(propValue, allocateParam) ||
+          methods(propValue);
+      }
+    });
   }
 }
