@@ -1,4 +1,5 @@
 import type { BaseQuery } from './BaseQuery';
+import { CubeSymbols } from "../compiler/CubeSymbols";
 
 export class BaseSegment {
   public readonly expression: any;
@@ -24,7 +25,7 @@ export class BaseSegment {
     } else {
       // TODO move this `as` to static types
       const segmentPath = segment as string;
-      const { path, joinHint } = this.query.cubeEvaluator.joinHintFromPath(segmentPath);
+      const { path, joinHint } = CubeSymbols.joinHintFromPath(segmentPath);
       this.segment = path;
       this.joinHint = joinHint;
     }

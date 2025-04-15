@@ -1,6 +1,7 @@
 import R from 'ramda';
 import { FROM_PARTITION_RANGE, getEnv, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
+import { CubeSymbols } from "../compiler/CubeSymbols";
 import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
@@ -173,7 +174,7 @@ export class PreAggregations {
 
         // timeDimensionsReference[*].dimension can contain full join path, so we should trim it
         // TODO check full join path match here
-        const timeDimensionReferenceDimension = this.query.cubeEvaluator.joinHintFromPath(timeDimensionReference.dimension).path;
+        const timeDimensionReferenceDimension = CubeSymbols.joinHintFromPath(timeDimensionReference.dimension).path;
 
         if (td.dimension === timeDimensionReferenceDimension) {
           return true;
@@ -1095,7 +1096,7 @@ export class PreAggregations {
         !!references.dimensions.find((d) => {
           // `d` can contain full join path, so we should trim it
           // TODO check full join path match here
-          const trimmedDimension = this.query.cubeEvaluator.joinHintFromPath(d).path;
+          const trimmedDimension = CubeSymbols.joinHintFromPath(d).path;
           return this.query.cubeEvaluator.dimensionByPath(trimmedDimension).primaryKey;
         }),
     });
