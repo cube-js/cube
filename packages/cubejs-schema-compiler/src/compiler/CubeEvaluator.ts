@@ -83,7 +83,7 @@ type PreAggregationTimeDimensionReference = {
 };
 
 /// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
-type PreAggregationReferences = {
+export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
   dimensions: Array<string>,
   measures: Array<string>,
@@ -91,7 +91,7 @@ type PreAggregationReferences = {
   rollups: Array<string>,
 };
 
-type PreAggregationInfo = {
+export type PreAggregationInfo = {
   id: string,
   preAggregationName: string,
   preAggregation: unknown,
