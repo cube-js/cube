@@ -1,6 +1,7 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareCube } from './PrepareCompiler';
 import { PreAggregations } from '../../src/adapter/PreAggregations';
+import { PreAggregationReferences } from '../../src/compiler/CubeEvaluator';
 
 describe('Pre Aggregation by filter match tests', () => {
   function getCube(cube) {
@@ -30,7 +31,7 @@ describe('Pre Aggregation by filter match tests', () => {
     preAggSegments: Array<String> | undefined = undefined,
     querySegments: Array<String> | undefined = undefined
   ) {
-    const aaa: any = {
+    const testPreAgg = {
       type: 'rollup',
       measures: ['cube.uniqueField'],
       dimensions: preAggdimensions.map(d => `cube.${d}`),
@@ -40,20 +41,25 @@ describe('Pre Aggregation by filter match tests', () => {
       partitionGranularity: 'month',
     };
 
-    const cube: any = {
+    const cube = {
       segments: {
         qqq: { sql: 'id > 10000' }
       },
       dimensions: Object.fromEntries(cubedimensions.map(d => [d, { sql: d, type: 'string' }])),
-      preAggregations: { aaa }
+      preAggregations: { testPreAgg }
     };
 
     const { compiler, joinGraph, cubeEvaluator } = getCube(cube);
 
-    if (aaa.segments) aaa.dimensions = aaa.dimensions.concat(aaa.segments);
-    aaa.sortedDimensions = aaa.dimensions;
-    aaa.sortedDimensions.sort();
-    aaa.sortedTimeDimensions = [[aaa.timeDimension, aaa.granularity]];
+    const refs: PreAggregationReferences = {
+      dimensions: testPreAgg.segments ? testPreAgg.dimensions.concat(testPreAgg.segments) : testPreAgg.dimensions,
+      measures: testPreAgg.measures,
+      timeDimensions: [{
+        dimension: testPreAgg.timeDimension,
+        granularity: testPreAgg.granularity,
+      }],
+      rollups: [],
+    };
 
     await compiler.compile();
 
@@ -72,7 +78,7 @@ describe('Pre Aggregation by filter match tests', () => {
 
     const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
       PreAggregations.transformQueryToCanUseForm(query),
-      aaa
+      refs
     );
 
     expect(usePreAggregation).toEqual(expecting);
