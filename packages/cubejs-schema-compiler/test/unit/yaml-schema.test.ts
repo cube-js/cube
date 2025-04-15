@@ -581,4 +581,52 @@ describe('Yaml Schema Testing', () => {
       await compiler.compile();
     });
   });
+
+  it('calling cube\'s sql()', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: simple_orders
+    sql: >
+      SELECT 1 AS id, 100 AS amount, 'new' status, now() AS created_at
+
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+  - name: simple_orders_sql_ext
+
+    sql: >
+      SELECT * FROM {simple_orders.sql()}
+      WHERE status = 'processed'
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+    `
+    );
+
+    await compiler.compile();
+  });
 });

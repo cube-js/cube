@@ -675,4 +675,86 @@ views:
       }]
     );
   });
+
+  it('calling cube\'s sql()', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
+      `cubes:
+  - name: simple_orders
+    sql: >
+      SELECT 1 AS id, 100 AS amount, 'new' status, '2025-04-15'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 2 AS id, 200 AS amount, 'new' status, '2025-04-16'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 3 AS id, 300 AS amount, 'processed' status, '2025-04-17'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 4 AS id, 500 AS amount, 'processed' status, '2025-04-18'::TIMESTAMP AS created_at
+      UNION ALL
+      SELECT 5 AS id, 600 AS amount, 'shipped' status, '2025-04-19'::TIMESTAMP AS created_at
+
+    measures:
+      - name: count
+        type: count
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+  - name: simple_orders_sql_ext
+
+    sql: >
+      SELECT * FROM ({simple_orders.sql()}) as parent
+      WHERE status = 'new'
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+    `
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['simple_orders_sql_ext.count'],
+      timeDimensions: [{
+        dimension: 'simple_orders_sql_ext.created_at',
+        granularity: 'day',
+        dateRange: ['2025-04-01', '2025-05-01']
+      }],
+      timezone: 'UTC',
+      preAggregationsSchema: ''
+    });
+
+    const res = await dbRunner.evaluateQueryWithPreAggregations(query);
+
+    expect(res).toEqual(
+      [
+        {
+          simple_orders_sql_ext__count: '1',
+          simple_orders_sql_ext__created_at_day: '2025-04-15T00:00:00.000Z',
+        },
+        {
+          simple_orders_sql_ext__count: '1',
+          simple_orders_sql_ext__created_at_day: '2025-04-16T00:00:00.000Z',
+        }
+      ]
+    );
+  });
 });
