@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/engine/df/optimizers/filter_push_down.rs
+expression: optimize(&plan)
+---
+Projection: #t1.c1, #SUM(t1.c2) AS c2_sum, #t1.c3
+  Filter: #SUM(t1.c2) > Int32(10)
+    Aggregate: groupBy=[[#t1.c1, #t1.c3]], aggr=[[SUM(#t1.c2)]]
+      Filter: #t1.c3 = Int32(0)
+        Projection: #t1.c1, #t1.c2, #t1.c3
+          TableScan: t1 projection=None
