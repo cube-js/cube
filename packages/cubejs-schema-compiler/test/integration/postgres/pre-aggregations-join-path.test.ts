@@ -1,7 +1,7 @@
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
@@ -28,7 +28,7 @@ describe('PreAggregations join path', () => {
     // TODO in this model queries like [A.a_id, X.x_id] become ambiguous, probably we want to handle this better
 
     // language=JavaScript
-    const prepared = prepareCompiler(`
+    const prepared = prepareJsCompiler(`
       cube('A', {
         sql: 'SELECT 1 AS a_id, 100 AS a_value',
 
