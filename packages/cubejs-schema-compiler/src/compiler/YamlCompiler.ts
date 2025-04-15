@@ -230,6 +230,12 @@ export class YamlCompiler {
       } else if (str[i] === '`' && peek().inStr) {
         result.push(str[i]);
         stateStack.pop();
+      } else if (str[i] === '\\' && str[i + 1] === '{' && stateStack.length === 0) {
+        result.push('\\{');
+        i += 1;
+      } else if (str[i] === '\\' && str[i + 1] === '}' && stateStack.length === 0) {
+        result.push('\\}');
+        i += 1;
       } else if (str[i] === '{' && str[i + 1] === '{' && peek()?.inFormattedStr) {
         result.push('{{');
         i += 1;
