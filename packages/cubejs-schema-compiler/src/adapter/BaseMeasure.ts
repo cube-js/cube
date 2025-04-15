@@ -81,8 +81,14 @@ export class BaseMeasure {
         case 'count_distinct_approx':
           // ok, do nothing
           break;
+        case 'number':
+          // Additional filters for `number` measures should be propagated to leaf measures
+          // And only leaf `number` measures should trigger an error
+          throw new UserError(
+            `Additional filters for measure ${sourceMeasure} type ${source.type} are supported only in Tesseract`
+          );
         default:
-          // Can not add filters to string, time, boolean, number
+          // Can not add filters to string, time, boolean
           // Aggregation is already included in SQL, it's hard to patch that
           throw new UserError(
             `Unsupported additional filters for measure ${sourceMeasure} type ${source.type}`
