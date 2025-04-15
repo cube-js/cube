@@ -98,7 +98,9 @@
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
       "dist/src/**/*.js",
-      "dist/src/**/*.ts"
+      "dist/src/**/*.ts",
+      "!dist/src/parser/GenericSql*.js",
+      "!dist/src/parser/Python3*.js"
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
