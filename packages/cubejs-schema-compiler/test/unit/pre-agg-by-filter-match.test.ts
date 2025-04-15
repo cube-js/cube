@@ -44,14 +44,9 @@ describe('Pre Aggregation by filter match tests', () => {
       segments: {
         qqq: { sql: 'id > 10000' }
       },
-      dimensions: {},
+      dimensions: Object.fromEntries(cubedimensions.map(d => [d, { sql: d, type: 'string' }])),
       preAggregations: { aaa }
     };
-
-    cubedimensions.forEach(d => {
-      // @ts-ignore
-      cube.dimensions[d] = { sql: d, type: 'string' };
-    });
 
     const { compiler, joinGraph, cubeEvaluator } = getCube(cube);
 
