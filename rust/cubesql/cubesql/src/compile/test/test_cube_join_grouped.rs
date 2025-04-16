@@ -899,3 +899,63 @@ LIMIT 1
         .on
         .contains(r#"${MultiTypeCube.dim_str0} IS NOT DISTINCT FROM \"t0\".\"dim_str0\""#));
 }
+
+/// Filter on top of ungrouped-grouped join with complex condition should be rewritten as well
+#[tokio::test]
+async fn test_join_ungrouped_grouped_with_filter_and_measure() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT "t0"."measure"
+FROM
+    MultiTypeCube
+    INNER JOIN (
+        SELECT
+            dim_str0,
+            AVG(avgPrice) AS "measure"
+        FROM
+            MultiTypeCube
+        GROUP BY 1
+    ) "t0"
+    ON (MultiTypeCube.dim_str0 IS NOT DISTINCT FROM "t0".dim_str0)
+WHERE ("t0"."measure" IS NULL)
+LIMIT 1
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+
+    assert_eq!(request.ungrouped, Some(true));
+
+    assert_eq!(request.subquery_joins.as_ref().unwrap().len(), 1);
+
+    let subquery = &request.subquery_joins.unwrap()[0];
+
+    assert!(!subquery.sql.contains("ungrouped"));
+    assert_eq!(subquery.join_type, "INNER");
+    assert!(subquery
+        .on
+        .contains(r#"${MultiTypeCube.dim_str0} IS NOT DISTINCT FROM \"t0\".\"dim_str0\""#));
+
+    // Outer filter
+    assert_eq!(request.segments.as_ref().unwrap().len(), 1);
+    assert!(request.segments.as_ref().unwrap()[0].contains(r#"\"t0\".\"measure\" IS NULL"#));
+}
