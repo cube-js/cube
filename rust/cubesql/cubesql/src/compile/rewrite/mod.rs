@@ -560,7 +560,7 @@ macro_rules! var_list_iter {
 #[macro_export]
 macro_rules! var {
     ($var_str:expr) => {
-        $var_str.parse().unwrap()
+        $var_str.parse::<::egg::Var>().unwrap()
     };
 }
 
