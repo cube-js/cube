@@ -512,7 +512,7 @@ export class PreAggregations {
    */
   public async checkPartitionsBuildRangeCache(queryBody) {
     const preAggregations = queryBody.preAggregations || [];
-    const result = await Promise.all(
+    return Promise.all(
       preAggregations.map(async (preAggregation) => {
         const { preAggregationStartEndQueries } = preAggregation;
         const invalidate =
@@ -538,7 +538,6 @@ export class PreAggregations {
         };
       })
     );
-    return result;
   }
 
   public async expandPartitionsInPreAggregations(queryBody: Query): Promise<Query> {
