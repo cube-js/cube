@@ -552,7 +552,7 @@ impl MemberRules {
                         "?terminal_member",
                         "?filtered_member_pushdown_replacer_alias_to_cube",
                     ),
-                    self.find_matching_old_member(
+                    self.transform_find_matching_old_member(
                         "?member_pushdown_replacer_alias_to_cube",
                         "?column",
                         "?old_members",
@@ -1944,7 +1944,7 @@ impl MemberRules {
         )
     }
 
-    fn find_matching_old_member(
+    fn transform_find_matching_old_member(
         &self,
         member_pushdown_replacer_alias_to_cube_var: &'static str,
         column_var: &'static str,
