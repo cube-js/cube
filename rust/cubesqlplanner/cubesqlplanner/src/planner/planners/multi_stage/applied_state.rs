@@ -2,7 +2,6 @@ use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
-use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;

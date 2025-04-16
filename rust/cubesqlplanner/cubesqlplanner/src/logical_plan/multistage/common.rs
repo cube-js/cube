@@ -1,17 +1,8 @@
 use crate::logical_plan::pretty_print::*;
 use crate::planner::planners::multi_stage::MultiStageAppliedState;
 
-use crate::plan::{FilterGroup, FilterItem};
-use crate::planner::filter::FilterOperator;
-use crate::planner::sql_evaluator::MeasureTimeShift;
-use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
-use cubenativeutils::CubeError;
+use crate::planner::BaseMember;
 use itertools::Itertools;
-use std::cmp::PartialEq;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::rc::Rc;
 
 impl PrettyPrint for MultiStageAppliedState {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {

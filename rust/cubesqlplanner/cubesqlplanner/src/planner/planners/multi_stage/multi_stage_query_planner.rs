@@ -4,18 +4,15 @@ use super::{
     MultiStageQueryDescription, RollingWindowPlanner,
 };
 use crate::logical_plan::*;
-use crate::plan::{Cte, From, Schema, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
-use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::BaseMember;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MultiStageQueryPlanner {
@@ -36,7 +33,7 @@ impl MultiStageQueryPlanner {
         }
     }
 
-    pub fn plan_logical_queries(
+    pub fn plan_queries(
         &self,
     ) -> Result<
         (
@@ -107,82 +104,6 @@ impl MultiStageQueryPlanner {
             .collect_vec();
 
         Ok((all_queries, top_level_ctes))
-    }
-
-    pub fn plan_queries(&self) -> Result<(Vec<Rc<Cte>>, Vec<Rc<Select>>), CubeError> {
-        let multi_stage_members = self
-            .query_properties
-            .all_members(false)
-            .into_iter()
-            .filter_map(|memb: Rc<dyn BaseMember>| -> Option<Result<_, CubeError>> {
-                match has_multi_stage_members(&memb.member_evaluator(), false) {
-                    Ok(true) => Some(Ok(memb)),
-                    Ok(false) => None,
-                    Err(e) => Some(Err(e)),
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        if multi_stage_members.is_empty() {
-            return Ok((vec![], vec![]));
-        }
-        let mut descriptions = Vec::new();
-        let state = MultiStageAppliedState::new(
-            self.query_properties.time_dimensions().clone(),
-            self.query_properties.dimensions().clone(),
-            self.query_properties.time_dimensions_filters().clone(),
-            self.query_properties.dimensions_filters().clone(),
-            self.query_properties.measures_filters().clone(),
-            self.query_properties.segments().clone(),
-        );
-
-        let top_level_ctes = multi_stage_members
-            .into_iter()
-            .map(|memb| -> Result<_, CubeError> {
-                Ok(self
-                    .make_queries_descriptions(
-                        memb.member_evaluator().clone(),
-                        state.clone(),
-                        &mut descriptions,
-                    )?
-                    .alias()
-                    .clone())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let mut cte_schemas = HashMap::new();
-        let all_queries = descriptions
-            .into_iter()
-            .map(|descr| -> Result<_, CubeError> {
-                let planner = MultiStageMemberQueryPlanner::new(
-                    self.query_tools.clone(),
-                    self.query_properties.clone(),
-                    descr.clone(),
-                );
-                let res = planner.plan_query(&cte_schemas)?;
-
-                cte_schemas.insert(descr.alias().clone(), res.query().schema());
-                Ok(res)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let cte_joins = top_level_ctes
-            .iter()
-            .map(|alias| self.cte_select(alias, &cte_schemas))
-            .collect_vec();
-
-        Ok((all_queries, cte_joins))
-    }
-
-    pub fn cte_select(
-        &self,
-        alias: &String,
-        cte_schemas: &HashMap<String, Rc<Schema>>,
-    ) -> Rc<Select> {
-        let schema = cte_schemas.get(alias).unwrap().clone();
-        let select_builder =
-            SelectBuilder::new(From::new_from_table_reference(alias.clone(), schema, None));
-
-        Rc::new(select_builder.build(SqlNodesFactory::new()))
     }
 
     fn create_multi_stage_inode_member(
@@ -340,12 +261,5 @@ impl MultiStageQueryPlanner {
 
         descriptions.push(description.clone());
         Ok(description)
-    }
-
-    fn compile_dimension(&self, name: &String) -> Result<Rc<BaseDimension>, CubeError> {
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let evaluator = evaluator_compiler.add_dimension_evaluator(name.clone())?;
-        BaseDimension::try_new_required(evaluator, self.query_tools.clone())
     }
 }

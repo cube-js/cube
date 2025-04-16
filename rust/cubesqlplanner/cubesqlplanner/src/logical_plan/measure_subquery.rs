@@ -1,5 +1,4 @@
 use super::*;
-use crate::planner::query_properties::OrderByItem;
 use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 

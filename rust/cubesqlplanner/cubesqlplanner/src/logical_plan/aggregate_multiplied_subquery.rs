@@ -1,8 +1,5 @@
 use super::pretty_print::*;
-use super::LogicalFilter;
-use super::LogicalJoin;
 use super::*;
-use crate::planner::query_properties::OrderByItem;
 use crate::planner::BaseCube;
 use std::rc::Rc;
 

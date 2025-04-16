@@ -2,8 +2,7 @@ use super::planners::QueryPlanner;
 use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::logical_plan::*;
-use crate::physical_plan_builder::*;
+use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
@@ -78,13 +77,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     fn build_sql_and_params_impl(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
-        let plan = query_planner.plan()?;
-        let logical_plan = query_planner.plan_logical()?;
+        let logical_plan = query_planner.plan()?;
         let physical_plan_builder = PhysicalPlanBuilder::new(self.query_tools.clone());
-        //println!("!!! logical_plan: {}", pretty_print_rc(&logical_plan));
         let physical_plan = physical_plan_builder.build(logical_plan)?;
 
-        //let sql = plan.to_sql(&templates)?;
         let sql = physical_plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
 

@@ -1,5 +1,4 @@
 use super::*;
-use std::rc::Rc;
 
 pub enum Query {
     SimpleQuery(SimpleQuery),

@@ -1,9 +1,9 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
-use crate::planner::sql_evaluator::MeasureTimeShift;
 use crate::planner::sql_evaluator::MemberSymbol;
 use itertools::Itertools;
 use std::rc::Rc;
+
 #[derive(PartialEq)]
 pub enum MultiStageCalculationType {
     Rank,

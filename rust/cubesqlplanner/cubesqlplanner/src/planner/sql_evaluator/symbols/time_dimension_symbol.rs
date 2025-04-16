@@ -1,5 +1,4 @@
 use super::MemberSymbol;
-use crate::planner::query_tools::QueryTools;
 use crate::planner::time_dimension::Granularity;
 use crate::planner::QueryDateTime;
 use chrono_tz::Tz;

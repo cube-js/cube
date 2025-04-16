@@ -115,7 +115,6 @@ pub fn pretty_print_filter_item(
         }
         FilterItem::Group(group) => {
             result.println(&format!("{{{}:[", group.operator.to_string()), state);
-            let items_state = state.new_level();
             for item in group.items.iter() {
                 pretty_print_filter_item(result, state, item);
             }

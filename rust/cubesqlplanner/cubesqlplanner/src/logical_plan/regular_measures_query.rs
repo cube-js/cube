@@ -2,9 +2,7 @@ use super::pretty_print::*;
 use super::LogicalFilter;
 use super::LogicalJoin;
 use super::LogicalSchema;
-use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::query_properties::OrderByItem;
-use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 
 #[derive(Clone)]

@@ -222,7 +222,7 @@ impl PhysicalPlanBuilder {
         references_builder: &ReferencesBuilder,
         render_references: &mut HashMap<String, QualifiedColumnName>,
         joins_len: usize,
-        context: &PhysicalPlanBuilderContext,
+        _context: &PhysicalPlanBuilderContext,
     ) -> Result<(), CubeError> {
         let dimensions_for_join_names = full_key_aggregate
             .join_dimensions
@@ -832,7 +832,7 @@ impl PhysicalPlanBuilder {
     fn process_multi_stage_time_series(
         &self,
         time_series: &MultiStageTimeSeries,
-        context: &PhysicalPlanBuilderContext,
+        _context: &PhysicalPlanBuilderContext,
     ) -> Result<Rc<QueryPlan>, CubeError> {
         let time_dimension = time_series.time_dimension.clone();
         let time_dimension_symbol = time_dimension.as_time_dimension()?;
@@ -889,9 +889,6 @@ impl PhysicalPlanBuilder {
         context: &PhysicalPlanBuilderContext,
     ) -> Result<Rc<QueryPlan>, CubeError> {
         let time_dimension = rolling_window.rolling_time_dimension.clone();
-        let time_dimension_ref = time_dimension
-            .clone()
-            .as_base_member(self.query_tools.clone())?;
         let time_series_ref = rolling_window.time_series_input.clone();
         let measure_input_ref = rolling_window.measure_input.clone();
 

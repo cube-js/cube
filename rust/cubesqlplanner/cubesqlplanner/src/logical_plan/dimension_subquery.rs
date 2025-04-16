@@ -1,7 +1,5 @@
 use super::pretty_print::*;
-use super::LogicalSchema;
 use super::*;
-use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 

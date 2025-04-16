@@ -1,8 +1,6 @@
 use super::pretty_print::*;
-use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
-use crate::planner::sql_evaluator::MemberSymbol;
+use crate::plan::{Filter, FilterItem};
 use itertools::Itertools;
-use std::rc::Rc;
 
 pub struct LogicalFilter {
     pub dimensions_filters: Vec<FilterItem>,

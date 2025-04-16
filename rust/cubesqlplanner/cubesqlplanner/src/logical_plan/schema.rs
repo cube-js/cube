@@ -1,7 +1,6 @@
 use itertools::Itertools;
 
 use super::pretty_print::*;
-use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
 use crate::planner::sql_evaluator::MemberSymbol;
 use std::collections::HashSet;
 use std::rc::Rc;
