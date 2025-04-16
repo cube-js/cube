@@ -31,6 +31,7 @@ use crate::{
         },
     },
     config::ConfigObj,
+    sql::ColumnType,
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
     var, var_iter, var_list_iter, CubeError,
 };
@@ -527,6 +528,23 @@ impl MemberRules {
                     relation,
                 ),
             ),
+            // Cast without alias will not generate stable name in schema, so there's no rule like that for now
+            // TODO implement it anyway, to be able to remove Projection on top of CubeScan completely
+            transforming_rewrite(
+                &format!("member-pushdown-replacer-column-{}-cast-alias", name),
+                member_pushdown_replacer(
+                    alias_expr(cast_expr(column_expr("?column"), "?cast_type"), "?alias"),
+                    member_fn("?old_alias"),
+                    "?member_pushdown_replacer_alias_to_cube",
+                ),
+                member_fn("?output_column"),
+                self.transform_alias(
+                    "?member_pushdown_replacer_alias_to_cube",
+                    "?alias",
+                    "?output_column",
+                    relation,
+                ),
+            ),
         ]
     }
 
@@ -541,7 +559,10 @@ impl MemberRules {
         };
 
         let find_matching_old_member =
-            |name: &str, column_expr: String, column_to_search: ColumnToSearch| {
+            |name: &str,
+             column_expr: String,
+             column_to_search: ColumnToSearch,
+             cast_type_var: Option<&'static str>| {
                 transforming_rewrite(
                     &format!(
                         "member-pushdown-replacer-column-find-matching-old-member-{}",
@@ -560,6 +581,7 @@ impl MemberRules {
                     self.transform_find_matching_old_member(
                         "?member_pushdown_replacer_alias_to_cube",
                         column_to_search,
+                        cast_type_var,
                         "?old_members",
                         "?terminal_member",
                         "?filtered_member_pushdown_replacer_alias_to_cube",
@@ -610,16 +632,31 @@ impl MemberRules {
             "column",
             column_expr("?column"),
             ColumnToSearch::Var("?column"),
+            None,
+        ));
+        rules.push(find_matching_old_member(
+            "column-cast",
+            cast_expr(column_expr("?column"), "?cast_type"),
+            ColumnToSearch::Var("?column"),
+            Some("?cast_type"),
         ));
         rules.push(find_matching_old_member(
             "alias",
             alias_expr(column_expr("?column"), "?alias"),
             ColumnToSearch::Var("?column"),
+            None,
+        ));
+        rules.push(find_matching_old_member(
+            "alias-cast",
+            alias_expr(cast_expr(column_expr("?column"), "?cast_type"), "?alias"),
+            ColumnToSearch::Var("?column"),
+            Some("?cast_type"),
         ));
         rules.push(find_matching_old_member(
             "agg-fun",
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
             ColumnToSearch::Var("?column"),
+            None,
         ));
         rules.push(find_matching_old_member(
             "agg-fun-alias",
@@ -628,11 +665,13 @@ impl MemberRules {
                 "?alias",
             ),
             ColumnToSearch::Var("?column"),
+            None,
         ));
         rules.push(find_matching_old_member(
             "udaf-fun",
             udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
             ColumnToSearch::Var("?column"),
+            None,
         ));
         rules.push(find_matching_old_member(
             "agg-fun-default-count",
@@ -642,6 +681,7 @@ impl MemberRules {
                 "AggregateFunctionExprDistinct:false",
             ),
             ColumnToSearch::DefaultCount,
+            None,
         ));
         rules.push(find_matching_old_member(
             "agg-fun-default-count-alias",
@@ -654,6 +694,7 @@ impl MemberRules {
                 "?alias",
             ),
             ColumnToSearch::DefaultCount,
+            None,
         ));
         rules.push(find_matching_old_member(
             "agg-fun-with-cast",
@@ -664,6 +705,7 @@ impl MemberRules {
                 "?distinct",
             ),
             ColumnToSearch::Var("?column"),
+            None,
         ));
         rules.push(find_matching_old_member(
             "date-trunc",
@@ -672,6 +714,7 @@ impl MemberRules {
                 vec![literal_expr("?granularity"), column_expr("?column")],
             ),
             ColumnToSearch::Var("?column"),
+            None,
         ));
         rules.push(find_matching_old_member(
             "date-trunc-with-alias",
@@ -684,6 +727,7 @@ impl MemberRules {
                 "?original_alias",
             ),
             ColumnToSearch::Var("?column"),
+            None,
         ));
         Self::measure_rewrites(
             &mut rules,
@@ -1955,10 +1999,47 @@ impl MemberRules {
         )
     }
 
+    fn can_remove_cast(
+        meta: &MetaContext,
+        member: &Member,
+        cast_types: Option<&Vec<DataType>>,
+    ) -> bool {
+        let cube = member.cube();
+        match cast_types {
+            // No cast, nothing to check
+            None => true,
+            // Need to check that cast is trivial
+            Some(cast_types) => {
+                // For now, allow trivial casts only for cube members, not literals
+                let Some(cube) = &cube else {
+                    return false;
+                };
+                let Some(name) = member.name() else {
+                    return false;
+                };
+                let Some(cube) = meta.find_cube_with_name(cube) else {
+                    return false;
+                };
+                // For now, allow trivial casts only for dimensions
+                let Some(dimension) = cube.lookup_dimension_by_member_name(name) else {
+                    return false;
+                };
+
+                cast_types
+                    .iter()
+                    .any(|dt| match (dimension.get_sql_type(), dt) {
+                        (ColumnType::String, DataType::Utf8) => true,
+                        _ => false,
+                    })
+            }
+        }
+    }
+
     fn transform_find_matching_old_member(
         &self,
         member_pushdown_replacer_alias_to_cube_var: &'static str,
         column_to_search: ColumnToSearch,
+        cast_type_var: Option<&'static str>,
         old_members_var: &'static str,
         terminal_member: &'static str,
         filtered_member_pushdown_replacer_alias_to_cube_var: &'static str,
@@ -1969,11 +2050,13 @@ impl MemberRules {
             ColumnToSearch::Var(column_var) => Some(var!(column_var)),
             ColumnToSearch::DefaultCount => None,
         };
+        let cast_type_var = cast_type_var.map(|cast_type_var| var!(cast_type_var));
         let old_members_var = var!(old_members_var);
         let terminal_member = var!(terminal_member);
         let filtered_member_pushdown_replacer_alias_to_cube_var =
             var!(filtered_member_pushdown_replacer_alias_to_cube_var);
         let flat_list = self.config_obj.push_down_pull_up_split();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             let alias_to_cubes: Vec<_> = var_iter!(
                 egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
@@ -1981,6 +2064,13 @@ impl MemberRules {
             )
             .cloned()
             .collect();
+
+            let cast_types = cast_type_var.map(|cast_type_var| {
+                var_iter!(egraph[subst[cast_type_var]], CastExprDataType)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            });
+
             for alias_to_cube in alias_to_cubes {
                 let column_iter = match column_var {
                     Some(column_var) => var_iter!(egraph[subst[column_var]], ColumnExprColumn)
@@ -1996,7 +2086,9 @@ impl MemberRules {
                         .data
                         .find_member_by_alias(&alias_name)
                     {
-                        let cube_to_filter = if let Some(cube) = member.1.cube() {
+                        let member = &member.1;
+
+                        let cube_to_filter = if let Some(cube) = member.cube() {
                             Some(cube)
                         } else {
                             alias_to_cube
@@ -2014,8 +2106,12 @@ impl MemberRules {
                             alias_to_cube.clone()
                         };
 
+                        if !Self::can_remove_cast(&meta, member, cast_types.as_ref()) {
+                            continue;
+                        }
+
                         // TODO remove unwrap
-                        let old_member = member.1.clone().add_to_egraph(egraph, flat_list).unwrap();
+                        let old_member = member.clone().add_to_egraph(egraph, flat_list).unwrap();
                         subst.insert(terminal_member, old_member);
 
                         let filtered_member_pushdown_replacer_alias_to_cube =
