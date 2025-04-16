@@ -71,7 +71,7 @@ export class OrchestratorApi {
    * error otherwise.
    */
   public async executeQuery(query: QueryBody) {
-    const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
+    const queryForLog = query.query?.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
     try {
