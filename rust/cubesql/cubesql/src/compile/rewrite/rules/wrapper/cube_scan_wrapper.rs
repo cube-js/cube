@@ -118,40 +118,46 @@ impl WrapperRules {
                 return false;
             }
 
-            if let Some(_) = egraph[subst[members_var]].data.member_name_to_expr {
-                for alias_to_cube in
-                    var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
+            if egraph[subst[members_var]]
+                .data
+                .member_name_to_expr
+                .is_none()
+            {
+                return false;
+            }
+
+            for alias_to_cube in
+                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
+            {
+                for ungrouped in
+                    var_iter!(egraph[subst[ungrouped_cube_var]], CubeScanUngrouped).cloned()
                 {
-                    for ungrouped in
-                        var_iter!(egraph[subst[ungrouped_cube_var]], CubeScanUngrouped).cloned()
-                    {
-                        // When CubeScan already has limit or offset, it's unsafe to allow to push
-                        // anything on top to Cube.
-                        // Especially aggregation: aggregate does not commute with limit,
-                        // so it would be incorrect to join them to single CubeScan
-                        let push_to_cube_out = ungrouped && has_no_limit_or_offset;
-                        subst.insert(
-                            push_to_cube_out_var,
-                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextPushToCube(
-                                WrapperReplacerContextPushToCube(push_to_cube_out),
-                            )),
-                        );
-                        subst.insert(
-                            alias_to_cube_var_out,
-                            egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
-                                WrapperReplacerContextAliasToCube(alias_to_cube),
-                            )),
-                        );
-                        subst.insert(
-                            grouped_subqueries_out_var,
-                            egraph.add(
-                                LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
-                                    WrapperReplacerContextGroupedSubqueries(vec![]),
-                                ),
+                    // When CubeScan already has limit or offset, it's unsafe to allow to push
+                    // anything on top to Cube.
+                    // Especially aggregation: aggregate does not commute with limit,
+                    // so it would be incorrect to join them to single CubeScan
+                    let push_to_cube_out = ungrouped && has_no_limit_or_offset;
+                    subst.insert(
+                        push_to_cube_out_var,
+                        egraph.add(LogicalPlanLanguage::WrapperReplacerContextPushToCube(
+                            WrapperReplacerContextPushToCube(push_to_cube_out),
+                        )),
+                    );
+                    subst.insert(
+                        alias_to_cube_var_out,
+                        egraph.add(LogicalPlanLanguage::WrapperReplacerContextAliasToCube(
+                            WrapperReplacerContextAliasToCube(alias_to_cube),
+                        )),
+                    );
+                    subst.insert(
+                        grouped_subqueries_out_var,
+                        egraph.add(
+                            LogicalPlanLanguage::WrapperReplacerContextGroupedSubqueries(
+                                WrapperReplacerContextGroupedSubqueries(vec![]),
                             ),
-                        );
-                        return true;
-                    }
+                        ),
+                    );
+                    return true;
                 }
             }
 
