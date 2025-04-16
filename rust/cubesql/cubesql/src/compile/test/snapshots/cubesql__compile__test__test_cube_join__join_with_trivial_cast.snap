@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/test/test_cube_join.rs
+expression: context.execute_query(query).await.unwrap()
+---
++-------+--------------+
+| notes | content_cast |
++-------+--------------+
+| foo   | bar          |
+| baz   | quux         |
++-------+--------------+
