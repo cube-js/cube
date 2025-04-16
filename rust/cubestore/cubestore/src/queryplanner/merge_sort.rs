@@ -8,9 +8,9 @@ use datafusion::arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
+use datafusion::physical_expr::{LexRequirement, PhysicalSortRequirement};
 use datafusion::physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, PlanProperties,
+    DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
 };
 use futures::Stream;
 use futures_util::StreamExt;
@@ -85,6 +85,20 @@ impl ExecutionPlan for LastRowByUniqueKeyExec {
 
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![&self.input]
+    }
+
+    fn required_input_distribution(&self) -> Vec<Distribution> {
+        vec![Distribution::SinglePartition]
+    }
+
+    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+        // We're leaning a bit on the fact that we know the original input was a SortPreservingMergeExec.
+        let ordering = self
+            .properties
+            .equivalence_properties()
+            .oeq_class()
+            .output_ordering();
+        vec![ordering.map(|exprs| PhysicalSortRequirement::from_sort_exprs(&exprs))]
     }
 
     fn with_new_children(
