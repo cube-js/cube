@@ -350,7 +350,7 @@ export class PreAggregations {
   }
 
   /**
-   * Determines whether the partition table is already exists or not.
+   * Determines whether the partition table already exists or not.
    */
   public async isPartitionExist(
     request: string,
