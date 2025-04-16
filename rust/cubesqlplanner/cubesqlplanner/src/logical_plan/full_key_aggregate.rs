@@ -1,11 +1,11 @@
 use super::*;
 use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::query_properties::OrderByItem;
+use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 
 pub struct MultiStageSubqueryRef {
-    pub name: String
+    pub name: String,
 }
 
 impl PrettyPrint for MultiStageSubqueryRef {
@@ -14,10 +14,9 @@ impl PrettyPrint for MultiStageSubqueryRef {
     }
 }
 
-    
 pub enum FullKeyAggregateSource {
     ResolveMultipliedMeasures(Rc<ResolveMultipliedMeasures>),
-    MultiStageSubqueryRef(Rc<MultiStageSubqueryRef>)
+    MultiStageSubqueryRef(Rc<MultiStageSubqueryRef>),
 }
 
 impl PrettyPrint for FullKeyAggregateSource {
@@ -35,7 +34,8 @@ impl PrettyPrint for FullKeyAggregateSource {
 
 pub struct FullKeyAggregate {
     pub join_dimensions: Vec<Rc<MemberSymbol>>,
-    pub sources: Vec<FullKeyAggregateSource>
+    pub use_full_join_and_coalesce: bool,
+    pub sources: Vec<FullKeyAggregateSource>,
 }
 
 impl PrettyPrint for FullKeyAggregate {
@@ -47,10 +47,16 @@ impl PrettyPrint for FullKeyAggregate {
             &format!("join_dimensions: {}", print_symbols(&self.join_dimensions)),
             &state,
         );
+        result.println(
+            &format!(
+                "use_full_join_and_coalesce: {}",
+                self.use_full_join_and_coalesce
+            ),
+            &state,
+        );
         result.println("sources:", &state);
         for source in self.sources.iter() {
             source.pretty_print(result, &details_state);
         }
     }
 }
-

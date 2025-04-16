@@ -29,26 +29,44 @@ pub struct MemberSymbolRef {
     default_alias: String,
     cube_name: String,
     name: String,
-
 }
 
 impl MemberSymbolRef {
-    pub fn try_new(member_evaluator: Rc<MemberSymbol>, query_tools: Rc<QueryTools>) -> Result<Rc<Self>, CubeError> {
-        let default_alias = BaseMemberHelper::default_alias(
-            &member_evaluator.cube_name(),
-            &member_evaluator.name(),
-            &member_evaluator.alias_suffix(),
-            query_tools.clone(),
-        )?;
+    pub fn try_new(
+        member_evaluator: Rc<MemberSymbol>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let default_alias = match member_evaluator.as_ref() {
+            &MemberSymbol::TimeDimension(_)
+            | &MemberSymbol::Dimension(_)
+            | &MemberSymbol::Measure(_) => BaseMemberHelper::default_alias(
+                &member_evaluator.cube_name(),
+                &member_evaluator.name(),
+                &member_evaluator.alias_suffix(),
+                query_tools.clone(),
+            )?,
+            MemberSymbol::MemberExpression(_)
+            | MemberSymbol::CubeName(_)
+            | MemberSymbol::CubeTable(_) => query_tools.alias_name(&member_evaluator.name()),
+        };
         let cube_name = member_evaluator.cube_name();
         let name = member_evaluator.name();
-        Ok(Rc::new(Self { member_evaluator, default_alias, query_tools, cube_name, name }))
+        Ok(Rc::new(Self {
+            member_evaluator,
+            default_alias,
+            query_tools,
+            cube_name,
+            name,
+        }))
     }
-
 }
 
 impl BaseMember for MemberSymbolRef {
-    fn to_sql(&self, context: Rc<VisitorContext>, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
+    fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
         evaluate_with_context(
             &self.member_evaluator,
             self.query_tools.clone(),

@@ -28,7 +28,10 @@ impl Compiler {
         }
     }
 
-    pub fn add_auto_resolved_member_evaluator(&mut self, name: String) -> Result<Rc<MemberSymbol>, CubeError> {
+    pub fn add_auto_resolved_member_evaluator(
+        &mut self,
+        name: String,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
         let path = name.split(".").map(|s| s.to_string()).collect::<Vec<_>>();
         if self.cube_evaluator.is_measure(path.clone())? {
             Ok(self.add_measure_evaluator(name)?)

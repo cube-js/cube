@@ -68,7 +68,6 @@ impl SingleAliasedSource {
         }
     }
 
-
     pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Self {
         Self {
             source: SingleSource::Subquery(plan),

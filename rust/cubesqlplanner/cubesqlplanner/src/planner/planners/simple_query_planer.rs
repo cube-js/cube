@@ -1,11 +1,11 @@
 use super::{DimensionSubqueryPlanner, JoinPlanner, OrderPlanner};
 use crate::logical_plan::*;
+use crate::physical_plan_builder::*;
 use crate::plan::{Filter, QualifiedColumnName, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions_from_symbols;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::QueryProperties;
-use crate::physical_plan_builder::*;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -35,7 +35,8 @@ impl SimpleQueryPlanner {
     pub fn logical_plan(&self) -> Result<Rc<Query>, CubeError> {
         let (source, subquery_dimension_queries) = self.logical_source_and_subquery_dimensions()?;
 
-        let multiplied_measures = self.query_properties
+        let multiplied_measures = self
+            .query_properties
             .full_key_aggregate_measures()?
             .rendered_as_multiplied_measures
             .clone();
@@ -43,7 +44,7 @@ impl SimpleQueryPlanner {
             dimensions: self.query_properties.dimension_symbols(),
             measures: self.query_properties.measure_symbols(),
             time_dimensions: self.query_properties.time_dimension_symbols(),
-            multiplied_measures
+            multiplied_measures,
         });
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
@@ -64,7 +65,9 @@ impl SimpleQueryPlanner {
         Ok(Rc::new(Query::SimpleQuery(result)))
     }
 
-    pub fn logical_source_and_subquery_dimensions(&self) -> Result<(Rc<LogicalJoin>, Vec<Rc<DimensionSubQuery>>), CubeError> {
+    pub fn logical_source_and_subquery_dimensions(
+        &self,
+    ) -> Result<(Rc<LogicalJoin>, Vec<Rc<DimensionSubQuery>>), CubeError> {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(
             &self.query_properties.all_member_symbols(false),
@@ -77,19 +80,17 @@ impl SimpleQueryPlanner {
             self.query_tools.clone(),
             self.query_properties.clone(),
         )?;
-        let subquery_dimension_queries = dimension_subquery_planner.plan_logical_queries(&subquery_dimensions)?;
-        let source = self
-            .join_planner
-            .make_join_logical_plan(join.clone())?;
+        let subquery_dimension_queries =
+            dimension_subquery_planner.plan_logical_queries(&subquery_dimensions)?;
+        let source = self.join_planner.make_join_logical_plan(join.clone())?;
         Ok((source, subquery_dimension_queries))
     }
 
     pub fn plan(&self) -> Result<Rc<Select>, CubeError> {
         self.old_plan()
-
     }
     pub fn old_plan(&self) -> Result<Rc<Select>, CubeError> {
-         let (mut select_builder, render_references) = self.make_select_builder()?;
+        let (mut select_builder, render_references) = self.make_select_builder()?;
 
         let filter = self.query_properties.all_filters();
         let having = if self.query_properties.measures_filters().is_empty() {
@@ -122,8 +123,7 @@ impl SimpleQueryPlanner {
         select_builder.set_limit(self.query_properties.row_limit());
         select_builder.set_offset(self.query_properties.offset());
         let res = Rc::new(select_builder.build(context_factory));
-        Ok(res) 
-        
+        Ok(res)
     }
 
     pub fn make_select_builder(

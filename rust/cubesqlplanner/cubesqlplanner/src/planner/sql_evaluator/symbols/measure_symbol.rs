@@ -61,6 +61,9 @@ pub struct MeasureSymbol {
     measure_drill_filters: Vec<Rc<SqlCall>>,
     time_shifts: Vec<MeasureTimeShift>,
     measure_order_by: Vec<MeasureOrderBy>,
+    reduce_by: Option<Vec<Rc<MemberSymbol>>>,
+    add_group_by: Option<Vec<Rc<MemberSymbol>>>,
+    group_by: Option<Vec<Rc<MemberSymbol>>>,
     member_sql: Option<Rc<SqlCall>>,
     pk_sqls: Vec<Rc<SqlCall>>,
     is_splitted_source: bool,
@@ -77,6 +80,9 @@ impl MeasureSymbol {
         measure_drill_filters: Vec<Rc<SqlCall>>,
         time_shifts: Vec<MeasureTimeShift>,
         measure_order_by: Vec<MeasureOrderBy>,
+        reduce_by: Option<Vec<Rc<MemberSymbol>>>,
+        add_group_by: Option<Vec<Rc<MemberSymbol>>>,
+        group_by: Option<Vec<Rc<MemberSymbol>>>,
     ) -> Self {
         Self {
             cube_name,
@@ -89,6 +95,9 @@ impl MeasureSymbol {
             measure_order_by,
             time_shifts,
             is_splitted_source: false,
+            reduce_by,
+            add_group_by,
+            group_by,
         }
     }
 
@@ -249,6 +258,18 @@ impl MeasureSymbol {
 
     pub fn definition(&self) -> Rc<dyn MeasureDefinition> {
         self.definition.clone()
+    }
+
+    pub fn reduce_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
+        &self.reduce_by
+    }
+
+    pub fn add_group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
+        &self.add_group_by
+    }
+
+    pub fn group_by(&self) -> &Option<Vec<Rc<MemberSymbol>>> {
+        &self.group_by
     }
 
     pub fn time_shift_references(&self) -> &Option<Vec<TimeShiftReference>> {
@@ -417,6 +438,37 @@ impl SymbolFactory for MeasureSymbolFactory {
                 vec![]
             };
 
+        let reduce_by = if let Some(reduce_by) = &definition.static_data().reduce_by_references {
+            let symbols = reduce_by
+                .iter()
+                .map(|reduce_by| compiler.add_dimension_evaluator(reduce_by.clone()))
+                .collect::<Result<Vec<_>, _>>()?;
+            Some(symbols)
+        } else {
+            None
+        };
+
+        let add_group_by =
+            if let Some(add_group_by) = &definition.static_data().add_group_by_references {
+                let symbols = add_group_by
+                    .iter()
+                    .map(|add_group_by| compiler.add_dimension_evaluator(add_group_by.clone()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Some(symbols)
+            } else {
+                None
+            };
+
+        let group_by = if let Some(group_by) = &definition.static_data().group_by_references {
+            let symbols = group_by
+                .iter()
+                .map(|group_by| compiler.add_dimension_evaluator(group_by.clone()))
+                .collect::<Result<Vec<_>, _>>()?;
+            Some(symbols)
+        } else {
+            None
+        };
+
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_name,
             name,
@@ -427,6 +479,9 @@ impl SymbolFactory for MeasureSymbolFactory {
             measure_drill_filters,
             time_shifts,
             measure_order_by,
+            reduce_by,
+            add_group_by,
+            group_by,
         )))
     }
 }

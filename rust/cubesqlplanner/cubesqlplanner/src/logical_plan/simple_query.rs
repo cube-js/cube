@@ -1,6 +1,6 @@
 use super::*;
-use std::rc::Rc;
 use crate::planner::query_properties::OrderByItem;
+use std::rc::Rc;
 pub struct SimpleQuery {
     pub schema: Rc<LogicalSchema>,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
@@ -37,7 +37,14 @@ impl PrettyPrint for SimpleQuery {
         if !self.order_by.is_empty() {
             result.println("order_by:", &state);
             for order_by in self.order_by.iter() {
-                result.println(&format!("{} {}", order_by.name(), if order_by.desc() { "desc" } else { "asc" }), &details_state);
+                result.println(
+                    &format!(
+                        "{} {}",
+                        order_by.name(),
+                        if order_by.desc() { "desc" } else { "asc" }
+                    ),
+                    &details_state,
+                );
             }
         }
 

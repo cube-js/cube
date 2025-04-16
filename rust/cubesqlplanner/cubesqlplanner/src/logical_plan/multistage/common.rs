@@ -1,10 +1,10 @@
 use crate::logical_plan::pretty_print::*;
 use crate::planner::planners::multi_stage::MultiStageAppliedState;
 
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
 use crate::planner::sql_evaluator::MeasureTimeShift;
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -13,17 +13,34 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-
 impl PrettyPrint for MultiStageAppliedState {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         let details_state = state.new_level();
         result.println(
-            &format!("-time_dimensions: {}", print_symbols(&self.time_dimensions().iter().map(|d| d.member_evaluator()).collect_vec())),
+            &format!(
+                "-time_dimensions: {}",
+                print_symbols(
+                    &self
+                        .time_dimensions()
+                        .iter()
+                        .map(|d| d.member_evaluator())
+                        .collect_vec()
+                )
+            ),
             state,
         );
 
         result.println(
-            &format!("-dimensions: {}", print_symbols(&self.dimensions().iter().map(|d| d.member_evaluator()).collect_vec())),
+            &format!(
+                "-dimensions: {}",
+                print_symbols(
+                    &self
+                        .dimensions()
+                        .iter()
+                        .map(|d| d.member_evaluator())
+                        .collect_vec()
+                )
+            ),
             state,
         );
 
@@ -46,9 +63,14 @@ impl PrettyPrint for MultiStageAppliedState {
 
         result.println("time_shifts:", &state);
         for (_, time_shift) in self.time_shifts().iter() {
-
-            result.println(&format!("- {}: {}", time_shift.dimension.full_name(), time_shift.interval.to_sql()), &details_state);
+            result.println(
+                &format!(
+                    "- {}: {}",
+                    time_shift.dimension.full_name(),
+                    time_shift.interval.to_sql()
+                ),
+                &details_state,
+            );
         }
-
     }
 }

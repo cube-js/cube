@@ -287,6 +287,7 @@ impl<'a> DependenciesBuilder<'a> {
         name: &String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let dep_full_name = format!("{}.{}", cube_name, name);
-        self.compiler.add_auto_resolved_member_evaluator(dep_full_name)
+        self.compiler
+            .add_auto_resolved_member_evaluator(dep_full_name)
     }
 }

@@ -3,8 +3,8 @@ use super::LogicalFilter;
 use super::LogicalJoin;
 use super::LogicalSchema;
 use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::query_properties::OrderByItem;
+use crate::planner::sql_evaluator::MemberSymbol;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -37,7 +37,14 @@ impl PrettyPrint for RegularMeasuresQuery {
         if !self.order_by.is_empty() {
             result.println("order_by:", &state);
             for order_by in self.order_by.iter() {
-                result.println(&format!("{} {}", order_by.name(), if order_by.desc() { "desc" } else { "asc" }), &details_state);
+                result.println(
+                    &format!(
+                        "{} {}",
+                        order_by.name(),
+                        if order_by.desc() { "desc" } else { "asc" }
+                    ),
+                    &details_state,
+                );
             }
         }
 

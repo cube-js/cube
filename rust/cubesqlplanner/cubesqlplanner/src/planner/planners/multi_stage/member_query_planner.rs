@@ -273,8 +273,11 @@ impl MultiStageMemberQueryPlanner {
             time_series_input: inputs[0].clone(),
             measure_input: inputs[1].clone(),
             rolling_time_dimension: rolling_window_desc.time_dimension.member_evaluator(),
+            time_dimension_in_measure_input: rolling_window_desc
+                .base_time_dimension
+                .member_evaluator(), //time dimension in measure input can have different granularity
         };
-        Ok(Rc::new(LogicalMultiStageMember {        
+        Ok(Rc::new(LogicalMultiStageMember {
             name: self.description.alias().clone(),
             member_type: MultiStageMemberLogicalType::RollingWindow(result),
         }))
@@ -427,18 +430,17 @@ impl MultiStageMemberQueryPlanner {
         &self,
         multi_stage_member: &MultiStageInodeMember,
     ) -> Result<Rc<LogicalMultiStageMember>, CubeError> {
-        let dimensions = self.all_dimensions();
-        let dimensions_names = dimensions.iter().map(|d| d.full_name()).collect_vec();
+        let input_dimensions = self.all_input_dimensions();
 
         let partition_by = self.member_partition_by_logical(
-            multi_stage_member.reduce_by(),
-            multi_stage_member.group_by(),
+            &multi_stage_member.reduce_by_symbols(),
+            &multi_stage_member.group_by_symbols(),
         );
 
         let window_function_to_use = match multi_stage_member.inode_type() {
             MultiStageInodeMemberType::Rank => MultiStageCalculationWindowFunction::Rank,
             MultiStageInodeMemberType::Aggregate => {
-                if partition_by != dimensions_names {
+                if partition_by.len() != self.all_dimensions().len() {
                     MultiStageCalculationWindowFunction::Window
                 } else {
                     MultiStageCalculationWindowFunction::None
@@ -483,10 +485,11 @@ impl MultiStageMemberQueryPlanner {
             window_function_to_use,
             order_by: self.query_order_by()?,
             source: Rc::new(FullKeyAggregate {
-                join_dimensions: dimensions
+                join_dimensions: input_dimensions
                     .iter()
                     .map(|d| d.member_evaluator().clone())
                     .collect(),
+                use_full_join_and_coalesce: true,
                 sources: input_sources,
             }),
         };
@@ -527,8 +530,8 @@ impl MultiStageMemberQueryPlanner {
 
         //FIXME here is direct use of alias, should be replaced with schema use
         let partition_by = self.member_partition_by(
-            multi_stage_member.reduce_by(),
-            multi_stage_member.group_by(),
+            &multi_stage_member.reduce_by(),
+            &multi_stage_member.group_by(),
         );
 
         let mut context_factory = SqlNodesFactory::new();
@@ -893,15 +896,19 @@ impl MultiStageMemberQueryPlanner {
 
     fn member_partition_by_logical(
         &self,
-        reduce_by: &Vec<String>,
-        group_by: &Option<Vec<String>>,
-    ) -> Vec<String> {
-        let dimensions = self.all_dimensions();
+        reduce_by: &Vec<Rc<MemberSymbol>>,
+        group_by: &Option<Vec<Rc<MemberSymbol>>>,
+    ) -> Vec<Rc<MemberSymbol>> {
+        let dimensions = self
+            .all_dimensions()
+            .into_iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect_vec();
         let dimensions = if !reduce_by.is_empty() {
             dimensions
                 .into_iter()
                 .filter(|d| {
-                    if reduce_by.contains(&d.member_evaluator().full_name()) {
+                    if reduce_by.iter().any(|m| d.full_name() == m.full_name()) {
                         false
                     } else {
                         true
@@ -915,7 +922,7 @@ impl MultiStageMemberQueryPlanner {
             dimensions
                 .into_iter()
                 .filter(|d| {
-                    if group_by.contains(&d.member_evaluator().full_name()) {
+                    if group_by.iter().any(|m| d.full_name() == m.full_name()) {
                         true
                     } else {
                         false
@@ -925,7 +932,7 @@ impl MultiStageMemberQueryPlanner {
         } else {
             dimensions
         };
-        dimensions.iter().map(|d| d.full_name()).collect_vec()
+        dimensions
     }
 
     //FIXME unoptiomal

@@ -123,6 +123,6 @@ pub fn pretty_print_filter_item(
         }
         FilterItem::Segment(base_segment) => {
             result.println(&format!("{{segment: {}}}", base_segment.full_name()), state);
-        },
+        }
     }
 }

@@ -59,6 +59,7 @@ impl FullKeyAggregateQueryPlanner {
             .collect_vec();
         Ok(Rc::new(FullKeyAggregate {
             sources,
+            use_full_join_and_coalesce: true,
             join_dimensions,
         }))
     }

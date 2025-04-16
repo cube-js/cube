@@ -206,12 +206,22 @@ impl MultiStageQueryPlanner {
                 MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
                 _ => self.query_properties.ungrouped(),
             };
+            let (reduce_by, add_group_by, group_by) =
+                if let Ok(measure_symbol) = measure.member_evaluator().as_measure() {
+                    (
+                        measure_symbol.reduce_by().clone().unwrap_or_default(),
+                        measure_symbol.add_group_by().clone().unwrap_or_default(),
+                        measure_symbol.group_by().clone(),
+                    )
+                } else {
+                    (vec![], vec![], None)
+                };
             (
                 MultiStageInodeMember::new(
                     member_type,
-                    measure.reduce_by().clone().unwrap_or_default(),
-                    measure.add_group_by().clone().unwrap_or_default(),
-                    measure.group_by().clone(),
+                    reduce_by,
+                    add_group_by,
+                    group_by,
                     time_shifts,
                 ),
                 is_ungrupped,
@@ -279,9 +289,11 @@ impl MultiStageQueryPlanner {
                 self.create_multi_stage_inode_member(member.clone())?;
 
             let dimensions_to_add = multi_stage_member
-                .add_group_by()
+                .add_group_by_symbols()
                 .iter()
-                .map(|name| self.compile_dimension(name))
+                .map(|symbol| {
+                    BaseDimension::try_new_required(symbol.clone(), self.query_tools.clone())
+                })
                 .collect::<Result<Vec<_>, _>>()?;
 
             let new_state = if !dimensions_to_add.is_empty()

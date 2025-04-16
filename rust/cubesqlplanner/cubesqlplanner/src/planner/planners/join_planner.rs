@@ -34,6 +34,14 @@ impl JoinPlanner {
         self.make_join_node_impl(alias_prefix, join, dimension_subquery_planner)
     }
 
+    pub fn make_join_logical_plan_with_join_hints(
+        &self,
+        join_hints: Vec<JoinHintItem>,
+    ) -> Result<Rc<LogicalJoin>, CubeError> {
+        let join = self.query_tools.join_graph().build_join(join_hints)?;
+        self.make_join_logical_plan(join)
+    }
+
     pub fn make_join_logical_plan(
         &self,
         join: Rc<dyn JoinDefinition>,

@@ -2,36 +2,24 @@ use super::pretty_print::*;
 use super::LogicalFilter;
 use super::LogicalJoin;
 use super::*;
-use crate::plan::{Expr, Filter, FilterItem, MemberExpression};
-use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::query_properties::OrderByItem;
+use crate::planner::BaseCube;
 use std::rc::Rc;
 
 pub enum AggregateMultipliedSubquerySouce {
-    Cube(Rc<Cube>)
+    Cube,
+    MeasureSubquery(Rc<MeasureSubquery>),
 }
-
-impl PrettyPrint for AggregateMultipliedSubquerySouce {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        match self {
-            AggregateMultipliedSubquerySouce::Cube(cube) => {
-                result.println(&format!("Cube: {}", cube.cube.name()), state);
-            }
-        }
-    }
-}
-    
-
 
 pub struct AggregateMultipliedSubquery {
     pub schema: Rc<LogicalSchema>,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     pub keys_subquery: Rc<KeysSubQuery>,
+    pub pk_cube: Rc<BaseCube>, //FIXME may be duplication with information in keys_subquery
     pub source: Rc<AggregateMultipliedSubquerySouce>,
-    
 }
 
-impl PrettyPrint for AggregateMultipliedSubquery {    
+impl PrettyPrint for AggregateMultipliedSubquery {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println("AggregateMultipliedSubquery: ", state);
         let state = state.new_level();
@@ -47,8 +35,17 @@ impl PrettyPrint for AggregateMultipliedSubquery {
         result.println("keys_subquery:", &state);
         self.keys_subquery.pretty_print(result, &details_state);
         result.println("source:", &state);
-        self.source.pretty_print(result, &details_state);
-
+        match self.source.as_ref() {
+            AggregateMultipliedSubquerySouce::Cube => {
+                result.println(&format!("Cube: {}", self.pk_cube.name()), &details_state);
+            }
+            AggregateMultipliedSubquerySouce::MeasureSubquery(measure_subquery) => {
+                result.println(
+                    &format!("MeasureSubquery: {}", measure_subquery.measures.len()),
+                    &details_state,
+                );
+                measure_subquery.pretty_print(result, &details_state);
+            }
+        }
     }
 }
-

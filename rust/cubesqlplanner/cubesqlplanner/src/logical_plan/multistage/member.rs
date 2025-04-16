@@ -5,7 +5,7 @@ pub enum MultiStageMemberLogicalType {
     MeasureCalculation(MultiStageMeasureCalculation),
     GetDateRange(MultiStageGetDateRange),
     TimeSeries(MultiStageTimeSeries),
-    RollingWindow(MultiStageRollingWindow)
+    RollingWindow(MultiStageRollingWindow),
 }
 
 impl PrettyPrint for MultiStageMemberLogicalType {
@@ -27,7 +27,6 @@ pub struct LogicalMultiStageMember {
 
 impl PrettyPrint for LogicalMultiStageMember {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-
         result.println(&format!("MultiStageMember `{}`: ", self.name), state);
         let details_state = state.new_level();
         self.member_type.pretty_print(result, &details_state);

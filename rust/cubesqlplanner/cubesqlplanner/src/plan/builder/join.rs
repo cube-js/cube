@@ -1,5 +1,7 @@
 use crate::plan::join::JoinType;
-use crate::plan::{Join, JoinCondition, JoinItem, QueryPlan, Schema, Select, SingleAliasedSource, SingleSource};
+use crate::plan::{
+    Join, JoinCondition, JoinItem, QueryPlan, Schema, Select, SingleAliasedSource, SingleSource,
+};
 use crate::planner::BaseCube;
 use std::rc::Rc;
 
@@ -73,9 +75,6 @@ impl JoinBuilder {
         self.join_source(source, alias, on, JoinType::Full)
     }
 
-
-
-
     pub fn inner_join_cube(
         &mut self,
         cube: Rc<BaseCube>,
@@ -128,7 +127,6 @@ impl JoinBuilder {
         })
     }
 
-
     fn join_cube(
         &mut self,
         cube: Rc<BaseCube>,
@@ -144,7 +142,13 @@ impl JoinBuilder {
         })
     }
 
-    fn join_source(&mut self, source: SingleSource, alias: String, on: JoinCondition, join_type: JoinType) {
+    fn join_source(
+        &mut self,
+        source: SingleSource,
+        alias: String,
+        on: JoinCondition,
+        join_type: JoinType,
+    ) {
         let from = SingleAliasedSource::new_from_source(source, alias);
         self.joins.push(JoinItem {
             from,

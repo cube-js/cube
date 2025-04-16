@@ -1,17 +1,17 @@
 use super::MemberSymbol;
-use crate::planner::time_dimension::Granularity;
-use std::rc::Rc;
-use cubenativeutils::CubeError;
-use crate::planner::QueryDateTime;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::time_dimension::Granularity;
+use crate::planner::QueryDateTime;
 use chrono_tz::Tz;
+use cubenativeutils::CubeError;
+use std::rc::Rc;
 
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
     full_name: String,
     granularity: Option<String>,
     granularity_obj: Option<Granularity>,
-    alias_suffix: String
+    alias_suffix: String,
 }
 
 impl TimeDimensionSymbol {
@@ -31,7 +31,7 @@ impl TimeDimensionSymbol {
             granularity,
             granularity_obj,
             full_name,
-            alias_suffix: name_suffix
+            alias_suffix: name_suffix,
         }
     }
 
@@ -75,7 +75,11 @@ impl TimeDimensionSymbol {
         self.base_symbol.name()
     }
 
-    pub fn get_range_for_time_series(&self, date_range: Option<Vec<String>>, tz: Tz) -> Result<Option<(String, String)>, CubeError> {
+    pub fn get_range_for_time_series(
+        &self,
+        date_range: Option<Vec<String>>,
+        tz: Tz,
+    ) -> Result<Option<(String, String)>, CubeError> {
         let res = if let Some(date_range) = &date_range {
             if date_range.len() != 2 {
                 return Err(CubeError::user(format!(

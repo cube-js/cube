@@ -13,34 +13,34 @@ pub struct LogicalSchema {
 }
 
 impl LogicalSchema {
-    pub fn find_member_position(&self, name: &str) -> Option<usize> {
+    pub fn find_member_positions(&self, name: &str) -> Vec<usize> {
+        let mut result = Vec::new();
         for (i, m) in self.dimensions.iter().enumerate() {
             if m.full_name() == name {
-                return Some(i);
+                result.push(i);
             }
         }
         for (i, m) in self.time_dimensions.iter().enumerate() {
             if m.full_name() == name {
-                return Some(i + self.dimensions.len());
+                result.push(i + self.dimensions.len());
             } else if let Ok(time_dimension) = m.as_time_dimension() {
                 if time_dimension.base_symbol().full_name() == name {
-                    return Some(i + self.dimensions.len());
+                    result.push(i + self.dimensions.len());
                 }
             }
         }
         for (i, m) in self.measures.iter().enumerate() {
             if m.full_name() == name {
-                return Some(i + self.time_dimensions.len() + self.dimensions.len());
+                result.push(i + self.time_dimensions.len() + self.dimensions.len());
             }
         }
-        None
+        result
     }
 
     pub fn all_dimensions(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
         self.dimensions.iter().chain(self.time_dimensions.iter())
     }
 }
-    
 
 impl PrettyPrint for LogicalSchema {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
@@ -58,7 +58,10 @@ impl PrettyPrint for LogicalSchema {
         );
         if !self.multiplied_measures.is_empty() {
             result.println(
-                &format!("-multiplied_measures: {}", self.multiplied_measures.iter().join(", ")),
+                &format!(
+                    "-multiplied_measures: {}",
+                    self.multiplied_measures.iter().join(", ")
+                ),
                 state,
             );
         }
