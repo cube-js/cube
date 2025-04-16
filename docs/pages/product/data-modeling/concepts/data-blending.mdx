@@ -128,6 +128,8 @@ cube(`online_orders`, {
 
 Given the above cubes, a data blending cube can be introduced as follows:
 
+<CodeTabs>
+
 ```javascript
 cube(`all_sales`, {
   sql: `
@@ -136,14 +138,14 @@ cube(`all_sales`, {
       user_id AS customer_id,
       created_at,
       'online' AS row_type
-    FROM (${online_orders.sql()}) AS online
+    FROM ${online_orders.sql()} AS online
     UNION ALL
     SELECT
       amount,
       customer_id,
       created_at,
       'retail' AS row_type
-    FROM (${retail_orders.sql()}) AS retail
+    FROM ${retail_orders.sql()} AS retail
  `,
 
   measures: {
@@ -193,16 +195,63 @@ cube(`all_sales`, {
 });
 ```
 
-<ReferenceBox>
+```yaml
+cubes:
+  - name: all_sales
+    sql: >
+      SELECT
+        amount,
+        user_id AS customer_id,
+        created_at,
+        'online' AS row_type
+      FROM {online_orders.sql()} AS online
+      UNION ALL
+      SELECT
+        amount,
+        customer_id,
+        created_at,
+        'retail' AS row_type
+      FROM {retail_orders.sql()} AS retail
 
-Currently, [`{cube.sql()}` function][ref-cube-sql-func] is not supported in YAML data models.
-Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+    measures:
+      - name: customer_count
+        sql: customer_id
+        type: count_distinct
 
-As a workaround, you can use JavaScript data models, put a SQL query in a
-[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
-the [template context](/reference/python/cube#templatecontext-class).
+      - name: revenue
+        sql: amount
+        type: sum
 
-</ReferenceBox>
+      - name: online_revenue
+        sql: amount
+        type: sum
+        filters:
+          - sql: "{CUBE}.row_type = 'online'"
+
+      - name: offline_revenue
+        sql: amount
+        type: sum
+        filters:
+          - sql: "{CUBE}.row_type = 'retail'"
+
+      - name: online_revenue_percentage
+        sql: >
+          {online_revenue} /
+          NULLIF({online_revenue} + {offline_revenue}, 0)
+        type: number
+        format: percent
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: revenue_type
+        sql: row_type
+        type: string
+```
+
+</CodeTabs>
 
 Another use case of the Data Blending approach would be when you want to chart
 some measures (business related) together and see how they correlate.

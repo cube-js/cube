@@ -38,7 +38,7 @@ model
 Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
 JavaScript syntax. YAML data model files should have the `.yml` extension,
 whereas JavaScript data model files should end with `.js`. You can mix YAML and
-JavaScript files within a single data model. 
+JavaScript files within a single data model.
 
 <CodeTabs>
 
@@ -547,6 +547,8 @@ when defining [polymorphic cubes][ref-polymorphism] or using [data blending][ref
 
 Consider the following data model:
 
+<CodeTabs>
+
 ```javascript
 cube(`organisms`, {
   sql_table: `organisms`
@@ -564,7 +566,7 @@ cube(`dogs`, {
   sql: `
     SELECT *
     FROM ${animals.sql()}
-    WHERE species = 'dogs' 
+    WHERE species = 'dogs'
   `,
 
   measures: {
@@ -574,6 +576,30 @@ cube(`dogs`, {
   }
 })
 ```
+
+```yaml
+cubes:
+  - name: organisms
+    sql_table: organisms
+
+  - name: animals
+    sql: >
+      SELECT *
+      FROM {organisms.sql()}
+      WHERE kingdom = 'animals'
+
+  - name: dogs
+    sql: >
+      SELECT *
+      FROM {animals.sql()}
+      WHERE species = 'dogs'
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
 
 If you query for `dogs.count`, Cube will generate the following SQL:
 
@@ -589,18 +615,6 @@ FROM (
   WHERE species = 'dogs'
 ) AS "dogs"
 ```
-
-<ReferenceBox>
-
-Currently, `{cube.sql()}` function is only supported in JavaScript data models.
-It is not supported in YAML data models.
-Please [track this issue](https://github.com/cube-js/cube/issues/7484).
-
-As a workaround, you can use JavaScript data models, put a SQL query in a
-[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
-the [template context](/reference/python/cube#templatecontext-class).
-
-</ReferenceBox>
 
 ### Curly braces and escaping
 
