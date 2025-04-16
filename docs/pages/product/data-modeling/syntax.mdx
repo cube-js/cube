@@ -602,6 +602,73 @@ the [template context](/reference/python/cube#templatecontext-class).
 
 </ReferenceBox>
 
+### Curly braces and escaping
+
+As you can see in the examples above, within [SQL expressions][self-sql-expressions],
+curly braces are used to reference cubes and members.
+
+In YAML data models, use `{reference}`:
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT id, created_at
+      FROM {other_cube.sql()}
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: status_x2
+        sql: "{status} || ' ' || {status}"
+        type: string
+```
+
+In JavaScript data models, use `${reference}` in [JavaScript template
+literals][link-js-template-literals] (mind the dollar sign):
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT id, created_at
+    FROM ${other_cube.sql()}
+  `,
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    status_x2: {
+      sql: `${status} || ' ' || ${status}`,
+      type: `string`
+    }
+  }
+})
+```
+
+If you need to use literal, non-referential curly braces in YAML, e.g.,
+to define a JSON object, you can escape them with a backslash:
+
+```yaml
+cubes:
+  - name: json_object_in_postgres
+    sql: SELECT CAST('\{"key":"value"\}'::JSON AS TEXT) AS json_column
+
+  - name: csv_from_s3_in_duckdb
+    sql: >
+      SELECT *
+      FROM read_csv(
+        's3://bbb/aaa.csv',
+        delim = ',',
+        header = true,
+        columns=\{'time':'DATE','count':'NUMERIC'\}
+      )
+```
+
 ### Non-SQL references
 
 Outside [SQL expressions][self-sql-expressions], `column` is not recognized
@@ -694,3 +761,4 @@ defining dynamic data models.
 [ref-style-guide]: /guides/style-guide
 [ref-polymorphism]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
+[link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
