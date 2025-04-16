@@ -19,16 +19,15 @@ use crate::{
             transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
             udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
-            BinaryExprOp, CastExprDataType, ChangeUserCube, ColumnExprColumn, CubeScanAliasToCube,
+            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliasToCube,
             CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset, CubeScanUngrouped,
             DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType,
             LikeExprNegated, LikeType, LimitFetch, LimitSkip, ListType, LiteralExprValue,
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
             MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
             MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
-            SegmentName, TableScanFetch, TableScanProjection, TableScanSourceTableName,
-            TableScanTableName, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
         },
     },
     config::ConfigObj,
@@ -538,8 +537,7 @@ impl MemberRules {
 
         let find_matching_old_member_with_count =
             |name: &str, column_expr: String, default_count: bool| {
-                vec![
-                transforming_rewrite(
+                vec![transforming_rewrite(
                     &format!(
                         "member-pushdown-replacer-column-find-matching-old-member-{}",
                         name
@@ -562,31 +560,7 @@ impl MemberRules {
                         "?filtered_member_pushdown_replacer_alias_to_cube",
                         default_count,
                     ),
-                ),
-                transforming_rewrite(
-                    &format!(
-                        "member-pushdown-replacer-column-find-matching-old-member-{}-select-member-from-all-members",
-                        name
-                    ),
-                    member_pushdown_replacer(
-                        column_expr.clone(),
-                        all_members("?cube", "?all_members_alias"),
-                        "?member_pushdown_replacer_alias_to_cube",
-                    ),
-                    member_pushdown_replacer(
-                        column_expr.clone(),
-                        "?terminal_member",
-                        "?member_pushdown_replacer_alias_to_cube",
-                    ),
-                    self.select_from_all_member_by_column(
-                        "?cube",
-                        "?member_pushdown_replacer_alias_to_cube",
-                        "?column",
-                        "?terminal_member",
-                        default_count
-                    ),
-                ),
-            ]
+                )]
             };
 
         let find_matching_old_member = |name: &str, column_expr: String| {
@@ -2043,127 +2017,6 @@ impl MemberRules {
                         );
 
                         return true;
-                    }
-                }
-            }
-            false
-        }
-    }
-
-    fn select_from_all_member_by_column(
-        &self,
-        cube_var: &'static str,
-        member_pushdown_replacer_alias_to_cube_var: &'static str,
-        column_var: &'static str,
-        member_var: &'static str,
-        default_count: bool,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let cube_var = var!(cube_var);
-        let member_pushdown_replacer_alias_to_cube_var =
-            var!(member_pushdown_replacer_alias_to_cube_var);
-        let column_var = var!(column_var);
-        let member_var = var!(member_var);
-        let meta = self.meta_context.clone();
-        move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
-                MemberPushdownReplacerAliasToCube
-            )
-            .cloned()
-            {
-                // alias_to_cube at this point is already filtered to a single cube
-                let cube_alias = alias_to_cube.first().unwrap().0 .1.to_string();
-                for cube in var_iter!(egraph[subst[cube_var]], AllMembersCube).cloned() {
-                    let column_iter = if default_count {
-                        vec![Column::from_name(Self::default_count_measure_name())]
-                    } else {
-                        var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-                            .cloned()
-                            .collect()
-                    };
-                    for column in column_iter {
-                        if let Some(cube) = meta.find_cube_with_name(&cube) {
-                            let alias_expr = |egraph| {
-                                Self::add_alias_column(
-                                    egraph,
-                                    column.name.to_string(),
-                                    Some(cube_alias.clone()),
-                                )
-                            };
-
-                            if let Some(dimension) = cube.lookup_dimension(&column.name) {
-                                let dimension_name =
-                                    egraph.add(LogicalPlanLanguage::DimensionName(DimensionName(
-                                        dimension.name.to_string(),
-                                    )));
-
-                                let alias = alias_expr(egraph);
-                                subst.insert(
-                                    member_var,
-                                    egraph.add(LogicalPlanLanguage::Dimension([
-                                        dimension_name,
-                                        alias,
-                                    ])),
-                                );
-                                return true;
-                            }
-
-                            if let Some(measure) = cube.lookup_measure(&column.name) {
-                                let measure_name = egraph.add(LogicalPlanLanguage::MeasureName(
-                                    MeasureName(measure.name.to_string()),
-                                ));
-                                let alias = alias_expr(egraph);
-                                subst.insert(
-                                    member_var,
-                                    egraph.add(LogicalPlanLanguage::Measure([measure_name, alias])),
-                                );
-                                return true;
-                            }
-
-                            if let Some(segment) = cube.lookup_segment(&column.name) {
-                                let segment_name = egraph.add(LogicalPlanLanguage::SegmentName(
-                                    SegmentName(segment.name.to_string()),
-                                ));
-                                let alias = alias_expr(egraph);
-                                subst.insert(
-                                    member_var,
-                                    egraph.add(LogicalPlanLanguage::Segment([segment_name, alias])),
-                                );
-                                return true;
-                            }
-
-                            let member_name = column.name.to_string();
-
-                            if member_name.eq_ignore_ascii_case(&"__user") {
-                                let cube = egraph.add(LogicalPlanLanguage::ChangeUserCube(
-                                    ChangeUserCube(cube.name.to_string()),
-                                ));
-                                let alias = alias_expr(egraph);
-                                subst.insert(
-                                    member_var,
-                                    egraph.add(LogicalPlanLanguage::ChangeUser([cube, alias])),
-                                );
-                                return true;
-                            }
-
-                            if member_name.eq_ignore_ascii_case(&"__cubeJoinField") {
-                                let field_name = egraph.add(LogicalPlanLanguage::VirtualFieldName(
-                                    VirtualFieldName(column.name.to_string()),
-                                ));
-                                let cube = egraph.add(LogicalPlanLanguage::VirtualFieldCube(
-                                    VirtualFieldCube(cube.name.to_string()),
-                                ));
-                                let alias = alias_expr(egraph);
-                                subst.insert(
-                                    member_var,
-                                    egraph.add(LogicalPlanLanguage::VirtualField([
-                                        field_name, cube, alias,
-                                    ])),
-                                );
-
-                                return true;
-                            }
-                        }
                     }
                 }
             }
