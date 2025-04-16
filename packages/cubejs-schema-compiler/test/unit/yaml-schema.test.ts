@@ -604,7 +604,7 @@ describe('Yaml Schema Testing', () => {
   - name: simple_orders_sql_ext
 
     sql: >
-      SELECT * FROM {simple_orders.sql()}
+      SELECT * FROM {simple_orders.sql()} as q
       WHERE status = 'processed'
 
     measures:
