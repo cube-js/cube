@@ -23,6 +23,10 @@ declare module '@cubejs-client/core' {
     headers?: Record<string, string>;
     credentials?: 'omit' | 'same-origin' | 'include';
     method?: 'GET' | 'PUT' | 'POST' | 'PATCH';
+    /**
+     * Fetch timeout in milliseconds. Would be passed as AbortSignal.timeout()
+     */
+    fetchTimeout?: number;
   };
 
   export interface ITransportResponse<R> {
@@ -81,6 +85,10 @@ declare module '@cubejs-client/core' {
     parseDateMeasures?: boolean;
     resType?: 'default' | 'compact';
     castNumerics?: boolean;
+    /**
+     * How many network errors would be retried before returning to users. Default to 0.
+     */
+    networkErrorRetries?: number;
   };
 
   export type LoadMethodOptions = {
