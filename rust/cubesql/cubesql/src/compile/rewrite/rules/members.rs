@@ -468,6 +468,11 @@ impl RewriteRules for MemberRules {
     }
 }
 
+enum ColumnToSearch {
+    Var(&'static str),
+    DefaultCount,
+}
+
 impl MemberRules {
     pub fn new(
         meta_context: Arc<MetaContext>,
@@ -535,8 +540,8 @@ impl MemberRules {
             )
         };
 
-        let find_matching_old_member_with_count =
-            |name: &str, column_expr: String, default_count: bool| {
+        let find_matching_old_member =
+            |name: &str, column_expr: String, column_to_search: ColumnToSearch| {
                 transforming_rewrite(
                     &format!(
                         "member-pushdown-replacer-column-find-matching-old-member-{}",
@@ -554,18 +559,13 @@ impl MemberRules {
                     ),
                     self.transform_find_matching_old_member(
                         "?member_pushdown_replacer_alias_to_cube",
-                        "?column",
+                        column_to_search,
                         "?old_members",
                         "?terminal_member",
                         "?filtered_member_pushdown_replacer_alias_to_cube",
-                        default_count,
                     ),
                 )
             };
-
-        let find_matching_old_member = |name: &str, column_expr: String| {
-            find_matching_old_member_with_count(name, column_expr, false)
-        };
 
         if self.config_obj.push_down_pull_up_split() {
             rules.extend(replacer_flat_push_down_node_substitute_rules(
@@ -606,14 +606,20 @@ impl MemberRules {
                 member_replacer_fn,
             ));
         }
-        rules.push(find_matching_old_member("column", column_expr("?column")));
+        rules.push(find_matching_old_member(
+            "column",
+            column_expr("?column"),
+            ColumnToSearch::Var("?column"),
+        ));
         rules.push(find_matching_old_member(
             "alias",
             alias_expr(column_expr("?column"), "?alias"),
+            ColumnToSearch::Var("?column"),
         ));
         rules.push(find_matching_old_member(
             "agg-fun",
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            ColumnToSearch::Var("?column"),
         ));
         rules.push(find_matching_old_member(
             "agg-fun-alias",
@@ -621,21 +627,23 @@ impl MemberRules {
                 agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
                 "?alias",
             ),
+            ColumnToSearch::Var("?column"),
         ));
         rules.push(find_matching_old_member(
             "udaf-fun",
             udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
+            ColumnToSearch::Var("?column"),
         ));
-        rules.push(find_matching_old_member_with_count(
+        rules.push(find_matching_old_member(
             "agg-fun-default-count",
             agg_fun_expr(
                 "Count",
                 vec![literal_expr("?any")],
                 "AggregateFunctionExprDistinct:false",
             ),
-            true,
+            ColumnToSearch::DefaultCount,
         ));
-        rules.push(find_matching_old_member_with_count(
+        rules.push(find_matching_old_member(
             "agg-fun-default-count-alias",
             alias_expr(
                 agg_fun_expr(
@@ -645,7 +653,7 @@ impl MemberRules {
                 ),
                 "?alias",
             ),
-            true,
+            ColumnToSearch::DefaultCount,
         ));
         rules.push(find_matching_old_member(
             "agg-fun-with-cast",
@@ -655,6 +663,7 @@ impl MemberRules {
                 vec![cast_expr(column_expr("?column"), "?data_type")],
                 "?distinct",
             ),
+            ColumnToSearch::Var("?column"),
         ));
         rules.push(find_matching_old_member(
             "date-trunc",
@@ -662,6 +671,7 @@ impl MemberRules {
                 "DateTrunc",
                 vec![literal_expr("?granularity"), column_expr("?column")],
             ),
+            ColumnToSearch::Var("?column"),
         ));
         rules.push(find_matching_old_member(
             "date-trunc-with-alias",
@@ -673,6 +683,7 @@ impl MemberRules {
                 ),
                 "?original_alias",
             ),
+            ColumnToSearch::Var("?column"),
         ));
         Self::measure_rewrites(
             &mut rules,
@@ -1947,15 +1958,17 @@ impl MemberRules {
     fn transform_find_matching_old_member(
         &self,
         member_pushdown_replacer_alias_to_cube_var: &'static str,
-        column_var: &'static str,
+        column_to_search: ColumnToSearch,
         old_members_var: &'static str,
         terminal_member: &'static str,
         filtered_member_pushdown_replacer_alias_to_cube_var: &'static str,
-        default_count: bool,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
-        let column_var = var!(column_var);
+        let column_var = match column_to_search {
+            ColumnToSearch::Var(column_var) => Some(var!(column_var)),
+            ColumnToSearch::DefaultCount => None,
+        };
         let old_members_var = var!(old_members_var);
         let terminal_member = var!(terminal_member);
         let filtered_member_pushdown_replacer_alias_to_cube_var =
@@ -1969,12 +1982,11 @@ impl MemberRules {
             .cloned()
             .collect();
             for alias_to_cube in alias_to_cubes {
-                let column_iter = if default_count {
-                    vec![Column::from_name(Self::default_count_measure_name())]
-                } else {
-                    var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                let column_iter = match column_var {
+                    Some(column_var) => var_iter!(egraph[subst[column_var]], ColumnExprColumn)
                         .cloned()
-                        .collect()
+                        .collect(),
+                    None => vec![Column::from_name(Self::default_count_measure_name())],
                 };
                 for alias_column in column_iter {
                     let alias_name = expr_column_name(&Expr::Column(alias_column), &None);
