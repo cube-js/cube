@@ -537,7 +537,7 @@ impl MemberRules {
 
         let find_matching_old_member_with_count =
             |name: &str, column_expr: String, default_count: bool| {
-                vec![transforming_rewrite(
+                transforming_rewrite(
                     &format!(
                         "member-pushdown-replacer-column-find-matching-old-member-{}",
                         name
@@ -560,7 +560,7 @@ impl MemberRules {
                         "?filtered_member_pushdown_replacer_alias_to_cube",
                         default_count,
                     ),
-                )]
+                )
             };
 
         let find_matching_old_member = |name: &str, column_expr: String| {
@@ -606,27 +606,27 @@ impl MemberRules {
                 member_replacer_fn,
             ));
         }
-        rules.extend(find_matching_old_member("column", column_expr("?column")));
-        rules.extend(find_matching_old_member(
+        rules.push(find_matching_old_member("column", column_expr("?column")));
+        rules.push(find_matching_old_member(
             "alias",
             alias_expr(column_expr("?column"), "?alias"),
         ));
-        rules.extend(find_matching_old_member(
+        rules.push(find_matching_old_member(
             "agg-fun",
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
         ));
-        rules.extend(find_matching_old_member(
+        rules.push(find_matching_old_member(
             "agg-fun-alias",
             alias_expr(
                 agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
                 "?alias",
             ),
         ));
-        rules.extend(find_matching_old_member(
+        rules.push(find_matching_old_member(
             "udaf-fun",
             udaf_expr(MEASURE_UDAF_NAME, vec![column_expr("?column")]),
         ));
-        rules.extend(find_matching_old_member_with_count(
+        rules.push(find_matching_old_member_with_count(
             "agg-fun-default-count",
             agg_fun_expr(
                 "Count",
@@ -635,7 +635,7 @@ impl MemberRules {
             ),
             true,
         ));
-        rules.extend(find_matching_old_member_with_count(
+        rules.push(find_matching_old_member_with_count(
             "agg-fun-default-count-alias",
             alias_expr(
                 agg_fun_expr(
@@ -647,7 +647,7 @@ impl MemberRules {
             ),
             true,
         ));
-        rules.extend(find_matching_old_member(
+        rules.push(find_matching_old_member(
             "agg-fun-with-cast",
             // TODO need to check data_type if we can remove the cast
             agg_fun_expr(
@@ -656,14 +656,14 @@ impl MemberRules {
                 "?distinct",
             ),
         ));
-        rules.extend(find_matching_old_member(
+        rules.push(find_matching_old_member(
             "date-trunc",
             self.fun_expr(
                 "DateTrunc",
                 vec![literal_expr("?granularity"), column_expr("?column")],
             ),
         ));
-        rules.extend(find_matching_old_member(
+        rules.push(find_matching_old_member(
             "date-trunc-with-alias",
             // TODO need to check data_type if we can remove the cast
             alias_expr(
