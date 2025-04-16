@@ -1183,7 +1183,7 @@ describe('SQL Generation', () => {
       const utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60;
       expect(query.everyRefreshKeySql({
         every: '1 hour'
-      })).toEqual(['FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)', false, expect.any(BaseQuery)]);
+      })).toEqual(['FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 3600)', false, expect.any(BaseQuery)]);
 
       // Standard syntax (minutes hours day month dow)
       expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
@@ -1290,7 +1290,7 @@ describe('SQL Generation', () => {
       expect(query.cacheKeyQueries()).toEqual([
         [
           // Postgres dialect
-          'SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
+          'SELECT FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
           [],
           {
             // false, because there is no externalQueryClass
@@ -1311,7 +1311,7 @@ describe('SQL Generation', () => {
         ],
         timeDimensions: [],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone: 'Europe/London',
         externalQueryClass: MssqlQuery
       });
 
@@ -1319,7 +1319,7 @@ describe('SQL Generation', () => {
       expect(query.cacheKeyQueries()).toEqual([
         [
           // MSSQL dialect, because externalQueryClass
-          'SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
+          'SELECT FLOOR((3600 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
           [],
           {
             // true, because externalQueryClass
@@ -1352,7 +1352,7 @@ describe('SQL Generation', () => {
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
           // MSSQL dialect
-          'SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) as refresh_key',
+          'SELECT FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) as refresh_key',
           [],
           {
             external: true,
@@ -1405,7 +1405,7 @@ describe('SQL Generation', () => {
           dateRange: ['2016-12-30', '2017-01-05']
         }],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone: 'Asia/Tokyo',
         externalQueryClass: MssqlQuery
       });
 
@@ -1413,7 +1413,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
+          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((32400 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
           [
             '__TO_PARTITION_RANGE',
           ],
@@ -1496,7 +1496,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
+          'SELECT FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
           [],
           {
             external: false,
@@ -1527,7 +1527,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
+          'SELECT FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
           [],
           {
             external: true,
