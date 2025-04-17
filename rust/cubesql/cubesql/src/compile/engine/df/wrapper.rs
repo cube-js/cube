@@ -2003,113 +2003,102 @@ impl CubeScanWrapperNode {
 
     /// This function is async to be able to call to JS land,
     /// in case some SQL generation could not be done through Jinja
-    pub fn generate_sql_for_expr<'ctx>(
+    pub async fn generate_sql_for_expr<'ctx>(
         mut sql_query: SqlQuery,
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
-        push_to_cube_context: Option<&'ctx PushToCubeContext>,
+        push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
         subqueries: Arc<HashMap<String, String>>,
         mut used_members: Option<&'ctx mut HashSet<String>>,
-    ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send + 'ctx>> {
-        Box::pin(async move {
-            match expr {
-                Expr::Alias(expr, _) => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
+    ) -> Result<(String, SqlQuery)> {
+        match expr {
+            Expr::Alias(expr, _) => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                Ok((expr, sql_query))
+            }
+            // Expr::OuterColumn(_, _) => {}
+            Expr::Column(ref c) => {
+                if let Some(subquery) = subqueries.get(&c.flat_name()) {
+                    Ok((
+                        sql_generator
+                            .get_sql_templates()
+                            .subquery_expr(subquery.clone())
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for subquery expr: {}",
+                                    e
+                                ))
+                            })?,
                         sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    Ok((expr, sql_query))
-                }
-                // Expr::OuterColumn(_, _) => {}
-                Expr::Column(ref c) => {
-                    if let Some(subquery) = subqueries.get(&c.flat_name()) {
-                        Ok((
-                            sql_generator
-                                .get_sql_templates()
-                                .subquery_expr(subquery.clone())
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for subquery expr: {}",
-                                        e
-                                    ))
-                                })?,
-                            sql_query,
-                        ))
-                    } else if let Some(PushToCubeContext {
-                        ungrouped_scan_node,
-                        join_subqueries: _,
-                        known_join_subqueries,
-                    }) = push_to_cube_context
-                    {
-                        if let Some(relation) = c.relation.as_ref() {
-                            if known_join_subqueries.contains(relation) {
-                                // SQL API passes fixed aliases to Cube.js for join subqueries
-                                // It means we don't need to use member expressions here, and can just use that fixed alias
-                                // So we can generate that as if it were regular column expression
+                    ))
+                } else if let Some(PushToCubeContext {
+                    ungrouped_scan_node,
+                    join_subqueries: _,
+                    known_join_subqueries,
+                }) = push_to_cube_context
+                {
+                    if let Some(relation) = c.relation.as_ref() {
+                        if known_join_subqueries.contains(relation) {
+                            // SQL API passes fixed aliases to Cube.js for join subqueries
+                            // It means we don't need to use member expressions here, and can just use that fixed alias
+                            // So we can generate that as if it were regular column expression
 
-                                return Self::generate_sql_for_expr(
-                                    sql_query,
-                                    sql_generator.clone(),
-                                    expr,
-                                    None,
-                                    subqueries.clone(),
-                                    used_members,
-                                )
-                                .await;
-                            }
+                            return Self::generate_sql_for_expr_rec(
+                                sql_query,
+                                sql_generator.clone(),
+                                expr,
+                                None,
+                                subqueries.clone(),
+                                used_members,
+                            )
+                            .await;
                         }
+                    }
 
-                        let member = Self::find_member_in_ungrouped_scan(ungrouped_scan_node, c)?;
+                    let member = Self::find_member_in_ungrouped_scan(ungrouped_scan_node, c)?;
 
-                        match member {
-                            MemberField::Member(member) => {
-                                if let Some(used_members) = used_members {
-                                    used_members.insert(member.clone());
-                                }
-                                Ok((format!("${{{}}}", member), sql_query))
+                    match member {
+                        MemberField::Member(member) => {
+                            if let Some(used_members) = used_members {
+                                used_members.insert(member.clone());
                             }
-                            MemberField::Literal(value) => {
-                                Self::generate_sql_for_expr(
-                                    sql_query,
-                                    sql_generator.clone(),
-                                    Expr::Literal(value.clone()),
-                                    push_to_cube_context,
-                                    subqueries.clone(),
-                                    used_members,
-                                )
-                                .await
-                            }
+                            Ok((format!("${{{}}}", member), sql_query))
                         }
-                    } else {
-                        Ok((
-                            match c.relation.as_ref() {
-                                Some(r) => format!(
-                                    "{}.{}",
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .quote_identifier(&r)
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for column: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .quote_identifier(&c.name)
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for column: {}",
-                                                e
-                                            ))
-                                        })?
-                                ),
-                                None => sql_generator
+                        MemberField::Literal(value) => {
+                            Self::generate_sql_for_expr_rec(
+                                sql_query,
+                                sql_generator.clone(),
+                                Expr::Literal(value.clone()),
+                                push_to_cube_context,
+                                subqueries.clone(),
+                                used_members,
+                            )
+                            .await
+                        }
+                    }
+                } else {
+                    Ok((
+                        match c.relation.as_ref() {
+                            Some(r) => format!(
+                                "{}.{}",
+                                sql_generator
+                                    .get_sql_templates()
+                                    .quote_identifier(&r)
+                                    .map_err(|e| {
+                                        DataFusionError::Internal(format!(
+                                            "Can't generate SQL for column: {}",
+                                            e
+                                        ))
+                                    })?,
+                                sql_generator
                                     .get_sql_templates()
                                     .quote_identifier(&c.name)
                                     .map_err(|e| {
@@ -2117,1048 +2106,236 @@ impl CubeScanWrapperNode {
                                             "Can't generate SQL for column: {}",
                                             e
                                         ))
-                                    })?,
-                            },
-                            sql_query,
+                                    })?
+                            ),
+                            None => sql_generator
+                                .get_sql_templates()
+                                .quote_identifier(&c.name)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for column: {}",
+                                        e
+                                    ))
+                                })?,
+                        },
+                        sql_query,
+                    ))
+                }
+            }
+            // Expr::ScalarVariable(_, _) => {}
+            Expr::BinaryExpr { left, op, right } => {
+                let (left, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *left,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members.as_deref_mut(),
+                )
+                .await?;
+                let (right, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *right,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .binary_expr(left, op.to_string(), right)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for binary expr: {}",
+                            e
                         ))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            // Expr::AnyExpr { .. } => {}
+            Expr::Like(like) => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *like.expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members.as_deref_mut(),
+                )
+                .await?;
+                let (pattern, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *like.pattern,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members.as_deref_mut(),
+                )
+                .await?;
+                let (escape_char, sql_query) = match like.escape_char {
+                    Some(escape_char) => {
+                        let (escape_char, sql_query) = Self::generate_sql_for_expr_rec(
+                            sql_query,
+                            sql_generator.clone(),
+                            Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
+                            push_to_cube_context,
+                            subqueries.clone(),
+                            used_members,
+                        )
+                        .await?;
+                        (Some(escape_char), sql_query)
                     }
-                }
-                // Expr::ScalarVariable(_, _) => {}
-                Expr::BinaryExpr { left, op, right } => {
-                    let (left, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *left,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members.as_deref_mut(),
-                    )
-                    .await?;
-                    let (right, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *right,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    let resulting_sql = sql_generator
+                    None => (None, sql_query),
+                };
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .like_expr(LikeType::Like, expr, like.negated, pattern, escape_char)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for like expr: {}",
+                            e
+                        ))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            Expr::ILike(ilike) => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *ilike.expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members.as_deref_mut(),
+                )
+                .await?;
+                let (pattern, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *ilike.pattern,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members.as_deref_mut(),
+                )
+                .await?;
+                let (escape_char, sql_query) = match ilike.escape_char {
+                    Some(escape_char) => {
+                        let (escape_char, sql_query) = Self::generate_sql_for_expr_rec(
+                            sql_query,
+                            sql_generator.clone(),
+                            Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
+                            push_to_cube_context,
+                            subqueries.clone(),
+                            used_members,
+                        )
+                        .await?;
+                        (Some(escape_char), sql_query)
+                    }
+                    None => (None, sql_query),
+                };
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .like_expr(LikeType::ILike, expr, ilike.negated, pattern, escape_char)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for ilike expr: {}",
+                            e
+                        ))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            // Expr::SimilarTo(_) => {}
+            Expr::Not(expr) => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                let resulting_sql =
+                    sql_generator
                         .get_sql_templates()
-                        .binary_expr(left, op.to_string(), right)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for binary expr: {}",
-                                e
-                            ))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                // Expr::AnyExpr { .. } => {}
-                Expr::Like(like) => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *like.expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members.as_deref_mut(),
-                    )
-                    .await?;
-                    let (pattern, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *like.pattern,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members.as_deref_mut(),
-                    )
-                    .await?;
-                    let (escape_char, sql_query) = match like.escape_char {
-                        Some(escape_char) => {
-                            let (escape_char, sql_query) = Self::generate_sql_for_expr(
-                                sql_query,
-                                sql_generator.clone(),
-                                Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
-                                push_to_cube_context,
-                                subqueries.clone(),
-                                used_members,
-                            )
-                            .await?;
-                            (Some(escape_char), sql_query)
-                        }
-                        None => (None, sql_query),
-                    };
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .like_expr(LikeType::Like, expr, like.negated, pattern, escape_char)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for like expr: {}",
-                                e
-                            ))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                Expr::ILike(ilike) => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *ilike.expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members.as_deref_mut(),
-                    )
-                    .await?;
-                    let (pattern, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *ilike.pattern,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members.as_deref_mut(),
-                    )
-                    .await?;
-                    let (escape_char, sql_query) = match ilike.escape_char {
-                        Some(escape_char) => {
-                            let (escape_char, sql_query) = Self::generate_sql_for_expr(
-                                sql_query,
-                                sql_generator.clone(),
-                                Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
-                                push_to_cube_context,
-                                subqueries.clone(),
-                                used_members,
-                            )
-                            .await?;
-                            (Some(escape_char), sql_query)
-                        }
-                        None => (None, sql_query),
-                    };
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .like_expr(LikeType::ILike, expr, ilike.negated, pattern, escape_char)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for ilike expr: {}",
-                                e
-                            ))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                // Expr::SimilarTo(_) => {}
-                Expr::Not(expr) => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    let resulting_sql =
-                        sql_generator
-                            .get_sql_templates()
-                            .not_expr(expr)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for not expr: {}",
-                                    e
-                                ))
-                            })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                Expr::IsNotNull(expr) => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .is_null_expr(expr, true)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for is not null expr: {}",
-                                e
-                            ))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                Expr::IsNull(expr) => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .is_null_expr(expr, false)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for is null expr: {}",
-                                e
-                            ))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                Expr::Negative(expr) => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .negative_expr(expr)
+                        .not_expr(expr)
                         .map_err(|e| {
                             DataFusionError::Internal(format!(
                                 "Can't generate SQL for not expr: {}",
                                 e
                             ))
                         })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                // Expr::GetIndexedField { .. } => {}
-                // Expr::Between { .. } => {}
-                Expr::Case {
-                    expr,
-                    when_then_expr,
-                    else_expr,
-                } => {
-                    let expr = if let Some(expr) = expr {
-                        let (expr, sql_query_next) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            *expr,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = sql_query_next;
-                        Some(expr)
-                    } else {
-                        None
-                    };
-                    let mut when_then_expr_sql = Vec::new();
-                    for (when, then) in when_then_expr {
-                        let (when, sql_query_next) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            *when,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        let (then, sql_query_next) = Self::generate_sql_for_expr(
-                            sql_query_next,
-                            sql_generator.clone(),
-                            *then,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = sql_query_next;
-                        when_then_expr_sql.push((when, then));
-                    }
-                    let else_expr = if let Some(else_expr) = else_expr {
-                        let (else_expr, sql_query_next) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            *else_expr,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members,
-                        )
-                        .await?;
-                        sql_query = sql_query_next;
-                        Some(else_expr)
-                    } else {
-                        None
-                    };
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .case(expr, when_then_expr_sql, else_expr)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                Expr::Cast { expr, data_type } => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    let data_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
-                    let resulting_sql =
-                        Self::generate_sql_cast_expr(sql_generator, expr, data_type)?;
-                    Ok((resulting_sql, sql_query))
-                }
-                // Expr::TryCast { .. } => {}
-                Expr::Sort {
-                    expr,
-                    asc,
-                    nulls_first,
-                } => {
-                    let (expr, sql_query) = Self::generate_sql_for_expr(
-                        sql_query,
-                        sql_generator.clone(),
-                        *expr,
-                        push_to_cube_context,
-                        subqueries.clone(),
-                        used_members,
-                    )
-                    .await?;
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .sort_expr(expr, asc, nulls_first)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for sort expr: {}",
-                                e
-                            ))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-
-                // Expr::TableUDF { .. } => {}
-                Expr::Literal(literal) => {
-                    Ok(match literal {
-                        ScalarValue::Boolean(b) => (
-                            b.map(|b| {
-                                sql_generator
-                                    .get_sql_templates()
-                                    .literal_bool_expr(b)
-                                    .map_err(|e| {
-                                        DataFusionError::Internal(format!(
-                                            "Can't generate SQL for literal bool: {}",
-                                            e
-                                        ))
-                                    })
-                            })
-                            .transpose()?
-                            .map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::Float32(f) => (
-                            f.map(|f| format!("{f}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::Float64(f) => (
-                            f.map(|f| format!("{f}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::Decimal128(x, precision, scale) => {
-                            // In Postgres, NUMERIC or DECIMAL scale can be negative.  But it's unsigned, here.
-                            let scale: usize = scale;
-
-                            (
-                                if let Some(x) = x {
-                                    let number = Decimal::format_string(x, scale);
-                                    let data_type = Self::generate_sql_type(
-                                        sql_generator.clone(),
-                                        DataType::Decimal(precision, scale),
-                                    )?;
-                                    CubeScanWrapperNode::generate_sql_cast_expr(
-                                        sql_generator,
-                                        format!("'{}'", number),
-                                        data_type,
-                                    )?
-                                } else {
-                                    Self::generate_null_for_literal(sql_generator, &literal)?
-                                },
-                                sql_query,
-                            )
-                        }
-                        ScalarValue::Int8(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::Int16(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::Int32(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::Int64(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::UInt8(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::UInt16(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::UInt32(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::UInt64(x) => (
-                            x.map(|x| format!("{x}")).map_or_else(
-                                || Self::generate_null_for_literal(sql_generator, &literal),
-                                Ok,
-                            )?,
-                            sql_query,
-                        ),
-                        ScalarValue::Utf8(x) => {
-                            if x.is_some() {
-                                let param_index = sql_query.add_value(x);
-                                (format!("${}$", param_index), sql_query)
-                            } else {
-                                (
-                                    Self::generate_typed_null(sql_generator, Some(DataType::Utf8))?,
-                                    sql_query,
-                                )
-                            }
-                        }
-                        // ScalarValue::LargeUtf8(_) => {}
-                        // ScalarValue::Binary(_) => {}
-                        // ScalarValue::LargeBinary(_) => {}
-                        // ScalarValue::List(_, _) => {}
-                        ScalarValue::Date32(x) => {
-                            if let Some(x) = x {
-                                let days = Days::new(x.abs().try_into().unwrap());
-                                let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-                                let new_date = if x < 0 {
-                                    epoch.checked_sub_days(days)
-                                } else {
-                                    epoch.checked_add_days(days)
-                                };
-                                let Some(new_date) = new_date else {
-                                    return Err(DataFusionError::Internal(format!(
-                                        "Can't generate SQL for date: day out of bounds ({})",
-                                        x
-                                    )));
-                                };
-                                let formatted_date = new_date.format("%Y-%m-%d").to_string();
-                                (
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .scalar_function(
-                                            "DATE".to_string(),
-                                            vec![format!("'{}'", formatted_date)],
-                                            None,
-                                            None,
-                                        )
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for date: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    sql_query,
-                                )
-                            } else {
-                                (
-                                    Self::generate_null_for_literal(sql_generator, &literal)?,
-                                    sql_query,
-                                )
-                            }
-                        }
-                        // ScalarValue::Date64(_) => {}
-
-                        // generate_sql_for_timestamp will call Utc constructors, so only support UTC zone for now
-                        // DataFusion can return "UTC" for stuff like `NOW()` during constant folding
-                        ScalarValue::TimestampSecond(s, ref tz)
-                            if matches!(tz.as_deref(), None | Some("UTC")) =>
-                        {
-                            generate_sql_for_timestamp!(
-                                literal,
-                                s,
-                                timestamp,
-                                sql_generator,
-                                sql_query
-                            )
-                        }
-                        ScalarValue::TimestampMillisecond(ms, ref tz)
-                            if matches!(tz.as_deref(), None | Some("UTC")) =>
-                        {
-                            generate_sql_for_timestamp!(
-                                literal,
-                                ms,
-                                timestamp_millis_opt,
-                                sql_generator,
-                                sql_query
-                            )
-                        }
-                        ScalarValue::TimestampMicrosecond(ms, ref tz)
-                            if matches!(tz.as_deref(), None | Some("UTC")) =>
-                        {
-                            generate_sql_for_timestamp!(
-                                literal,
-                                ms,
-                                timestamp_micros,
-                                sql_generator,
-                                sql_query
-                            )
-                        }
-                        ScalarValue::TimestampNanosecond(nanoseconds, ref tz)
-                            if matches!(tz.as_deref(), None | Some("UTC")) =>
-                        {
-                            generate_sql_for_timestamp!(
-                                literal,
-                                nanoseconds,
-                                timestamp_nanos,
-                                sql_generator,
-                                sql_query
-                            )
-                        }
-                        ScalarValue::IntervalYearMonth(x) => {
-                            if let Some(x) = x {
-                                let (num, date_part) = (x, "MONTH");
-                                let interval = format!("{} {}", num, date_part);
-                                (
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .interval_any_expr(interval, num.into(), date_part)
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for interval: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    sql_query,
-                                )
-                            } else {
-                                (
-                                    Self::generate_null_for_literal(sql_generator, &literal)?,
-                                    sql_query,
-                                )
-                            }
-                        }
-                        ScalarValue::IntervalDayTime(x) => {
-                            if let Some(x) = x {
-                                let templates = sql_generator.get_sql_templates();
-                                let decomposed = DecomposedDayTime::from_raw_interval_value(x);
-                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
-                                (generated_sql, sql_query)
-                            } else {
-                                (
-                                    Self::generate_null_for_literal(sql_generator, &literal)?,
-                                    sql_query,
-                                )
-                            }
-                        }
-                        ScalarValue::IntervalMonthDayNano(x) => {
-                            if let Some(x) = x {
-                                let templates = sql_generator.get_sql_templates();
-                                let decomposed = DecomposedMonthDayNano::from_raw_interval_value(x);
-                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
-                                (generated_sql, sql_query)
-                            } else {
-                                (
-                                    Self::generate_null_for_literal(sql_generator, &literal)?,
-                                    sql_query,
-                                )
-                            }
-                        }
-                        // ScalarValue::Struct(_, _) => {}
-                        ScalarValue::Null => {
-                            (Self::generate_typed_null(sql_generator, None)?, sql_query)
-                        }
-                        x => {
-                            return Err(DataFusionError::Internal(format!(
-                                "Can't generate SQL for literal: {:?}",
-                                x
-                            )));
-                        }
-                    })
-                }
-                Expr::ScalarUDF { fun, args } => {
-                    let date_part_err = |dp| {
+                Ok((resulting_sql, sql_query))
+            }
+            Expr::IsNotNull(expr) => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .is_null_expr(expr, true)
+                    .map_err(|e| {
                         DataFusionError::Internal(format!(
-                        "Can't generate SQL for scalar function: date part '{}' is not supported",
-                        dp
-                    ))
-                    };
-                    let date_part = match fun.name.as_str() {
-                        "datediff" | "dateadd" => match &args[0] {
-                            Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
-                                // Security check to prevent SQL injection
-                                if DATE_PART_REGEX.is_match(date_part) {
-                                    Ok(Some(date_part.to_string()))
-                                } else {
-                                    Err(date_part_err(date_part.to_string()))
-                                }
-                            }
-                            _ => Err(date_part_err(args[0].to_string())),
-                        },
-                        "date_add" => match &args[1] {
-                            Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
-                                let days = (*interval >> 32) as i32;
-                                let ms = (*interval & 0xFFFF_FFFF) as i32;
-
-                                if days != 0 && ms == 0 {
-                                    Ok(Some("DAY".to_string()))
-                                } else if ms != 0 && days == 0 {
-                                    Ok(Some("MILLISECOND".to_string()))
-                                } else {
-                                    Err(DataFusionError::Internal(format!(
-                                        "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
-                                    )))
-                                }
-                            }
-                            Expr::Literal(ScalarValue::IntervalYearMonth(Some(_months))) => {
-                                Ok(Some("MONTH".to_string()))
-                            }
-                            Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
-                                let months = (interval >> 96) as i32;
-                                let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
-                                let nanos = *interval as i64;
-
-                                if months != 0 && days == 0 && nanos == 0 {
-                                    Ok(Some("MONTH".to_string()))
-                                } else if days != 0 && months == 0 && nanos == 0 {
-                                    Ok(Some("DAY".to_string()))
-                                } else if nanos != 0 && months == 0 && days == 0 {
-                                    Ok(Some("NANOSECOND".to_string()))
-                                } else {
-                                    Err(DataFusionError::Internal(format!(
-                                        "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
-                                    )))
-                                }
-                            }
-                            _ => Err(date_part_err(args[1].to_string())),
-                        },
-                        _ => Ok(None),
-                    }?;
-                    let interval = match fun.name.as_str() {
-                        "dateadd" => match &args[1] {
-                            Expr::Literal(ScalarValue::Int64(Some(interval))) => {
-                                Ok(Some(interval.to_string()))
-                            }
-                            _ => Err(DataFusionError::Internal(format!(
-                                "Can't generate SQL for scalar function: interval must be Int64"
-                            ))),
-                        },
-                        "date_add" => match &args[1] {
-                            Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
-                                let days = (*interval >> 32) as i32;
-                                let ms = (*interval & 0xFFFF_FFFF) as i32;
-
-                                if days != 0 && ms == 0 {
-                                    Ok(Some(days.to_string()))
-                                } else if ms != 0 && days == 0 {
-                                    Ok(Some(ms.to_string()))
-                                } else {
-                                    Err(DataFusionError::Internal(format!(
-                                        "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
-                                    )))
-                                }
-                            }
-                            Expr::Literal(ScalarValue::IntervalYearMonth(Some(months))) => {
-                                Ok(Some(months.to_string()))
-                            }
-                            Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
-                                let months = (interval >> 96) as i32;
-                                let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
-                                let nanos = *interval as i64;
-
-                                if months != 0 && days == 0 && nanos == 0 {
-                                    Ok(Some(months.to_string()))
-                                } else if days != 0 && months == 0 && nanos == 0 {
-                                    Ok(Some(days.to_string()))
-                                } else if nanos != 0 && months == 0 && days == 0 {
-                                    Ok(Some(nanos.to_string()))
-                                } else {
-                                    Err(DataFusionError::Internal(format!(
-                                        "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
-                                    )))
-                                }
-                            }
-                            _ => Err(date_part_err(args[1].to_string())),
-                        },
-                        _ => Ok(None),
-                    }?;
-                    let mut sql_args = Vec::new();
-                    for arg in args {
-                        let (sql, query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            arg,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = query;
-                        sql_args.push(sql);
-                    }
-                    Ok((
-                        sql_generator
-                            .get_sql_templates()
-                            .scalar_function(fun.name.to_string(), sql_args, date_part, interval)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for scalar function: {}",
-                                    e
-                                ))
-                            })?,
-                        sql_query,
-                    ))
-                }
-                Expr::ScalarFunction { fun, args } => {
-                    if let BuiltinScalarFunction::DatePart = &fun {
-                        if args.len() >= 2 {
-                            match &args[0] {
-                                Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
-                                    // Security check to prevent SQL injection
-                                    if !DATE_PART_REGEX.is_match(date_part) {
-                                        return Err(DataFusionError::Internal(format!(
-                                            "Can't generate SQL for scalar function: date part '{}' is not supported",
-                                            date_part
-                                        )));
-                                    }
-                                    let (arg_sql, query) = Self::generate_sql_for_expr(
-                                        sql_query,
-                                        sql_generator.clone(),
-                                        args[1].clone(),
-                                        push_to_cube_context,
-                                        subqueries.clone(),
-                                        used_members,
-                                    )
-                                    .await?;
-                                    return Ok((
-                                        sql_generator
-                                            .get_sql_templates()
-                                            .extract_expr(date_part.to_string(), arg_sql)
-                                            .map_err(|e| {
-                                                DataFusionError::Internal(format!(
-                                                    "Can't generate SQL for scalar function: {}",
-                                                    e
-                                                ))
-                                            })?,
-                                        query,
-                                    ));
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    let date_part = if let BuiltinScalarFunction::DateTrunc = &fun {
-                        match &args[0] {
-                            Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
-                                // Security check to prevent SQL injection
-                                if DATE_PART_REGEX.is_match(date_part) {
-                                    Some(date_part.to_string())
-                                } else {
-                                    None
-                                }
-                            }
-                            _ => None,
-                        }
-                    } else {
-                        None
-                    };
-                    let mut sql_args = Vec::new();
-                    for arg in args {
-                        let (sql, query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            arg,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = query;
-                        sql_args.push(sql);
-                    }
-                    Ok((
-                        sql_generator
-                            .get_sql_templates()
-                            .scalar_function(fun.to_string(), sql_args, date_part, None)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for scalar function: {}",
-                                    e
-                                ))
-                            })?,
-                        sql_query,
-                    ))
-                }
-                Expr::AggregateFunction {
-                    fun,
-                    args,
-                    distinct,
-                } => {
-                    let mut sql_args = Vec::new();
-                    for arg in args {
-                        if let AggregateFunction::Count = fun {
-                            if !distinct {
-                                if let Expr::Literal(_) = arg {
-                                    sql_args.push("*".to_string());
-                                    break;
-                                }
-                            }
-                        }
-                        let (sql, query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            arg,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = query;
-                        sql_args.push(sql);
-                    }
-                    Ok((
-                        sql_generator
-                            .get_sql_templates()
-                            .aggregate_function(fun, sql_args, distinct)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for aggregate function: {}",
-                                    e
-                                ))
-                            })?,
-                        sql_query,
-                    ))
-                }
-                Expr::GroupingSet(grouping_set) => match grouping_set {
-                    datafusion::logical_plan::GroupingSet::Rollup(exprs) => {
-                        let mut sql_exprs = Vec::new();
-                        for expr in exprs {
-                            let (sql, query) = Self::generate_sql_for_expr(
-                                sql_query,
-                                sql_generator.clone(),
-                                expr,
-                                push_to_cube_context,
-                                subqueries.clone(),
-                                used_members.as_deref_mut(),
-                            )
-                            .await?;
-                            sql_query = query;
-                            sql_exprs.push(sql);
-                        }
-                        Ok((
-                            sql_generator
-                                .get_sql_templates()
-                                .rollup_expr(sql_exprs)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for rollup expression: {}",
-                                        e
-                                    ))
-                                })?,
-                            sql_query,
+                            "Can't generate SQL for is not null expr: {}",
+                            e
                         ))
-                    }
-                    datafusion::logical_plan::GroupingSet::Cube(exprs) => {
-                        let mut sql_exprs = Vec::new();
-                        for expr in exprs {
-                            let (sql, query) = Self::generate_sql_for_expr(
-                                sql_query,
-                                sql_generator.clone(),
-                                expr,
-                                push_to_cube_context,
-                                subqueries.clone(),
-                                used_members.as_deref_mut(),
-                            )
-                            .await?;
-                            sql_query = query;
-                            sql_exprs.push(sql);
-                        }
-                        Ok((
-                            sql_generator
-                                .get_sql_templates()
-                                .cube_expr(sql_exprs)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for rollup expression: {}",
-                                        e
-                                    ))
-                                })?,
-                            sql_query,
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            Expr::IsNull(expr) => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .is_null_expr(expr, false)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for is null expr: {}",
+                            e
                         ))
-                    }
-                    datafusion::logical_plan::GroupingSet::GroupingSets(_) => {
-                        Err(DataFusionError::Internal(format!(
-                            "SQL generation for GroupingSet is not supported"
-                        )))
-                    }
-                },
-
-                Expr::WindowFunction {
-                    fun,
-                    args,
-                    partition_by,
-                    order_by,
-                    window_frame,
-                } => {
-                    let mut sql_args = Vec::new();
-                    for arg in args {
-                        let (sql, query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            arg,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = query;
-                        sql_args.push(sql);
-                    }
-                    let mut sql_partition_by = Vec::new();
-                    for arg in partition_by {
-                        let (sql, query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            arg,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = query;
-                        sql_partition_by.push(sql);
-                    }
-                    let mut sql_order_by = Vec::new();
-                    for arg in order_by {
-                        let (sql, query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            arg,
-                            push_to_cube_context,
-                            subqueries.clone(),
-                            used_members.as_deref_mut(),
-                        )
-                        .await?;
-                        sql_query = query;
-                        sql_order_by.push(sql);
-                    }
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .window_function_expr(
-                            fun,
-                            sql_args,
-                            sql_partition_by,
-                            sql_order_by,
-                            window_frame,
-                        )
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for window function: {}",
-                                e
-                            ))
-                        })?;
-                    Ok((resulting_sql, sql_query))
-                }
-                Expr::AggregateUDF { ref fun, ref args } => {
-                    match fun.name.as_str() {
-                        // TODO allow this only in agg expr
-                        MEASURE_UDAF_NAME => {
-                            let Some(PushToCubeContext {
-                                ungrouped_scan_node,
-                                ..
-                            }) = push_to_cube_context
-                            else {
-                                return Err(DataFusionError::Internal(format!(
-                                    "Unexpected {} UDAF expression without push-to-Cube context: {expr}",
-                                    fun.name,
-                                )));
-                            };
-
-                            let measure_column = match args.as_slice() {
-                                [Expr::Column(measure_column)] => measure_column,
-                                _ => {
-                                    return Err(DataFusionError::Internal(format!(
-                                        "Unexpected arguments for {} UDAF: {expr}",
-                                        fun.name,
-                                    )))
-                                }
-                            };
-
-                            let member = Self::find_member_in_ungrouped_scan(
-                                ungrouped_scan_node,
-                                measure_column,
-                            )?;
-
-                            let MemberField::Member(member) = member else {
-                                return Err(DataFusionError::Internal(format!(
-                                    "First argument for {} UDAF should reference member, not literal: {expr}",
-                                    fun.name,
-                                )));
-                            };
-
-                            if let Some(used_members) = used_members {
-                                used_members.insert(member.clone());
-                            }
-
-                            Ok((format!("${{{member}}}"), sql_query))
-                        }
-                        // There's no branch for PatchMeasure, because it should generate via different path
-                        _ => Err(DataFusionError::Internal(format!(
-                            "Can't generate SQL for UDAF: {}",
-                            fun.name
-                        ))),
-                    }
-                }
-                Expr::InList {
-                    expr,
-                    list,
-                    negated,
-                } => {
-                    let mut sql_query = sql_query;
-                    let (sql_expr, query) = Self::generate_sql_for_expr(
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            Expr::Negative(expr) => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .negative_expr(expr)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!("Can't generate SQL for not expr: {}", e))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            // Expr::GetIndexedField { .. } => {}
+            // Expr::Between { .. } => {}
+            Expr::Case {
+                expr,
+                when_then_expr,
+                else_expr,
+            } => {
+                let expr = if let Some(expr) = expr {
+                    let (expr, sql_query_next) = Self::generate_sql_for_expr_rec(
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -3167,10 +2344,628 @@ impl CubeScanWrapperNode {
                         used_members.as_deref_mut(),
                     )
                     .await?;
+                    sql_query = sql_query_next;
+                    Some(expr)
+                } else {
+                    None
+                };
+                let mut when_then_expr_sql = Vec::new();
+                for (when, then) in when_then_expr {
+                    let (when, sql_query_next) = Self::generate_sql_for_expr_rec(
+                        sql_query,
+                        sql_generator.clone(),
+                        *when,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members.as_deref_mut(),
+                    )
+                    .await?;
+                    let (then, sql_query_next) = Self::generate_sql_for_expr_rec(
+                        sql_query_next,
+                        sql_generator.clone(),
+                        *then,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members.as_deref_mut(),
+                    )
+                    .await?;
+                    sql_query = sql_query_next;
+                    when_then_expr_sql.push((when, then));
+                }
+                let else_expr = if let Some(else_expr) = else_expr {
+                    let (else_expr, sql_query_next) = Self::generate_sql_for_expr_rec(
+                        sql_query,
+                        sql_generator.clone(),
+                        *else_expr,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members,
+                    )
+                    .await?;
+                    sql_query = sql_query_next;
+                    Some(else_expr)
+                } else {
+                    None
+                };
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .case(expr, when_then_expr_sql, else_expr)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            Expr::Cast { expr, data_type } => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                let data_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
+                let resulting_sql = Self::generate_sql_cast_expr(sql_generator, expr, data_type)?;
+                Ok((resulting_sql, sql_query))
+            }
+            // Expr::TryCast { .. } => {}
+            Expr::Sort {
+                expr,
+                asc,
+                nulls_first,
+            } => {
+                let (expr, sql_query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .sort_expr(expr, asc, nulls_first)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for sort expr: {}",
+                            e
+                        ))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+
+            // Expr::TableUDF { .. } => {}
+            Expr::Literal(literal) => {
+                Ok(match literal {
+                    ScalarValue::Boolean(b) => (
+                        b.map(|b| {
+                            sql_generator
+                                .get_sql_templates()
+                                .literal_bool_expr(b)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for literal bool: {}",
+                                        e
+                                    ))
+                                })
+                        })
+                        .transpose()?
+                        .map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::Float32(f) => (
+                        f.map(|f| format!("{f}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::Float64(f) => (
+                        f.map(|f| format!("{f}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::Decimal128(x, precision, scale) => {
+                        // In Postgres, NUMERIC or DECIMAL scale can be negative.  But it's unsigned, here.
+                        let scale: usize = scale;
+
+                        (
+                            if let Some(x) = x {
+                                let number = Decimal::format_string(x, scale);
+                                let data_type = Self::generate_sql_type(
+                                    sql_generator.clone(),
+                                    DataType::Decimal(precision, scale),
+                                )?;
+                                CubeScanWrapperNode::generate_sql_cast_expr(
+                                    sql_generator,
+                                    format!("'{}'", number),
+                                    data_type,
+                                )?
+                            } else {
+                                Self::generate_null_for_literal(sql_generator, &literal)?
+                            },
+                            sql_query,
+                        )
+                    }
+                    ScalarValue::Int8(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::Int16(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::Int32(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::Int64(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::UInt8(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::UInt16(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::UInt32(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::UInt64(x) => (
+                        x.map(|x| format!("{x}")).map_or_else(
+                            || Self::generate_null_for_literal(sql_generator, &literal),
+                            Ok,
+                        )?,
+                        sql_query,
+                    ),
+                    ScalarValue::Utf8(x) => {
+                        if x.is_some() {
+                            let param_index = sql_query.add_value(x);
+                            (format!("${}$", param_index), sql_query)
+                        } else {
+                            (
+                                Self::generate_typed_null(sql_generator, Some(DataType::Utf8))?,
+                                sql_query,
+                            )
+                        }
+                    }
+                    // ScalarValue::LargeUtf8(_) => {}
+                    // ScalarValue::Binary(_) => {}
+                    // ScalarValue::LargeBinary(_) => {}
+                    // ScalarValue::List(_, _) => {}
+                    ScalarValue::Date32(x) => {
+                        if let Some(x) = x {
+                            let days = Days::new(x.abs().try_into().unwrap());
+                            let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                            let new_date = if x < 0 {
+                                epoch.checked_sub_days(days)
+                            } else {
+                                epoch.checked_add_days(days)
+                            };
+                            let Some(new_date) = new_date else {
+                                return Err(DataFusionError::Internal(format!(
+                                    "Can't generate SQL for date: day out of bounds ({})",
+                                    x
+                                )));
+                            };
+                            let formatted_date = new_date.format("%Y-%m-%d").to_string();
+                            (
+                                sql_generator
+                                    .get_sql_templates()
+                                    .scalar_function(
+                                        "DATE".to_string(),
+                                        vec![format!("'{}'", formatted_date)],
+                                        None,
+                                        None,
+                                    )
+                                    .map_err(|e| {
+                                        DataFusionError::Internal(format!(
+                                            "Can't generate SQL for date: {}",
+                                            e
+                                        ))
+                                    })?,
+                                sql_query,
+                            )
+                        } else {
+                            (
+                                Self::generate_null_for_literal(sql_generator, &literal)?,
+                                sql_query,
+                            )
+                        }
+                    }
+                    // ScalarValue::Date64(_) => {}
+
+                    // generate_sql_for_timestamp will call Utc constructors, so only support UTC zone for now
+                    // DataFusion can return "UTC" for stuff like `NOW()` during constant folding
+                    ScalarValue::TimestampSecond(s, ref tz)
+                        if matches!(tz.as_deref(), None | Some("UTC")) =>
+                    {
+                        generate_sql_for_timestamp!(literal, s, timestamp, sql_generator, sql_query)
+                    }
+                    ScalarValue::TimestampMillisecond(ms, ref tz)
+                        if matches!(tz.as_deref(), None | Some("UTC")) =>
+                    {
+                        generate_sql_for_timestamp!(
+                            literal,
+                            ms,
+                            timestamp_millis_opt,
+                            sql_generator,
+                            sql_query
+                        )
+                    }
+                    ScalarValue::TimestampMicrosecond(ms, ref tz)
+                        if matches!(tz.as_deref(), None | Some("UTC")) =>
+                    {
+                        generate_sql_for_timestamp!(
+                            literal,
+                            ms,
+                            timestamp_micros,
+                            sql_generator,
+                            sql_query
+                        )
+                    }
+                    ScalarValue::TimestampNanosecond(nanoseconds, ref tz)
+                        if matches!(tz.as_deref(), None | Some("UTC")) =>
+                    {
+                        generate_sql_for_timestamp!(
+                            literal,
+                            nanoseconds,
+                            timestamp_nanos,
+                            sql_generator,
+                            sql_query
+                        )
+                    }
+                    ScalarValue::IntervalYearMonth(x) => {
+                        if let Some(x) = x {
+                            let (num, date_part) = (x, "MONTH");
+                            let interval = format!("{} {}", num, date_part);
+                            (
+                                sql_generator
+                                    .get_sql_templates()
+                                    .interval_any_expr(interval, num.into(), date_part)
+                                    .map_err(|e| {
+                                        DataFusionError::Internal(format!(
+                                            "Can't generate SQL for interval: {}",
+                                            e
+                                        ))
+                                    })?,
+                                sql_query,
+                            )
+                        } else {
+                            (
+                                Self::generate_null_for_literal(sql_generator, &literal)?,
+                                sql_query,
+                            )
+                        }
+                    }
+                    ScalarValue::IntervalDayTime(x) => {
+                        if let Some(x) = x {
+                            let templates = sql_generator.get_sql_templates();
+                            let decomposed = DecomposedDayTime::from_raw_interval_value(x);
+                            let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                            (generated_sql, sql_query)
+                        } else {
+                            (
+                                Self::generate_null_for_literal(sql_generator, &literal)?,
+                                sql_query,
+                            )
+                        }
+                    }
+                    ScalarValue::IntervalMonthDayNano(x) => {
+                        if let Some(x) = x {
+                            let templates = sql_generator.get_sql_templates();
+                            let decomposed = DecomposedMonthDayNano::from_raw_interval_value(x);
+                            let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                            (generated_sql, sql_query)
+                        } else {
+                            (
+                                Self::generate_null_for_literal(sql_generator, &literal)?,
+                                sql_query,
+                            )
+                        }
+                    }
+                    // ScalarValue::Struct(_, _) => {}
+                    ScalarValue::Null => {
+                        (Self::generate_typed_null(sql_generator, None)?, sql_query)
+                    }
+                    x => {
+                        return Err(DataFusionError::Internal(format!(
+                            "Can't generate SQL for literal: {:?}",
+                            x
+                        )));
+                    }
+                })
+            }
+            Expr::ScalarUDF { fun, args } => {
+                let date_part_err = |dp| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for scalar function: date part '{}' is not supported",
+                        dp
+                    ))
+                };
+                let date_part = match fun.name.as_str() {
+                    "datediff" | "dateadd" => match &args[0] {
+                        Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                            // Security check to prevent SQL injection
+                            if DATE_PART_REGEX.is_match(date_part) {
+                                Ok(Some(date_part.to_string()))
+                            } else {
+                                Err(date_part_err(date_part.to_string()))
+                            }
+                        }
+                        _ => Err(date_part_err(args[0].to_string())),
+                    },
+                    "date_add" => match &args[1] {
+                        Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
+                            let days = (*interval >> 32) as i32;
+                            let ms = (*interval & 0xFFFF_FFFF) as i32;
+
+                            if days != 0 && ms == 0 {
+                                Ok(Some("DAY".to_string()))
+                            } else if ms != 0 && days == 0 {
+                                Ok(Some("MILLISECOND".to_string()))
+                            } else {
+                                Err(DataFusionError::Internal(format!(
+                                    "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
+                                )))
+                            }
+                        }
+                        Expr::Literal(ScalarValue::IntervalYearMonth(Some(_months))) => {
+                            Ok(Some("MONTH".to_string()))
+                        }
+                        Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
+                            let months = (interval >> 96) as i32;
+                            let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
+                            let nanos = *interval as i64;
+
+                            if months != 0 && days == 0 && nanos == 0 {
+                                Ok(Some("MONTH".to_string()))
+                            } else if days != 0 && months == 0 && nanos == 0 {
+                                Ok(Some("DAY".to_string()))
+                            } else if nanos != 0 && months == 0 && days == 0 {
+                                Ok(Some("NANOSECOND".to_string()))
+                            } else {
+                                Err(DataFusionError::Internal(format!(
+                                    "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
+                                )))
+                            }
+                        }
+                        _ => Err(date_part_err(args[1].to_string())),
+                    },
+                    _ => Ok(None),
+                }?;
+                let interval = match fun.name.as_str() {
+                    "dateadd" => match &args[1] {
+                        Expr::Literal(ScalarValue::Int64(Some(interval))) => {
+                            Ok(Some(interval.to_string()))
+                        }
+                        _ => Err(DataFusionError::Internal(format!(
+                            "Can't generate SQL for scalar function: interval must be Int64"
+                        ))),
+                    },
+                    "date_add" => match &args[1] {
+                        Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
+                            let days = (*interval >> 32) as i32;
+                            let ms = (*interval & 0xFFFF_FFFF) as i32;
+
+                            if days != 0 && ms == 0 {
+                                Ok(Some(days.to_string()))
+                            } else if ms != 0 && days == 0 {
+                                Ok(Some(ms.to_string()))
+                            } else {
+                                Err(DataFusionError::Internal(format!(
+                                    "Unsupported mixed IntervalDayTime: days = {days}, ms = {ms}"
+                                )))
+                            }
+                        }
+                        Expr::Literal(ScalarValue::IntervalYearMonth(Some(months))) => {
+                            Ok(Some(months.to_string()))
+                        }
+                        Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
+                            let months = (interval >> 96) as i32;
+                            let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
+                            let nanos = *interval as i64;
+
+                            if months != 0 && days == 0 && nanos == 0 {
+                                Ok(Some(months.to_string()))
+                            } else if days != 0 && months == 0 && nanos == 0 {
+                                Ok(Some(days.to_string()))
+                            } else if nanos != 0 && months == 0 && days == 0 {
+                                Ok(Some(nanos.to_string()))
+                            } else {
+                                Err(DataFusionError::Internal(format!(
+                                    "Unsupported mixed IntervalMonthDayNano: months = {months}, days = {days}, nanos = {nanos}"
+                                )))
+                            }
+                        }
+                        _ => Err(date_part_err(args[1].to_string())),
+                    },
+                    _ => Ok(None),
+                }?;
+                let mut sql_args = Vec::new();
+                for arg in args {
+                    let (sql, query) = Self::generate_sql_for_expr_rec(
+                        sql_query,
+                        sql_generator.clone(),
+                        arg,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members.as_deref_mut(),
+                    )
+                    .await?;
                     sql_query = query;
-                    let mut sql_in_exprs = Vec::new();
-                    for expr in list {
-                        let (sql, query) = Self::generate_sql_for_expr(
+                    sql_args.push(sql);
+                }
+                Ok((
+                    sql_generator
+                        .get_sql_templates()
+                        .scalar_function(fun.name.to_string(), sql_args, date_part, interval)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for scalar function: {}",
+                                e
+                            ))
+                        })?,
+                    sql_query,
+                ))
+            }
+            Expr::ScalarFunction { fun, args } => {
+                if let BuiltinScalarFunction::DatePart = &fun {
+                    if args.len() >= 2 {
+                        match &args[0] {
+                            Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                                // Security check to prevent SQL injection
+                                if !DATE_PART_REGEX.is_match(date_part) {
+                                    return Err(DataFusionError::Internal(format!(
+                                        "Can't generate SQL for scalar function: date part '{}' is not supported",
+                                        date_part
+                                    )));
+                                }
+                                let (arg_sql, query) = Self::generate_sql_for_expr_rec(
+                                    sql_query,
+                                    sql_generator.clone(),
+                                    args[1].clone(),
+                                    push_to_cube_context,
+                                    subqueries.clone(),
+                                    used_members,
+                                )
+                                .await?;
+                                return Ok((
+                                    sql_generator
+                                        .get_sql_templates()
+                                        .extract_expr(date_part.to_string(), arg_sql)
+                                        .map_err(|e| {
+                                            DataFusionError::Internal(format!(
+                                                "Can't generate SQL for scalar function: {}",
+                                                e
+                                            ))
+                                        })?,
+                                    query,
+                                ));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                let date_part = if let BuiltinScalarFunction::DateTrunc = &fun {
+                    match &args[0] {
+                        Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                            // Security check to prevent SQL injection
+                            if DATE_PART_REGEX.is_match(date_part) {
+                                Some(date_part.to_string())
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                let mut sql_args = Vec::new();
+                for arg in args {
+                    let (sql, query) = Self::generate_sql_for_expr_rec(
+                        sql_query,
+                        sql_generator.clone(),
+                        arg,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members.as_deref_mut(),
+                    )
+                    .await?;
+                    sql_query = query;
+                    sql_args.push(sql);
+                }
+                Ok((
+                    sql_generator
+                        .get_sql_templates()
+                        .scalar_function(fun.to_string(), sql_args, date_part, None)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for scalar function: {}",
+                                e
+                            ))
+                        })?,
+                    sql_query,
+                ))
+            }
+            Expr::AggregateFunction {
+                fun,
+                args,
+                distinct,
+            } => {
+                let mut sql_args = Vec::new();
+                for arg in args {
+                    if let AggregateFunction::Count = fun {
+                        if !distinct {
+                            if let Expr::Literal(_) = arg {
+                                sql_args.push("*".to_string());
+                                break;
+                            }
+                        }
+                    }
+                    let (sql, query) = Self::generate_sql_for_expr_rec(
+                        sql_query,
+                        sql_generator.clone(),
+                        arg,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members.as_deref_mut(),
+                    )
+                    .await?;
+                    sql_query = query;
+                    sql_args.push(sql);
+                }
+                Ok((
+                    sql_generator
+                        .get_sql_templates()
+                        .aggregate_function(fun, sql_args, distinct)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for aggregate function: {}",
+                                e
+                            ))
+                        })?,
+                    sql_query,
+                ))
+            }
+            Expr::GroupingSet(grouping_set) => match grouping_set {
+                datafusion::logical_plan::GroupingSet::Rollup(exprs) => {
+                    let mut sql_exprs = Vec::new();
+                    for expr in exprs {
+                        let (sql, query) = Self::generate_sql_for_expr_rec(
                             sql_query,
                             sql_generator.clone(),
                             expr,
@@ -3180,71 +2975,285 @@ impl CubeScanWrapperNode {
                         )
                         .await?;
                         sql_query = query;
-                        sql_in_exprs.push(sql);
+                        sql_exprs.push(sql);
                     }
                     Ok((
                         sql_generator
                             .get_sql_templates()
-                            .in_list_expr(sql_expr, sql_in_exprs, negated)
+                            .rollup_expr(sql_exprs)
                             .map_err(|e| {
                                 DataFusionError::Internal(format!(
-                                    "Can't generate SQL for in list expr: {}",
+                                    "Can't generate SQL for rollup expression: {}",
                                     e
                                 ))
                             })?,
                         sql_query,
                     ))
                 }
-                Expr::InSubquery {
-                    expr,
-                    subquery,
-                    negated,
-                } => {
-                    let mut sql_query = sql_query;
-                    let (sql_expr, query) = Self::generate_sql_for_expr(
+                datafusion::logical_plan::GroupingSet::Cube(exprs) => {
+                    let mut sql_exprs = Vec::new();
+                    for expr in exprs {
+                        let (sql, query) = Self::generate_sql_for_expr_rec(
+                            sql_query,
+                            sql_generator.clone(),
+                            expr,
+                            push_to_cube_context,
+                            subqueries.clone(),
+                            used_members.as_deref_mut(),
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_exprs.push(sql);
+                    }
+                    Ok((
+                        sql_generator
+                            .get_sql_templates()
+                            .cube_expr(sql_exprs)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for rollup expression: {}",
+                                    e
+                                ))
+                            })?,
+                        sql_query,
+                    ))
+                }
+                datafusion::logical_plan::GroupingSet::GroupingSets(_) => {
+                    Err(DataFusionError::Internal(format!(
+                        "SQL generation for GroupingSet is not supported"
+                    )))
+                }
+            },
+
+            Expr::WindowFunction {
+                fun,
+                args,
+                partition_by,
+                order_by,
+                window_frame,
+            } => {
+                let mut sql_args = Vec::new();
+                for arg in args {
+                    let (sql, query) = Self::generate_sql_for_expr_rec(
                         sql_query,
                         sql_generator.clone(),
-                        *expr,
+                        arg,
                         push_to_cube_context,
                         subqueries.clone(),
                         used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
-                    let (subquery_sql, query) = Self::generate_sql_for_expr(
+                    sql_args.push(sql);
+                }
+                let mut sql_partition_by = Vec::new();
+                for arg in partition_by {
+                    let (sql, query) = Self::generate_sql_for_expr_rec(
                         sql_query,
                         sql_generator.clone(),
-                        *subquery,
+                        arg,
                         push_to_cube_context,
                         subqueries.clone(),
-                        used_members,
+                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
-
-                    Ok((
-                        sql_generator
-                            .get_sql_templates()
-                            .in_subquery_expr(sql_expr, subquery_sql, negated)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for in subquery expr: {}",
-                                    e
-                                ))
-                            })?,
-                        sql_query,
-                    ))
+                    sql_partition_by.push(sql);
                 }
-                // Expr::Wildcard => {}
-                // Expr::QualifiedWildcard { .. } => {}
-                x => {
-                    return Err(DataFusionError::Internal(format!(
-                        "SQL generation for expression is not supported: {:?}",
-                        x
-                    )))
+                let mut sql_order_by = Vec::new();
+                for arg in order_by {
+                    let (sql, query) = Self::generate_sql_for_expr_rec(
+                        sql_query,
+                        sql_generator.clone(),
+                        arg,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members.as_deref_mut(),
+                    )
+                    .await?;
+                    sql_query = query;
+                    sql_order_by.push(sql);
+                }
+                let resulting_sql = sql_generator
+                    .get_sql_templates()
+                    .window_function_expr(
+                        fun,
+                        sql_args,
+                        sql_partition_by,
+                        sql_order_by,
+                        window_frame,
+                    )
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for window function: {}",
+                            e
+                        ))
+                    })?;
+                Ok((resulting_sql, sql_query))
+            }
+            Expr::AggregateUDF { ref fun, ref args } => {
+                match fun.name.as_str() {
+                    // TODO allow this only in agg expr
+                    MEASURE_UDAF_NAME => {
+                        let Some(PushToCubeContext {
+                            ungrouped_scan_node,
+                            ..
+                        }) = push_to_cube_context
+                        else {
+                            return Err(DataFusionError::Internal(format!(
+                                "Unexpected {} UDAF expression without push-to-Cube context: {expr}",
+                                fun.name,
+                            )));
+                        };
+
+                        let measure_column = match args.as_slice() {
+                            [Expr::Column(measure_column)] => measure_column,
+                            _ => {
+                                return Err(DataFusionError::Internal(format!(
+                                    "Unexpected arguments for {} UDAF: {expr}",
+                                    fun.name,
+                                )))
+                            }
+                        };
+
+                        let member = Self::find_member_in_ungrouped_scan(
+                            ungrouped_scan_node,
+                            measure_column,
+                        )?;
+
+                        let MemberField::Member(member) = member else {
+                            return Err(DataFusionError::Internal(format!(
+                                "First argument for {} UDAF should reference member, not literal: {expr}",
+                                fun.name,
+                            )));
+                        };
+
+                        if let Some(used_members) = used_members {
+                            used_members.insert(member.clone());
+                        }
+
+                        Ok((format!("${{{member}}}"), sql_query))
+                    }
+                    // There's no branch for PatchMeasure, because it should generate via different path
+                    _ => Err(DataFusionError::Internal(format!(
+                        "Can't generate SQL for UDAF: {}",
+                        fun.name
+                    ))),
                 }
             }
-        })
+            Expr::InList {
+                expr,
+                list,
+                negated,
+            } => {
+                let mut sql_query = sql_query;
+                let (sql_expr, query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members.as_deref_mut(),
+                )
+                .await?;
+                sql_query = query;
+                let mut sql_in_exprs = Vec::new();
+                for expr in list {
+                    let (sql, query) = Self::generate_sql_for_expr_rec(
+                        sql_query,
+                        sql_generator.clone(),
+                        expr,
+                        push_to_cube_context,
+                        subqueries.clone(),
+                        used_members.as_deref_mut(),
+                    )
+                    .await?;
+                    sql_query = query;
+                    sql_in_exprs.push(sql);
+                }
+                Ok((
+                    sql_generator
+                        .get_sql_templates()
+                        .in_list_expr(sql_expr, sql_in_exprs, negated)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for in list expr: {}",
+                                e
+                            ))
+                        })?,
+                    sql_query,
+                ))
+            }
+            Expr::InSubquery {
+                expr,
+                subquery,
+                negated,
+            } => {
+                let mut sql_query = sql_query;
+                let (sql_expr, query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *expr,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members.as_deref_mut(),
+                )
+                .await?;
+                sql_query = query;
+                let (subquery_sql, query) = Self::generate_sql_for_expr_rec(
+                    sql_query,
+                    sql_generator.clone(),
+                    *subquery,
+                    push_to_cube_context,
+                    subqueries.clone(),
+                    used_members,
+                )
+                .await?;
+                sql_query = query;
+
+                Ok((
+                    sql_generator
+                        .get_sql_templates()
+                        .in_subquery_expr(sql_expr, subquery_sql, negated)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for in subquery expr: {}",
+                                e
+                            ))
+                        })?,
+                    sql_query,
+                ))
+            }
+            // Expr::Wildcard => {}
+            // Expr::QualifiedWildcard { .. } => {}
+            x => {
+                return Err(DataFusionError::Internal(format!(
+                    "SQL generation for expression is not supported: {:?}",
+                    x
+                )))
+            }
+        }
+    }
+
+    /// This function is async to be able to call to JS land,
+    /// in case some SQL generation could not be done through Jinja
+    fn generate_sql_for_expr_rec<'ctx>(
+        sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: Expr,
+        push_to_cube_context: Option<&'ctx PushToCubeContext>,
+        subqueries: Arc<HashMap<String, String>>,
+        used_members: Option<&'ctx mut HashSet<String>>,
+    ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send + 'ctx>> {
+        Self::generate_sql_for_expr(
+            sql_query,
+            sql_generator,
+            expr,
+            push_to_cube_context,
+            subqueries,
+            used_members,
+        )
+        .boxed()
     }
 
     fn find_member_in_ungrouped_scan<'scan, 'col>(
