@@ -1583,7 +1583,7 @@ impl LanguageToLogicalPlanConverter {
                                     data_type,
                                     true,
                                 ),
-                                MemberField::Member(measure.to_string()),
+                                MemberField::regular(measure.to_string()),
                             ));
                         }
                         LogicalPlanLanguage::TimeDimension(params) => {
@@ -1609,7 +1609,7 @@ impl LanguageToLogicalPlanConverter {
                             if !query_time_dimensions.contains(&query_time_dimension) {
                                 query_time_dimensions.push(query_time_dimension);
                             }
-                            if let Some(granularity) = &granularity {
+                            if let Some(granularity) = granularity {
                                 fields.push((
                                     DFField::new(
                                         expr_relation(&expr),
@@ -1618,7 +1618,7 @@ impl LanguageToLogicalPlanConverter {
                                         DataType::Timestamp(TimeUnit::Nanosecond, None),
                                         true,
                                     ),
-                                    MemberField::Member(format!("{}.{}", dimension, granularity)),
+                                    MemberField::time_dimension(dimension.to_string(), granularity),
                                 ));
                             }
                         }
@@ -1641,7 +1641,7 @@ impl LanguageToLogicalPlanConverter {
                                     data_type,
                                     true,
                                 ),
-                                MemberField::Member(dimension),
+                                MemberField::regular(dimension),
                             ));
                         }
                         LogicalPlanLanguage::Segment(params) => {
@@ -1740,7 +1740,7 @@ impl LanguageToLogicalPlanConverter {
                                                     column.get_column_type().to_arrow(),
                                                     true,
                                                 ),
-                                                MemberField::Member(
+                                                MemberField::regular(
                                                     column.member_name().to_string(),
                                                 ),
                                             ));

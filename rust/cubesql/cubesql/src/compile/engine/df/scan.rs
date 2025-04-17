@@ -55,9 +55,29 @@ use datafusion::{
 use serde_json::Value;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub struct RegularMember {
+    pub member: String,
+    /// Field name in Cube response for this member. Can be different from member, i.e. for
+    /// time dimension with granularity: member is `cube.dimension`, field is `cube.dim.granularity`
+    pub field_name: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MemberField {
-    Member(String),
+    Member(RegularMember),
     Literal(ScalarValue),
+}
+
+impl MemberField {
+    pub fn regular(member: String) -> Self {
+        let field_name = member.clone();
+        MemberField::Member(RegularMember { member, field_name })
+    }
+
+    pub fn time_dimension(member: String, granularity: String) -> Self {
+        let field_name = format!("{}.{}", member, granularity);
+        MemberField::Member(RegularMember { member, field_name })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -523,9 +543,10 @@ macro_rules! build_column {
 macro_rules! build_column_custom_builder {
     ($data_type:expr, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         match $field_name {
-            MemberField::Member(field_name) => {
+            MemberField::Member(member) => {
+                let field_name = &member.field_name;
                 for i in 0..$len {
-                    let value = $response.get(i, field_name)?;
+                    let value = $response.get(i, &field_name)?;
                     match (value, &mut $builder) {
                         (FieldValue::Null, builder) => builder.append_null()?,
                         $($builder_block)*
@@ -1507,7 +1528,7 @@ mod tests {
                     if f.name() == "KibanaSampleDataEcommerce.is_female" {
                         MemberField::Literal(ScalarValue::Boolean(None))
                     } else {
-                        MemberField::Member(f.name().to_string())
+                        MemberField::regular(f.name().to_string())
                     }
                 })
                 .collect(),
