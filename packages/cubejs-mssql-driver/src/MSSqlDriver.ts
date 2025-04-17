@@ -4,16 +4,31 @@
  * @fileoverview The `MSSqlDriver` and related types declaration.
  */
 
-const {
+import sql, { ConnectionPool, config as MsSQLConfig } from 'mssql';
+import {
   getEnv,
   assertDataSource,
-} = require('@cubejs-backend/shared');
-const sql = require('mssql');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
-const QueryStream = require('./QueryStream');
+} from '@cubejs-backend/shared';
+import {
+  BaseDriver,
+  DriverInterface,
+  StreamOptions,
+  DownloadQueryResultsOptions,
+  TableStructure,
+  DriverCapabilities,
+  DownloadQueryResultsResult, TableColumnQueryResult,
+} from '@cubejs-backend/base-driver';
+import { QueryStream } from './QueryStream';
 
+// ********* Value converters ***************** //
+// sql.valueHandler.set(sql.TYPES.Int, (value) => value + 1);
 
-const GenericTypeToMSSql = {
+export type MSSqlDriverConfiguration = Omit<MsSQLConfig, 'server'> & {
+  readOnly?: boolean;
+  server?: string;
+}
+
+const GenericTypeToMSSql: Record<string, string> = {
   boolean: 'bit',
   string: 'nvarchar(max)',
   text: 'nvarchar(max)',
@@ -21,7 +36,7 @@ const GenericTypeToMSSql = {
   uuid: 'uniqueidentifier'
 };
 
-const MSSqlToGenericType = {
+const MSSqlToGenericType: Record<string, string> = {
   bit: 'boolean',
   uniqueidentifier: 'uuid',
   datetime2: 'timestamp'
@@ -30,7 +45,12 @@ const MSSqlToGenericType = {
 /**
  * MS SQL driver class.
  */
-class MSSqlDriver extends BaseDriver {
+export class MSSqlDriver extends BaseDriver implements DriverInterface {
+
+  private readonly connectionPool: ConnectionPool;
+  private readonly initialConnectPromise: Promise<ConnectionPool>;
+  private readonly config: MSSqlDriverConfiguration;
+
   /**
    * Returns default concurrency value.
    */
@@ -41,7 +61,25 @@ class MSSqlDriver extends BaseDriver {
   /**
    * Class constructor.
    */
-  constructor(config = {}) {
+  constructor(config: MSSqlDriverConfiguration & {
+      /**
+       * Data source name.
+       */
+      dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
+      maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
+      server?: string,
+    } = {}
+  ) {
     super({
       testConnectionTimeout: config.testConnectionTimeout,
     });
@@ -78,14 +116,14 @@ class MSSqlDriver extends BaseDriver {
       ...config
     };
     const { readOnly, ...poolConfig } = this.config;
-    this.connectionPool = new sql.ConnectionPool(poolConfig);
+    this.connectionPool = new ConnectionPool(poolConfig as MsSQLConfig);
     this.initialConnectPromise = this.connectionPool.connect();
   }
 
   /**
    * Returns the configurable driver options
    * Note: It returns the unprefixed option names.
-   * In case of using multisources options need to be prefixed manually.
+   * In case of using multi sources options need to be prefixed manually.
    */
   static driverEnvVariables() {
     return [
@@ -98,8 +136,9 @@ class MSSqlDriver extends BaseDriver {
     ];
   }
 
-  testConnection() {
-    return this.initialConnectPromise.then((pool) => pool.request().query('SELECT 1 as number'));
+  public async testConnection() {
+    const conn = await this.initialConnectPromise.then((pool: ConnectionPool) => pool.request());
+    await conn.query('SELECT 1 as number');
   }
 
   /**
@@ -110,11 +149,7 @@ class MSSqlDriver extends BaseDriver {
    * @param {{ highWaterMark: number? }} options
    * @return {Promise<StreamTableDataWithTypes>}
    */
-  async stream(
-    query,
-    values,
-    options,
-  ) {
+  public async stream(query: string, values: unknown[], { highWaterMark }: StreamOptions) {
     const pool = await this.initialConnectPromise;
     const request = pool.request();
 
@@ -124,15 +159,15 @@ class MSSqlDriver extends BaseDriver {
     });
     request.query(query);
 
-    const stream = new QueryStream(request, options?.highWaterMark);
-    const fields = await new Promise((resolve, reject) => {
+    const stream = new QueryStream(request, highWaterMark);
+    const fields: TableStructure = await new Promise((resolve, reject) => {
       request.on('recordset', (columns) => {
         resolve(this.mapFields(columns));
       });
-      request.on('error', (err) => {
+      request.on('error', (err: Error) => {
         reject(err);
       });
-      stream.on('error', (err) => {
+      stream.on('error', (err: Error) => {
         reject(err);
       })
     });
@@ -161,7 +196,7 @@ class MSSqlDriver extends BaseDriver {
    *   }
    * }} fields
    */
-  mapFields(fields) {
+  mapFields(fields: Record<string, any>) {
     return Object.keys(fields).map((field) => {
       let type;
       switch (fields[field].type) {
@@ -231,9 +266,9 @@ class MSSqlDriver extends BaseDriver {
     });
   }
 
-  query(query, values) {
-    let cancelFn = null;
-    const promise = this.initialConnectPromise.then((pool) => {
+  public async query(query: string, values: unknown[]) {
+    let cancelFn: (() => void) | null = null;
+    const promise: any = this.initialConnectPromise.then((pool) => {
       const request = pool.request();
       (values || []).forEach((v, i) => request.input(`_${i + 1}`, v));
 
@@ -246,14 +281,14 @@ class MSSqlDriver extends BaseDriver {
     return promise;
   }
 
-  param(paramIndex) {
+  public param(paramIndex: number): string {
     return `@_${paramIndex + 1}`;
   }
 
-  async tableColumnTypes(table) {
+  public async tableColumnTypes(table: string): Promise<TableStructure> {
     const [schema, name] = table.split('.');
 
-    const columns = await this.query(
+    const columns: TableColumnQueryResult[] = await this.query(
       `SELECT column_name as ${this.quoteIdentifier('column_name')},
              table_name as ${this.quoteIdentifier('table_name')},
              table_schema as ${this.quoteIdentifier('table_schema')},
@@ -266,27 +301,27 @@ class MSSqlDriver extends BaseDriver {
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
-  getTablesQuery(schemaName) {
+  public getTablesQuery(schemaName: string) {
     return this.query(
       `SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = ${this.param(0)}`,
       [schemaName]
     );
   }
 
-  createSchemaIfNotExists(schemaName) {
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     return this.query(
       `SELECT schema_name FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = ${this.param(0)}`,
       [schemaName]
-    ).then((schemas) => {
+    ).then((schemas: string[]) => {
       if (schemas.length === 0) {
-        return this.query(`CREATE SCHEMA ${schemaName}`);
+        return this.query(`CREATE SCHEMA ${schemaName}`, []);
       }
       return null;
     });
   }
 
-  informationSchemaQuery() {
-    // fix The multi-part identifier "columns.data_type" could not be bound
+  public informationSchemaQuery(): string {
+    // fix The multipart identifier "columns.data_type" could not be bound
     return `
       SELECT column_name as ${this.quoteIdentifier('column_name')},
         table_name as ${this.quoteIdentifier('table_name')},
@@ -297,8 +332,8 @@ class MSSqlDriver extends BaseDriver {
     `;
   }
 
-  async downloadQueryResults(query, values, options) {
-    if ((options || {}).streamImport) {
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    if (options?.streamImport) {
       return this.stream(query, values, options);
     }
 
@@ -314,27 +349,25 @@ class MSSqlDriver extends BaseDriver {
     };
   }
 
-  fromGenericType(columnType) {
+  protected fromGenericType(columnType: string): string {
     return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
   }
 
-  toGenericType(columnType){
+  protected toGenericType(columnType: string): string{
     return MSSqlToGenericType[columnType] || super.toGenericType(columnType);
   }
 
-  readOnly() {
+  public readOnly(): boolean {
     return !!this.config.readOnly;
   }
 
-  wrapQueryWithLimit(query) {
+  public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
   }
 
-  capabilities() {
+  public capabilities(): DriverCapabilities {
     return {
       incrementalSchemaLoading: true,
     };
   }
 }
-
-module.exports = MSSqlDriver;
