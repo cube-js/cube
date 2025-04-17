@@ -19,13 +19,11 @@ use datafusion::{
     arrow::array::Array, dataframe::DataFrame as DFDataFrame,
     physical_plan::SendableRecordBatchStream,
 };
-use futures::*;
+use futures::{FutureExt, Stream, StreamExt};
 use pg_srv::protocol::{CommandComplete, PortalCompletion, PortalSuspended};
 
 use crate::transport::SpanId;
 use async_stream::stream;
-use futures_core::stream::Stream;
-use futures_util::stream::StreamExt;
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -608,7 +606,7 @@ mod tests {
         },
         prelude::SessionContext,
     };
-    use futures_util::stream::StreamExt;
+    use futures::StreamExt;
     use std::pin::pin;
     use std::sync::Arc;
 
