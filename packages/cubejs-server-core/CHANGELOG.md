@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
+
+### Bug Fixes
+
+- **schema-compiler:** Make RefreshKeySql timezone-aware ([#9479](https://github.com/cube-js/cube/issues/9479)) ([fa2adb9](https://github.com/cube-js/cube/commit/fa2adb92e6fd87223f551b61d75f367dc8ea2524))
+
 ## [1.3.3](https://github.com/cube-js/cube/compare/v1.3.2...v1.3.3) (2025-04-16)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
