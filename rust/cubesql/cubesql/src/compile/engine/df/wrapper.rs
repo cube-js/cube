@@ -1564,9 +1564,8 @@ impl CubeScanWrapperNode {
             // LogicalPlan::Analyze(_) => {}
             // LogicalPlan::TableUDFs(_) => {}
             LogicalPlan::Extension(Extension { node }) => {
-                let cube_scan_node = node.as_any().downcast_ref::<CubeScanNode>();
-                let wrapped_select_node = node.as_any().downcast_ref::<WrappedSelectNode>();
-                if let Some(node) = cube_scan_node {
+                let node_any = node.as_any();
+                if let Some(node) = node_any.downcast_ref::<CubeScanNode>() {
                     Self::generate_sql_for_cube_scan(
                         &plan.meta,
                         node,
@@ -1574,7 +1573,9 @@ impl CubeScanWrapperNode {
                         &load_request_meta,
                     )
                     .await
-                } else if let Some(wrapped_select_node) = wrapped_select_node {
+                } else if let Some(wrapped_select_node) =
+                    node_any.downcast_ref::<WrappedSelectNode>()
+                {
                     Self::generate_sql_for_wrapper(
                         plan,
                         transport,
@@ -1588,8 +1589,7 @@ impl CubeScanWrapperNode {
                     .await
                 } else {
                     return Err(CubeError::internal(format!(
-                        "Can't generate SQL for node: {:?}",
-                        node
+                        "Can't generate SQL for node: {node:?}"
                     )));
                 }
             }
