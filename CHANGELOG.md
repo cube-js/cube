@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.5](https://github.com/cube-js/cube/compare/v1.3.4...v1.3.5) (2025-04-17)
+
+### Bug Fixes
+
+- **cubesql:** Disallow mixing measure and dimension filters in a single FilterOp ([#9486](https://github.com/cube-js/cube/issues/9486)) ([858f6d5](https://github.com/cube-js/cube/commit/858f6d55df7f4167c4eccce7b2825f36f74a8820))
+
 ## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
 
 ### Bug Fixes
