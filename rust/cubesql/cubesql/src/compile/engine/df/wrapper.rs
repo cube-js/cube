@@ -928,26 +928,22 @@ impl CubeScanWrapperNode {
 
         // TODO support ungrouped joins
         let ungrouped_scan_node = if push_to_cube {
-            if let LogicalPlan::Extension(Extension { node }) = from.as_ref() {
-                if let Some(cube_scan_node) = node.as_any().downcast_ref::<CubeScanNode>() {
-                    if cube_scan_node.request.ungrouped != Some(true) {
-                        return Err(CubeError::internal(format!(
-                            "Expected ungrouped CubeScan node but found: {cube_scan_node:?}"
-                        )));
-                    }
-                    Some(cube_scan_node)
-                } else {
-                    return Err(CubeError::internal(format!(
-                        "Expected CubeScan node but found: {:?}",
-                        plan
-                    )));
-                }
-            } else {
+            let LogicalPlan::Extension(Extension { node }) = from.as_ref() else {
                 return Err(CubeError::internal(format!(
-                    "Expected CubeScan node but found: {:?}",
-                    plan
+                    "Expected CubeScan node but found: {plan:?}"
+                )));
+            };
+            let Some(cube_scan_node) = node.as_any().downcast_ref::<CubeScanNode>() else {
+                return Err(CubeError::internal(format!(
+                    "Expected CubeScan node but found: {plan:?}"
+                )));
+            };
+            if cube_scan_node.request.ungrouped != Some(true) {
+                return Err(CubeError::internal(format!(
+                    "Expected ungrouped CubeScan node but found: {cube_scan_node:?}"
                 )));
             }
+            Some(cube_scan_node)
         } else {
             None
         };
