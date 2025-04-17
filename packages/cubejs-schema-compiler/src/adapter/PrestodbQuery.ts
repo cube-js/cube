@@ -1,3 +1,4 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 
@@ -53,6 +54,30 @@ export class PrestodbQuery extends BaseQuery {
     return this.timezone ?
       `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
       field;
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * Athena doesn't support INTERVALs directly — using date_diff/date_add
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    const intervalParts = Object.entries(intervalParsed);
+
+    if (intervalParts.length > 1) {
+      throw new Error('Athena/Presto supports only simple intervals with one date part');
+    }
+
+    const [unit, count] = intervalParts[0];
+    const originExpr = this.timeStampCast(`'${origin}'`);
+
+    return `date_add('${unit}',
+      floor(
+        date_diff('${unit}', ${originExpr}, ${source}) / ${count}
+      ) * ${count},
+      ${originExpr}
+    )`;
   }
 
   public timeGroupedColumn(granularity, dimension) {

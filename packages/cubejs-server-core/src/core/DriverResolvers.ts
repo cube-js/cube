@@ -49,13 +49,13 @@ export const lookupDriverClass = (dbType): Constructor<BaseDriver> & {
  */
 export const isDriver = (val: any): boolean => {
   let isDriverInstance = val instanceof BaseDriver;
-  if (!isDriverInstance && val && val.constructor) {
+  if (!isDriverInstance && val?.constructor) {
     let end = false;
     let obj = val.constructor;
     while (!isDriverInstance && !end) {
       obj = Object.getPrototypeOf(obj);
       end = !obj;
-      isDriverInstance = obj && obj.name ? obj.name === 'BaseDriver' : false;
+      isDriverInstance = obj?.name ? obj.name === 'BaseDriver' : false;
     }
   }
   return isDriverInstance;
@@ -82,11 +82,11 @@ export const getDriverMaxPool = async (
     const queryQueueOptions = await options
       .queryCacheOptions
       .queueOptions(context.dataSource);
-  
+
     const preAggregationsQueueOptions = await options
       .preAggregationsOptions
       .queueOptions(context.dataSource);
-  
+
     return 2 * (
       queryQueueOptions.concurrency +
         preAggregationsQueueOptions.concurrency
