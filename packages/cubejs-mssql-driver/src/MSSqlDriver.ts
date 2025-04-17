@@ -21,7 +21,22 @@ import {
 import { QueryStream } from './QueryStream';
 
 // ********* Value converters ***************** //
-// sql.valueHandler.set(sql.TYPES.Int, (value) => value + 1);
+const numericTypes = [
+  sql.TYPES.Int,
+  sql.TYPES.BigInt,
+  sql.TYPES.SmallInt,
+  sql.TYPES.TinyInt,
+  sql.TYPES.Decimal,
+  sql.TYPES.Numeric,
+  sql.TYPES.Float,
+  sql.TYPES.Real,
+  sql.TYPES.Money,
+  sql.TYPES.SmallMoney
+];
+
+for (const type of numericTypes) {
+  sql.valueHandler.set(type, (value) => value != null ? String(value) : value);
+}
 
 export type MSSqlDriverConfiguration = Omit<MsSQLConfig, 'server'> & {
   readOnly?: boolean;
