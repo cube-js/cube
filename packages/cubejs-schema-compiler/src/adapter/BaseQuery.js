@@ -3714,7 +3714,7 @@ export class BaseQuery {
 
     let utcOffset = 0;
 
-    if (refreshKey.timezone) {
+    if (refreshKey.timezone || this.timezone) {
       utcOffset = moment.tz(refreshKey.timezone).utcOffset() * 60;
     }
 
@@ -3733,7 +3733,9 @@ export class BaseQuery {
     const every = refreshKey.every || '1 hour';
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      return [this.floorSql(`(${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`), external, this];
+      const utcOffset = this.timezone ? moment.tz(this.timezone).utcOffset() * 60 : 0;
+      const utcOffsetPrefix = utcOffset ? `${utcOffset} + ` : '';
+      return [this.floorSql(`(${utcOffsetPrefix}${this.unixTimestampSql()}) / ${this.parseSecondDuration(every)}`), external, this];
     }
 
     const { dayOffset, utcOffset, interval } = this.calcIntervalForCronString(refreshKey);

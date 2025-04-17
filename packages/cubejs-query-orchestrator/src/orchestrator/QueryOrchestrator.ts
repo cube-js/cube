@@ -448,11 +448,11 @@ export class QueryOrchestrator {
     return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id, callback) {
+  public async subscribeQueueEvents(id: string, callback) {
     return this.getQueueEventsBus().subscribe(id, callback);
   }
 
-  public async unSubscribeQueueEvents(id) {
+  public async unSubscribeQueueEvents(id: string) {
     return this.getQueueEventsBus().unsubscribe(id);
   }
 

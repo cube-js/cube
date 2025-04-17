@@ -9,7 +9,7 @@ import {
   InlineTables,
   CacheDriverInterface,
   TableStructure,
-  DriverInterface, QueryKey,
+  DriverInterface,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue } from './QueryQueue';
@@ -208,9 +208,7 @@ export class QueryCache {
       .cacheKeyQueriesFrom(queryBody)
       .map(replacePreAggregationTableNames);
 
-    const renewalThreshold =
-      queryBody.cacheKeyQueries &&
-      queryBody.cacheKeyQueries.renewalThreshold;
+    const renewalThreshold = queryBody.cacheKeyQueries?.renewalThreshold;
 
     const expireSecs = this.getExpireSecs(queryBody);
 
@@ -350,7 +348,7 @@ export class QueryCache {
   }
 
   private cacheKeyQueriesFrom(queryBody: QueryBody): QueryWithParams[] {
-    return queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.queries ||
+    return queryBody.cacheKeyQueries?.queries ||
       queryBody.cacheKeyQueries ||
       [];
   }
