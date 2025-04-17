@@ -630,7 +630,7 @@ impl CubeScanWrapperNode {
         let schema = self.schema();
         let wrapped_plan = self.wrapped_plan.clone();
         let (sql, request, member_fields) = Self::generate_sql_for_node(
-            Arc::new(self.clone()),
+            &self.meta,
             transport,
             load_request_meta,
             self.clone().set_max_limit_for_node(wrapped_plan),
@@ -896,7 +896,7 @@ impl CubeScanWrapperNode {
     }
 
     async fn generate_sql_for_wrapper(
-        plan: Arc<Self>,
+        meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
@@ -958,7 +958,7 @@ impl CubeScanWrapperNode {
             let data_sources = ungrouped_scan_node
                 .used_cubes
                 .iter()
-                .map(|c| plan.meta.cube_to_data_source.get(c).map(|c| c.to_string()))
+                .map(|c| meta.cube_to_data_source.get(c).map(|c| c.to_string()))
                 .unique()
                 .collect::<Option<Vec<_>>>()
                 .ok_or_else(|| {
@@ -989,7 +989,7 @@ impl CubeScanWrapperNode {
             }
         } else {
             Self::generate_sql_for_node_rec(
-                plan.clone(),
+                meta,
                 transport.clone(),
                 load_request_meta.clone(),
                 from.clone(),
@@ -1009,7 +1009,7 @@ impl CubeScanWrapperNode {
                 sql: subquery_sql,
                 request: _,
             } = Self::generate_sql_for_node_rec(
-                plan.clone(),
+                meta,
                 transport.clone(),
                 load_request_meta.clone(),
                 subquery.clone(),
@@ -1087,7 +1087,7 @@ impl CubeScanWrapperNode {
                     })?;
 
                 let subq_sql = Self::generate_sql_for_node_rec(
-                    plan.clone(),
+                    meta,
                     transport.clone(),
                     load_request_meta.clone(),
                     lp.clone(),
@@ -1145,8 +1145,7 @@ impl CubeScanWrapperNode {
             )));
         };
 
-        let generator = plan
-            .meta
+        let generator = meta
             .data_source_to_sql_generator
             .get(&data_source)
             .ok_or_else(|| {
@@ -1320,7 +1319,7 @@ impl CubeScanWrapperNode {
                 .partition::<Vec<_>, _>(|(_column, used_members)| {
                     used_members
                         .iter()
-                        .all(|member| plan.meta.find_dimension_with_name(member).is_some())
+                        .all(|member| meta.find_dimension_with_name(member).is_some())
                 });
 
             let load_request = V1LoadRequestQuery {
@@ -1530,7 +1529,7 @@ impl CubeScanWrapperNode {
     }
 
     pub async fn generate_sql_for_node(
-        plan: Arc<Self>,
+        meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         node: Arc<LogicalPlan>,
@@ -1563,7 +1562,7 @@ impl CubeScanWrapperNode {
                 let node_any = node.as_any();
                 if let Some(node) = node_any.downcast_ref::<CubeScanNode>() {
                     Self::generate_sql_for_cube_scan(
-                        &plan.meta,
+                        meta,
                         node,
                         transport.as_ref(),
                         &load_request_meta,
@@ -1573,7 +1572,7 @@ impl CubeScanWrapperNode {
                     node_any.downcast_ref::<WrappedSelectNode>()
                 {
                     Self::generate_sql_for_wrapper(
-                        plan,
+                        meta,
                         transport,
                         load_request_meta,
                         node,
@@ -1607,16 +1606,17 @@ impl CubeScanWrapperNode {
     }
 
     fn generate_sql_for_node_rec(
-        plan: Arc<Self>,
+        meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
         parent_data_source: Option<String>,
-    ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send>> {
+    ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send + '_>>
+    {
         Self::generate_sql_for_node(
-            plan,
+            meta,
             transport,
             load_request_meta,
             node,
