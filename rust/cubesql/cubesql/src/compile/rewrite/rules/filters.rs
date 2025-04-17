@@ -813,7 +813,11 @@ impl RewriteRules for FilterRules {
                     "FilterOpOp:and",
                 ),
             ),
-            rewrite(
+            // OR filters presents an issue: it must be a single filter with LogicalOp inside, so it can't have both measures and dimensions together
+            // There's no need to check AND operation for measure-dimension mixup
+            // Any number of AND's between root and terminal filter will be split to separate filters in CubeScan
+            // It's enough to stop on first OR, because FilterReplacer goes top-down
+            transforming_rewrite(
                 "filter-replacer-or",
                 filter_replacer(
                     binary_expr("?left", "OR", "?right"),
@@ -827,6 +831,13 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?right", "?alias_to_cube", "?members", "?filter_aliases"),
                     ),
                     "FilterOpOp:or",
+                ),
+                self.transform_filter_or(
+                    "?left",
+                    "?right",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
                 ),
             ),
             // Unwrap lower for case-insensitive operators
@@ -2792,6 +2803,74 @@ impl FilterRules {
         }
     }
 
+    fn transform_filter_or(
+        &self,
+        left_var: &'static str,
+        right_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let left_var = var!(left_var);
+        let right_var = var!(right_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            let Some(left_columns) = &egraph[subst[left_var]].data.referenced_expr else {
+                return false;
+            };
+            let Some(right_columns) = &egraph[subst[right_var]].data.referenced_expr else {
+                return false;
+            };
+            let columns = left_columns
+                .iter()
+                .chain(right_columns.iter())
+                .cloned()
+                .collect::<Vec<_>>();
+
+            let aliases_es: Vec<Vec<(String, String)>> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
+                let mut has_dimensions = false;
+                let mut has_measures = false;
+
+                for column in &columns {
+                    let Expr::Column(column) = column else {
+                        // Unexpected non-column in referenced_expr
+                        return false;
+                    };
+
+                    let Some((member_name, _, cube)) = Self::filter_member_name_on_columns(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        &[column.clone()],
+                        members_var,
+                        &aliases,
+                    ) else {
+                        // TODO is this necessary? When predicate in a filter references column that is not-a-member, is it ok to push it?
+                        return false;
+                    };
+
+                    has_dimensions |= cube.lookup_dimension_by_member_name(&member_name).is_some();
+                    has_measures |= cube.lookup_measure_by_member_name(&member_name).is_some();
+                }
+                if has_dimensions && has_measures {
+                    // This filter references both measure and dimension in a single OR
+                    // It is not supported by Cube.js
+                    return false;
+                }
+            }
+
+            true
+        }
+    }
+
     fn unwrap_lower_or_upper(
         &self,
         op_var: &'static str,
@@ -3933,6 +4012,30 @@ impl FilterRules {
         members_var: Var,
         aliases: &Vec<(String, String)>,
     ) -> Option<(String, Option<String>, &'meta V1CubeMeta)> {
+        let columns: Vec<_> = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+            .cloned()
+            .collect();
+
+        Self::filter_member_name_on_columns(
+            egraph,
+            subst,
+            meta_context,
+            alias_to_cube_var,
+            &columns,
+            members_var,
+            aliases,
+        )
+    }
+
+    fn filter_member_name_on_columns<'meta>(
+        egraph: &mut CubeEGraph,
+        subst: &Subst,
+        meta_context: &'meta MetaContext,
+        alias_to_cube_var: Var,
+        columns: &[Column],
+        members_var: Var,
+        aliases: &Vec<(String, String)>,
+    ) -> Option<(String, Option<String>, &'meta V1CubeMeta)> {
         let alias_to_cubes: Vec<_> =
             var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
                 .cloned()
@@ -3940,9 +4043,6 @@ impl FilterRules {
         if alias_to_cubes.is_empty() {
             return None;
         }
-        let columns: Vec<_> = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-            .cloned()
-            .collect();
         for alias_to_cube in alias_to_cubes {
             for column in columns.iter() {
                 let alias_name = expr_column_name(&Expr::Column(column.clone()), &None);
