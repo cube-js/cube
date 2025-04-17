@@ -721,15 +721,15 @@ impl CubeScanWrapperNode {
     }
 
     async fn generate_sql_for_cube_scan(
-        plan: Arc<Self>,
-        node: CubeScanNode,
-        transport: Arc<dyn TransportService>,
-        load_request_meta: Arc<LoadRequestMeta>,
+        meta: &MetaContext,
+        node: &CubeScanNode,
+        transport: &dyn TransportService,
+        load_request_meta: &LoadRequestMeta,
     ) -> result::Result<SqlGenerationResult, CubeError> {
         let data_sources = node
             .used_cubes
             .iter()
-            .map(|c| plan.meta.cube_to_data_source.get(c).map(|c| c.to_string()))
+            .map(|c| meta.cube_to_data_source.get(c).map(|c| c.to_string()))
             .unique()
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| {
@@ -746,7 +746,7 @@ impl CubeScanWrapperNode {
             )));
         }
         let data_source = &data_sources[0];
-        let mut meta_with_user = load_request_meta.as_ref().clone();
+        let mut meta_with_user = load_request_meta.clone();
         meta_with_user.set_change_user(node.options.change_user.clone());
 
         // Single CubeScan can represent join of multiple table scans
@@ -809,7 +809,7 @@ impl CubeScanWrapperNode {
             .sql(
                 node.span_id.clone(),
                 node.request.clone(),
-                node.auth_context,
+                node.auth_context.clone(),
                 meta_with_user,
                 Some(member_to_alias),
                 None,
@@ -821,8 +821,7 @@ impl CubeScanWrapperNode {
             // Need to generate wrapper SELECT with literal columns
             // Generated columns need to have same aliases as targets in `remapper`
             // Because that's what plans higher up would use in generated SQL
-            let generator = plan
-                .meta
+            let generator = meta
                 .data_source_to_sql_generator
                 .get(data_source)
                 .ok_or_else(|| {
@@ -1564,12 +1563,18 @@ impl CubeScanWrapperNode {
             // LogicalPlan::Analyze(_) => {}
             // LogicalPlan::TableUDFs(_) => {}
             LogicalPlan::Extension(Extension { node }) => {
+                let cube_scan_node = node.as_any().downcast_ref::<CubeScanNode>();
                 // .cloned() to avoid borrowing Any to comply with Send + Sync
-                let cube_scan_node = node.as_any().downcast_ref::<CubeScanNode>().cloned();
                 let wrapped_select_node =
                     node.as_any().downcast_ref::<WrappedSelectNode>().cloned();
                 if let Some(node) = cube_scan_node {
-                    Self::generate_sql_for_cube_scan(plan, node, transport, load_request_meta).await
+                    Self::generate_sql_for_cube_scan(
+                        &plan.meta,
+                        node,
+                        transport.as_ref(),
+                        &load_request_meta,
+                    )
+                    .await
                 } else if let Some(wrapped_select_node) = wrapped_select_node {
                     Self::generate_sql_for_wrapper(
                         plan,
