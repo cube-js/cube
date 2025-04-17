@@ -903,8 +903,9 @@ impl CubeScanWrapperNode {
         can_rename_columns: bool,
         values: Vec<Option<String>>,
         parent_data_source: Option<String>,
-        wrapped_select_node: WrappedSelectNode,
+        wrapped_select_node: &WrappedSelectNode,
     ) -> result::Result<SqlGenerationResult, CubeError> {
+        // This is cloned just to simplify some code in this function, feel free to remove it
         let WrappedSelectNode {
             schema,
             select_type,
@@ -923,7 +924,7 @@ impl CubeScanWrapperNode {
             alias,
             distinct,
             push_to_cube,
-        } = wrapped_select_node;
+        } = wrapped_select_node.clone();
 
         // TODO support ungrouped joins
         let ungrouped_scan_node = if push_to_cube {
@@ -1564,9 +1565,7 @@ impl CubeScanWrapperNode {
             // LogicalPlan::TableUDFs(_) => {}
             LogicalPlan::Extension(Extension { node }) => {
                 let cube_scan_node = node.as_any().downcast_ref::<CubeScanNode>();
-                // .cloned() to avoid borrowing Any to comply with Send + Sync
-                let wrapped_select_node =
-                    node.as_any().downcast_ref::<WrappedSelectNode>().cloned();
+                let wrapped_select_node = node.as_any().downcast_ref::<WrappedSelectNode>();
                 if let Some(node) = cube_scan_node {
                     Self::generate_sql_for_cube_scan(
                         &plan.meta,
