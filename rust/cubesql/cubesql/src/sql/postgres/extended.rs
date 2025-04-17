@@ -609,6 +609,7 @@ mod tests {
         prelude::SessionContext,
     };
     use futures_util::stream::StreamExt;
+    use std::pin::pin;
     use std::sync::Arc;
 
     fn generate_testing_data_frame(cnt: usize) -> DataFrame {
@@ -709,7 +710,7 @@ mod tests {
 
         let mut portal = Pin::new(&mut p);
         let stream = portal.execute(10);
-        pin_mut!(stream);
+        let mut stream = pin!(stream);
 
         let response = stream.next().await.unwrap()?;
         match response {
@@ -742,7 +743,7 @@ mod tests {
 
         let mut portal = Pin::new(&mut p);
         let stream = portal.execute(1);
-        pin_mut!(stream);
+        let mut stream = pin!(stream);
 
         let response = stream.next().await.unwrap();
         match response {
@@ -770,7 +771,7 @@ mod tests {
 
         let mut portal = Pin::new(&mut p);
         let stream = portal.execute(0);
-        pin_mut!(stream);
+        let mut stream = pin!(stream);
 
         let response = stream.next().await.unwrap()?;
         match response {
@@ -850,7 +851,7 @@ mod tests {
     ) -> Result<(), ConnectionError> {
         let mut p = Pin::new(portal);
         let stream = p.execute(max_rows);
-        pin_mut!(stream);
+        let mut stream = pin!(stream);
 
         match stream.next().await.unwrap()? {
             PortalBatch::Description(_) => (),
@@ -877,7 +878,7 @@ mod tests {
     ) -> Result<(), ConnectionError> {
         let mut p = Pin::new(portal);
         let stream = p.execute(max_rows);
-        pin_mut!(stream);
+        let mut stream = pin!(stream);
 
         let mut total_rows = 0;
         while let Some(batch) = stream.next().await {
