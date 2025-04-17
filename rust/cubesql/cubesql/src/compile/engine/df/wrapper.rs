@@ -32,6 +32,7 @@ use datafusion::{
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
 };
+use futures::FutureExt;
 use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
@@ -991,7 +992,7 @@ impl CubeScanWrapperNode {
                 request: ungrouped_scan_node.request.clone(),
             }
         } else {
-            Self::generate_sql_for_node(
+            Self::generate_sql_for_node_rec(
                 plan.clone(),
                 transport.clone(),
                 load_request_meta.clone(),
@@ -1011,7 +1012,7 @@ impl CubeScanWrapperNode {
                 column_remapping: _,
                 sql: subquery_sql,
                 request: _,
-            } = Self::generate_sql_for_node(
+            } = Self::generate_sql_for_node_rec(
                 plan.clone(),
                 transport.clone(),
                 load_request_meta.clone(),
@@ -1089,7 +1090,7 @@ impl CubeScanWrapperNode {
                         CubeError::internal(format!("Alias not found for join subquery {lp:?}"))
                     })?;
 
-                let subq_sql = Self::generate_sql_for_node(
+                let subq_sql = Self::generate_sql_for_node_rec(
                     plan.clone(),
                     transport.clone(),
                     load_request_meta.clone(),
@@ -1532,7 +1533,80 @@ impl CubeScanWrapperNode {
         }
     }
 
-    pub fn generate_sql_for_node(
+    pub async fn generate_sql_for_node(
+        plan: Arc<Self>,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        node: Arc<LogicalPlan>,
+        can_rename_columns: bool,
+        values: Vec<Option<String>>,
+        parent_data_source: Option<String>,
+    ) -> result::Result<SqlGenerationResult, CubeError> {
+        match node.as_ref() {
+            // LogicalPlan::Projection(_) => {}
+            // LogicalPlan::Filter(_) => {}
+            // LogicalPlan::Window(_) => {}
+            // LogicalPlan::Sort(_) => {}
+            // LogicalPlan::Join(_) => {}
+            // LogicalPlan::CrossJoin(_) => {}
+            // LogicalPlan::Repartition(_) => {}
+            // LogicalPlan::Union(_) => {}
+            // LogicalPlan::TableScan(_) => {}
+            // LogicalPlan::EmptyRelation(_) => {}
+            // LogicalPlan::Limit(_) => {}
+            // LogicalPlan::Subquery(_) => {}
+            // LogicalPlan::CreateExternalTable(_) => {}
+            // LogicalPlan::CreateMemoryTable(_) => {}
+            // LogicalPlan::CreateCatalogSchema(_) => {}
+            // LogicalPlan::DropTable(_) => {}
+            // LogicalPlan::Values(_) => {}
+            // LogicalPlan::Explain(_) => {}
+            // LogicalPlan::Analyze(_) => {}
+            // LogicalPlan::TableUDFs(_) => {}
+            LogicalPlan::Extension(Extension { node }) => {
+                // .cloned() to avoid borrowing Any to comply with Send + Sync
+                let cube_scan_node = node.as_any().downcast_ref::<CubeScanNode>().cloned();
+                let wrapped_select_node =
+                    node.as_any().downcast_ref::<WrappedSelectNode>().cloned();
+                if let Some(node) = cube_scan_node {
+                    Self::generate_sql_for_cube_scan(plan, node, transport, load_request_meta).await
+                } else if let Some(wrapped_select_node) = wrapped_select_node {
+                    Self::generate_sql_for_wrapper(
+                        plan,
+                        transport,
+                        load_request_meta,
+                        node,
+                        can_rename_columns,
+                        values,
+                        parent_data_source,
+                        wrapped_select_node,
+                    )
+                    .await
+                } else {
+                    return Err(CubeError::internal(format!(
+                        "Can't generate SQL for node: {:?}",
+                        node
+                    )));
+                }
+            }
+            LogicalPlan::EmptyRelation(_) => Ok(SqlGenerationResult {
+                data_source: parent_data_source,
+                from_alias: None,
+                sql: SqlQuery::new("".to_string(), values.clone()),
+                column_remapping: None,
+                request: TransportLoadRequestQuery::new(),
+            }),
+            // LogicalPlan::Distinct(_) => {}
+            x => {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for node: {:?}",
+                    x
+                )))
+            }
+        }
+    }
+
+    fn generate_sql_for_node_rec(
         plan: Arc<Self>,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
@@ -1541,71 +1615,16 @@ impl CubeScanWrapperNode {
         values: Vec<Option<String>>,
         parent_data_source: Option<String>,
     ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send>> {
-        Box::pin(async move {
-            match node.as_ref() {
-                // LogicalPlan::Projection(_) => {}
-                // LogicalPlan::Filter(_) => {}
-                // LogicalPlan::Window(_) => {}
-                // LogicalPlan::Sort(_) => {}
-                // LogicalPlan::Join(_) => {}
-                // LogicalPlan::CrossJoin(_) => {}
-                // LogicalPlan::Repartition(_) => {}
-                // LogicalPlan::Union(_) => {}
-                // LogicalPlan::TableScan(_) => {}
-                // LogicalPlan::EmptyRelation(_) => {}
-                // LogicalPlan::Limit(_) => {}
-                // LogicalPlan::Subquery(_) => {}
-                // LogicalPlan::CreateExternalTable(_) => {}
-                // LogicalPlan::CreateMemoryTable(_) => {}
-                // LogicalPlan::CreateCatalogSchema(_) => {}
-                // LogicalPlan::DropTable(_) => {}
-                // LogicalPlan::Values(_) => {}
-                // LogicalPlan::Explain(_) => {}
-                // LogicalPlan::Analyze(_) => {}
-                // LogicalPlan::TableUDFs(_) => {}
-                LogicalPlan::Extension(Extension { node }) => {
-                    // .cloned() to avoid borrowing Any to comply with Send + Sync
-                    let cube_scan_node = node.as_any().downcast_ref::<CubeScanNode>().cloned();
-                    let wrapped_select_node =
-                        node.as_any().downcast_ref::<WrappedSelectNode>().cloned();
-                    if let Some(node) = cube_scan_node {
-                        Self::generate_sql_for_cube_scan(plan, node, transport, load_request_meta)
-                            .await
-                    } else if let Some(wrapped_select_node) = wrapped_select_node {
-                        Self::generate_sql_for_wrapper(
-                            plan,
-                            transport,
-                            load_request_meta,
-                            node,
-                            can_rename_columns,
-                            values,
-                            parent_data_source,
-                            wrapped_select_node,
-                        )
-                        .await
-                    } else {
-                        return Err(CubeError::internal(format!(
-                            "Can't generate SQL for node: {:?}",
-                            node
-                        )));
-                    }
-                }
-                LogicalPlan::EmptyRelation(_) => Ok(SqlGenerationResult {
-                    data_source: parent_data_source,
-                    from_alias: None,
-                    sql: SqlQuery::new("".to_string(), values.clone()),
-                    column_remapping: None,
-                    request: TransportLoadRequestQuery::new(),
-                }),
-                // LogicalPlan::Distinct(_) => {}
-                x => {
-                    return Err(CubeError::internal(format!(
-                        "Can't generate SQL for node: {:?}",
-                        x
-                    )))
-                }
-            }
-        })
+        Self::generate_sql_for_node(
+            plan,
+            transport,
+            load_request_meta,
+            node,
+            can_rename_columns,
+            values,
+            parent_data_source,
+        )
+        .boxed()
     }
 
     fn get_patch_measure<'l>(
