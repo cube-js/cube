@@ -18,12 +18,14 @@ use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::sql::SqlServiceImpl;
 use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
-use crate::table::parquet::CubestoreParquetMetadataCache;
+use crate::table::parquet::{parquet_source, CubestoreParquetMetadataCache};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::telemetry::suboptimal_query_plan_event;
 use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion_datasource::memory::MemoryExec;
 use core::fmt;
 use datafusion::arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Decimal128Array, Float64Array,
@@ -41,7 +43,7 @@ use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::object_store::ObjectStoreUrl;
 use datafusion::datasource::physical_plan::parquet::ParquetExecBuilder;
 use datafusion::datasource::physical_plan::{
-    FileScanConfig, ParquetExec, ParquetFileReaderFactory,
+    FileScanConfig, ParquetExec, ParquetFileReaderFactory, ParquetSource,
 };
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
@@ -50,6 +52,7 @@ use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::{SessionStateBuilder, TaskContext};
 use datafusion::logical_expr::{Expr, LogicalPlan, TableSource};
 use datafusion::physical_expr;
+use datafusion::physical_expr::LexOrdering;
 use datafusion::physical_expr::{
     expressions, Distribution, EquivalenceProperties, LexRequirement, PhysicalSortExpr,
     PhysicalSortRequirement,
@@ -70,14 +73,13 @@ use datafusion::physical_optimizer::update_aggr_exprs::OptimizeAggregateOrder;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, ExecutionPlanProperties,
+    collect, DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties,
     Partitioning, PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
@@ -695,10 +697,10 @@ impl CubeTable {
                     .expect(format!("Missing remote path {}", remote_path).as_str());
 
                 let file_scan =
-                    FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone())
+                    FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone(), parquet_source())
                         .with_file(PartitionedFile::from_path(local_path.to_string())?)
                         .with_projection(index_projection_or_none_on_schema_match.clone())
-                        .with_output_ordering(vec![(0..key_len)
+                        .with_output_ordering(vec![LexOrdering::new((0..key_len)
                             .map(|i| -> Result<_, DataFusionError> {
                                 Ok(PhysicalSortExpr::new(
                             Arc::new(
@@ -710,7 +712,7 @@ impl CubeTable {
                             SortOptions::default(),
                         ))
                             })
-                            .collect::<Result<Vec<_>, _>>()?]);
+                            .collect::<Result<Vec<_>, _>>()?)]);
                 let parquet_exec_builder = ParquetExecBuilder::new(file_scan)
                     .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
                 let parquet_exec_builder = if let Some(phys_pred) = &physical_predicate {
@@ -750,12 +752,12 @@ impl CubeTable {
                             index_schema.clone(),
                             index_projection_or_none_on_schema_match.clone(),
                         )?
-                        .with_sort_information(vec![
-                            lex_ordering_for_index(
+                        .try_with_sort_information(vec![
+                            LexOrdering::new(lex_ordering_for_index(
                                 self.index_snapshot.index.get_row(),
                                 &index_projection_schema,
-                            )?,
-                        ]),
+                            )?),
+                        ])?,
                     )
                 } else {
                     let remote_path = chunk.get_row().get_full_name(chunk.get_id());
@@ -764,15 +766,15 @@ impl CubeTable {
                         .get(&remote_path)
                         .expect(format!("Missing remote path {}", remote_path).as_str());
 
-                    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone())
+                    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone(), parquet_source())
                         .with_file(PartitionedFile::from_path(local_path.to_string())?)
                         .with_projection(index_projection_or_none_on_schema_match.clone())
-                        .with_output_ordering(vec![(0..key_len).map(|i| -> Result<_, DataFusionError> { Ok(PhysicalSortExpr::new(
+                        .with_output_ordering(vec![LexOrdering::new((0..key_len).map(|i| -> Result<_, DataFusionError> { Ok(PhysicalSortExpr::new(
                             Arc::new(
                                 datafusion::physical_expr::expressions::Column::new_with_schema(index_schema.field(i).name(), &index_schema)?
                             ),
                             SortOptions::default(),
-                        ))}).collect::<Result<Vec<_>, _>>()?])
+                        ))}).collect::<Result<Vec<_>, _>>()?)])
                         ;
                     let parquet_exec_builder = ParquetExecBuilder::new(file_scan)
                         .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
@@ -844,10 +846,10 @@ impl CubeTable {
 
         if partition_execs.len() == 0 {
             partition_execs.push(Arc::new(SortExec::new(
-                lex_ordering_for_index(
+                LexOrdering::new(lex_ordering_for_index(
                     self.index_snapshot.index.get_row(),
                     &table_projected_schema,
-                )?,
+                )?),
                 Arc::new(EmptyExec::new(table_projected_schema.clone())),
             )));
         }
@@ -863,13 +865,14 @@ impl CubeTable {
             properties: PlanProperties::new(
                 EquivalenceProperties::new_with_orderings(
                     schema.clone(),
-                    &[lex_ordering_for_index(
+                    &[LexOrdering::new(lex_ordering_for_index(
                         self.index_snapshot.index.get_row(),
                         &schema,
-                    )?],
+                    )?)],
                 ),
                 Partitioning::UnknownPartitioning(partition_num),
-                ExecutionMode::Bounded,
+                EmissionType::Both,  // TODO upgrade DF
+                Boundedness::Bounded,
             ),
         });
         let unique_key_columns = self
@@ -900,7 +903,7 @@ impl CubeTable {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let mut exec: Arc<dyn ExecutionPlan> =
-                Arc::new(SortPreservingMergeExec::new(sort_columns, read_data));
+                Arc::new(SortPreservingMergeExec::new(sort_columns.into(), read_data));
             exec = Arc::new(LastRowByUniqueKeyExec::try_new(
                 exec,
                 key_columns
@@ -956,7 +959,7 @@ impl CubeTable {
                     ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            Arc::new(SortPreservingMergeExec::new(join_columns, read_data))
+            Arc::new(SortPreservingMergeExec::new(LexOrdering::new(join_columns), read_data))
         } else {
             Arc::new(CoalescePartitionsExec::new(read_data))
         };
@@ -1049,13 +1052,14 @@ impl ExecutionPlan for CubeTableExec {
             properties: PlanProperties::new(
                 EquivalenceProperties::new_with_orderings(
                     self.schema.clone(),
-                    &[lex_ordering_for_index(
+                    &[LexOrdering::new(lex_ordering_for_index(
                         self.index_snapshot.index.get_row(),
                         &(&self.schema),
-                    )?],
+                    )?)],
                 ),
                 Partitioning::UnknownPartitioning(partition_count),
-                ExecutionMode::Bounded,
+                EmissionType::Both,  // TODO upgrade DF
+                Boundedness::Bounded,
             ),
         }))
     }
@@ -1181,6 +1185,7 @@ impl ExecutionPlan for CubeTableExec {
     }
 }
 
+// TODO upgrade DF: Make this return LexOrdering?
 pub fn lex_ordering_for_index(
     index: &Index,
     schema: &SchemaRef,
@@ -1317,7 +1322,8 @@ impl ClusterSendExec {
         PlanProperties::new(
             eq_properties,
             Partitioning::UnknownPartitioning(partitions_num),
-            input_properties.execution_mode.clone(),
+            EmissionType::Both,  // TODO upgrade DF: Actually Final, unless we implement streaming, but check if that value has implications.
+            input_properties.boundedness.clone(),
         )
     }
 

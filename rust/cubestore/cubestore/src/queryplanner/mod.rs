@@ -3,6 +3,8 @@ pub mod optimizations;
 pub mod panic;
 mod partition_filter;
 mod planning;
+use datafusion::logical_expr::planner::ExprPlanner;
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 // use datafusion::physical_plan::parquet::MetadataCacheFactory;
 pub use planning::PlanningMeta;
 mod check_memory;
@@ -81,10 +83,11 @@ use datafusion::logical_expr::{
     TableSource, WindowUDF,
 };
 use datafusion::physical_expr::EquivalenceProperties;
-use datafusion::physical_plan::memory::MemoryExec;
+// TODO upgrade DF
+// use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning,
+    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning,
     PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{SessionConfig, SessionContext};
@@ -288,6 +291,7 @@ struct MetaStoreSchemaProvider {
     inline_tables: InlineTables,
     cache: Arc<SqlResultCache>,
     config_options: ConfigOptions,
+    expr_planners: Vec<Arc<dyn ExprPlanner>>,  // session_state.expr_planners clone
     session_state: Arc<SessionState>,
 }
 
@@ -333,6 +337,7 @@ impl MetaStoreSchemaProvider {
             cache,
             inline_tables: (*inline_tables).clone(),
             config_options: ConfigOptions::new(),
+            expr_planners: datafusion::execution::FunctionRegistry::expr_planners(session_state.as_ref()),
             session_state,
         }
     }
@@ -572,6 +577,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
             .cloned()
             .collect()
     }
+
+    // We implement this for count(*) replacement.
+    fn get_expr_planners(&self) -> &[Arc<dyn datafusion::logical_expr::planner::ExprPlanner>] {
+        self.expr_planners.as_slice()
+    }
 }
 
 /// Enables our options used with `SqlToRel`.  Sets `enable_ident_normalization` to false.  See also
@@ -760,7 +770,8 @@ impl TableProvider for InfoSchemaTableProvider {
             properties: PlanProperties::new(
                 EquivalenceProperties::new(schema),
                 Partitioning::UnknownPartitioning(1),
-                ExecutionMode::Bounded,
+                EmissionType::Both,  // TODO upgrade DF:  Both is safe choice
+                Boundedness::Bounded,
             ),
         };
         Ok(Arc::new(exec))

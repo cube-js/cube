@@ -7,7 +7,7 @@ use datafusion::common::tree_node::{
 use datafusion::common::{Column, DataFusionError, JoinType, ScalarValue, TableReference};
 use datafusion::functions::datetime::date_part::DatePartFunc;
 use datafusion::functions::datetime::date_trunc::DateTruncFunc;
-use datafusion::logical_expr::expr::{AggregateFunction, Alias, ScalarFunction};
+use datafusion::logical_expr::expr::{AggregateFunction, AggregateFunctionParams, Alias, ScalarFunction};
 use datafusion::logical_expr::{
     Aggregate, BinaryExpr, Cast, ColumnarValue, Expr, Extension, Join, LogicalPlan, Operator,
     Projection, ScalarUDFImpl, SubqueryAlias, Union, Unnest,
@@ -41,6 +41,7 @@ use std::sync::Arc;
 /// ```plan
 /// RollingWindowAggregate
 /// ```
+#[derive(Debug)]
 pub struct RollingOptimizerRule {}
 
 impl RollingOptimizerRule {
@@ -178,14 +179,16 @@ impl RollingOptimizerRule {
                 let rolling_aggs = aggr_expr
                     .iter()
                     .map(|e| match e {
-                        Expr::AggregateFunction(AggregateFunction { func, args, .. }) => {
+                        Expr::AggregateFunction(AggregateFunction { func, params: AggregateFunctionParams { args, .. } }) => {
                             Some(Expr::AggregateFunction(AggregateFunction {
                                 func: func.clone(),
-                                args: args.clone(),
-                                distinct: false,
-                                filter: None,
-                                order_by: None,
-                                null_treatment: None,
+                                params: AggregateFunctionParams {
+                                    args: args.clone(),
+                                    distinct: false,
+                                    filter: None,
+                                    order_by: None,
+                                    null_treatment: None,
+                                },
                             }))
                         }
                         _ => None,
