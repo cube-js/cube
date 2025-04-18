@@ -5,6 +5,7 @@ set -eo pipefail
 export DEBUG=testcontainers
 
 echo "::group::BigQuery [cloud]"
+export CUBEJS_DB_BQ_CREDENTIALS=$DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_BQ_CREDENTIALS
 export CUBEJS_DB_BQ_PROJECT_ID=cube-open-source
 export CUBEJS_DB_EXPORT_BUCKET=cube-open-source-export-bucket
 yarn lerna run --concurrency 1 --stream --no-prefix integration:bigquery
