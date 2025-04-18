@@ -66,9 +66,9 @@ use datafusion::execution::{SessionState, TaskContext};
 use datafusion::logical_expr::expr::Alias;
 use datafusion::logical_expr::utils::expr_to_columns;
 use datafusion::logical_expr::{
-    expr, logical_plan, Aggregate, BinaryExpr, Expr, Extension, Filter, Join, Limit, LogicalPlan,
-    Operator, Projection, Sort, SortExpr, SubqueryAlias, TableScan, Union, Unnest,
-    UserDefinedLogicalNode,
+    expr, logical_plan, Aggregate, BinaryExpr, Expr, Extension, FetchType, Filter, InvariantLevel,
+    Join, Limit, LogicalPlan, Operator, Projection, SkipType, Sort, SortExpr, SubqueryAlias,
+    TableScan, Union, Unnest, UserDefinedLogicalNode,
 };
 use datafusion::physical_expr::{Distribution, LexRequirement};
 use datafusion::physical_plan::repartition::RepartitionExec;
@@ -793,11 +793,23 @@ impl PlanRewriter for ChooseIndex<'_> {
     fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
         match n {
             // TODO upgrade DF
-            LogicalPlan::Limit(Limit {
-                fetch: Some(n),
-                skip: 0,
+            LogicalPlan::Limit(limit@Limit {
+                // fetch: Some(n),
+                // skip: 0,
                 ..
-            }) => Some(context.update_limit(Some(*n))),
+            }) => {
+                // TODO upgrade DF: Propogate the errors instead of .ok()? returning None.
+                if let FetchType::Literal(Some(n)) = limit.get_fetch_type().ok()? {
+                    // TODO upgrade DF: Handle skip non-zero (as in commented block below)
+                    if let SkipType::Literal(0) = limit.get_skip_type().ok()? {
+                        Some(context.update_limit(Some(n)))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
             // LogicalPlan::Skip { n, .. } => {
             //     if let Some(limit) = context.limit {
             //         Some(context.update_limit(Some(limit + *n)))
@@ -1023,7 +1035,10 @@ fn check_aggregates_expr(table: &IdRow<Table>, aggregates: &Vec<Expr>) -> bool {
 
     for aggr in aggregates.iter() {
         match aggr {
-            Expr::AggregateFunction(expr::AggregateFunction { func, args, .. }) => {
+            Expr::AggregateFunction(expr::AggregateFunction {
+                func,
+                params: expr::AggregateFunctionParams { args, .. },
+            }) => {
                 if args.len() != 1 {
                     return false;
                 }
@@ -1373,7 +1388,7 @@ fn partition_filter_schema(index: &IdRow<Index>) -> datafusion::arrow::datatypes
     datafusion::arrow::datatypes::Schema::new(schema_fields)
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, PartialEq, Eq, PartialOrd)]
 pub enum Snapshot {
     Index(IndexSnapshot),
     Inline(InlineSnapshot),
@@ -1461,6 +1476,10 @@ impl UserDefinedLogicalNode for ClusterSendNode {
         self.input.schema()
     }
 
+    fn check_invariants(&self, _check: InvariantLevel, _plan: &LogicalPlan) -> common::Result<()> {
+        Ok(())
+    }
+
     fn expressions(&self) -> Vec<Expr> {
         vec![]
     }
@@ -1497,9 +1516,16 @@ impl UserDefinedLogicalNode for ClusterSendNode {
     fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
         other
             .as_any()
-            .downcast_ref()
-            .map(|s| self.input.eq(s))
+            .downcast_ref::<ClusterSendNode>()
+            .map(|s| self.input.eq(&s.input))
             .unwrap_or(false)
+    }
+
+    fn dyn_ord(&self, other: &dyn UserDefinedLogicalNode) -> Option<Ordering> {
+        other
+            .as_any()
+            .downcast_ref::<ClusterSendNode>()
+            .and_then(|s| self.input.as_ref().partial_cmp(s.input.as_ref()))
     }
 }
 

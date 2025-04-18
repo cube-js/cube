@@ -16,15 +16,15 @@ use datafusion::logical_expr::expr::{Alias, ScalarFunction};
 use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection};
 use datafusion::optimizer::AnalyzerRule;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
+use datafusion_datasource::memory::MemoryExec;
 use sqlparser::ast::{Expr as SQExpr, FunctionArgExpr, FunctionArgumentList, FunctionArguments};
 use sqlparser::ast::{FunctionArg, Ident, ObjectName, Query, SelectItem, SetExpr, Statement};
 use sqlparser::parser::Parser;
-use sqlparser::tokenizer::Tokenizer;
+use sqlparser::tokenizer::{Span, Tokenizer};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -337,6 +337,7 @@ impl KafkaPostProcessPlanner {
                     ObjectName(vec![Ident {
                         value: "CONVERT_TZ_KSQL".to_string(),
                         quote_style: None,
+                        span: Span::empty(),
                     }])
                 } else {
                     f.name

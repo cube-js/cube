@@ -5,10 +5,13 @@ use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::error::DataFusionError;
 use datafusion::execution::TaskContext;
-use datafusion::logical_expr::{Expr, Extension, LogicalPlan, UserDefinedLogicalNode};
+use datafusion::logical_expr::{
+    Expr, Extension, InvariantLevel, LogicalPlan, UserDefinedLogicalNode,
+};
 use datafusion::physical_expr::EquivalenceProperties;
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, Partitioning, PlanProperties,
+    DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
     SendableRecordBatchStream,
 };
 use serde::{Deserialize, Serialize};
@@ -60,6 +63,14 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
         &EMPTY_SCHEMA
     }
 
+    fn check_invariants(
+        &self,
+        _check: InvariantLevel,
+        _plan: &LogicalPlan,
+    ) -> Result<(), DataFusionError> {
+        Ok(())
+    }
+
     fn expressions(&self) -> Vec<Expr> {
         vec![]
     }
@@ -87,9 +98,13 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
     fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
         other
             .as_any()
-            .downcast_ref()
+            .downcast_ref::<Self>()
             .map(|o| self.eq(o))
             .unwrap_or(false)
+    }
+
+    fn dyn_ord(&self, other: &dyn UserDefinedLogicalNode) -> Option<Ordering> {
+        other.as_any().downcast_ref::<Self>().map(|o| self.cmp(o))
     }
 }
 
@@ -107,7 +122,8 @@ impl PanicWorkerExec {
             properties: PlanProperties::new(
                 EquivalenceProperties::new(Arc::new(Schema::empty())),
                 Partitioning::UnknownPartitioning(1),
-                ExecutionMode::Bounded,
+                EmissionType::Both, // Well, neither.
+                Boundedness::Bounded,
             ),
         }
     }

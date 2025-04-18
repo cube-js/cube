@@ -29,16 +29,16 @@ use super::udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 use crate::queryplanner::rolling::RollingWindowAggregate;
 use bytes::Bytes;
 use datafusion::catalog::TableProvider;
-use datafusion::catalog_common::TableReference;
 use datafusion::common::tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeVisitor};
+use datafusion::common::TableReference;
 use datafusion::common::{Column, DFSchemaRef, JoinConstraint, JoinType};
 use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{
-    wrap_projection_for_join_if_necessary, Aggregate, CrossJoin, Distinct, DistinctOn,
-    EmptyRelation, Expr, Extension, Filter, Join, Limit, LogicalPlan, Projection, RecursiveQuery,
-    Repartition, Sort, Subquery, SubqueryAlias, TableScan, Union, Unnest, Values, Window,
+    wrap_projection_for_join_if_necessary, Aggregate, Distinct, DistinctOn, EmptyRelation, Expr,
+    Extension, Filter, Join, Limit, LogicalPlan, Projection, RecursiveQuery, Repartition, Sort,
+    Subquery, SubqueryAlias, TableScan, Union, Unnest, Values, Window,
 };
 use datafusion::prelude::SessionContext;
 use datafusion_proto::bytes::{
@@ -111,7 +111,7 @@ pub struct SchemaSnapshot {
     index_snapshots: PlanningMeta,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd)]
 pub struct IndexSnapshot {
     pub table_path: TablePath,
     pub index: IdRow<Index>,
@@ -141,7 +141,7 @@ impl IndexSnapshot {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, PartialOrd)]
 pub struct PartitionSnapshot {
     pub partition: IdRow<Partition>,
     pub chunks: Vec<IdRow<Chunk>>,
@@ -157,7 +157,7 @@ impl PartitionSnapshot {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, PartialEq, Eq, PartialOrd)]
 pub struct InlineSnapshot {
     pub id: u64,
 }
@@ -778,8 +778,8 @@ impl PreSerializedPlan {
                     })
                 } else {
                     LogicalPlan::Limit(Limit {
-                        skip: *skip,
-                        fetch: *fetch,
+                        skip: skip.clone(),
+                        fetch: fetch.clone(),
                         input: Arc::new(input),
                     })
                 }
@@ -884,28 +884,29 @@ impl PreSerializedPlan {
                     )?)
                 }
             }
-            LogicalPlan::CrossJoin(CrossJoin {
-                left,
-                right,
-                schema,
-            }) => {
-                let left = PreSerializedPlan::remove_unused_tables(
-                    left,
-                    partition_ids_to_execute,
-                    inline_tables_to_execute,
-                )?;
-                let right = PreSerializedPlan::remove_unused_tables(
-                    right,
-                    partition_ids_to_execute,
-                    inline_tables_to_execute,
-                )?;
+            // TODO upgrade DF: Figure out where CrossJoin went.
+            // LogicalPlan::CrossJoin(CrossJoin {
+            //     left,
+            //     right,
+            //     schema,
+            // }) => {
+            //     let left = PreSerializedPlan::remove_unused_tables(
+            //         left,
+            //         partition_ids_to_execute,
+            //         inline_tables_to_execute,
+            //     )?;
+            //     let right = PreSerializedPlan::remove_unused_tables(
+            //         right,
+            //         partition_ids_to_execute,
+            //         inline_tables_to_execute,
+            //     )?;
 
-                LogicalPlan::CrossJoin(CrossJoin {
-                    left: Arc::new(left),
-                    right: Arc::new(right),
-                    schema: schema.clone(),
-                })
-            }
+            //     LogicalPlan::CrossJoin(CrossJoin {
+            //         left: Arc::new(left),
+            //         right: Arc::new(right),
+            //         schema: schema.clone(),
+            //     })
+            // }
             LogicalPlan::Window(Window {
                 input,
                 window_expr,
@@ -1155,7 +1156,6 @@ impl PreSerializedPlan {
             LogicalPlan::Explain(_)
             | LogicalPlan::Statement(_)
             | LogicalPlan::Analyze(_)
-            | LogicalPlan::Prepare(_)
             | LogicalPlan::Dml(_)
             | LogicalPlan::Ddl(_)
             | LogicalPlan::Copy(_)

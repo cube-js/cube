@@ -6,7 +6,7 @@ use sqlparser::ast::{
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
-use sqlparser::tokenizer::{Token, Tokenizer};
+use sqlparser::tokenizer::{Span, Token, Tokenizer};
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
@@ -272,7 +272,7 @@ impl<'a> CubeStoreParser<'a> {
             Token::Word(w) => {
                 self.parser.next_token();
 
-                Ok(QueueKey::ByPath(w.to_ident().value))
+                Ok(QueueKey::ByPath(w.into_ident(Span::empty()).value))
             }
             Token::SingleQuotedString(v) => {
                 self.parser.next_token();
@@ -335,23 +335,23 @@ impl<'a> CubeStoreParser<'a> {
                 };
 
                 CacheCommand::Set {
-                    key: self.parser.parse_identifier(false)?,
+                    key: self.parser.parse_identifier()?,
                     value: self.parser.parse_literal_string()?,
                     ttl,
                     nx,
                 }
             }
             "get" => CacheCommand::Get {
-                key: self.parser.parse_identifier(false)?,
+                key: self.parser.parse_identifier()?,
             },
             "keys" => CacheCommand::Keys {
-                prefix: self.parser.parse_identifier(false)?,
+                prefix: self.parser.parse_identifier()?,
             },
             "incr" => CacheCommand::Incr {
-                path: self.parser.parse_identifier(false)?,
+                path: self.parser.parse_identifier()?,
             },
             "remove" => CacheCommand::Remove {
-                key: self.parser.parse_identifier(false)?,
+                key: self.parser.parse_identifier()?,
             },
             "truncate" => CacheCommand::Truncate {},
             other => {
@@ -492,7 +492,7 @@ impl<'a> CubeStoreParser<'a> {
                 QueueCommand::Add {
                     priority,
                     orphaned,
-                    key: self.parser.parse_identifier(false)?,
+                    key: self.parser.parse_identifier()?,
                     value: self.parser.parse_literal_string()?,
                 }
             }
@@ -523,7 +523,7 @@ impl<'a> CubeStoreParser<'a> {
                 let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);
 
                 QueueCommand::ToCancel {
-                    prefix: self.parser.parse_identifier(false)?,
+                    prefix: self.parser.parse_identifier()?,
                     orphaned_timeout: None,
                     heartbeat_timeout,
                 }
@@ -532,7 +532,7 @@ impl<'a> CubeStoreParser<'a> {
                 let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
 
                 QueueCommand::ToCancel {
-                    prefix: self.parser.parse_identifier(false)?,
+                    prefix: self.parser.parse_identifier()?,
                     heartbeat_timeout: None,
                     orphaned_timeout,
                 }
@@ -542,7 +542,7 @@ impl<'a> CubeStoreParser<'a> {
                 let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
 
                 QueueCommand::ToCancel {
-                    prefix: self.parser.parse_identifier(false)?,
+                    prefix: self.parser.parse_identifier()?,
                     heartbeat_timeout,
                     orphaned_timeout,
                 }
@@ -551,7 +551,7 @@ impl<'a> CubeStoreParser<'a> {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
                 QueueCommand::List {
-                    prefix: self.parser.parse_identifier(false)?,
+                    prefix: self.parser.parse_identifier()?,
                     with_payload,
                     status_filter: Some(QueueItemStatus::Pending),
                     sort_by_priority: true,
@@ -561,7 +561,7 @@ impl<'a> CubeStoreParser<'a> {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
                 QueueCommand::List {
-                    prefix: self.parser.parse_identifier(false)?,
+                    prefix: self.parser.parse_identifier()?,
                     with_payload,
                     status_filter: Some(QueueItemStatus::Active),
                     sort_by_priority: false,
@@ -571,7 +571,7 @@ impl<'a> CubeStoreParser<'a> {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
                 QueueCommand::List {
-                    prefix: self.parser.parse_identifier(false)?,
+                    prefix: self.parser.parse_identifier()?,
                     with_payload,
                     status_filter: None,
                     sort_by_priority: true,
@@ -587,13 +587,13 @@ impl<'a> CubeStoreParser<'a> {
                 };
 
                 QueueCommand::Retrieve {
-                    key: self.parser.parse_identifier(false)?,
+                    key: self.parser.parse_identifier()?,
                     extended,
                     concurrency,
                 }
             }
             "result" => QueueCommand::Result {
-                key: self.parser.parse_identifier(false)?,
+                key: self.parser.parse_identifier()?,
             },
             "result_blocking" => {
                 let timeout = self.parse_integer(&"timeout", false)?;
@@ -682,7 +682,7 @@ impl<'a> CubeStoreParser<'a> {
 
         // Parse optional `AS ( query )`
         let query = if self.parser.parse_keyword(Keyword::AS) {
-            Some(self.parser.parse_boxed_query()?)
+            Some(self.parser.parse_query()?)
         } else {
             None
         };
@@ -691,7 +691,7 @@ impl<'a> CubeStoreParser<'a> {
             self.parser.expect_token(&Token::LParen)?;
             let res = Some(
                 self.parser
-                    .parse_comma_separated(|p| p.parse_identifier(false))?,
+                    .parse_comma_separated(|p| p.parse_identifier())?,
             );
             self.parser.expect_token(&Token::RParen)?;
             res
@@ -702,9 +702,9 @@ impl<'a> CubeStoreParser<'a> {
         let aggregates = if self.parse_custom_token("aggregations") {
             self.parser.expect_token(&Token::LParen)?;
             let res = self.parser.parse_comma_separated(|p| {
-                let func = p.parse_identifier(true)?;
+                let func = p.parse_identifier()?;
                 p.expect_token(&Token::LParen)?;
-                let column = p.parse_identifier(true)?;
+                let column = p.parse_identifier()?;
                 p.expect_token(&Token::RParen)?;
                 Ok((func, column))
             })?;
@@ -737,7 +737,7 @@ impl<'a> CubeStoreParser<'a> {
             self.parser.expect_token(&Token::LParen)?;
             let columns = self
                 .parser
-                .parse_comma_separated(|t| Parser::parse_identifier(t, true))?;
+                .parse_comma_separated(|t| Parser::parse_identifier(t))?;
             self.parser.expect_token(&Token::RParen)?;
             Some(PartitionedIndexRef { name, columns })
         } else {
@@ -784,6 +784,7 @@ impl<'a> CubeStoreParser<'a> {
                 order_by: None,
                 partition_by: None,
                 cluster_by: None,
+                clustered_by: None,
                 options: None,
                 strict: false,
                 copy_grants: false,
@@ -828,6 +829,7 @@ impl<'a> CubeStoreParser<'a> {
             if_not_exists: false,
             include: vec![],
             nulls_distinct: None,
+            with: vec![],
             predicate: None,
         }))
     }
@@ -845,7 +847,7 @@ impl<'a> CubeStoreParser<'a> {
 
     fn parse_create_source(&mut self) -> Result<Statement, ParserError> {
         let or_update = self.parser.parse_keywords(&[Keyword::OR, Keyword::UPDATE]);
-        let name = self.parser.parse_identifier(false)?;
+        let name = self.parser.parse_identifier()?;
         self.parser.expect_keyword(Keyword::AS)?;
         let source_type = self.parser.parse_literal_string()?;
         let credentials = self.parser.parse_options(Keyword::VALUES)?;

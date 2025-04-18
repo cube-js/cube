@@ -588,6 +588,9 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                 | DataType::Varchar(_)
                 | DataType::Clob(_)
                 | DataType::Text
+                | DataType::TinyText
+                | DataType::MediumText
+                | DataType::LongText
                 | DataType::String(_)
                 | DataType::Character(_)
                 | DataType::CharacterVarying(_)
@@ -600,6 +603,9 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                 | DataType::Binary(_)
                 | DataType::Varbinary(_)
                 | DataType::Blob(_)
+                | DataType::TinyBlob
+                | DataType::MediumBlob
+                | DataType::LongBlob
                 | DataType::Bytea
                 | DataType::Array(_)
                 | DataType::Bytes(_) => ColumnType::Bytes,
@@ -659,7 +665,7 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                 DataType::Boolean | DataType::Bool => ColumnType::Boolean,
                 DataType::Float(_)
                 | DataType::Real
-                | DataType::Double
+                | DataType::Double(_)
                 | DataType::Float4
                 | DataType::Float32
                 | DataType::Float64
@@ -699,12 +705,15 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                 | DataType::Map(_, _)
                 | DataType::Tuple(_)
                 | DataType::Nested(_)
-                | DataType::Enum(_)
+                | DataType::Enum(_, _)
                 | DataType::Set(_)
                 | DataType::Struct(_, _)
                 | DataType::Union(_)
                 | DataType::Nullable(_)
                 | DataType::LowCardinality(_)
+                | DataType::Bit(_)
+                | DataType::BitVarying(_)
+                | DataType::AnyType
                 | DataType::Unspecified
                 | DataType::Trigger => {
                     return Err(CubeError::user(format!(
