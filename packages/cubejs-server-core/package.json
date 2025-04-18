@@ -87,7 +87,7 @@
     "coverageReporters": [
       "text",
       "html",
-      "cobertura"
+      "lcov"
     ],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
