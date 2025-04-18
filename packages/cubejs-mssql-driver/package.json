@@ -11,9 +11,15 @@
   "engines": {
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
   "main": "index.js",
+  "typings": "dist/src/index.d.ts",
   "dependencies": {
     "@cubejs-backend/base-driver": "1.3.5",
+    "@cubejs-backend/shared": "1.3.5",
     "mssql": "^11.0.1"
   },
   "devDependencies": {
@@ -22,6 +28,9 @@
   },
   "jest": {
     "testEnvironment": "node"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   },
   "license": "Apache-2.0",
   "publishConfig": {
