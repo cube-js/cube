@@ -2,13 +2,13 @@ pub mod compaction;
 
 use async_trait::async_trait;
 use datafusion::arrow::compute::{concat_batches, lexsort_to_indices, SortColumn, SortOptions};
-use datafusion::physical_expr::PhysicalSortExpr;
+use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::common::collect as common_collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column as FusionColumn;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
+use datafusion_datasource::memory::MemoryExec;
 use serde::{de, Deserialize, Serialize};
 extern crate bincode;
 
@@ -1322,13 +1322,15 @@ impl ChunkStore {
                     lex_ordering.push(PhysicalSortExpr::new(col, SortOptions::default()));
                 }
 
-                let input = Arc::new(memory_exec.with_sort_information(vec![lex_ordering]));
+                let input = Arc::new(
+                    memory_exec.try_with_sort_information(vec![LexOrdering::new(lex_ordering)])?,
+                );
 
                 let aggregates = table
                     .get_row()
                     .aggregate_columns()
                     .iter()
-                    .map(|aggr_col| aggr_col.aggregate_expr(&schema))
+                    .map(|aggr_col| aggr_col.aggregate_expr(&schema).map(Arc::new))
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let filter_expr: Vec<Option<Arc<dyn PhysicalExpr>>> = vec![None; aggregates.len()];

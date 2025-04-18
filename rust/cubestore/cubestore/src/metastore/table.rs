@@ -23,7 +23,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
 use std::sync::Arc;
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct AggregateColumnIndex {
     index: u64,
     function: AggregateFunction,
@@ -114,7 +114,7 @@ impl core::fmt::Display for AggregateColumn {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum StreamOffset {
     Earliest = 1,
     Latest = 2,
@@ -129,7 +129,7 @@ impl DataFrameValue<String> for Option<StreamOffset> {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Table {
     table_name: String,
     schema_id: u64,
@@ -172,7 +172,7 @@ pub struct Table {
 
 impl RocksEntity for Table {}
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd)]
 pub struct TablePath {
     pub table: IdRow<Table>,
     pub schema: Arc<IdRow<Schema>>,

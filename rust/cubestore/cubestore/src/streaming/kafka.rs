@@ -422,10 +422,10 @@ mod tests {
     use datafusion::datasource::TableProvider;
     use datafusion::execution::TaskContext;
     use datafusion::physical_plan::collect;
-    use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::prelude::SessionContext;
     use datafusion::sql::parser::Statement as DFStatement;
     use datafusion::sql::planner::SqlToRel;
+    use datafusion_datasource::memory::MemoryExec;
     use sqlparser::parser::Parser;
     use sqlparser::tokenizer::Tokenizer;
 

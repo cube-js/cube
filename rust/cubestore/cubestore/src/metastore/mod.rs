@@ -341,7 +341,9 @@ impl DataFrameValue<String> for Option<Vec<AggregateFunction>> {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
+#[derive(
+    Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd, DeepSizeOf,
+)]
 pub enum HllFlavour {
     Airlift,      // Compatible with Presto, Athena, etc.
     Snowflake,    // Same storage as Airlift, imports from Snowflake JSON.
@@ -369,7 +371,7 @@ pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeE
     return Ok(());
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd, DeepSizeOf)]
 pub enum ColumnType {
     String,
     Int,
@@ -547,7 +549,7 @@ impl From<&Column> for types::Type {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd, DeepSizeOf)]
 pub struct Column {
     name: String,
     column_type: ColumnType,
@@ -611,7 +613,7 @@ impl fmt::Display for Column {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum ImportFormat {
     CSV,
     CSVNoHeader,
@@ -624,7 +626,7 @@ pub enum ImportFormat {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Schema {
     name: String
 }
@@ -632,14 +634,14 @@ pub struct Schema {
 
 impl RocksEntity for Schema {}
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum IndexType {
     Regular = 1,
     Aggregate = 2,
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Index {
     name: String,
     table_id: u64,
@@ -656,7 +658,7 @@ pub struct Index {
 
 impl RocksEntity for Index {}
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum AggregateFunction {
     SUM = 1,
     MAX = 2,

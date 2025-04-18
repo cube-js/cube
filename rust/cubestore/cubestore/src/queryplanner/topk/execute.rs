@@ -13,16 +13,17 @@ use datafusion::logical_expr::Accumulator;
 use datafusion::physical_expr::{EquivalenceProperties, LexRequirement};
 use datafusion::physical_plan::aggregates::{create_accumulators, AccumulatorItem, AggregateMode};
 use datafusion::physical_plan::common::collect;
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use datafusion::physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, ExecutionPlanProperties,
-    Partitioning, PhysicalExpr, PlanProperties, SendableRecordBatchStream,
+    DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::scalar::ScalarValue;
+use datafusion_datasource::memory::MemoryExec;
 use flatbuffers::bitflags::_core::cmp::Ordering;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
@@ -47,7 +48,7 @@ pub enum TopKAggregateFunction {
 pub struct AggregateTopKExec {
     pub limit: usize,
     pub key_len: usize,
-    pub agg_expr: Vec<AggregateFunctionExpr>,
+    pub agg_expr: Vec<Arc<AggregateFunctionExpr>>,
     pub agg_descr: Vec<AggDescr>,
     pub order_by: Vec<SortColumn>,
     pub having: Option<Arc<dyn PhysicalExpr>>,
@@ -65,7 +66,7 @@ impl AggregateTopKExec {
     pub fn new(
         limit: usize,
         key_len: usize,
-        agg_expr: Vec<AggregateFunctionExpr>,
+        agg_expr: Vec<Arc<AggregateFunctionExpr>>,
         agg_fun: &[TopKAggregateFunction],
         order_by: Vec<SortColumn>,
         having: Option<Arc<dyn PhysicalExpr>>,
@@ -83,7 +84,8 @@ impl AggregateTopKExec {
         let cache = PlanProperties::new(
             EquivalenceProperties::new(schema.clone()),
             Partitioning::UnknownPartitioning(1),
-            ExecutionMode::Bounded,
+            EmissionType::Both, // TODO upgrade DF
+            Boundedness::Bounded,
         );
 
         AggregateTopKExec {
@@ -101,7 +103,7 @@ impl AggregateTopKExec {
     }
 
     fn compute_descr(
-        agg_expr: &[AggregateFunctionExpr],
+        agg_expr: &[Arc<AggregateFunctionExpr>],
         agg_fun: &[TopKAggregateFunction],
         order_by: &[SortColumn],
     ) -> Vec<AggDescr> {
@@ -275,7 +277,7 @@ struct TopKState<'a> {
     key_len: usize,
     order_by: &'a [SortColumn],
     having: &'a Option<Arc<dyn PhysicalExpr>>,
-    agg_expr: &'a Vec<AggregateFunctionExpr>,
+    agg_expr: &'a Vec<Arc<AggregateFunctionExpr>>,
     agg_descr: &'a [AggDescr],
     context: &'a Arc<TaskContext>,
     /// Holds the maximum value seen in each node, used to estimate unseen scores.
@@ -377,7 +379,7 @@ impl TopKState<'_> {
         key_len: usize,
         order_by: &'a [SortColumn],
         having: &'a Option<Arc<dyn PhysicalExpr>>,
-        agg_expr: &'a Vec<AggregateFunctionExpr>,
+        agg_expr: &'a Vec<Arc<AggregateFunctionExpr>>,
         agg_descr: &'a [AggDescr],
         buffer: &'a mut TopKBuffer,
         context: &'a Arc<TaskContext>,
@@ -1042,14 +1044,14 @@ mod tests {
     use datafusion::common::{Column, DFSchema};
     use datafusion::error::DataFusionError;
     use datafusion::execution::{SessionState, SessionStateBuilder};
-    use datafusion::logical_expr::expr::AggregateFunction;
+    use datafusion::logical_expr::expr::{AggregateFunction, AggregateFunctionParams};
     use datafusion::logical_expr::AggregateUDF;
-    use datafusion::physical_expr::PhysicalSortRequirement;
+    use datafusion::physical_expr::{LexOrdering, PhysicalSortRequirement};
     use datafusion::physical_plan::empty::EmptyExec;
-    use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::physical_planner::create_aggregate_expr_and_maybe_filter;
     use datafusion::prelude::Expr;
+    use datafusion_datasource::memory::MemoryExec;
     use futures::StreamExt;
     use itertools::Itertools;
 
@@ -1466,20 +1468,22 @@ mod tests {
             .enumerate()
             .map(|(i, f)| AggregateFunction {
                 func: topk_fun_to_fusion_type(&ctx, f).unwrap(),
-                args: vec![Expr::Column(Column::from_name(format!("agg{}", i + 1)))],
-                distinct: false,
-                filter: None,
-                order_by: None,
-                null_treatment: None,
+                params: AggregateFunctionParams {
+                    args: vec![Expr::Column(Column::from_name(format!("agg{}", i + 1)))],
+                    distinct: false,
+                    filter: None,
+                    order_by: None,
+                    null_treatment: None,
+                },
             })
             .collect::<Vec<_>>();
         let agg_exprs = agg_functions
             .iter()
             .map(|agg_fn| Expr::AggregateFunction(agg_fn.clone()));
         let physical_agg_exprs: Vec<(
-            AggregateFunctionExpr,
+            Arc<AggregateFunctionExpr>,
             Option<Arc<dyn PhysicalExpr>>,
-            Option<Vec<datafusion::physical_expr::PhysicalSortExpr>>,
+            Option<LexOrdering>,
         )> = agg_exprs
             .map(|e| {
                 Ok(create_aggregate_expr_and_maybe_filter(
@@ -1517,7 +1521,7 @@ mod tests {
                             input_schema.field(i).name(),
                             i,
                         )),
-                        &agg_functions[c.agg_index].args,
+                        &agg_functions[c.agg_index].params.args,
                         &input_schema,
                     ),
                     options: Some(SortOptions {

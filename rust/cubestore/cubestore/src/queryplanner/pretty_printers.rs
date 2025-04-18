@@ -8,16 +8,17 @@ use datafusion::datasource::physical_plan::ParquetExec;
 use datafusion::datasource::{DefaultTableSource, TableProvider};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{
-    Aggregate, CrossJoin, EmptyRelation, Explain, Extension, Filter, Join, Limit, LogicalPlan,
-    Projection, Repartition, Sort, TableScan, Union, Window,
+    Aggregate, EmptyRelation, Explain, Extension, FetchType, Filter, Join, Limit, LogicalPlan,
+    Projection, Repartition, SkipType, Sort, TableScan, Union, Window,
 };
-use datafusion::physical_expr::ConstExpr;
+use datafusion::physical_expr::{AcrossPartitions, ConstExpr};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::{ExecutionPlan, InputOrderMode, PlanProperties};
 use datafusion::prelude::Expr;
+use datafusion_datasource::memory::MemoryExec;
 use itertools::{repeat_n, Itertools};
 use std::sync::Arc;
 
@@ -43,7 +44,6 @@ use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::joins::{HashJoinExec, SortMergeJoinExec};
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::sorts::sort::SortExec;
@@ -241,24 +241,40 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                     }
                 }
                 LogicalPlan::EmptyRelation(EmptyRelation { .. }) => self.output += "Empty",
-                &LogicalPlan::Limit(Limit {
-                    skip,
-                    fetch,
-                    input: _,
-                }) => {
-                    if skip == 0 {
-                        if let Some(_) = fetch {
-                            self.output += "Limit";
-                        } else {
-                            self.output += "Limit infinity";
+                LogicalPlan::Limit(
+                    limit @ Limit {
+                        skip: _,
+                        fetch: _,
+                        input: _,
+                    },
+                ) => {
+                    let fetch: Result<FetchType, DataFusionError> = limit.get_fetch_type();
+                    let skip: Result<SkipType, DataFusionError> = limit.get_skip_type();
+                    let mut sep = ", ";
+                    let mut silent_infinite_fetch = false;
+                    match skip {
+                        Ok(SkipType::Literal(0)) => {
+                            sep = "";
                         }
-                    } else {
-                        if let Some(_) = fetch {
-                            self.output += "Skip, Limit";
-                        } else {
+                        Ok(SkipType::Literal(n)) => {
+                            silent_infinite_fetch = true;
                             self.output += "Skip";
                         }
-                    }
+                        Ok(SkipType::UnsupportedExpr) => self.output += "Skip UnsupportedExpr",
+                        Err(e) => self.output += &format!("Skip Err({})", e),
+                    };
+                    match fetch {
+                        Ok(FetchType::Literal(Some(_))) => self.output += &format!("{}Limit", sep),
+                        Ok(FetchType::Literal(None)) => {
+                            if !silent_infinite_fetch {
+                                self.output += &format!("{}Limit infinity", sep)
+                            }
+                        }
+                        Ok(FetchType::UnsupportedExpr) => {
+                            self.output += &format!("{}Limit UnsupportedExpr", sep)
+                        }
+                        Err(e) => self.output += &format!("{}Limit Err({})", sep, e),
+                    };
                 }
                 // LogicalPlan::CreateExternalTable(CreateExternalTable { .. }) => self.output += "CreateExternalTable",
                 LogicalPlan::Explain(Explain { .. }) => self.output += "Explain",
@@ -348,9 +364,10 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 LogicalPlan::Window(Window { .. }) => {
                     self.output += "Window";
                 }
-                LogicalPlan::CrossJoin(CrossJoin { .. }) => {
-                    self.output += "CrossJoin";
-                }
+                // TODO upgrade DF: There may be some join printable as "Cross" in DF.
+                // LogicalPlan::CrossJoin(CrossJoin { .. }) => {
+                //     self.output += "CrossJoin";
+                // }
                 LogicalPlan::Subquery(_) => {
                     self.output += "Subquery";
                 }
@@ -368,9 +385,6 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                 }
                 LogicalPlan::Distinct(_) => {
                     self.output += "Distinct";
-                }
-                LogicalPlan::Prepare(_) => {
-                    self.output += "Prepare";
                 }
                 LogicalPlan::Dml(_) => {
                     self.output += "Dml";
@@ -699,8 +713,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             if svals.len() > 0 {
                 let sv_columns: Option<Vec<usize>> = svals
                     .iter()
-                    .map(|const_expr| {
-                        if const_expr.across_partitions() {
+                    .map(|const_expr| match const_expr.across_partitions() {
+                        AcrossPartitions::Uniform(_) => {
                             if let Some(column_expr) =
                                 const_expr.expr().as_any().downcast_ref::<Column>()
                             {
@@ -708,9 +722,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                             } else {
                                 None
                             }
-                        } else {
-                            None
                         }
+                        AcrossPartitions::Heterogeneous => None,
                     })
                     .collect();
 

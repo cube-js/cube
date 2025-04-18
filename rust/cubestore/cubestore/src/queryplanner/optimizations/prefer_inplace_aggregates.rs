@@ -88,7 +88,7 @@ pub fn try_regroup_columns(
     }
 
     Ok(Arc::new(SortPreservingMergeExec::new(
-        sort_order.to_vec(),
+        LexOrdering::new(sort_order.to_vec()),
         p,
     )))
 }

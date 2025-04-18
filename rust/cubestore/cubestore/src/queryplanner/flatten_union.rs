@@ -47,7 +47,6 @@ impl OptimizerRule for FlattenUnion {
             | LogicalPlan::Values(_)
             | LogicalPlan::Analyze(_)
             | LogicalPlan::Distinct(_)
-            | LogicalPlan::Prepare(_)
             // | LogicalPlan::Execute(_)
             | LogicalPlan::Dml(_)
             | LogicalPlan::Ddl(_)
@@ -55,7 +54,6 @@ impl OptimizerRule for FlattenUnion {
             | LogicalPlan::DescribeTable(_)
             | LogicalPlan::Unnest(_)
             | LogicalPlan::RecursiveQuery(_)
-            | LogicalPlan::CrossJoin(_)
             => {
                 // apply the optimization to all inputs of the plan
                 let inputs = plan.inputs();

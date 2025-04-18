@@ -9,21 +9,22 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::error::DataFusionError;
 use datafusion::execution::SessionState;
-use datafusion::logical_expr::expr::physical_name;
+use datafusion::logical_expr::expr::{physical_name, AggregateFunctionParams};
 use datafusion::logical_expr::expr::{AggregateFunction, Alias, ScalarFunction};
-use datafusion::physical_expr::PhysicalSortRequirement;
+use datafusion::physical_expr::{LexOrdering, LexRequirement, PhysicalSortRequirement};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::udf::create_physical_expr;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
-use datafusion::common::{DFSchema, DFSchemaRef};
+use datafusion::common::{DFSchema, DFSchemaRef, Spans};
 use datafusion::logical_expr::{
-    Aggregate, Extension, Filter, Limit, LogicalPlan, Projection, SortExpr,
+    Aggregate, Extension, FetchType, Filter, Limit, LogicalPlan, Projection, SkipType, SortExpr,
 };
 use datafusion::physical_planner::{create_aggregate_expr_and_maybe_filter, PhysicalPlanner};
 use datafusion::prelude::Expr;
+use datafusion::scalar::ScalarValue;
 use datafusion::sql::TableReference;
 use itertools::Itertools;
 use std::cmp::max;
@@ -33,35 +34,51 @@ use std::sync::Arc;
 /// Replaces `Limit(Sort(Aggregate(ClusterSend)))` with [ClusterAggregateTopK] when possible.
 pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
     match &p {
-        LogicalPlan::Limit(Limit {
-            skip,
-            fetch: Some(limit),
-            input: sort,
-        }) => match sort.as_ref() {
-            LogicalPlan::Sort(datafusion::logical_expr::Sort {
-                expr: sort_expr,
-                input: sort_input,
-                fetch: sort_fetch,
-            }) => {
-                let skip_limit = *skip + *limit;
-                let fetch = sort_fetch.unwrap_or(skip_limit).min(skip_limit);
-                match materialize_topk_under_limit_sort(fetch, sort_expr, sort_input)? {
-                    Some(topk_plan) => {
-                        return Ok(if *skip == 0 {
-                            topk_plan
-                        } else {
-                            LogicalPlan::Limit(Limit {
-                                skip: *skip,
-                                fetch: Some(fetch.saturating_sub(*skip)),
-                                input: Arc::new(topk_plan),
+        LogicalPlan::Limit(
+            limit_node @ Limit {
+                skip: _,
+                fetch: _,
+                input: sort,
+            },
+        ) => {
+            let fetch_type = limit_node.get_fetch_type()?;
+            let FetchType::Literal(Some(limit)) = fetch_type else {
+                return Ok(p);
+            };
+            let skip_type = limit_node.get_skip_type()?;
+            let SkipType::Literal(skip) = skip_type else {
+                return Ok(p);
+            };
+            match sort.as_ref() {
+                LogicalPlan::Sort(datafusion::logical_expr::Sort {
+                    expr: sort_expr,
+                    input: sort_input,
+                    fetch: sort_fetch,
+                }) => {
+                    let skip_limit: usize = skip + limit;
+                    let fetch: usize = sort_fetch.unwrap_or(skip_limit).min(skip_limit);
+                    match materialize_topk_under_limit_sort(fetch, sort_expr, sort_input)? {
+                        Some(topk_plan) => {
+                            return Ok(if skip == 0 {
+                                topk_plan
+                            } else {
+                                LogicalPlan::Limit(Limit {
+                                    skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
+                                        skip as i64,
+                                    ))))),
+                                    fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
+                                        fetch.saturating_sub(skip) as i64,
+                                    ))))),
+                                    input: Arc::new(topk_plan),
+                                })
                             })
-                        })
+                        }
+                        None => {}
                     }
-                    None => {}
                 }
+                _ => {}
             }
-            _ => {}
-        },
+        }
         LogicalPlan::Sort(datafusion::logical_expr::Sort {
             expr: sort_expr,
             input: sort_input,
@@ -187,12 +204,14 @@ fn aggr_exprs_allow_topk(agg_exprs: &[Expr]) -> bool {
             // TODO: Maybe topk could support filter
             Expr::AggregateFunction(AggregateFunction {
                 func,
-                args: _,
-                distinct: false,
-                filter: None,
-                order_by: None,
-                null_treatment: _,
-                ..
+                params:
+                    AggregateFunctionParams {
+                        args: _,
+                        distinct: false,
+                        filter: None,
+                        order_by: None,
+                        null_treatment: _,
+                    },
             }) => {
                 if !fun_allows_topk(func.as_ref()) {
                     return false;
@@ -269,12 +288,14 @@ fn extract_aggregate_fun(e: &Expr) -> Option<(TopKAggregateFunction, &Vec<Expr>)
     match e {
         Expr::AggregateFunction(AggregateFunction {
             func,
-            distinct: false,
-            args,
-            filter: _,
-            order_by: _,
-            null_treatment: _,
-            ..
+            params:
+                AggregateFunctionParams {
+                    distinct: false,
+                    args,
+                    filter: _,
+                    order_by: _,
+                    null_treatment: _,
+                },
         }) => fun_topk_type(func).map(|t: TopKAggregateFunction| (t, args)),
         _ => None,
     }
@@ -463,6 +484,7 @@ fn extract_projections_and_havings(
                     Expr::Column(datafusion::common::Column {
                         relation: in_field_qualifier.cloned(),
                         name: in_field.name().clone(),
+                        spans: Spans::default(),
                     })
                 })
                 .collect();
@@ -548,9 +570,9 @@ pub fn plan_topk(
     let group_expr_len = group_expr.len();
     let groups = PhysicalGroupBy::new_single(group_expr);
     let initial_agg_filter: Vec<(
-        datafusion::physical_plan::udaf::AggregateFunctionExpr,
+        Arc<datafusion::physical_plan::udaf::AggregateFunctionExpr>,
         Option<Arc<dyn PhysicalExpr>>,
-        Option<Vec<PhysicalSortExpr>>,
+        Option<LexOrdering>,
     )> = lower_node
         .aggregate_expr
         .iter()
@@ -609,11 +631,13 @@ pub fn plan_topk(
             }
         })
         .collect_vec();
-    let sort_requirement = sort_expr
-        .iter()
-        .map(|e| PhysicalSortRequirement::from(e.clone()))
-        .collect::<Vec<_>>();
-    let sort = Arc::new(SortExec::new(sort_expr, aggregate));
+    let sort_requirement = LexRequirement::new(
+        sort_expr
+            .iter()
+            .map(|e| PhysicalSortRequirement::from(e.clone()))
+            .collect::<Vec<_>>(),
+    );
+    let sort = Arc::new(SortExec::new(LexOrdering::new(sort_expr), aggregate));
     let sort_schema = sort.schema();
 
     // Send results to router.
