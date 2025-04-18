@@ -1,6 +1,8 @@
 //! Tests that check user change via __user virtual column
 
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadRequestQueryFilterBase, V1LoadRequestQueryFilterItem,
+};
 use pretty_assertions::assert_eq;
 
 use crate::compile::{
@@ -143,13 +145,15 @@ async fn test_change_user_via_filter_and() {
             segments: Some(vec![]),
             dimensions: Some(vec![]),
             order: Some(vec![]),
-            filters: Some(vec![V1LoadRequestQueryFilterItem {
-                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                operator: Some("equals".to_string()),
-                values: Some(vec!["male".to_string()]),
-                or: None,
-                and: None,
-            }]),
+            filters: Some(vec![
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["male".to_string()]),
+                    }
+                ))
+            ]),
             ..Default::default()
         }
     )
