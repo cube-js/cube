@@ -13974,14 +13974,7 @@ copy-webpack-plugin@^9.0.1:
     schema-utils "^3.1.1"
     serialize-javascript "^6.0.0"
 
-core-js-compat@^3.18.0, core-js-compat@^3.19.1, core-js-compat@^3.31.0, core-js-compat@^3.33.1, core-js-compat@^3.38.0, core-js-compat@^3.38.1, core-js-compat@^3.8.3:
-  version "3.40.0"
-  resolved "https://registry.yarnpkg.com/core-js-compat/-/core-js-compat-3.40.0.tgz#7485912a5a4a4315c2fdb2cbdc623e6881c88b38"
-  integrity sha512-0XEDpr5y5mijvw8Lbc6E5AkjrHfp7eEoPlu36SWeAbcL8fn1G1ANe8DBlo2XoNN89oVpxWwOjYIPVzR4ZvsKCQ==
-  dependencies:
-    browserslist "^4.24.3"
-
-core-js-compat@^3.40.0:
+core-js-compat@^3.18.0, core-js-compat@^3.19.1, core-js-compat@^3.31.0, core-js-compat@^3.33.1, core-js-compat@^3.38.0, core-js-compat@^3.38.1, core-js-compat@^3.40.0, core-js-compat@^3.8.3:
   version "3.41.0"
   resolved "https://registry.yarnpkg.com/core-js-compat/-/core-js-compat-3.41.0.tgz#4cdfce95f39a8f27759b667cf693d96e5dda3d17"
   integrity sha512-RFsU9LySVue9RTwdDVX/T0e2Y6jRYWXERKElIjpuEOEnxaXffI0X7RUwVzfYLfzuLXSNJDYoRYUAmRUcyln20A==
