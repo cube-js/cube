@@ -7,14 +7,20 @@ use async_trait::async_trait;
 use datafusion::arrow::array::ArrayRef;
 use datafusion::arrow::datatypes::{Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
+use datafusion::datasource::physical_plan::{ParquetFileReaderFactory, ParquetSource};
 use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::parquet::file::properties::{
     WriterProperties, WriterPropertiesBuilder, WriterVersion,
 };
+use datafusion_datasource::file::FileSource;
 use std::fs::File;
 use std::sync::Arc;
+
+// TODO upgrade DF: We presumably want something different.
+pub fn parquet_source() -> Arc<dyn FileSource> {
+    Arc::new(ParquetSource::default())
+}
 
 pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {
     fn cache(self: &Self) -> Arc<dyn ParquetFileReaderFactory>;

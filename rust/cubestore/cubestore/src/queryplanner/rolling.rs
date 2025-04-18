@@ -14,22 +14,23 @@ use datafusion::common::{Column, DFSchema, DFSchemaRef, DataFusionError, ScalarV
 use datafusion::execution::{
     FunctionRegistry, SendableRecordBatchStream, SessionState, TaskContext,
 };
-use datafusion::logical_expr::expr::{AggregateFunction, Alias};
+use datafusion::logical_expr::expr::{AggregateFunction, AggregateFunctionParams, Alias};
 use datafusion::logical_expr::utils::exprlist_to_fields;
 use datafusion::logical_expr::{
     EmitTo, Expr, GroupsAccumulator, LogicalPlan, UserDefinedLogicalNode,
 };
 use datafusion::physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr};
 use datafusion::physical_expr::{
-    EquivalenceProperties, GroupsAccumulatorAdapter, LexRequirement, Partitioning, PhysicalExpr,
-    PhysicalSortExpr, PhysicalSortRequirement,
+    EquivalenceProperties, GroupsAccumulatorAdapter, LexOrdering, LexRequirement, Partitioning,
+    PhysicalExpr, PhysicalSortExpr, PhysicalSortRequirement,
 };
-use datafusion::physical_plan::aggregates::group_values::new_group_values;
+// TODO upgrade DF
+// use datafusion::physical_plan::aggregates::group_values::new_group_values;
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, ColumnarValue, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-    PlanProperties,
+    collect, ColumnarValue, DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
 };
 use datafusion::physical_planner::{
     create_aggregate_expr_and_maybe_filter, ExtensionPlanner, PhysicalPlanner,
@@ -66,6 +67,63 @@ pub struct RollingWindowAggregate {
     pub lower_bound: Option<Expr>,
     pub upper_bound: Option<Expr>,
     pub offset_to_end: bool,
+}
+
+impl PartialOrd for RollingWindowAggregate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // TODO upgrade DF: Figure out what dyn_ord is used for.
+
+        macro_rules! exit_early {
+            ( $x:expr ) => {{
+                let res = $x;
+                if res != Ordering::Equal {
+                    return Some(res);
+                }
+            }};
+        }
+
+        let RollingWindowAggregate {
+            schema,
+            input,
+            dimension,
+            dimension_alias,
+            from,
+            to,
+            every,
+            partition_by,
+            rolling_aggs,
+            rolling_aggs_alias,
+            group_by_dimension,
+            aggs,
+            lower_bound,
+            upper_bound,
+            offset_to_end,
+        } = self;
+
+        exit_early!(input.partial_cmp(&other.input)?);
+        exit_early!(dimension.cmp(&other.dimension));
+        exit_early!(dimension_alias.cmp(&other.dimension_alias));
+        exit_early!(from.partial_cmp(&other.from)?);
+        exit_early!(from.partial_cmp(&other.from)?);
+        exit_early!(to.partial_cmp(&other.to)?);
+        exit_early!(every.partial_cmp(&other.every)?);
+        exit_early!(partition_by.cmp(&other.partition_by));
+        exit_early!(rolling_aggs.partial_cmp(&other.rolling_aggs)?);
+        exit_early!(rolling_aggs_alias.cmp(&other.rolling_aggs_alias));
+        exit_early!(group_by_dimension.partial_cmp(&other.group_by_dimension)?);
+        exit_early!(aggs.partial_cmp(&other.aggs)?);
+        exit_early!(lower_bound.partial_cmp(&other.lower_bound)?);
+        exit_early!(upper_bound.partial_cmp(&other.upper_bound)?);
+        exit_early!(upper_bound.partial_cmp(&other.upper_bound)?);
+
+        if schema.eq(&other.schema) {
+            Some(Ordering::Equal)
+        } else {
+            // Everything but the schema was equal, but schema.eq(&other.schema) returned false.  It must be the schema is
+            // different (and incomparable?).  Returning None.
+            None
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -256,6 +314,15 @@ impl UserDefinedLogicalNode for RollingWindowAggregate {
         &self.schema
     }
 
+    fn check_invariants(
+        &self,
+        _check: datafusion::logical_expr::InvariantLevel,
+        _plan: &LogicalPlan,
+    ) -> datafusion::error::Result<()> {
+        // TODO upgrade DF: Might there be something to check?
+        Ok(())
+    }
+
     fn expressions(&self) -> Vec<Expr> {
         let mut e = vec![
             Expr::Column(self.dimension.clone()),
@@ -370,9 +437,16 @@ impl UserDefinedLogicalNode for RollingWindowAggregate {
     fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
         other
             .as_any()
-            .downcast_ref()
+            .downcast_ref::<RollingWindowAggregate>()
             .map(|s| self.eq(s))
             .unwrap_or(false)
+    }
+
+    fn dyn_ord(&self, other: &dyn UserDefinedLogicalNode) -> Option<Ordering> {
+        other
+            .as_any()
+            .downcast_ref::<RollingWindowAggregate>()
+            .and_then(|s| self.partial_cmp(s))
     }
 }
 
@@ -452,7 +526,10 @@ impl ExtensionPlanner for RollingWindowPlanner {
             .iter()
             .map(|e| -> Result<_, DataFusionError> {
                 match e {
-                    Expr::AggregateFunction(AggregateFunction { func, args, .. }) => {
+                    Expr::AggregateFunction(AggregateFunction {
+                        func,
+                        params: AggregateFunctionParams { args, .. },
+                    }) => {
                         let (agg, _, _) = create_aggregate_expr_and_maybe_filter(
                             e,
                             input_dfschema,
@@ -509,7 +586,7 @@ impl ExtensionPlanner for RollingWindowPlanner {
             options: Default::default(),
         });
 
-        let sort = Arc::new(SortExec::new(sort_key.clone(), input.clone()));
+        let sort = Arc::new(SortExec::new(LexOrdering::new(sort_key), input.clone()));
 
         let schema = node.schema.as_arrow();
 
@@ -519,7 +596,8 @@ impl ExtensionPlanner for RollingWindowPlanner {
                 // EquivalenceProperties::new_with_orderings(schema.clone().into(), &[sort_key]),
                 EquivalenceProperties::new(schema.clone().into()),
                 Partitioning::UnknownPartitioning(1),
-                ExecutionMode::Bounded,
+                EmissionType::Both, // TODO upgrade DF
+                Boundedness::Bounded,
             ),
             sorted_input: sort,
             group_key,
@@ -595,7 +673,7 @@ impl ExecutionPlan for RollingWindowAggExec {
             SortOptions::default(),
         )));
 
-        vec![Some(sort_key)]
+        vec![Some(LexRequirement::new(sort_key))]
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -688,11 +766,12 @@ impl ExecutionPlan for RollingWindowAggExec {
                 })
                 .transpose()?;
 
-            let mut group_by_dimension_group_values =
-                new_group_values(Arc::new(Schema::new(vec![input
-                    .schema()
-                    .field(plan.dimension.index())
-                    .clone()])))?;
+            // TODO upgrade DF: group_by_dimension_group_values was unused.
+            // let mut group_by_dimension_group_values =
+            //     new_group_values(Arc::new(Schema::new(vec![input
+            //         .schema()
+            //         .field(plan.dimension.index())
+            //         .clone()])))?;
             let extra_aggs_inputs = plan
                 .aggs
                 .iter()

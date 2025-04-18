@@ -18,7 +18,7 @@ base64 = "0.13.0"
 bumpalo = "3.6.1"
 tokio = { version = "1", features = ["full", "rt"] }
 warp = { version = "0.3.6" }
-sqlparser = { git = "https://github.com/cube-js/sqlparser-rs.git", branch = "cube-42.2.0" }
+sqlparser = { git = "https://github.com/cube-js/sqlparser-rs.git", branch = "cube-46.0.1" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
 serde_repr = "0.1"
@@ -29,9 +29,10 @@ cubezetasketch = { path = "../cubezetasketch" }
 cubedatasketches = { path = "../cubedatasketches" }
 cubeshared = { path = "../../cubeshared" }
 cuberpc = { path = "../cuberpc" }
-datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-42.2.0", features = ["serde"] }
-datafusion-proto = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-42.2.0" }
-datafusion-proto-common = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-42.2.0" }
+datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1", features = ["serde"] }
+datafusion-datasource = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1" }
+datafusion-proto = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1" }
+datafusion-proto-common = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube-46.0.1" }
 csv = "1.1.3"
 bytes = "1.6.0"
 serde_json = "1.0.56"

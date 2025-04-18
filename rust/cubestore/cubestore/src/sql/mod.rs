@@ -477,29 +477,37 @@ impl SqlServiceImpl {
 }
 
 pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<String> {
-    credentials
-        .iter()
-        .find(|o| o.name.value == prop_name)
-        .and_then(|x| {
-            if let Expr::Value(Value::SingleQuotedString(v)) = &x.value {
-                Some(v.to_string())
-            } else {
-                None
-            }
-        })
+    for credential in credentials {
+        let SqlOption::KeyValue { key, value } = credential else {
+            continue;
+        };
+        if key.value != prop_name {
+            continue;
+        }
+        return if let Expr::Value(Value::SingleQuotedString(v)) = value {
+            Some(v.to_string())
+        } else {
+            None
+        };
+    }
+    return None;
 }
 
 pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<bool> {
-    credentials
-        .iter()
-        .find(|o| o.name.value == prop_name)
-        .and_then(|x| {
-            if let Expr::Value(Value::Boolean(v)) = &x.value {
-                Some(*v)
-            } else {
-                None
-            }
-        })
+    for credential in credentials {
+        let SqlOption::KeyValue { key, value } = credential else {
+            continue;
+        };
+        if key.value != prop_name {
+            continue;
+        }
+        return if let Expr::Value(Value::Boolean(v)) = value {
+            Some(*v)
+        } else {
+            None
+        };
+    }
+    return None;
 }
 
 /// Normalizes an ident used for a column name -- hypothetically, by calling `to_ascii_lowercase()`
@@ -741,43 +749,47 @@ impl SqlService for SqlServiceImpl {
                 }
                 let schema_name = &normalize_for_schema_table_or_index_name(&nv[0]);
                 let table_name = &normalize_for_schema_table_or_index_name(&nv[1]);
+                fn filter_sql_option_key_value(opt: &SqlOption) -> Option<(&Ident, &Expr)> {
+                    if let SqlOption::KeyValue { key, value } = opt {
+                        Some((key, value))
+                    } else {
+                        None
+                    }
+                };
                 let mut import_format = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "input_format")
-                    .map_or(Result::Ok(ImportFormat::CSV), |option| {
-                        match &option.value {
-                            Expr::Value(Value::SingleQuotedString(input_format)) => {
-                                match input_format.as_str() {
-                                    "csv" => Result::Ok(ImportFormat::CSV),
-                                    "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
-                                    _ => Result::Err(CubeError::user(format!(
-                                        "Bad input_format {}",
-                                        option.value
-                                    ))),
-                                }
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "input_format")
+                    .map_or(Result::Ok(ImportFormat::CSV), |(_, value)| match value {
+                        Expr::Value(Value::SingleQuotedString(input_format)) => {
+                            match input_format.as_str() {
+                                "csv" => Result::Ok(ImportFormat::CSV),
+                                "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
+                                _ => Result::Err(CubeError::user(format!(
+                                    "Bad input_format {}",
+                                    value
+                                ))),
                             }
-                            _ => Result::Err(CubeError::user(format!(
-                                "Bad input format {}",
-                                option.value
-                            ))),
                         }
+                        _ => Result::Err(CubeError::user(format!("Bad input format {}", value))),
                     })?;
 
                 let delimiter = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "delimiter")
-                    .map_or(Ok(None), |option| match &option.value {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "delimiter")
+                    .map_or(Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(delimiter)) => {
                             match delimiter.as_str() {
                                 "tab" => Ok(Some('\t')),
                                 "^A" => Ok(Some('\u{0001}')),
                                 s if s.len() != 1 => {
-                                    Err(CubeError::user(format!("Bad delimiter {}", option.value)))
+                                    Err(CubeError::user(format!("Bad delimiter {}", value)))
                                 }
                                 s => Ok(Some(s.chars().next().unwrap())),
                             }
                         }
-                        _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
+                        _ => Err(CubeError::user(format!("Bad delimiter {}", value))),
                     })?;
 
                 if let Some(delimiter) = delimiter {
@@ -809,64 +821,62 @@ impl SqlService for SqlServiceImpl {
                 }
                 let build_range_end = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "build_range_end")
-                    .map_or(Result::Ok(None), |option| match &option.value {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "build_range_end")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(build_range_end)) => {
                             let ts = timestamp_from_string(build_range_end.as_str())?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
                         }
-                        _ => Result::Err(CubeError::user(format!(
-                            "Bad build_range_end {}",
-                            option.value
-                        ))),
+                        _ => Result::Err(CubeError::user(format!("Bad build_range_end {}", value))),
                     })?;
 
                 let seal_at = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "seal_at")
-                    .map_or(Result::Ok(None), |option| match &option.value {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "seal_at")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(seal_at)) => {
                             let ts = timestamp_from_string(seal_at)?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
                         }
-                        _ => Result::Err(CubeError::user(format!("Bad seal_at {}", option.value))),
+                        _ => Result::Err(CubeError::user(format!("Bad seal_at {}", value))),
                     })?;
                 let select_statement = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "select_statement")
-                    .map_or(Result::Ok(None), |option| match &option.value {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "select_statement")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(select_statement)) => {
                             Result::Ok(Some(select_statement.clone()))
                         }
-                        _ => Result::Err(CubeError::user(format!(
-                            "Bad select_statement {}",
-                            option.value
-                        ))),
+                        _ => {
+                            Result::Err(CubeError::user(format!("Bad select_statement {}", value)))
+                        }
                     })?;
                 let source_table = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "source_table")
-                    .map_or(Result::Ok(None), |option| match &option.value {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "source_table")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(source_table)) => {
                             Result::Ok(Some(source_table.clone()))
                         }
-                        _ => Result::Err(CubeError::user(format!(
-                            "Bad source_table {}",
-                            option.value
-                        ))),
+                        _ => Result::Err(CubeError::user(format!("Bad source_table {}", value))),
                     })?;
                 let stream_offset = with_options
                     .iter()
-                    .find(|&opt| opt.name.value == "stream_offset")
-                    .map_or(Result::Ok(None), |option| match &option.value {
+                    .filter_map(filter_sql_option_key_value)
+                    .find(|&(name, _)| name.value == "stream_offset")
+                    .map_or(Result::Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(select_statement)) => {
                             Result::Ok(Some(select_statement.clone()))
                         }
                         _ => Result::Err(CubeError::user(format!(
                             "Bad stream_offset {}. Expected string.",
-                            option.value
+                            value
                         ))),
                     })?;
 
@@ -1054,7 +1064,7 @@ impl SqlService for SqlServiceImpl {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CubeStoreStatement::Statement(Statement::Insert(Insert {
-                table_name,
+                table,
                 columns,
                 source,
                 ..
@@ -1062,10 +1072,17 @@ impl SqlService for SqlServiceImpl {
                 app_metrics::DATA_QUERIES
                     .add_with_tags(1, Some(&vec![metrics::format_tag("command", "insert")]));
 
+                let TableObject::TableName(table_name) = table else {
+                    return Err(CubeError::user(format!(
+                        "Insert target is required to be a table name, instead of {}",
+                        table
+                    )));
+                };
                 let source = source.ok_or(CubeError::user(format!(
                     "Insert source is required for {}",
                     table_name
                 )))?;
+
                 let data = if let SetExpr::Values(values) = source.body.as_ref() {
                     &values.rows
                 } else {

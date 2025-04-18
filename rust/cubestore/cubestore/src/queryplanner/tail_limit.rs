@@ -209,7 +209,7 @@ mod tests {
     use datafusion::arrow::array::Int64Array;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::physical_plan::collect as result_collect;
-    use datafusion::physical_plan::memory::MemoryExec;
+    use datafusion_datasource::memory::MemoryExec;
     use itertools::Itertools;
 
     fn ints_schema() -> SchemaRef {

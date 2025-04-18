@@ -4,6 +4,7 @@ use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::AggregateTopKExec;
 use datafusion::error::DataFusionError;
+use datafusion::physical_expr::LexOrdering;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::limit::GlobalLimitExec;
@@ -122,11 +123,17 @@ pub fn ensure_partition_merge_helper(
                 .children()
                 .into_iter()
                 .map(|c| -> Arc<dyn ExecutionPlan> {
-                    Arc::new(SortPreservingMergeExec::new(ordering.clone(), c.clone()))
+                    Arc::new(SortPreservingMergeExec::new(
+                        LexOrdering::new(ordering.clone()),
+                        c.clone(),
+                    ))
                 })
                 .collect();
             let new_plan = p.clone().with_new_children(merged_children)?;
-            Arc::new(SortPreservingMergeExec::new(ordering, new_plan))
+            Arc::new(SortPreservingMergeExec::new(
+                LexOrdering::new(ordering),
+                new_plan,
+            ))
         } else {
             let merged_children = p
                 .children()
