@@ -2292,35 +2292,7 @@
     "@babel/helper-plugin-utils" "^7.24.0"
     "@babel/helper-remap-async-to-generator" "^7.22.20"
 
-"@babel/plugin-transform-block-scoped-functions@^7.16.5":
-  version "7.16.5"
-  resolved "https://registry.yarnpkg.com/@babel/plugin-transform-block-scoped-functions/-/plugin-transform-block-scoped-functions-7.16.5.tgz#af087494e1c387574260b7ee9b58cdb5a4e9b0b0"
-  integrity sha512-BxmIyKLjUGksJ99+hJyL/HIxLIGnLKtw772zYDER7UuycDZ+Xvzs98ZQw6NGgM2ss4/hlFAaGiZmMNKvValEjw==
-  dependencies:
-    "@babel/helper-plugin-utils" "^7.16.5"
-
-"@babel/plugin-transform-block-scoped-functions@^7.23.3":
-  version "7.23.3"
-  resolved "https://registry.yarnpkg.com/@babel/plugin-transform-block-scoped-functions/-/plugin-transform-block-scoped-functions-7.23.3.tgz#fe1177d715fb569663095e04f3598525d98e8c77"
-  integrity sha512-vI+0sIaPIO6CNuM9Kk5VmXcMVRiOpDh7w2zZt9GXzmE/9KD70CUEVhvPR/etAeNK/FAEkhxQtXOzVF3EuRL41A==
-  dependencies:
-    "@babel/helper-plugin-utils" "^7.22.5"
-
-"@babel/plugin-transform-block-scoped-functions@^7.24.1":
-  version "7.24.1"
-  resolved "https://registry.yarnpkg.com/@babel/plugin-transform-block-scoped-functions/-/plugin-transform-block-scoped-functions-7.24.1.tgz#1c94799e20fcd5c4d4589523bbc57b7692979380"
-  integrity sha512-TWWC18OShZutrv9C6mye1xwtam+uNi2bnTOCBUd5sZxyHOiWbU6ztSROofIMrK84uweEZC219POICK/sTYwfgg==
-  dependencies:
-    "@babel/helper-plugin-utils" "^7.24.0"
-
-"@babel/plugin-transform-block-scoped-functions@^7.25.9":
-  version "7.25.9"
-  resolved "https://registry.yarnpkg.com/@babel/plugin-transform-block-scoped-functions/-/plugin-transform-block-scoped-functions-7.25.9.tgz#5700691dbd7abb93de300ca7be94203764fce458"
-  integrity sha512-toHc9fzab0ZfenFpsyYinOX0J/5dgJVA2fm64xPewu7CoYHWEivIWKxkK2rMi4r3yQqLnVmheMXRdG+k239CgA==
-  dependencies:
-    "@babel/helper-plugin-utils" "^7.25.9"
-
-"@babel/plugin-transform-block-scoped-functions@^7.26.5":
+"@babel/plugin-transform-block-scoped-functions@^7.16.5", "@babel/plugin-transform-block-scoped-functions@^7.23.3", "@babel/plugin-transform-block-scoped-functions@^7.24.1", "@babel/plugin-transform-block-scoped-functions@^7.25.9", "@babel/plugin-transform-block-scoped-functions@^7.26.5":
   version "7.26.5"
   resolved "https://registry.yarnpkg.com/@babel/plugin-transform-block-scoped-functions/-/plugin-transform-block-scoped-functions-7.26.5.tgz#3dc4405d31ad1cbe45293aa57205a6e3b009d53e"
   integrity sha512-chuTSY+hq09+/f5lMj8ZSYgCFpppV2CbYrhNFJ1BFoXpiWPnnAb7R0MqrafCpN8E1+YRrtM1MXZHJdIx8B6rMQ==
