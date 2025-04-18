@@ -107,6 +107,7 @@ impl QueryPlanner for CubeQueryPlanner {
     }
 }
 
+#[derive(Debug)]
 pub struct PreOptimizeRule {
     memory_handler: Arc<dyn MemoryHandler>,
     data_loaded_size: Option<Arc<DataLoadedSize>>,

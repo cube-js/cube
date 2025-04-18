@@ -10,11 +10,10 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::Expr;
 use datafusion::physical_expr::EquivalenceProperties;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionMode, Partitioning, PlanProperties,
-};
+use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
+use datafusion::physical_plan::{DisplayAs, DisplayFormatType, Partitioning, PlanProperties};
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
+use datafusion_datasource::memory::MemoryExec;
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -72,7 +71,8 @@ impl TableProvider for InfoSchemaQueryCacheTableProvider {
             properties: PlanProperties::new(
                 EquivalenceProperties::new(schema),
                 Partitioning::UnknownPartitioning(1),
-                ExecutionMode::Bounded,
+                EmissionType::Both, // TODO upgrade DF: which?
+                Boundedness::Bounded,
             ),
         };
 

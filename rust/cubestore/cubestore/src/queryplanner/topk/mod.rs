@@ -18,6 +18,7 @@ use datafusion::logical_expr::{Expr, LogicalPlan, UserDefinedLogicalNode};
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::any::Any;
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -32,7 +33,7 @@ pub const MIN_TOPK_STREAM_ROWS: usize = 1024;
 /// handle `having_expr` with the proper schema (the output schema of the Lower node).  This also
 /// includes `order_by` and `limit` just because that seems better-organized, but what it really
 /// needs is `having_expr`.
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct ClusterAggregateTopKUpper {
     // input is always a ClusterAggregateTopKLower node
     pub input: Arc<LogicalPlan>,
@@ -50,6 +51,40 @@ pub struct ClusterAggregateTopKLower {
     pub aggregate_expr: Vec<Expr>,
     pub schema: DFSchemaRef,
     pub snapshots: Vec<Snapshots>,
+}
+
+impl PartialOrd for ClusterAggregateTopKLower {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // Avoid inconsistencies with Eq implementation.
+        if self.eq(other) {
+            return Some(Ordering::Equal);
+        }
+
+        macro_rules! exit_early {
+            ( $x:expr ) => {{
+                let res = $x;
+                if res != Ordering::Equal {
+                    return Some(res);
+                }
+            }};
+        }
+
+        let ClusterAggregateTopKLower {
+            input,
+            group_expr,
+            aggregate_expr,
+            schema: _,
+            snapshots,
+        } = self;
+
+        exit_early!(input.partial_cmp(&other.input)?);
+        exit_early!(group_expr.partial_cmp(&other.group_expr)?);
+        exit_early!(aggregate_expr.partial_cmp(&other.aggregate_expr)?);
+        exit_early!(snapshots.partial_cmp(&other.snapshots)?);
+        // Returning None, not Some(Ordering::Equal), because all self.eq(other) returned false.  It
+        // must be the schema is different (and incomparable?).
+        return None;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -199,6 +234,15 @@ impl UserDefinedLogicalNode for ClusterAggregateTopKUpper {
         self.input.schema()
     }
 
+    fn check_invariants(
+        &self,
+        _check: datafusion::logical_expr::InvariantLevel,
+        _plan: &LogicalPlan,
+    ) -> datafusion::error::Result<()> {
+        // TODO upgrade DF: We might check invariants.
+        Ok(())
+    }
+
     fn expressions(&self) -> Vec<Expr> {
         let mut res = Vec::new();
         if self.having_expr.is_some() {
@@ -246,9 +290,16 @@ impl UserDefinedLogicalNode for ClusterAggregateTopKUpper {
     fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
         other
             .as_any()
-            .downcast_ref()
+            .downcast_ref::<Self>()
             .map(|s| self.eq(s))
             .unwrap_or(false)
+    }
+
+    fn dyn_ord(&self, other: &dyn UserDefinedLogicalNode) -> Option<Ordering> {
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .and_then(|s| self.partial_cmp(s))
     }
 }
 
@@ -267,6 +318,15 @@ impl UserDefinedLogicalNode for ClusterAggregateTopKLower {
 
     fn schema(&self) -> &DFSchemaRef {
         &self.schema
+    }
+
+    fn check_invariants(
+        &self,
+        check: datafusion::logical_expr::InvariantLevel,
+        plan: &LogicalPlan,
+    ) -> datafusion::error::Result<()> {
+        // TODO upgrade DF: Check anything?
+        Ok(())
     }
 
     fn expressions(&self) -> Vec<Expr> {
@@ -317,8 +377,15 @@ impl UserDefinedLogicalNode for ClusterAggregateTopKLower {
     fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
         other
             .as_any()
-            .downcast_ref()
+            .downcast_ref::<Self>()
             .map(|s| self.eq(s))
             .unwrap_or(false)
+    }
+
+    fn dyn_ord(&self, other: &dyn UserDefinedLogicalNode) -> Option<Ordering> {
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .and_then(|s| self.partial_cmp(s))
     }
 }
