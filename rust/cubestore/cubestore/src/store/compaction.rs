@@ -16,7 +16,9 @@ use crate::queryplanner::QueryPlannerImpl;
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{min_max_values_from_data, ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
-use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
+use crate::table::parquet::{
+    arrow_schema, parquet_source, CubestoreMetadataCacheFactory, ParquetTableStore,
+};
 use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::record_batch_buffer_size;
@@ -45,11 +47,11 @@ use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, Physic
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::{Column, Literal};
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, SendableRecordBatchStream};
 use datafusion::scalar::ScalarValue;
+use datafusion_datasource::memory::MemoryExec;
 use futures::StreamExt;
 use futures_util::future::join_all;
 use itertools::{EitherOrBoth, Itertools};
@@ -679,8 +681,12 @@ impl CompactionService for CompactionServiceImpl {
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
             Some(file) => {
-                let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), schema)
-                    .with_file(PartitionedFile::from_path(file.to_string())?);
+                let file_scan = FileScanConfig::new(
+                    ObjectStoreUrl::local_filesystem(),
+                    schema,
+                    parquet_source(),
+                )
+                .with_file(PartitionedFile::from_path(file.to_string())?);
                 let parquet_exec = ParquetExecBuilder::new(file_scan)
                     .with_parquet_file_reader_factory(
                         self.metadata_cache_factory
@@ -1063,14 +1069,15 @@ async fn read_files(
 ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
     assert!(!files.is_empty());
     // let mut inputs = Vec::<Arc<dyn ExecutionPlan>>::with_capacity(files.len());
-    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), schema)
-        .with_file_group(
-            files
-                .iter()
-                .map(|f| PartitionedFile::from_path(f.to_string()))
-                .collect::<Result<Vec<_>, _>>()?,
-        )
-        .with_projection(projection);
+    let file_scan =
+        FileScanConfig::new(ObjectStoreUrl::local_filesystem(), schema, parquet_source())
+            .with_file_group(
+                files
+                    .iter()
+                    .map(|f| PartitionedFile::from_path(f.to_string()))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )
+            .with_projection(projection);
     let plan = ParquetExecBuilder::new(file_scan)
         .with_parquet_file_reader_factory(metadata_cache_factory.make_noop_cache())
         .build();
@@ -1097,7 +1104,7 @@ async fn read_files(
         ));
     }
     Ok(Arc::new(SortPreservingMergeExec::new(
-        columns.clone(),
+        LexOrdering::new(columns.clone()),
         Arc::new(plan),
     )))
 }
@@ -1128,11 +1135,13 @@ async fn keys_with_counts(
         let col = Column::new(fields[i].name().as_str(), i);
         key.push((Arc::new(col), name));
     }
-    let agg: Vec<AggregateFunctionExpr> = vec![AggregateExprBuilder::new(
-        count_udaf(),
-        vec![Arc::new(Literal::new(ScalarValue::Int64(Some(1))))],
-    )
-    .build()?];
+    let agg: Vec<Arc<AggregateFunctionExpr>> = vec![Arc::new(
+        AggregateExprBuilder::new(
+            count_udaf(),
+            vec![Arc::new(Literal::new(ScalarValue::Int64(Some(1))))],
+        )
+        .build()?,
+    )];
     let plan_schema = plan.schema();
     let plan = AggregateExec::try_new(
         AggregateMode::Single,
@@ -1421,8 +1430,10 @@ pub async fn merge_chunks(
         l,
         Arc::new(MemoryExec::try_new(&[vec![r]], schema, None)?),
     ]);
-    let mut res: Arc<dyn ExecutionPlan> =
-        Arc::new(SortPreservingMergeExec::new(key, Arc::new(inputs)));
+    let mut res: Arc<dyn ExecutionPlan> = Arc::new(SortPreservingMergeExec::new(
+        LexOrdering::new(key),
+        Arc::new(inputs),
+    ));
 
     if let Some(aggregate_columns) = aggregate_columns {
         let mut groups = Vec::with_capacity(key_size);
@@ -1434,7 +1445,7 @@ pub async fn merge_chunks(
         }
         let aggregates = aggregate_columns
             .iter()
-            .map(|aggr_col| aggr_col.aggregate_expr(&res.schema()))
+            .map(|aggr_col| aggr_col.aggregate_expr(&res.schema()).map(Arc::new))
             .collect::<Result<Vec<_>, _>>()?;
         let aggregates_len = aggregates.len();
 
@@ -1508,6 +1519,7 @@ mod tests {
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
     use crate::table::data::rows_to_columns;
+    use crate::table::parquet::parquet_source;
     use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use crate::table::{cmp_same_types, Row, TableValue};
     use cuberockstore::rocksdb::{Options, DB};
@@ -2079,6 +2091,7 @@ mod tests {
         let file_scan = FileScanConfig::new(
             ObjectStoreUrl::local_filesystem(),
             Arc::new(arrow_schema(aggr_index.get_row())),
+            parquet_source(),
         )
         .with_file(PartitionedFile::from_path(local.to_string()).unwrap());
         let parquet_exec = ParquetExecBuilder::new(file_scan).build();

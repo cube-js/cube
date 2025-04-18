@@ -2,6 +2,7 @@ use crate::metastore::{Column, ColumnType};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
+use datafusion_datasource::memory::MemoryExec;
 use itertools::Itertools;
 use std::cmp::Ordering;
 
@@ -10,7 +11,6 @@ use datafusion::arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
 use datafusion::arrow::compute::concat_batches;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::execution::TaskContext;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use std::fmt;
 use std::sync::Arc;
