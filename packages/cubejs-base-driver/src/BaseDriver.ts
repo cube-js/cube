@@ -408,7 +408,7 @@ export abstract class BaseDriver implements DriverInterface {
     };
   }
 
-  public readOnly() {
+  public readOnly(): boolean {
     return false;
   }
 

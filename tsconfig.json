@@ -47,6 +47,9 @@
       "path": "packages/cubejs-firebolt-driver"
     },
     {
+      "path": "packages/cubejs-mssql-driver"
+    },
+    {
       "path": "packages/cubejs-mysql-driver"
     },
     {
