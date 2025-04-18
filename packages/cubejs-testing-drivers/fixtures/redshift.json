@@ -155,17 +155,10 @@
   },
   "skip": [
     "---------------------------------------",
-    "Error: Interval values with month or year parts are not supported",
+    "Error: Complex intervals like \"3 months 2 weeks 3 days\" are not supported. @see dateBin impl in ReshiftQuery",
     "---------------------------------------",
-    "querying BigECommerce: rolling window by 2 month",
-    "querying custom granularities ECommerce: count by half_year + no dimension",
-    "querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension",
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
-    "querying custom granularities ECommerce: count by half_year + dimension",
-    "querying custom granularities ECommerce: count by half_year_by_1st_april + dimension",
     "querying custom granularities ECommerce: count by three_months_by_march + dimension",
-    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
-    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
 
     "---------------------------------------",
     "SKIPPED FOR ALL                        ",

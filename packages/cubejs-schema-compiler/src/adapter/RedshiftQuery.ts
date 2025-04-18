@@ -1,3 +1,4 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { PostgresQuery } from './PostgresQuery';
 
 export class RedshiftQuery extends PostgresQuery {
@@ -10,6 +11,74 @@ export class RedshiftQuery extends PostgresQuery {
 
   public nowTimestampSql() {
     return 'GETDATE()';
+  }
+
+  /**
+   * Redshift doesn't support Interval values with month or year parts (as Postgres does)
+   * so we need to make date math on our own.
+   */
+  public override subtractInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let result = date;
+
+    for (const [datePart, intervalValue] of Object.entries(intervalParsed)) {
+      result = `DATEADD(${datePart}, -${intervalValue}, ${result})`;
+    }
+
+    return result;
+  }
+
+  /**
+   * Redshift doesn't support Interval values with month or year parts (as Postgres does)
+   * so we need to make date math on our own.
+   */
+  public override addInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let result = date;
+
+    for (const [datePart, intervalValue] of Object.entries(intervalParsed)) {
+      result = `DATEADD(${datePart}, ${intervalValue}, ${result})`;
+    }
+
+    return result;
+  }
+
+  /**
+   * Redshift doesn't support Interval values with month or year parts (as Postgres does)
+   * so we need to make date math on our own.
+   */
+  public override dateBin(interval: string, source: string, origin: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+
+    if ((intervalParsed.year || intervalParsed.month || intervalParsed.quarter) &&
+        (intervalParsed.week || intervalParsed.day || intervalParsed.hour || intervalParsed.minute || intervalParsed.second)) {
+      throw new Error(`Complex intervals like "${interval}" are not supported. Please use Year to Month or Day to second intervals`);
+    }
+
+    if (intervalParsed.year || intervalParsed.month || intervalParsed.quarter) {
+      let totalMonths = 0;
+
+      if (intervalParsed.year) {
+        totalMonths += intervalParsed.year * 12;
+      }
+
+      if (intervalParsed.quarter) {
+        totalMonths += intervalParsed.quarter * 3;
+      }
+
+      if (intervalParsed.month) {
+        totalMonths += intervalParsed.month;
+      }
+
+      return `DATEADD(
+      month,
+      (FLOOR(DATEDIFF(month, ${this.dateTimeCast(`'${origin}'`)}, ${source}) / ${totalMonths}) * ${totalMonths})::int,
+      ${this.dateTimeCast(`'${origin}'`)}
+    )`;
+    }
+
+    // For days and lower intervals - we can reuse Postgres version
+    return super.dateBin(interval, source, origin);
   }
 
   public sqlTemplates() {
