@@ -285,7 +285,6 @@ learn more about policy evaluation.
 
 The optional `row_level` parameter, when present, configures [row-level
 access][ref-dap-rls] for a policy by specifying `filters` that should apply to result set rows.
-You can also use the optional `allow_all` parameter to explicitly allow or disallow all rows.
 
 In the following example, users with the `manager` role are allowed to access only
 rows that have the `state` dimension matching the state from the [security context][ref-sec-ctx].
@@ -299,9 +298,6 @@ cubes:
     # ...
     
     access_policy:
-      - role: "*"
-        row_level:
-          allow_all: false
       
       - role: manager
         row_level:
@@ -316,12 +312,6 @@ cube(`orders`, {
   // ...
 
   access_policy: [
-    {
-      role: `*`,
-      row_level: {
-        allow_all: false
-      }
-    },
     {
       role: `manager`,
       row_level: {
