@@ -9,12 +9,13 @@ import {
  */
 export class QueryStream extends Readable {
   private request: sql.Request | null;
+
   private toRead: number = 0;
 
   /**
    * @constructor
    */
-  constructor(request: sql.Request, highWaterMark: number) {
+  public constructor(request: sql.Request, highWaterMark: number) {
     super({
       objectMode: true,
       highWaterMark:
@@ -27,10 +28,10 @@ export class QueryStream extends Readable {
       if (this.toRead-- <= 0 || !canAdd) {
         this.request?.pause();
       }
-    })
+    });
     this.request.on('done', () => {
       this.push(null);
-    })
+    });
     this.request.on('error', (err: Error) => {
       this.destroy(err);
     });
@@ -39,15 +40,15 @@ export class QueryStream extends Readable {
   /**
    * @override
    */
-  _read(toRead: number) {
+  public _read(toRead: number) {
     this.toRead += toRead;
     this.request?.resume();
   }
 
-  transformRow(row: Record<string, any>) {
-    for (const key in row) {
-      if (row.hasOwnProperty(key) && row[key] && row[key] instanceof Date) {
-        row[key] = row[key].toJSON();
+  private transformRow(row: Record<string, any>) {
+    for (const [key, value] of Object.entries(row)) {
+      if (value instanceof Date) {
+        row[key] = value.toJSON();
       }
     }
   }
@@ -55,7 +56,7 @@ export class QueryStream extends Readable {
   /**
    * @override
    */
-  _destroy(error: any, callback: CallableFunction) {
+  public _destroy(error: any, callback: CallableFunction) {
     this.request?.cancel();
     this.request = null;
     callback(error);

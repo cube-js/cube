@@ -35,13 +35,13 @@ const numericTypes = [
 ];
 
 for (const type of numericTypes) {
-  sql.valueHandler.set(type, (value) => value != null ? String(value) : value);
+  sql.valueHandler.set(type, (value) => (value != null ? String(value) : value));
 }
 
 export type MSSqlDriverConfiguration = Omit<MsSQLConfig, 'server'> & {
   readOnly?: boolean;
   server?: string;
-}
+};
 
 const GenericTypeToMSSql: Record<string, string> = {
   boolean: 'bit',
@@ -55,28 +55,29 @@ const MSSqlToGenericType: Record<string, string> = {
   bit: 'boolean',
   uniqueidentifier: 'uuid',
   datetime2: 'timestamp'
-}
+};
 
 /**
  * MS SQL driver class.
  */
 export class MSSqlDriver extends BaseDriver implements DriverInterface {
-
   private readonly connectionPool: ConnectionPool;
+
   private readonly initialConnectPromise: Promise<ConnectionPool>;
+
   private readonly config: MSSqlDriverConfiguration;
 
   /**
    * Returns default concurrency value.
    */
-  static getDefaultConcurrency() {
+  public static getDefaultConcurrency() {
     return 2;
   }
 
   /**
    * Class constructor.
    */
-  constructor(config: MSSqlDriverConfiguration & {
+  public constructor(config: MSSqlDriverConfiguration & {
       /**
        * Data source name.
        */
@@ -93,8 +94,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
        */
       testConnectionTimeout?: number,
       server?: string,
-    } = {}
-  ) {
+    } = {}) {
     super({
       testConnectionTimeout: config.testConnectionTimeout,
     });
@@ -140,7 +140,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
    * Note: It returns the unprefixed option names.
    * In case of using multi sources options need to be prefixed manually.
    */
-  static driverEnvVariables() {
+  public static driverEnvVariables() {
     return [
       'CUBEJS_DB_HOST',
       'CUBEJS_DB_NAME',
@@ -184,7 +184,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
       });
       stream.on('error', (err: Error) => {
         reject(err);
-      })
+      });
     });
     return {
       rowStream: stream,
@@ -211,7 +211,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
    *   }
    * }} fields
    */
-  mapFields(fields: Record<string, any>) {
+  private mapFields(fields: Record<string, any>) {
     return Object.keys(fields).map((field) => {
       let type;
       switch (fields[field].type) {
@@ -368,7 +368,7 @@ export class MSSqlDriver extends BaseDriver implements DriverInterface {
     return GenericTypeToMSSql[columnType] || super.fromGenericType(columnType);
   }
 
-  protected toGenericType(columnType: string): string{
+  protected toGenericType(columnType: string): string {
     return MSSqlToGenericType[columnType] || super.toGenericType(columnType);
   }
 
