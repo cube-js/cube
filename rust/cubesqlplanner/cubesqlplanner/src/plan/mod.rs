@@ -4,7 +4,6 @@ pub mod expression;
 pub mod filter;
 pub mod from;
 pub mod join;
-pub mod optimizer;
 pub mod order;
 pub mod query_plan;
 pub mod schema;
