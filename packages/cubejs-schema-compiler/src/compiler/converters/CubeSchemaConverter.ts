@@ -2,6 +2,7 @@ import generator from '@babel/generator';
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
+import YAML from 'js-yaml';
 
 export type AstSet = {
   fileName: string;
@@ -9,7 +10,15 @@ export type AstSet = {
   cubeDefinition: t.ObjectExpression;
 };
 
-export type AstByCubeName = Record<string, AstSet>;
+export type YamlSet = {
+  fileName: string;
+  yaml: any;
+  cubeDefinition: any;
+};
+
+const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
+
+export type AstByCubeName = Record<string, (AstSet | YamlSet)>;
 
 export interface CubeConverterInterface {
   convert(astByCubeName: AstByCubeName): void;
@@ -31,43 +40,80 @@ export class CubeSchemaConverter {
     this.dataSchemaFiles = await this.fileRepository.dataSchemaFiles();
 
     this.dataSchemaFiles.forEach((schemaFile) => {
-      const ast = this.parse(schemaFile);
-
-      traverse(ast, {
-        CallExpression: (path) => {
-          if (t.isIdentifier(path.node.callee)) {
-            const args = path.get('arguments');
-
-            if (path.node.callee.name === 'cube') {
-              if (args?.[args.length - 1]) {
-                let cubeName: string | undefined;
-
-                if (args[0].node.type === 'StringLiteral' && args[0].node.value) {
-                  cubeName = args[0].node.value;
-                } else if (args[0].node.type === 'TemplateLiteral' && args[0].node.quasis?.[0]?.value.cooked) {
-                  cubeName = args[0].node.quasis?.[0]?.value.cooked;
-                }
-
-                if (cubeName == null) {
-                  throw new Error(`Error parsing ${schemaFile.fileName}`);
-                }
-
-                if (t.isObjectExpression(args[1]?.node) && ast != null) {
-                  this.parsedFiles[cubeName] = {
-                    fileName: schemaFile.fileName,
-                    ast,
-                    cubeDefinition: args[1].node,
-                  };
-                }
-              }
-            }
-          }
-        },
-      });
+      if (schemaFile.fileName.endsWith('.js')) {
+        this.transformJS(schemaFile);
+      } else if (schemaFile.fileName.endsWith('.yml.jinja') || schemaFile.fileName.endsWith('.yaml.jinja') ||
+        (schemaFile.fileName.endsWith('.yml') || schemaFile.fileName.endsWith('.yaml')) && schemaFile.content.match(JINJA_SYNTAX)
+      ) {
+        throw new Error('Jinja-templated data models are not supported in Rollup Designer yet.');
+      } else if (schemaFile.fileName.endsWith('.yml') || schemaFile.fileName.endsWith('.yaml')) {
+        this.transformYaml(schemaFile);
+      } else {
+        throw new Error(`Unsupported schema file type in ${schemaFile.fileName}`);
+      }
     });
   }
 
-  protected parse(file: SchemaFile) {
+  protected transformYaml(schemaFile: SchemaFile) {
+    if (!schemaFile.content.trim()) {
+      return;
+    }
+
+    const yamlObj = YAML.load(schemaFile.content);
+    if (!yamlObj) {
+      return;
+    }
+
+    for (const key of Object.keys(yamlObj)) {
+      if (key === 'cubes') {
+        (yamlObj.cubes || []).forEach(({ cubeName, ...cubeDef }) => {
+          this.parsedFiles[cubeName] = {
+            fileName: schemaFile.fileName,
+            yaml: yamlObj,
+            cubeDefinition: cubeDef,
+          };
+        });
+      }
+    }
+  }
+
+  protected transformJS(schemaFile: SchemaFile) {
+    const ast = this.parseJS(schemaFile);
+
+    traverse(ast, {
+      CallExpression: (path) => {
+        if (t.isIdentifier(path.node.callee)) {
+          const args = path.get('arguments');
+
+          if (path.node.callee.name === 'cube') {
+            if (args?.[args.length - 1]) {
+              let cubeName: string | undefined;
+
+              if (args[0].node.type === 'StringLiteral' && args[0].node.value) {
+                cubeName = args[0].node.value;
+              } else if (args[0].node.type === 'TemplateLiteral' && args[0].node.quasis?.[0]?.value.cooked) {
+                cubeName = args[0].node.quasis?.[0]?.value.cooked;
+              }
+
+              if (cubeName == null) {
+                throw new Error(`Error parsing ${schemaFile.fileName}`);
+              }
+
+              if (t.isObjectExpression(args[1]?.node) && ast != null) {
+                this.parsedFiles[cubeName] = {
+                  fileName: schemaFile.fileName,
+                  ast,
+                  cubeDefinition: args[1].node,
+                };
+              }
+            }
+          }
+        }
+      },
+    });
+  }
+
+  protected parseJS(file: SchemaFile) {
     try {
       return parse(file.content, {
         sourceFilename: file.fileName,
@@ -95,10 +141,16 @@ export class CubeSchemaConverter {
   }
 
   public getSourceFiles() {
-    return Object.entries(this.parsedFiles).map(([cubeName, file]) => ({
-      cubeName,
-      fileName: file.fileName,
-      source: generator(file.ast, {}).code,
-    }));
+    return Object.entries(this.parsedFiles).map(([cubeName, file]) => {
+      const source = 'ast' in file
+        ? generator(file.ast, {}).code
+        : generator(file.yaml, {}).code;
+
+      return {
+        cubeName,
+        fileName: file.fileName,
+        source,
+      };
+    });
   }
 }
