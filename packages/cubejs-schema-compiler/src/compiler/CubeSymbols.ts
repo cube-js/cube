@@ -63,7 +63,7 @@ export class CubeSymbols {
 
   public cubeList: any[];
 
-  private evaluateViews: boolean;
+  private readonly evaluateViews: boolean;
 
   private resolveSymbolsCallContext: any;
 
@@ -447,13 +447,13 @@ export class CubeSymbols {
         includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
       } else {
         includes = cubeInclude.includes.map((include: any) => {
-          const member = include.alias || include;
+          const member = include.alias || include.name || include;
 
           if (member.includes('.')) {
             errorReporter.error(`Paths aren't allowed in cube includes but '${member}' provided as include member`);
           }
 
-          const name = fullMemberName(include.alias || member);
+          const name = fullMemberName(member);
           memberSets.allMembers.add(name);
 
           const includedMemberName = include.name || include;
