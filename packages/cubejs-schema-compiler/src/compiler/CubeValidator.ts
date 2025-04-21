@@ -110,6 +110,14 @@ const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day
 // Do not allow negative intervals for granularities, while offsets could be negative
 const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
 
+const formatSchema = Joi.alternatives([
+  Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
+  Joi.object().keys({
+    type: Joi.string().valid('link'),
+    label: Joi.string().required()
+  })
+]);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -122,13 +130,7 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
-  format: Joi.alternatives([
-    Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
-    Joi.object().keys({
-      type: Joi.string().valid('link'),
-      label: Joi.string().required()
-    })
-  ]),
+  format: formatSchema,
   meta: Joi.any(),
   granularities: Joi.when('type', {
     is: 'time',
@@ -796,7 +798,11 @@ const viewSchema = inherit(baseSchema, {
           Joi.string().required(),
           Joi.object().keys({
             name: identifier.required(),
-            alias: identifier
+            alias: identifier,
+            title: Joi.string(),
+            description: Joi.string(),
+            format: formatSchema,
+            meta: Joi.any(),
           })
         ]))
       ]).required(),
