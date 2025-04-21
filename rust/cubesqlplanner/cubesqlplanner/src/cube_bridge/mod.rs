@@ -27,3 +27,4 @@ pub mod segment_definition;
 pub mod sql_templates_render;
 pub mod sql_utils;
 pub mod struct_with_sql_member;
+pub mod pre_aggregation_obj;

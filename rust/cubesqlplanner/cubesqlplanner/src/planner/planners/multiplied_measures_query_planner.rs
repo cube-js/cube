@@ -275,7 +275,7 @@ impl MultipliedMeasuresQueryPlanner {
             limit: self.query_properties.row_limit(),
             ungrouped: self.query_properties.ungrouped(),
             dimension_subqueries: subquery_dimension_queries,
-            source,
+            source: SimpleQuerySource::LogicalJoin(source),
             order_by: vec![],
         };
         Ok(Rc::new(query))

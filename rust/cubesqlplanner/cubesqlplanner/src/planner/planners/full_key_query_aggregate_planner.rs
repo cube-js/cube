@@ -64,7 +64,7 @@ impl FullKeyAggregateQueryPlanner {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
             measures_filter: self.query_properties.measures_filters().clone(),
-            segments: vec![],
+            segments: self.query_properties.segments().clone(),
         });
         let result = FullKeyAggregateQuery {
             schema,

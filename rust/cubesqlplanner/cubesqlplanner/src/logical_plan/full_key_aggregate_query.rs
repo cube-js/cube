@@ -1,6 +1,6 @@
 use super::*;
-use crate::planner::query_properties::OrderByItem;
 use std::rc::Rc;
+use crate::planner::query_properties::OrderByItem;
 
 pub struct FullKeyAggregateQuery {
     pub multistage_members: Vec<Rc<LogicalMultiStageMember>>,
@@ -14,7 +14,7 @@ pub struct FullKeyAggregateQuery {
 }
 
 impl PrettyPrint for FullKeyAggregateQuery {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
+    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {  
         result.println("FullKeyAggregateQuery: ", state);
         let state = state.new_level();
         let details_state = state.new_level();
@@ -39,14 +39,7 @@ impl PrettyPrint for FullKeyAggregateQuery {
         if !self.order_by.is_empty() {
             result.println("order_by:", &state);
             for order_by in self.order_by.iter() {
-                result.println(
-                    &format!(
-                        "{} {}",
-                        order_by.name(),
-                        if order_by.desc() { "desc" } else { "asc" }
-                    ),
-                    &details_state,
-                );
+                result.println(&format!("{} {}", order_by.name(), if order_by.desc() { "desc" } else { "asc" }), &details_state);
             }
         }
         result.println("source:", &state);

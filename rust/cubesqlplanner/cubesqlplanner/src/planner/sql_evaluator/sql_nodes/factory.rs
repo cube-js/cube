@@ -2,7 +2,7 @@ use super::{
     AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     GeoDimensionSqlNode, MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode,
     RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
-    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
+    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::sql_evaluator::MeasureTimeShift;
@@ -16,6 +16,7 @@ pub struct SqlNodesFactory {
     ungrouped_measure: bool,
     count_approx_as_state: bool,
     render_references: HashMap<String, QualifiedColumnName>,
+    pre_aggregation_measures_references: HashMap<String, QualifiedColumnName>,
     rendered_as_multiplied_measures: HashSet<String>,
     ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
     cube_name_references: HashMap<String, String>,
@@ -33,6 +34,7 @@ impl SqlNodesFactory {
             ungrouped_measure: false,
             count_approx_as_state: false,
             render_references: HashMap::new(),
+            pre_aggregation_measures_references: HashMap::new(),
             ungrouped_measure_references: HashMap::new(),
             cube_name_references: HashMap::new(),
             rendered_as_multiplied_measures: HashSet::new(),
@@ -81,6 +83,14 @@ impl SqlNodesFactory {
 
     pub fn set_multi_stage_window(&mut self, partition_by: Vec<String>) {
         self.multi_stage_window = Some(partition_by);
+    }
+
+    pub fn set_pre_aggregation_measures_references(&mut self, value: HashMap<String, QualifiedColumnName>) {
+        self.pre_aggregation_measures_references = value;
+    }
+
+    pub fn add_pre_aggregation_measure_reference(&mut self, key: String, value: QualifiedColumnName) {
+        self.pre_aggregation_measures_references.insert(key, value);
     }
 
     pub fn set_rolling_window(&mut self, value: bool) {
@@ -173,11 +183,16 @@ impl SqlNodesFactory {
         } else if self.ungrouped {
             UngroupedQueryFinalMeasureSqlNode::new(input)
         } else {
-            let final_processor = FinalMeasureSqlNode::new(
+            let final_processor: Rc<dyn SqlNode> = FinalMeasureSqlNode::new(
                 input.clone(),
                 self.rendered_as_multiplied_measures.clone(),
                 self.count_approx_as_state,
             );
+            let final_processor = if !self.pre_aggregation_measures_references.is_empty() {   
+                FinalPreAggregationMeasureSqlNode::new(final_processor, self.pre_aggregation_measures_references.clone())
+            } else {
+                final_processor
+            };
             if self.rolling_window {
                 RollingWindowNode::new(input, final_processor)
             } else {

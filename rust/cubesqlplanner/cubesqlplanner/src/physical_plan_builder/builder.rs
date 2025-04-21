@@ -1,4 +1,5 @@
 use crate::logical_plan::*;
+use crate::planner::BaseMemberHelper;
 use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
 use crate::planner::query_properties::OrderByItem;
@@ -82,15 +83,23 @@ impl PhysicalPlanBuilder {
         context: &PhysicalPlanBuilderContext,
     ) -> Result<Rc<Select>, CubeError> {
         let mut render_references = HashMap::new();
-        let from = self.process_logical_join(
-            &logical_plan.source,
-            context,
-            &logical_plan.dimension_subqueries,
-            &mut render_references,
-        )?;
+        let mut measure_references = HashMap::new();
+        let from = match &logical_plan.source {
+            SimpleQuerySource::LogicalJoin(join) => {
+                self.process_logical_join(
+                    &join,
+                    context,
+                    &logical_plan.dimension_subqueries,
+                    &mut render_references,
+                )?
+            },
+            SimpleQuerySource::PreAggregation(pre_aggregation) => self.process_pre_aggregation(pre_aggregation, context, &mut render_references, &mut measure_references)?,
+        };
+
         let mut select_builder = SelectBuilder::new(from);
         let mut context_factory = context.make_sql_nodes_factory();
         context_factory.set_ungrouped(logical_plan.ungrouped);
+        context_factory.set_pre_aggregation_measures_references(measure_references);
 
         let mut group_by = Vec::new();
         for member in logical_plan.schema.dimensions.iter() {
@@ -142,6 +151,47 @@ impl PhysicalPlanBuilder {
 
         let res = Rc::new(select_builder.build(context_factory));
         Ok(res)
+    }
+
+    fn process_pre_aggregation(&self, pre_aggregation: &Rc<PreAggregation>, context: &PhysicalPlanBuilderContext, render_references: &mut HashMap<String, QualifiedColumnName>, measure_references: &mut HashMap<String, QualifiedColumnName>) -> Result<Rc<From>, CubeError> {
+        let mut pre_aggregation_schema = Schema::empty();
+        let pre_aggregation_alias = PlanSqlTemplates::memeber_alias_name(&pre_aggregation.cube_name, &pre_aggregation.name, &None);
+        for dim in pre_aggregation.dimensions.iter() {
+            let alias = BaseMemberHelper::default_alias(
+                &dim.cube_name(),
+                &dim.name(),
+                &dim.alias_suffix(),
+                self.query_tools.clone(),
+            )?;
+            render_references.insert(dim.full_name(), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+            pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(dim.full_name())));
+        }
+        for (dim, granularity) in pre_aggregation.time_dimensions.iter() {
+            let alias = BaseMemberHelper::default_alias(
+                &dim.cube_name(),
+                &dim.name(),
+                granularity,
+                self.query_tools.clone(),
+            )?;
+            render_references.insert(dim.full_name(), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+            if let Some(granularity) = &granularity {
+
+                render_references.insert(format!("{}_{}", dim.full_name(), granularity), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+            }
+            pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(dim.full_name())));
+        }
+        for meas in pre_aggregation.measures.iter() {
+            let alias = BaseMemberHelper::default_alias(
+                &meas.cube_name(),
+                &meas.name(),
+                &meas.alias_suffix(),
+                self.query_tools.clone(),
+            )?;
+            measure_references.insert(meas.full_name(), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+            pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(meas.full_name())));
+        }
+        let from = From::new_from_table_reference(pre_aggregation.table_name.clone(), Rc::new(pre_aggregation_schema), Some(pre_aggregation_alias));
+        Ok(from)
     }
 
     fn build_full_key_aggregate_query(

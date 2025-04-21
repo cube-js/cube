@@ -720,6 +720,9 @@ export class BaseQuery {
     const res = buildResult.result;
     // FIXME
     res[1] = [...res[1]];
+    if (res[2]) {
+      this.preAggregations.preAggregationForQuery = res[2];
+    }
     return res;
   }
 
@@ -741,6 +744,10 @@ export class BaseQuery {
   // FIXME helper for native generator, maybe should be moved entirely to rust
   generateCustomTimeSeries(granularityInterval, dateRange, origin) {
     return timeSeriesFromCustomInterval(granularityInterval, dateRange, moment(origin), { timestampPrecision: 3 });
+  }
+
+  getPreAggregationByName(cube, preAggregationName) {
+    return this.preAggregations.getRollupPreAggregationByName(cube, preAggregationName);
   }
 
   get shouldReuseParams() {

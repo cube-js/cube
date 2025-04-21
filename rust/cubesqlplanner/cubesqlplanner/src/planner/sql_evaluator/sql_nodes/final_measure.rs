@@ -32,7 +32,7 @@ impl FinalMeasureSqlNode {
         &self.input
     }
 
-    fn is_count_disttinct(&self, symbol: &MeasureSymbol) -> bool {
+    fn is_count_distinct(&self, symbol: &MeasureSymbol) -> bool {
         symbol.measure_type() == "countDistinct"
             || (symbol.measure_type() == "count"
                 && self
@@ -69,7 +69,7 @@ impl SqlNode for FinalMeasureSqlNode {
                     } else {
                         query_tools.base_tools().count_distinct_approx(input)?
                     }
-                } else if self.is_count_disttinct(ev) {
+                } else if self.is_count_distinct(ev) {
                     templates.count_distinct(&input)?
                 } else {
                     let measure_type = if ev.measure_type() == "runningTotal" {
