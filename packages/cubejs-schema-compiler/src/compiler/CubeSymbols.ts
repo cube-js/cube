@@ -275,13 +275,14 @@ export class CubeSymbols {
       this.prepareIncludes(cube, errorReporter, splitViews);
     }
 
-    return Object.assign(
-      { cubeName: () => cube.name, cubeObj: () => cube },
-      cube.measures || {},
-      cube.dimensions || {},
-      cube.segments || {},
-      cube.preAggregations || {}
-    );
+    return {
+      cubeName: () => cube.name,
+      cubeObj: () => cube,
+      ...cube.measures || {},
+      ...cube.dimensions || {},
+      ...cube.segments || {},
+      ...cube.preAggregations || {}
+    };
   }
 
   private camelCaseTypes(obj: Object) {
@@ -425,7 +426,7 @@ export class CubeSymbols {
     for (const [memberName, memberDefinition] of includeMembers) {
       if (cube[type]?.[memberName]) {
         errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member or assigning it an alias.`);
-      } else if (type !== 'hierarchies') {
+      } else {
         cube[type][memberName] = memberDefinition;
       }
     }
@@ -461,6 +462,14 @@ export class CubeSymbols {
           const resolvedMember = this.getResolvedMember(type, cubeReference, includedMemberName) ? {
             member: `${fullPath}.${includedMemberName}`,
             name,
+            ...(include.title || include.description || include.format || include.meta) ? {
+              override: {
+                title: include.title,
+                description: include.description,
+                format: include.format,
+                meta: include.meta,
+              }
+            } : {}
           } : undefined;
 
           if (resolvedMember) {
@@ -537,10 +546,10 @@ export class CubeSymbols {
           sql,
           type: CubeSymbols.toMemberDataType(resolvedMember.type),
           aggType: resolvedMember.type,
-          meta: resolvedMember.meta,
-          title: resolvedMember.title,
-          description: resolvedMember.description,
-          format: resolvedMember.format,
+          meta: memberRef.override?.meta || resolvedMember.meta,
+          title: memberRef.override?.title || resolvedMember.title,
+          description: memberRef.override?.description || resolvedMember.description,
+          format: memberRef.override?.format || resolvedMember.format,
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
@@ -549,24 +558,24 @@ export class CubeSymbols {
         memberDefinition = {
           sql,
           type: resolvedMember.type,
-          meta: resolvedMember.meta,
-          title: resolvedMember.title,
-          description: resolvedMember.description,
-          format: resolvedMember.format,
+          meta: memberRef.override?.meta || resolvedMember.meta,
+          title: memberRef.override?.title || resolvedMember.title,
+          description: memberRef.override?.description || resolvedMember.description,
+          format: memberRef.override?.format || resolvedMember.format,
           ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
         };
       } else if (type === 'segments') {
         memberDefinition = {
           sql,
-          meta: resolvedMember.meta,
-          title: resolvedMember.title,
-          description: resolvedMember.description,
+          meta: memberRef.override?.meta || resolvedMember.meta,
+          description: memberRef.override?.description || resolvedMember.description,
+          title: memberRef.override?.title || resolvedMember.title,
           aliases: resolvedMember.aliases,
         };
       } else if (type === 'hierarchies') {
         memberDefinition = {
-          title: resolvedMember.title,
+          title: memberRef.override?.title || resolvedMember.title,
           levels: resolvedMember.levels,
         };
       } else {
