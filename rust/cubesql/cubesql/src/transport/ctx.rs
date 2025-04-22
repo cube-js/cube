@@ -40,6 +40,42 @@ pub struct CubeMetaColumn {
     pub can_be_null: bool,
 }
 
+#[derive(Clone, Debug)]
+pub enum DataSource<'meta> {
+    Unrestricted,
+    Specific(&'meta str),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DataSourceError {
+    #[error("Multiple data sources found, '{0}' and '{1}'")]
+    Conflict(String, String),
+    #[error("Data source not found for member '{0}'")]
+    Missing(String),
+}
+
+impl<'meta> DataSource<'meta> {
+    pub fn specific_or<E>(self, err: E) -> Result<&'meta str, E> {
+        match self {
+            DataSource::Unrestricted => Err(err),
+            DataSource::Specific(data_source) => Ok(data_source),
+        }
+    }
+
+    pub fn merge(&self, other: &Self) -> Result<Self, DataSourceError> {
+        match (self, other) {
+            (Self::Unrestricted, ds) | (ds, Self::Unrestricted) => Ok(ds.clone()),
+            (Self::Specific(s1), Self::Specific(s2)) => {
+                if s1 == s2 {
+                    Ok(self.clone())
+                } else {
+                    Err(DataSourceError::Conflict(s1.to_string(), s2.to_string()))
+                }
+            }
+        }
+    }
+}
+
 impl MetaContext {
     pub fn new(
         cubes: Vec<CubeMeta>,
@@ -83,6 +119,7 @@ impl MetaContext {
         }
     }
 
+    // TODO remove this in favor of source-per-member
     pub fn sql_generator_by_alias_to_cube(
         &self,
         alias_to_cube: &Vec<(String, String)>,
@@ -96,6 +133,27 @@ impl MetaContext {
         let data_source = data_source.ok()??;
 
         self.data_source_to_sql_generator.get(data_source).cloned()
+    }
+
+    pub fn data_source_for_member_name(&self, member: &str) -> Result<DataSource, DataSourceError> {
+        if self.is_synthetic_field(member) {
+            return Ok(DataSource::Unrestricted);
+        }
+
+        match self.member_to_data_source.get(member) {
+            Some(data_source) => Ok(DataSource::Specific(data_source.as_ref())),
+            None => Err(DataSourceError::Missing(member.to_string())),
+        }
+    }
+
+    pub fn data_source_for_member_names<'mem>(
+        &self,
+        members: impl IntoIterator<Item = &'mem str>,
+    ) -> Result<DataSource, DataSourceError> {
+        members
+            .into_iter()
+            .map(|member| self.data_source_for_member_name(member))
+            .try_fold(DataSource::Unrestricted, |l, r| l.merge(&r?))
     }
 
     pub fn find_cube_with_name(&self, name: &str) -> Option<&CubeMeta> {

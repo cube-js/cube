@@ -16,13 +16,14 @@ use crate::{
     config::ConfigObj,
     sql::AuthContextRef,
     transport::{
-        AliasedColumn, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlTemplates,
-        TransportLoadRequestQuery, TransportService,
+        AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator,
+        SqlTemplates, TransportLoadRequestQuery, TransportService,
     },
     CubeError,
 };
 use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
 use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
+use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
@@ -731,32 +732,37 @@ impl CubeScanWrapperNode {
         }
     }
 
+    fn data_source_for_cube_scan<'ctx>(
+        meta: &'ctx MetaContext,
+        node: &CubeScanNode,
+    ) -> result::Result<DataSource<'ctx>, CubeError> {
+        meta.data_source_for_member_names(
+            node.member_fields
+                .iter()
+                .filter_map(|mem| match mem {
+                    MemberField::Member(mem) => Some(mem),
+                    MemberField::Literal(_) => None,
+                })
+                .map(|mem| mem.member.as_str()),
+        )
+        .map_err(|err| {
+            CubeError::internal(format!(
+                "Can't generate SQL for node; error: {err}; node: {node:?}"
+            ))
+        })
+    }
+
     async fn generate_sql_for_cube_scan(
         meta: &MetaContext,
         node: &CubeScanNode,
         transport: &dyn TransportService,
         load_request_meta: &LoadRequestMeta,
     ) -> result::Result<SqlGenerationResult, CubeError> {
-        let data_sources = node
-            .used_cubes
-            .iter()
-            .map(|c| meta.cube_to_data_source.get(c).map(|c| c.to_string()))
-            .unique()
-            .collect::<Option<Vec<_>>>()
-            .ok_or_else(|| {
-                CubeError::internal(format!(
-                    "Can't generate SQL for node due to sql generator can't be found: {:?}",
-                    node
-                ))
-            })?;
-        if data_sources.len() != 1 {
-            return Err(CubeError::internal(format!(
-                "Can't generate SQL for node due to multiple data sources {}: {:?}",
-                data_sources.join(","),
-                node
-            )));
-        }
-        let data_source = &data_sources[0];
+        let data_source =
+            Self::data_source_for_cube_scan(meta, node)?.specific_or(CubeError::internal(
+                format!("Can't generate SQL for CubeScan without specific data source: {node:?}"),
+            ))?;
+
         let mut meta_with_user = load_request_meta.clone();
         meta_with_user.set_change_user(node.options.change_user.clone());
 
@@ -858,7 +864,6 @@ impl CubeScanWrapperNode {
                     expr,
                     None,
                     &HashMap::new(),
-                    None,
                 )
                 .await?;
                 columns.push(AliasedColumn { expr, alias });
@@ -899,7 +904,7 @@ impl CubeScanWrapperNode {
         let column_remapping = remapper.into_remapping();
 
         return Ok(SqlGenerationResult {
-            data_source: Some(data_source.clone()),
+            data_source: Some(data_source.to_string()),
             from_alias,
             sql,
             column_remapping,
@@ -1117,6 +1122,16 @@ impl WrappedSelectNode {
         }
     }
 
+    fn subqueries_names(&self) -> result::Result<HashSet<String>, CubeError> {
+        let mut subqueries_names = HashSet::new();
+        for subquery in self.subqueries.iter() {
+            // TODO why only field 0 is a key?
+            let field = subquery.schema().field(0);
+            subqueries_names.insert(field.qualified_name());
+        }
+        Ok(subqueries_names)
+    }
+
     async fn prepare_subqueries_sql(
         &self,
         meta: &MetaContext,
@@ -1176,16 +1191,17 @@ impl WrappedSelectNode {
                     return Ok((None, sql_query));
                 }
 
-                let Some(PushToCubeContext {
-                    ungrouped_scan_node,
-                    ..
-                }) = push_to_cube_context
-                else {
+                let Some(push_to_cube_context) = push_to_cube_context else {
                     return Err(CubeError::internal(format!(
                         "Unexpected UDAF expression without push-to-Cube context: {}",
                         fun.name
                     )));
                 };
+
+                let PushToCubeContext {
+                    ungrouped_scan_node,
+                    ..
+                } = push_to_cube_context;
 
                 let (measure, aggregation, filter) = match args.as_slice() {
                     [measure, aggregation, filter] => (measure, aggregation, filter),
@@ -1218,14 +1234,18 @@ impl WrappedSelectNode {
                 let (filters, sql_query) = match filter {
                     Expr::Literal(ScalarValue::Null) => (vec![], sql_query),
                     _ => {
-                        let mut used_members = HashSet::new();
+                        let used_members = collect_used_members(
+                            filter,
+                            push_to_cube_context,
+                            // TODO avoid this alloc
+                            &subqueries.keys().cloned().collect(),
+                        )?;
                         let (filter, sql_query) = Self::generate_sql_for_expr(
                             sql_query,
                             sql_generator.clone(),
                             filter.clone(),
-                            push_to_cube_context,
+                            Some(push_to_cube_context),
                             subqueries,
-                            Some(&mut used_members),
                         )
                         .await?;
 
@@ -1612,14 +1632,21 @@ impl WrappedSelectNode {
                 can_rename_columns,
             )?;
 
-            let mut used_members = HashSet::new();
+            let used_members = match push_to_cube_context {
+                Some(push_to_cube_context) => collect_used_members(
+                    &expr,
+                    push_to_cube_context,
+                    // TODO avoid this alloc
+                    &subqueries.keys().cloned().collect(),
+                )?,
+                None => HashSet::new(),
+            };
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
                 sql,
                 generator.clone(),
                 expr.clone(),
                 push_to_cube_context,
                 subqueries,
-                Some(&mut used_members),
             )
             .await?;
             let expr_sql =
@@ -1687,7 +1714,6 @@ impl WrappedSelectNode {
         expr: Expr,
         push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
         subqueries: &HashMap<String, String>,
-        mut used_members: Option<&'ctx mut HashSet<String>>,
     ) -> Result<(String, SqlQuery)> {
         match expr {
             Expr::Alias(expr, _) => {
@@ -1697,7 +1723,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 Ok((expr, sql_query))
@@ -1734,7 +1759,6 @@ impl WrappedSelectNode {
                                 expr,
                                 None,
                                 subqueries,
-                                used_members,
                             )
                             .await;
                         }
@@ -1744,9 +1768,6 @@ impl WrappedSelectNode {
 
                     match member {
                         MemberField::Member(member) => {
-                            if let Some(used_members) = used_members {
-                                used_members.insert(member.member.clone());
-                            }
                             Ok((format!("${{{}}}", member.field_name), sql_query))
                         }
                         MemberField::Literal(value) => {
@@ -1756,7 +1777,6 @@ impl WrappedSelectNode {
                                 Expr::Literal(value.clone()),
                                 push_to_cube_context,
                                 subqueries,
-                                used_members,
                             )
                             .await
                         }
@@ -1807,7 +1827,6 @@ impl WrappedSelectNode {
                     *left,
                     push_to_cube_context,
                     subqueries,
-                    used_members.as_deref_mut(),
                 )
                 .await?;
                 let (right, sql_query) = Self::generate_sql_for_expr_rec(
@@ -1816,7 +1835,6 @@ impl WrappedSelectNode {
                     *right,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 let resulting_sql = sql_generator
@@ -1838,7 +1856,6 @@ impl WrappedSelectNode {
                     *like.expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members.as_deref_mut(),
                 )
                 .await?;
                 let (pattern, sql_query) = Self::generate_sql_for_expr_rec(
@@ -1847,7 +1864,6 @@ impl WrappedSelectNode {
                     *like.pattern,
                     push_to_cube_context,
                     subqueries,
-                    used_members.as_deref_mut(),
                 )
                 .await?;
                 let (escape_char, sql_query) = match like.escape_char {
@@ -1858,7 +1874,6 @@ impl WrappedSelectNode {
                             Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                             push_to_cube_context,
                             subqueries,
-                            used_members,
                         )
                         .await?;
                         (Some(escape_char), sql_query)
@@ -1883,7 +1898,6 @@ impl WrappedSelectNode {
                     *ilike.expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members.as_deref_mut(),
                 )
                 .await?;
                 let (pattern, sql_query) = Self::generate_sql_for_expr_rec(
@@ -1892,7 +1906,6 @@ impl WrappedSelectNode {
                     *ilike.pattern,
                     push_to_cube_context,
                     subqueries,
-                    used_members.as_deref_mut(),
                 )
                 .await?;
                 let (escape_char, sql_query) = match ilike.escape_char {
@@ -1903,7 +1916,6 @@ impl WrappedSelectNode {
                             Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                             push_to_cube_context,
                             subqueries,
-                            used_members,
                         )
                         .await?;
                         (Some(escape_char), sql_query)
@@ -1929,7 +1941,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 let resulting_sql =
@@ -1951,7 +1962,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 let resulting_sql = sql_generator
@@ -1972,7 +1982,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 let resulting_sql = sql_generator
@@ -1993,7 +2002,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 let resulting_sql = sql_generator
@@ -2018,7 +2026,6 @@ impl WrappedSelectNode {
                         *expr,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = sql_query_next;
@@ -2034,7 +2041,6 @@ impl WrappedSelectNode {
                         *when,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     let (then, sql_query_next) = Self::generate_sql_for_expr_rec(
@@ -2043,7 +2049,6 @@ impl WrappedSelectNode {
                         *then,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = sql_query_next;
@@ -2056,7 +2061,6 @@ impl WrappedSelectNode {
                         *else_expr,
                         push_to_cube_context,
                         subqueries,
-                        used_members,
                     )
                     .await?;
                     sql_query = sql_query_next;
@@ -2079,7 +2083,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 let data_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
@@ -2098,7 +2101,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 let resulting_sql = sql_generator
@@ -2499,7 +2501,6 @@ impl WrappedSelectNode {
                         arg,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2536,7 +2537,6 @@ impl WrappedSelectNode {
                                     args[1].clone(),
                                     push_to_cube_context,
                                     subqueries,
-                                    used_members,
                                 )
                                 .await?;
                                 return Ok((
@@ -2579,7 +2579,6 @@ impl WrappedSelectNode {
                         arg,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2619,7 +2618,6 @@ impl WrappedSelectNode {
                         arg,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2648,7 +2646,6 @@ impl WrappedSelectNode {
                             expr,
                             push_to_cube_context,
                             subqueries,
-                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2676,7 +2673,6 @@ impl WrappedSelectNode {
                             expr,
                             push_to_cube_context,
                             subqueries,
-                            used_members.as_deref_mut(),
                         )
                         .await?;
                         sql_query = query;
@@ -2717,7 +2713,6 @@ impl WrappedSelectNode {
                         arg,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2731,7 +2726,6 @@ impl WrappedSelectNode {
                         arg,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2745,7 +2739,6 @@ impl WrappedSelectNode {
                         arg,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2805,10 +2798,6 @@ impl WrappedSelectNode {
                             )));
                         };
 
-                        if let Some(used_members) = used_members {
-                            used_members.insert(member.member.clone());
-                        }
-
                         Ok((format!("${{{}}}", member.field_name), sql_query))
                     }
                     // There's no branch for PatchMeasure, because it should generate via different path
@@ -2830,7 +2819,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members.as_deref_mut(),
                 )
                 .await?;
                 sql_query = query;
@@ -2842,7 +2830,6 @@ impl WrappedSelectNode {
                         expr,
                         push_to_cube_context,
                         subqueries,
-                        used_members.as_deref_mut(),
                     )
                     .await?;
                     sql_query = query;
@@ -2873,7 +2860,6 @@ impl WrappedSelectNode {
                     *expr,
                     push_to_cube_context,
                     subqueries,
-                    used_members.as_deref_mut(),
                 )
                 .await?;
                 sql_query = query;
@@ -2883,7 +2869,6 @@ impl WrappedSelectNode {
                     *subquery,
                     push_to_cube_context,
                     subqueries,
-                    used_members,
                 )
                 .await?;
                 sql_query = query;
@@ -2920,7 +2905,6 @@ impl WrappedSelectNode {
         expr: Expr,
         push_to_cube_context: Option<&'ctx PushToCubeContext>,
         subqueries: &'ctx HashMap<String, String>,
-        used_members: Option<&'ctx mut HashSet<String>>,
     ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send + 'ctx>> {
         Self::generate_sql_for_expr(
             sql_query,
@@ -2928,7 +2912,6 @@ impl WrappedSelectNode {
             expr,
             push_to_cube_context,
             subqueries,
-            used_members,
         )
         .boxed()
     }
@@ -2996,28 +2979,6 @@ impl WrappedSelectNode {
             cube_scan_node
         };
 
-        let data_source = {
-            let data_sources = ungrouped_scan_node
-                .used_cubes
-                .iter()
-                .map(|c| meta.cube_to_data_source.get(c).map(|c| c.to_string()))
-                .unique()
-                .collect::<Option<Vec<_>>>()
-                .ok_or_else(|| {
-                    CubeError::internal(format!(
-                        "Can't generate SQL for node due to sql generator can't be found: {:?}",
-                        ungrouped_scan_node
-                    ))
-                })?;
-            if data_sources.len() != 1 {
-                return Err(CubeError::internal(format!(
-                    "Can't generate SQL for node due to multiple data sources {}: {:?}",
-                    data_sources.join(","),
-                    ungrouped_scan_node
-                )));
-            }
-            Some(data_sources[0].clone())
-        };
         let from_alias = ungrouped_scan_node
             .schema
             .fields()
@@ -3027,21 +2988,79 @@ impl WrappedSelectNode {
         let mut column_remapping = None;
         let mut sql = SqlQuery::new("".to_string(), values.clone());
 
+        let subqueries_names = self.subqueries_names()?;
+
+        fn alias_for_join_subq(plan: &LogicalPlan) -> result::Result<&String, CubeError> {
+            // TODO avoid using direct alias from schema, implement remapping for qualifiers instead
+            plan.schema()
+                .fields()
+                .iter()
+                .filter_map(|f| f.qualifier())
+                .next()
+                .ok_or_else(|| {
+                    CubeError::internal(format!("Alias not found for join subquery {plan:?}"))
+                })
+        }
+
+        let push_to_cube_context = {
+            let mut known_join_subqueries = HashSet::new();
+            for (lp, _cond, _join_type) in &self.joins {
+                // TODO avoid using direct alias from schema, implement remapping for qualifiers instead
+                known_join_subqueries.insert(alias_for_join_subq(lp)?.clone());
+            }
+            PushToCubeContext {
+                ungrouped_scan_node,
+                known_join_subqueries,
+            }
+        };
+
+        // Turn to ref
+        let push_to_cube_context = &push_to_cube_context;
+
+        let data_source = {
+            let mut every_used_member = HashSet::new();
+            let every_expression = self
+                .projection_expr
+                .iter()
+                .chain(self.group_expr.iter())
+                .chain(self.aggr_expr.iter())
+                .chain(self.filter_expr.iter())
+                .chain(self.window_expr.iter())
+                .chain(self.order_expr.iter())
+                .chain(self.joins.iter().map(|(_plan, cond, _join_type)| cond));
+            for expr in every_expression {
+                collect_used_members_to_set(
+                    expr,
+                    push_to_cube_context,
+                    &subqueries_names,
+                    &mut every_used_member,
+                )?;
+            }
+
+            meta.data_source_for_member_names(every_used_member.iter().map(|m| m.as_str()))
+                .map_err(|err| {
+                    CubeError::internal(format!("Could not determine data source: {err}"))
+                })?
+        };
+
+        let data_source = data_source.specific_or(CubeError::internal(format!(
+            "Can't generate SQL for push-to-Cube CubeScan without specific data source: {node:?}"
+        )))?;
+
         let subqueries_sql = self
             .prepare_subqueries_sql(
                 meta,
                 transport.clone(),
                 load_request_meta.clone(),
                 &mut sql,
-                data_source.as_deref(),
+                Some(data_source),
             )
             .await?;
         let subqueries_sql = &subqueries_sql;
         let alias = self.alias.clone().or(from_alias.clone());
 
-        let (push_to_cube_context, join_subqueries) = {
+        let join_subqueries = {
             let mut join_subqueries = vec![];
-            let mut known_join_subqueries = HashSet::new();
             for (lp, cond, join_type) in &self.joins {
                 match lp.as_ref() {
                     LogicalPlan::Extension(Extension { node }) => {
@@ -3086,15 +3105,7 @@ impl WrappedSelectNode {
                 }
 
                 // TODO avoid using direct alias from schema, implement remapping for qualifiers instead
-                let alias = lp
-                    .schema()
-                    .fields()
-                    .iter()
-                    .filter_map(|f| f.qualifier())
-                    .next()
-                    .ok_or_else(|| {
-                        CubeError::internal(format!("Alias not found for join subquery {lp:?}"))
-                    })?;
+                let alias = alias_for_join_subq(lp)?;
 
                 let subq_sql = CubeScanWrapperNode::generate_sql_for_node_rec(
                     meta,
@@ -3103,7 +3114,7 @@ impl WrappedSelectNode {
                     lp.clone(),
                     true,
                     sql.values.clone(),
-                    data_source.as_deref(),
+                    Some(data_source),
                 )
                 .await?;
                 let (subq_sql_string, new_values) = subq_sql.sql.unpack();
@@ -3133,22 +3144,13 @@ impl WrappedSelectNode {
                     condition: cond.clone(),
                     join_type: *join_type,
                 });
-                known_join_subqueries.insert(alias.clone());
             }
 
-            (
-                PushToCubeContext {
-                    ungrouped_scan_node,
-                    known_join_subqueries,
-                },
-                join_subqueries,
-            )
+            join_subqueries
         };
 
         // Drop mut, turn to ref
         let column_remapping = column_remapping.as_ref();
-        // Turn to ref
-        let push_to_cube_context = &push_to_cube_context;
 
         let (generator, columns, mut sql, mut next_remapper) = self
             .generate_columns(
@@ -3156,7 +3158,7 @@ impl WrappedSelectNode {
                 node,
                 can_rename_columns,
                 sql,
-                data_source.as_deref(),
+                Some(data_source),
                 Some(push_to_cube_context),
                 subqueries_sql,
                 column_remapping,
@@ -3385,7 +3387,7 @@ impl WrappedSelectNode {
             .await?;
 
         Ok(SqlGenerationResult {
-            data_source,
+            data_source: Some(data_source.to_string()),
             from_alias: alias,
             sql: sql_response.sql,
             column_remapping: next_remapper.into_remapping(),
@@ -3650,6 +3652,83 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             self.distinct,
             self.push_to_cube,
         ))
+    }
+}
+
+struct CollectMembersVisitor<'ctx, 'mem> {
+    push_to_cube_context: &'ctx PushToCubeContext<'ctx>,
+    subqueries: &'ctx HashSet<String>,
+    used_members: &'mem mut HashSet<String>,
+}
+
+fn collect_used_members<'ctx>(
+    expr: &Expr,
+    push_to_cube_context: &'ctx PushToCubeContext<'_>,
+    subqueries: &'ctx HashSet<String>,
+) -> result::Result<HashSet<String>, CubeError> {
+    let mut used_members = HashSet::new();
+    collect_used_members_to_set(expr, push_to_cube_context, subqueries, &mut used_members)?;
+    Ok(used_members)
+}
+
+fn collect_used_members_to_set<'ctx, 'mem>(
+    expr: &Expr,
+    push_to_cube_context: &'ctx PushToCubeContext<'_>,
+    subqueries: &'ctx HashSet<String>,
+    used_members: &'mem mut HashSet<String>,
+) -> result::Result<(), CubeError> {
+    let v = CollectMembersVisitor {
+        push_to_cube_context,
+        subqueries,
+        used_members,
+    };
+    expr.accept(v)?;
+
+    Ok(())
+}
+
+impl<'ctx, 'mem> CollectMembersVisitor<'ctx, 'mem> {
+    fn handle_column(&mut self, c: &Column) -> Result<()> {
+        if self.subqueries.contains(&c.flat_name()) {
+            // Do nothing
+        } else {
+            let PushToCubeContext {
+                ungrouped_scan_node,
+                known_join_subqueries,
+            } = self.push_to_cube_context;
+
+            if let Some(relation) = c.relation.as_ref() {
+                if known_join_subqueries.contains(relation) {
+                    return Ok(());
+                }
+            }
+
+            let member = WrappedSelectNode::find_member_in_ungrouped_scan(ungrouped_scan_node, c)?;
+
+            match member {
+                MemberField::Member(member) => {
+                    self.used_members.insert(member.member.clone());
+                }
+                MemberField::Literal(_) => {
+                    // Do nothing
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
+    fn pre_visit(mut self, expr: &Expr) -> Result<Recursion<Self>> {
+        match expr {
+            Expr::Column(ref c) => {
+                self.handle_column(c)?;
+            }
+            _ => {}
+        }
+
+        Ok(Recursion::Continue(self))
     }
 }
 
