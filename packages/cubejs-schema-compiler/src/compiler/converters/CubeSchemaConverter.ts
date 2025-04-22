@@ -2,9 +2,9 @@ import generator from '@babel/generator';
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
-import YAML from 'js-yaml';
+import YAML, { isMap, isSeq } from 'yaml';
 
-export type AstSet = {
+export type JsSet = {
   fileName: string;
   ast: t.File;
   cubeDefinition: t.ObjectExpression;
@@ -12,13 +12,13 @@ export type AstSet = {
 
 export type YamlSet = {
   fileName: string;
-  yaml: any;
-  cubeDefinition: any;
+  yaml: YAML.Document;
+  cubeDefinition: YAML.YAMLMap;
 };
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
 
-export type AstByCubeName = Record<string, (AstSet | YamlSet)>;
+export type AstByCubeName = Record<string, (JsSet | YamlSet)>;
 
 export interface CubeConverterInterface {
   convert(astByCubeName: AstByCubeName): void;
@@ -42,14 +42,10 @@ export class CubeSchemaConverter {
     this.dataSchemaFiles.forEach((schemaFile) => {
       if (schemaFile.fileName.endsWith('.js')) {
         this.transformJS(schemaFile);
-      } else if (schemaFile.fileName.endsWith('.yml.jinja') || schemaFile.fileName.endsWith('.yaml.jinja') ||
-        (schemaFile.fileName.endsWith('.yml') || schemaFile.fileName.endsWith('.yaml')) && schemaFile.content.match(JINJA_SYNTAX)
-      ) {
-        throw new Error('Jinja-templated data models are not supported in Rollup Designer yet.');
-      } else if (schemaFile.fileName.endsWith('.yml') || schemaFile.fileName.endsWith('.yaml')) {
+      } else if ((schemaFile.fileName.endsWith('.yml') || schemaFile.fileName.endsWith('.yaml')) && !schemaFile.content.match(JINJA_SYNTAX)) {
+        // Jinja-templated data models are not supported in Rollup Designer yet, so we're ignoring them,
+        // and if user has chosen the cube from such file - it won't be found during generation.
         this.transformYaml(schemaFile);
-      } else {
-        throw new Error(`Unsupported schema file type in ${schemaFile.fileName}`);
       }
     });
   }
@@ -59,20 +55,42 @@ export class CubeSchemaConverter {
       return;
     }
 
-    const yamlObj = YAML.load(schemaFile.content);
-    if (!yamlObj) {
+    const yamlDoc = YAML.parseDocument(schemaFile.content);
+    if (!yamlDoc?.contents) {
       return;
     }
 
-    for (const key of Object.keys(yamlObj)) {
-      if (key === 'cubes') {
-        (yamlObj.cubes || []).forEach(({ cubeName, ...cubeDef }) => {
+    const root = yamlDoc.contents;
+
+    if (!isMap(root)) {
+      return;
+    }
+
+    const cubesPair = root.items.find((item) => {
+      const key = item.key as YAML.Scalar;
+      return key?.value === 'cubes';
+    });
+
+    if (!cubesPair || !isSeq(cubesPair.value)) {
+      return;
+    }
+
+    for (const cubeNode of cubesPair.value.items) {
+      if (isMap(cubeNode)) {
+        const cubeNamePair = cubeNode.items.find((item) => {
+          const key = item.key as YAML.Scalar;
+          return key?.value === 'name';
+        });
+
+        const cubeName = (cubeNamePair?.value as YAML.Scalar).value;
+
+        if (cubeName && typeof cubeName === 'string') {
           this.parsedFiles[cubeName] = {
             fileName: schemaFile.fileName,
-            yaml: yamlObj,
-            cubeDefinition: cubeDef,
+            yaml: yamlDoc,
+            cubeDefinition: cubeNode,
           };
-        });
+        }
       }
     }
   }
@@ -144,7 +162,7 @@ export class CubeSchemaConverter {
     return Object.entries(this.parsedFiles).map(([cubeName, file]) => {
       const source = 'ast' in file
         ? generator(file.ast, {}).code
-        : generator(file.yaml, {}).code;
+        : String(file.yaml);
 
       return {
         cubeName,
