@@ -752,7 +752,75 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         join_path: 'UngroupedMeasureWithFilter1.UngroupedMeasureWithFilter2',
         includes: ['count']
       }]
-    })
+    });
+
+    cube(\`sales\`, {
+      sql: \`SELECT * FROM sales\`,
+
+      dimensions: {
+        date: {
+          sql: \`date\`,
+          type: \`time\`
+        },
+        id: {
+          sql: \`id\`,
+          type: \`number\`,
+          primaryKey: true
+        },
+        category: {
+          sql: \`category\`,
+          type: \`string\`
+        },
+        region: {
+          sql: \`region\`,
+          type: \`string\`
+        }
+      },
+
+      measures: {
+        current_month_sum: {
+          sql: 'amount',
+          type: 'sum',
+          rolling_window: {
+            trailing: '1 month',
+            offset: 'end'
+          }
+        },
+        previous_month_sum: {
+          sql: 'amount',
+          type: 'sum',
+          rolling_window: {
+            trailing: '1 month',
+            offset: 'start'
+          }
+        },
+        month_over_month_ratio: {
+          type: \`number\`,
+          sql: \`\${current_month_sum} / NULLIF(\${previous_month_sum}, 0)\`
+        },
+        current_year_sum: {
+          sql: 'amount',
+          type: 'sum',
+          rolling_window: {
+            trailing: '1 year',
+            offset: 'end'
+          }
+        },
+        previous_year_sum: {
+          sql: 'amount',
+          type: 'sum',
+          rolling_window: {
+            trailing: '1 year',
+            offset: 'start'
+          }
+        },
+        year_over_year_ratio: {
+          type: \`number\`,
+          sql: \`\${current_year_sum} / NULLIF(\${previous_year_sum}, 0)\`
+        }
+      }
+    });
+
     `);
 
   it('simple join', async () => {
@@ -1343,6 +1411,8 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }],
     timezone: 'America/Los_Angeles'
   }, [
+    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__cagr_day: null, visitors__revenue: '100', visitors__revenue_day_ago: null },
+    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__cagr_day: null, visitors__revenue: '200', visitors__revenue_day_ago: null },
     { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
     { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
   ]));
@@ -3173,6 +3243,8 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       ],
       order: [{
         id: 'visitors.source'
+      }, {
+        id: 'visitors.updated_at'
       }],
       timezone: 'UTC',
     },
@@ -3284,6 +3356,8 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       ],
       order: [{
         id: 'visitors_multi_stage.source'
+      }, {
+        id: 'visitors_multi_stage.updated_at'
       }],
       timezone: 'UTC',
     },
@@ -3797,4 +3871,111 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       }]
     );
   });
+
+  it('period over period time only', async () => runQueryTest({
+    measures: [
+      'sales.current_month_sum',
+      'sales.previous_month_sum',
+      'sales.month_over_month_ratio'
+    ],
+    timeDimensions: [{
+      dimension: 'sales.date',
+      granularity: 'month',
+      dateRange: ['2023-01-01', '2023-12-31']
+    }],
+    order: [{
+      id: 'sales.date'
+    }],
+    timezone: 'UTC'
+  }, [
+    { sales__date_month: '2023-01-01T00:00:00.000Z', sales__current_month_sum: '800', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-02-01T00:00:00.000Z', sales__current_month_sum: '1000', sales__previous_month_sum: '800', sales__month_over_month_ratio: '1.2500000000000000' },
+    { sales__date_month: '2023-03-01T00:00:00.000Z', sales__current_month_sum: '500', sales__previous_month_sum: '1000', sales__month_over_month_ratio: '0.50000000000000000000' },
+    { sales__date_month: '2023-04-01T00:00:00.000Z', sales__current_month_sum: null, sales__previous_month_sum: '500', sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-05-01T00:00:00.000Z', sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-06-01T00:00:00.000Z', sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-07-01T00:00:00.000Z', sales__current_month_sum: '300', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-08-01T00:00:00.000Z', sales__current_month_sum: null, sales__previous_month_sum: '300', sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-09-01T00:00:00.000Z', sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-10-01T00:00:00.000Z', sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-11-01T00:00:00.000Z', sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-12-01T00:00:00.000Z', sales__current_month_sum: '600', sales__previous_month_sum: null, sales__month_over_month_ratio: null }
+  ]));
+
+  it('period over period one dimension', async () => runQueryTest({
+    measures: [
+      'sales.current_month_sum',
+      'sales.previous_month_sum',
+      'sales.month_over_month_ratio'
+    ],
+    dimensions: ['sales.category'],
+    timeDimensions: [{
+      dimension: 'sales.date',
+      granularity: 'month',
+      dateRange: ['2023-01-01', '2023-12-31']
+    }],
+    order: [{
+      id: 'sales.date'
+    }, {
+      id: 'sales.category'
+    }],
+    timezone: 'UTC'
+  }, [
+    { sales__date_month: '2023-01-01T00:00:00.000Z', sales__category: 'Clothing', sales__current_month_sum: '300', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-01-01T00:00:00.000Z', sales__category: 'Electronics', sales__current_month_sum: '500', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-02-01T00:00:00.000Z', sales__category: 'Clothing', sales__current_month_sum: '400', sales__previous_month_sum: '300', sales__month_over_month_ratio: '1.3333333333333333' },
+    { sales__date_month: '2023-02-01T00:00:00.000Z', sales__category: 'Electronics', sales__current_month_sum: '600', sales__previous_month_sum: '500', sales__month_over_month_ratio: '1.2000000000000000' },
+    { sales__date_month: '2023-03-01T00:00:00.000Z', sales__category: 'Electronics', sales__current_month_sum: '500', sales__previous_month_sum: '600', sales__month_over_month_ratio: '0.83333333333333333333' },
+    { sales__date_month: '2023-04-01T00:00:00.000Z', sales__category: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-05-01T00:00:00.000Z', sales__category: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-06-01T00:00:00.000Z', sales__category: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-07-01T00:00:00.000Z', sales__category: 'Electronics', sales__current_month_sum: '300', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-08-01T00:00:00.000Z', sales__category: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-09-01T00:00:00.000Z', sales__category: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-10-01T00:00:00.000Z', sales__category: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-11-01T00:00:00.000Z', sales__category: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-12-01T00:00:00.000Z', sales__category: 'Clothing', sales__current_month_sum: '600', sales__previous_month_sum: null, sales__month_over_month_ratio: null }
+  ]));
+
+  it('period over period two dimensions', async () => runQueryTest({
+    measures: [
+      'sales.current_month_sum',
+      'sales.previous_month_sum',
+      'sales.month_over_month_ratio'
+    ],
+    dimensions: ['sales.category', 'sales.region'],
+    timeDimensions: [{
+      dimension: 'sales.date',
+      granularity: 'month',
+      dateRange: ['2023-01-01', '2023-12-31']
+    }],
+    order: [{
+      id: 'sales.date'
+    }, {
+      id: 'sales.category'
+    }, {
+      id: 'sales.region'
+    }],
+    timezone: 'UTC'
+  }, [
+    { sales__date_month: '2023-01-01T00:00:00.000Z', sales__category: 'Clothing', sales__region: 'North', sales__current_month_sum: '200', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-01-01T00:00:00.000Z', sales__category: 'Clothing', sales__region: 'South', sales__current_month_sum: '100', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-01-01T00:00:00.000Z', sales__category: 'Electronics', sales__region: 'North', sales__current_month_sum: '300', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-01-01T00:00:00.000Z', sales__category: 'Electronics', sales__region: 'South', sales__current_month_sum: '200', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-02-01T00:00:00.000Z', sales__category: 'Clothing', sales__region: 'North', sales__current_month_sum: '300', sales__previous_month_sum: '200', sales__month_over_month_ratio: '1.5000000000000000' },
+    { sales__date_month: '2023-02-01T00:00:00.000Z', sales__category: 'Clothing', sales__region: 'South', sales__current_month_sum: '100', sales__previous_month_sum: '100', sales__month_over_month_ratio: '1.00000000000000000000' },
+    { sales__date_month: '2023-02-01T00:00:00.000Z', sales__category: 'Electronics', sales__region: 'North', sales__current_month_sum: '400', sales__previous_month_sum: '300', sales__month_over_month_ratio: '1.3333333333333333' },
+    { sales__date_month: '2023-02-01T00:00:00.000Z', sales__category: 'Electronics', sales__region: 'South', sales__current_month_sum: '200', sales__previous_month_sum: '200', sales__month_over_month_ratio: '1.00000000000000000000' },
+    { sales__date_month: '2023-03-01T00:00:00.000Z', sales__category: 'Electronics', sales__region: 'North', sales__current_month_sum: '500', sales__previous_month_sum: '400', sales__month_over_month_ratio: '1.2500000000000000' },
+    { sales__date_month: '2023-04-01T00:00:00.000Z', sales__category: null, sales__region: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-05-01T00:00:00.000Z', sales__category: null, sales__region: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-06-01T00:00:00.000Z', sales__category: null, sales__region: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-07-01T00:00:00.000Z', sales__category: 'Electronics', sales__region: 'South', sales__current_month_sum: '300', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-08-01T00:00:00.000Z', sales__category: null, sales__region: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-09-01T00:00:00.000Z', sales__category: null, sales__region: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-10-01T00:00:00.000Z', sales__category: null, sales__region: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-11-01T00:00:00.000Z', sales__category: null, sales__region: null, sales__current_month_sum: null, sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-12-01T00:00:00.000Z', sales__category: 'Clothing', sales__region: 'North', sales__current_month_sum: '400', sales__previous_month_sum: null, sales__month_over_month_ratio: null },
+    { sales__date_month: '2023-12-01T00:00:00.000Z', sales__category: 'Clothing', sales__region: 'South', sales__current_month_sum: '200', sales__previous_month_sum: null, sales__month_over_month_ratio: null }
+  ]));
 });
