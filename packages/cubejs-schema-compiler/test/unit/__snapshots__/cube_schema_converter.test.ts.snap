@@ -1,5 +1,41 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`CubeSchemaConverter adds a pre-aggregation to JS model using CubePreAggregationConverter: single_cube.yaml 1`] = `
+"# Useless comment for compilation, but is checked in
+# CubeSchemaConverter tests
+cubes:
+  - name: yml_orders
+    sql_table: yml_orders
+
+    measures:
+      - name: count
+        type: count
+      - name: sum
+        type: sum
+        sql: amount
+      - name: min
+        sql: amount
+        type: min
+      - name: max
+        sql: amount
+        type: max
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: createdAt
+        sql: created_at
+        type: time
+    pre_aggregations:
+      - name: main
+        measures:
+          - yml_orders.count
+        timeDimension: yml_orders.createdAt
+        granularity: day
+"
+`;
+
 exports[`CubeSchemaConverter converts all schema repository models (no changes, without additional converters): multi_ecom.yaml 1`] = `
 "cubes:
   - name: orders
