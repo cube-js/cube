@@ -54,6 +54,7 @@ export class PostgresDBRunner extends BaseDbRunner {
       tx.query('CREATE TEMPORARY TABLE right_table (id INT, total DOUBLE PRECISION, description character varying) ON COMMIT DROP'),
       tx.query('CREATE TEMPORARY TABLE mid_table (id INT, left_id INT, right_id INT) ON COMMIT DROP'),
       tx.query('CREATE TEMPORARY TABLE compound_key_cards (id_a INT, id_b INT, visitor_id INT, visitor_checkin_id INT, visit_rank INT) ON COMMIT DROP'),
+      tx.query('CREATE TEMPORARY TABLE sales (id INT PRIMARY KEY, date DATE, category TEXT, region TEXT, amount DECIMAL) ON COMMIT DROP'),
       tx.query(`
         INSERT INTO
         visitors
@@ -126,6 +127,23 @@ export class PostgresDBRunner extends BaseDbRunner {
         (2, 2, 3, 6, 7),
         (2, 2, 2, 4, 8),
         (2, 3, 4, 5, 2);
+      `),
+      tx.query(`
+        INSERT INTO
+        sales
+        (id, date, category, region, amount) VALUES
+        (1, '2023-01-01', 'Electronics', 'North', 300),
+        (2, '2023-01-01', 'Electronics', 'South', 200),
+        (3, '2023-01-01', 'Clothing', 'North', 200),
+        (4, '2023-01-01', 'Clothing', 'South', 100),
+        (5, '2023-02-01', 'Electronics', 'North', 400),
+        (6, '2023-02-01', 'Electronics', 'South', 200),
+        (7, '2023-02-01', 'Clothing', 'North', 300),
+        (8, '2023-02-01', 'Clothing', 'South', 100),
+        (9, '2023-03-01', 'Electronics', 'North', 500),
+        (10, '2023-07-01', 'Electronics', 'South', 300),
+        (11, '2023-12-01', 'Clothing', 'North', 400),
+        (12, '2023-12-01', 'Clothing', 'South', 200)
       `)
     ]);
   }
