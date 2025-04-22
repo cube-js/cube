@@ -908,14 +908,13 @@ impl CubeScanWrapperNode {
         });
     }
 
-    async fn generate_sql_for_wrapper(
+    async fn generate_sql_for_push_to_cube_wrapper(
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
-        parent_data_source: Option<String>,
         wrapped_select_node: &WrappedSelectNode,
     ) -> result::Result<SqlGenerationResult, CubeError> {
         // This is cloned just to simplify some code in this function, feel free to remove it
@@ -935,12 +934,12 @@ impl CubeScanWrapperNode {
             offset,
             order_expr,
             alias,
-            distinct,
-            push_to_cube,
+            distinct: _,
+            push_to_cube: _,
         } = wrapped_select_node.clone();
 
         // TODO support ungrouped joins
-        let ungrouped_scan_node = if push_to_cube {
+        let ungrouped_scan_node = {
             let LogicalPlan::Extension(Extension { node }) = from.as_ref() else {
                 return Err(CubeError::internal(format!(
                     "Expected CubeScan node in from for Push-to-cube but found: {from:?}"
@@ -956,9 +955,7 @@ impl CubeScanWrapperNode {
                     "Expected ungrouped CubeScan node in from for Push-to-cube but found: {cube_scan_node:?}"
                 )));
             }
-            Some(cube_scan_node)
-        } else {
-            None
+            cube_scan_node
         };
 
         let SqlGenerationResult {
@@ -966,8 +963,8 @@ impl CubeScanWrapperNode {
             from_alias,
             mut column_remapping,
             mut sql,
-            request,
-        } = if let Some(ungrouped_scan_node) = &ungrouped_scan_node {
+            request: _,
+        } = {
             let data_sources = ungrouped_scan_node
                 .used_cubes
                 .iter()
@@ -1000,17 +997,6 @@ impl CubeScanWrapperNode {
                 sql,
                 request: ungrouped_scan_node.request.clone(),
             }
-        } else {
-            Self::generate_sql_for_node_rec(
-                meta,
-                transport.clone(),
-                load_request_meta.clone(),
-                from.clone(),
-                true,
-                values.clone(),
-                parent_data_source.clone(),
-            )
-            .await?
         };
 
         let subqueries_sql = wrapped_select_node
@@ -1025,7 +1011,7 @@ impl CubeScanWrapperNode {
         let subqueries_sql = &subqueries_sql;
         let alias = alias.or(from_alias.clone());
 
-        let push_to_cube_context = if let Some(ungrouped_scan_node) = ungrouped_scan_node {
+        let push_to_cube_context = {
             let mut join_subqueries = vec![];
             let mut known_join_subqueries = HashSet::new();
             for (lp, cond, join_type) in joins {
@@ -1122,18 +1108,17 @@ impl CubeScanWrapperNode {
                 known_join_subqueries.insert(alias.clone());
             }
 
-            Some(PushToCubeContext {
+            PushToCubeContext {
                 ungrouped_scan_node,
                 join_subqueries,
                 known_join_subqueries,
-            })
-        } else {
-            None
+            }
         };
+
         // Drop mut, turn to ref
         let column_remapping = column_remapping.as_ref();
         // Turn to ref
-        let push_to_cube_context = push_to_cube_context.as_ref();
+        let push_to_cube_context = &push_to_cube_context;
 
         let (generator, columns, mut sql, mut next_remapper) = wrapped_select_node
             .generate_columns(
@@ -1142,7 +1127,7 @@ impl CubeScanWrapperNode {
                 can_rename_columns,
                 sql,
                 &data_source,
-                push_to_cube_context,
+                Some(push_to_cube_context),
                 subqueries_sql,
                 column_remapping,
                 alias.clone(),
@@ -1158,289 +1143,367 @@ impl CubeScanWrapperNode {
             patch_measures,
             filter,
             window,
-            order,
+            order: _,
         } = columns;
 
-        if let Some(PushToCubeContext {
+        let PushToCubeContext {
             ungrouped_scan_node,
             join_subqueries,
             known_join_subqueries: _,
-        }) = push_to_cube_context
+        } = push_to_cube_context;
+        let mut prepared_join_subqueries = vec![];
+        for JoinSubquery {
+            alias: subq_alias,
+            sql: subq_sql,
+            condition,
+            join_type,
+        } in join_subqueries
         {
-            let mut prepared_join_subqueries = vec![];
-            for JoinSubquery {
-                alias: subq_alias,
-                sql: subq_sql,
-                condition,
+            // Need to call generate_column_expr to apply column_remapping
+            let (join_condition, new_sql) = Self::generate_column_expr(
+                schema.clone(),
+                [condition.clone()],
+                sql,
+                generator.clone(),
+                column_remapping,
+                &mut next_remapper,
+                true,
+                Some(push_to_cube_context),
+                subqueries_sql,
+            )
+            .await?;
+
+            let join_condition_members = &join_condition[0].1;
+            let join_condition = join_condition[0].0.expr.clone();
+            sql = new_sql;
+
+            let join_sql_expression = {
+                // TODO this is NOT a proper way to generate member expr here
+                // TODO Do we even want a full-blown member expression here? or arguments + expr will be enough?
+                let res = Self::make_member_def(
+                    &AliasedColumn {
+                        expr: join_condition,
+                        alias: "__join__alias__unused".to_string(),
+                    },
+                    join_condition_members,
+                    &ungrouped_scan_node.used_cubes,
+                )?;
+                serde_json::json!(res).to_string()
+            };
+
+            let join_type = match join_type {
+                JoinType::Left => generator.get_sql_templates().left_join()?,
+                JoinType::Inner => generator.get_sql_templates().inner_join()?,
+                _ => {
+                    return Err(CubeError::internal(format!(
+                        "Unsupported join type for join subquery: {join_type:?}"
+                    )))
+                }
+            };
+
+            // for simple ungrouped-grouped joins everything should already be present in from
+            // so we can just attach this join to the end, no need to look for a proper spot
+            prepared_join_subqueries.push(V1LoadRequestQueryJoinSubquery {
+                sql: subq_sql.clone(),
+                on: join_sql_expression,
                 join_type,
-            } in join_subqueries
-            {
-                // Need to call generate_column_expr to apply column_remapping
-                let (join_condition, new_sql) = Self::generate_column_expr(
-                    schema.clone(),
-                    [condition.clone()],
-                    sql,
-                    generator.clone(),
-                    column_remapping,
-                    &mut next_remapper,
-                    true,
-                    push_to_cube_context,
-                    subqueries_sql,
-                )
-                .await?;
+                alias: subq_alias.clone(),
+            });
+        }
 
-                let join_condition_members = &join_condition[0].1;
-                let join_condition = join_condition[0].0.expr.clone();
-                sql = new_sql;
+        let load_request = &ungrouped_scan_node.request;
 
-                let join_sql_expression = {
-                    // TODO this is NOT a proper way to generate member expr here
-                    // TODO Do we even want a full-blown member expression here? or arguments + expr will be enough?
-                    let res = Self::make_member_def(
-                        &AliasedColumn {
-                            expr: join_condition,
-                            alias: "__join__alias__unused".to_string(),
-                        },
-                        join_condition_members,
-                        &ungrouped_scan_node.used_cubes,
-                    )?;
-                    serde_json::json!(res).to_string()
-                };
+        let (dimensions_only_projection, projection_with_measures) = projection
+            .iter()
+            .partition::<Vec<_>, _>(|(_column, used_members)| {
+                used_members
+                    .iter()
+                    .all(|member| meta.find_dimension_with_name(member).is_some())
+            });
 
-                let join_type = match join_type {
-                    JoinType::Left => generator.get_sql_templates().left_join()?,
-                    JoinType::Inner => generator.get_sql_templates().inner_join()?,
-                    _ => {
-                        return Err(CubeError::internal(format!(
-                            "Unsupported join type for join subquery: {join_type:?}"
-                        )))
-                    }
-                };
-
-                // for simple ungrouped-grouped joins everything should already be present in from
-                // so we can just attach this join to the end, no need to look for a proper spot
-                prepared_join_subqueries.push(V1LoadRequestQueryJoinSubquery {
-                    sql: subq_sql.clone(),
-                    on: join_sql_expression,
-                    join_type,
-                    alias: subq_alias.clone(),
-                });
-            }
-
-            let load_request = &ungrouped_scan_node.request;
-
-            let (dimensions_only_projection, projection_with_measures) = projection
-                .iter()
-                .partition::<Vec<_>, _>(|(_column, used_members)| {
-                    used_members
-                        .iter()
-                        .all(|member| meta.find_dimension_with_name(member).is_some())
-                });
-
-            let load_request = V1LoadRequestQuery {
-                measures: Some(
-                    aggregate
-                        .iter()
-                        .map(|(m, used_members)| {
-                            Self::ungrouped_member_def(
-                                m,
-                                used_members,
-                                &ungrouped_scan_node.used_cubes,
-                            )
-                        })
-                        .chain(projection_with_measures.iter().map(|(m, used_members)| {
-                            Self::ungrouped_member_def(
-                                m,
-                                used_members,
-                                &ungrouped_scan_node.used_cubes,
-                            )
-                        }))
-                        .chain(window.iter().map(|(m, used_members)| {
-                            Self::ungrouped_member_def(
-                                m,
-                                used_members,
-                                &ungrouped_scan_node.used_cubes,
-                            )
-                        }))
-                        .chain(
-                            patch_measures.into_iter().map(|(def, cube, alias)| {
-                                Self::patch_measure_expr(def, cube, alias)
-                            }),
-                        )
-                        .collect::<Result<_>>()?,
-                ),
-                dimensions: Some(
-                    group_by
-                        .iter()
-                        .zip(group_descs.iter())
-                        .map(|((m, used_members), t)| {
-                            Self::dimension_member_def(
-                                m,
-                                used_members,
-                                &ungrouped_scan_node.used_cubes,
-                                t,
-                            )
-                        })
-                        .chain(dimensions_only_projection.iter().map(|(m, used_members)| {
-                            Self::ungrouped_member_def(
-                                m,
-                                used_members,
-                                &ungrouped_scan_node.used_cubes,
-                            )
-                        }))
-                        .collect::<Result<_>>()?,
-                ),
-                segments: Some(
-                    filter
-                        .iter()
-                        .map(|(m, used_members)| {
-                            Self::ungrouped_member_def(
-                                m,
-                                used_members,
-                                &ungrouped_scan_node.used_cubes,
-                            )
-                        })
-                        .collect::<Result<_>>()?,
-                ),
-                order: if !order_expr.is_empty() {
-                    Some(
-                        order_expr
-                            .iter()
-                            .map(|o| -> Result<_> { match o {
-                                Expr::Sort {
-                                    expr,
-                                    asc,
-                                    ..
-                                } => {
-                                    let col_name = expr_name(&expr, &schema)?;
-
-                                    let find_column = |exprs: &[Expr], columns: &[(AliasedColumn, HashSet<String>)]| -> Option<AliasedColumn> {
-                                        exprs.iter().zip(columns.iter())
-                                            .find(|(e, _c)| expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false))
-                                            .map(|(_e, c)| c.0.clone())
-                                    };
-
-                                    // TODO handle patch measures collection here
-                                    let aliased_column = find_column(&aggr_expr, &aggregate)
-                                        .or_else(|| find_column(&projection_expr, &projection))
-                                        .or_else(|| find_column(&flat_group_expr, &group_by))
-                                        .ok_or_else(|| {
-                                            DataFusionError::Execution(format!(
-                                                "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
-                                                col_name,
-                                                projection_expr,
-                                                aggr_expr,
-                                                flat_group_expr
-                                            ))
-                                        })?;
-                                    Ok(vec![
-                                        aliased_column.alias,
-                                        if *asc { "asc".to_string() } else { "desc".to_string() },
-                                    ])
-                                }
-                                _ => Err(DataFusionError::Execution(format!(
-                                    "Expected sort expression, found {:?}",
-                                    o
-                                ))),
-                            }})
-                            .collect::<Result<Vec<_>>>()?,
+        let load_request = V1LoadRequestQuery {
+            measures: Some(
+                aggregate
+                    .iter()
+                    .map(|(m, used_members)| {
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
+                    })
+                    .chain(projection_with_measures.iter().map(|(m, used_members)| {
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
+                    }))
+                    .chain(window.iter().map(|(m, used_members)| {
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
+                    }))
+                    .chain(
+                        patch_measures
+                            .into_iter()
+                            .map(|(def, cube, alias)| Self::patch_measure_expr(def, cube, alias)),
                     )
-                } else {
-                    load_request.order.clone()
-                },
-                ungrouped: if let WrappedSelectType::Projection = select_type {
-                    load_request.ungrouped
+                    .collect::<Result<_>>()?,
+            ),
+            dimensions: Some(
+                group_by
+                    .iter()
+                    .zip(group_descs.iter())
+                    .map(|((m, used_members), t)| {
+                        Self::dimension_member_def(
+                            m,
+                            used_members,
+                            &ungrouped_scan_node.used_cubes,
+                            t,
+                        )
+                    })
+                    .chain(dimensions_only_projection.iter().map(|(m, used_members)| {
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
+                    }))
+                    .collect::<Result<_>>()?,
+            ),
+            segments: Some(
+                filter
+                    .iter()
+                    .map(|(m, used_members)| {
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
+                    })
+                    .collect::<Result<_>>()?,
+            ),
+            order: if !order_expr.is_empty() {
+                Some(
+                    order_expr
+                        .iter()
+                        .map(|o| -> Result<_> { match o {
+                            Expr::Sort {
+                                expr,
+                                asc,
+                                ..
+                            } => {
+                                let col_name = expr_name(&expr, &schema)?;
+
+                                let find_column = |exprs: &[Expr], columns: &[(AliasedColumn, HashSet<String>)]| -> Option<AliasedColumn> {
+                                    exprs.iter().zip(columns.iter())
+                                        .find(|(e, _c)| expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false))
+                                        .map(|(_e, c)| c.0.clone())
+                                };
+
+                                // TODO handle patch measures collection here
+                                let aliased_column = find_column(&aggr_expr, &aggregate)
+                                    .or_else(|| find_column(&projection_expr, &projection))
+                                    .or_else(|| find_column(&flat_group_expr, &group_by))
+                                    .ok_or_else(|| {
+                                        DataFusionError::Execution(format!(
+                                            "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
+                                            col_name,
+                                            projection_expr,
+                                            aggr_expr,
+                                            flat_group_expr
+                                        ))
+                                    })?;
+                                Ok(vec![
+                                    aliased_column.alias,
+                                    if *asc { "asc".to_string() } else { "desc".to_string() },
+                                ])
+                            }
+                            _ => Err(DataFusionError::Execution(format!(
+                                "Expected sort expression, found {:?}",
+                                o
+                            ))),
+                        }})
+                        .collect::<Result<Vec<_>>>()?,
+                )
+            } else {
+                load_request.order.clone()
+            },
+            ungrouped: if let WrappedSelectType::Projection = select_type {
+                load_request.ungrouped
+            } else {
+                None
+            },
+            // TODO is it okay to just override limit?
+            limit: if let Some(limit) = limit {
+                Some(limit as i32)
+            } else {
+                load_request.limit
+            },
+            // TODO is it okay to just override offset?
+            offset: if let Some(offset) = offset {
+                Some(offset as i32)
+            } else {
+                load_request.offset
+            },
+
+            // Original scan node can already have consumed filters from Logical plan
+            // It's incorrect to just throw them away
+            filters: ungrouped_scan_node.request.filters.clone(),
+
+            time_dimensions: load_request.time_dimensions.clone(),
+            subquery_joins: (!prepared_join_subqueries.is_empty())
+                .then_some(prepared_join_subqueries),
+        };
+
+        // TODO time dimensions, filters, segments
+
+        let mut meta_with_user = load_request_meta.as_ref().clone();
+        meta_with_user.set_change_user(ungrouped_scan_node.options.change_user.clone());
+        let sql_response = transport
+            .sql(
+                ungrouped_scan_node.span_id.clone(),
+                load_request.clone(),
+                ungrouped_scan_node.auth_context.clone(),
+                meta_with_user,
+                // TODO use aliases or push everything through names?
+                None,
+                Some(sql.values.clone()),
+            )
+            .await?;
+
+        Ok(SqlGenerationResult {
+            data_source,
+            from_alias: alias,
+            sql: sql_response.sql,
+            column_remapping: next_remapper.into_remapping(),
+            request: load_request.clone(),
+        })
+    }
+
+    async fn generate_sql_for_wrapper(
+        meta: &MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
+        can_rename_columns: bool,
+        values: Vec<Option<String>>,
+        parent_data_source: Option<String>,
+        wrapped_select_node: &WrappedSelectNode,
+    ) -> result::Result<SqlGenerationResult, CubeError> {
+        if wrapped_select_node.push_to_cube {
+            return Self::generate_sql_for_push_to_cube_wrapper(
+                meta,
+                transport,
+                load_request_meta,
+                node,
+                can_rename_columns,
+                values,
+                wrapped_select_node,
+            )
+            .await;
+        }
+
+        // This is cloned just to simplify some code in this function, feel free to remove it
+        let WrappedSelectNode {
+            schema: _,
+            select_type: _select_type,
+            projection_expr: _,
+            subqueries: _,
+            group_expr: _,
+            aggr_expr: _,
+            window_expr: _,
+            from,
+            joins: _joins,
+            filter_expr: _,
+            having_expr: _having_expr,
+            limit,
+            offset,
+            order_expr: _,
+            alias,
+            distinct,
+            push_to_cube: _push_to_cube,
+        } = wrapped_select_node.clone();
+
+        let SqlGenerationResult {
+            data_source,
+            from_alias,
+            column_remapping,
+            mut sql,
+            request,
+        } = Self::generate_sql_for_node_rec(
+            meta,
+            transport.clone(),
+            load_request_meta.clone(),
+            from.clone(),
+            true,
+            values.clone(),
+            parent_data_source.clone(),
+        )
+        .await?;
+
+        let subqueries_sql = wrapped_select_node
+            .prepare_subqueries_sql(
+                meta,
+                transport.clone(),
+                load_request_meta.clone(),
+                &mut sql,
+                &data_source,
+            )
+            .await?;
+        let subqueries_sql = &subqueries_sql;
+        let alias = alias.or(from_alias.clone());
+
+        // Drop mut, turn to ref
+        let column_remapping = column_remapping.as_ref();
+
+        let (generator, columns, mut sql, next_remapper) = wrapped_select_node
+            .generate_columns(
+                meta,
+                node,
+                can_rename_columns,
+                sql,
+                &data_source,
+                None,
+                subqueries_sql,
+                column_remapping,
+                alias.clone(),
+            )
+            .await?;
+
+        let GeneratedColumns {
+            projection,
+            group_by,
+            group_descs,
+            flat_group_expr: _,
+            aggregate,
+            patch_measures,
+            filter,
+            window: _,
+            order,
+        } = columns;
+
+        if !patch_measures.is_empty() {
+            return Err(CubeError::internal(format!(
+                "Unexpected patch measures for non-push-to-Cube wrapped select: {patch_measures:?}",
+            )));
+        }
+
+        let resulting_sql = generator
+            .get_sql_templates()
+            .select(
+                sql.sql.to_string(),
+                projection.into_iter().map(|(m, _)| m).collect(),
+                group_by.into_iter().map(|(m, _)| m).collect(),
+                group_descs,
+                aggregate.into_iter().map(|(m, _)| m).collect(),
+                // TODO
+                from_alias.unwrap_or("".to_string()),
+                if !filter.is_empty() {
+                    Some(filter.iter().map(|(f, _)| f.expr.to_string()).join(" AND "))
                 } else {
                     None
                 },
-                // TODO is it okay to just override limit?
-                limit: if let Some(limit) = limit {
-                    Some(limit as i32)
-                } else {
-                    load_request.limit
-                },
-                // TODO is it okay to just override offset?
-                offset: if let Some(offset) = offset {
-                    Some(offset as i32)
-                } else {
-                    load_request.offset
-                },
-
-                // Original scan node can already have consumed filters from Logical plan
-                // It's incorrect to just throw them away
-                filters: ungrouped_scan_node.request.filters.clone(),
-
-                time_dimensions: load_request.time_dimensions.clone(),
-                subquery_joins: (!prepared_join_subqueries.is_empty())
-                    .then_some(prepared_join_subqueries),
-            };
-
-            // TODO time dimensions, filters, segments
-
-            let mut meta_with_user = load_request_meta.as_ref().clone();
-            meta_with_user.set_change_user(ungrouped_scan_node.options.change_user.clone());
-            let sql_response = transport
-                .sql(
-                    ungrouped_scan_node.span_id.clone(),
-                    load_request.clone(),
-                    ungrouped_scan_node.auth_context.clone(),
-                    meta_with_user,
-                    // TODO use aliases or push everything through names?
-                    None,
-                    Some(sql.values.clone()),
-                )
-                .await?;
-
-            Ok(SqlGenerationResult {
-                data_source,
-                from_alias: alias,
-                sql: sql_response.sql,
-                column_remapping: next_remapper.into_remapping(),
-                request: load_request.clone(),
-            })
-        } else {
-            if !patch_measures.is_empty() {
-                return Err(CubeError::internal(format!(
-                    "Unexpected patch measures for non-push-to-Cube wrapped select: {patch_measures:?}",
-                )));
-            }
-
-            let resulting_sql = generator
-                .get_sql_templates()
-                .select(
-                    sql.sql.to_string(),
-                    projection.into_iter().map(|(m, _)| m).collect(),
-                    group_by.into_iter().map(|(m, _)| m).collect(),
-                    group_descs,
-                    aggregate.into_iter().map(|(m, _)| m).collect(),
-                    // TODO
-                    from_alias.unwrap_or("".to_string()),
-                    if !filter.is_empty() {
-                        Some(filter.iter().map(|(f, _)| f.expr.to_string()).join(" AND "))
-                    } else {
-                        None
-                    },
-                    None,
-                    order.into_iter().map(|(m, _)| m).collect(),
-                    limit,
-                    offset,
-                    distinct,
-                )
-                .map_err(|e| {
-                    DataFusionError::Internal(format!(
-                        "Can't generate SQL for wrapped select: {}",
-                        e
-                    ))
-                })?;
-            sql.replace_sql(resulting_sql.clone());
-            Ok(SqlGenerationResult {
-                data_source,
-                from_alias: alias,
-                sql,
-                column_remapping: next_remapper.into_remapping(),
-                request,
-            })
-        }
+                None,
+                order.into_iter().map(|(m, _)| m).collect(),
+                limit,
+                offset,
+                distinct,
+            )
+            .map_err(|e| {
+                DataFusionError::Internal(format!("Can't generate SQL for wrapped select: {}", e))
+            })?;
+        sql.replace_sql(resulting_sql.clone());
+        Ok(SqlGenerationResult {
+            data_source,
+            from_alias: alias,
+            sql,
+            column_remapping: next_remapper.into_remapping(),
+            request,
+        })
     }
 
     pub async fn generate_sql_for_node(
