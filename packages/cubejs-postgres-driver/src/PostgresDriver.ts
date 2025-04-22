@@ -310,7 +310,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         highWaterMark
       });
       const rowStream: QueryStream = await conn.query(queryStream);
-      const fields = await await rowStream.fields();
+      const fields = await rowStream.fields();
 
       return {
         rowStream,
