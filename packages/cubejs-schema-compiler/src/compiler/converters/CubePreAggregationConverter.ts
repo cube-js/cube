@@ -90,7 +90,7 @@ export class CubePreAggregationConverter implements CubeConverterInterface {
     }
 
     const preAggsPair = cubeDefinition.items.find(
-      (pair: Pair) => isScalar(pair.key) && pair.key.value === 'pre_aggregations'
+      (pair: Pair) => isScalar(pair.key) && (pair.key.value === 'pre_aggregations' || pair.key.value === 'preAggregations')
     );
 
     if (preAggsPair) {
