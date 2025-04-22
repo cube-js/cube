@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "1.3.0",
+  "version": "1.3.5",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -40,8 +40,8 @@
     "@babel/standalone": "^7.24",
     "@babel/traverse": "^7.24",
     "@babel/types": "^7.24",
-    "@cubejs-backend/native": "1.3.0",
-    "@cubejs-backend/shared": "1.3.0",
+    "@cubejs-backend/native": "1.3.5",
+    "@cubejs-backend/shared": "1.3.5",
     "antlr4ts": "0.5.0-alpha.4",
     "camelcase": "^6.2.0",
     "cron-parser": "^4.9.0",
@@ -50,7 +50,7 @@
     "joi": "^17.13.3",
     "js-yaml": "^4.1.0",
     "lru-cache": "^11.1.0",
-    "moment-timezone": "^0.5.46",
+    "moment-timezone": "^0.5.48",
     "node-dijkstra": "^2.5.0",
     "ramda": "^0.27.2",
     "syntax-error": "^1.3.0",
@@ -59,8 +59,8 @@
   },
   "devDependencies": {
     "@clickhouse/client": "^1.7.0",
-    "@cubejs-backend/linter": "1.3.0",
-    "@cubejs-backend/query-orchestrator": "1.3.0",
+    "@cubejs-backend/linter": "1.3.5",
+    "@cubejs-backend/query-orchestrator": "1.3.5",
     "@types/babel__code-frame": "^7.0.6",
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.5",
@@ -93,12 +93,14 @@
     "coverageReporters": [
       "text",
       "html",
-      "cobertura"
+      "lcov"
     ],
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [
       "dist/src/**/*.js",
-      "dist/src/**/*.ts"
+      "dist/src/**/*.ts",
+      "!dist/src/parser/GenericSql*.js",
+      "!dist/src/parser/Python3*.js"
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"

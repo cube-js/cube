@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.5](https://github.com/cube-js/cube/compare/v1.3.4...v1.3.5) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+## [1.3.3](https://github.com/cube-js/cube/compare/v1.3.2...v1.3.3) (2025-04-16)
+
+### Features
+
+- **client-core:** Add fetch timeout and network retry options ([#9484](https://github.com/cube-js/cube/issues/9484)) ([b8de1a4](https://github.com/cube-js/cube/commit/b8de1a4869fde24fb98203b6039ec970f8258812))
+
+## [1.3.2](https://github.com/cube-js/cube/compare/v1.3.1...v1.3.2) (2025-04-16)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+## [1.3.1](https://github.com/cube-js/cube/compare/v1.3.0...v1.3.1) (2025-04-14)
+
+**Note:** Version bump only for package @cubejs-client/core
+
 # [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
 
 **Note:** Version bump only for package @cubejs-client/core

@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.5](https://github.com/cube-js/cube/compare/v1.3.4...v1.3.5) (2025-04-17)
+
+### Bug Fixes
+
+- **cubesql:** Disallow mixing measure and dimension filters in a single FilterOp ([#9486](https://github.com/cube-js/cube/issues/9486)) ([858f6d5](https://github.com/cube-js/cube/commit/858f6d55df7f4167c4eccce7b2825f36f74a8820))
+
+## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
+
+### Bug Fixes
+
+- **schema-compiler:** Make RefreshKeySql timezone-aware ([#9479](https://github.com/cube-js/cube/issues/9479)) ([fa2adb9](https://github.com/cube-js/cube/commit/fa2adb92e6fd87223f551b61d75f367dc8ea2524))
+
+## [1.3.3](https://github.com/cube-js/cube/compare/v1.3.2...v1.3.3) (2025-04-16)
+
+### Features
+
+- **client-core:** Add fetch timeout and network retry options ([#9484](https://github.com/cube-js/cube/issues/9484)) ([b8de1a4](https://github.com/cube-js/cube/commit/b8de1a4869fde24fb98203b6039ec970f8258812))
+
+## [1.3.2](https://github.com/cube-js/cube/compare/v1.3.1...v1.3.2) (2025-04-16)
+
+### Bug Fixes
+
+- **schema-compiler:** Allow calling cube functions in yaml python blocks ([#9473](https://github.com/cube-js/cube/issues/9473)) ([61ef9da](https://github.com/cube-js/cube/commit/61ef9da243e8219b8ba3ab7ccbf9f9e0403cba04))
+- **schema-compiler:** Allow escaping of curly braces in yaml models ([#9469](https://github.com/cube-js/cube/issues/9469)) ([0a8cf07](https://github.com/cube-js/cube/commit/0a8cf07f20351a0e591b658f02f243510bf78eae))
+
+### Features
+
+- **duckdb-driver:** Add support for installing and loading DuckDB Community Extensions ([#9169](https://github.com/cube-js/cube/issues/9169)) ([c97f99a](https://github.com/cube-js/cube/commit/c97f99a27f2c95b1a58ea4863dfe0c4227e4c42d))
+
+## [1.3.1](https://github.com/cube-js/cube/compare/v1.3.0...v1.3.1) (2025-04-14)
+
+### Bug Fixes
+
+- **schema-compiler:** Fix incorrect transpilation of yaml models ([#9465](https://github.com/cube-js/cube/issues/9465)) ([e732fa2](https://github.com/cube-js/cube/commit/e732fa2b8ead0ca605512611eb371b94e0238dec))
+
 # [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
 
 ### Bug Fixes

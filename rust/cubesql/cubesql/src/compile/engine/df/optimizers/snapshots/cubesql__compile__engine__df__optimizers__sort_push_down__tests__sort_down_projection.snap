@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/engine/df/optimizers/sort_push_down.rs
+expression: optimize(&plan)
+---
+Projection: #t1.c1 AS n1, #t1.c2, #t1.c3 AS n2, alias=t2
+  Sort: #t1.c2 ASC NULLS LAST, #t1.c3 DESC NULLS FIRST
+    Projection: #t1.c1, #t1.c2, #t1.c3
+      TableScan: t1 projection=None

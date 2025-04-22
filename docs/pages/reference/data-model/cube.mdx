@@ -269,17 +269,33 @@ cubes:
 
 </CodeTabs>
 
-With JavaScript models, you can also reference other cubes' SQL statements for
-code reuse:
+You can also reference other cubes' SQL statements for code reuse using the
+[`{cube.sql()}`][ref-syntax-cube-sql] function:
+
+<CodeTabs>
 
 ```javascript
 cube(`companies`, {
   sql: `
-    SELECT users.company_name, users.company_id
+    SELECT
+      users.company_name,
+      users.company_id
     FROM ${users.sql()} AS users
   `,
 });
 ```
+
+```yaml
+cubes:
+  - name: companies
+    sql:
+      SELECT
+        users.company_name,
+        users.company_id
+      FROM {users.sql()} AS users
+```
+
+</CodeTabs>
 
 It is recommended to prefer the [`sql_table`](#parameters-sql-table) parameter
 over the `sql` parameter for all cubes that are supposed to use queries like
@@ -342,7 +358,7 @@ When applicable, it will be displayed in [Playground][ref-playground] and expose
 to data consumers via [APIs and integrations][ref-apis].
 
 A description can give a hint both to your team and end users, making sure they
-interpret the data correctly. 
+interpret the data correctly.
 
 <CodeTabs>
 
@@ -462,7 +478,8 @@ cubes:
 
 `every` - can be set as an interval with granularities `second`, `minute`,
 `hour`, `day`, and `week` or accept CRON string with some limitations. If you
-set `every` as CRON string, you can use the `timezone` parameter.
+set `every` as CRON string, you can use the `timezone` parameter. It takes
+precedence over the query timezone.
 
 For example:
 
@@ -627,3 +644,4 @@ The `access_policy` parameter is used to configure [data access policies][ref-re
 [ref-ref-joins]: /reference/data-model/joins
 [ref-ref-pre-aggs]: /reference/data-model/pre-aggregations
 [ref-ref-dap]: /reference/data-model/data-access-policies
+[ref-syntax-cube-sql]: /product/data-modeling/syntax#cubesql-function

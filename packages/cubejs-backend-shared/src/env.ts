@@ -1773,6 +1773,19 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return [];
   },
+  duckdbCommunityExtensions: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const extensions = process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_COMMUNITY_EXTENSIONS', dataSource)
+    ];
+    if (extensions) {
+      return extensions.split(',').map(e => e.trim());
+    }
+    return [];
+  },
   /** ***************************************************************
    * Presto Driver                                                  *
    **************************************************************** */
