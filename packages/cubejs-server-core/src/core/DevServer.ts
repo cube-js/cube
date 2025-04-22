@@ -620,7 +620,7 @@ export class DevServer {
       ]);
 
       try {
-        await schemaConverter.generate();
+        await schemaConverter.generate(cubeName);
       } catch (error) {
         return res.status(400).json({ error: (error as Error).message || error });
       }
@@ -629,9 +629,11 @@ export class DevServer {
         ({ cubeName: currentCubeName }) => currentCubeName === cubeName
       );
 
-      if (file) {
-        this.cubejsServer.repository.writeDataSchemaFile(file.fileName, file.source);
+      if (!file) {
+        return res.status(400).json({ error: `The schema file for "${cubeName}" cube was not found or could not be updated. Only JS and non-templated YAML files are supported.` });
       }
+
+      this.cubejsServer.repository.writeDataSchemaFile(file.fileName, file.source);
       return res.json('ok');
     }));
   }

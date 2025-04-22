@@ -36,21 +36,27 @@ export class CubeSchemaConverter {
 
   public constructor(protected fileRepository: any, protected converters: CubeConverterInterface[]) {}
 
-  protected async prepare(): Promise<void> {
+  /**
+   * Parse Schema files from the repository and create a mapping of cube names to schema files.
+   * If optional `cubeName` parameter is passed - only file with asked cube is parsed and stored.
+   * @param cubeName
+   * @protected
+   */
+  protected async prepare(cubeName?: string): Promise<void> {
     this.dataSchemaFiles = await this.fileRepository.dataSchemaFiles();
 
     this.dataSchemaFiles.forEach((schemaFile) => {
       if (schemaFile.fileName.endsWith('.js')) {
-        this.transformJS(schemaFile);
+        this.transformJS(schemaFile, cubeName);
       } else if ((schemaFile.fileName.endsWith('.yml') || schemaFile.fileName.endsWith('.yaml')) && !schemaFile.content.match(JINJA_SYNTAX)) {
         // Jinja-templated data models are not supported in Rollup Designer yet, so we're ignoring them,
         // and if user has chosen the cube from such file - it won't be found during generation.
-        this.transformYaml(schemaFile);
+        this.transformYaml(schemaFile, cubeName);
       }
     });
   }
 
-  protected transformYaml(schemaFile: SchemaFile) {
+  protected transformYaml(schemaFile: SchemaFile, filterCubeName?: string) {
     if (!schemaFile.content.trim()) {
       return;
     }
@@ -84,18 +90,22 @@ export class CubeSchemaConverter {
 
         const cubeName = (cubeNamePair?.value as YAML.Scalar).value;
 
-        if (cubeName && typeof cubeName === 'string') {
+        if (cubeName && typeof cubeName === 'string' && (!filterCubeName || cubeName === filterCubeName)) {
           this.parsedFiles[cubeName] = {
             fileName: schemaFile.fileName,
             yaml: yamlDoc,
             cubeDefinition: cubeNode,
           };
+
+          if (cubeName === filterCubeName) {
+            return;
+          }
         }
       }
     }
   }
 
-  protected transformJS(schemaFile: SchemaFile) {
+  protected transformJS(schemaFile: SchemaFile, filterCubeName?: string) {
     const ast = this.parseJS(schemaFile);
 
     traverse(ast, {
@@ -117,7 +127,7 @@ export class CubeSchemaConverter {
                 throw new Error(`Error parsing ${schemaFile.fileName}`);
               }
 
-              if (t.isObjectExpression(args[1]?.node) && ast != null) {
+              if (t.isObjectExpression(args[1]?.node) && ast != null && (!filterCubeName || cubeName === filterCubeName)) {
                 this.parsedFiles[cubeName] = {
                   fileName: schemaFile.fileName,
                   ast,
@@ -150,8 +160,8 @@ export class CubeSchemaConverter {
     }
   }
 
-  public async generate() {
-    await this.prepare();
+  public async generate(cubeName?: string) {
+    await this.prepare(cubeName);
 
     this.converters.forEach((converter) => {
       converter.convert(this.parsedFiles);
