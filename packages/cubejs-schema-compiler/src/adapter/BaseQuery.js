@@ -24,6 +24,7 @@ import {
   timeSeriesFromCustomInterval
 } from '@cubejs-backend/shared';
 
+import { CubeSymbols } from "../compiler/CubeSymbols";
 import { UserError } from '../compiler/UserError';
 import { SqlParser } from '../parser/SqlParser';
 import { BaseDimension } from './BaseDimension';
@@ -307,16 +308,16 @@ export class BaseQuery {
   }
 
   prebuildJoin() {
-    if (this.useNativeSqlPlanner) {
-      // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
-      // But we need this join for a fallback when using pre-aggregations. So we’ll try to obtain the join but ignore any errors (which may occur if the query is a multi-fact one).
-      try {
-        this.join = this.joinGraph.buildJoin(this.allJoinHints);
-      } catch (e) {
-        // Ignore
-      }
-    } else {
+    try {
+      // TODO allJoinHints should contain join hints form pre-agg
       this.join = this.joinGraph.buildJoin(this.allJoinHints);
+    } catch (e) {
+      if (this.useNativeSqlPlanner) {
+        // Tesseract doesn't require join to be prebuilt and there's a case where single join can't be built for multi-fact query
+        // But we need this join for a fallback when using pre-aggregations. So we’ll try to obtain the join but ignore any errors (which may occur if the query is a multi-fact one).
+      } else {
+        throw e;
+      }
     }
   }
 
@@ -363,6 +364,10 @@ export class BaseQuery {
     return this.collectedCubeNames;
   }
 
+  /**
+   *
+   * @returns {Array<Array<string>>}
+   */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
       this.collectedJoinHints = this.collectJoinHints();
@@ -1203,7 +1208,16 @@ export class BaseQuery {
 
   collectAllMultiStageMembers(allMemberChildren) {
     const allMembers = R.uniq(R.flatten(Object.keys(allMemberChildren).map(k => [k].concat(allMemberChildren[k]))));
-    return R.fromPairs(allMembers.map(m => ([m, this.memberInstanceByPath(m).isMultiStage()])));
+    return R.fromPairs(allMembers.map(m => {
+      // When `m` is coming from `collectAllMemberChildren`, it can contain `granularities.customGranularityName` in path
+      // And it would mess up with join hints detection
+      const trimmedPath = this
+        .cubeEvaluator
+        .parsePathAnyType(m)
+        .slice(0, 2)
+        .join('.');
+      return [m, this.memberInstanceByPath(trimmedPath).isMultiStage()];
+    }));
   }
 
   memberInstanceByPath(m) {
@@ -1398,7 +1412,7 @@ export class BaseQuery {
       // TODO condition should something else instead of rank
       multiStageQuery: !!withQuery.measures.find(d => {
         const { type } = this.newMeasure(d).definition();
-        return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
+        return type === 'rank' || CubeSymbols.isCalculatedMeasureType(type);
       }),
       disableExternalPreAggregations: true,
     };
@@ -1992,7 +2006,7 @@ export class BaseQuery {
     );
 
     if (shouldBuildJoinForMeasureSelect) {
-      const joinHints = this.collectFrom(measures, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      const joinHints = this.collectJoinHintsFromMembers(measures);
       const measuresJoin = this.joinGraph.buildJoin(joinHints);
       if (measuresJoin.multiplicationFactor[keyCubeName]) {
         throw new UserError(
@@ -2046,6 +2060,11 @@ export class BaseQuery {
       (!this.safeEvaluateSymbolContext().ungrouped && this.aggregateSubQueryGroupByClause() || '');
   }
 
+  /**
+   * @param {Array<BaseMeasure>} measures
+   * @param {string} keyCubeName
+   * @returns {boolean}
+   */
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
     // When member expression references view, it would have to collect join hints from view
     // Consider join A->B, as many-to-one, so B is multiplied and A is not, and member expression like SUM(AB_view.dimB)
@@ -2067,7 +2086,11 @@ export class BaseQuery {
         .filter(member => member.definition().ownedByCube);
 
       const cubes = this.collectFrom(nonViewMembers, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
-      const joinHints = this.collectFrom(nonViewMembers, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      // Not using `collectJoinHintsFromMembers([measure])` because it would collect too many join hints from view
+      const joinHints = [
+        measure.joinHint,
+        ...this.collectJoinHintsFromMembers(nonViewMembers),
+      ];
       if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
         const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
@@ -2186,12 +2209,29 @@ export class BaseQuery {
     );
   }
 
+  /**
+   *
+   * @param {boolean} [excludeTimeDimensions=false]
+   * @returns {Array<Array<string>>}
+   */
   collectJoinHints(excludeTimeDimensions = false) {
-    return this.collectFromMembers(
-      excludeTimeDimensions,
-      this.collectJoinHintsFor.bind(this),
-      'collectJoinHintsFor'
-    );
+    const membersToCollectFrom = this.allMembersConcat(excludeTimeDimensions)
+      .concat(this.join ? this.join.joins.map(j => ({
+        getMembers: () => [{
+          path: () => null,
+          cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
+          definition: () => j.join,
+        }]
+      })) : []);
+
+    return this.collectJoinHintsFromMembers(membersToCollectFrom);
+  }
+
+  collectJoinHintsFromMembers(members) {
+    return [
+      ...members.map(m => m.joinHint).filter(h => h?.length > 0),
+      ...this.collectFrom(members, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFromMembers'),
+    ];
   }
 
   collectFromMembers(excludeTimeDimensions, fn, methodName) {
@@ -2206,6 +2246,11 @@ export class BaseQuery {
     return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
+  /**
+   *
+   * @param {boolean} excludeTimeDimensions
+   * @returns {Array<BaseMeasure | BaseDimension | BaseSegment>}
+   */
   allMembersConcat(excludeTimeDimensions) {
     return this.measures
       .concat(this.dimensions)
@@ -2902,7 +2947,7 @@ export class BaseQuery {
           funDef = this.countDistinctApprox(evaluateSql);
         } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
           funDef = `count(distinct ${evaluateSql})`;
-        } else if (BaseQuery.isCalculatedMeasureType(symbol.type)) {
+        } else if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
           // TODO calculated measure type will be ungrouped
           // if (this.multiStageDimensions.length !== this.dimensions.length) {
           //   throw new UserError(`Calculated measure '${measurePath}' uses group_by or reduce_by context modifiers while it isn't allowed`);
@@ -2928,21 +2973,10 @@ export class BaseQuery {
         return this.primaryKeyCount(cubeName, true);
       }
     }
-    if (BaseQuery.isCalculatedMeasureType(symbol.type)) {
+    if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
       return evaluateSql;
     }
     return `${symbol.type}(${evaluateSql})`;
-  }
-
-  static isCalculatedMeasureType(type) {
-    return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
-  }
-
-  /**
-   TODO: support type qualifiers on min and max
-  */
-  static toMemberDataType(type) {
-    return this.isCalculatedMeasureType(type) ? type : 'number';
   }
 
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
@@ -4051,7 +4085,7 @@ export class BaseQuery {
       sqlUtils: {
         convertTz: (field) => field,
       },
-      securityContext: BaseQuery.contextSymbolsProxyFrom({}, allocateParam),
+      securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
     };
   }
 
@@ -4066,41 +4100,7 @@ export class BaseQuery {
   }
 
   contextSymbolsProxy(symbols) {
-    return BaseQuery.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
-  }
-
-  static contextSymbolsProxyFrom(symbols, allocateParam) {
-    return new Proxy(symbols, {
-      get: (target, name) => {
-        const propValue = target[name];
-        const methods = (paramValue) => ({
-          filter: (column) => {
-            if (paramValue) {
-              const value = Array.isArray(paramValue) ?
-                paramValue.map(allocateParam) :
-                allocateParam(paramValue);
-              if (typeof column === 'function') {
-                return column(value);
-              } else {
-                return `${column} = ${value}`;
-              }
-            } else {
-              return '1 = 1';
-            }
-          },
-          requiredFilter: (column) => {
-            if (!paramValue) {
-              throw new UserError(`Filter for ${column} is required`);
-            }
-            return methods(paramValue).filter(column);
-          },
-          unsafeValue: () => paramValue
-        });
-        return methods(target)[name] ||
-          typeof propValue === 'object' && propValue !== null && BaseQuery.contextSymbolsProxyFrom(propValue, allocateParam) ||
-          methods(propValue);
-      }
-    });
+    return CubeSymbols.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
   }
 
   static extractFilterMembers(filter) {
@@ -4306,6 +4306,11 @@ export class BaseQuery {
     });
   }
 
+  /**
+   *
+   * @param {boolean} excludeSegments
+   * @returns {Array<BaseMeasure | BaseDimension | BaseSegment>}
+   */
   flattenAllMembers(excludeSegments = false) {
     return R.flatten(
       this.measures
@@ -4326,9 +4331,14 @@ export class BaseQuery {
     return this.backAliasMembers(this.flattenAllMembers());
   }
 
+  /**
+   *
+   * @param {Array<BaseMeasure | BaseDimension | BaseSegment>} members
+   * @returns {Record<string, string>}
+   */
   backAliasMembers(members) {
     const query = this;
-    return members.map(
+    return Object.fromEntries(members.flatMap(
       member => {
         const collectedMembers = query.evaluateSymbolSqlWithContext(
           () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
@@ -4343,10 +4353,8 @@ export class BaseQuery {
             }
             return !nonAliasSeen;
           })
-          .map(d => (
-            { [query.cubeEvaluator.byPathAnyType(d).aliasMember]: memberPath }
-          )).reduce((a, b) => ({ ...a, ...b }), {});
+          .map(d => [query.cubeEvaluator.byPathAnyType(d).aliasMember, memberPath]);
       }
-    ).reduce((a, b) => ({ ...a, ...b }), {});
+    ));
   }
 }

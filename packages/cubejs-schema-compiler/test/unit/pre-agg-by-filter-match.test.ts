@@ -1,6 +1,7 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareCube } from './PrepareCompiler';
 import { PreAggregations } from '../../src/adapter/PreAggregations';
+import { PreAggregationReferences } from '../../src/compiler/CubeEvaluator';
 
 describe('Pre Aggregation by filter match tests', () => {
   function getCube(cube) {
@@ -21,7 +22,7 @@ describe('Pre Aggregation by filter match tests', () => {
     return prepareCube('cube', cube);
   }
 
-  function testPreAggregationMatch(
+  async function testPreAggregationMatch(
     expecting: boolean,
     cubedimensions: Array<String>,
     preAggdimensions: Array<String>,
@@ -30,7 +31,7 @@ describe('Pre Aggregation by filter match tests', () => {
     preAggSegments: Array<String> | undefined = undefined,
     querySegments: Array<String> | undefined = undefined
   ) {
-    const aaa: any = {
+    const testPreAgg = {
       type: 'rollup',
       measures: ['cube.uniqueField'],
       dimensions: preAggdimensions.map(d => `cube.${d}`),
@@ -40,47 +41,47 @@ describe('Pre Aggregation by filter match tests', () => {
       partitionGranularity: 'month',
     };
 
-    const cube: any = {
+    const cube = {
       segments: {
         qqq: { sql: 'id > 10000' }
       },
-      dimensions: {},
-      preAggregations: { aaa }
+      dimensions: Object.fromEntries(cubedimensions.map(d => [d, { sql: d, type: 'string' }])),
+      preAggregations: { testPreAgg }
     };
-
-    cubedimensions.forEach(d => {
-      // @ts-ignore
-      cube.dimensions[d] = { sql: d, type: 'string' };
-    });
 
     const { compiler, joinGraph, cubeEvaluator } = getCube(cube);
 
-    if (aaa.segments) aaa.dimensions = aaa.dimensions.concat(aaa.segments);
-    aaa.sortedDimensions = aaa.dimensions;
-    aaa.sortedDimensions.sort();
-    aaa.sortedTimeDimensions = [[aaa.timeDimension, aaa.granularity]];
+    const refs: PreAggregationReferences = {
+      dimensions: testPreAgg.segments ? testPreAgg.dimensions.concat(testPreAgg.segments) : testPreAgg.dimensions,
+      measures: testPreAgg.measures,
+      timeDimensions: [{
+        dimension: testPreAgg.timeDimension,
+        granularity: testPreAgg.granularity,
+      }],
+      rollups: [],
+    };
 
-    return compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-        dimensions: querydimensions.map(d => `cube.${d}`),
-        measures: ['cube.uniqueField'],
-        timeDimensions: [{
-          dimension: 'cube.created',
-          granularity: 'day',
-          dateRange: { from: '2017-01-01', to: '2017-01-30' }
-        }],
-        timezone: 'America/Los_Angeles',
-        filters,
-        segments: querySegments?.map(s => `cube.${s}`),
-      });
+    await compiler.compile();
 
-      const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
-        PreAggregations.transformQueryToCanUseForm(query),
-        aaa
-      );
-
-      expect(usePreAggregation).toEqual(expecting);
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      dimensions: querydimensions.map(d => `cube.${d}`),
+      measures: ['cube.uniqueField'],
+      timeDimensions: [{
+        dimension: 'cube.created',
+        granularity: 'day',
+        dateRange: { from: '2017-01-01', to: '2017-01-30' }
+      }],
+      timezone: 'America/Los_Angeles',
+      filters,
+      segments: querySegments?.map(s => `cube.${s}`),
     });
+
+    const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
+      PreAggregations.transformQueryToCanUseForm(query),
+      refs
+    );
+
+    expect(usePreAggregation).toEqual(expecting);
   }
 
   it('1 Dimension, 1 Filter', () => testPreAggregationMatch(
@@ -147,7 +148,7 @@ describe('Pre Aggregation by filter match tests', () => {
       },
     ]
   ));
-  
+
   it('1 Dimension, 1 Filter, gt', () => testPreAggregationMatch(
     false,
     ['type'],

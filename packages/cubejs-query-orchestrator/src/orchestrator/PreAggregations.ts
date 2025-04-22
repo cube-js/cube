@@ -590,7 +590,7 @@ export class PreAggregations {
 
     return {
       ...queryBody,
-      preAggregations: expandedPreAggregations.reduce((a, b) => a.concat(b), []),
+      preAggregations: expandedPreAggregations.flat(),
       groupedPartitionPreAggregations: expandedPreAggregations
     };
   }

@@ -1,5 +1,6 @@
 import type { BaseQuery } from './BaseQuery';
 import type { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
+import { CubeSymbols } from "../compiler/CubeSymbols";
 
 export class BaseDimension {
   public readonly expression: any;
@@ -9,6 +10,8 @@ export class BaseDimension {
   public readonly expressionName: string | undefined;
 
   public readonly isMemberExpression: boolean = false;
+
+  public readonly joinHint: Array<string> = [];
 
   public constructor(
     protected readonly query: BaseQuery,
@@ -20,6 +23,14 @@ export class BaseDimension {
       // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = dimension.expressionName || `${dimension.cubeName}.${dimension.name}`;
       this.isMemberExpression = !!dimension.definition;
+    } else {
+      // TODO move this `as` to static types
+      const dimensionPath = dimension as string | null;
+      if (dimensionPath !== null) {
+        const { path, joinHint } = CubeSymbols.joinHintFromPath(dimensionPath);
+        this.dimension = path;
+        this.joinHint = joinHint;
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 import R from 'ramda';
 import { FROM_PARTITION_RANGE, getEnv, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
+import { CubeSymbols } from "../compiler/CubeSymbols";
 import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
@@ -169,13 +170,18 @@ export class PreAggregations {
         const timeDimensionsReference =
           foundPreAggregation.preAggregation.rollupLambdaTimeDimensionsReference ||
           foundPreAggregation.references.timeDimensions;
+        const timeDimensionReference = timeDimensionsReference[0];
 
-        if (td.dimension === timeDimensionsReference[0].dimension) {
+        // timeDimensionsReference[*].dimension can contain full join path, so we should trim it
+        // TODO check full join path match here
+        const timeDimensionReferenceDimension = CubeSymbols.joinHintFromPath(timeDimensionReference.dimension).path;
+
+        if (td.dimension === timeDimensionReferenceDimension) {
           return true;
         }
 
         // Handling for views
-        return td.dimension === allBackAliasMembers[timeDimensionsReference[0].dimension];
+        return td.dimension === allBackAliasMembers[timeDimensionReferenceDimension];
       });
 
     const filters = preAggregation.partitionGranularity && this.query.filters.filter(td => {
@@ -424,6 +430,13 @@ export class PreAggregations {
     };
   }
 
+  /**
+   *
+   * @param query
+   * @param members
+   * @param {Map<string, Array<string>>} cubeToJoinPrefix
+   * @returns {Array<string>}
+   */
   static ownedMembers(query, members) {
     return R.pipe(R.uniq, R.sortBy(R.identity))(
       query
@@ -481,10 +494,41 @@ export class PreAggregations {
    * Returns function to determine whether pre-aggregation can be used or not
    * for specified query, or its value for `refs` if specified.
    * @param {Object} transformedQuery transformed query
-   * @param {Object?} refs pre-aggs reference
+   * @param {PreAggregationReferences?} refs pre-aggs reference
    * @returns {function(preagg: Object): boolean}
    */
   static canUsePreAggregationForTransformedQueryFn(transformedQuery, refs) {
+    // TODO this needs to check not only members list, but their join paths as well:
+    //  query can have same members as pre-agg, but different calculated join path
+    //  `refs` will come from preagg references, and would contain full join paths
+
+    // TODO remove this in favor of matching with join path
+    /**
+     * @param {PreAggregationReferences} references
+     * @returns {PreAggregationReferences}
+     */
+    function trimmedReferences(references) {
+      const timeDimensionsTrimmed = references
+        .timeDimensions
+        .map(td => ({
+          ...td,
+          dimension: CubeSymbols.joinHintFromPath(td.dimension).path,
+        }));
+      const measuresTrimmed = references
+        .measures
+        .map(m => CubeSymbols.joinHintFromPath(m).path);
+      const dimensionsTrimmed = references
+        .dimensions
+        .map(d => CubeSymbols.joinHintFromPath(d).path);
+
+      return {
+        ...references,
+        dimensions: dimensionsTrimmed,
+        measures: measuresTrimmed,
+        timeDimensions: timeDimensionsTrimmed,
+      };
+    }
+
     /**
      * Returns an array of 2-elements arrays with the dimension and granularity
      * sorted by the concatenated dimension + granularity key.
@@ -524,18 +568,19 @@ export class PreAggregations {
 
     /**
      * Determine whether pre-aggregation can be used or not.
-     * @param {*} references
+     * @param {PreAggregationReferences} references
      * @returns {boolean}
      */
     const canUsePreAggregationNotAdditive = (references) => {
-      const refTimeDimensions =
-        backAlias(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
+      // TODO remove this in favor of matching with join path
+      const referencesTrimmed = trimmedReferences(references);
+
+      const refTimeDimensions = backAlias(sortTimeDimensions(referencesTrimmed.timeDimensions));
       const qryTimeDimensions = references.allowNonStrictDateRangeMatch
         ? transformedQuery.timeDimensions
         : transformedQuery.sortedTimeDimensions;
-      const backAliasMeasures = backAlias(references.measures);
-      const backAliasSortedDimensions = backAlias(references.sortedDimensions || references.dimensions);
-      const backAliasDimensions = backAlias(references.dimensions);
+      const backAliasMeasures = backAlias(referencesTrimmed.measures);
+      const backAliasDimensions = backAlias(referencesTrimmed.dimensions);
       return ((
         transformedQuery.hasNoTimeDimensionsWithoutGranularity
       ) && (
@@ -547,10 +592,10 @@ export class PreAggregations {
         R.equals(transformedQuery.timeDimensions, refTimeDimensions)
       ) && (
         filterDimensionsSingleValueEqual &&
-        references.dimensions.length === filterDimensionsSingleValueEqual.size &&
+        referencesTrimmed.dimensions.length === filterDimensionsSingleValueEqual.size &&
         R.all(d => filterDimensionsSingleValueEqual.has(d), backAliasDimensions) ||
         transformedQuery.allFiltersWithinSelectedDimensions &&
-        R.equals(backAliasSortedDimensions, transformedQuery.sortedDimensions)
+        R.equals(backAliasDimensions, transformedQuery.sortedDimensions)
       ) && (
         R.all(m => backAliasMeasures.indexOf(m) !== -1, transformedQuery.measures) ||
         // TODO do we need backAlias here?
@@ -571,16 +616,15 @@ export class PreAggregations {
 
     /**
      * Determine whether time dimensions match to the window granularity or not.
-     * @param {*} references
+     * @param {PreAggregationReferences} references
      * @returns {boolean}
      */
     const windowGranularityMatches = (references) => {
       if (!transformedQuery.windowGranularity) {
         return true;
       }
-      const sortedTimeDimensions =
-        references.sortedTimeDimensions ||
-        sortTimeDimensions(references.timeDimensions);
+      // Beware that sortedTimeDimensions contain full join paths
+      const sortedTimeDimensions = sortTimeDimensions(references.timeDimensions);
 
       return sortedTimeDimensions
         .map(td => expandGranularity(td[0], transformedQuery.windowGranularity))
@@ -610,7 +654,7 @@ export class PreAggregations {
     /**
      * Determine whether pre-aggregation can be used or not.
      * TODO: revisit cumulative leaf measure matches.
-     * @param {*} references
+     * @param {PreAggregationReferences} references
      * @returns {boolean}
      */
     const canUsePreAggregationLeafMeasureAdditive = (references) => {
@@ -626,11 +670,14 @@ export class PreAggregations {
         ? transformedQuery.ownedTimeDimensionsAsIs.map(expandTimeDimension)
         : transformedQuery.ownedTimeDimensionsWithRollupGranularity.map(expandTimeDimension);
 
+      // TODO remove this in favor of matching with join path
+      const referencesTrimmed = trimmedReferences(references);
+
       const dimensionsMatch = (dimensions, doBackAlias) => R.all(
         d => (
           doBackAlias ?
-            backAlias(references.sortedDimensions || references.dimensions) :
-            (references.sortedDimensions || references.dimensions)
+            backAlias(referencesTrimmed.dimensions) :
+            (referencesTrimmed.dimensions)
         ).indexOf(d) !== -1,
         dimensions
       );
@@ -647,13 +694,13 @@ export class PreAggregations {
         )
       )(
         doBackAlias ?
-          backAlias(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions)) :
-          (references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions))
+          backAlias(sortTimeDimensions(referencesTrimmed.timeDimensions)) :
+          (sortTimeDimensions(referencesTrimmed.timeDimensions))
       );
 
       if (transformedQuery.ungrouped) {
         const allReferenceCubes = R.pipe(R.map(m => (m.dimension || m).split('.')[0]), R.uniq, R.sortBy(R.identity))(
-          references.measures.concat(references.dimensions).concat(references.timeDimensions)
+          referencesTrimmed.measures.concat(referencesTrimmed.dimensions).concat(referencesTrimmed.timeDimensions)
         );
         if (
           !R.equals(transformedQuery.sortedAllCubeNames, allReferenceCubes) ||
@@ -665,12 +712,12 @@ export class PreAggregations {
         }
       }
 
-      const backAliasMeasures = backAlias(references.measures);
+      const backAliasMeasures = backAlias(referencesTrimmed.measures);
       return ((
         windowGranularityMatches(references)
       ) && (
         R.all(
-          m => references.measures.indexOf(m) !== -1,
+          m => referencesTrimmed.measures.indexOf(m) !== -1,
           transformedQuery.leafMeasures,
         ) || R.all(
           m => backAliasMeasures.indexOf(m) !== -1,
@@ -1061,22 +1108,35 @@ export class PreAggregations {
   }
 
   rollupPreAggregationQuery(cube, aggregation) {
+    // `this.evaluateAllReferences` will retain not only members, but their join path as well, and pass join hints
+    // to subquery. Otherwise, members in subquery would regenerate new join tree from clean state,
+    // and it can be different from expected by join path in pre-aggregation declaration
     const references = this.evaluateAllReferences(cube, aggregation);
     const cubeQuery = this.query.newSubQueryForCube(cube, {});
-    return this.query.newSubQueryForCube(
-      cube,
-      {
-        rowLimit: null,
-        offset: null,
-        measures: references.measures,
-        dimensions: references.dimensions,
-        timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
-        preAggregationQuery: true,
-        useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
-        ungrouped: cubeQuery.preAggregationAllowUngroupingWithPrimaryKey(cube, aggregation) &&
-          !!references.dimensions.find(d => this.query.cubeEvaluator.dimensionByPath(d).primaryKey)
-      }
-    );
+    return this.query.newSubQueryForCube(cube, {
+      rowLimit: null,
+      offset: null,
+      measures: references.measures,
+      dimensions: references.dimensions,
+      timeDimensions: this.mergePartitionTimeDimensions(
+        references,
+        aggregation.partitionTimeDimensions
+      ),
+      preAggregationQuery: true,
+      useOriginalSqlPreAggregationsInPreAggregation:
+        aggregation.useOriginalSqlPreAggregations,
+      ungrouped:
+        cubeQuery.preAggregationAllowUngroupingWithPrimaryKey(
+          cube,
+          aggregation
+        ) &&
+        !!references.dimensions.find((d) => {
+          // `d` can contain full join path, so we should trim it
+          // TODO check full join path match here
+          const trimmedDimension = CubeSymbols.joinHintFromPath(d).path;
+          return this.query.cubeEvaluator.dimensionByPath(trimmedDimension).primaryKey;
+        }),
+    });
   }
 
   autoRollupPreAggregationQuery(cube, aggregation) {
@@ -1101,6 +1161,7 @@ export class PreAggregations {
     }
     return aggregation.timeDimensions.map(d => {
       const toMerge = partitionTimeDimensions.find(
+        // Both qd and d comes from PreaggregationReferences
         qd => qd.dimension === d.dimension
       );
       return toMerge ? { ...d, dateRange: toMerge.dateRange, boundaryDateRange: toMerge.boundaryDateRange } : d;
@@ -1119,7 +1180,18 @@ export class PreAggregations {
       .toLowerCase();
   }
 
+  /**
+   *
+   * @param {string} cube
+   * @param aggregation
+   * @param {string} [preAggregationName]
+   * @returns {PreAggregationReferences}
+   */
   evaluateAllReferences(cube, aggregation, preAggregationName) {
+    // TODO build a join tree for all references, so they would always include full join path
+    //  Even for preaggregation references without join path
+    //  It is necessary to be able to match query and preaggregation based on full join tree
+
     const evaluateReferences = () => {
       const references = this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
       if (aggregation.type === 'rollupLambda') {
