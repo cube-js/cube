@@ -625,12 +625,13 @@ export class DevServer {
         return res.status(400).json({ error: (error as Error).message || error });
       }
 
-      schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
-        if (currentCubeName === cubeName) {
-          this.cubejsServer.repository.writeDataSchemaFile(fileName, source);
-        }
-      });
+      const file = schemaConverter.getSourceFiles().find(
+        ({ cubeName: currentCubeName }) => currentCubeName === cubeName
+      );
 
+      if (file) {
+        this.cubejsServer.repository.writeDataSchemaFile(file.fileName, file.source);
+      }
       return res.json('ok');
     }));
   }
