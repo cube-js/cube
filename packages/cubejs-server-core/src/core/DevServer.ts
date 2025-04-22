@@ -611,6 +611,12 @@ export class DevServer {
     app.post('/playground/schema/pre-aggregation', catchErrors(async (req: Request, res: Response) => {
       const { cubeName, preAggregationName, code } = req.body;
 
+      /**
+       * Important note:
+       * JS code for pre-agg includes the content of the pre-aggregation object
+       * without name, which is passed as preAggregationName.
+       * While yaml code for pre-agg includes whole yaml object including name.
+       */
       const schemaConverter = new CubeSchemaConverter(this.cubejsServer.repository, [
         new CubePreAggregationConverter({
           cubeName,
