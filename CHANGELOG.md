@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.6](https://github.com/cube-js/cube/compare/v1.3.5...v1.3.6) (2025-04-22)
+
+### Bug Fixes
+
+- **cubesql:** Fix SortPushDown pushing sort through joins ([#9464](https://github.com/cube-js/cube/issues/9464)) ([fed08e1](https://github.com/cube-js/cube/commit/fed08e1384cf6f666970472f5bd67feb5c86462e)), closes [/github.com/apache/datafusion/blob/7.0.0/datafusion/src/physical_plan/hash_join.rs#L282-L284](https://github.com//github.com/apache/datafusion/blob/7.0.0/datafusion/src/physical_plan/hash_join.rs/issues/L282-L284) [/github.com/apache/datafusion/blob/7.0.0/datafusion/src/physical_plan/cross_join.rs#L141-L143](https://github.com//github.com/apache/datafusion/blob/7.0.0/datafusion/src/physical_plan/cross_join.rs/issues/L141-L143)
+- **cubesql:** Realias expressions when normalizing columns ([#9498](https://github.com/cube-js/cube/issues/9498)) ([32f9b79](https://github.com/cube-js/cube/commit/32f9b7993c97fc294ec92b54a587f27e4e29dda0))
+- **schema-compiler:** Use join paths from pre-aggregation declaration instead of building join tree from scratch ([#9471](https://github.com/cube-js/cube/issues/9471)) ([cd7e9fd](https://github.com/cube-js/cube/commit/cd7e9fddca8fa1c31335adbba6e79c4032841cbb))
+
+### Features
+
+- **mssql-driver:** Return numeric result values as strings ([#9485](https://github.com/cube-js/cube/issues/9485)) ([52da601](https://github.com/cube-js/cube/commit/52da6010792985b610087040733f6da650369c1a))
+
 ## [1.3.5](https://github.com/cube-js/cube/compare/v1.3.4...v1.3.5) (2025-04-17)
 
 ### Bug Fixes

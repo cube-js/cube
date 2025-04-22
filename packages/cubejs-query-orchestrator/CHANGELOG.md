@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.6](https://github.com/cube-js/cube/compare/v1.3.5...v1.3.6) (2025-04-22)
+
+### Bug Fixes
+
+- **schema-compiler:** Use join paths from pre-aggregation declaration instead of building join tree from scratch ([#9471](https://github.com/cube-js/cube/issues/9471)) ([cd7e9fd](https://github.com/cube-js/cube/commit/cd7e9fddca8fa1c31335adbba6e79c4032841cbb))
+
 ## [1.3.5](https://github.com/cube-js/cube/compare/v1.3.4...v1.3.5) (2025-04-17)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator
