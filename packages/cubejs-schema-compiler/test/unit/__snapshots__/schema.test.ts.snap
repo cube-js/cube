@@ -1509,6 +1509,7 @@ Object {
   },
   "name": "orders_view",
   "preAggregations": Object {},
+  "rawCubes": [Function],
   "rawFolders": [Function],
   "segments": Object {},
 }
@@ -1573,4 +1574,164 @@ Object {
   "title": undefined,
   "type": "number",
 }
+`;
+
+exports[`Schema Testing Views views extends views 1`] = `
+Object {
+  "renamed_orders_id": Object {
+    "aliasMember": "orders.id",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+  "renamed_orders_number": Object {
+    "aliasMember": "orders.number",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+  "renamed_orders_status": Object {
+    "aliasMember": "orders.status",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+  "users_age": Object {
+    "aliasMember": "users.age",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+  "users_city": Object {
+    "aliasMember": "users.city",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+  "users_gender": Object {
+    "aliasMember": "users.gender",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+  "users_state": Object {
+    "aliasMember": "users.state",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 2`] = `
+Object {
+  "renamed_orders_count": Object {
+    "aggType": "count",
+    "aliasMember": "orders.count",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 3`] = `
+Object {
+  "renamed_orders_count": Object {
+    "aggType": "count",
+    "aliasMember": "orders.count",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "number",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 4`] = `
+Object {
+  "renamed_orders_orders_hierarchy": Object {
+    "levels": [Function],
+    "title": undefined,
+  },
+  "renamed_orders_some_other_hierarchy": Object {
+    "levels": [Function],
+    "title": "Some other hierarchy",
+  },
+}
+`;
+
+exports[`Schema Testing Views views extends views 5`] = `
+Array [
+  Object {
+    "includes": Array [
+      Object {
+        "memberPath": "users.age",
+        "name": "users_age",
+        "type": "dimensions",
+      },
+      Object {
+        "memberPath": "users.state",
+        "name": "users_state",
+        "type": "dimensions",
+      },
+      Object {
+        "memberPath": "orders.status",
+        "name": "renamed_orders_status",
+        "type": "dimensions",
+      },
+    ],
+    "name": "folder1",
+  },
+  Object {
+    "includes": Array [
+      Object {
+        "memberPath": "users.city",
+        "name": "users_city",
+        "type": "dimensions",
+      },
+      Object {
+        "memberPath": "users.gender",
+        "name": "users_gender",
+        "type": "dimensions",
+      },
+    ],
+    "name": "folder2",
+  },
+]
 `;
