@@ -720,6 +720,42 @@ impl CubeScanWrapperNode {
         }
     }
 
+    async fn prepare_subqueries_sql(
+        meta: &MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        sql: &mut SqlQuery,
+        data_source: &Option<String>,
+        subqueries: impl IntoIterator<Item = Arc<LogicalPlan>>,
+    ) -> result::Result<Arc<HashMap<String, String>>, CubeError> {
+        let mut subqueries_sql = HashMap::new();
+        for subquery in subqueries.into_iter() {
+            let SqlGenerationResult {
+                data_source: _,
+                from_alias: _,
+                column_remapping: _,
+                sql: subquery_sql,
+                request: _,
+            } = Self::generate_sql_for_node_rec(
+                meta,
+                transport.clone(),
+                load_request_meta.clone(),
+                subquery.clone(),
+                true,
+                sql.values.clone(),
+                data_source.clone(),
+            )
+            .await?;
+
+            let (sql_string, new_values) = subquery_sql.unpack();
+            sql.extend_values(new_values);
+            // TODO why only field 0 is a key?
+            let field = subquery.schema().field(0);
+            subqueries_sql.insert(field.qualified_name(), sql_string);
+        }
+        Ok(Arc::new(subqueries_sql))
+    }
+
     async fn generate_sql_for_cube_scan(
         meta: &MetaContext,
         node: &CubeScanNode,
@@ -1001,32 +1037,15 @@ impl CubeScanWrapperNode {
             .await?
         };
 
-        let mut subqueries_sql = HashMap::new();
-        for subquery in subqueries.iter() {
-            let SqlGenerationResult {
-                data_source: _,
-                from_alias: _,
-                column_remapping: _,
-                sql: subquery_sql,
-                request: _,
-            } = Self::generate_sql_for_node_rec(
-                meta,
-                transport.clone(),
-                load_request_meta.clone(),
-                subquery.clone(),
-                true,
-                sql.values.clone(),
-                data_source.clone(),
-            )
-            .await?;
-
-            let (sql_string, new_values) = subquery_sql.unpack();
-            sql.extend_values(new_values);
-            // TODO why only field 0 is a key?
-            let field = subquery.schema().field(0);
-            subqueries_sql.insert(field.qualified_name(), sql_string);
-        }
-        let subqueries_sql = Arc::new(subqueries_sql);
+        let subqueries_sql = Self::prepare_subqueries_sql(
+            meta,
+            transport.clone(),
+            load_request_meta.clone(),
+            &mut sql,
+            &data_source,
+            subqueries,
+        )
+        .await?;
         let alias = alias.or(from_alias.clone());
         let mut next_remapper = Remapper::new(alias.clone(), can_rename_columns);
 
