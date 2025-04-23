@@ -747,6 +747,7 @@ const baseSchema = {
   extends: Joi.func(),
   allDefinitions: Joi.func(), // Helpers function for extending
   rawFolders: Joi.func(), // Helpers function for extending
+  rawCubes: Joi.func(), // Helpers function for extending
   title: Joi.string(),
   sqlAlias: Joi.string(),
   dataSource: Joi.string(),
