@@ -908,148 +908,6 @@ impl CubeScanWrapperNode {
         });
     }
 
-    async fn generate_sql_for_wrapper(
-        meta: &MetaContext,
-        transport: Arc<dyn TransportService>,
-        load_request_meta: Arc<LoadRequestMeta>,
-        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
-        can_rename_columns: bool,
-        values: Vec<Option<String>>,
-        parent_data_source: Option<String>,
-        wrapped_select_node: &WrappedSelectNode,
-    ) -> result::Result<SqlGenerationResult, CubeError> {
-        if wrapped_select_node.push_to_cube {
-            return wrapped_select_node
-                .generate_sql_for_push_to_cube(
-                    meta,
-                    transport,
-                    load_request_meta,
-                    node,
-                    can_rename_columns,
-                    values,
-                )
-                .await;
-        }
-
-        // This is cloned just to simplify some code in this function, feel free to remove it
-        let WrappedSelectNode {
-            schema: _,
-            select_type: _select_type,
-            projection_expr: _,
-            subqueries: _,
-            group_expr: _,
-            aggr_expr: _,
-            window_expr: _,
-            from,
-            joins: _joins,
-            filter_expr: _,
-            having_expr: _having_expr,
-            limit,
-            offset,
-            order_expr: _,
-            alias,
-            distinct,
-            push_to_cube: _push_to_cube,
-        } = wrapped_select_node.clone();
-
-        let SqlGenerationResult {
-            data_source,
-            from_alias,
-            column_remapping,
-            mut sql,
-            request,
-        } = Self::generate_sql_for_node_rec(
-            meta,
-            transport.clone(),
-            load_request_meta.clone(),
-            from.clone(),
-            true,
-            values.clone(),
-            parent_data_source.clone(),
-        )
-        .await?;
-
-        let subqueries_sql = wrapped_select_node
-            .prepare_subqueries_sql(
-                meta,
-                transport.clone(),
-                load_request_meta.clone(),
-                &mut sql,
-                &data_source,
-            )
-            .await?;
-        let subqueries_sql = &subqueries_sql;
-        let alias = alias.or(from_alias.clone());
-
-        // Drop mut, turn to ref
-        let column_remapping = column_remapping.as_ref();
-
-        let (generator, columns, mut sql, next_remapper) = wrapped_select_node
-            .generate_columns(
-                meta,
-                node,
-                can_rename_columns,
-                sql,
-                &data_source,
-                None,
-                subqueries_sql,
-                column_remapping,
-                alias.clone(),
-            )
-            .await?;
-
-        let GeneratedColumns {
-            projection,
-            group_by,
-            group_descs,
-            flat_group_expr: _,
-            aggregate,
-            patch_measures,
-            filter,
-            window: _,
-            order,
-        } = columns;
-
-        if !patch_measures.is_empty() {
-            return Err(CubeError::internal(format!(
-                "Unexpected patch measures for non-push-to-Cube wrapped select: {patch_measures:?}",
-            )));
-        }
-
-        let resulting_sql = generator
-            .get_sql_templates()
-            .select(
-                sql.sql.to_string(),
-                projection.into_iter().map(|(m, _)| m).collect(),
-                group_by.into_iter().map(|(m, _)| m).collect(),
-                group_descs,
-                aggregate.into_iter().map(|(m, _)| m).collect(),
-                // TODO
-                from_alias.unwrap_or("".to_string()),
-                if !filter.is_empty() {
-                    Some(filter.iter().map(|(f, _)| f.expr.to_string()).join(" AND "))
-                } else {
-                    None
-                },
-                None,
-                order.into_iter().map(|(m, _)| m).collect(),
-                limit,
-                offset,
-                distinct,
-            )
-            .map_err(|e| {
-                DataFusionError::Internal(format!("Can't generate SQL for wrapped select: {}", e))
-            })?;
-        sql.replace_sql(resulting_sql.clone());
-        Ok(SqlGenerationResult {
-            data_source,
-            from_alias: alias,
-            sql,
-            column_remapping: next_remapper.into_remapping(),
-            request,
-        })
-    }
-
     pub async fn generate_sql_for_node(
         meta: &MetaContext,
         transport: Arc<dyn TransportService>,
@@ -1093,17 +951,17 @@ impl CubeScanWrapperNode {
                 } else if let Some(wrapped_select_node) =
                     node_any.downcast_ref::<WrappedSelectNode>()
                 {
-                    Self::generate_sql_for_wrapper(
-                        meta,
-                        transport,
-                        load_request_meta,
-                        node,
-                        can_rename_columns,
-                        values,
-                        parent_data_source,
-                        wrapped_select_node,
-                    )
-                    .await
+                    wrapped_select_node
+                        .generate_sql(
+                            meta,
+                            transport,
+                            load_request_meta,
+                            node,
+                            can_rename_columns,
+                            values,
+                            parent_data_source,
+                        )
+                        .await
                 } else {
                     return Err(CubeError::internal(format!(
                         "Can't generate SQL for node: {node:?}"
@@ -3581,6 +3439,148 @@ impl WrappedSelectNode {
             sql: sql_response.sql,
             column_remapping: next_remapper.into_remapping(),
             request: load_request.clone(),
+        })
+    }
+
+    async fn generate_sql(
+        &self,
+        meta: &MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
+        can_rename_columns: bool,
+        values: Vec<Option<String>>,
+        parent_data_source: Option<String>,
+    ) -> result::Result<SqlGenerationResult, CubeError> {
+        if self.push_to_cube {
+            return self
+                .generate_sql_for_push_to_cube(
+                    meta,
+                    transport,
+                    load_request_meta,
+                    node,
+                    can_rename_columns,
+                    values,
+                )
+                .await;
+        }
+
+        // This is cloned just to simplify some code in this function, feel free to remove it
+        let WrappedSelectNode {
+            schema: _,
+            select_type: _select_type,
+            projection_expr: _,
+            subqueries: _,
+            group_expr: _,
+            aggr_expr: _,
+            window_expr: _,
+            from,
+            joins: _joins,
+            filter_expr: _,
+            having_expr: _having_expr,
+            limit,
+            offset,
+            order_expr: _,
+            alias,
+            distinct,
+            push_to_cube: _push_to_cube,
+        } = self.clone();
+
+        let SqlGenerationResult {
+            data_source,
+            from_alias,
+            column_remapping,
+            mut sql,
+            request,
+        } = CubeScanWrapperNode::generate_sql_for_node_rec(
+            meta,
+            transport.clone(),
+            load_request_meta.clone(),
+            from.clone(),
+            true,
+            values.clone(),
+            parent_data_source.clone(),
+        )
+        .await?;
+
+        let subqueries_sql = self
+            .prepare_subqueries_sql(
+                meta,
+                transport.clone(),
+                load_request_meta.clone(),
+                &mut sql,
+                &data_source,
+            )
+            .await?;
+        let subqueries_sql = &subqueries_sql;
+        let alias = alias.or(from_alias.clone());
+
+        // Drop mut, turn to ref
+        let column_remapping = column_remapping.as_ref();
+
+        let (generator, columns, mut sql, next_remapper) = self
+            .generate_columns(
+                meta,
+                node,
+                can_rename_columns,
+                sql,
+                &data_source,
+                None,
+                subqueries_sql,
+                column_remapping,
+                alias.clone(),
+            )
+            .await?;
+
+        let GeneratedColumns {
+            projection,
+            group_by,
+            group_descs,
+            flat_group_expr: _,
+            aggregate,
+            patch_measures,
+            filter,
+            window: _,
+            order,
+        } = columns;
+
+        if !patch_measures.is_empty() {
+            return Err(CubeError::internal(format!(
+                "Unexpected patch measures for non-push-to-Cube wrapped select: {patch_measures:?}",
+            )));
+        }
+
+        let resulting_sql = generator
+            .get_sql_templates()
+            .select(
+                sql.sql.to_string(),
+                projection.into_iter().map(|(m, _)| m).collect(),
+                group_by.into_iter().map(|(m, _)| m).collect(),
+                group_descs,
+                aggregate.into_iter().map(|(m, _)| m).collect(),
+                // TODO
+                from_alias.unwrap_or("".to_string()),
+                if !filter.is_empty() {
+                    Some(filter.iter().map(|(f, _)| f.expr.to_string()).join(" AND "))
+                } else {
+                    None
+                },
+                None,
+                order.into_iter().map(|(m, _)| m).collect(),
+                limit,
+                offset,
+                distinct,
+            )
+            .map_err(|e| {
+                DataFusionError::Internal(format!("Can't generate SQL for wrapped select: {}", e))
+            })?;
+        sql.replace_sql(resulting_sql.clone());
+        Ok(SqlGenerationResult {
+            data_source,
+            from_alias: alias,
+            sql,
+            column_remapping: next_remapper.into_remapping(),
+            request,
         })
     }
 }
