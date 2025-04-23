@@ -71,6 +71,15 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubePythonModel> {
+        let sys_path = py.import("sys")?.getattr("path")?.downcast::<PyList>()?;
+
+        let config_dir = Path::new(&model_file_name)
+            .parent()
+            .unwrap_or_else(|| Path::new("."));
+        let config_dir_str = config_dir.to_str().unwrap_or(".");
+
+        sys_path.insert(0, PyString::new(py, config_dir_str))?;
+
         let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
