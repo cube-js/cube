@@ -28,6 +28,18 @@ async function loadConfigurationFile(fileName: string) {
   return config;
 }
 
+const nativeInstance = new native.NativeInstance();
+
+suite('Python Models', () => {
+  test('models import', async () => {
+    const fullFileName = path.join(process.cwd(), 'test', 'globals.py');
+    const content = await fs.readFile(fullFileName, 'utf8');
+
+    // Just checking it won't fail
+    await nativeInstance.loadPythonContext(fullFileName, content);
+  });
+});
+
 suite('Python Config', () => {
   let config: PyConfiguration;
 
