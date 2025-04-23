@@ -1007,195 +1007,6 @@ impl CubeScanWrapperNode {
         .boxed()
     }
 
-    async fn get_patch_measure<'l>(
-        sql_query: SqlQuery,
-        sql_generator: Arc<dyn SqlGenerator>,
-        expr: &'l Expr,
-        push_to_cube_context: Option<&'l PushToCubeContext<'_>>,
-        subqueries: &'l HashMap<String, String>,
-    ) -> result::Result<(Option<(PatchMeasureDef, String)>, SqlQuery), CubeError> {
-        match expr {
-            Expr::Alias(inner, _alias) => {
-                Self::get_patch_measure_rec(
-                    sql_query,
-                    sql_generator,
-                    inner,
-                    push_to_cube_context,
-                    subqueries,
-                )
-                .await
-            }
-            Expr::AggregateUDF { fun, args } => {
-                if fun.name != PATCH_MEASURE_UDAF_NAME {
-                    return Ok((None, sql_query));
-                }
-
-                let Some(PushToCubeContext {
-                    ungrouped_scan_node,
-                    ..
-                }) = push_to_cube_context
-                else {
-                    return Err(CubeError::internal(format!(
-                        "Unexpected UDAF expression without push-to-Cube context: {}",
-                        fun.name
-                    )));
-                };
-
-                let (measure, aggregation, filter) = match args.as_slice() {
-                    [measure, aggregation, filter] => (measure, aggregation, filter),
-                    _ => {
-                        return Err(CubeError::internal(format!(
-                            "Unexpected number arguments for UDAF: {}, {args:?}",
-                            fun.name
-                        )))
-                    }
-                };
-
-                let Expr::Column(measure_column) = measure else {
-                    return Err(CubeError::internal(format!(
-                        "First argument should be column expression: {}",
-                        fun.name
-                    )));
-                };
-
-                let aggregation = match aggregation {
-                    Expr::Literal(ScalarValue::Utf8(Some(aggregation))) => Some(aggregation),
-                    Expr::Literal(ScalarValue::Null) => None,
-                    _ => {
-                        return Err(CubeError::internal(format!(
-                            "Second argument should be Utf8 literal expression: {}",
-                            fun.name
-                        )));
-                    }
-                };
-
-                let (filters, sql_query) = match filter {
-                    Expr::Literal(ScalarValue::Null) => (vec![], sql_query),
-                    _ => {
-                        let mut used_members = HashSet::new();
-                        let (filter, sql_query) = Self::generate_sql_for_expr(
-                            sql_query,
-                            sql_generator.clone(),
-                            filter.clone(),
-                            push_to_cube_context,
-                            subqueries,
-                            Some(&mut used_members),
-                        )
-                        .await?;
-
-                        let used_cubes = Self::prepare_used_cubes(&used_members);
-
-                        (
-                            vec![SqlFunctionExpr {
-                                cube_params: used_cubes,
-                                sql: filter,
-                            }],
-                            sql_query,
-                        )
-                    }
-                };
-
-                let member =
-                    Self::find_member_in_ungrouped_scan(ungrouped_scan_node, measure_column)?;
-
-                let MemberField::Member(member) = member else {
-                    return Err(CubeError::internal(format!(
-                        "First argument should reference regular member, not literal: {}",
-                        fun.name
-                    )));
-                };
-                let member = &member.member;
-
-                let (cube, _member) = member.split_once('.').ok_or_else(|| {
-                    CubeError::internal(format!("Can't parse cube name from member {member}",))
-                })?;
-
-                Ok((
-                    Some((
-                        PatchMeasureDef {
-                            source_measure: member.to_string(),
-                            replace_aggregation_type: aggregation.cloned(),
-                            add_filters: filters,
-                        },
-                        cube.to_string(),
-                    )),
-                    sql_query,
-                ))
-            }
-            _ => Ok((None, sql_query)),
-        }
-    }
-
-    fn get_patch_measure_rec<'l>(
-        sql_query: SqlQuery,
-        sql_generator: Arc<dyn SqlGenerator>,
-        expr: &'l Expr,
-        push_to_cube_context: Option<&'l PushToCubeContext<'_>>,
-        subqueries: &'l HashMap<String, String>,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = result::Result<
-                        (Option<(PatchMeasureDef, String)>, SqlQuery),
-                        CubeError,
-                    >,
-                > + Send
-                + 'l,
-        >,
-    > {
-        Self::get_patch_measure(
-            sql_query,
-            sql_generator,
-            expr,
-            push_to_cube_context,
-            subqueries,
-        )
-        .boxed()
-    }
-
-    async fn extract_patch_measures(
-        schema: &DFSchema,
-        exprs: impl IntoIterator<Item = Expr>,
-        mut sql_query: SqlQuery,
-        sql_generator: Arc<dyn SqlGenerator>,
-        column_remapping: Option<&ColumnRemapping>,
-        next_remapper: &mut Remapper,
-        can_rename_columns: bool,
-        push_to_cube_context: Option<&PushToCubeContext<'_>>,
-        subqueries: &HashMap<String, String>,
-    ) -> result::Result<(Vec<(PatchMeasureDef, String, String)>, Vec<Expr>, SqlQuery), CubeError>
-    {
-        let mut patches = vec![];
-        let mut other = vec![];
-
-        for original_expr in exprs {
-            let (patch_def, sql_query_next) = Self::get_patch_measure(
-                sql_query,
-                sql_generator.clone(),
-                &original_expr,
-                push_to_cube_context,
-                subqueries,
-            )
-            .await?;
-            sql_query = sql_query_next;
-            if let Some((patch_def, cube)) = patch_def {
-                let (_expr, alias) = Self::remap_column_expression(
-                    schema,
-                    &original_expr,
-                    column_remapping,
-                    next_remapper,
-                    can_rename_columns,
-                )?;
-
-                patches.push((patch_def, cube, alias));
-            } else {
-                other.push(original_expr);
-            }
-        }
-
-        Ok((patches, other, sql_query))
-    }
-
     fn remap_column_expression(
         schema: &DFSchema,
         original_expr: &Expr,
@@ -1264,80 +1075,6 @@ impl CubeScanWrapperNode {
             ));
         }
         Ok((aliased_columns, sql))
-    }
-
-    fn prepare_used_cubes<'m>(used_members: impl IntoIterator<Item = &'m String>) -> Vec<String> {
-        used_members
-            .into_iter()
-            .flat_map(|member| member.split_once('.'))
-            .map(|(cube, _rest)| cube)
-            .unique()
-            .map(|cube| cube.to_string())
-            .collect::<Vec<_>>()
-    }
-
-    fn make_member_def<'m>(
-        column: &AliasedColumn,
-        used_members: impl IntoIterator<Item = &'m String>,
-        ungrouped_scan_cubes: &Vec<String>,
-    ) -> Result<UngroupedMemberDef> {
-        let used_cubes = Self::prepare_used_cubes(used_members);
-        let cube_name = used_cubes
-            .first()
-            .or_else(|| ungrouped_scan_cubes.first())
-            .ok_or_else(|| {
-                DataFusionError::Internal(format!(
-                    "Can't generate SQL for column without cubes: {:?}",
-                    column
-                ))
-            })?
-            .clone();
-
-        let res = UngroupedMemberDef {
-            cube_name,
-            alias: column.alias.clone(),
-            expr: UngroupedMemberExpr::SqlFunction(SqlFunctionExpr {
-                cube_params: used_cubes,
-                sql: column.expr.clone(),
-            }),
-            grouping_set: None,
-        };
-        Ok(res)
-    }
-
-    fn ungrouped_member_def<'m>(
-        column: &AliasedColumn,
-        used_members: impl IntoIterator<Item = &'m String>,
-        ungrouped_scan_cubes: &Vec<String>,
-    ) -> Result<String> {
-        let res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
-        Ok(serde_json::json!(res).to_string())
-    }
-
-    fn dimension_member_def<'m>(
-        column: &AliasedColumn,
-        used_members: impl IntoIterator<Item = &'m String>,
-        ungrouped_scan_cubes: &Vec<String>,
-        grouping_type: &Option<GroupingSetDesc>,
-    ) -> Result<String> {
-        let mut res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
-        res.grouping_set = grouping_type.clone();
-        Ok(serde_json::json!(res).to_string())
-    }
-
-    fn patch_measure_expr(
-        def: PatchMeasureDef,
-        cube_name: String,
-        alias: String,
-    ) -> Result<String> {
-        let res = UngroupedMemberDef {
-            cube_name,
-            alias,
-            expr: UngroupedMemberExpr::PatchMeasure(def),
-            grouping_set: None,
-        };
-
-        Ok(serde_json::json!(res).to_string())
     }
 
     fn generate_sql_cast_expr(
@@ -2817,6 +2554,197 @@ impl WrappedSelectNode {
         Ok(subqueries_sql)
     }
 
+    async fn get_patch_measure<'l>(
+        sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: &'l Expr,
+        push_to_cube_context: Option<&'l PushToCubeContext<'_>>,
+        subqueries: &'l HashMap<String, String>,
+    ) -> result::Result<(Option<(PatchMeasureDef, String)>, SqlQuery), CubeError> {
+        match expr {
+            Expr::Alias(inner, _alias) => {
+                Self::get_patch_measure_rec(
+                    sql_query,
+                    sql_generator,
+                    inner,
+                    push_to_cube_context,
+                    subqueries,
+                )
+                .await
+            }
+            Expr::AggregateUDF { fun, args } => {
+                if fun.name != PATCH_MEASURE_UDAF_NAME {
+                    return Ok((None, sql_query));
+                }
+
+                let Some(PushToCubeContext {
+                    ungrouped_scan_node,
+                    ..
+                }) = push_to_cube_context
+                else {
+                    return Err(CubeError::internal(format!(
+                        "Unexpected UDAF expression without push-to-Cube context: {}",
+                        fun.name
+                    )));
+                };
+
+                let (measure, aggregation, filter) = match args.as_slice() {
+                    [measure, aggregation, filter] => (measure, aggregation, filter),
+                    _ => {
+                        return Err(CubeError::internal(format!(
+                            "Unexpected number arguments for UDAF: {}, {args:?}",
+                            fun.name
+                        )))
+                    }
+                };
+
+                let Expr::Column(measure_column) = measure else {
+                    return Err(CubeError::internal(format!(
+                        "First argument should be column expression: {}",
+                        fun.name
+                    )));
+                };
+
+                let aggregation = match aggregation {
+                    Expr::Literal(ScalarValue::Utf8(Some(aggregation))) => Some(aggregation),
+                    Expr::Literal(ScalarValue::Null) => None,
+                    _ => {
+                        return Err(CubeError::internal(format!(
+                            "Second argument should be Utf8 literal expression: {}",
+                            fun.name
+                        )));
+                    }
+                };
+
+                let (filters, sql_query) = match filter {
+                    Expr::Literal(ScalarValue::Null) => (vec![], sql_query),
+                    _ => {
+                        let mut used_members = HashSet::new();
+                        let (filter, sql_query) = CubeScanWrapperNode::generate_sql_for_expr(
+                            sql_query,
+                            sql_generator.clone(),
+                            filter.clone(),
+                            push_to_cube_context,
+                            subqueries,
+                            Some(&mut used_members),
+                        )
+                        .await?;
+
+                        let used_cubes = Self::prepare_used_cubes(&used_members);
+
+                        (
+                            vec![SqlFunctionExpr {
+                                cube_params: used_cubes,
+                                sql: filter,
+                            }],
+                            sql_query,
+                        )
+                    }
+                };
+
+                let member = CubeScanWrapperNode::find_member_in_ungrouped_scan(
+                    ungrouped_scan_node,
+                    measure_column,
+                )?;
+
+                let MemberField::Member(member) = member else {
+                    return Err(CubeError::internal(format!(
+                        "First argument should reference regular member, not literal: {}",
+                        fun.name
+                    )));
+                };
+                let member = &member.member;
+
+                let (cube, _member) = member.split_once('.').ok_or_else(|| {
+                    CubeError::internal(format!("Can't parse cube name from member {member}",))
+                })?;
+
+                Ok((
+                    Some((
+                        PatchMeasureDef {
+                            source_measure: member.to_string(),
+                            replace_aggregation_type: aggregation.cloned(),
+                            add_filters: filters,
+                        },
+                        cube.to_string(),
+                    )),
+                    sql_query,
+                ))
+            }
+            _ => Ok((None, sql_query)),
+        }
+    }
+
+    fn get_patch_measure_rec<'l>(
+        sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        expr: &'l Expr,
+        push_to_cube_context: Option<&'l PushToCubeContext<'_>>,
+        subqueries: &'l HashMap<String, String>,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = result::Result<
+                        (Option<(PatchMeasureDef, String)>, SqlQuery),
+                        CubeError,
+                    >,
+                > + Send
+                + 'l,
+        >,
+    > {
+        Self::get_patch_measure(
+            sql_query,
+            sql_generator,
+            expr,
+            push_to_cube_context,
+            subqueries,
+        )
+        .boxed()
+    }
+
+    async fn extract_patch_measures(
+        schema: &DFSchema,
+        exprs: impl IntoIterator<Item = Expr>,
+        mut sql_query: SqlQuery,
+        sql_generator: Arc<dyn SqlGenerator>,
+        column_remapping: Option<&ColumnRemapping>,
+        next_remapper: &mut Remapper,
+        can_rename_columns: bool,
+        push_to_cube_context: Option<&PushToCubeContext<'_>>,
+        subqueries: &HashMap<String, String>,
+    ) -> result::Result<(Vec<(PatchMeasureDef, String, String)>, Vec<Expr>, SqlQuery), CubeError>
+    {
+        let mut patches = vec![];
+        let mut other = vec![];
+
+        for original_expr in exprs {
+            let (patch_def, sql_query_next) = Self::get_patch_measure(
+                sql_query,
+                sql_generator.clone(),
+                &original_expr,
+                push_to_cube_context,
+                subqueries,
+            )
+            .await?;
+            sql_query = sql_query_next;
+            if let Some((patch_def, cube)) = patch_def {
+                let (_expr, alias) = CubeScanWrapperNode::remap_column_expression(
+                    schema,
+                    &original_expr,
+                    column_remapping,
+                    next_remapper,
+                    can_rename_columns,
+                )?;
+
+                patches.push((patch_def, cube, alias));
+            } else {
+                other.push(original_expr);
+            }
+        }
+
+        Ok((patches, other, sql_query))
+    }
+
     async fn generate_columns(
         &self,
         meta: &MetaContext,
@@ -2885,7 +2813,7 @@ impl WrappedSelectNode {
         .await?;
         let group_descs = extract_group_type_from_groupping_set(&self.group_expr)?;
 
-        let (patch_measures, aggr_expr, sql) = CubeScanWrapperNode::extract_patch_measures(
+        let (patch_measures, aggr_expr, sql) = Self::extract_patch_measures(
             schema.as_ref(),
             self.aggr_expr.iter().cloned(),
             sql,
@@ -2966,6 +2894,80 @@ impl WrappedSelectNode {
             sql,
             next_remapper,
         ))
+    }
+
+    fn prepare_used_cubes<'m>(used_members: impl IntoIterator<Item = &'m String>) -> Vec<String> {
+        used_members
+            .into_iter()
+            .flat_map(|member| member.split_once('.'))
+            .map(|(cube, _rest)| cube)
+            .unique()
+            .map(|cube| cube.to_string())
+            .collect::<Vec<_>>()
+    }
+
+    fn make_member_def<'m>(
+        column: &AliasedColumn,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
+    ) -> Result<UngroupedMemberDef> {
+        let used_cubes = Self::prepare_used_cubes(used_members);
+        let cube_name = used_cubes
+            .first()
+            .or_else(|| ungrouped_scan_cubes.first())
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "Can't generate SQL for column without cubes: {:?}",
+                    column
+                ))
+            })?
+            .clone();
+
+        let res = UngroupedMemberDef {
+            cube_name,
+            alias: column.alias.clone(),
+            expr: UngroupedMemberExpr::SqlFunction(SqlFunctionExpr {
+                cube_params: used_cubes,
+                sql: column.expr.clone(),
+            }),
+            grouping_set: None,
+        };
+        Ok(res)
+    }
+
+    fn ungrouped_member_def<'m>(
+        column: &AliasedColumn,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
+    ) -> Result<String> {
+        let res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
+        Ok(serde_json::json!(res).to_string())
+    }
+
+    fn dimension_member_def<'m>(
+        column: &AliasedColumn,
+        used_members: impl IntoIterator<Item = &'m String>,
+        ungrouped_scan_cubes: &Vec<String>,
+        grouping_type: &Option<GroupingSetDesc>,
+    ) -> Result<String> {
+        let mut res = Self::make_member_def(column, used_members, ungrouped_scan_cubes)?;
+        res.grouping_set = grouping_type.clone();
+        Ok(serde_json::json!(res).to_string())
+    }
+
+    fn patch_measure_expr(
+        def: PatchMeasureDef,
+        cube_name: String,
+        alias: String,
+    ) -> Result<String> {
+        let res = UngroupedMemberDef {
+            cube_name,
+            alias,
+            expr: UngroupedMemberExpr::PatchMeasure(def),
+            grouping_set: None,
+        };
+
+        Ok(serde_json::json!(res).to_string())
     }
 
     async fn generate_sql_for_push_to_cube(
@@ -3220,7 +3222,7 @@ impl WrappedSelectNode {
             let join_sql_expression = {
                 // TODO this is NOT a proper way to generate member expr here
                 // TODO Do we even want a full-blown member expression here? or arguments + expr will be enough?
-                let res = CubeScanWrapperNode::make_member_def(
+                let res = Self::make_member_def(
                     &AliasedColumn {
                         expr: join_condition,
                         alias: "__join__alias__unused".to_string(),
@@ -3266,29 +3268,19 @@ impl WrappedSelectNode {
                 aggregate
                     .iter()
                     .map(|(m, used_members)| {
-                        CubeScanWrapperNode::ungrouped_member_def(
-                            m,
-                            used_members,
-                            &ungrouped_scan_node.used_cubes,
-                        )
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
                     })
                     .chain(projection_with_measures.iter().map(|(m, used_members)| {
-                        CubeScanWrapperNode::ungrouped_member_def(
-                            m,
-                            used_members,
-                            &ungrouped_scan_node.used_cubes,
-                        )
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
                     }))
                     .chain(window.iter().map(|(m, used_members)| {
-                        CubeScanWrapperNode::ungrouped_member_def(
-                            m,
-                            used_members,
-                            &ungrouped_scan_node.used_cubes,
-                        )
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
                     }))
-                    .chain(patch_measures.into_iter().map(|(def, cube, alias)| {
-                        CubeScanWrapperNode::patch_measure_expr(def, cube, alias)
-                    }))
+                    .chain(
+                        patch_measures
+                            .into_iter()
+                            .map(|(def, cube, alias)| Self::patch_measure_expr(def, cube, alias)),
+                    )
                     .collect::<Result<_>>()?,
             ),
             dimensions: Some(
@@ -3296,7 +3288,7 @@ impl WrappedSelectNode {
                     .iter()
                     .zip(group_descs.iter())
                     .map(|((m, used_members), t)| {
-                        CubeScanWrapperNode::dimension_member_def(
+                        Self::dimension_member_def(
                             m,
                             used_members,
                             &ungrouped_scan_node.used_cubes,
@@ -3304,11 +3296,7 @@ impl WrappedSelectNode {
                         )
                     })
                     .chain(dimensions_only_projection.iter().map(|(m, used_members)| {
-                        CubeScanWrapperNode::ungrouped_member_def(
-                            m,
-                            used_members,
-                            &ungrouped_scan_node.used_cubes,
-                        )
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
                     }))
                     .collect::<Result<_>>()?,
             ),
@@ -3316,11 +3304,7 @@ impl WrappedSelectNode {
                 filter
                     .iter()
                     .map(|(m, used_members)| {
-                        CubeScanWrapperNode::ungrouped_member_def(
-                            m,
-                            used_members,
-                            &ungrouped_scan_node.used_cubes,
-                        )
+                        Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
                     })
                     .collect::<Result<_>>()?,
             ),
