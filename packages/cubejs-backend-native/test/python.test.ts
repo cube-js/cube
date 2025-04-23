@@ -9,16 +9,17 @@ const suite = native.isFallbackBuild() ? xdescribe : describe;
 const darwinSuite = process.platform === 'darwin' && !native.isFallbackBuild() ? describe : xdescribe;
 
 async function loadConfigurationFile(fileName: string) {
-  const content = await fs.readFile(path.join(process.cwd(), 'test', fileName), 'utf8');
+  const fullFileName = path.join(process.cwd(), 'test', fileName);
+  const content = await fs.readFile(fullFileName, 'utf8');
   console.log('content', {
     content,
-    fileName
+    fileName: fullFileName
   });
 
   const config = await native.pythonLoadConfig(
     content,
     {
-      fileName
+      fileName: fullFileName
     }
   );
 
