@@ -727,7 +727,7 @@ impl CubeScanWrapperNode {
         sql: &mut SqlQuery,
         data_source: &Option<String>,
         subqueries: impl IntoIterator<Item = Arc<LogicalPlan>>,
-    ) -> result::Result<Arc<HashMap<String, String>>, CubeError> {
+    ) -> result::Result<HashMap<String, String>, CubeError> {
         let mut subqueries_sql = HashMap::new();
         for subquery in subqueries.into_iter() {
             let SqlGenerationResult {
@@ -753,7 +753,7 @@ impl CubeScanWrapperNode {
             let field = subquery.schema().field(0);
             subqueries_sql.insert(field.qualified_name(), sql_string);
         }
-        Ok(Arc::new(subqueries_sql))
+        Ok(subqueries_sql)
     }
 
     async fn generate_sql_for_cube_scan(
@@ -882,7 +882,7 @@ impl CubeScanWrapperNode {
                     generator.clone(),
                     expr,
                     None,
-                    Arc::new(HashMap::new()),
+                    &HashMap::new(),
                     None,
                 )
                 .await?;
@@ -1046,6 +1046,7 @@ impl CubeScanWrapperNode {
             subqueries,
         )
         .await?;
+        let subqueries_sql = &subqueries_sql;
         let alias = alias.or(from_alias.clone());
         let mut next_remapper = Remapper::new(alias.clone(), can_rename_columns);
 
@@ -1184,7 +1185,7 @@ impl CubeScanWrapperNode {
             &mut next_remapper,
             can_rename_columns,
             push_to_cube_context,
-            subqueries_sql.clone(),
+            subqueries_sql,
         )
         .await?;
         let flat_group_expr = extract_exprlist_from_groupping_set(&group_expr);
@@ -1197,7 +1198,7 @@ impl CubeScanWrapperNode {
             &mut next_remapper,
             can_rename_columns,
             push_to_cube_context,
-            subqueries_sql.clone(),
+            subqueries_sql,
         )
         .await?;
         let group_descs = extract_group_type_from_groupping_set(&group_expr)?;
@@ -1211,7 +1212,7 @@ impl CubeScanWrapperNode {
             &mut next_remapper,
             can_rename_columns,
             push_to_cube_context,
-            subqueries_sql.clone(),
+            subqueries_sql,
         )
         .await?;
 
@@ -1224,7 +1225,7 @@ impl CubeScanWrapperNode {
             &mut next_remapper,
             can_rename_columns,
             push_to_cube_context,
-            subqueries_sql.clone(),
+            subqueries_sql,
         )
         .await?;
 
@@ -1237,7 +1238,7 @@ impl CubeScanWrapperNode {
             &mut next_remapper,
             can_rename_columns,
             push_to_cube_context,
-            subqueries_sql.clone(),
+            subqueries_sql,
         )
         .await?;
 
@@ -1250,7 +1251,7 @@ impl CubeScanWrapperNode {
             &mut next_remapper,
             can_rename_columns,
             push_to_cube_context,
-            subqueries_sql.clone(),
+            subqueries_sql,
         )
         .await?;
 
@@ -1263,7 +1264,7 @@ impl CubeScanWrapperNode {
             &mut next_remapper,
             can_rename_columns,
             push_to_cube_context,
-            subqueries_sql.clone(),
+            subqueries_sql,
         )
         .await?;
         if let Some(PushToCubeContext {
@@ -1290,7 +1291,7 @@ impl CubeScanWrapperNode {
                     &mut next_remapper,
                     true,
                     push_to_cube_context,
-                    subqueries_sql.clone(),
+                    subqueries_sql,
                 )
                 .await?;
 
@@ -1652,7 +1653,7 @@ impl CubeScanWrapperNode {
         sql_generator: Arc<dyn SqlGenerator>,
         expr: &'l Expr,
         push_to_cube_context: Option<&'l PushToCubeContext<'_>>,
-        subqueries: Arc<HashMap<String, String>>,
+        subqueries: &'l HashMap<String, String>,
     ) -> result::Result<(Option<(PatchMeasureDef, String)>, SqlQuery), CubeError> {
         match expr {
             Expr::Alias(inner, _alias) => {
@@ -1718,7 +1719,7 @@ impl CubeScanWrapperNode {
                             sql_generator.clone(),
                             filter.clone(),
                             push_to_cube_context,
-                            subqueries.clone(),
+                            subqueries,
                             Some(&mut used_members),
                         )
                         .await?;
@@ -1771,7 +1772,7 @@ impl CubeScanWrapperNode {
         sql_generator: Arc<dyn SqlGenerator>,
         expr: &'l Expr,
         push_to_cube_context: Option<&'l PushToCubeContext<'_>>,
-        subqueries: Arc<HashMap<String, String>>,
+        subqueries: &'l HashMap<String, String>,
     ) -> Pin<
         Box<
             dyn Future<
@@ -1802,7 +1803,7 @@ impl CubeScanWrapperNode {
         next_remapper: &mut Remapper,
         can_rename_columns: bool,
         push_to_cube_context: Option<&PushToCubeContext<'_>>,
-        subqueries: Arc<HashMap<String, String>>,
+        subqueries: &HashMap<String, String>,
     ) -> result::Result<(Vec<(PatchMeasureDef, String, String)>, Vec<Expr>, SqlQuery), CubeError>
     {
         let mut patches = vec![];
@@ -1814,7 +1815,7 @@ impl CubeScanWrapperNode {
                 sql_generator.clone(),
                 &original_expr,
                 push_to_cube_context,
-                subqueries.clone(),
+                subqueries,
             )
             .await?;
             sql_query = sql_query_next;
@@ -1869,7 +1870,7 @@ impl CubeScanWrapperNode {
         next_remapper: &mut Remapper,
         can_rename_columns: bool,
         push_to_cube_context: Option<&PushToCubeContext<'_>>,
-        subqueries: Arc<HashMap<String, String>>,
+        subqueries: &HashMap<String, String>,
     ) -> result::Result<(Vec<(AliasedColumn, HashSet<String>)>, SqlQuery), CubeError> {
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
@@ -1887,7 +1888,7 @@ impl CubeScanWrapperNode {
                 generator.clone(),
                 expr.clone(),
                 push_to_cube_context,
-                subqueries.clone(),
+                subqueries,
                 Some(&mut used_members),
             )
             .await?;
@@ -2029,7 +2030,7 @@ impl CubeScanWrapperNode {
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
         push_to_cube_context: Option<&'ctx PushToCubeContext<'ctx>>,
-        subqueries: Arc<HashMap<String, String>>,
+        subqueries: &HashMap<String, String>,
         mut used_members: Option<&'ctx mut HashSet<String>>,
     ) -> Result<(String, SqlQuery)> {
         match expr {
@@ -2039,7 +2040,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2077,7 +2078,7 @@ impl CubeScanWrapperNode {
                                 sql_generator.clone(),
                                 expr,
                                 None,
-                                subqueries.clone(),
+                                subqueries,
                                 used_members,
                             )
                             .await;
@@ -2099,7 +2100,7 @@ impl CubeScanWrapperNode {
                                 sql_generator.clone(),
                                 Expr::Literal(value.clone()),
                                 push_to_cube_context,
-                                subqueries.clone(),
+                                subqueries,
                                 used_members,
                             )
                             .await
@@ -2150,7 +2151,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *left,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members.as_deref_mut(),
                 )
                 .await?;
@@ -2159,7 +2160,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *right,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2181,7 +2182,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *like.expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members.as_deref_mut(),
                 )
                 .await?;
@@ -2190,7 +2191,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *like.pattern,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members.as_deref_mut(),
                 )
                 .await?;
@@ -2201,7 +2202,7 @@ impl CubeScanWrapperNode {
                             sql_generator.clone(),
                             Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                             push_to_cube_context,
-                            subqueries.clone(),
+                            subqueries,
                             used_members,
                         )
                         .await?;
@@ -2226,7 +2227,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *ilike.expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members.as_deref_mut(),
                 )
                 .await?;
@@ -2235,7 +2236,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *ilike.pattern,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members.as_deref_mut(),
                 )
                 .await?;
@@ -2246,7 +2247,7 @@ impl CubeScanWrapperNode {
                             sql_generator.clone(),
                             Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
                             push_to_cube_context,
-                            subqueries.clone(),
+                            subqueries,
                             used_members,
                         )
                         .await?;
@@ -2272,7 +2273,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2294,7 +2295,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2315,7 +2316,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2336,7 +2337,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2361,7 +2362,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         *expr,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -2377,7 +2378,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         *when,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -2386,7 +2387,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         *then,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -2399,7 +2400,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         *else_expr,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members,
                     )
                     .await?;
@@ -2422,7 +2423,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2441,7 +2442,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -2842,7 +2843,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         arg,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -2879,7 +2880,7 @@ impl CubeScanWrapperNode {
                                     sql_generator.clone(),
                                     args[1].clone(),
                                     push_to_cube_context,
-                                    subqueries.clone(),
+                                    subqueries,
                                     used_members,
                                 )
                                 .await?;
@@ -2922,7 +2923,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         arg,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -2962,7 +2963,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         arg,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -2991,7 +2992,7 @@ impl CubeScanWrapperNode {
                             sql_generator.clone(),
                             expr,
                             push_to_cube_context,
-                            subqueries.clone(),
+                            subqueries,
                             used_members.as_deref_mut(),
                         )
                         .await?;
@@ -3019,7 +3020,7 @@ impl CubeScanWrapperNode {
                             sql_generator.clone(),
                             expr,
                             push_to_cube_context,
-                            subqueries.clone(),
+                            subqueries,
                             used_members.as_deref_mut(),
                         )
                         .await?;
@@ -3060,7 +3061,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         arg,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -3074,7 +3075,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         arg,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -3088,7 +3089,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         arg,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -3173,7 +3174,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members.as_deref_mut(),
                 )
                 .await?;
@@ -3185,7 +3186,7 @@ impl CubeScanWrapperNode {
                         sql_generator.clone(),
                         expr,
                         push_to_cube_context,
-                        subqueries.clone(),
+                        subqueries,
                         used_members.as_deref_mut(),
                     )
                     .await?;
@@ -3216,7 +3217,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *expr,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members.as_deref_mut(),
                 )
                 .await?;
@@ -3226,7 +3227,7 @@ impl CubeScanWrapperNode {
                     sql_generator.clone(),
                     *subquery,
                     push_to_cube_context,
-                    subqueries.clone(),
+                    subqueries,
                     used_members,
                 )
                 .await?;
@@ -3263,7 +3264,7 @@ impl CubeScanWrapperNode {
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
         push_to_cube_context: Option<&'ctx PushToCubeContext>,
-        subqueries: Arc<HashMap<String, String>>,
+        subqueries: &'ctx HashMap<String, String>,
         used_members: Option<&'ctx mut HashSet<String>>,
     ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send + 'ctx>> {
         Self::generate_sql_for_expr(
