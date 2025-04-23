@@ -43,6 +43,43 @@ describe('Cube Folders', () => {
     );
   });
 
+  it('folders from view extending other view', async () => {
+    const view2 = metaTransformer.cubes.find(
+      (it) => it.config.name === 'test_view2'
+    );
+    const view3 = metaTransformer.cubes.find(
+      (it) => it.config.name === 'test_view3'
+    );
+
+    expect(view2.config.folders.length).toBe(1);
+    expect(view3.config.folders.length).toBe(2);
+
+    const folder1 = view2.config.folders.find(
+      (it) => it.name === 'folder1'
+    );
+    expect(folder1.members).toEqual([
+      'test_view2.users_age',
+      'test_view2.users_state',
+      'test_view2.renamed_orders_status',
+    ]);
+
+    const folder1v3 = view3.config.folders.find(
+      (it) => it.name === 'folder1'
+    );
+    expect(folder1v3.members).toEqual([
+      'test_view3.users_age',
+      'test_view3.users_state',
+      'test_view3.renamed_orders_status',
+    ]);
+
+    const folder2 = view3.config.folders.find(
+      (it) => it.name === 'folder2'
+    );
+    expect(folder2.members).toEqual(
+      expect.arrayContaining(['test_view3.users_city', 'test_view3.users_gender'])
+    );
+  });
+
   it('throws errors for folder members with path', async () => {
     const modelContent = fs.readFileSync(
       path.join(process.cwd(), '/test/unit/fixtures/folders_invalid_path.yml'),

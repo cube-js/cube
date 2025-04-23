@@ -745,7 +745,8 @@ const baseSchema = {
   refreshKey: CubeRefreshKeySchema,
   fileName: Joi.string().required(),
   extends: Joi.func(),
-  allDefinitions: Joi.func(),
+  allDefinitions: Joi.func(), // Helpers function for extending
+  rawFolders: Joi.func(), // Helpers function for extending
   title: Joi.string(),
   sqlAlias: Joi.string(),
   dataSource: Joi.string(),

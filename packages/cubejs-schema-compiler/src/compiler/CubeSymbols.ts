@@ -26,6 +26,7 @@ interface CubeDefinition {
   pre_aggregations?: Record<string, any>;
   joins?: Record<string, any>;
   accessPolicy?: any[];
+  folders?: any[];
   includes?: any;
   excludes?: any;
   cubes?: any;
@@ -118,6 +119,7 @@ export class CubeSymbols {
     let segments: any;
     let hierarchies: any;
     let accessPolicy: any;
+    let folders: any;
 
     const cubeObject = Object.assign({
       allDefinitions(type: string) {
@@ -129,6 +131,22 @@ export class CubeSymbols {
         } else {
           return { ...cubeDefinition[type] };
         }
+      },
+
+      // Folders are not a part of Cube Symbols and are constructed in the CubeEvaluator,
+      // but views can extend other views, so we need the ability to access parent's folders.
+      rawFolders() {
+        if (!folders) {
+          if (cubeDefinition.extends) {
+            folders = [
+              ...super.rawFolders(),
+              ...(cubeDefinition.folders || [])
+            ];
+          } else {
+            folders = [...(cubeDefinition.folders || [])];
+          }
+        }
+        return folders;
       },
 
       get preAggregations() {
