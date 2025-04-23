@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { prepareCompiler, prepareJsCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaWithCustomGranularities, createCubeSchemaWithAccessPolicy } from './utils';
+import { createCubeSchema, createCubeSchemaWithCustomGranularitiesAndTimeShift, createCubeSchemaWithAccessPolicy } from './utils';
 
 const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'accessPolicy'];
 
@@ -382,7 +382,7 @@ describe('Schema Testing', () => {
 
   it('custom granularities in meta', async () => {
     const { compiler, metaTransformer } = prepareJsCompiler([
-      createCubeSchemaWithCustomGranularities('orders')
+      createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
     ]);
     await compiler.compile();
 
@@ -521,6 +521,17 @@ describe('Schema Testing', () => {
   });
 
   describe('Views', () => {
+    it('extends custom granularities and timeshifts', async () => {
+      const { compiler, metaTransformer } = prepareJsCompiler([
+        createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
+      ]);
+      await compiler.compile();
+
+      const { measures, dimensions } = metaTransformer.cubeEvaluator.evaluatedCubes.orders_view;
+      expect(dimensions.createdAt).toMatchSnapshot();
+      expect(measures.count_shifted_year).toMatchSnapshot();
+    });
+
     it('throws errors for incorrect referenced includes members', async () => {
       const orders = fs.readFileSync(
         path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
