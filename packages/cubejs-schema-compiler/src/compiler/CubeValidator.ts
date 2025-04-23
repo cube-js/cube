@@ -734,6 +734,12 @@ const RolePolicySchema = Joi.object().keys({
  * and update CubePropContextTranspiler.transpiledFieldsPatterns
  **************************** */
 
+const hierarchySchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
+  title: Joi.string(),
+  public: Joi.boolean().strict(),
+  levels: Joi.func()
+}));
+
 const baseSchema = {
   name: identifier,
   refreshKey: CubeRefreshKeySchema,
@@ -760,26 +766,13 @@ const baseSchema = {
   dimensions: DimensionsSchema,
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
-  folders: Joi.array().items(Joi.object().keys({
-    name: Joi.string().required(),
-    includes: Joi.alternatives([
-      Joi.string().valid('*'),
-      Joi.array().items(Joi.string().required())
-    ]).required(),
-  })),
   accessPolicy: Joi.array().items(RolePolicySchema.required()),
+  hierarchies: hierarchySchema,
 };
-
-const hierarchySchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
-  title: Joi.string(),
-  public: Joi.boolean().strict(),
-  levels: Joi.func()
-}));
 
 const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
-  hierarchies: hierarchySchema,
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
@@ -811,8 +804,13 @@ const viewSchema = inherit(baseSchema, {
       'object.oxor': 'Using split together with prefix is not supported'
     })
   ),
-  accessPolicy: Joi.array().items(RolePolicySchema.required()),
-  hierarchies: hierarchySchema,
+  folders: Joi.array().items(Joi.object().keys({
+    name: Joi.string().required(),
+    includes: Joi.alternatives([
+      Joi.string().valid('*'),
+      Joi.array().items(Joi.string().required())
+    ]).required(),
+  })),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
