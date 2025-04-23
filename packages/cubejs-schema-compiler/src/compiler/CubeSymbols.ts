@@ -541,22 +541,28 @@ export class CubeSymbols {
           title: resolvedMember.title,
           description: resolvedMember.description,
           format: resolvedMember.format,
+          ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
+          ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
+          ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
-          ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           sql,
           type: resolvedMember.type,
           meta: resolvedMember.meta,
           title: resolvedMember.title,
           description: resolvedMember.description,
           format: resolvedMember.format,
+          ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
+          ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
         };
       } else if (type === 'segments') {
         memberDefinition = {
           sql,
           meta: resolvedMember.meta,
+          title: resolvedMember.title,
           description: resolvedMember.description,
+          aliases: resolvedMember.aliases,
         };
       } else if (type === 'hierarchies') {
         memberDefinition = {
