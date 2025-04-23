@@ -147,7 +147,7 @@ export class CubeSymbols {
         }
         return preAggregations;
       },
-      set preAggregations(v) {
+      set preAggregations(_v) {
         // Dont allow to modify
       },
 
@@ -157,7 +157,7 @@ export class CubeSymbols {
         }
         return joins;
       },
-      set joins(v) {
+      set joins(_v) {
         // Dont allow to modify
       },
 
@@ -167,7 +167,7 @@ export class CubeSymbols {
         }
         return measures;
       },
-      set measures(v) {
+      set measures(_v) {
         // Dont allow to modify
       },
 
@@ -177,7 +177,7 @@ export class CubeSymbols {
         }
         return dimensions;
       },
-      set dimensions(v) {
+      set dimensions(_v) {
         // Dont allow to modify
       },
 
@@ -187,7 +187,7 @@ export class CubeSymbols {
         }
         return segments;
       },
-      set segments(v) {
+      set segments(_v) {
         // Dont allow to modify
       },
 
@@ -197,7 +197,7 @@ export class CubeSymbols {
         }
         return hierarchies;
       },
-      set hierarchies(v) {
+      set hierarchies(_v) {
         // Dont allow to modify
       },
 
@@ -213,7 +213,7 @@ export class CubeSymbols {
           return undefined;
         }
       },
-      set accessPolicy(v) {
+      set accessPolicy(_v) {
         // Dont allow to modify
       }
     },
