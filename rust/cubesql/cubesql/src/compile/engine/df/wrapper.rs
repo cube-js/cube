@@ -583,6 +583,18 @@ macro_rules! generate_sql_for_timestamp {
     };
 }
 
+struct GeneratedColumns {
+    projection: Vec<(AliasedColumn, HashSet<String>)>,
+    group_by: Vec<(AliasedColumn, HashSet<String>)>,
+    group_descs: Vec<Option<GroupingSetDesc>>,
+    flat_group_expr: Vec<Expr>,
+    aggregate: Vec<(AliasedColumn, HashSet<String>)>,
+    patch_measures: Vec<(PatchMeasureDef, String, String)>,
+    filter: Vec<(AliasedColumn, HashSet<String>)>,
+    window: Vec<(AliasedColumn, HashSet<String>)>,
+    order: Vec<(AliasedColumn, HashSet<String>)>,
+}
+
 impl CubeScanWrapperNode {
     pub fn has_ungrouped_scan(&self) -> bool {
         Self::has_ungrouped_wrapped_node(self.wrapped_plan.as_ref())
@@ -754,6 +766,157 @@ impl CubeScanWrapperNode {
             subqueries_sql.insert(field.qualified_name(), sql_string);
         }
         Ok(subqueries_sql)
+    }
+
+    async fn generate_wrapped_select_columns(
+        meta: &MetaContext,
+        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
+        can_rename_columns: bool,
+        sql: SqlQuery,
+        data_source: &Option<String>,
+        push_to_cube_context: Option<&PushToCubeContext<'_>>,
+        subqueries_sql: &HashMap<String, String>,
+        column_remapping: Option<&ColumnRemapping>,
+        alias: Option<String>,
+        wrapped_select_node: &WrappedSelectNode,
+    ) -> result::Result<
+        (
+            Arc<dyn SqlGenerator + Send + Sync>,
+            GeneratedColumns,
+            SqlQuery,
+            Remapper,
+        ),
+        CubeError,
+    > {
+        let mut next_remapper = Remapper::new(alias, can_rename_columns);
+
+        let schema = wrapped_select_node.schema();
+
+        let Some(data_source) = data_source else {
+            return Err(CubeError::internal(format!(
+                "Can't generate SQL for wrapped select: no data source for {:?}",
+                node
+            )));
+        };
+
+        let generator = meta
+            .data_source_to_sql_generator
+            .get(data_source)
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Can't generate SQL for wrapped select: no sql generator for {:?}",
+                    node
+                ))
+            })?
+            .clone();
+        let (projection, sql) = Self::generate_column_expr(
+            schema.clone(),
+            wrapped_select_node.projection_expr.iter().cloned(),
+            sql,
+            generator.clone(),
+            column_remapping,
+            &mut next_remapper,
+            can_rename_columns,
+            push_to_cube_context,
+            subqueries_sql,
+        )
+        .await?;
+        let flat_group_expr = extract_exprlist_from_groupping_set(&wrapped_select_node.group_expr);
+        let (group_by, sql) = Self::generate_column_expr(
+            schema.clone(),
+            flat_group_expr.clone(),
+            sql,
+            generator.clone(),
+            column_remapping,
+            &mut next_remapper,
+            can_rename_columns,
+            push_to_cube_context,
+            subqueries_sql,
+        )
+        .await?;
+        let group_descs = extract_group_type_from_groupping_set(&wrapped_select_node.group_expr)?;
+
+        let (patch_measures, aggr_expr, sql) = Self::extract_patch_measures(
+            schema.as_ref(),
+            wrapped_select_node.aggr_expr.iter().cloned(),
+            sql,
+            generator.clone(),
+            column_remapping,
+            &mut next_remapper,
+            can_rename_columns,
+            push_to_cube_context,
+            subqueries_sql,
+        )
+        .await?;
+
+        let (aggregate, sql) = Self::generate_column_expr(
+            schema.clone(),
+            aggr_expr.clone(),
+            sql,
+            generator.clone(),
+            column_remapping,
+            &mut next_remapper,
+            can_rename_columns,
+            push_to_cube_context,
+            subqueries_sql,
+        )
+        .await?;
+
+        let (filter, sql) = Self::generate_column_expr(
+            schema.clone(),
+            wrapped_select_node.filter_expr.iter().cloned(),
+            sql,
+            generator.clone(),
+            column_remapping,
+            &mut next_remapper,
+            can_rename_columns,
+            push_to_cube_context,
+            subqueries_sql,
+        )
+        .await?;
+
+        let (window, sql) = Self::generate_column_expr(
+            schema.clone(),
+            wrapped_select_node.window_expr.iter().cloned(),
+            sql,
+            generator.clone(),
+            column_remapping,
+            &mut next_remapper,
+            can_rename_columns,
+            push_to_cube_context,
+            subqueries_sql,
+        )
+        .await?;
+
+        let (order, sql) = Self::generate_column_expr(
+            schema.clone(),
+            wrapped_select_node.order_expr.iter().cloned(),
+            sql,
+            generator.clone(),
+            column_remapping,
+            &mut next_remapper,
+            can_rename_columns,
+            push_to_cube_context,
+            subqueries_sql,
+        )
+        .await?;
+
+        Ok((
+            generator,
+            GeneratedColumns {
+                projection,
+                group_by,
+                group_descs,
+                flat_group_expr,
+                aggregate,
+                patch_measures,
+                filter,
+                window,
+                order,
+            },
+            sql,
+            next_remapper,
+        ))
     }
 
     async fn generate_sql_for_cube_scan(
@@ -948,12 +1111,12 @@ impl CubeScanWrapperNode {
             select_type,
             projection_expr,
             subqueries,
-            group_expr,
+            group_expr: _,
             aggr_expr,
-            window_expr,
+            window_expr: _,
             from,
             joins,
-            filter_expr,
+            filter_expr: _,
             having_expr: _having_expr,
             limit,
             offset,
@@ -1048,7 +1211,6 @@ impl CubeScanWrapperNode {
         .await?;
         let subqueries_sql = &subqueries_sql;
         let alias = alias.or(from_alias.clone());
-        let mut next_remapper = Remapper::new(alias.clone(), can_rename_columns);
 
         let push_to_cube_context = if let Some(ungrouped_scan_node) = ungrouped_scan_node {
             let mut join_subqueries = vec![];
@@ -1159,114 +1321,34 @@ impl CubeScanWrapperNode {
         let column_remapping = column_remapping.as_ref();
         // Turn to ref
         let push_to_cube_context = push_to_cube_context.as_ref();
-        let Some(data_source) = data_source else {
-            return Err(CubeError::internal(format!(
-                "Can't generate SQL for wrapped select: no data source for {:?}",
-                node
-            )));
-        };
 
-        let generator = meta
-            .data_source_to_sql_generator
-            .get(&data_source)
-            .ok_or_else(|| {
-                CubeError::internal(format!(
-                    "Can't generate SQL for wrapped select: no sql generator for {:?}",
-                    node
-                ))
-            })?
-            .clone();
-        let (projection, sql) = Self::generate_column_expr(
-            schema.clone(),
-            projection_expr.clone(),
-            sql,
-            generator.clone(),
-            column_remapping,
-            &mut next_remapper,
-            can_rename_columns,
-            push_to_cube_context,
-            subqueries_sql,
-        )
-        .await?;
-        let flat_group_expr = extract_exprlist_from_groupping_set(&group_expr);
-        let (group_by, sql) = Self::generate_column_expr(
-            schema.clone(),
-            flat_group_expr.clone(),
-            sql,
-            generator.clone(),
-            column_remapping,
-            &mut next_remapper,
-            can_rename_columns,
-            push_to_cube_context,
-            subqueries_sql,
-        )
-        .await?;
-        let group_descs = extract_group_type_from_groupping_set(&group_expr)?;
+        let (generator, columns, mut sql, mut next_remapper) =
+            Self::generate_wrapped_select_columns(
+                meta,
+                node,
+                can_rename_columns,
+                sql,
+                &data_source,
+                push_to_cube_context,
+                subqueries_sql,
+                column_remapping,
+                alias.clone(),
+                wrapped_select_node,
+            )
+            .await?;
 
-        let (patch_measures, aggr_expr, sql) = Self::extract_patch_measures(
-            schema.as_ref(),
-            aggr_expr,
-            sql,
-            generator.clone(),
-            column_remapping,
-            &mut next_remapper,
-            can_rename_columns,
-            push_to_cube_context,
-            subqueries_sql,
-        )
-        .await?;
+        let GeneratedColumns {
+            projection,
+            group_by,
+            group_descs,
+            flat_group_expr,
+            aggregate,
+            patch_measures,
+            filter,
+            window,
+            order,
+        } = columns;
 
-        let (aggregate, sql) = Self::generate_column_expr(
-            schema.clone(),
-            aggr_expr.clone(),
-            sql,
-            generator.clone(),
-            column_remapping,
-            &mut next_remapper,
-            can_rename_columns,
-            push_to_cube_context,
-            subqueries_sql,
-        )
-        .await?;
-
-        let (filter, sql) = Self::generate_column_expr(
-            schema.clone(),
-            filter_expr.clone(),
-            sql,
-            generator.clone(),
-            column_remapping,
-            &mut next_remapper,
-            can_rename_columns,
-            push_to_cube_context,
-            subqueries_sql,
-        )
-        .await?;
-
-        let (window, sql) = Self::generate_column_expr(
-            schema.clone(),
-            window_expr.clone(),
-            sql,
-            generator.clone(),
-            column_remapping,
-            &mut next_remapper,
-            can_rename_columns,
-            push_to_cube_context,
-            subqueries_sql,
-        )
-        .await?;
-
-        let (order, mut sql) = Self::generate_column_expr(
-            schema.clone(),
-            order_expr.clone(),
-            sql,
-            generator.clone(),
-            column_remapping,
-            &mut next_remapper,
-            can_rename_columns,
-            push_to_cube_context,
-            subqueries_sql,
-        )
-        .await?;
         if let Some(PushToCubeContext {
             ungrouped_scan_node,
             join_subqueries,
@@ -1498,7 +1580,7 @@ impl CubeScanWrapperNode {
                 .await?;
 
             Ok(SqlGenerationResult {
-                data_source: Some(data_source),
+                data_source,
                 from_alias: alias,
                 sql: sql_response.sql,
                 column_remapping: next_remapper.into_remapping(),
@@ -1540,7 +1622,7 @@ impl CubeScanWrapperNode {
                 })?;
             sql.replace_sql(resulting_sql.clone());
             Ok(SqlGenerationResult {
-                data_source: Some(data_source),
+                data_source,
                 from_alias: alias,
                 sql,
                 column_remapping: next_remapper.into_remapping(),
