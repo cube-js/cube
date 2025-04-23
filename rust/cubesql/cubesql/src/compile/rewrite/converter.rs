@@ -2,8 +2,8 @@ pub use super::rewriter::CubeRunner;
 use crate::{
     compile::{
         engine::df::{
-            scan::{CubeScanNode, CubeScanOptions, MemberField, WrappedSelectNode},
-            wrapper::CubeScanWrapperNode,
+            scan::{CubeScanNode, CubeScanOptions, MemberField},
+            wrapper::{CubeScanWrapperNode, WrappedSelectNode},
         },
         rewrite::{
             analysis::LogicalPlanAnalysis,
