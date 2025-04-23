@@ -1,0 +1,35 @@
+cubes:
+  - name: ordersExt
+    extends: orders
+
+    dimensions:
+      - name: city
+        sql: city
+        type: string
+
+    measures:
+      - name: count_distinct
+        sql: status
+        type: count_distinct
+
+    segments:
+      - name: anotherStatus
+        description: Just another one
+        sql: ${CUBE}.status = 'Rock and Roll'
+
+    hierarchies:
+      - name: ehlo
+        title: UnderGround
+        levels: [status, city]
+
+    pre_aggregations:
+      - name: mainPreAggs
+        type: rollup
+        measures: [count_distinct]
+        dimensions: [city]
+
+    accessPolicy:
+      - role: manager
+        memberLevel:
+          excludes:
+            - status

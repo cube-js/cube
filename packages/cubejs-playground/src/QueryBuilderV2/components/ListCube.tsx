@@ -2,7 +2,7 @@ import { Space, tasty, Text, TooltipProvider, ViewIcon, CubeIcon } from '@cube-d
 import { PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 
 import { CubeStats } from '../types';
-import { ArrowIcon } from '../icons/ArrowIcon';
+import { ChevronIcon } from '../icons/ChevronIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
 
 import { ListButton } from './ListButton';
@@ -55,6 +55,7 @@ export function ListCube({
           {description ? <> – {description}</> : undefined}
         </>
       }
+      width="max-content"
       placement="right"
     >
       <CubeListButton
@@ -74,7 +75,7 @@ export function ListCube({
         rightIcon={
           !isMissing ? (
             rightIcon === 'arrow' ? (
-              <ArrowIcon
+              <ChevronIcon
                 direction={!isSelected ? 'right' : 'top'}
                 style={{ color: 'var(--purple-color)' }}
               />

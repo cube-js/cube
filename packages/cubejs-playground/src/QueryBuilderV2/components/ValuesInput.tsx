@@ -1,5 +1,9 @@
 import {
   Button,
+  CaretDownIcon,
+  ComboBox,
+  Grid,
+  InfoCircleIcon,
   NumberInput,
   Space,
   Tag,
@@ -7,10 +11,12 @@ import {
   TextInput,
   TooltipProvider,
 } from '@cube-dev/ui-kit';
+import { Key } from '@react-types/shared';
 import React, { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 
-import { useOutsideFocus } from '../hooks';
+import { useQueryBuilderContext } from '../context';
+import { useEvent, useOutsideFocus, useDimensionValues } from '../hooks';
 
 const ButtonWrapper = tasty({
   styles: {
@@ -27,9 +33,12 @@ const AddButton = tasty(Button, {
   size: 'small',
   icon: <PlusOutlined />,
   styles: {
-    radius: '(1r - 1bw) right',
     width: '(4x - 2bw)',
     height: '(4x - 2bw)',
+    radius: {
+      '': true,
+      inside: 'right',
+    },
   },
 });
 
@@ -56,55 +65,92 @@ const StyledTag = tasty(Tag, {
 
 interface ValuesInputProps {
   type?: 'string' | 'number';
+  memberName?: string;
+  memberType?: 'measure' | 'dimension';
+  placeholder?: string;
   isCompact?: boolean;
+  allowSuggestions?: boolean;
   values: string[];
   onChange: (values: string[]) => void;
 }
 
 export function ValuesInput(props: ValuesInputProps) {
-  const { type = 'string', values, isCompact, onChange } = props;
+  const {
+    type = 'string',
+    memberName,
+    memberType,
+    allowSuggestions,
+    placeholder,
+    values,
+    isCompact,
+    onChange,
+  } = props;
 
-  const [open, setOpen] = useState(!values.length);
-  const [error, setError] = useState(!values.length);
+  const [isOpen, setIsOpen] = useState(!values.length);
+  const [hasError, setHasError] = useState(false);
   const [textValue, setTextValue] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const ref = useRef<HTMLElement>();
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // If focus goes outside the widget, then clear the value and hid the input
+  const { cubeApi, mutexObj } = useQueryBuilderContext();
+
+  const {
+    suggestions,
+    isLoading: isSuggestionLoading,
+    error: suggestionError,
+  } = useDimensionValues({
+    cubeApi,
+    mutexObj,
+    dimension: memberName,
+    skip:
+      !isOpen || !allowSuggestions || !showSuggestions || !memberName || memberType !== 'dimension',
+  });
+
+  // If focus goes outside the widget, update the state
   useOutsideFocus(
     ref,
-    useCallback(() => {
-      setTextValue('');
-      if (values.length) {
-        setOpen(false);
-      } else {
-        setError(true);
+    useEvent(() => {
+      if (textValue && textValue.trim()) {
+        addValueLazy();
       }
-    }, [values.length, ref?.current])
+    })
   );
 
   const onAddButtonPress = () => {
-    if (open) {
+    if (isOpen) {
       addValue();
     } else {
-      setOpen(true);
+      setIsOpen(true);
     }
   };
 
   const onFocus = () => {
-    setError(false);
+    setHasError(false);
   };
+
+  function focusOnInput() {
+    setTimeout(() => {
+      ref.current?.querySelector('input')?.focus();
+    }, 100);
+  }
 
   // If input is shown, then focus on it
   useEffect(() => {
-    if (open && ref.current) {
-      ref.current?.querySelector('input')?.focus();
+    if (isOpen && ref.current) {
+      focusOnInput();
     }
-  }, [open]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isSuggestionLoading) {
+      focusOnInput();
+    }
+  }, [isSuggestionLoading]);
 
   // Add current value to the value list and clear the input value
-  const addValue = () => {
+  const addValue = useEvent(() => {
     const value = textValue.trim();
 
     if (!value) {
@@ -113,11 +159,23 @@ export function ValuesInput(props: ValuesInputProps) {
 
     onChange([...values.filter((val) => val !== value), value]);
     setTextValue('');
+    setIsOpen(false);
+  });
+
+  const addValueLazy = () => {
+    setTimeout(() => {
+      addValue();
+    });
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
-      addValue();
+      e.preventDefault();
+      addValueLazy();
+    }
+    if (e.key === 'Escape') {
+      setTextValue('');
+      setIsOpen(false);
     }
   };
 
@@ -126,8 +184,8 @@ export function ValuesInput(props: ValuesInputProps) {
       const newValues = values.filter((val) => val !== value);
 
       if (!newValues.length) {
-        setError(true);
-        setOpen(true);
+        setHasError(true);
+        setIsOpen(true);
       }
 
       onChange(newValues);
@@ -135,20 +193,9 @@ export function ValuesInput(props: ValuesInputProps) {
     [values.length]
   );
 
-  function onTextChange(value: string | number) {
-    if (!Number.isNaN(value)) {
-      setTextValue(typeof value === 'number' ? String(value) : value);
-    }
-  }
-
-  function onBlur() {
-    if (inputRef?.current) {
-      if (!inputRef.current.value || !inputRef.current.value.trim()) {
-        inputRef.current.value = textValue;
-        setOpen(false);
-      }
-    }
-  }
+  const onTextChange = useEvent((value: string | number) => {
+    setTextValue(typeof value === 'number' ? (!Number.isNaN(value) ? String(value) : '') : value);
+  });
 
   function onInput() {
     if (inputRef?.current) {
@@ -164,35 +211,110 @@ export function ValuesInput(props: ValuesInputProps) {
     }
   }
 
-  const addButton = <AddButton isDisabled={!textValue.length && open} onPress={onAddButtonPress} />;
+  const addButton = (
+    <AddButton
+      isDisabled={!textValue.length && isOpen}
+      mods={{ inside: isOpen }}
+      onPress={onAddButtonPress}
+    />
+  );
 
   const input =
     type === 'string' ? (
-      <TextInput
-        aria-label="Text input"
-        inputRef={inputRef}
-        size="small"
-        value={textValue}
-        placeholder="Type value to add..."
-        suffix={addButton}
-        validationState={error ? 'invalid' : undefined}
-        suffixPosition="after"
-        onChange={onTextChange}
-        onKeyDown={onKeyDown}
-        onFocus={onFocus}
-      />
+      memberType === 'dimension' && allowSuggestions && showSuggestions ? (
+        <ComboBox
+          allowsCustomValue
+          aria-label="Text value input"
+          inputRef={inputRef}
+          size="small"
+          inputValue={textValue}
+          placeholder={
+            isSuggestionLoading
+              ? 'Loading values...'
+              : (placeholder ?? `Type ${suggestions.length ? 'or select ' : ''}value to add...`)
+          }
+          validationState={hasError ? 'invalid' : undefined}
+          suffix={
+            suggestionError ? (
+              <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
+                <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
+              </TooltipProvider>
+            ) : null
+          }
+          suffixPosition="after"
+          width="30x"
+          menuTrigger="focus"
+          isLoading={isSuggestionLoading && !suggestions.length}
+          disabledKeys={suggestions.length ? undefined : ['no-suggestions']}
+          onSelectionChange={(key: Key | null) => {
+            key && onTextChange(key as string);
+            addValueLazy();
+          }}
+          onInputChange={(key: Key | null) => {
+            onTextChange(key as string);
+          }}
+          onKeyDown={onKeyDown}
+          onFocus={onFocus}
+        >
+          {suggestions.length ? (
+            suggestions.map((suggestion) => (
+              <ComboBox.Item key={suggestion} textValue={suggestion}>
+                {suggestion}
+              </ComboBox.Item>
+            ))
+          ) : (
+            <ComboBox.Item key="no-suggestions">No values loaded</ComboBox.Item>
+          )}
+        </ComboBox>
+      ) : (
+        <TextInput
+          aria-label="Text value input"
+          inputRef={inputRef}
+          size="small"
+          value={textValue}
+          placeholder={placeholder || `Type ${allowSuggestions ? 'or select ' : ''}value to add...`}
+          validationState={hasError ? 'invalid' : undefined}
+          isLoading={isSuggestionLoading}
+          suffix={
+            allowSuggestions && !suggestionError ? (
+              !isSuggestionLoading ? (
+                <TooltipProvider title="Load values...">
+                  <Button
+                    icon={<CaretDownIcon />}
+                    type="neutral"
+                    size="small"
+                    height="(4x - 2bw)"
+                    radius="right"
+                    onPress={() => setShowSuggestions(true)}
+                  />
+                </TooltipProvider>
+              ) : null
+            ) : suggestionError && !hasError ? (
+              <Grid width="4x" placeContent="center">
+                <TooltipProvider activeWrap title={`Unable to load values.\n${suggestionError}`}>
+                  <InfoCircleIcon color="#danger" styles={{ cursor: 'default' }} />
+                </TooltipProvider>
+              </Grid>
+            ) : null
+          }
+          suffixPosition="after"
+          wrapperStyles={{ width: '30x' }}
+          onChange={onTextChange}
+          onKeyDown={onKeyDown}
+          onFocus={onFocus}
+        />
+      )
     ) : (
       <NumberInput
-        aria-label="Number input"
+        aria-label="Number value input"
         inputRef={inputRef}
         size="small"
         value={parseFloat(textValue)}
-        placeholder="Type value to add..."
+        placeholder={placeholder || 'Type value to add...'}
         suffix={addButton}
-        validationState={error ? 'invalid' : undefined}
+        validationState={hasError ? 'invalid' : undefined}
         suffixPosition="after"
         wrapperStyles={{ width: '20x' }}
-        onBlur={onBlur}
         onInput={onInput}
         onChange={onTextChange}
         onKeyDown={onKeyDown}
@@ -225,7 +347,7 @@ export function ValuesInput(props: ValuesInputProps) {
         );
       })}
       <Space gap={0} placeContent="baseline">
-        {open ? input : <ButtonWrapper>{addButton}</ButtonWrapper>}
+        {isOpen ? input : <ButtonWrapper>{addButton}</ButtonWrapper>}
       </Space>
     </Element>
   );

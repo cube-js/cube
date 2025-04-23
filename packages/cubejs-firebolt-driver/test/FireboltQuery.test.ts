@@ -70,13 +70,13 @@ cube(\`sales\`, {
         measures: ['sales.count'],
         filters: [
           {
-            member: "sales.isShiped",
-            operator: "equals",
-            values: ["true"]
+            member: 'sales.isShiped',
+            operator: 'equals',
+            values: ['true']
           }
         ]
       }
-    )
+    );
 
     const queryAndParams = query.buildSqlAndParams();
 
@@ -84,36 +84,34 @@ cube(\`sales\`, {
       '("sales".is_shiped = CAST(? AS BOOLEAN))'
     );
 
-    expect(queryAndParams[1]).toEqual(["true"]);
-  }))
-    it("should cast timestamp", () =>
-    compiler.compile().then(() => {
-      const query = new FireboltQuery(
-        { joinGraph, cubeEvaluator, compiler },
-        {
-          measures: ["sales.count"],
-          timeDimensions: [
-            {
-              dimension: "sales.salesDatetime",
-              granularity: "day",
-              dateRange: ["2017-01-01", "2017-01-02"],
-            },
-          ],
-          timezone: "America/Los_Angeles",
-          order: [
-            {
-              id: "sales.salesDatetime",
-            },
-          ],
-        }
-      );
+    expect(queryAndParams[1]).toEqual(['true']);
+  }));
 
-      const queryAndParams = query.buildSqlAndParams();
+  it('should cast timestamp', () => compiler.compile().then(() => {
+    const query = new FireboltQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: ['sales.count'],
+        timeDimensions: [
+          {
+            dimension: 'sales.salesDatetime',
+            granularity: 'day',
+            dateRange: ['2017-01-01', '2017-01-02'],
+          },
+        ],
+        timezone: 'America/Los_Angeles',
+        order: [
+          {
+            id: 'sales.salesDatetime',
+          },
+        ],
+      }
+    );
 
-      expect(queryAndParams[0]).toContain(
-        '("sales".sales_datetime >= ?::timestamptz AND "sales".sales_datetime <= ?::timestamptz)'
-      );
-    }));
+    const queryAndParams = query.buildSqlAndParams();
 
-
-})
+    expect(queryAndParams[0]).toContain(
+      '("sales".sales_datetime >= ?::timestamptz AND "sales".sales_datetime <= ?::timestamptz)'
+    );
+  }));
+});

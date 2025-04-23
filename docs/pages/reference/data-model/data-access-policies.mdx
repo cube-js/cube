@@ -1,0 +1,366 @@
+# Data access policies
+
+You can use the `access_policy` parameter within [cubes][ref-ref-cubes] and [views][ref-ref-views]
+to configure [data access policies][ref-dap] for them.
+
+## Parameters
+
+The `access_policy` parameter should define a list of access policies. Each policy
+can be configured using the following parameters:
+
+- [`role`](#role) defines which [data access role][ref-dap-roles] a policy applies
+to.
+- [`conditions`](#conditions) can be optionally used to specify when a policy
+takes effect.
+- [`member_level`](#member-level) and [`row_level`](#row-level) parameters are used
+to configure [member-level][ref-dap-mls] and [row-level][ref-dap-rls] access.
+
+### `role`
+
+The `role` parameter defines which [data access role][ref-dap-roles], as defined
+by the [`context_to_roles`][ref-context-to-roles] configuration parameter, a
+policy applies to. To define a policy that applies to all users regardless of
+their roles, use the _any role_ shorthand: `role: "*"`.
+
+In the following example, three access policies are defined, with the first one
+applying to all users and two other applying to users with `marketing` or
+`finance` roles, respectively.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+        # Applies to any role
+      - role: "*"
+        # ...
+
+      - role: marketing
+        # ...
+
+      - role: finance
+        # ...
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      // Applies to any role
+      role: `*`,
+      // ...
+    },
+    {
+      role: `marketing`,
+      // ...
+    },
+    {
+      role: `finance`,
+      // ...
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+### `conditions`
+
+The optional `conditions` parameter, when present, defines a list of conditions
+that should all be `true` in order for a policy to take effect. Each condition is
+configured with an `if` parameter that is expected to reference the [security
+context][ref-sec-ctx].
+
+In the following example, a permissive policy for all roles will only apply to
+EMEA-based users, as determined by the `is_EMEA_based` attribute in the security
+context:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - role: "*"
+        conditions:
+          - if: "{ securityContext.is_EMEA_based }"
+        member_level:
+          includes: "*"
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      role: `*`,
+      conditions: [
+        { if: securityContext.is_EMEA_based }
+      ],
+      member_level: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+You can use the `conditions` parameter to define multiple policies for the same
+role.
+
+In the following example, the first policy provides access to a _subset of members_
+to managers who are full-time employees while the other one provides access to
+_all members_ to managers who are full-time employees and have also completed a
+data privacy training:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    access_policy:
+      - role: manager
+        conditions:
+          - if: "{ securityContext.is_full_time_employee }"
+        member_level:
+          includes:
+            - status
+            - count
+
+      - role: manager
+        conditions:
+          - if: "{ securityContext.is_full_time_employee }"
+          - if: "{ securityContext.has_completed_privacy_training }"
+        member_level:
+          includes: "*"
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      role: `manager`,
+      conditions: [
+        { if: securityContext.is_full_time_employee }
+      ],
+      member_level: {
+        includes: [
+          `status`,
+          `count`
+        ]
+      }
+    },
+    {
+      role: `manager`,
+      conditions: [
+        { if: securityContext.is_full_time_employee },
+        { if: securityContext.has_completed_privacy_training }
+      ],
+      member_level: {
+        includes: `*`
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+### `member_level`
+
+The optional `member_level` parameter, when present, configures [member-level
+access][ref-dap-mls] for a policy by specifying allowed or disallowed members.
+
+You can either provide a list of allowed members with the `includes` parameter,
+or a list of disallowed members with the `excludes` parameter. There's also the
+_all members_ shorthand for both of these paramaters: `includes: "*"`, `excludes: "*"`.
+
+In the following example, member-level access is configured this way:
+
+| Scope | Access |
+| --- | --- |
+| Users with the `manager` role | All members except for `count` |
+| Users with the `observer` role | All members except for `count` and `count_7d` |
+| Users with the `guest` role | Only the `count_30d` measure |
+| All other users | No access to this cube at all |
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+    
+    access_policy:
+      - role: "*"
+        member_level:
+          # Includes nothing, i.e., excludes all members
+          includes: []
+      
+      - role: manager
+        member_level:
+          # Includes all members except for `count`
+          excludes:
+            - count
+      
+      - role: observer
+        member_level:
+          # Includes all members except for `count` and `count_7d`
+          excludes:
+            - count
+            - count_7d
+      
+      - role: guest
+        # Includes only `count_30d`, excludes all other members
+        member_level:
+          includes:
+            - count_30d
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      role: `*`,
+      // Includes nothing, i.e., excludes all members
+      member_level: {
+        includes: []
+      }
+    },
+    {
+      role: `manager`,
+      // Includes all members except for `count`
+      member_level: {
+        excludes: [
+          `count`
+        ]
+      }
+    },
+    {
+      role: `observer`,
+      // Includes all members except for `count` and `count_7d`
+      member_level: {
+        excludes: [
+          `count`,
+          `count_7d`
+        ]
+      }
+    },
+    {
+      role: `guest`,
+      // Includes only `count_30d`, excludes all other members
+      member_level: {
+        includes: [
+          `count_30d`
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+Note that access policies also respect [member-level security][ref-mls] restrictions
+configured via `public` parameters. See [member-level access][ref-dap-mls] to
+learn more about policy evaluation.
+
+### `row_level`
+
+The optional `row_level` parameter, when present, configures [row-level
+access][ref-dap-rls] for a policy by specifying `filters` that should apply to result set rows.
+You can also use the optional `allow_all` parameter to explicitly allow or disallow all rows.
+
+In the following example, users with the `manager` role are allowed to access only
+rows that have the `state` dimension matching the state from the [security context][ref-sec-ctx].
+All other users are disallowed from accessing any rows at all.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+    
+    access_policy:
+      - role: "*"
+        row_level:
+          allow_all: false
+      
+      - role: manager
+        row_level:
+          filters:
+            - member: state
+              operator: equals
+              values: [ "{ securityContext.state }" ]
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  access_policy: [
+    {
+      role: `*`,
+      row_level: {
+        allow_all: false
+      }
+    },
+    {
+      role: `manager`,
+      row_level: {
+        filters: [
+          {
+            member: `state`,
+            operator: `equals`,
+            values: [ securityContext.state ]
+          }
+        ]
+      }
+    }
+  ]
+})
+```
+
+</CodeTabs>
+
+For convenience, row filters are configured using the same format as [filters in
+REST API][ref-rest-query-filters] queries, allowing to use the same set of
+[filter operators][ref-rest-query-ops], e.g., `equals`, `contains`, `gte`, etc.
+You can also use `and` and `or` parameters to combine multiple filters into
+[boolean logical operators][ref-rest-boolean-ops].
+
+Note that access policies also respect [row-level security][ref-rls] restrictions
+configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
+learn more about policy evaluation.
+
+
+[ref-ref-cubes]: /reference/data-model/cube
+[ref-ref-views]: /reference/data-model/view
+[ref-dap]: /product/auth/data-access-policies
+[ref-dap-roles]: /product/auth/data-access-policies#data-access-roles
+[ref-dap-mls]: /product/auth/data-access-policies#member-level-access
+[ref-dap-rls]: /product/auth/data-access-policies#row-level-access
+[ref-context-to-roles]: /reference/configuration/config#context_to_roles
+[ref-mls]: /product/auth/member-level-security
+[ref-rls]: /product/auth/row-level-security
+[ref-sec-ctx]: /product/auth/context
+[ref-rest-query-filters]: /product/apis-integrations/rest-api/query-format#filters-format
+[ref-rest-query-ops]: /product/apis-integrations/rest-api/query-format#filters-operators
+[ref-rest-boolean-ops]: /product/apis-integrations/rest-api/query-format#boolean-logical-operators

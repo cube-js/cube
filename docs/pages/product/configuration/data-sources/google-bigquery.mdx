@@ -11,7 +11,9 @@ redirect_from:
 
 In order to connect Google BigQuery to Cube, you need to provide service account
 credentials. Cube requires the service account to have **BigQuery Data Viewer**
-and **BigQuery Job User** roles enabled. You can learn more about acquiring
+and **BigQuery Job User** roles enabled. If you plan to use pre-aggregations, 
+the account will need the **BigQuery Data Editor** role instead of **BigQuery Data Viewer**. 
+You can learn more about acquiring
 Google BigQuery credentials [here][bq-docs-getting-started].
 
 </InfoBox>
@@ -77,8 +79,10 @@ if [dedicated infrastructure][ref-dedicated-infra] is used. Check out the
 | `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to. Required if used with pre-aggregations outside of US. If not set then BQ driver will fail with `Dataset was not found in location US` error | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ⚠️    |
 | `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                                                                                                                                                           | A valid bucket name from cloud storage                                  |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                                                                                                                                                   | `gcp`                                                                   |    ❌    |
-| `CUBEJS_CONCURRENCY`           | The number of concurrent connections each queue has to the database. Default is `10`                                                                                                            | A valid number                                                          |    ❌    |
 | `CUBEJS_DB_MAX_POOL`           | The maximum number of concurrent database connections to pool. Default is `40`                                                                                                                  | A valid number                                                          |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
+
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-source-concurrency
 
 ## Pre-Aggregation Feature Support
 

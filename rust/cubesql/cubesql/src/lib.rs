@@ -2,16 +2,8 @@
     // Clippy bug: https://github.com/rust-lang/rust-clippy/issues/7422
     clippy::nonstandard_macro_braces,
 )]
-#![feature(test)]
-// #![feature(backtrace)]
-#![feature(async_closure)]
-#![feature(box_patterns)]
-// #![feature(slice_internals)]
-#![feature(vec_into_raw_parts)]
-#![feature(hash_set_entry)]
 // #![feature(trace_macros)]
 #![recursion_limit = "2048"]
-#![feature(error_generic_member_access)]
 
 // trace_macros!(false);
 

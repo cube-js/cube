@@ -1,11 +1,55 @@
----
-redirect_from:
-  - /security
----
+# Access control
 
-# Overview
+Cube supports a few methods to authenticates requests to [APIs & integrations][ref-apis].
+Usually, an API supports authentication via [one of these methods][ref-apis-methods]:
 
-In Cube, authorization (or access control) is based on the **security context**.
+* [User name and password](#user-name-and-password) (e.g., used by the [SQL API][ref-sql-api]).
+* [Identity provider](#identity-provider) (e.g., used by the [Cube Cloud for Sheets][ref-cube-cloud-sheets]).
+* [Access token](#access-token) (e.g., used by the [REST API][ref-rest-api]).
+
+Regardless of the method, the authentication flow includes the following steps:
+
+* User identity information (e.g., password or access token) is passed to Cube.
+* Cube validates the identity information or trusts the identity provider.
+* User identity information is optionally enriched with additional attributes,
+such the user's role, via [authentication integration](#authentication-integration).
+* Finally, the API request is associated with a [security context][ref-sec-ctx].
+It is then used to configure [member-level security][ref-mls]
+and [row-level security][ref-rls] as well as set [data access policies][ref-dap].
+
+## User name and password
+
+Some visualization tools (e.g., BI tools) can pass user name and, sometimes, password to Cube.
+
+### Configuration
+
+Relevant configuration options: [`check_sql_auth`][ref-config-check-sql-auth] and [`can_switch_sql_user`][ref-config-can-switch-sql-user].
+
+Relevant environment variables: `CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, `CUBEJS_SQL_SUPER_USER`.
+
+## Identity provider
+
+Some visualization tools (e.g., [Cube Cloud for Sheets][ref-cube-cloud-sheets]) implement
+an OAuth 2.0 flow to authenticate users.
+
+<SuccessBox>
+
+OAuth 2.0 flow is available in Cube Cloud on [Premium and above](https://cube.dev/pricing) product tiers.
+
+</SuccessBox>
+
+During this flow, users are redirected to a login page of an identity provider (e.g., Google)
+where they enter their credentials. Then, the identity provider passes the user identity
+information to Cube Cloud.
+
+This method does not require any configuration.
+
+## Access token
+
+Some visualization tools (e.g., custom front-end applications) can pass access tokens based
+on the [JSON Web Token][wiki-jwt] (JWT) standard to Cube. These tokens can be either generated
+by these applications or obtained from an identity provider. Cube then validates these tokens.
+
 The diagram below shows how it works during the request processing in Cube:
 
 <div style={{ textAlign: "center" }}>
@@ -16,18 +60,44 @@ The diagram below shows how it works during the request processing in Cube:
   />
 </div>
 
-Authentication is handled outside of Cube. A typical use case would be:
+### Configuration
 
-1.  A web server serves an HTML page containing the Cube client, which needs to
-    communicate securely with the Cube API.
-2.  The web server should generate a JWT with an expiry to achieve this. The
-    server could include the token in the HTML it serves or provide the token to
-    the frontend via an XHR request, which is then stored it in local storage or
+Relevant configuration options: [`check_auth`][ref-config-check-auth] and [`jwt`][ref-config-jwt].
+
+Relevant environment variables: `CUBEJS_API_SECRET`, `CUBEJS_JWT_KEY`, `CUBEJS_JWK_URL`,
+`CUBEJS_JWT_AUDIENCE`, `CUBEJS_JWT_ISSUER`, `CUBEJS_JWT_SUBJECT`, `CUBEJS_JWT_CLAIMS_NAMESPACE`.
+
+### Custom authentication
+
+Cube allows you to provide your own JWT verification logic. You can use the
+[`check_auth`][ref-config-check-auth] configuration option to verify a JWT and set the security context.
+
+For example, if you needed to retrieve user information from an LDAP server,
+you might do the following:
+
+```javascript
+module.exports = {
+  checkAuth: async (req, auth) => {
+    try {
+      const userInfo = await getUserFromLDAP(req.get("X-LDAP-User-ID"))
+      return { security_context: userInfo }
+    }
+    catch {
+      throw new Error("Could not authenticate user from LDAP")
+    }
+  }
+}
+```
+
+A typical use case would be:
+
+1.  A web server serves a page which needs to communicate with the Cube API.
+2.  The web server generates a JWT. The
+    server includes the token in the page or provides the token to
+    the frontend via an XHR request. The token is then stored in the local storage or
     a cookie.
-3.  The JavaScript client is initialized using this token, and includes it in
-    calls to the Cube API.
-4.  The token is received by Cube, and verified using any available JWKS (if
-    configured)
+3.  The token is used for calls to the Cube API.
+4.  The token is received by Cube, and verified using any available JWKS (if configured)
 5.  Once decoded, the token claims are injected into the [security
     context][ref-sec-ctx].
 
@@ -38,7 +108,7 @@ can still use it to [pass a security context][ref-sec-ctx].
 
 </InfoBox>
 
-## Generating JSON Web Tokens (JWT)
+### Generating JSON Web Tokens
 
 Authentication tokens are generated based on your API secret. Cube CLI generates
 an API Secret when a project is scaffolded and saves this value in the `.env`
@@ -118,7 +188,7 @@ const cubeApi = cube(
 You can optionally store this token in local storage or in a cookie, so that you
 can then use it to query the Cube API.
 
-## Using JSON Web Key Sets (JWKS)
+### Using JSON Web Key Sets
 
 <InfoBox>
 
@@ -127,8 +197,6 @@ our recipes for using [Auth0][ref-recipe-auth0] or [AWS
 Cognito][ref-recipe-cognito] with Cube.
 
 </InfoBox>
-
-### Configuration
 
 As mentioned previously, Cube supports verifying JWTs using industry-standard
 JWKS. The JWKS can be provided either from a URL, or as a JSON object conforming
@@ -177,7 +245,7 @@ Or configure the same using environment variables:
 CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
 ```
 
-### Verifying claims
+#### Verifying claims
 
 Cube can also verify the audience, subject and issuer claims in JWTs. Similarly
 to JWK configuration, these can also be configured in the `cube.js`
@@ -201,7 +269,7 @@ CUBEJS_JWT_ISSUER='<ISSUER_FROM_IDENTITY_PROVIDER>'
 CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'
 ```
 
-### Custom claims namespace
+#### Custom claims namespace
 
 Cube can also extract claims defined in custom namespaces. Simply specify the
 namespace in your `cube.js` configuration file:
@@ -214,49 +282,42 @@ module.exports = {
 };
 ```
 
-### Caching
+## Authentication integration
 
-Cube caches JWKS by default when
-[`CUBEJS_JWK_URL` or `jwt.jwkUrl` is specified](#configuration).
+When using Cube Cloud, you can enrich the security context with information about
+an authenticated user, obtained during their authentication or loaded via an
+[LDAP integration][ref-ldap-integration].
 
-- If the response contains a `Cache-Control` header, then Cube uses it to
-  determine cache expiry.
-- The keys inside the JWKS are checked for expiry values and used for cache
-  expiry.
-- If an inbound request supplies a JWT referencing a key not found in the cache,
-  the cache is refreshed.
+<SuccessBox>
 
-## Custom authentication
+Authentication integration is available in Cube Cloud on [all product tiers](https://cube.dev/pricing).
 
-Cube also allows you to provide your own JWT verification logic by setting a
-[`checkAuth()`][ref-config-check-auth] function in the `cube.js` configuration
-file. This function is expected to verify a JWT and return its claims as the
-security context.
+</SuccessBox>
 
-As an example, if you needed to retrieve user information from an LDAP server,
-you might do the following:
+You can enable the authentication integration by navigating to the <Btn>Settings → Configuration</Btn>
+of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</Btn> toggle.
 
-```javascript
-module.exports = {
-  checkAuth: async (req, auth) => {
-    try {
-      const userInfo = await getUserFromLDAP(req.get("X-LDAP-User-ID"));
-      return { security_context: userInfo };
-    } catch {
-      throw new Error("Could not authenticate user from LDAP");
-    }
-  },
-};
-```
 
-[link-jwt-docs]:
-  https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
+[wiki-jwt]: https://en.wikipedia.org/wiki/JSON_Web_Token
+[link-jwt-docs]: https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
-[ref-config-check-auth]: /reference/configuration/config#checkauth
+[ref-config-check-auth]: /reference/configuration/config#check_auth
+[ref-config-jwt]: /reference/configuration/config#jwt
+[ref-config-check-sql-auth]: /reference/configuration/config#check_sql_auth
+[ref-config-can-switch-sql-user]: /reference/configuration/config#can_switch_sql_user
 [ref-config-migrate-cube]:
   /product/configuration#migration-from-express-to-docker-template
 [ref-recipe-auth0]: /guides/recipes/auth/auth0-guide
 [ref-recipe-cognito]: /guides/recipes/auth/aws-cognito
 [ref-sec-ctx]: /product/auth/context
-[link-slack]: https://slack.cube.dev/
+[ref-apis]: /product/apis-integrations
+[ref-apis-methods]: /product/apis-integrations#authentication-methods
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-dap]: /product/auth/data-access-policies
+[ref-mls]: /product/auth/member-level-security
+[ref-rls]: /product/auth/row-level-security
+[ref-auth-sso]: /product/workspace/sso
+[ref-ldap-integration]: /product/workspace/sso#ldap-integration
+[ref-cube-cloud-sheets]: /product/apis-integrations/google-sheets

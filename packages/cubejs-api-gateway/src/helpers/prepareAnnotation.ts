@@ -154,6 +154,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
 export default prepareAnnotation;
 export {
   ConfigItem,
+  GranularityMeta,
   annotation,
   prepareAnnotation,
 };

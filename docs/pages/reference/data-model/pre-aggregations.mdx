@@ -6,8 +6,8 @@ redirect_from:
 
 # Pre-aggregations
 
-[Pre-aggregations][ref-pre-aggs] can be defined using the `pre_aggregations`
-parameter of a [cube][ref-ref-cubes].
+You can use the `pre_aggregations` parameter within [cubes][ref-ref-cubes] to define
+[pre-aggregations][ref-pre-aggs].
 
 Pre-aggregations must have, at minimum, a [name](#name) and a [type](#type).
 Pre-aggregations must include all dimensions and measures you will query with.
@@ -921,10 +921,16 @@ cubes:
 
 </CodeTabs>
 
-For possible `every` parameter values please refer to
+To have a pre-aggregation rebuild at a specific time of day, you can use a CRON string with some limitations. For more details about values that can be used with the `every` parameter, please refer to the
 [`refreshKey`][ref-cube-refreshkey] documentation.
 
 You can also use `every` with `sql`:
+
+<WarningBox>
+
+Using CRON strings and `sql` is not supported and will result in a compilation error.
+
+</WarningBox>
 
 <CodeTabs>
 
@@ -1104,10 +1110,20 @@ refreshes.
 
 ### `allow_non_strict_date_range_match`
 
-The `allow_non_strict_date_range_match` property can be used to allow queries to
-match this pre-aggregation when using non-strict date ranges. This is useful
-when using a visualization tools such as [Apache
-Superset][ref-config-downstream-superset] that use loose date ranges by default.
+The `allow_non_strict_date_range_match` parameter is used to allow queries to match a
+pre-aggregation even if a query contains a _non-strict date range_. It is set to `true`
+by default via the [`CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`][ref-env-allow-non-strict]
+environment variable.
+
+If this flag is set to `false`, Cube would check if requested date range exactly matches
+pre-aggregation granularity. For example, if you're requesting half of a day or your date
+range filter is just one millisecond off for a pre-aggregation with the daily granularity,
+Cube would not use such a pre-aggregation.
+
+With this flag set to `true`, that strict check is lifted. It allows queries from BI tools
+to still match pre-aggregations at the cost of a slight potential data discrepancy.
+This is convenient when using Cube with visualization tools such as [Tableau][ref-config-downstream-tableau]
+or [Apache Superset][ref-config-downstream-superset] that use loose date ranges.
 
 <CodeTabs>
 
@@ -1635,6 +1651,13 @@ cubes:
 
 </CodeTabs>
 
+<ReferenceBox>
+
+In some cases, indexes would not work with `original_sql` pre-aggregations.
+Please [track this issue](https://github.com/cube-js/cube/issues/7420).
+
+</ReferenceBox>
+
 #### `type`
 
 This option is used to define [aggregating indexes][ref-aggregating-indexes]
@@ -1750,3 +1773,5 @@ cubes:
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
 [ref-ref-cubes]: /reference/data-model/cube
 [ref-custom-granularity]: /reference/data-model/dimensions#granularities
+[ref-env-allow-non-strict]: /reference/configuration/environment-variables#cubejs-pre-aggregations-allow-non-strict-date-range-match
+[ref-config-downstream-tableau]: /product/configuration/visualization-tools/tableau

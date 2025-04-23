@@ -57,6 +57,7 @@ class CubeApi {
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
     this.castNumerics = typeof options.castNumerics === 'boolean' ? options.castNumerics : false;
+    this.networkErrorRetries = options.networkErrorRetries || 0;
 
     this.updateAuthorizationPromise = null;
   }
@@ -104,6 +105,8 @@ class CubeApi {
       }
     };
 
+    let networkRetries = this.networkErrorRetries;
+
     const loadImpl = async (response, next) => {
       const requestInstance = await requestPromise;
 
@@ -135,7 +138,11 @@ class CubeApi {
 
       skipAuthorizationUpdate = false;
 
-      if (response.status === 502) {
+      if (response.status === 502 ||
+        response.error &&
+        response.error.toLowerCase() === 'network error' &&
+        --networkRetries >= 0
+      ) {
         await checkMutex();
         return continueWait(true);
       }

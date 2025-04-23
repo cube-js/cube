@@ -221,11 +221,11 @@ client to initiate a new data loading query or know if the current invocation
 wasn't initiated earlier by another client. Only Refresh Key freshness
 guarantees are provided in this case.
 
-For situations like real-time analytics or responding to live user changes to
-underlying data, the `refresh_key` query cache can prevent fresh data from
-showing up immediately. For these situations, the cache can effectively be
-disabled by setting the [`refresh_key.every`][ref-schema-ref-cube-refresh-key]
-parameter to something very low, like `1 second`.
+The `refresh_key` parameter can be used to control cache validity.
+For closer-to-real-time use cases, [`refresh_key.every`][ref-schema-ref-cube-refresh-key]
+can be set to a low value, such as `1 minute`, which is the lowest recommended option.
+
+For truly real-time use cases, consider using [streaming pre-aggregations][ref-streaming-preaggs].
 
 ## Inspecting Queries
 
@@ -257,21 +257,26 @@ versions.
 
 Any query that is fulfilled by Cube will use one of the following cache types:
 
-- **[Pre-aggregations](#pre-aggregations) in Cube Store.** This is the most
-advantageous and performant option.
+- **[Pre-aggregations](#pre-aggregations) in Cube Store.** This cache type 
+indicates that the query utilized existing pre-aggregations in Cube Store, 
+so it did not need to go to the database for processing.
 - **Pre-aggregations in Cube Store with a suboptimal query plan.** This cache
-type indicates that queries still benefit from pre-aggregations in Cube Store
-but it's possible to get a performance boost by [using indexes][ref-indexes].
+type indicates that the query ultilized pre-aggregations in Cube Store,
+but that it's possible to get a performance boost by [using indexes][ref-indexes].
 - **Pre-aggregations in the data source.** This cache type indicates that
-queries don't benefit from pre-aggregations in Cube Store and it's possible
-to get a massive performance boost by using Cube Store as [pre-aggregation
+the query utilized pre-aggregations from in the upstream data source. 
+These queries could gain a performance boost by using Cube Store as [pre-aggregation
 storage][ref-storage].
-- **[In-memory cache.](#in-memory-cache)** This cache type indicates that
-queries don't benefit from pre-aggregations at all. Queries directly hit the
-upstream data source and in-memory cache is used to speed up the execution of
-identical queries that arrive within a short period of time.
-- **No cache.** This cache type indicates queries that directly hit the
-upstream data source and have the worst performance possible.
+- **[In-memory cache.](#in-memory-cache)** This cache type indicates that the 
+results were retrieved from Cube's in-memory cache. All query results 
+are stored in Cube's in-memory cache, and if the same query is 
+run within a certain time frame, the results will be retrieved from in-memory 
+cache instead of being processed on the database or in Cube Store. This is the 
+fastest query retrieval method, but it requires that the exact same query was 
+run very recently.
+- **No cache.** This cache type indicates that the query was processed in the upstream 
+data source and was not accelrated using pre-aggregations. These queries could have 
+a significant performance boost if pre-aggregations and Cube Store were utilized.
 
 In [Query History][ref-query-history] and throughout Cube Cloud, colored bolt
 icons are used to indicate the cache type. Also, [Performance
@@ -292,6 +297,7 @@ cache types.
 [ref-schema-ref-cube-refresh-key]:
   /reference/data-model/cube#refresh_key
 [ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
+[ref-streaming-preaggs]: /product/caching/lambda-pre-aggregations#batch-and-streaming-data
 [ref-query-history]: /product/workspace/query-history#inspecting-api-queries
 [ref-perf-insights]: /product/workspace/performance#cache-type
 [ref-indexes]: /product/caching/using-pre-aggregations#using-indexes

@@ -20,7 +20,7 @@ class OracleFilter extends BaseFilter {
   }
 
   /**
-   * "ILIKE" does't support
+   * "ILIKE" is not supported
    */
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
@@ -31,7 +31,7 @@ class OracleFilter extends BaseFilter {
 
 export class OracleQuery extends BaseQuery {
   /**
-   * "LIMIT" on Oracle it's illegal
+   * "LIMIT" on Oracle is illegal
    * TODO replace with limitOffsetClause override
    */
   public groupByDimensionLimit() {

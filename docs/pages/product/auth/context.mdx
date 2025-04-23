@@ -31,6 +31,30 @@ inside:
 - the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
   support [multi-tenant deployments][link-multitenancy].
 
+## Contents
+
+By convention, the contents of the security context should be an object (dictionary)
+with nested structure:
+
+```json
+{
+  "sub": "1234567890",
+  "iat": 1516239022,
+  "user_name": "John Doe",
+  "user_id": 42,
+  "location": {
+    "city": "San Francisco",
+    "state": "CA"
+  }
+}
+```
+
+### Reserved elements
+
+Some features of Cube Cloud (e.g., [authentication integration][ref-auth-integration]
+and [LDAP integration][ref-ldap-integration]) use the `cubeCloud` element in the security context.
+This element is reserved and should not be used for other purposes.
+
 ## Using query_rewrite
 
 You can use [`query_rewrite`][ref-config-queryrewrite] to amend incoming queries
@@ -140,7 +164,7 @@ const cubeToken = jwt.sign({ user_id: 42 }, CUBE_API_SECRET, {
 Using this token, we authorize our request to the Cube API by passing it in the
 Authorization HTTP header.
 
-```bash{outputLines: 2-5}
+```bash
 curl \
   -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7ImlkIjo0Mn0sImlhdCI6MTU1NjAyNTM1MiwiZXhwIjoxNTU4NjE3MzUyfQ._8QBL6nip6SkIrFzZzGq2nSF8URhl5BSSSGZYp7IJZ4" \
   -G \
@@ -220,9 +244,8 @@ def masked(sql, security_context):
   if is_trusted_team:
     return sql
   else:
-    return "\"'--- masked ---'\""
+    return "'--- masked ---'"
 ```
-
 
 ### Usage with pre-aggregations
 
@@ -248,3 +271,5 @@ build one from a JSON object.
 [ref-cubes-compile-ctx]: /reference/data-model/context-variables#compile_context
 [ref-devtools-playground]:
   /product/workspace/playground#editing-the-security-context
+[ref-auth-integration]: /product/auth#authentication-integration
+[ref-ldap-integration]: /product/workspace/sso#ldap-integration

@@ -23,6 +23,10 @@ declare module '@cubejs-client/core' {
     headers?: Record<string, string>;
     credentials?: 'omit' | 'same-origin' | 'include';
     method?: 'GET' | 'PUT' | 'POST' | 'PATCH';
+    /**
+     * Fetch timeout in milliseconds. Would be passed as AbortSignal.timeout()
+     */
+    fetchTimeout?: number;
   };
 
   export interface ITransportResponse<R> {
@@ -81,6 +85,10 @@ declare module '@cubejs-client/core' {
     parseDateMeasures?: boolean;
     resType?: 'default' | 'compact';
     castNumerics?: boolean;
+    /**
+     * How many network errors would be retried before returning to users. Default to 0.
+     */
+    networkErrorRetries?: number;
   };
 
   export type LoadMethodOptions = {
@@ -252,9 +260,13 @@ declare module '@cubejs-client/core' {
      */
     y?: string[];
     /**
-     * If `true` missing dates on the time dimensions will be filled with `0` for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
+     * If `true` missing dates on the time dimensions will be filled with fillWithValue or `0` by default for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
      */
     fillMissingDates?: boolean | null;
+    /**
+     * Value to autofill all the missing date's measure.
+     */
+    fillWithValue?: string | number | null;
     /**
      * Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#result-set-chart-pivot)
      */
@@ -972,6 +984,18 @@ declare module '@cubejs-client/core' {
 
   export type CubeMember = TCubeMeasure | TCubeDimension | TCubeSegment;
 
+  export type TCubeFolder = {
+    name: string;
+    members: string[];
+  };
+
+  export type TCubeHierarchy = {
+    name: string;
+    title?: string;
+    levels: string[];
+    public?: boolean;
+  };
+
   /**
    * @deprecated use DryRunResponse
    */
@@ -998,6 +1022,8 @@ declare module '@cubejs-client/core' {
     measures: TCubeMeasure[];
     dimensions: TCubeDimension[];
     segments: TCubeSegment[];
+    folders: TCubeFolder[];
+    hierarchies: TCubeHierarchy[];
     connectedComponent?: number;
     type?: 'view' | 'cube';
     /**

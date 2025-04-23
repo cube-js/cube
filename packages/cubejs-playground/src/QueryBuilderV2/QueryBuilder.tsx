@@ -1,15 +1,21 @@
-import { useEffect, useMemo } from 'react';
-import cube, { Query } from '@cubejs-client/core';
 import { Alert, Block, Card, PrismCode, Title } from '@cube-dev/ui-kit';
+import cube, { Query } from '@cubejs-client/core';
+import { useEffect, useMemo, ReactNode } from 'react';
 
-import { useLocalStorage } from './hooks';
-import { QueryBuilderProps } from './types';
 import { QueryBuilderContext } from './context';
+import { useLocalStorage } from './hooks';
 import { useQueryBuilder } from './hooks/query-builder';
 import { QueryBuilderInternals } from './QueryBuilderInternals';
+import { QueryBuilderProps } from './types';
 import { useCommitPress } from './utils/use-commit-press';
 
-export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl: string | null }) {
+export function QueryBuilder(
+  props: Omit<QueryBuilderProps, 'apiUrl'> & {
+    displayPrivateItems?: boolean;
+    apiUrl: string | null;
+    children?: ReactNode;
+  }
+) {
   const {
     apiUrl,
     apiToken,
@@ -22,9 +28,12 @@ export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl
     tracking,
     isApiBlocked,
     apiVersion,
+    memberViewType,
     VizardComponent,
     RequestStatusComponent,
     openSqlRunner,
+    displayPrivateItems,
+    disableSidebarResizing,
   } = props;
 
   const cubeApi = useMemo(() => {
@@ -43,10 +52,6 @@ export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl
     // add the last stored timezone if the query is empty
     if (JSON.stringify(queryCopy) === '{}' && storedTimezones[0]) {
       queryCopy.timezone = storedTimezones[0];
-    }
-
-    if (typeof queryCopy.limit !== 'number' || queryCopy.limit < 1 || queryCopy.limit > 50_000) {
-      queryCopy.limit = 5_000;
     }
 
     return queryCopy;
@@ -72,8 +77,10 @@ export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl
     defaultPivotConfig,
     schemaVersion,
     onQueryChange,
+    memberViewType,
     tracking,
     queryValidator,
+    displayPrivateItems,
   });
 
   useEffect(() => {
@@ -86,7 +93,11 @@ export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl
     return runQuery();
   }, true);
 
-  return apiToken && cubeApi && apiUrl ? (
+  if (!apiToken || !cubeApi || !apiUrl) {
+    return null;
+  }
+
+  return (
     <QueryBuilderContext.Provider
       value={{
         runQuery,
@@ -108,6 +119,7 @@ export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl
         VizardComponent,
         RequestStatusComponent,
         openSqlRunner,
+        disableSidebarResizing,
         ...otherProps,
       }}
     >
@@ -122,9 +134,11 @@ export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl
             </Alert>
           )}
         </Block>
+      ) : props.children ? (
+        props.children
       ) : (
         <QueryBuilderInternals />
       )}
     </QueryBuilderContext.Provider>
-  ) : null;
+  );
 }

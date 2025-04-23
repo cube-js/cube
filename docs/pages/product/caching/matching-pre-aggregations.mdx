@@ -21,14 +21,18 @@ If you don't know why a query doesn't match a pre-aggregation, check
 
 ## Eligible pre-aggregations
 
-Cube will search for matching pre-aggregations in all cubes that define
-members in the query.
-
-Pre-aggregations are tested in the order they are defined in the data model
+Cube goes through the following steps to determine if there are any pre-aggregations
+matching a query:
+- **Members (e.g., dimensions, measures, etc.) are extracted from the query.**
+If the query contains members of a [view][ref-views], they are substituted by
+respective members of cubes where they are defined. It means that pre-aggregations
+defined for cube members would also match queries with view members. There's no need
+to define additional pre-aggregations for views.
+- Cube looks for pre-aggregations in all cubes that define members in the query.
+- Pre-aggregations are tested in the order they are defined in the data model
 file. However, `rollup` pre-aggregations are tested before `original_sql`
 pre-aggregations.
-
-The first pre-aggregation that matches a query is used.  
+- The first pre-aggregation that [matches](#matching-algorithm) a query is used.  
 
 ## Matching algorithm
 
@@ -47,7 +51,7 @@ checked for additivity.
 - **Does every member of the query exist in the pre-aggregation?** Cube checks
 that the pre-aggregation contains all dimensions, filter dimensions, and leaf
 measures from the query.
-- **Are any query measures multiplied in the cube's data schema?** Cube checks
+- **Are any query measures multiplied in the cube's data model?** Cube checks
 if any measures are multiplied via a [`one_to_many`
 relationship][ref-schema-joins-rel] between cubes in the query.
 - **Does the query specify granularity for its time dimension?** Cube checks
@@ -73,9 +77,10 @@ the values should be the start and end days of the month, i.e.,
 `['2020-01-01T00:00:00.000', '2020-01-31T23:59:59.999']`; when the granularity
 is `day`, the values should be the start and end hours of the day, i.e.,
 `['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']`. Date ranges are
-inclusive, and the minimum granularity is `second`. Use the
-[`allow_non_strict_date_range_match`][ref-non-strict-date-range-match] to allow
-a pre-aggregation to match a non-strict date range anyway.
+inclusive, and the minimum granularity is `second`. By default, this is ensured
+via the [`allow_non_strict_date_range_match`][ref-non-strict-date-range-match]
+parameter of pre-aggregations: it allows to match _non-strict date ranges_ and is
+set to `true` by default.
 - **The time zone in the query must match the time zone of a pre-aggregation.**
 You can configure a list of time zones that pre-aggregations will be built for
 using the [`scheduled_refresh_time_zones`][ref-conf-scheduled-refresh-time-zones]
@@ -130,3 +135,4 @@ configuration option.
 [ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [ref-primary-key]: /reference/data-model/dimensions#primary_key
 [ref-custom-granularity]: /reference/data-model/dimensions#granularities
+[ref-views]: /product/data-modeling/concepts#views

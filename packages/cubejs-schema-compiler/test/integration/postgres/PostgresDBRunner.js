@@ -25,13 +25,19 @@ export class PostgresDBRunner extends BaseDbRunner {
     return {
       testQueries(queries, prepareDataSet) {
         prepareDataSet = prepareDataSet || defaultFixture;
-        return db.tx(tx => tx.query('SET TIME ZONE \'UTC\'')
-          .then(() => prepareDataSet(tx)
-            .then(() => queries
-              .map(([query, params]) => () => tx.query(query, params).catch(e => {
-                throw new Error(`Execution failed for '${query}', params: ${params}: ${e.stack || e}`);
-              })).reduce((a, b) => a.then(b), Promise.resolve()))
-            .then(r => JSON.parse(JSON.stringify(r)))));
+        return db.tx(async tx => {
+          await tx.query('SET TIME ZONE \'UTC\'');
+          await prepareDataSet(tx);
+          let lastResult;
+          for (const [query, params] of queries) {
+            try {
+              lastResult = await tx.query(query, params);
+            } catch (e) {
+              throw new Error(`Execution failed for '${query}', params: ${params}: ${e.stack || e}`);
+            }
+          }
+          return JSON.parse(JSON.stringify(lastResult));
+        });
       },
       close() {
         return pgp.end();
@@ -125,7 +131,7 @@ export class PostgresDBRunner extends BaseDbRunner {
   }
 
   async containerLazyInit() {
-    const version = process.env.TEST_PGSQL_VERSION || '9.6.8';
+    const version = process.env.TEST_PGSQL_VERSION || '12.22';
 
     return new GenericContainer(`postgres:${version}`)
       .withEnvironment({

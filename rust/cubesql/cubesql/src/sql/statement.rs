@@ -480,9 +480,7 @@ trait Visitor<'ast, E: Error> {
                 ConnectionError::from(ErrorResponse::error(
                     ErrorCode::SyntaxError,
                     format!(
-                        "Unable to extract position for placeholder, actual: {}, err: {}",
-                        name,
-                        err.to_string()
+                        "Unable to extract position for placeholder, actual: {name}, err: {err}"
                     ),
                 ))
             })?;
@@ -1094,7 +1092,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
             ast::Value::SingleQuotedString(str)
             | ast::Value::DoubleQuotedString(str)
             | ast::Value::NationalStringLiteral(str) => {
-                if vec!["false", "true"].contains(&str.as_str()) || str.len() < 4 {
+                if ["false", "true"].contains(&str.as_str()) || str.len() < 4 {
                     return Ok(());
                 }
                 *str = "[REPLACED]".to_string();

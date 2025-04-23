@@ -116,6 +116,35 @@ describe('lambda', () => {
     expect(response.loadResponse.results[0].data.length).toEqual(3);
   });
 
+  test('Query lambda with ksql with create table ', async () => {
+    const query: Query = {
+      measures: ['RequestsNonReadOnly.count'],
+      dimensions: ['RequestsNonReadOnly.tenant_id', 'RequestsNonReadOnly.request_id'],
+      timeDimensions: [
+        {
+          dimension: 'RequestsNonReadOnly.timestamp',
+          granularity: 'day'
+        }
+      ],
+    };
+    // First call to trigger the pre-aggregation build
+    await client.load(query);
+    // We have to wait for cubestore to consume the data from Kafka. There is no way to know when it's done right now.
+    await pausePromise(5000);
+
+    const response = await client.load(query);
+
+    // @ts-ignore
+    expect(response.loadResponse.results[0].data.map(i => i['RequestsNonReadOnly.request_id'])).toEqual([
+      'req-2',
+      'req-1',
+      'req-stream-2'
+    ]);
+
+    // @ts-ignore
+    expect(response.loadResponse.results[0].data.length).toEqual(3);
+  });
+
   test('query', async () => {
     const query: Query = {
       measures: ['Orders.count'],

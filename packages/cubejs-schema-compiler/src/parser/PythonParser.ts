@@ -19,6 +19,7 @@ import {
   LambdefContext,
   Single_string_template_atomContext,
   ArglistContext,
+  CallArgumentsContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import { Python3ParserVisitor } from './Python3ParserVisitor';
@@ -36,7 +37,7 @@ const nodeVisitor = <R>(visitor: { visitNode: (node: RuleNode, children: R[]) =>
     const result: R[] = [];
     for (let i = 0; i < node.childCount; i++) {
       const child = node.getChild(i);
-      if (child && child.childCount) {
+      if (child?.childCount) {
         result.push(child.accept(this));
       }
     }
@@ -175,13 +176,22 @@ export class PythonParser {
           } else {
             return singleNodeReturn();
           }
-        } else if (node instanceof TrailerContext) {
-          const name = node.NAME();
+        } else if (node instanceof CallArgumentsContext) {
           const argsList = node.arglist();
           if (argsList) {
-            // trailer with arglist have a single child: arguments _list_
+            // arglist have a single child: arguments _list_
             const args = children[0];
             return { call: args };
+          } else {
+            return { call: [] };
+          }
+        } else if (node instanceof TrailerContext) {
+          const name = node.NAME();
+          const argsList = node.callArguments();
+          if (argsList) {
+            // trailer with callArguments have a single child: CallArgumentsContext
+            // which was already processed (see other if branch)
+            return children[0];
           } else if (name) {
             return { identifier: t.identifier(name.text) };
           } else {

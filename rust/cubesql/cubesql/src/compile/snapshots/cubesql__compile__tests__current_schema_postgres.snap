@@ -1,9 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"SELECT current_schema()\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"SELECT current_schema()\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
-+------------------+
-| current_schema() |
-+------------------+
-| public           |
-+------------------+
++----------------+
+| current_schema |
++----------------+
+| public         |
++----------------+

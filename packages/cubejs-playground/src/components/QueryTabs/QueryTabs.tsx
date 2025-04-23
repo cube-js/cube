@@ -17,17 +17,43 @@ import { useChartRendererStateMethods } from './ChartRendererStateProvider';
 
 const { TabPane } = Tabs;
 
-const StyledTabs = styled(Tabs)`
+export const StyledTabs = styled(Tabs)`
+  margin-top: 0;
+  display: grid;
+  max-width: 100%;
+  grid-template-rows: min-content 1fr;
+  overflow: hidden;
+
   & .ant-tabs-nav {
-    background: #fff;
-    padding: 12px 16px 0;
+    padding: 0;
     margin: 0;
+    overflow: hidden;
+    background-color: white;
+  }
+
+  & .ant-tabs-nav-wrap {
+    padding: 8px 8px 0;
   }
 
   & .ant-tabs-extra-content {
-    margin-left: 32px;
+    padding: 8px;
+    place-self: start;
+  }
+
+  & .ant-tabs-tab {
+    margin: 0 24px 0 0;
+  }
+
+  & .ant-tabs-content-holder {
+    position: relative;
+    display: flex;
+  }
+
+  & .ant-tabs-tab {
+    border-radius: var(--radius) var(--radius) 0 0 !important;
   }
 `;
+
 
 type QueryTab = {
   id: string;
@@ -246,7 +272,7 @@ export function QueryTabs({
       }),
     });
   }
-  
+
   function setTabName(tabId: string, name: string) {
     saveTabs({
       ...queryTabs,
@@ -327,7 +353,7 @@ export function QueryTabs({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     setEditableTabId(undefined);
-                    
+
                     if (editableTabValue.trim()) {
                       setTabName(tab.id, editableTabValue.trim());
                       setEditableTabValue('');

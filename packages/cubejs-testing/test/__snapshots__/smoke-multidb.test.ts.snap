@@ -1,5 +1,21 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`multidb SQL pushdown queries to different data sources: Products 1`] = `
+Array [
+  Object {
+    "name": "apples",
+  },
+]
+`;
+
+exports[`multidb SQL pushdown queries to different data sources: Suppliers 1`] = `
+Array [
+  Object {
+    "company": "Fruits Inc",
+  },
+]
+`;
+
 exports[`multidb query: query 1`] = `
 Array [
   Object {

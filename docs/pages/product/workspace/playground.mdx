@@ -14,21 +14,27 @@ or use the [JavaScript SDKs][ref-js-sdk] to build your own query builder.
 
 <SuccessBox>
 
-Playground is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
+Playground is available in Cube Cloud on
+[all product tiers](https://cube.dev/pricing).
 
 </SuccessBox>
 
-<SuccessBox>
+<InfoBox>
 
 Playground is available in Cube Core at [localhost:4000](http://localhost:4000)
 when it's run in the [development mode][ref-dev-mode].
 
-</SuccessBox>
+</InfoBox>
 
 You can [view](#viewing-the-data-model) the data model entities or [search](#searching-the-data-model)
 for them, [compose](#composing-queries) a query from scratch or [paste](#pasting-a-query)
 an exsiting query, view [results](#viewing-results), check a [generated
 query](#viewing-a-generated-query), or copy equivalent [queries for data APIs](#copying-api-queries).
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/4epojUSQvOU"
+  aspectRatio={4/3}
+/>
 
 ## Viewing the data model
 
@@ -41,7 +47,8 @@ on a cube or a view to view a list of its members.
   src="https://ucarecdn.com/08d5cc69-431d-43d9-8da4-804029adf1fa/"
 />
 
-Measures, dimensions, and segments are shown using distinct colors. If a member has
+Members of cubes and views (i.e., measures, dimensions, hierarchies, folders, etc.)
+are shown using distinct colors and icons. If a member has
 a [title][ref-data-model-title] or a [description][ref-data-model-description] set
 in the data model, they will be shown in a tooltip. If a member is not
 [public][ref-data-model-public], you will see a lock sign next to it.
@@ -76,7 +83,8 @@ or existing query.
 
 You can compose a new query by selecting desired measures, dimensions, and segments
 in the sidebar on the left. Click on the _funnel_ icon next to any member to add a filter
-for it to the query.
+for it to the query or use the <Btn>Filters</Btn> pane to add filters, including filters
+with [advanced boolean logic][ref-boolean-filters].
 
 Click <Btn>All members</Btn> or <Btn>Used members</Btn> to show only members of the
 query or all available members. Click <Btn>Reset</Btn> to remove all members from the query.
@@ -96,7 +104,8 @@ Use the <Btn>Order</Btn> drop-down on the right to specify how the
 
 Use the <Btn>Options</Btn> drop-down on the right to specify if the query shall be
 [ungrouped][ref-ungrouped-query], to set a [time zone][ref-time-zone], or to set
-a [row limit][ref-row-limit] and an offset.
+a [row limit][ref-row-limit] and an offset. You can also request the count of all rows
+in the result set as if there's no limit present.
 
 <Screenshot
   highlight="inset(35% 0 15% 80% round 10px)"
@@ -155,6 +164,13 @@ on the <Btn>Generated SQL</Btn> tab. Click <Btn>Copy</Btn> to put it into your c
   src="https://ucarecdn.com/d2b6e514-9219-49ea-bae6-bcd0f1936542/"
 />
 
+<InfoBox>
+
+Note that a generated query can contain placeholders, e.g., `?` or `$1`, for parameters
+that Cube passes to an underlying data source driver later when executing the query.
+
+</InfoBox>
+
 ## Copying API queries
 
 View the queries for respective data APIs on the <Btn>SQL API</Btn>, <Btn>REST API</Btn>,
@@ -206,3 +222,4 @@ manually.
 [ref-time-zone]: /product/apis-integrations/queries#time-zone
 [ref-row-limit]: /product/apis-integrations/queries#limit
 [ref-chart-prototyping]: /product/workspace/vizard
+[ref-boolean-filters]: /product/apis-integrations/rest-api/query-format#boolean-logical-operators

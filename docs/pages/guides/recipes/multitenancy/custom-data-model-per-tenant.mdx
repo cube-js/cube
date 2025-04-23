@@ -67,10 +67,10 @@ module.exports = {
 
 ## Data modeling
 
-### Customizing publicity
+### Customizing member-level access
 
-The simplest way to customize the data models is by changing the [publicity][ref-publicity]
-of data model entities. It works great for use cases when tenants share parts of
+The simplest way to customize the data models is by changing the [member-level access][ref-mls]
+to data model entities. It works great for use cases when tenants share parts of
 their data models.
 
 By setting the `public` parameter of [cubes][ref-cubes-public], [views][ref-views-public],
@@ -168,7 +168,7 @@ cube(`cube_x`, {
 
 </CodeTabs>
 
-For your convenience, [Playground][ref-playground] ignores publicity configration
+For your convenience, [Playground][ref-playground] ignores member-level access configration
 and marks data model entities that are not accessible for querying through
 [APIs][ref-apis] with the lock icon.
 
@@ -182,8 +182,8 @@ And here's the *perspective* of `Bob`:
 
 ### Customizing other parameters
 
-Similarly to [customizing publicity](#customizing-publicity), you can set other
-parameters of data model entities for each tenant individually:
+Similarly to [customizing member-level access](#customizing-member-level-access),
+you can set other parameters of data model entities for each tenant individually:
 
 - By setting `sql` or [`sql_table` parameters][ref-cube-sql-table] of cubes, you
 can ensure that each tenant accesses data from its own tables or database schemas.
@@ -364,7 +364,7 @@ code that fetches data model files for each tenant.
 [ref-scheduled-refresh-contexts]: /reference/configuration/config#scheduled_refresh_contexts
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
 [ref-config-files]: /product/configuration#cubepy-and-cubejs-files
-[ref-publicity]: /product/data-modeling/concepts/publicity
+[ref-mls]: /product/auth/member-level-security
 [ref-cubes-public]: /reference/data-model/cube#public
 [ref-views-public]: /reference/data-model/view#public
 [ref-measures-public]: /reference/data-model/measures#public

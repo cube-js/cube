@@ -32,14 +32,16 @@ impl CommonUtils {
             .static_data()
             .primary_keys
             .get(cube_name)
-            .unwrap();
+            .cloned()
+            .unwrap_or_else(|| vec![]);
 
         let dims = primary_keys
             .iter()
-            .map(|d| {
+            .map(|d| -> Result<_, CubeError> {
                 let full_name = format!("{}.{}", cube_name, d);
                 let evaluator = evaluator_compiler.add_dimension_evaluator(full_name.clone())?;
-                BaseDimension::try_new(full_name, self.query_tools.clone(), evaluator)
+                let dim = BaseDimension::try_new_required(evaluator, self.query_tools.clone())?;
+                Ok(dim)
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(dims)

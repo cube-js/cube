@@ -379,7 +379,7 @@ export class QueryOrchestrator {
       preAggregations.map(p => {
         const { preAggregation } = p.preAggregation;
         const partition = p.partitions[0];
-        preAggregation.dataSource = (partition && partition.dataSource) || 'default';
+        preAggregation.dataSource = partition?.dataSource || 'default';
         preAggregation.preAggregationsSchema = preAggregationsSchema;
         return preAggregation;
       }),
@@ -448,11 +448,11 @@ export class QueryOrchestrator {
     return this.preAggregations.cancelQueriesFromQueue(queryKeys, dataSource);
   }
 
-  public async subscribeQueueEvents(id, callback) {
+  public async subscribeQueueEvents(id: string, callback) {
     return this.getQueueEventsBus().subscribe(id, callback);
   }
 
-  public async unSubscribeQueueEvents(id) {
+  public async unSubscribeQueueEvents(id: string) {
     return this.getQueueEventsBus().unsubscribe(id);
   }
 

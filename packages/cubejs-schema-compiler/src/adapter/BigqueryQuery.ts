@@ -187,11 +187,21 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public subtractTimestampInterval(date, interval) {
-    return `TIMESTAMP_SUB(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit)) {
+      return this.timeStampCast(`DATETIME_SUB(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
+    }
+
+    return `TIMESTAMP_SUB(${date}, INTERVAL ${intervalFormatted})`;
   }
 
   public addTimestampInterval(date, interval) {
-    return `TIMESTAMP_ADD(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
+    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
+    if (['YEAR', 'MONTH', 'QUARTER'].includes(timeUnit)) {
+      return this.timeStampCast(`DATETIME_ADD(DATETIME(${date}), INTERVAL ${intervalFormatted})`);
+    }
+
+    return `TIMESTAMP_ADD(${date}, INTERVAL ${intervalFormatted})`;
   }
 
   public nowTimestampSql() {
@@ -237,13 +247,13 @@ export class BigqueryQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
-    templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
+    templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {% if date_part|upper == \'WEEK\' %}{{ \'WEEK(MONDAY)\' }}{% else %}{{ date_part }}{% endif %})';
     templates.functions.LOG = 'LOG({{ args_concat }}{% if args[1] is undefined %}, 10{% endif %})';
     templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.functions.STRPOS = 'STRPOS({{ args_concat }})';
     templates.functions.DATEDIFF = 'DATETIME_DIFF(CAST({{ args[2] }} AS DATETIME), CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
     // DATEADD is being rewritten to DATE_ADD
-    // templates.functions.DATEADD = 'DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})';
+    templates.functions.DATE_ADD = '{% if date_part|upper in [\'YEAR\', \'MONTH\', \'QUARTER\'] %}TIMESTAMP(DATETIME_ADD(DATETIME({{ args[0] }}), INTERVAL {{ interval }} {{ date_part }})){% else %}TIMESTAMP_ADD({{ args[0] }}, INTERVAL {{ interval }} {{ date_part }}){% endif %}';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     delete templates.functions.TO_CHAR;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
@@ -257,6 +267,8 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.double = 'FLOAT64';
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
+    templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
+    templates.join_types.full = 'FULL';
     return templates;
   }
 }

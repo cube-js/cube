@@ -1,5 +1,7 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
+import { MeasureDefinition } from '../compiler/CubeEvaluator';
+import { CubeSymbols } from "../compiler/CubeSymbols";
 
 export class BaseMeasure {
   public readonly expression: any;
@@ -9,6 +11,102 @@ export class BaseMeasure {
   public readonly expressionName: any;
 
   public readonly isMemberExpression: boolean = false;
+
+  protected readonly patchedMeasure: MeasureDefinition | null = null;
+
+  public readonly joinHint: Array<string> = [];
+
+  protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{sql: Function}>): MeasureDefinition {
+    const source = this.query.cubeEvaluator.measureByPath(sourceMeasure);
+
+    let resultMeasureType = source.type;
+    if (newMeasureType !== null) {
+      switch (source.type) {
+        case 'sum':
+        case 'avg':
+        case 'min':
+        case 'max':
+          switch (newMeasureType) {
+            case 'sum':
+            case 'avg':
+            case 'min':
+            case 'max':
+            case 'count_distinct':
+            case 'count_distinct_approx':
+              // Can change from avg/... to count_distinct
+              // Latter does not care what input value is
+              // ok, do nothing
+              break;
+            default:
+              throw new UserError(
+                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+              );
+          }
+          break;
+        case 'count_distinct':
+        case 'count_distinct_approx':
+          switch (newMeasureType) {
+            case 'count_distinct':
+            case 'count_distinct_approx':
+              // ok, do nothing
+              break;
+            default:
+              // Can not change from count_distinct to avg/...
+              // Latter do care what input value is, and original measure can be defined on strings
+              throw new UserError(
+                `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+              );
+          }
+          break;
+        default:
+          // Can not change from string, time, boolean, number
+          // Aggregation is already included in SQL, it's hard to patch that
+          // Can not change from count
+          // There's no SQL at all
+          throw new UserError(
+            `Unsupported measure type replacement for ${sourceMeasure}: ${source.type} => ${newMeasureType}`
+          );
+      }
+
+      resultMeasureType = newMeasureType;
+    }
+
+    const resultFilters = source.filters ?? [];
+
+    if (addFilters.length > 0) {
+      switch (resultMeasureType) {
+        case 'sum':
+        case 'avg':
+        case 'min':
+        case 'max':
+        case 'count':
+        case 'count_distinct':
+        case 'count_distinct_approx':
+          // ok, do nothing
+          break;
+        default:
+          // Can not add filters to string, time, boolean, number
+          // Aggregation is already included in SQL, it's hard to patch that
+          throw new UserError(
+            `Unsupported additional filters for measure ${sourceMeasure} type ${source.type}`
+          );
+      }
+
+      resultFilters.push(...addFilters);
+    }
+
+    const patchedFrom = this.query.cubeEvaluator.parsePath('measures', sourceMeasure);
+
+    return {
+      ...source,
+      type: resultMeasureType,
+      filters: resultFilters,
+      patchedFrom: {
+        cubeName: patchedFrom[0],
+        name: patchedFrom[1],
+      },
+    };
+  }
 
   public constructor(
     protected readonly query: BaseQuery,
@@ -20,6 +118,20 @@ export class BaseMeasure {
       // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = measure.expressionName || `${measure.cubeName}.${measure.name}`;
       this.isMemberExpression = !!measure.definition;
+
+      if (measure.expression.type === 'PatchMeasure') {
+        this.patchedMeasure = this.preparePatchedMeasure(
+          measure.expression.sourceMeasure,
+          measure.expression.replaceAggregationType,
+          measure.expression.addFilters,
+        );
+      }
+    } else {
+      // TODO move this `as` to static types
+      const measurePath = measure as string;
+      const { path, joinHint } = CubeSymbols.joinHintFromPath(measurePath);
+      this.measure = path;
+      this.joinHint = joinHint;
     }
   }
 
@@ -74,10 +186,16 @@ export class BaseMeasure {
   }
 
   public measureDefinition() {
+    if (this.patchedMeasure) {
+      return this.patchedMeasure;
+    }
     return this.query.cubeEvaluator.measureByPath(this.measure);
   }
 
   public definition(): any {
+    if (this.patchedMeasure) {
+      return this.patchedMeasure;
+    }
     if (this.expression) {
       return {
         sql: this.expression,

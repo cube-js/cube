@@ -2,12 +2,12 @@
 
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) • [Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
-[![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
+[![npm version](https://badge.fury.io/js/%40cubejs-client%2Fngx.svg)](https://badge.fury.io/js/%40cubejs-client%2Fngx)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
 # Cube.js Angular Client
 
-Cube.js Angular is an Angular Module for Angular 6+.
+Cube.js Angular is an Angular Module for Angular 12+.
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 

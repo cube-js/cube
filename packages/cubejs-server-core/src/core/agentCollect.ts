@@ -1,6 +1,8 @@
 import { getEnv } from '@cubejs-backend/shared';
 import http from 'http';
 import https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { HttpProxyAgent } from 'http-proxy-agent';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 import WebSocket from 'ws';
@@ -50,12 +52,12 @@ class WebSocketTransport implements AgentTransport {
       clearTimeout(this.pingTimeout);
       this.onClose();
     });
-  
+
     this.wsClient.on('error', e => {
       connectionPromiseReject(e);
       this.logger('Agent Error', { error: (e.stack || e).toString() });
     });
-  
+
     this.wsClient.on('message', (data: WebSocket.Data) => {
       try {
         const { method, params } = JSON.parse(data.toString());
@@ -103,17 +105,45 @@ class WebSocketTransport implements AgentTransport {
   }
 }
 
+function isOnNoProxyList(url: string): boolean {
+  const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+  if (!noProxy) {
+    return false;
+  }
+
+  const parsedUrl = new URL(url);
+  const { hostname } = parsedUrl;
+  const noProxyList = noProxy.split(',').map((entry) => entry.trim());
+
+  return noProxyList.some((entry) => {
+    if (entry === '*') {
+      return true;
+    }
+    if (entry.startsWith('.')) {
+      return hostname.endsWith(entry);
+    }
+
+    return hostname === entry;
+  });
+}
+
 class HttpTransport implements AgentTransport {
-  private agent: http.Agent | https.Agent;
+  private agent: http.Agent | https.Agent | HttpProxyAgent<string> | HttpsProxyAgent<string>;
 
   public constructor(
     private readonly endpointUrl: string
   ) {
-    const AgentClass = endpointUrl.startsWith('https') ? https.Agent : http.Agent;
-    this.agent = new AgentClass({
+    const agentParams = {
       keepAlive: true,
       maxSockets: getEnv('agentMaxSockets')
-    });
+    };
+    if (!isOnNoProxyList(endpointUrl) && (process.env.http_proxy || process.env.https_proxy)) {
+      this.agent = endpointUrl.startsWith('https') ?
+        new HttpsProxyAgent(process.env.https_proxy, agentParams) :
+        new HttpProxyAgent(process.env.http_proxy, agentParams);
+    } else {
+      this.agent = endpointUrl.startsWith('https') ? new https.Agent(agentParams) : new http.Agent(agentParams);
+    }
   }
 
   public ready() {
@@ -167,7 +197,7 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
       const sentAt = new Date().toJSON();
       const result = await transport.send(toFlush.map(r => ({ ...r, sentAt })));
       if (!result && retries > 0) return flush(toFlush, retries - 1);
-  
+
       return true;
     } catch (e: any) {
       if (retries > 0) return flush(toFlush, retries - 1);

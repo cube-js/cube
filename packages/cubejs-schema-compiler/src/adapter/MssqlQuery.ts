@@ -4,6 +4,7 @@ import moment from 'moment-timezone';
 import { QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import { BaseSegment } from './BaseSegment';
 import { ParamAllocator } from './ParamAllocator';
 
 const abbrs = {
@@ -54,9 +55,31 @@ class MssqlFilter extends BaseFilter {
   }
 }
 
+class MssqlSegment extends BaseSegment {
+  public filterToWhere(): string {
+    const where = super.filterToWhere();
+
+    const context = this.query.safeEvaluateSymbolContext();
+    if (context.rollupQuery) {
+      // Segment itself will be rendered as reference for rollupQuery
+      // In MSSQL using just `WHERE (segment_column) AND (other_filter)` is incorrect, because
+      // `segment_column` is not of boolean type, but of `BIT` type
+      // Correct way to work with them is to use `WHERE segment_column = 1`
+      // This relies on `wrapSegmentForDimensionSelect` mapping segment to a `BIT` data type
+      return `${where} = 1`;
+    }
+
+    return where;
+  }
+}
+
 export class MssqlQuery extends BaseQuery {
   public newFilter(filter) {
     return new MssqlFilter(this, filter);
+  }
+
+  public newSegment(segment): BaseSegment {
+    return new MssqlSegment(this, segment);
   }
 
   public castToString(sql) {
@@ -72,7 +95,7 @@ export class MssqlQuery extends BaseQuery {
   }
 
   public timeStampCast(value: string) {
-    return this.dateTimeCast(value);
+    return `CAST(${value} AS DATETIMEOFFSET)`;
   }
 
   public dateTimeCast(value: string) {
@@ -89,16 +112,16 @@ export class MssqlQuery extends BaseQuery {
    * The formula operates with seconds diffs so it won't produce human-expected dates aligned with offset date parts.
    */
   public dateBin(interval: string, source: string, origin: string): string {
-    const beginOfTime = this.timeStampCast('DATEFROMPARTS(1970, 1, 1)');
+    const beginOfTime = this.dateTimeCast('DATEFROMPARTS(1970, 1, 1)');
     const timeUnit = this.diffTimeUnitForInterval(interval);
 
     // Need to explicitly cast one argument of floor to float to trigger correct sign logic
     return `DATEADD(${timeUnit},
         FLOOR(
-          CAST(DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) AS FLOAT) /
+          CAST(DATEDIFF(${timeUnit}, ${this.dateTimeCast(`'${origin}'`)}, ${source}) AS FLOAT) /
           DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})
         ) * DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)}),
-        ${this.timeStampCast(`'${origin}'`)}
+        ${this.dateTimeCast(`'${origin}'`)}
     )`;
   }
 
@@ -225,6 +248,8 @@ export class MssqlQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     delete templates.expressions.ilike;
+    // NOTE: this template contains a comma; two order expressions are being generated
+    templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'BIT';
     templates.types.integer = 'INT';

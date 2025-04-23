@@ -106,7 +106,7 @@ timeouts. If you are experiencing connection issues, please check the following:
 
 ## Using dedicated pre-aggregation storage
 
-On the Enterprise Premier plan, you get an option to supply your own S3 bucket to
+On the Enterprise Premier product tier, you get an option to supply your own S3 bucket to
 be used as an underlying storage for Cube Store pre-aggregated data. This
 allows you to keep all data at-rest fully within your infrastructure while
 still leveraging the full power of the Cube Cloud for managed compute.
@@ -132,7 +132,12 @@ Customer Success Manager and share with them the following:
 [aws-docs-vpc-peering-routing]:
   https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html
 [aws-docs-vpc-peering]:
-  https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
-[aws-docs-vpc-security-group]: https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
+  https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html [aws-docs-vpc-security-group]: https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
 [wiki-cidr-block]:
   https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_blocks
+
+## Supported Regions
+
+We support all general-purpose regions. Cube Store is currently located only in
+`US East 2` and `EU West 1` so pre-aggregations performance might depend on geographical
+proximity to it.

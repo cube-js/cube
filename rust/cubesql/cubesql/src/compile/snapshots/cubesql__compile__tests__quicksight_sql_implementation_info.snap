@@ -1,9 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(r#\"\n                SELECT character_value, version() \n                FROM INFORMATION_SCHEMA.SQL_IMPLEMENTATION_INFO\n                WHERE implementation_info_id IN ('17','18')\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(r#\"\n                SELECT character_value, version()\n                FROM INFORMATION_SCHEMA.SQL_IMPLEMENTATION_INFO\n                WHERE implementation_info_id IN ('17','18')\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
 ---
 +-----------------+-----------------------------------+
-| character_value | version()                         |
+| character_value | version                           |
 +-----------------+-----------------------------------+
 | PostgreSQL      | PostgreSQL 14.2 on x86_64-cubesql |
 | 14.02.0000)     | PostgreSQL 14.2 on x86_64-cubesql |

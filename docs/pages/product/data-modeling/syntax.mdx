@@ -38,7 +38,7 @@ model
 Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
 JavaScript syntax. YAML data model files should have the `.yml` extension,
 whereas JavaScript data model files should end with `.js`. You can mix YAML and
-JavaScript files within a single data model. 
+JavaScript files within a single data model.
 
 <CodeTabs>
 
@@ -539,10 +539,154 @@ LEFT JOIN contacts "contacts"
   ON "users".contact_id = "contacts".id
 ```
 
+### `{cube.sql()}` function
+
+When defining a cube, you can reference the `sql` parameter of another cube,
+effectively reusing the SQL query it's defined on. This is particularly useful
+when defining [polymorphic cubes][ref-polymorphism] or using [data blending][ref-data-blending].
+
+Consider the following data model:
+
+<CodeTabs>
+
+```javascript
+cube(`organisms`, {
+  sql_table: `organisms`
+})
+
+cube(`animals`, {
+  sql: `
+    SELECT *
+    FROM ${organisms.sql()}
+    WHERE kingdom = 'animals'
+  `
+})
+
+cube(`dogs`, {
+  sql: `
+    SELECT *
+    FROM ${animals.sql()}
+    WHERE species = 'dogs'
+  `,
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: organisms
+    sql_table: organisms
+
+  - name: animals
+    sql: >
+      SELECT *
+      FROM {organisms.sql()}
+      WHERE kingdom = 'animals'
+
+  - name: dogs
+    sql: >
+      SELECT *
+      FROM {animals.sql()}
+      WHERE species = 'dogs'
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
+
+If you query for `dogs.count`, Cube will generate the following SQL:
+
+```sql
+SELECT count(*) "dogs__count"
+FROM (
+  SELECT *
+  FROM (
+    SELECT *
+    FROM organisms
+    WHERE kingdom = 'animals'
+  )
+  WHERE species = 'dogs'
+) AS "dogs"
+```
+
+### Curly braces and escaping
+
+As you can see in the examples above, within [SQL expressions][self-sql-expressions],
+curly braces are used to reference cubes and members.
+
+In YAML data models, use `{reference}`:
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT id, created_at
+      FROM {other_cube.sql()}
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: status_x2
+        sql: "{status} || ' ' || {status}"
+        type: string
+```
+
+In JavaScript data models, use `${reference}` in [JavaScript template
+literals][link-js-template-literals] (mind the dollar sign):
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT id, created_at
+    FROM ${other_cube.sql()}
+  `,
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    status_x2: {
+      sql: `${status} || ' ' || ${status}`,
+      type: `string`
+    }
+  }
+})
+```
+
+If you need to use literal, non-referential curly braces in YAML, e.g.,
+to define a JSON object, you can escape them with a backslash:
+
+```yaml
+cubes:
+  - name: json_object_in_postgres
+    sql: SELECT CAST('\{"key":"value"\}'::JSON AS TEXT) AS json_column
+
+  - name: csv_from_s3_in_duckdb
+    sql: >
+      SELECT *
+      FROM read_csv(
+        's3://bbb/aaa.csv',
+        delim = ',',
+        header = true,
+        columns=\{'time':'DATE','count':'NUMERIC'\}
+      )
+```
+
 ### Non-SQL references
 
 Outside [SQL expressions][self-sql-expressions], `column` is not recognized
-as a column name; it is rather regonized as a member name. It means that,
+as a column name; it is rather recognized as a member name. It means that,
 outside `sql` and `sql_table` parameters, you can skip the curly braces and
 reference members by their names directly: `member`, `cube_name.member`, or
 `CUBE.member`.
@@ -629,3 +773,6 @@ defining dynamic data models.
 [ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
 [ref-custom-granularities]: /reference/data-model/dimensions#granularities
 [ref-style-guide]: /guides/style-guide
+[ref-polymorphism]: /product/data-modeling/concepts/polymorphic-cubes
+[ref-data-blending]: /product/data-modeling/concepts/data-blending
+[link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript

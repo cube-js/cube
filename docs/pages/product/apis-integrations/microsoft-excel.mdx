@@ -1,0 +1,125 @@
+# Cube Cloud for Excel
+
+Cube Cloud for Excel is the native [Microsoft Excel][ref-excel] add-in for Cube Cloud.
+
+Unlike the [MDX API][ref-mdx-api], it works with Excel on all operating systems,
+including macOS, and all platforms, including web and mobile. It doesn't integrate
+with the native [PivotTable][link-pivottable] in Excel but provides a custom
+[pivot table](#create-reports-via-pivot-table) UI.
+
+<SuccessBox>
+
+Cube Cloud for Excel is available in Cube Cloud on [Enterprise and above](https://cube.dev/pricing) product tiers.
+
+</SuccessBox>
+
+<WarningBox>
+
+Cube Cloud for Excel is currently in preview. Please [contact us](https://cube.dev/contact) to get access to it.
+
+</WarningBox>
+
+After [configuring](#configuration), [installing](#installation), and
+[authenticating](#authentication) this add-in, you will be able to [create
+reports via pivot table](#create-reports-via-pivot-table) and work with
+[saved reports](#work-with-saved-reports).
+
+<YouTubeVideo
+  url="https://www.youtube.com/embed/vG7iEdYTvIQ"
+  aspectRatio={5/4}
+/>
+
+## Configuration
+
+Cube Cloud for Excel uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
+
+## Installation
+
+<WarningBox>
+
+Please contact the customer success team in Cube Cloud so we can guide you
+through the installation.
+
+</WarningBox>
+
+## Authentication
+
+You need to authenticate Cube Cloud for Excel to retrieve data from Cube Cloud.
+To do so, open the sidebar by clicking on the <Btn>Cube Cloud</Btn> button in
+the <Btn>Home</Btn> ribbon. Then, click <Btn>Sign in</Btn>.
+
+<Screenshot
+  src="https://ucarecdn.com/bdf82477-02d3-4686-9c8f-8d6384c3e7f3/"
+  highlight="inset(25% 0 45% 72.5% round 10px)"
+/>
+
+A modal window with an authentication prompt will appear. Choose the deployments
+that you want to work with in Microsoft Excel and click <Btn>Authorize</Btn>.
+Once you see the `Access Granted` message, close the modal window.
+
+If you want to revoke the authentication, open the add-in menu and click
+<Btn>Sign out</Btn>.
+
+## Create reports via pivot table
+
+To create a report, go to the add-in menu and click <Btn>Create report via pivot
+table</Btn>. Then, select a Cube Cloud deployment from the drop-down. Finally,
+you can start building a query by selecting a view and its members in the UI that
+looks and feels like [Playground][ref-playground].
+
+<InfoBox>
+
+Google Cloud for Excel works only with [views][ref-views], not cubes.
+
+</InfoBox>
+
+Click on members to add them to <Btn>Rows</Btn> and <Btn>Measures</Btn>.
+If needed, drag dimensions from <Btn>Rows</Btn> to <Btn>Columns</Btn>. Click on
+the funnel buttons to add members to <Btn>Filters</Btn>. Click on <Btn>×</Btn> to
+remove members from a query.
+
+<Screenshot
+  src="https://ucarecdn.com/670fda9d-358a-4345-9242-7888d8aaedd8/"
+  highlight="inset(18% 0 2% 72.5% round 10px)"
+/>
+
+Use <Btn>Order</Btn> and <Btn>Filters</Btn> panes below to sort and filter the
+data in the report.
+
+If you'd like to move the report to a new location, click on the desired top-left
+cell and then confirm with the target button under <Btn>Result location</Btn>.
+
+<Screenshot
+  src="https://ucarecdn.com/4c3af7b9-4ef6-4f7f-8d0f-6d579609482e/"
+  highlight="inset(56.5% 0 2% 72.5% round 10px)"
+/>
+
+With every change to your query, Cube Cloud for Excel will update the report on
+the sheet after a slight delay. If you'd like to minimize it, consider
+implementing [pre-aggregations][ref-pre-aggs].
+
+When your report is ready, you can optionally move it to [saved reports](#work-with-saved-reports)
+by clicking <Btn>Save</Btn>.
+
+## Work with saved reports
+
+Go to the add-in menu and click <Btn>View saved reports</Btn> to see a list of
+reports.
+
+Click <Btn>Refresh</Btn> to manually refresh the data in the report's location.
+Click <Btn>Edit</Btn> to chnage the query or the location.
+
+<Screenshot
+  src="https://ucarecdn.com/167abe25-635c-4fa6-b4a2-c090aa533f3c/"
+  highlight="inset(22.5% 0 20% 72.5% round 10px)"
+/>
+
+
+[ref-excel]: /product/configuration/visualization-tools/excel
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[link-pivottable]: https://support.microsoft.com/en-us/office/create-a-pivottable-to-analyze-worksheet-data-a9a84538-bfe9-40a9-a8e9-f99134456576
+[ref-playground]: /product/workspace/playground
+[ref-views]: /product/data-modeling/concepts#views
+[ref-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-sql-api-enabled]: /product/apis-integrations/sql-api#cube-cloud

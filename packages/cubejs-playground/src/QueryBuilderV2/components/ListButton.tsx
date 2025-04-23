@@ -15,7 +15,8 @@ export const ListButton = tasty(Button, {
       disabled: '#purple',
     },
     placeContent: 'space-between',
-    gridTemplateColumns: 'auto 1fr auto',
+    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
     textAlign: 'left',
+    padding: '(.75x - 1bw) (0.75x - 1bw) (.75x - 1bw) (1.25x - 1bw)',
   },
 });

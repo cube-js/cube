@@ -9,7 +9,6 @@
  */
 
 /// V1CubeMetaType : Type of cube
-
 /// Type of cube
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum V1CubeMetaType {

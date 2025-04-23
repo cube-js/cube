@@ -2,7 +2,7 @@ use crate::{
     compile::rewrite::{
         literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        WrapperReplacerContextAliasToCube,
     },
     var, var_iter,
 };
@@ -10,6 +10,7 @@ use crate::{
 use crate::compile::rewrite::{
     rewriter::{CubeEGraph, CubeRewrite},
     rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
+    wrapper_replacer_context,
 };
 use datafusion::scalar::ScalarValue;
 use egg::Subst;
@@ -21,17 +22,25 @@ impl WrapperRules {
                 "wrapper-push-down-literal",
                 wrapper_pushdown_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 wrapper_pullup_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_literal("?alias_to_cube", "?value"),
             ),
@@ -39,17 +48,25 @@ impl WrapperRules {
                 "wrapper-push-down-interval-literal",
                 wrapper_pushdown_replacer(
                     literal_expr("?value"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 wrapper_pullup_replacer(
                     "?new_value",
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapper_replacer_context(
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                        "?grouped_subqueries",
+                        "?ungrouped_scan",
+                    ),
                 ),
                 self.transform_interval_literal("?alias_to_cube", "?value", "?new_value"),
             ),
@@ -67,7 +84,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
                     for literal in var_iter!(egraph[subst[value_var]], LiteralExprValue) {
@@ -108,7 +125,7 @@ impl WrapperRules {
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
-                WrapperPullupReplacerAliasToCube
+                WrapperReplacerContextAliasToCube
             ) {
                 if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(alias_to_cube) {
                     let contains_template =

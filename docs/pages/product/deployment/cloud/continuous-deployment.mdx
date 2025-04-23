@@ -34,6 +34,13 @@ First, ensure your deployment is configured to deploy with Git. Then connect
 your GitHub repository to your deployment by clicking the <Btn>Connect to
 GitHub</Btn> button, and selecting your repository.
 
+<WarningBox>
+
+If your organization uses SAML SSO for GitHub authentication, make sure to start an active SAML 
+session prior to connecting to your GitHub account from Cube.
+
+</WarningBox>
+
 <div style={{ textAlign: "center" }}>
   <img
     src="https://ucarecdn.com/3dab6d90-6bd9-44a5-ae4d-d5579a08dd89/"
@@ -101,10 +108,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Use Node.js 14.x
+      - name: Use Node.js 20.x
         uses: actions/setup-node@v1
         with:
-          node-version: 14.x
+          node-version: 20.x
+      - name: Install Cube backend server core
+        run: npm i @cubejs-backend/server-core
       - name: Deploy to Cube Cloud
         run: npx cubejs-cli deploy --token ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
 ```

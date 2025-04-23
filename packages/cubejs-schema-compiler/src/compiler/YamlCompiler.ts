@@ -33,6 +33,7 @@ export class YamlCompiler {
     private readonly cubeSymbols: CubeSymbols,
     private readonly cubeDictionary: CubeDictionary,
     private readonly nativeInstance: NativeInstance,
+    private readonly viewCompiler: CubeSymbols,
   ) {
   }
 
@@ -131,6 +132,7 @@ export class YamlCompiler {
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
     cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
     cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
+    cubeObj.hierarchies = this.yamlArrayToObj(cubeObj.hierarchies || [], 'hierarchies', errorsReport);
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
@@ -228,11 +230,11 @@ export class YamlCompiler {
       } else if (str[i] === '`' && peek().inStr) {
         result.push(str[i]);
         stateStack.pop();
-      } else if (str[i] === '{' && str[i + 1] === '{' && peek()?.inFormattedStr) {
-        result.push('{{');
+      } else if (str[i] === '\\' && str[i + 1] === '{' && stateStack.length === 0) {
+        result.push('\\{');
         i += 1;
-      } else if (str[i] === '}' && str[i + 1] === '}' && peek()?.inFormattedStr) {
-        result.push('}}');
+      } else if (str[i] === '\\' && str[i + 1] === '}' && stateStack.length === 0) {
+        result.push('\\}');
         i += 1;
       } else if (str[i] === '{' && peek()?.inFormattedStr) {
         result.push(str[i]);
@@ -287,7 +289,9 @@ export class YamlCompiler {
       },
     );
 
-    resolveSymbol = resolveSymbol || (n => this.cubeSymbols.resolveSymbol(cubeName, n) || this.cubeSymbols.isCurrentCube(n));
+    resolveSymbol = resolveSymbol || (n => this.viewCompiler.resolveSymbol(cubeName, n) ||
+      this.cubeSymbols.resolveSymbol(cubeName, n) ||
+      this.cubeSymbols.isCurrentCube(n));
 
     const traverseObj = {
       Program: (babelPath) => {
