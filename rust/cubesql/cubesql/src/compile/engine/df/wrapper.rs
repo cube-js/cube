@@ -2977,30 +2977,10 @@ impl WrappedSelectNode {
         can_rename_columns: bool,
         values: Vec<Option<String>>,
     ) -> result::Result<SqlGenerationResult, CubeError> {
-        // This is cloned just to simplify some code in this function, feel free to remove it
-        let WrappedSelectNode {
-            schema,
-            select_type,
-            projection_expr,
-            subqueries: _,
-            group_expr: _,
-            aggr_expr,
-            window_expr: _,
-            from,
-            joins,
-            filter_expr: _,
-            having_expr: _having_expr,
-            limit,
-            offset,
-            order_expr,
-            alias,
-            distinct: _,
-            push_to_cube: _,
-        } = self.clone();
-
         // TODO support ungrouped joins
         let ungrouped_scan_node = {
-            let LogicalPlan::Extension(Extension { node }) = from.as_ref() else {
+            let from = self.from.as_ref();
+            let LogicalPlan::Extension(Extension { node }) = from else {
                 return Err(CubeError::internal(format!(
                     "Expected CubeScan node in from for Push-to-cube but found: {from:?}"
                 )));
@@ -3069,12 +3049,12 @@ impl WrappedSelectNode {
             )
             .await?;
         let subqueries_sql = &subqueries_sql;
-        let alias = alias.or(from_alias.clone());
+        let alias = self.alias.clone().or(from_alias.clone());
 
         let push_to_cube_context = {
             let mut join_subqueries = vec![];
             let mut known_join_subqueries = HashSet::new();
-            for (lp, cond, join_type) in joins {
+            for (lp, cond, join_type) in &self.joins {
                 match lp.as_ref() {
                     LogicalPlan::Extension(Extension { node }) => {
                         if let Some(join_cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
@@ -3163,7 +3143,7 @@ impl WrappedSelectNode {
                     alias: subq_alias.unwrap_or_else(|| alias.clone()),
                     sql: subq_sql_string,
                     condition: cond.clone(),
-                    join_type: join_type,
+                    join_type: *join_type,
                 });
                 known_join_subqueries.insert(alias.clone());
             }
@@ -3221,7 +3201,7 @@ impl WrappedSelectNode {
         {
             // Need to call generate_column_expr to apply column_remapping
             let (join_condition, new_sql) = CubeScanWrapperNode::generate_column_expr(
-                schema.clone(),
+                self.schema.clone(),
                 [condition.clone()],
                 sql,
                 generator.clone(),
@@ -3344,9 +3324,9 @@ impl WrappedSelectNode {
                     })
                     .collect::<Result<_>>()?,
             ),
-            order: if !order_expr.is_empty() {
+            order: if !self.order_expr.is_empty() {
                 Some(
-                    order_expr
+                    self.order_expr
                         .iter()
                         .map(|o| -> Result<_> { match o {
                             Expr::Sort {
@@ -3354,24 +3334,24 @@ impl WrappedSelectNode {
                                 asc,
                                 ..
                             } => {
-                                let col_name = expr_name(&expr, &schema)?;
+                                let col_name = expr_name(&expr, &self.schema)?;
 
                                 let find_column = |exprs: &[Expr], columns: &[(AliasedColumn, HashSet<String>)]| -> Option<AliasedColumn> {
                                     exprs.iter().zip(columns.iter())
-                                        .find(|(e, _c)| expr_name(e, &schema).map(|n| n == col_name).unwrap_or(false))
+                                        .find(|(e, _c)| expr_name(e, &self.schema).map(|n| n == col_name).unwrap_or(false))
                                         .map(|(_e, c)| c.0.clone())
                                 };
 
                                 // TODO handle patch measures collection here
-                                let aliased_column = find_column(&aggr_expr, &aggregate)
-                                    .or_else(|| find_column(&projection_expr, &projection))
+                                let aliased_column = find_column(&self.aggr_expr, &aggregate)
+                                    .or_else(|| find_column(&self.projection_expr, &projection))
                                     .or_else(|| find_column(&flat_group_expr, &group_by))
                                     .ok_or_else(|| {
                                         DataFusionError::Execution(format!(
                                             "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
                                             col_name,
-                                            projection_expr,
-                                            aggr_expr,
+                                            self.projection_expr,
+                                            self.aggr_expr,
                                             flat_group_expr
                                         ))
                                     })?;
@@ -3390,19 +3370,19 @@ impl WrappedSelectNode {
             } else {
                 load_request.order.clone()
             },
-            ungrouped: if let WrappedSelectType::Projection = select_type {
+            ungrouped: if let WrappedSelectType::Projection = self.select_type {
                 load_request.ungrouped
             } else {
                 None
             },
             // TODO is it okay to just override limit?
-            limit: if let Some(limit) = limit {
+            limit: if let Some(limit) = self.limit {
                 Some(limit as i32)
             } else {
                 load_request.limit
             },
             // TODO is it okay to just override offset?
-            offset: if let Some(offset) = offset {
+            offset: if let Some(offset) = self.offset {
                 Some(offset as i32)
             } else {
                 load_request.offset
