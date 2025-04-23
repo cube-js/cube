@@ -3445,27 +3445,6 @@ impl WrappedSelectNode {
                 .await;
         }
 
-        // This is cloned just to simplify some code in this function, feel free to remove it
-        let WrappedSelectNode {
-            schema: _,
-            select_type: _select_type,
-            projection_expr: _,
-            subqueries: _,
-            group_expr: _,
-            aggr_expr: _,
-            window_expr: _,
-            from,
-            joins: _joins,
-            filter_expr: _,
-            having_expr: _having_expr,
-            limit,
-            offset,
-            order_expr: _,
-            alias,
-            distinct,
-            push_to_cube: _push_to_cube,
-        } = self.clone();
-
         let SqlGenerationResult {
             data_source,
             from_alias,
@@ -3476,7 +3455,7 @@ impl WrappedSelectNode {
             meta,
             transport.clone(),
             load_request_meta.clone(),
-            from.clone(),
+            self.from.clone(),
             true,
             values.clone(),
             parent_data_source.clone(),
@@ -3493,7 +3472,7 @@ impl WrappedSelectNode {
             )
             .await?;
         let subqueries_sql = &subqueries_sql;
-        let alias = alias.or(from_alias.clone());
+        let alias = self.alias.clone().or(from_alias.clone());
 
         // Drop mut, turn to ref
         let column_remapping = column_remapping.as_ref();
@@ -3547,9 +3526,9 @@ impl WrappedSelectNode {
                 },
                 None,
                 order.into_iter().map(|(m, _)| m).collect(),
-                limit,
-                offset,
-                distinct,
+                self.limit,
+                self.offset,
+                self.distinct,
             )
             .map_err(|e| {
                 DataFusionError::Internal(format!("Can't generate SQL for wrapped select: {}", e))
