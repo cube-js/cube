@@ -252,8 +252,6 @@ export class CubeEvaluator extends CubeSymbols {
         });
       });
     }
-
-    return [];
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
