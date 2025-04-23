@@ -1,9 +1,7 @@
 use crate::queryplanner::rolling::RollingWindowAggregate;
-use datafusion::arrow::array::{Array, AsArray};
-use datafusion::arrow::compute::{date_part, DatePart};
-use datafusion::common::tree_node::{
-    Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor,
-};
+use datafusion::arrow::array::Array;
+use datafusion::arrow::datatypes::DataType;
+use datafusion::common::tree_node::Transformed;
 use datafusion::common::{Column, DataFusionError, JoinType, ScalarValue, TableReference};
 use datafusion::functions::datetime::date_part::DatePartFunc;
 use datafusion::functions::datetime::date_trunc::DateTruncFunc;
@@ -12,13 +10,11 @@ use datafusion::logical_expr::expr::{
 };
 use datafusion::logical_expr::{
     Aggregate, BinaryExpr, Cast, ColumnarValue, Expr, Extension, Join, LogicalPlan, Operator,
-    Projection, ScalarUDFImpl, SubqueryAlias, Union, Unnest,
+    Projection, ScalarFunctionArgs, ScalarUDFImpl, SubqueryAlias, Union, Unnest,
 };
 use datafusion::optimizer::optimizer::ApplyOrder;
 use datafusion::optimizer::{OptimizerConfig, OptimizerRule};
 use itertools::Itertools;
-use mockall::predicate::le;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Rewrites following logical plan:
@@ -197,6 +193,7 @@ impl RollingOptimizerRule {
                         _ => None,
                     })
                     .collect::<Option<Vec<_>>>()?;
+
                 let RollingWindowJoinExtractorResult {
                     input,
                     dimension,
@@ -264,6 +261,7 @@ impl RollingOptimizerRule {
             }) => {
                 let left_series = Self::extract_series_projection(left)
                     .or_else(|| Self::extract_series_union(left))?;
+
                 let RollingWindowBoundsExtractorResult {
                     lower_bound,
                     upper_bound,
@@ -599,10 +597,17 @@ impl RollingOptimizerRule {
             LogicalPlan::Unnest(Unnest {
                 input,
                 exec_columns,
+                schema,
                 ..
             }) => {
                 let series_column = exec_columns.iter().next().cloned()?;
-                Self::extract_series_from_unnest(input, series_column)
+                let series = Self::extract_series_from_unnest(input, series_column);
+                let col = schema.field(0).name();
+                series.map(|mut series| {
+                    series.from_col = Column::from_name(col);
+                    series.to_col = series.from_col.clone();
+                    series
+                })
             }
             _ => None,
         }
@@ -642,10 +647,8 @@ impl RollingOptimizerRule {
                                 let to =
                                     ScalarValue::try_from_array(&array, array.len() - 1).ok()?;
 
-                                let every = month_aware_sub(
-                                    &from,
-                                    &ScalarValue::try_from_array(&array, 1).ok()?,
-                                )?;
+                                let index_1 = ScalarValue::try_from_array(&array, 1).ok()?;
+                                let every = month_aware_sub(&from, &index_1)?;
 
                                 return Some(RollingWindowSeriesExtractorResult {
                                     from: Expr::Literal(from),
@@ -703,58 +706,94 @@ pub fn month_aware_sub(from: &ScalarValue, to: &ScalarValue) -> Option<ScalarVal
             | ScalarValue::TimestampMicrosecond(_, None)
             | ScalarValue::TimestampNanosecond(_, None),
         ) => {
+            let from_type = from.data_type();
+            let to_type = to.data_type();
             // TODO lookup from registry?
             let date_trunc = DateTruncFunc::new();
-            let date_part = DatePartFunc::new();
             let from_trunc = date_trunc
-                .invoke(&[
-                    ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
-                    ColumnarValue::Scalar(from.clone()),
-                ])
+                .invoke_with_args(ScalarFunctionArgs {
+                    args: vec![
+                        ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
+                        ColumnarValue::Scalar(from.clone()),
+                    ],
+                    number_rows: 1,
+                    return_type: &from_type,
+                })
                 .ok()?;
             let to_trunc = date_trunc
-                .invoke(&[
-                    ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
-                    ColumnarValue::Scalar(to.clone()),
-                ])
+                .invoke_with_args(ScalarFunctionArgs {
+                    args: vec![
+                        ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
+                        ColumnarValue::Scalar(to.clone()),
+                    ],
+                    number_rows: 1,
+                    return_type: &to_type,
+                })
                 .ok()?;
             match (from_trunc, to_trunc) {
                 (ColumnarValue::Scalar(from_trunc), ColumnarValue::Scalar(to_trunc)) => {
+                    // TODO as with date_trunc above, lookup from registry?
+                    let date_part = DatePartFunc::new();
+
                     if from.sub(from_trunc.clone()).ok() == to.sub(to_trunc.clone()).ok() {
                         let from_month = date_part
-                            .invoke(&[
-                                ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
-                                ColumnarValue::Scalar(from_trunc.clone()),
-                            ])
+                            .invoke_with_args(ScalarFunctionArgs {
+                                args: vec![
+                                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                                        "month".to_string(),
+                                    ))),
+                                    ColumnarValue::Scalar(from_trunc.clone()),
+                                ],
+                                number_rows: 1,
+                                return_type: &DataType::Int32,
+                            })
                             .ok()?;
                         let from_year = date_part
-                            .invoke(&[
-                                ColumnarValue::Scalar(ScalarValue::Utf8(Some("year".to_string()))),
-                                ColumnarValue::Scalar(from_trunc.clone()),
-                            ])
+                            .invoke_with_args(ScalarFunctionArgs {
+                                args: vec![
+                                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                                        "year".to_string(),
+                                    ))),
+                                    ColumnarValue::Scalar(from_trunc.clone()),
+                                ],
+                                number_rows: 1,
+                                return_type: &DataType::Int32,
+                            })
                             .ok()?;
                         let to_month = date_part
-                            .invoke(&[
-                                ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
-                                ColumnarValue::Scalar(to_trunc.clone()),
-                            ])
+                            .invoke_with_args(ScalarFunctionArgs {
+                                args: vec![
+                                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                                        "month".to_string(),
+                                    ))),
+                                    ColumnarValue::Scalar(to_trunc.clone()),
+                                ],
+                                number_rows: 1,
+                                return_type: &DataType::Int32,
+                            })
                             .ok()?;
                         let to_year = date_part
-                            .invoke(&[
-                                ColumnarValue::Scalar(ScalarValue::Utf8(Some("year".to_string()))),
-                                ColumnarValue::Scalar(to_trunc.clone()),
-                            ])
+                            .invoke_with_args(ScalarFunctionArgs {
+                                args: vec![
+                                    ColumnarValue::Scalar(ScalarValue::Utf8(Some(
+                                        "year".to_string(),
+                                    ))),
+                                    ColumnarValue::Scalar(to_trunc.clone()),
+                                ],
+                                number_rows: 1,
+                                return_type: &DataType::Int32,
+                            })
                             .ok()?;
+
                         match (from_month, from_year, to_month, to_year) {
                             (
-                                ColumnarValue::Scalar(ScalarValue::Float64(Some(from_month))),
-                                ColumnarValue::Scalar(ScalarValue::Float64(Some(from_year))),
-                                ColumnarValue::Scalar(ScalarValue::Float64(Some(to_month))),
-                                ColumnarValue::Scalar(ScalarValue::Float64(Some(to_year))),
+                                ColumnarValue::Scalar(ScalarValue::Int32(Some(from_month))),
+                                ColumnarValue::Scalar(ScalarValue::Int32(Some(from_year))),
+                                ColumnarValue::Scalar(ScalarValue::Int32(Some(to_month))),
+                                ColumnarValue::Scalar(ScalarValue::Int32(Some(to_year))),
                             ) => {
                                 return Some(ScalarValue::IntervalYearMonth(Some(
-                                    (to_year - from_year) as i32 * 12
-                                        + (to_month - from_month) as i32,
+                                    (to_year - from_year) * 12 + (to_month - from_month),
                                 )))
                             }
                             _ => {}
