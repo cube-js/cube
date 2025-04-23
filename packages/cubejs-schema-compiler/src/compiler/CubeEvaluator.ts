@@ -257,7 +257,9 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
-    if (Object.keys(cube.hierarchies).length) {
+    // Hierarchies from views are not fully populated at this moment and are processed later,
+    // so we should not pollute the cube hierarchies definition here.
+    if (!cube.isView && Object.keys(cube.hierarchies).length) {
       cube.evaluatedHierarchies = Object.entries(cube.hierarchies).map(([name, hierarchy]) => ({
         name,
         ...(typeof hierarchy === 'object' ? hierarchy : {}),
@@ -306,6 +308,8 @@ export class CubeEvaluator extends CubeSymbols {
                 throw new UserError(`Hierarchy '${it.name}' not found in cube '${cubeName}'`);
               }
               return {
+                // Title might be overridden in the view
+                title: cube.hierarchies?.[it.name]?.override?.title || it.title,
                 ...it,
                 name,
                 levels

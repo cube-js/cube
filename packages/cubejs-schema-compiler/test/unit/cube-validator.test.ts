@@ -165,6 +165,47 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeTruthy();
   });
 
+  it('view with overridden included members properties', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      // it's a hidden field which we use internally
+      isView: true,
+      fileName: 'fileName',
+      cubes: [
+        {
+          joinPath: () => '',
+          prefix: false,
+          includes: [
+            'member_by_name',
+            {
+              name: 'member_by_alias',
+              alias: 'correct_alias'
+            },
+            {
+              name: 'member_by_alias_with_overrides',
+              title: 'Overridden title',
+              description: 'Overridden description',
+              format: 'percent',
+              meta: {
+                f1: 'Overridden 1',
+                f2: 'Overridden 2',
+              },
+            }
+          ]
+        }
+      ]
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message: any, _e: any) => {
+        console.log(message);
+      }
+    } as any);
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
   it('refreshKey alternatives', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
