@@ -157,7 +157,7 @@ export class PreAggregations {
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName);
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-    const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries && queryForSqlEvaluation.partitionInvalidateKeyQueries(cube, preAggregation);
+    const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
 
     const allBackAliasMembers = this.query.allBackAliasMembers();
 

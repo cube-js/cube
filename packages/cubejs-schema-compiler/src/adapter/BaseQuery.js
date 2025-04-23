@@ -3144,7 +3144,7 @@ export class BaseQuery {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   dateBin(interval, source, origin) {
-    throw new Error('Date bin function is not implemented');
+    throw new Error('Date bin function, required for custom time dimension granularities, is not implemented for this data source');
     // Different syntax possible in different DBs
   }
 
