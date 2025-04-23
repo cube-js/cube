@@ -260,6 +260,32 @@ to test access control rules. The [Developer
 Playground][ref-devtools-playground] allows you to set your own JWTs, or you can
 build one from a JSON object.
 
+## Enriching the security context
+
+Sometimes it is convenient to enrich the security context with additional attributes
+before it is used to evaluate access control rules.
+
+### Extending the security context
+
+You can use the [`extend_context`][ref-extend-context] configuration option to
+enrich the security context with additional attributes.
+
+### Authentication integration
+
+When using Cube Cloud, you can enrich the security context with information about
+an authenticated user, obtained during their authentication or loaded via an
+[LDAP integration][ref-ldap-integration].
+
+<SuccessBox>
+
+Authentication integration is available in Cube Cloud on [all product tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+You can enable the authentication integration by navigating to the <Btn>Settings → Configuration</Btn>
+of your Cube Cloud deployment and using the <Btn>Enable Cloud Auth Integration</Btn> toggle.
+
+
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
 [link-multitenancy]: /product/configuration/advanced/multitenancy
@@ -273,3 +299,4 @@ build one from a JSON object.
   /product/workspace/playground#editing-the-security-context
 [ref-auth-integration]: /product/auth#authentication-integration
 [ref-ldap-integration]: /product/workspace/sso#ldap-integration
+[ref-extend-context]: /reference/configuration/config#extend_context

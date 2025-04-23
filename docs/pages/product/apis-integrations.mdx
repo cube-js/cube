@@ -65,8 +65,9 @@ tools][ref-viz-tools]:
 | Method | ✅ Supported in |
 | --- | --- |
 | [User name and password][ref-auth-user-pass] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api]<br/>[Semantic Layer Sync][ref-sls]<br/>[SQL API][ref-sql-api] |
+| [Kerberos][ref-auth-kerberos] and [NTLM][ref-auth-ntlm] | [DAX API][ref-dax-api]<br/>[MDX API][ref-mdx-api] |
 | [Identity provider][ref-auth-idp] | [Cube Cloud for Excel][ref-cube-cloud-for-excel]<br/>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets] |
-| [Access token][ref-auth-tokens] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api]<br/>[AI API][ref-ai-api] |
+| [JSON Web Token][ref-auth-jwt] | [REST API][ref-rest-api]<br/>[GraphQL API][ref-graphql-api]<br/>[AI API][ref-ai-api] |
 
 ## Management APIs
 
@@ -96,6 +97,8 @@ API][ref-orchestration-api].
 [ref-excel]: /product/configuration/visualization-tools/excel
 [ref-sheets]: /product/configuration/visualization-tools/google-sheets
 [ref-tableau]: /product/configuration/visualization-tools/tableau
-[ref-auth-user-pass]: /product/auth#user-name-and-password
-[ref-auth-idp]: /product/auth#identity-provider
-[ref-auth-tokens]: /product/auth#access-token
+[ref-auth-user-pass]: /product/auth/methods/name-password
+[ref-auth-idp]: /product/auth/methods/identity-provider
+[ref-auth-jwt]: /product/auth/methods/jwt
+[ref-auth-kerberos]: /product/auth/methods/kerberos
+[ref-auth-ntlm]: /product/auth/methods/ntlm
