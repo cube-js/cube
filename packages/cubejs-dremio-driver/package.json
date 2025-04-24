@@ -39,6 +39,13 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "html",
+      "lcov"
+    ],
+    "coverageDirectory": "coverage/",
     "setupFiles": [
       "./test/test-env.js"
     ],
@@ -46,7 +53,8 @@
       "node_modules/(?!axios)/"
     ],
     "moduleNameMapper": {
-      "^axios$": "axios/dist/node/axios.cjs"
+      "^axios$": "<rootDir>/../../node_modules/axios/dist/node/axios.cjs",
+      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js"
     }
   },
   "eslintConfig": {

@@ -105,7 +105,7 @@
       "<rootDir>/dist/test/**/*.(test|spec).(ts|js)"
     ],
     "moduleNameMapper": {
-      "^axios$": "axios/dist/node/axios.cjs",
+      "^axios$": "<rootDir>/../../node_modules/axios/dist/node/axios.cjs",
       "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js",
       "^yaml$": "<rootDir>/../../node_modules/docker-compose/node_modules/yaml/dist/index.js"
     },
