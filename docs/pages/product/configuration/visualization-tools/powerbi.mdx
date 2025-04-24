@@ -38,7 +38,7 @@ Cube Cloud supports the following authentication methods for Power BI:
 | --- | --- | --- |
 | Power BI Desktop | [NTLM][ref-ntlm-desktop] | 🟡 Works well for testing purposes |
 | Power BI Desktop | [Kerberos][ref-kerberos] | 🟢 Recommended for production |
-| Power BI Service | [NTLM][ref-ntlm] + [Kerberos][ref-kerberos] | 🟢 Recommended for production |
+| Power BI Service | [NTLM][ref-ntlm] + [Kerberos][ref-kerberos] | 🟢 Recommended for production.<br/>Requires [on-premises data gateway][ref-opdg] |
 
 ### Connection methods
 
@@ -77,3 +77,4 @@ than the DAX API. However, this is the only option when using Cube Core.
 [ref-ntlm]: /product/auth/methods/ntlm
 [ref-ntlm-desktop]: /product/auth/methods/ntlm#power-bi-desktop
 [link-powerbi-connection]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-live-connect-dq-datasets
+[ref-opdg]: /product/auth/methods/ntlm#configuration
