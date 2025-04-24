@@ -6858,6 +6858,24 @@ async fn date_add(service: Box<dyn SqlClient>) {
             None,
         ]),
     );
+
+    // Check we tolerate NOW(), perhaps with +00:00 time zone.
+    let r = service
+        .exec_query("SELECT NOW(), date_add(NOW(), INTERVAL '1 day')")
+        .await
+        .unwrap();
+    let rows = to_rows(&r);
+    assert_eq!(1, rows.len());
+    assert_eq!(2, rows[0].len());
+    match (&rows[0][0], &rows[0][1]) {
+        (TableValue::Timestamp(tv), TableValue::Timestamp(day_later)) => {
+            assert_eq!(
+                day_later.get_time_stamp(),
+                tv.get_time_stamp() + 86400i64 * 1_000_000_000
+            );
+        }
+        _ => panic!("row has wrong types: {:?}", rows[0]),
+    }
 }
 
 async fn date_bin(service: Box<dyn SqlClient>) {

@@ -6,12 +6,13 @@ use datafusion::arrow::array::{
 };
 use datafusion::arrow::buffer::ScalarBuffer;
 use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
+use datafusion::common::internal_err;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::function::AccumulatorArgs;
 use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyInfo};
 use datafusion::logical_expr::{
     AggregateUDF, AggregateUDFImpl, Expr, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature,
-    Volatility,
+    Volatility, TIMEZONE_WILDCARD,
 };
 use datafusion::physical_plan::{Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
@@ -461,6 +462,7 @@ struct DateAddSub {
 
 impl DateAddSub {
     pub fn new(is_add: bool) -> DateAddSub {
+        let tz_wildcard: Arc<str> = Arc::from(TIMEZONE_WILDCARD);
         DateAddSub {
             is_add,
             signature: Signature {
@@ -475,6 +477,22 @@ impl DateAddSub {
                     ]),
                     TypeSignature::Exact(vec![
                         DataType::Timestamp(TimeUnit::Nanosecond, None),
+                        DataType::Interval(IntervalUnit::MonthDayNano),
+                    ]),
+                    // We wanted this for NOW(), which has "+00:00" time zone.  Using
+                    // TIMEZONE_WILDCARD to favor DST-related questions over "UTC" == "+00:00"
+                    // questions.  MySQL doesn't have a timezone as this function is applied, and we
+                    // simply invoke DF's date + interval behavior.
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some(tz_wildcard.clone())),
+                        DataType::Interval(IntervalUnit::YearMonth),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some(tz_wildcard.clone())),
+                        DataType::Interval(IntervalUnit::DayTime),
+                    ]),
+                    TypeSignature::Exact(vec![
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some(tz_wildcard)),
                         DataType::Interval(IntervalUnit::MonthDayNano),
                     ]),
                 ]),
@@ -509,8 +527,20 @@ impl ScalarUDFImpl for DateAddSub {
     fn signature(&self) -> &Signature {
         &self.signature
     }
-    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
-        Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
+    fn return_type(&self, arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
+        if arg_types.len() != 2 {
+            return Err(DataFusionError::Internal(format!(
+                "DateAddSub return_type expects 2 arguments, got {:?}",
+                arg_types
+            )));
+        }
+        match (&arg_types[0], &arg_types[1]) {
+            (ts @ DataType::Timestamp(_, _), DataType::Interval(_)) => Ok(ts.clone()),
+            _ => Err(DataFusionError::Internal(format!(
+                "DateAddSub return_type expects Timestamp and Interval arguments, got {:?}",
+                arg_types
+            ))),
+        }
     }
     fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
         use datafusion::arrow::compute::kernels::numeric::add;
@@ -518,9 +548,7 @@ impl ScalarUDFImpl for DateAddSub {
         assert_eq!(inputs.len(), 2);
         // DF 42.2.0 already has date + interval or date - interval.  Note that `add` and `sub` are
         // public (defined in arrow_arith), while timestamp-specific functions they invoke,
-        // `arithmetic_op` and then `timestamp_op::<TimestampNanosecondType>`, are not.
-        //
-        // TODO upgrade DF: Double-check that the TypeSignature is actually enforced.
+        // Arrow's `arithmetic_op` and then `timestamp_op::<TimestampNanosecondType>`, are not.
         datafusion::physical_expr_common::datum::apply(
             &inputs[0],
             &inputs[1],
