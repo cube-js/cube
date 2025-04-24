@@ -27,15 +27,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let config_module = PyModule::from_code(py, &file_content_arg, &options_file_name, "")?;
-        let settings_py = if config_module.hasattr("__execution_context_locals")? {
-            let execution_context_locals = config_module.getattr("__execution_context_locals")?;
-
-            if config_module.hasattr("config")? {
-                execution_context_locals.get_item("config")?
-            } else {
-                config_module.getattr("settings")?
-            }
-        } else if config_module.hasattr("config")? {
+        let settings_py = if config_module.hasattr("config")? {
             config_module.getattr("config")?
         } else {
             // backward compatibility
@@ -108,25 +100,6 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                     local_key.to_string(),
                     CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
                 );
-            }
-
-            // TODO remove all other ways of defining functions
-        } else if model_module.hasattr("__execution_context_locals")? {
-            let execution_context_locals = model_module
-                .getattr("__execution_context_locals")?
-                .downcast::<PyDict>()?;
-
-            for (local_key, local_value) in execution_context_locals.iter() {
-                if local_value.is_instance_of::<PyFunction>() {
-                    let has_attr = local_value.hasattr("cube_context_func")?;
-                    if has_attr {
-                        let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
-                        collected_functions.insert(
-                            local_key.to_string(),
-                            CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
-                        );
-                    }
-                }
             }
         } else {
             let inspect_module = py.import("inspect")?;

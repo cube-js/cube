@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(r#\"\n            SELECT LEFT(XIRR(payment, date)::text, 10) AS xirr\n            FROM (\n                SELECT '2014-01-01'::date AS date, -10000.0 AS payment\n                UNION ALL\n                SELECT '2014-03-01'::date AS date, 2750.0 AS payment\n                UNION ALL\n                SELECT '2014-10-30'::date AS date, 4250.0 AS payment\n                UNION ALL\n                SELECT '2015-02-15'::date AS date, 3250.0 AS payment\n                UNION ALL\n                SELECT '2015-04-01'::date AS date, 2750.0 AS payment\n            ) AS \"t\"\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------------+
+| xirr       |
++------------+
+| 0.37485859 |
++------------+

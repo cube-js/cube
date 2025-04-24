@@ -236,26 +236,3 @@ darwinSuite('Old Python Config', () => {
     );
   });
 });
-
-darwinSuite('Scoped Python Config', () => {
-  test('test', async () => {
-    const config = await loadConfigurationFile('scoped-config.py');
-    expect(config).toEqual({
-      schemaPath: 'models',
-      pgSqlPort: 5555,
-      telemetry: false,
-      contextToApiScopes: expect.any(Function),
-      checkAuth: expect.any(Function),
-      queryRewrite: expect.any(Function),
-    });
-
-    if (!config.checkAuth) {
-      throw new Error('checkAuth was not defined in config.py');
-    }
-
-    await config.checkAuth(
-      { requestId: 'test' },
-      'MY_SECRET_TOKEN'
-    );
-  });
-});

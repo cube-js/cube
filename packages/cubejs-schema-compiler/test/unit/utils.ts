@@ -224,7 +224,7 @@ export function createCubeSchemaWithAccessPolicy(name: string, extraPolicies: st
   `;
 }
 
-export function createCubeSchemaWithCustomGranularities(name: string): string {
+export function createCubeSchemaWithCustomGranularitiesAndTimeShift(name: string): string {
   return `cube('${name}', {
         sql: 'select * from orders',
         public: true,
@@ -292,6 +292,15 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
         measures: {
           count: {
             type: 'count'
+          },
+          count_shifted_year: {
+            type: 'count',
+            multiStage: true,
+            timeShift: [{
+              timeDimension: \`createdAt\`,
+              interval: '1 year',
+              type: 'prior'
+            }]
           },
           rollingCountByTrailing2Day: {
             type: 'count',
