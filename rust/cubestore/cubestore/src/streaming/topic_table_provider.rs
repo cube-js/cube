@@ -408,7 +408,12 @@ impl ContextProvider for TopicTableProvider {
     }
 
     fn udf_names(&self) -> Vec<String> {
-        Vec::new()
+        // TODO upgrade DF: We probably need to register the UDFs and have all the default UDFs.
+        vec![
+            "parse_timestamp".to_owned(),
+            "convert_tz_ksql".to_owned(),
+            "format_timestamp".to_owned(),
+        ]
     }
 
     fn udaf_names(&self) -> Vec<String> {
