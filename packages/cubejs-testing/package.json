@@ -144,7 +144,7 @@
     ],
     "moduleNameMapper": {
       "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js",
-      "^yaml$": "<rootDir>/../../node_modules/yaml/dist/index.js"
+      "^yaml$": "<rootDir>/../../node_modules/docker-compose/node_modules/yaml/dist/index.js"
     },
     "snapshotResolver": "<rootDir>/test/snapshotResolver.js",
     "snapshotFormat": {
