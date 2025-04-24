@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
+
+### Features
+
+- **cubesql:** Add `XIRR` aggregate function ([#9508](https://github.com/cube-js/cube/issues/9508)) ([c7fb71b](https://github.com/cube-js/cube/commit/c7fb71bd4023b37635bfb82c2aac523337c2f8be))
+
 ## [1.3.7](https://github.com/cube-js/cube/compare/v1.3.6...v1.3.7) (2025-04-23)
 
 ### Bug Fixes
