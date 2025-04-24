@@ -1638,6 +1638,16 @@ Object {
     "title": undefined,
     "type": "string",
   },
+  "users_renamed_in_view3_gender": Object {
+    "aliasMember": "users.gender",
+    "description": undefined,
+    "format": undefined,
+    "meta": undefined,
+    "ownedByCube": false,
+    "sql": [Function],
+    "title": undefined,
+    "type": "string",
+  },
   "users_state": Object {
     "aliasMember": "users.state",
     "description": undefined,
@@ -1727,7 +1737,7 @@ Array [
       },
       Object {
         "memberPath": "users.gender",
-        "name": "users_gender",
+        "name": "users_renamed_in_view3_gender",
         "type": "dimensions",
       },
     ],

@@ -76,7 +76,7 @@ describe('Cube Folders', () => {
       (it) => it.name === 'folder2'
     );
     expect(folder2.members).toEqual(
-      expect.arrayContaining(['test_view3.users_city', 'test_view3.users_gender'])
+      expect.arrayContaining(['test_view3.users_city', 'test_view3.users_renamed_in_view3_gender'])
     );
   });
 

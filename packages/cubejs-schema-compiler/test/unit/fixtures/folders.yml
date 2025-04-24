@@ -84,6 +84,7 @@ views:
         includes:
           - age
           - state
+          - gender
     folders:
       - name: folder1
         includes:
@@ -97,12 +98,13 @@ views:
         prefix: true
         includes:
           - city
-          - gender
+          - name: gender
+            alias: renamed_in_view3_gender
     folders:
       - name: folder2
         includes:
           - users_city
-          - users_gender
+          - users_renamed_in_view3_gender
 
   # - name: empty_view
   #   cubes:
