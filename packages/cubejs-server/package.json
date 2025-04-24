@@ -69,9 +69,10 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20",
     "@types/semver": "^7.5.8",
+    "@types/jest": "^29",
     "@types/ws": "^7.2.9",
     "@types/yarnpkg__lockfile": "^1.1.4",
-    "jest": "^27",
+    "jest": "^29",
     "typescript": "~5.2.2"
   },
   "license": "Apache-2.0",
@@ -89,7 +90,10 @@
       "html",
       "lcov"
     ],
-    "coverageDirectory": "coverage/"
+    "coverageDirectory": "coverage/",
+    "moduleNameMapper": {
+      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js"
+    }
   },
   "oclif": {
     "commands": "./dist/src/command",
