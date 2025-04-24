@@ -403,6 +403,11 @@ export class PreAggregations {
     filterDimensionsSingleValueEqual =
       allValuesEq1(filterDimensionsSingleValueEqual) ? new Set(filterDimensionsSingleValueEqual?.keys()) : null;
 
+
+    console.log('transformQueryToCanUseForm query.timeDimensions', query.timeDimensions);
+    console.log('transformQueryToCanUseForm ownedTimeDimensions', ownedTimeDimensions);
+    console.log('transformQueryToCanUseForm timeDimensions', timeDimensions);
+
     return {
       sortedDimensions,
       sortedTimeDimensions,
@@ -575,12 +580,20 @@ export class PreAggregations {
       // TODO remove this in favor of matching with join path
       const referencesTrimmed = trimmedReferences(references);
 
+      console.log('canUsePreAggregationNotAdditive transformedQuery.timeDimensions', transformedQuery.timeDimensions);
+
+
       const refTimeDimensions = backAlias(sortTimeDimensions(referencesTrimmed.timeDimensions));
       const qryTimeDimensions = references.allowNonStrictDateRangeMatch
         ? transformedQuery.timeDimensions
         : transformedQuery.sortedTimeDimensions;
       const backAliasMeasures = backAlias(referencesTrimmed.measures);
       const backAliasDimensions = backAlias(referencesTrimmed.dimensions);
+
+      console.log('canUsePreAggregationNotAdditive qryTimeDimensions', qryTimeDimensions);
+      console.log('canUsePreAggregationNotAdditive refTimeDimensions', refTimeDimensions);
+      console.log('canUsePreAggregationNotAdditive TD equals', R.equals(qryTimeDimensions, refTimeDimensions));
+
       return ((
         transformedQuery.hasNoTimeDimensionsWithoutGranularity
       ) && (
@@ -609,10 +622,18 @@ export class PreAggregations {
      * @param {string} granularity Granularity
      * @returns {Array<string>}
      */
-    const expandGranularity = (dimension, granularity) => (
-      transformedQuery.granularityHierarchies[`${dimension}.${granularity}`] ||
-      [granularity]
-    );
+    const expandGranularity = (dimension, granularity) => {
+      console.log("expandGranularity dimension", dimension);
+      console.log("expandGranularity granularity", granularity);
+      console.log("expandGranularity granularityHierarchies", transformedQuery.granularityHierarchies[
+        `${dimension}.${granularity}`
+        ]);
+      return (
+        transformedQuery.granularityHierarchies[
+          `${dimension}.${granularity}`
+        ] || [granularity]
+      );
+    };
 
     /**
      * Determine whether time dimensions match to the window granularity or not.

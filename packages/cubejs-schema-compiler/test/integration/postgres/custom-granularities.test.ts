@@ -81,6 +81,11 @@ describe('Custom Granularities', () => {
           type: count
           rolling_window:
             trailing: unbounded
+      pre_aggregations:
+        - name: half_year_preagg
+          timeDimension: createdAt
+          granularity: half_year
+#          granularity: quarter
 
   views:
     - name: orders_view
@@ -984,4 +989,33 @@ describe('Custom Granularities', () => {
     ],
     { joinGraph, cubeEvaluator, compiler }
   ));
+
+  it('pre-aggregation with custom granularity should match its own references', async () => {
+    await compiler.compile();
+
+    const preAggregationId = 'orders.half_year_preagg';
+    const preAggregations = cubeEvaluator.preAggregations({});
+    console.log('preAggregations', preAggregations);
+
+    const preAggregation = preAggregations
+      .find(p => p.id === preAggregationId);
+    if (preAggregation === undefined) {
+      throw expect(preAggregation).toBeDefined();
+    }
+
+    console.log('references', preAggregation.references);
+
+    const query = dbRunner.newTestQuery({ joinGraph, cubeEvaluator, compiler }, {
+      ...preAggregation.references,
+      preAggregationId: preAggregation.id,
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregation.id);
+    if (preAggregationFromQuery === undefined) {
+      throw expect(preAggregationFromQuery).toBeDefined();
+    }
+
+    expect(preAggregationFromQuery.preAggregationId).toBe(preAggregationId);
+  });
 });
