@@ -38,6 +38,14 @@ suite('Python Models', () => {
     // Just checking it won't fail
     await nativeInstance.loadPythonContext(fullFileName, content);
   });
+
+  test('models import with sys.path changed', async () => {
+    const fullFileName = path.join(process.cwd(), 'test', 'globals_w_import_path.py');
+    const content = await fs.readFile(fullFileName, 'utf8');
+
+    // Just checking it won't fail
+    await nativeInstance.loadPythonContext(fullFileName, content);
+  });
 });
 
 suite('Python Config', () => {
