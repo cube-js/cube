@@ -24,7 +24,7 @@ import {
   timeSeriesFromCustomInterval
 } from '@cubejs-backend/shared';
 
-import { CubeSymbols } from "../compiler/CubeSymbols";
+import { CubeSymbols } from '../compiler/CubeSymbols';
 import { UserError } from '../compiler/UserError';
 import { SqlParser } from '../parser/SqlParser';
 import { BaseDimension } from './BaseDimension';

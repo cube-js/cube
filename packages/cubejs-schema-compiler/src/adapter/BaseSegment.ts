@@ -1,5 +1,5 @@
 import type { BaseQuery } from './BaseQuery';
-import { CubeSymbols } from "../compiler/CubeSymbols";
+import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseSegment {
   public readonly expression: any;

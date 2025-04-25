@@ -1,7 +1,7 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
 import { MeasureDefinition } from '../compiler/CubeEvaluator';
-import { CubeSymbols } from "../compiler/CubeSymbols";
+import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseMeasure {
   public readonly expression: any;

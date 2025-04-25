@@ -678,7 +678,7 @@ describe('PreAggregations', () => {
     await compiler.compile();
 
     const preAggregationId = 'visitors.countAnotherCountCustomGranularity';
-    const preAggregations = cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId]});
+    const preAggregations = cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId] });
 
     const preAggregation = preAggregations[0];
     if (preAggregation === undefined) {
