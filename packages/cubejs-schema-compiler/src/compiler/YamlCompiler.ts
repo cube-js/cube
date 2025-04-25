@@ -53,6 +53,16 @@ export class YamlCompiler {
     });
   }
 
+  public async renderTemplate(file: FileContent, compileContext, pythonContext: PythonCtx): Promise<FileContent> {
+    return {
+      fileName: file.fileName,
+      content: await this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
+        ...pythonContext.functions,
+        ...pythonContext.variables
+      }),
+    };
+  }
+
   public async compileYamlWithJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
@@ -63,15 +73,9 @@ export class YamlCompiler {
     toCompile,
     compiledFiles,
     compileContext,
-    pythonContext
+    pythonContext: PythonCtx
   ) {
-    const compiledFile = {
-      fileName: file.fileName,
-      content: await this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
-        ...pythonContext.functions,
-        ...pythonContext.variables
-      }),
-    };
+    const compiledFile = await this.renderTemplate(file, compileContext, pythonContext);
 
     return this.compileYamlFile(
       compiledFile,
