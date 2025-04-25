@@ -284,7 +284,7 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public overTimeSeriesForSelectRollup(cumulativeMeasures, otherMeasures, timeDimension, preAggregationForQuery) {
-    const rollupMeasures = this.preAggregations?.rollupMeasures(preAggregationForQuery);
+    const rollupMeasures = this.preAggregations.rollupMeasures(preAggregationForQuery);
     const renderedReference = rollupMeasures.map(measure => {
       const m = this.newMeasure(measure);
       const renderSql = () => {

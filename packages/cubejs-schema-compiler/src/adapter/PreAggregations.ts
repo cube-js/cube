@@ -1515,22 +1515,23 @@ export class PreAggregations {
     )(this.rollupTimeDimensions(preAggregationForQuery));
   }
 
-  private rollupMembers(preAggregationForQuery: PreAggregationForQuery, type: 'measures' | 'dimensions' | 'timeDimensions'): string[] | PreAggregationTimeDimensionReference[] {
+  private rollupMembers<T extends 'measures' | 'dimensions' | 'timeDimensions'>(preAggregationForQuery: PreAggregationForQuery, type: T): PreAggregationReferences[T] {
     return preAggregationForQuery.preAggregation.type === 'autoRollup' ?
-      preAggregationForQuery.preAggregation[type] :
+      // TODO proper types
+      (preAggregationForQuery.preAggregation as any)[type] :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation, preAggregationForQuery.preAggregationName)[type];
   }
 
   public rollupMeasures(preAggregationForQuery: PreAggregationForQuery): string[] {
-    return this.rollupMembers(preAggregationForQuery, 'measures') as string[];
+    return this.rollupMembers(preAggregationForQuery, 'measures');
   }
 
   public rollupDimensions(preAggregationForQuery: PreAggregationForQuery): string[] {
-    return this.rollupMembers(preAggregationForQuery, 'dimensions') as string[];
+    return this.rollupMembers(preAggregationForQuery, 'dimensions');
   }
 
   public rollupTimeDimensions(preAggregationForQuery: PreAggregationForQuery): PreAggregationTimeDimensionReference[] {
-    return this.rollupMembers(preAggregationForQuery, 'timeDimensions') as PreAggregationTimeDimensionReference[];
+    return this.rollupMembers(preAggregationForQuery, 'timeDimensions');
   }
 
   public preAggregationId(preAggregation: PreAggregationForQuery): string {
