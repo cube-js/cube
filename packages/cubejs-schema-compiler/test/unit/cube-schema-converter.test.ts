@@ -1,8 +1,9 @@
 import { CubePreAggregationConverter, CubeSchemaConverter } from '../../src';
 import {
   createCubeSchema,
-  createCubeSchemaWithCustomGranularities,
-  createCubeSchemaYaml, createECommerceSchema,
+  createCubeSchemaWithCustomGranularitiesAndTimeShift,
+  createCubeSchemaYaml,
+  createECommerceSchema,
   createSchemaYaml
 } from './utils';
 
@@ -16,7 +17,7 @@ const repo = {
         preAggregations: 'existing_pre_agg: {\n  measures: [\n    single_preagg_cube.count\n  ],\n  timeDimension: single_preagg_cube.createdAt,\n  granularity: `month`\n}'
       })
     },
-    { fileName: 'orders_and_users.js', content: createCubeSchemaWithCustomGranularities('js_orders') },
+    { fileName: 'orders_and_users.js', content: createCubeSchemaWithCustomGranularitiesAndTimeShift('js_orders') },
     { fileName: 'single_cube.yaml', content: createCubeSchemaYaml({ name: 'yml_orders', sqlTable: 'yml_orders' }) },
     { fileName: 'multi_ecom.yaml', content: createSchemaYaml(createECommerceSchema()) },
     { fileName: 'empty1.yaml', content: '       ' },

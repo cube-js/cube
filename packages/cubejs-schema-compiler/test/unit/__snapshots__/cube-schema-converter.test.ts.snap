@@ -69,6 +69,15 @@ exports[`CubeSchemaConverter adds a pre-aggregation to JS model (w/o pre-agg) us
     count: {
       type: 'count'
     },
+    count_shifted_year: {
+      type: 'count',
+      multiStage: true,
+      timeShift: [{
+        timeDimension: \`createdAt\`,
+        interval: '1 year',
+        type: 'prior'
+      }]
+    },
     rollingCountByTrailing2Day: {
       type: 'count',
       rollingWindow: {
@@ -675,6 +684,15 @@ exports[`CubeSchemaConverter converts all schema repository models (no changes, 
     count: {
       type: 'count'
     },
+    count_shifted_year: {
+      type: 'count',
+      multiStage: true,
+      timeShift: [{
+        timeDimension: \`createdAt\`,
+        interval: '1 year',
+        type: 'prior'
+      }]
+    },
     rollingCountByTrailing2Day: {
       type: 'count',
       rollingWindow: {
@@ -809,6 +827,15 @@ exports[`CubeSchemaConverter converts all schema repository models (no changes, 
   measures: {
     count: {
       type: 'count'
+    },
+    count_shifted_year: {
+      type: 'count',
+      multiStage: true,
+      timeShift: [{
+        timeDimension: \`createdAt\`,
+        interval: '1 year',
+        type: 'prior'
+      }]
     },
     rollingCountByTrailing2Day: {
       type: 'count',
