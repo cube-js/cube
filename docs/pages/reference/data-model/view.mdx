@@ -34,6 +34,74 @@ views:
 
 </CodeTabs>
 
+### `extends`
+
+You can use the `extends` parameter to [extend views][ref-extension] in order to reuse
+all declared members of a view.
+
+In the example below, `extended_orders` will extend `orders` with an additional join path:
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: `base_orders`,
+      includes: `*`
+    }
+  ]
+})
+
+view(`extended_orders`, {
+  extends: orders,
+  cubes: [
+    {
+      join_path: `base_orders.users`,
+      includes: `*`
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: orders
+    cubes:
+      - join_path: base_orders
+        includes: "*"
+
+  - name: extended_orders
+    extends: orders
+    cubes:
+      - join_path: base_orders.users
+        includes: "*"
+```
+
+</CodeTabs>
+
+### `title`
+
+Use the `title` parameter to change the display name of the view.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+    title: Product Orders
+```
+
+</CodeTabs>
+
 ### `description`
 
 This parameter provides a human-readable description of a view.
@@ -41,7 +109,7 @@ When applicable, it will be displayed in [Playground][ref-playground] and expose
 to data consumers via [APIs and integrations][ref-apis].
 
 A description can give a hint both to your team and end users, making sure they
-interpret the data correctly. 
+interpret the data correctly.
 
 <CodeTabs>
 
@@ -55,6 +123,103 @@ view(`active_users`, {
 views:
   - name: active_users
     description: 14 days rolling count of active users
+```
+
+</CodeTabs>
+
+### `public`
+
+The `public` parameter is used to manage the visibility of a view. Valid values
+for `public` are `true` and `false`. When set to `false`, this view **cannot**
+be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders
+    public: false
+```
+
+```javascript
+view(`orders`, {
+  public: false,
+});
+```
+
+</CodeTabs>
+
+You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check
+out our
+[Controlling access to cubes and views ](/guides/recipes/access-control/controlling-access-to-cubes-and-views)
+recipe.
+
+<CodeTabs>
+
+```javascript
+view(`arr`, {
+  description: `Annual Recurring Revenue`,
+  public: COMPILE_CONTEXT.security_context.is_finance,
+
+  cubes: [
+    {
+      join_path: revenue,
+      includes: [
+        `arr`,
+        `date`
+      ]
+    },
+    {
+      join_path: revenue.customers,
+      includes: `plan`
+    }
+  ]
+})
+```
+
+```yaml
+views:
+  - name: arr
+    description: Annual Recurring Revenue
+    public: COMPILE_CONTEXT.security_context.is_finance
+
+    cubes:
+      - join_path: revenue
+        includes:
+          - arr
+          - date
+
+      - join_path: revenue.customers
+        includes:
+          - plan
+```
+
+</CodeTabs>
+
+To learn more about using `public` to control visibility based on security
+context, read the [Controlling access to cubes and views
+recipe][ref-recipe-control-access-cubes-views].
+
+### `meta`
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {
+  meta: {
+    any: `value`
+  }
+});
+```
+
+```yaml
+views:
+  - name: active_users
+    meta:
+      any: value
+
 ```
 
 </CodeTabs>
@@ -154,7 +319,7 @@ above for `base_orders`.
 #### `includes` and `excludes`
 
 The other required parameter inside the `cubes` block is `includes`. Use it
-to list measures, dimensions, or segments you'd like to include into the view. 
+to list measures, dimensions, or segments you'd like to include into the view.
 
 To include all members from a cube, use the _includes all_ shorthand: `includes: "*"`.
 In that case, you can also use the `excludes` parameter to list members that
@@ -281,103 +446,6 @@ views:
 
 </CodeTabs>
 
-### `public`
-
-The `public` parameter is used to manage the visibility of a view. Valid values
-for `public` are `true` and `false`. When set to `false`, this view **cannot**
-be queried through the API. Defaults to `true`.
-
-<CodeTabs>
-
-```yaml
-views:
-  - name: orders
-    public: false
-```
-
-```javascript
-view(`orders`, {
-  public: false,
-});
-```
-
-</CodeTabs>
-
-You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check
-out our
-[Controlling access to cubes and views ](/guides/recipes/access-control/controlling-access-to-cubes-and-views)
-recipe.
-
-<CodeTabs>
-
-```javascript
-view(`arr`, {
-  description: `Annual Recurring Revenue`,
-  public: COMPILE_CONTEXT.security_context.is_finance,
-
-  cubes: [
-    {
-      join_path: revenue,
-      includes: [
-        `arr`,
-        `date`
-      ]
-    },
-    {
-      join_path: revenue.customers,
-      includes: `plan`
-    }
-  ]
-})
-```
-
-```yaml
-views:
-  - name: arr
-    description: Annual Recurring Revenue
-    public: COMPILE_CONTEXT.security_context.is_finance
-
-    cubes:
-      - join_path: revenue
-        includes:
-          - arr
-          - date
-
-      - join_path: revenue.customers
-        includes:
-          - plan
-```
-
-</CodeTabs>
-
-To learn more about using `public` to control visibility based on security
-context, read the [Controlling access to cubes and views
-recipe][ref-recipe-control-access-cubes-views].
-
-### `meta`
-
-Custom metadata. Can be used to pass any information to the frontend.
-
-<CodeTabs>
-
-```javascript
-view(`active_users`, {
-  meta: {
-    any: `value`
-  }
-});
-```
-
-```yaml
-views:
-  - name: active_users
-    meta:
-      any: value
-
-```
-
-</CodeTabs>
-
 ### `access_policy`
 
 The `access_policy` parameter is used to configure [data access policies][ref-ref-dap].
@@ -393,6 +461,7 @@ The `access_policy` parameter is used to configure [data access policies][ref-re
 [ref-apis-support]: /product/apis-integrations#data-modeling
 [ref-playground]: /product/workspace/playground#viewing-the-data-model
 [ref-viz-tools]: /product/configuration/visualization-tools
+[ref-extension]: /product/data-modeling/concepts/code-reusability-extending-cubes
 [ref-dim-name]: /reference/data-model/dimensions#name
 [ref-dim-title]: /reference/data-model/dimensions#title
 [ref-dim-description]: /reference/data-model/dimensions#description
