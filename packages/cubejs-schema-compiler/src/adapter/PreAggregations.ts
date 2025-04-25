@@ -1443,76 +1443,84 @@ export class PreAggregations {
   }
 
   private measuresRenderedReference(preAggregationForQuery: PreAggregationForQuery): Record<string, string> {
-    return R.pipe<
-      string[],
-      Array<[string, string]>,
-      Record<string, string>
-    >(
-      R.map((path: string): [string, string] => {
+    const measures = this.rollupMeasures(preAggregationForQuery);
+
+    return Object.fromEntries(measures
+      .flatMap(path => {
         const measure = this.query.newMeasure(path);
-        return [
+        const measurePath = measure.path();
+        const column = this.query.ungrouped ? measure.aliasName() : (this.query.aggregateOnGroupedColumn(
+          measure.measureDefinition(),
+          measure.aliasName(),
+          !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate,
           path,
-          this.query.ungrouped ? measure.aliasName() : (this.query.aggregateOnGroupedColumn(
-            measure.measureDefinition(),
-            measure.aliasName(),
-            !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate,
-            path,
-          ) || `sum(${measure.aliasName()})`),
+        ) || `sum(${measure.aliasName()})`);
+        if (measurePath === null) {
+          return [[path, column]];
+        }
+        const memberPath = this.query.cubeEvaluator.pathFromArray(measurePath);
+        // Return both full join path and measure path
+        return [
+          [path, column],
+          [memberPath, column],
         ];
-      }),
-      R.fromPairs,
-    )(this.rollupMeasures(preAggregationForQuery));
+      }));
   }
 
   private measureAliasesRenderedReference(preAggregationForQuery: PreAggregationForQuery): Record<string, string> {
-    return R.pipe<
-      string[],
-      Array<[string, string]>,
-      Record<string, string>
-    >(
-      R.map((path: string): [string, string] => {
+    const measures = this.rollupMeasures(preAggregationForQuery);
+
+    return Object.fromEntries(measures
+      .flatMap(path => {
         const measure = this.query.newMeasure(path);
+        const measurePath = measure.path();
+        const alias = measure.aliasName();
+        if (measurePath === null) {
+          return [[path, alias]];
+        }
+        const memberPath = this.query.cubeEvaluator.pathFromArray(measurePath);
+        // Return both full join path and measure path
         return [
-          path,
-          measure.aliasName(),
+          [path, alias],
+          [memberPath, alias],
         ];
-      }),
-      R.fromPairs,
-    )(this.rollupMeasures(preAggregationForQuery));
+      }));
   }
 
   private dimensionsRenderedReference(preAggregationForQuery: PreAggregationForQuery): Record<string, string> {
-    return R.pipe<
-      string[],
-      Array<[string, string]>,
-      Record<string, string>
-    >(
-      R.map((path: string): [string, string] => {
+    const dimensions = this.rollupDimensions(preAggregationForQuery);
+
+    return Object.fromEntries(dimensions
+      .flatMap(path => {
         const dimension = this.query.newDimension(path);
+        const dimensionPath = dimension.path();
+        const column = this.query.escapeColumnName(dimension.unescapedAliasName());
+        if (dimensionPath === null) {
+          return [[path, column]];
+        }
+        const memberPath = this.query.cubeEvaluator.pathFromArray(dimensionPath);
+        // Return both full join path and dimension path
         return [
-          path,
-          this.query.escapeColumnName(dimension.unescapedAliasName()),
+          [path, column],
+          [memberPath, column],
         ];
-      }),
-      R.fromPairs,
-    )(this.rollupDimensions(preAggregationForQuery));
+      }));
   }
 
   private timeDimensionsRenderedReference(rollupGranularity: string, preAggregationForQuery: PreAggregationForQuery): Record<string, string> {
-    return R.pipe<
-      PreAggregationTimeDimensionReference[],
-      Array<[string, string]>,
-      Record<string, string>
-    >(
-      R.map((td: PreAggregationTimeDimensionReference): [string, string] => {
+    const timeDimensions = this.rollupTimeDimensions(preAggregationForQuery);
+
+    return Object.fromEntries(timeDimensions
+      .flatMap(td => {
         const timeDimension = this.query.newTimeDimension(td);
+        const column = this.query.escapeColumnName(timeDimension.unescapedAliasName(rollupGranularity));
+        const memberPath = this.query.cubeEvaluator.pathFromArray(timeDimension.path());
+        // Return both full join path and dimension path
         return [
-          td.dimension,
-          this.query.escapeColumnName(timeDimension.unescapedAliasName(rollupGranularity)),
+          [td.dimension, column],
+          [memberPath, column],
         ];
-      }),
-      R.fromPairs,
-    )(this.rollupTimeDimensions(preAggregationForQuery));
+      }));
   }
 
   private rollupMembers<T extends 'measures' | 'dimensions' | 'timeDimensions'>(preAggregationForQuery: PreAggregationForQuery, type: T): PreAggregationReferences[T] {
