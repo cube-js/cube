@@ -32,6 +32,10 @@ describe('PreAggregations', () => {
           type: 'count'
         },
 
+        countAnother: {
+          type: 'count'
+        },
+
         checkinsTotal: {
           sql: \`\${checkinsCount}\`,
           type: 'sum'
@@ -100,6 +104,10 @@ describe('PreAggregations', () => {
             hourTenMinOffset: {
               interval: '1 hour',
               offset: '10 minutes'
+            },
+            halfYear: {
+              interval: '6 months',
+              origin: '2017-01-01'
             }
           }
         },
@@ -235,6 +243,12 @@ describe('PreAggregations', () => {
           measures: [count],
           timeDimension: createdAt,
           granularity: 'hourTenMinOffset',
+          allowNonStrictDateRangeMatch: false
+        },
+        countAnotherCountCustomGranularity: {
+          measures: [countAnother],
+          timeDimension: createdAt,
+          granularity: 'halfYear',
           allowNonStrictDateRangeMatch: false
         },
         sourceAndIdRollup: {
@@ -620,6 +634,35 @@ describe('PreAggregations', () => {
           },
         ]
       );
+    });
+  }));
+
+  it('simple pre-aggregation with custom granularity (exact match) 2', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.countAnother'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2017-01-01 00:00:00.000', '2017-12-31 23:59:59.999'],
+        granularity: 'halfYear',
+      }],
+      timezone: 'UTC',
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
+    expect(queryAndParams[0]).toMatch(/visitors_count_another_count_custom_granularity/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual([
+        {
+          visitors__count_another: '5',
+          visitors__created_at_halfYear: '2017-01-01T00:00:00.000Z',
+        },
+      ]);
     });
   }));
 
