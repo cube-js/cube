@@ -36,14 +36,14 @@
   "devDependencies": {
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
-    "@types/jest": "^27",
+    "@types/jest": "^29",
     "@types/moment-range": "^4.0.0",
-    "babel-jest": "^27",
+    "babel-jest": "^29",
     "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^10.0.0",
-    "jest": "^27"
+    "jest": "^29"
   },
   "jest": {
     "testEnvironment": "node",
@@ -53,6 +53,12 @@
       "html",
       "lcov"
     ],
-    "coverageDirectory": "coverage/"
+    "coverageDirectory": "coverage/",
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    },
+    "moduleNameMapper": {
+      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js"
+    }
   }
 }
