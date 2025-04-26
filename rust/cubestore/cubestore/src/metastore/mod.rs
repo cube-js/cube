@@ -459,18 +459,10 @@ impl ColumnType {
     pub fn target_scale(&self) -> i32 {
         match self {
             ColumnType::Decimal { scale, .. } => {
-                if *scale > 5 {
-                    10
-                } else {
-                    *scale
-                }
+                *scale
             }
             ColumnType::Decimal96 { scale, .. } => {
-                if *scale > 5 {
-                    10
-                } else {
-                    *scale
-                }
+                *scale
             }
             x => panic!("target_scale called on {:?}", x),
         }
