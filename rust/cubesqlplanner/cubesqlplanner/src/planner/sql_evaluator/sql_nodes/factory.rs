@@ -2,7 +2,7 @@ use super::{
     AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     GeoDimensionSqlNode, MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode,
     RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
-    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode,
+    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode, OriginalSqlPreAggregationSqlNode
 };
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::sql_evaluator::MeasureTimeShift;
@@ -24,6 +24,8 @@ pub struct SqlNodesFactory {
     multi_stage_window: Option<Vec<String>>, //partition_by
     rolling_window: bool,
     dimensions_with_ignored_timezone: HashSet<String>,
+    use_local_tz_in_date_range: bool,
+    original_sql_pre_aggregations: HashMap<String, String>,
 }
 
 impl SqlNodesFactory {
@@ -42,6 +44,8 @@ impl SqlNodesFactory {
             multi_stage_window: None,
             rolling_window: false,
             dimensions_with_ignored_timezone: HashSet::new(),
+            use_local_tz_in_date_range: false,
+            original_sql_pre_aggregations: HashMap::new(),
         }
     }
 
@@ -51,6 +55,14 @@ impl SqlNodesFactory {
 
     pub fn set_ungrouped(&mut self, value: bool) {
         self.ungrouped = value;
+    }
+
+    pub fn set_use_local_tz_in_date_range(&mut self, value: bool) {
+        self.use_local_tz_in_date_range = value;
+    }
+
+    pub fn use_local_tz_in_date_range(&self) -> bool {
+        self.use_local_tz_in_date_range
     }
 
     pub fn set_ungrouped_measure(&mut self, value: bool) {
@@ -67,6 +79,10 @@ impl SqlNodesFactory {
 
     pub fn set_rendered_as_multiplied_measures(&mut self, value: HashSet<String>) {
         self.rendered_as_multiplied_measures = value;
+    }
+
+    pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<String, String>) {
+        self.original_sql_pre_aggregations = value;
     }
 
     pub fn add_render_reference(&mut self, key: String, value: QualifiedColumnName) {
@@ -136,16 +152,25 @@ impl SqlNodesFactory {
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
 
+
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(evaluate_sql_processor.clone()),
             measure_processor.clone(),
             auto_prefix_processor.clone(),
+            self.cube_table_processor(evaluate_sql_processor.clone()),
             evaluate_sql_processor.clone(),
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())
     }
 
+    fn cube_table_processor(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        if !self.original_sql_pre_aggregations.is_empty() {
+            OriginalSqlPreAggregationSqlNode::new(default, self.original_sql_pre_aggregations.clone())
+        } else {
+            default
+        }
+    }
     fn add_ungrouped_measure_reference_if_needed(
         &self,
         default: Rc<dyn SqlNode>,

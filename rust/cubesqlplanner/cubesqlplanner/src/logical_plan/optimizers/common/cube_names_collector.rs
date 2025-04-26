@@ -39,6 +39,21 @@ impl CubeNamesCollector {
         query: &FullKeyAggregateQuery,
     ) -> Result<(), CubeError> {
         self.collect_from_full_key_aggregate(&query.source)?;
+        for member in query.multistage_members.iter() {
+            self.collect_from_multi_stage_member(member)?;
+        }
+        Ok(())
+    }
+
+    fn collect_from_multi_stage_member(&mut self, member: &Rc<LogicalMultiStageMember>) -> Result<(), CubeError> {
+        match &member.member_type {
+            MultiStageMemberLogicalType::LeafMeasure(leaf_measure) => self.collect_from_multi_stage_leaf_measure(leaf_measure),
+            _ => Ok(()),
+        }
+    }
+
+    fn collect_from_multi_stage_leaf_measure(&mut self, leaf_measure: &MultiStageLeafMeasure) -> Result<(), CubeError> {
+        self.collect(&leaf_measure.query)?;
         Ok(())
     }
 
@@ -92,7 +107,7 @@ impl CubeNamesCollector {
         self.collect_from_logical_join(&subquery.keys_subquery.source)?;
         match subquery.source.as_ref() {
             AggregateMultipliedSubquerySouce::Cube => {
-                self.cube_names.insert(subquery.pk_cube.name().clone());
+                self.cube_names.insert(subquery.pk_cube.name.clone());
             }
             AggregateMultipliedSubquerySouce::MeasureSubquery(measure_subquery) => {
                 self.collect_from_measure_subquery(&measure_subquery)?;

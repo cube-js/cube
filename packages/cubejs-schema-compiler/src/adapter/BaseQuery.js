@@ -636,15 +636,9 @@ export class BaseQuery {
    * @returns {[string, Array<unknown>]}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-      if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
-      }
-    }
-
     if (this.useNativeSqlPlanner) {
-/*       let isRelatedToPreAggregation = false;
-      if (this.options.preAggregationQuery) {
+      let isRelatedToPreAggregation = false;
+/*       if (this.options.preAggregationQuery) {
         isRelatedToPreAggregation = true;
       } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
         if (this.externalPreAggregationQuery()) {
@@ -666,6 +660,12 @@ export class BaseQuery {
       } */
 
       return this.buildSqlAndParamsRust(exportAnnotatedSql);
+    }
+
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      if (this.externalPreAggregationQuery()) { // TODO performance
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+      }
     }
 
     return this.compilers.compiler.withQuery(
@@ -724,6 +724,57 @@ export class BaseQuery {
       this.preAggregations.preAggregationForQuery = res[2];
     }
     return res;
+  }
+
+  //FIXME Temporary solution
+  findPreAggregationForQueryRust() {
+    if (!this.preAggregations.preAggregationForQuery) {
+      let optionsOrder = this.options.order;
+      if (optionsOrder && !Array.isArray(optionsOrder)) {
+        optionsOrder = [optionsOrder];
+      }
+      const order = optionsOrder ? R.pipe(
+        R.map((hash) => {
+          return ((!hash || !hash.id) ? null : hash);
+        }),
+        R.reject(R.isNil),
+      )(optionsOrder) : undefined;
+
+      const queryParams = {
+        measures: this.options.measures,
+        dimensions: this.options.dimensions,
+        segments: this.options.segments,
+        timeDimensions: this.options.timeDimensions,
+        timezone: this.options.timezone,
+        joinGraph: this.joinGraph,
+        cubeEvaluator: this.cubeEvaluator,
+        order,
+        filters: this.options.filters,
+        limit: this.options.limit ? this.options.limit.toString() : null,
+        rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+        offset: this.options.offset ? this.options.offset.toString() : null,
+        baseTools: this,
+        ungrouped: this.options.ungrouped,
+        exportAnnotatedSql: false,
+        preAggregationQuery: this.options.preAggregationQuery
+      };
+
+      const buildResult = nativeBuildSqlAndParams(queryParams);
+
+      if (buildResult.error) {
+        if (buildResult.error.cause && buildResult.error.cause === 'User') {
+          throw new UserError(buildResult.error.message);
+        } else {
+          throw new Error(buildResult.error.message);
+        }
+      }
+
+    const res = buildResult.result;
+      if (res[2]) {
+        this.preAggregations.preAggregationForQuery = res[2];
+      }
+    }
+    return this.preAggregations.preAggregationForQuery;
   }
 
   allCubeMembers(path) {
@@ -922,6 +973,7 @@ export class BaseQuery {
       multiStageMembers,
     } = this.fullKeyQueryAggregateMeasures();
 
+
     if (!multipliedMeasures.length && !cumulativeMeasures.length && !multiStageMembers.length) {
       return this.simpleQuery();
     }
@@ -929,7 +981,6 @@ export class BaseQuery {
     const renderedWithQueries = withQueries.map(q => this.renderWithQuery(q));
 
     let toJoin;
-
     if (this.options.preAggregationQuery) {
       const allRegular = regularMeasures.concat(
         cumulativeMeasures
@@ -3235,7 +3286,7 @@ export class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    options = { ...options, useNativeSqlPlanner: false }; // We don't use tesseract for pre-aggregations generation yet
+    options = { ...options };
     if (this.options.queryFactory) {
       // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
       // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
@@ -3420,7 +3471,8 @@ export class BaseQuery {
           });
         } else if (preAggregation.type === 'rollup') {
           const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
-          return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
+          const params = query.buildSqlAndParams();
+          return query.evaluateSymbolSqlWithContext(() => params, {
             collectOriginalSqlPreAggregations
           });
         } else if (preAggregation.type === 'originalSql') {

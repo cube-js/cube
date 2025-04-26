@@ -142,8 +142,14 @@ impl MultiStageMemberQueryPlanner {
             is_ungrouped: self.description.member().is_ungrupped(),
             rolling_window,
             order_by: self.query_order_by()?,
-            time_series_input: inputs[0].clone(),
-            measure_input: inputs[1].clone(),
+            time_series_input: MultiStageSubqueryRef {
+                name: inputs[0].0.clone(),
+                symbols: inputs[0].1.clone(),
+            },
+            measure_input: MultiStageSubqueryRef {
+                name: inputs[1].0.clone(),
+                symbols: inputs[1].1.clone(),
+            },
             rolling_time_dimension: rolling_window_desc.time_dimension.member_evaluator(),
             time_dimension_in_measure_input: rolling_window_desc
                 .base_time_dimension
@@ -199,9 +205,10 @@ impl MultiStageMemberQueryPlanner {
         let input_sources = self
             .input_cte_aliases()
             .into_iter()
-            .map(|alias| {
+            .map(|(name, symbols)| {
                 FullKeyAggregateSource::MultiStageSubqueryRef(Rc::new(MultiStageSubqueryRef {
-                    name: alias,
+                    name: name.clone(),
+                    symbols: symbols.clone(),
                 }))
             })
             .collect_vec();
@@ -300,12 +307,12 @@ impl MultiStageMemberQueryPlanner {
             .collect_vec()
     }
 
-    fn input_cte_aliases(&self) -> Vec<String> {
+    fn input_cte_aliases(&self) -> Vec<(String, Vec<Rc<MemberSymbol>>)> {
         self.description
             .input()
             .iter()
-            .map(|d| d.alias().clone())
-            .unique()
+            .map(|d| (d.alias().clone(), vec![d.member_node().clone()]))
+            .unique_by(|(a, _)| a.clone())
             .collect_vec()
     }
 

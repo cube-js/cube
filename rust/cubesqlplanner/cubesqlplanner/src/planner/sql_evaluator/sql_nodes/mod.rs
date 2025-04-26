@@ -16,6 +16,7 @@ pub mod time_shift;
 pub mod ungroupped_measure;
 pub mod ungroupped_query_final_measure;
 pub mod final_pre_aggregation_measure;
+pub mod original_sql_pre_aggregation;
 
 pub use auto_prefix::AutoPrefixSqlNode;
 pub use case_dimension::CaseDimensionSqlNode;
@@ -35,3 +36,4 @@ pub use time_shift::TimeShiftSqlNode;
 pub use ungroupped_measure::UngroupedMeasureSqlNode;
 pub use ungroupped_query_final_measure::UngroupedQueryFinalMeasureSqlNode;
 pub use final_pre_aggregation_measure::FinalPreAggregationMeasureSqlNode;
+pub use original_sql_pre_aggregation::OriginalSqlPreAggregationSqlNode;

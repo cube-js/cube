@@ -4,14 +4,21 @@ use std::rc::Rc;
 
 pub struct MultiStageSubqueryRef {
     pub name: String,
+    pub symbols: Vec<Rc<MemberSymbol>>,
 }
 
 impl PrettyPrint for MultiStageSubqueryRef {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(&format!("MultiStageSubqueryRef: {}", self.name), state);
+        let state = state.new_level();
+        result.println(
+            &format!("symbols: {}", print_symbols(&self.symbols)),
+            &state,
+        );
     }
 }
 
+#[derive(Clone)]
 pub enum FullKeyAggregateSource {
     ResolveMultipliedMeasures(Rc<ResolveMultipliedMeasures>),
     MultiStageSubqueryRef(Rc<MultiStageSubqueryRef>),

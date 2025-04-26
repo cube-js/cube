@@ -23,6 +23,7 @@ struct PhysicalPlanBuilderContext {
     pub render_measure_as_state: bool, //Render measure as state, for example hll state for count_approx
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: HashMap<String, MeasureTimeShift>,
+    pub original_sql_pre_aggregations: HashMap<String, String>,
 }
 
 impl Default for PhysicalPlanBuilderContext {
@@ -32,6 +33,7 @@ impl Default for PhysicalPlanBuilderContext {
             render_measure_as_state: false,
             render_measure_for_ungrouped: false,
             time_shifts: HashMap::new(),
+            original_sql_pre_aggregations: HashMap::new(),
         }
     }
 }
@@ -42,6 +44,7 @@ impl PhysicalPlanBuilderContext {
         factory.set_time_shifts(self.time_shifts.clone());
         factory.set_count_approx_as_state(self.render_measure_as_state);
         factory.set_ungrouped_measure(self.render_measure_for_ungrouped);
+        factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
         factory
     }
 }
@@ -60,8 +63,10 @@ impl PhysicalPlanBuilder {
         }
     }
 
-    pub fn build(&self, logical_plan: Rc<Query>) -> Result<Rc<Select>, CubeError> {
-        self.build_impl(logical_plan, &PhysicalPlanBuilderContext::default())
+    pub fn build(&self, logical_plan: Rc<Query>, original_sql_pre_aggregations: HashMap<String, String>) -> Result<Rc<Select>, CubeError> {
+        let mut context = PhysicalPlanBuilderContext::default();
+        context.original_sql_pre_aggregations = original_sql_pre_aggregations;
+        self.build_impl(logical_plan, &context)
     }
 
     fn build_impl(
@@ -84,6 +89,7 @@ impl PhysicalPlanBuilder {
     ) -> Result<Rc<Select>, CubeError> {
         let mut render_references = HashMap::new();
         let mut measure_references = HashMap::new();
+        let mut context_factory = context.make_sql_nodes_factory();
         let from = match &logical_plan.source {
             SimpleQuerySource::LogicalJoin(join) => {
                 self.process_logical_join(
@@ -93,11 +99,17 @@ impl PhysicalPlanBuilder {
                     &mut render_references,
                 )?
             },
-            SimpleQuerySource::PreAggregation(pre_aggregation) => self.process_pre_aggregation(pre_aggregation, context, &mut render_references, &mut measure_references)?,
+            SimpleQuerySource::PreAggregation(pre_aggregation) => {
+                let res = self.process_pre_aggregation(pre_aggregation, context, &mut render_references, &mut measure_references)?;
+                for member in logical_plan.schema.time_dimensions.iter() {
+                    context_factory.add_dimensions_with_ignored_timezone(member.full_name());
+                }
+                context_factory.set_use_local_tz_in_date_range(true);
+                res
+            },
         };
 
         let mut select_builder = SelectBuilder::new(from);
-        let mut context_factory = context.make_sql_nodes_factory();
         context_factory.set_ungrouped(logical_plan.ungrouped);
         context_factory.set_pre_aggregation_measures_references(measure_references);
 
@@ -578,7 +590,7 @@ impl PhysicalPlanBuilder {
             .primary_keys_dimensions;
         let pk_cube = aggregate_multiplied_subquery.pk_cube.clone();
         let pk_cube_alias =
-            pk_cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.default_alias())));
+            pk_cube.cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube.default_alias())));
         match aggregate_multiplied_subquery.source.as_ref() {
             AggregateMultipliedSubquerySouce::Cube => {
                 let conditions = primary_keys_dimensions
@@ -597,7 +609,7 @@ impl PhysicalPlanBuilder {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 join_builder.left_join_cube(
-                    pk_cube.clone(),
+                    pk_cube.cube.clone(),
                     Some(pk_cube_alias.clone()),
                     JoinCondition::new_dimension_join(conditions, false),
                 );
@@ -939,8 +951,8 @@ impl PhysicalPlanBuilder {
         context: &PhysicalPlanBuilderContext,
     ) -> Result<Rc<QueryPlan>, CubeError> {
         let time_dimension = rolling_window.rolling_time_dimension.clone();
-        let time_series_ref = rolling_window.time_series_input.clone();
-        let measure_input_ref = rolling_window.measure_input.clone();
+        let time_series_ref = rolling_window.time_series_input.name.clone();
+        let measure_input_ref = rolling_window.measure_input.name.clone();
 
         let time_series_schema = if let Some(schema) = multi_stage_schemas.get(&time_series_ref) {
             schema.clone()

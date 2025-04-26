@@ -59,8 +59,8 @@ pub struct MultiStageRollingWindow {
     pub rolling_time_dimension: Rc<MemberSymbol>,
     pub rolling_window: MultiStageRollingWindowType,
     pub order_by: Vec<OrderByItem>,
-    pub time_series_input: String,
-    pub measure_input: String,
+    pub time_series_input: MultiStageSubqueryRef,
+    pub measure_input: MultiStageSubqueryRef,
     pub time_dimension_in_measure_input: Rc<MemberSymbol>, //time dimension in measure input can have different granularity
 }
 
@@ -93,11 +93,10 @@ impl PrettyPrint for MultiStageRollingWindow {
                 );
             }
         }
-        result.println(
-            &format!("time_series_input: {}", self.time_series_input),
-            &state,
-        );
-        result.println(&format!("measure_input: {}", self.measure_input), &state);
+        result.println("time_series_input:", &state);
+        self.time_series_input.pretty_print(result, &details_state);
+        result.println("measure_input:", &state);
+        self.measure_input.pretty_print(result, &details_state);
         result.println(
             &format!(
                 "time_dimension_in_measure_input: {}",

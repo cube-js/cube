@@ -14,6 +14,7 @@ pub struct CompiledPreAggregation {
     pub measures: Vec<Rc<MemberSymbol>>,
     pub dimensions: Vec<Rc<MemberSymbol>>,
     pub time_dimensions: Vec<(Rc<MemberSymbol>, Option<String>)>,
+    pub allow_non_strict_date_range_match: bool,
 }
 
 
@@ -27,6 +28,7 @@ impl Debug for CompiledPreAggregation {
             .field("measures", &self.measures)
             .field("dimensions", &self.dimensions)
             .field("time_dimensions", &self.time_dimensions)
+            .field("allow_non_strict_date_range_match", &self.allow_non_strict_date_range_match)
             .finish()
     }
 }
@@ -69,6 +71,7 @@ impl CompiledPreAggregation {
         } else {
             Vec::new()
         };
+        let allow_non_strict_date_range_match = description.static_data().allow_non_strict_date_range_match.unwrap_or(false);
         let res = Rc::new(Self {
             name: static_data.name.clone(),
             cube_name: cube_name.clone(),
@@ -77,6 +80,7 @@ impl CompiledPreAggregation {
             measures,
             dimensions,
             time_dimensions,
+            allow_non_strict_date_range_match
         });
         Ok(res)
     }

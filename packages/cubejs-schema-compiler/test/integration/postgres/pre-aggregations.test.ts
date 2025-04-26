@@ -531,8 +531,7 @@ describe('PreAggregations', () => {
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
-    console.log("!!!! pre aggrs", query.preAggregations?.preAggregationForQuery);
-    console.log("!!!! pre aggrs fun", query.preAggregations?.preAggregationForQuery.preAggregation);
+    console.log(query.preAggregations?.preAggregationsDescription());
     expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
@@ -955,6 +954,7 @@ describe('PreAggregations', () => {
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
     expect(queryAndParams[0]).toMatch(/count\(distinct/ig);
+    expect(queryAndParams[0]).toMatch(/visitors_default/ig);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect((<any>preAggregationsDescription).filter(p => p.type === 'rollup').length).toBe(0);
@@ -1617,6 +1617,7 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
@@ -1673,6 +1674,7 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
@@ -1721,6 +1723,7 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
 
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
     expect(queries.filter(([q]) => !!q.match(/3600/)).length).toBeGreaterThanOrEqual(1);
@@ -1771,9 +1774,10 @@ describe('PreAggregations', () => {
     });
 
     const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
+    console.log("!!! ---", queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
@@ -1851,6 +1855,7 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
+    expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 

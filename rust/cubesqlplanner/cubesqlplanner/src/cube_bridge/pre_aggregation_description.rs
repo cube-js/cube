@@ -16,7 +16,11 @@ pub struct PreAggregationDescriptionStatic {
     #[serde(rename = "type")]
     pub pre_aggregation_type: String,
     pub granularity: Option<String>,
+    #[serde(rename = "sqlAlias")]
+    pub sql_alias: Option<String>,
     pub external: Option<bool>,
+    #[serde(rename = "allowNonStrictDateRangeMatch")]
+    pub allow_non_strict_date_range_match: Option<bool>,
 }
 
 #[nativebridge::native_bridge(PreAggregationDescriptionStatic)]

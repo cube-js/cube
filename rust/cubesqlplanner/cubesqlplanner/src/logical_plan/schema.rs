@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use super::pretty_print::*;
 use crate::planner::sql_evaluator::MemberSymbol;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
 pub struct LogicalSchema {

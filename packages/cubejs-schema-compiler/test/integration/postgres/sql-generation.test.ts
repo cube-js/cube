@@ -3138,7 +3138,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     }]
   ));
 
-  it('multi stage complex graph', async () => runQueryTest(
+  it('multi stage complex graph 111', async () => runQueryTest(
     {
       measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
       dimensions: ['visitors.source'],

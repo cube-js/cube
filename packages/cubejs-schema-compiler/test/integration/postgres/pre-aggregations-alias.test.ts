@@ -368,8 +368,9 @@ describe('PreAggregationsAlias', () => {
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    const sqlAndParams = query.buildSqlAndParams();
     expect(preAggregationsDescription[0].tableName).toEqual('rvis_rollupalias');
-    expect(query.buildSqlAndParams()[0]).toContain('rvis_rollupalias');
+    expect(sqlAndParams[0]).toContain('rvis_rollupalias');
 
     return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
       expect(res).toEqual(

@@ -96,6 +96,7 @@ impl BaseTimeDimension {
             member_evaluator.clone(),
             granularity.clone(),
             granularity_obj.clone(),
+            &date_range,
         )));
         Ok(Rc::new(Self {
             dimension,
@@ -124,6 +125,7 @@ impl BaseTimeDimension {
             self.dimension.member_evaluator(),
             new_granularity.clone(),
             new_granularity_obj.clone(),
+            &self.date_range,
         )));
         Ok(Rc::new(Self {
             dimension: self.dimension.clone(),

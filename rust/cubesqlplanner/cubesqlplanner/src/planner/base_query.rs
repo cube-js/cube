@@ -15,6 +15,7 @@ use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle, NativeS
 use cubenativeutils::{CubeError, CubeErrorCauseType};
 use crate::cube_bridge::pre_aggregation_obj::{PreAggregationObj, NativePreAggregationObj};
 use crate::logical_plan::pretty_print::*;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
@@ -84,10 +85,18 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let logical_plan = query_planner.plan()?;
 
-        let (optimized_plan, used_pre_aggregations) = self.try_pre_aggregations (logical_plan)?;
+        //println!("!!!! original plan{}, : {}", self.request.is_pre_aggregation_query(), pretty_print_rc(&logical_plan));
+        let (optimized_plan, used_pre_aggregations) = self.try_pre_aggregations(logical_plan.clone())?;
+        //println!("!!!! original plan: ---------");
+        //println!("!!!! optimized plan: {}", pretty_print_rc(&optimized_plan));
 
         let physical_plan_builder = PhysicalPlanBuilder::new(self.query_tools.clone());
-        let physical_plan = physical_plan_builder.build(optimized_plan)?;
+        let original_sql_pre_aggregations = if !self.request.is_pre_aggregation_query() {
+            OriginalSqlCollector::new(self.query_tools.clone()).collect(&optimized_plan)?
+        } else {
+            HashMap::new()
+        };
+        let physical_plan = physical_plan_builder.build(optimized_plan, original_sql_pre_aggregations)?;
 
         let sql = physical_plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
@@ -103,10 +112,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         Ok(result)
     }
 
-     fn try_pre_aggregations(&self, plan: Rc<Query>) -> Result<(Rc<Query>, Vec<Rc<dyn PreAggregationObj>>), CubeError> {
+    fn try_pre_aggregations(&self, plan: Rc<Query>) -> Result<(Rc<Query>, Vec<Rc<dyn PreAggregationObj>>), CubeError> {
         let result = if !self.request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(self.query_tools.clone());
-            println!("!!! Pre-aggregation optimizer");
             if let Some(result) = pre_aggregation_optimizer.try_optimize(plan.clone())? {
                 (result, pre_aggregation_optimizer.get_used_pre_aggregations())
             } else {

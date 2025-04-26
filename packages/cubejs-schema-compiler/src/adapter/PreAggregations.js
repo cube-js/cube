@@ -782,11 +782,15 @@ export class PreAggregations {
    */
   findPreAggregationForQuery() {
     if (!this.preAggregationForQuery) {
-      this.preAggregationForQuery =
-        this
-          .rollupMatchResults()
-          // Refresh worker can access specific pre-aggregations even in case those hidden by others
-          .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
+      if (this.query.useNativeSqlPlanner) {
+        this.query.findPreAggregationForQueryRust();
+      } else {
+        this.preAggregationForQuery =
+          this
+            .rollupMatchResults()
+            // Refresh worker can access specific pre-aggregations even in case those hidden by others
+            .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
+      }
     }
     return this.preAggregationForQuery;
   }

@@ -62,4 +62,5 @@ pub trait BaseTools {
     ) -> Result<String, CubeError>;
 
     fn get_pre_aggregation_by_name(&self, cube_name: String, name: String) -> Result<Rc<dyn PreAggregationObj>, CubeError>;
+    fn pre_aggregation_table_name(&self, cube_name: String, name: String) -> Result<String, CubeError>; //TODO move to rust
 }

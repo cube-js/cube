@@ -771,7 +771,7 @@ impl QueryProperties {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.all_used_measures()?;
         for m in measures.iter() {
-            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
+            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative || self.pre_aggregation_query)? {
                 result.multi_stage_measures.push(m.clone())
             } else {
                 let join = self
