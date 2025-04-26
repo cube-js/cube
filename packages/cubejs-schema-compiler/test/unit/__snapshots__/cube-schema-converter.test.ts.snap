@@ -143,9 +143,9 @@ cube(\`js_orders_users\`, {
     }
   }
 });
-view(\`orders_view\`, {
+view(\`js_orders_view\`, {
   cubes: [{
-    join_path: orders,
+    join_path: js_orders,
     includes: '*'
   }]
 });"
@@ -751,9 +751,9 @@ cube(\`js_orders_users\`, {
     }
   }
 });
-view(\`orders_view\`, {
+view(\`js_orders_view\`, {
   cubes: [{
-    join_path: orders,
+    join_path: js_orders,
     includes: '*'
   }]
 });"
@@ -895,9 +895,9 @@ cube(\`js_orders_users\`, {
     }
   }
 });
-view(\`orders_view\`, {
+view(\`js_orders_view\`, {
   cubes: [{
-    join_path: orders,
+    join_path: js_orders,
     includes: '*'
   }]
 });"
