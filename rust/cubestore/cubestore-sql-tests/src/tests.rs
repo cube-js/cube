@@ -39,6 +39,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("refresh_selects", refresh_selects),
         t("negative_numbers", negative_numbers),
         t("negative_decimal", negative_decimal),
+        t("decimal_math", decimal_math),
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
@@ -455,6 +456,50 @@ async fn negative_decimal(service: Box<dyn SqlClient>) {
             x => panic!("Expected decimal but found: {:?}", x),
         },
         "-0.12345"
+    );
+}
+
+async fn decimal_math(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+    service
+        .exec_query("CREATE TABLE foo.test_decimal (value Decimal(5, 10))")
+        .await
+        .unwrap();
+    service.exec_query("INSERT INTO foo.test_decimal (value) VALUES (10), (20), (30), (40), (100), (200), (300)").await.unwrap();
+    let r: Arc<DataFrame> = service
+        .exec_query("SELECT value, value / 3 FROM foo.test_decimal")
+        .await
+        .unwrap();
+    let columns: &Vec<Column> = r.get_columns();
+    assert_eq!(columns.len(), 2);
+    assert_eq!(
+        columns[0].get_column_type(),
+        &ColumnType::Decimal {
+            scale: 10,
+            precision: 10
+        }
+    );
+    assert_eq!(
+        columns[1].get_column_type(),
+        &ColumnType::Decimal {
+            scale: 14,
+            precision: 14
+        }
+    );
+    const S10: i128 = 1_00000_00000i128;
+    const S14: i128 = 1_0000_00000_00000i128;
+    fn mk_row(n: i128) -> Vec<TableValue> {
+        vec![
+            TableValue::Decimal(Decimal::new(n * S10)),
+            TableValue::Decimal(Decimal::new(n * S14 / 3)),
+        ]
+    }
+    assert_eq!(
+        to_rows(&r),
+        [10, 20, 30, 40, 100, 200, 300]
+            .into_iter()
+            .map(|n| mk_row(n))
+            .collect::<Vec<_>>()
     );
 }
 
