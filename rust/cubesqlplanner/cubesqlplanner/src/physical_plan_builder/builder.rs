@@ -872,13 +872,13 @@ impl PhysicalPlanBuilder {
             }
         };
 
-        let time_seira = TimeSeries::new(
+        let time_series = TimeSeries::new(
             self.query_tools.clone(),
             time_dimension.full_name(),
             ts_date_range,
             granularity_obj,
         );
-        let query_plan = Rc::new(QueryPlan::TimeSeries(Rc::new(time_seira)));
+        let query_plan = Rc::new(QueryPlan::TimeSeries(Rc::new(time_series)));
         Ok(query_plan)
     }
 
@@ -973,13 +973,13 @@ impl PhysicalPlanBuilder {
         let mut render_references = HashMap::new();
         let mut select_builder = SelectBuilder::new(from.clone());
 
-        //We insert render reference for main time dimension (with the some granularity as in time series to avoid unnessesary date_tranc)
+        //We insert render reference for main time dimension (with the some granularity as in time series to avoid unnecessary date_tranc)
         render_references.insert(
             time_dimension.full_name(),
             QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from")),
         );
 
-        //We also insert render reference for the base dimension of time dimension (i.e. without `_granularity` prefix to let other time dimensions make date_tranc)
+        //We also insert render reference for the base dimension of the time dimension (i.e. without `_granularity` prefix to let other time dimensions make date_tranc)
         render_references.insert(
             time_dimension
                 .as_time_dimension()?
