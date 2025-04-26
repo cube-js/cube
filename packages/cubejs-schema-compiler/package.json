@@ -115,7 +115,7 @@
     "moduleNameMapper": {
       "^axios$": "<rootDir>/../../node_modules/axios/dist/node/axios.cjs",
       "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js",
-      "^yaml$": "<rootDir>/../../node_modules/yaml/dist/index.js"
+      "^yaml$": "<rootDir>/node_modules/yaml/dist/index.js"
     },
     "snapshotFormat": {
       "escapeString": true,
