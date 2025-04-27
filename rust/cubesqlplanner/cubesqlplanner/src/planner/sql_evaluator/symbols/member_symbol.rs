@@ -136,6 +136,17 @@ impl MemberSymbol {
         }
     }
 
+    pub fn owned_by_cube(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.owned_by_cube(),
+            Self::TimeDimension(d) => d.owned_by_cube(),
+            Self::Measure(m) => m.owned_by_cube(),
+            Self::CubeName(_) => false,
+            Self::CubeTable(_) => false,
+            Self::MemberExpression(e) => false,
+        }
+    }
+
     pub fn as_time_dimension(&self) -> Result<&TimeDimensionSymbol, CubeError> {
         match self {
             Self::TimeDimension(d) => Ok(d),

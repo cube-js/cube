@@ -436,22 +436,17 @@ impl PreAggregationOptimizer {
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
         let helper = OptimizerHelper::new();
-        let time_dimensions = &schema.time_dimensions;
-        let time_dimension_filters = &filters.time_dimensions_filters;
 
         //println!("!!! ========");
-        let mut match_state = self.match_dimensions(
+        let match_state = self.match_dimensions(
             &schema.dimensions,
+            &schema.time_dimensions,
             &filters.dimensions_filters,
+            &filters.time_dimensions_filters,
             &filters.segments,
             pre_aggregation,
         )?;
         //println!("!!!! pre-agg-name: {}, match_state: {:?}", pre_aggregation.name, match_state);
-        match_state = match_state.combine(&self.match_time_dimensions(
-            &time_dimensions,
-            &time_dimension_filters,
-            pre_aggregation,
-        )?);
 
         let all_measures = helper.all_measures(schema, filters);
         /*         if !schema.multiplied_measures.is_empty() && match_state == MatchState::Partial {
@@ -493,23 +488,16 @@ impl PreAggregationOptimizer {
     fn match_dimensions(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
+        time_dimensions: &Vec<Rc<MemberSymbol>>,
         filters: &Vec<FilterItem>,
+        time_dimension_filters: &Vec<FilterItem>,
         segments: &Vec<FilterItem>,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<MatchState, CubeError> {
-        let matcher = DimensionMatcher::new();
-        let result = matcher.try_match(dimensions, filters, segments, pre_aggregation)?;
+        let mut matcher = DimensionMatcher::new(self.query_tools.clone(), pre_aggregation);
+        matcher.try_match(dimensions, time_dimensions, filters, time_dimension_filters, segments)?;
+        let result = matcher.result();
         Ok(result)
     }
 
-    fn match_time_dimensions(
-        &self,
-        time_dimensions: &Vec<Rc<MemberSymbol>>,
-        time_dimension_filters: &Vec<FilterItem>,
-        pre_aggregation: &CompiledPreAggregation,
-    ) -> Result<MatchState, CubeError> {
-        let matcher = TimeDimensionMatcher::new(self.query_tools.clone());
-        let result = matcher.try_match(time_dimensions, time_dimension_filters, pre_aggregation)?;
-        Ok(result)
-    }
 }

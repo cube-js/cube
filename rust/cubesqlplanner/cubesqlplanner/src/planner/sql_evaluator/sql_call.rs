@@ -87,7 +87,11 @@ impl SqlCall {
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
                 }
-                Dependency::TimeDimensionDependency(dep) => result.push(dep.base_symbol.clone()),
+                Dependency::TimeDimensionDependency(dep) => {
+                    for (_, granularity) in dep.granularities.iter() {
+                        result.push(granularity.clone());
+                    }
+                },
                 Dependency::ContextDependency(_) => {}
             }
         }
@@ -98,7 +102,9 @@ impl SqlCall {
             match dep {
                 Dependency::SymbolDependency(dep) => result.push((dep.clone(), vec![])),
                 Dependency::TimeDimensionDependency(dep) => {
-                    result.push((dep.base_symbol.clone(), vec![]))
+                    for (_, granularity) in dep.granularities.iter() {
+                        result.push((granularity.clone(), vec![]));
+                    }
                 }
                 Dependency::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, vec![], result)
@@ -136,7 +142,9 @@ impl SqlCall {
             match v {
                 CubeDepProperty::SymbolDependency(dep) => result.push(dep.clone()),
                 CubeDepProperty::TimeDimensionDependency(dep) => {
-                    result.push(dep.base_symbol.clone())
+                    for (_, granularity) in dep.granularities.iter() {
+                        result.push(granularity.clone());
+                    }
                 }
                 CubeDepProperty::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_from_cube_dep(cube_dep, result)
@@ -162,7 +170,9 @@ impl SqlCall {
             match v {
                 CubeDepProperty::SymbolDependency(dep) => result.push((dep.clone(), path.clone())),
                 CubeDepProperty::TimeDimensionDependency(dep) => {
-                    result.push((dep.base_symbol.clone(), path.clone()))
+                    for (_, granularity) in dep.granularities.iter() {
+                        result.push((granularity.clone(), path.clone()));
+                    }
                 }
                 CubeDepProperty::CubeDependency(cube_dep) => {
                     self.extract_symbol_deps_with_path_from_cube_dep(cube_dep, path.clone(), result)

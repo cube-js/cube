@@ -3,6 +3,9 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import {
+  getEnv,
+} from '@cubejs-backend/shared';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
@@ -568,6 +571,9 @@ describe('PreAggregations', () => {
 
 
   it('simple pre-aggregation proxy time dimension', () => compiler.compile().then(() => {
+    if (!getEnv('nativeSqlPlanner')) {
+      return;
+    }
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.count'

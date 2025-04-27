@@ -182,7 +182,7 @@ impl<'a> DependenciesBuilder<'a> {
                         base_evaluator.clone(),
                         Some(granularity.clone()),
                         Some(granularity_obj),
-                        &None
+                        None
                     )));
                 granularities.insert(granularity.clone(), member_evaluator);
             } else {
