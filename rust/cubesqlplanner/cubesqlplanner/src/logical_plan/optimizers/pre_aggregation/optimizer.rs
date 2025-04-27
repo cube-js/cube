@@ -157,7 +157,7 @@ impl PreAggregationOptimizer {
             )?;
         }
         let all_multi_stage_rewrited = rewrited_multistage.values().all(|v| *v);
-        println!("!!! pre-aggr: {}, all_multi_stage_rewrited: {}, rewritten: {:#?}", pre_aggregation.name, all_multi_stage_rewrited, rewrited_multistage);
+        //println!("!!! pre-aggr: {}, all_multi_stage_rewrited: {}, rewritten: {:#?}", pre_aggregation.name, all_multi_stage_rewrited, rewrited_multistage);
         if !all_multi_stage_rewrited {
             return Ok(None);
         }
@@ -439,14 +439,14 @@ impl PreAggregationOptimizer {
         let time_dimensions = &schema.time_dimensions;
         let time_dimension_filters = &filters.time_dimensions_filters;
 
-        println!("!!! ========");
+        //println!("!!! ========");
         let mut match_state = self.match_dimensions(
             &schema.dimensions,
             &filters.dimensions_filters,
             &filters.segments,
             pre_aggregation,
         )?;
-        println!("!!!! pre-agg-name: {}, match_state: {:?}", pre_aggregation.name, match_state);
+        //println!("!!!! pre-agg-name: {}, match_state: {:?}", pre_aggregation.name, match_state);
         match_state = match_state.combine(&self.match_time_dimensions(
             &time_dimensions,
             &time_dimension_filters,
@@ -465,7 +465,7 @@ impl PreAggregationOptimizer {
             pre_aggregation,
             match_state == MatchState::Partial,
         )?;
-        println!("!!!! pre-agg-name: {}, match_state: {:?}, measures_match: {}", pre_aggregation.name, match_state, measures_match);
+        //println!("!!!! pre-agg-name: {}, match_state: {:?}, measures_match: {}", pre_aggregation.name, match_state, measures_match);
         if !schema.multiplied_measures.is_empty() && match_state == MatchState::Partial {
             return Ok(false);
         }

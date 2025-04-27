@@ -8,7 +8,8 @@ use std::collections::HashMap;
 use crate::planner::filter::BaseFilter;
 use std::rc::Rc;
 
-pub struct DimensionMatcher {}
+pub struct DimensionMatcher {
+}
 
 impl DimensionMatcher {
     pub fn new() -> Self {
@@ -85,6 +86,10 @@ impl DimensionMatcher {
 
         if symbol.get_dependencies().is_empty() {
             return Ok(MatchState::NotMatched);
+        }
+
+        if !symbol.is_reference() {
+            result = result.combine(&MatchState::Partial);
         }
 
         for dep in symbol.get_dependencies() {

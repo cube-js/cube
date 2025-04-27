@@ -49,6 +49,10 @@ impl MemberExpressionSymbol {
         format!("expr:{}.{}", self.cube_name, self.name)
     }
 
+    pub fn is_reference(&self) -> bool {
+        false
+    }
+
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         let mut deps = vec![];
         self.expression.extract_symbol_deps(&mut deps);

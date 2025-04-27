@@ -82,6 +82,10 @@ impl TimeDimensionSymbol {
         self.base_symbol.is_multi_stage()
     }
 
+    pub fn is_reference(&self) -> bool {
+        self.base_symbol.is_reference()
+    }
+
     pub fn name(&self) -> String {
         self.base_symbol.name()
     }

@@ -311,6 +311,8 @@ export class PreAggregations {
     const dimensionsList = query.dimensions.map(dim => dim.expressionPath());
     const segmentsList = query.segments.map(s => s.expressionPath());
     const ownedDimensions = PreAggregations.ownedMembers(query, flattenDimensionMembers);
+    console.log("!!! dimensions", dimensionsList);
+    console.log("!!! ownedDimensions", ownedDimensions);
     const ownedTimeDimensions = query.timeDimensions.map(td => {
       const owned = PreAggregations.ownedMembers(query, [td]);
       let { dimension } = td;

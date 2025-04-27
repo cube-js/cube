@@ -57,6 +57,7 @@ pub struct MeasureSymbol {
     cube_name: String,
     name: String,
     definition: Rc<dyn MeasureDefinition>,
+    is_reference: bool,
     measure_filters: Vec<Rc<SqlCall>>,
     measure_drill_filters: Vec<Rc<SqlCall>>,
     time_shifts: Vec<MeasureTimeShift>,
@@ -74,6 +75,7 @@ impl MeasureSymbol {
         cube_name: String,
         name: String,
         member_sql: Option<Rc<SqlCall>>,
+        is_reference: bool,
         pk_sqls: Vec<Rc<SqlCall>>,
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<SqlCall>>,
@@ -88,6 +90,7 @@ impl MeasureSymbol {
             cube_name,
             name,
             member_sql,
+            is_reference,
             pk_sqls,
             definition,
             measure_filters,
@@ -118,7 +121,11 @@ impl MeasureSymbol {
     }
 
     pub fn is_calculated(&self) -> bool {
-        match self.definition.static_data().measure_type.as_str() {
+        Self::is_calculated_type(&self.definition.static_data().measure_type)
+    }
+
+    pub fn is_calculated_type(measure_type: &str) -> bool {
+        match measure_type {
             "number" | "string" | "time" | "boolean" => true,
             _ => false,
         }
@@ -222,6 +229,10 @@ impl MeasureSymbol {
             .static_data()
             .owned_by_cube
             .unwrap_or(true)
+    }
+
+    pub fn is_reference(&self) -> bool {
+        self.is_reference
     }
 
     pub fn measure_type(&self) -> &String {
@@ -372,6 +383,7 @@ impl SymbolFactory for MeasureSymbolFactory {
         } else {
             vec![]
         };
+
         let mut measure_filters = vec![];
         if let Some(filters) = definition.filters()? {
             for filter in filters.iter() {
@@ -399,6 +411,12 @@ impl SymbolFactory for MeasureSymbolFactory {
             Some(compiler.compile_sql_call(&cube_name, sql)?)
         } else {
             None
+        };
+
+        let is_sql_is_direct_ref = if let Some(sql) = &sql {
+            sql.is_direct_reference()?
+        } else {
+            false
         };
 
         let time_shifts =
@@ -469,10 +487,29 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
+        let is_calculated =
+            MeasureSymbol::is_calculated_type(&definition.static_data().measure_type)
+                && !definition.static_data().multi_stage.unwrap_or(false);
+        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+        let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+
+        let is_reference = !owned_by_cube
+            && is_sql_is_direct_ref
+            && is_calculated
+            && !is_multi_stage
+            && measure_filters.is_empty()
+            && measure_drill_filters.is_empty()
+            && time_shifts.is_empty()
+            && measure_order_by.is_empty()
+            && reduce_by.is_none()
+            && add_group_by.is_none()
+            && group_by.is_none();
+
         Ok(MemberSymbol::new_measure(MeasureSymbol::new(
             cube_name,
             name,
             sql,
+            is_reference,
             pk_sqls,
             definition,
             measure_filters,

@@ -184,6 +184,10 @@ impl TimeDimensionMatcher {
             return Ok(MatchState::NotMatched);
         }
 
+        if !symbol.is_reference() {
+            result = result.combine(&MatchState::Partial);
+        }
+
         for dep in symbol.get_dependencies() {
             let dep_match = self.try_match_symbol(
                 &dep,
