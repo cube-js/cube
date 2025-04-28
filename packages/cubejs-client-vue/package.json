@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue",
-  "version": "1.3.8",
+  "version": "1.3.9",
   "engines": {},
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "1.3.8",
+    "@cubejs-client/core": "1.3.9",
     "core-js": "^3.6.5",
     "ramda": "^0.27.2"
   },

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/linter",
   "description": "Cube.js ESLint (virtual package) for linting code",
   "author": "Cube Dev, Inc.",
-  "version": "1.3.8",
+  "version": "1.3.9",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",

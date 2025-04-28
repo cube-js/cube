@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
+
+### Features
+
+- **schema-compiler:** Support adding pre-aggregations in Rollup Designer for YAML-based models ([#9500](https://github.com/cube-js/cube/issues/9500)) ([1cfe4c2](https://github.com/cube-js/cube/commit/1cfe4c2dd1cc0fe738590abb39fe2485899fc51e))
+
 ## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
