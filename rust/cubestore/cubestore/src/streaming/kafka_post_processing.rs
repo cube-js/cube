@@ -1,5 +1,6 @@
 use crate::metastore::Column;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::{sql_to_rel_options, QueryPlannerImpl};
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
@@ -425,6 +426,12 @@ impl KafkaPostProcessPlanner {
         &self,
         plan: &LogicalPlan,
     ) -> Result<(Arc<dyn ExecutionPlan>, Option<Arc<dyn ExecutionPlan>>), CubeError> {
+        fn only_certain_plans_allowed_error(plan: &LogicalPlan) -> CubeError {
+            CubeError::user(
+                format!("Only Projection > [Filter] > TableScan plans are allowed for streaming; got plan {}", pp_plan_ext(plan, &PPOptions::show_all())),
+            )
+        }
+
         let source_schema = Arc::new(Schema::new(
             self.source_columns
                 .iter()
@@ -465,10 +472,7 @@ impl KafkaPostProcessPlanner {
 
                         Ok((projection_phys_plan.clone(), Some(filter_phys_plan)))
                     }
-                    _ => Err(CubeError::user(
-                        "Only Projection > [Filter] > TableScan plans are allowed for streaming"
-                            .to_string(),
-                    )),
+                    _ => Err(only_certain_plans_allowed_error(plan)),
                 },
                 LogicalPlan::TableScan { .. } => {
                     let projection_plan =
@@ -484,15 +488,9 @@ impl KafkaPostProcessPlanner {
                         .with_new_children(vec![empty_exec.clone()])?;
                     Ok((projection_phys_plan, None))
                 }
-                _ => Err(CubeError::user(
-                    "Only Projection > [Filter] > TableScan plans are allowed for streaming"
-                        .to_string(),
-                )),
+                _ => Err(only_certain_plans_allowed_error(plan)),
             },
-            _ => Err(CubeError::user(
-                "Only Projection > [Filter] > TableScan plans are allowed for streaming"
-                    .to_string(),
-            )),
+            _ => Err(only_certain_plans_allowed_error(plan)),
         }
     }
 
