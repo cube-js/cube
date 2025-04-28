@@ -1,6 +1,6 @@
 import type { BaseQuery } from './BaseQuery';
 import type { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
-import { CubeSymbols } from "../compiler/CubeSymbols";
+import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseDimension {
   public readonly expression: any;

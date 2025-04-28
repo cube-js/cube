@@ -1,7 +1,7 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareCube } from './PrepareCompiler';
 import { PreAggregations } from '../../src/adapter/PreAggregations';
-import { PreAggregationReferences } from "../../src/compiler/CubeEvaluator";
+import { PreAggregationReferences } from '../../src/compiler/CubeEvaluator';
 
 describe('Pre Aggregation by filter match tests', () => {
   function getCube(cube) {
