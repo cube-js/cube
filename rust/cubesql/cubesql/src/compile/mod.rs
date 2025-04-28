@@ -13429,7 +13429,7 @@ ORDER BY "source"."str0" ASC
         V1LoadResultAnnotation::new(json!([]), json!([]), json!([]), json!([]))
     }
 
-    fn simple_load_response(data: Vec<serde_json::Value>) -> V1LoadResponse {
+    pub(crate) fn simple_load_response(data: Vec<serde_json::Value>) -> V1LoadResponse {
         V1LoadResponse::new(vec![V1LoadResult::new(empty_annotation(), data)])
     }
 
