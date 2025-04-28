@@ -13,7 +13,7 @@ use datafusion::common;
 use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::config::ConfigOptions;
 use datafusion::logical_expr::expr::{Alias, ScalarFunction};
-use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection};
+use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection, SubqueryAlias};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::sql::parser::Statement as DFStatement;
@@ -431,6 +431,14 @@ impl KafkaPostProcessPlanner {
                 format!("Only Projection > [Filter] > TableScan plans are allowed for streaming; got plan {}", pp_plan_ext(plan, &PPOptions::show_all())),
             )
         }
+        fn remove_subquery_alias_around_table_scan(plan: &LogicalPlan) -> &LogicalPlan {
+            if let LogicalPlan::SubqueryAlias(SubqueryAlias { input, .. }) = plan {
+                if matches!(input.as_ref(), LogicalPlan::TableScan { .. }) {
+                    return input.as_ref();
+                }
+            }
+            return plan;
+        }
 
         let source_schema = Arc::new(Schema::new(
             self.source_columns
@@ -445,8 +453,8 @@ impl KafkaPostProcessPlanner {
                 expr,
                 schema,
                 ..
-            }) => match projection_input.as_ref() {
-                filter_plan @ LogicalPlan::Filter(Filter { input, .. }) => match input.as_ref() {
+            }) => match remove_subquery_alias_around_table_scan(projection_input.as_ref()) {
+                filter_plan @ LogicalPlan::Filter(Filter { input, .. }) => match remove_subquery_alias_around_table_scan(input.as_ref()) {
                     LogicalPlan::TableScan { .. } => {
                         let projection_plan = self.make_projection_plan(
                             expr,
