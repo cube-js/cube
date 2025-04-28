@@ -368,9 +368,9 @@ export function createCubeSchemaWithCustomGranularitiesAndTimeShift(name: string
         }
       })
 
-      view(\`orders_view\`, {
+      view(\`${name}_view\`, {
         cubes: [{
-          join_path: orders,
+          join_path: ${name},
           includes: '*'
         }]
       })`;

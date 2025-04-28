@@ -26,12 +26,19 @@ interface CubeDefinition {
   pre_aggregations?: Record<string, any>;
   joins?: Record<string, any>;
   accessPolicy?: any[];
+  folders?: any[];
   includes?: any;
   excludes?: any;
   cubes?: any;
   isView?: boolean;
   isSplitView?: boolean;
   includedMembers?: any[];
+}
+
+interface CubeDefinitionExtended extends CubeDefinition {
+  allDefinitions: (type: string) => Record<string, any>;
+  rawFolders: () => any[];
+  rawCubes: () => any[];
 }
 
 interface SplitViews {
@@ -101,7 +108,7 @@ export class CubeSymbols {
     }
   }
 
-  public getCubeDefinition(cubeName: string) {
+  public getCubeDefinition(cubeName: string): CubeDefinitionExtended {
     if (!this.builtCubes[cubeName]) {
       const cubeDefinition = this.cubeDefinitions[cubeName];
       this.builtCubes[cubeName] = this.createCube(cubeDefinition);
@@ -110,7 +117,7 @@ export class CubeSymbols {
     return this.builtCubes[cubeName];
   }
 
-  public createCube(cubeDefinition: CubeDefinition) {
+  public createCube(cubeDefinition: CubeDefinition): CubeDefinitionExtended {
     let preAggregations: any;
     let joins: any;
     let measures: any;
@@ -118,6 +125,8 @@ export class CubeSymbols {
     let segments: any;
     let hierarchies: any;
     let accessPolicy: any;
+    let folders: any;
+    let cubes: any;
 
     const cubeObject = Object.assign({
       allDefinitions(type: string) {
@@ -129,6 +138,38 @@ export class CubeSymbols {
         } else {
           return { ...cubeDefinition[type] };
         }
+      },
+
+      // Folders are not a part of Cube Symbols and are constructed in the CubeEvaluator,
+      // but views can extend other views, so we need the ability to access parent's folders.
+      rawFolders() {
+        if (!folders) {
+          if (cubeDefinition.extends) {
+            folders = [
+              ...super.rawFolders(),
+              ...(cubeDefinition.folders || [])
+            ];
+          } else {
+            folders = [...(cubeDefinition.folders || [])];
+          }
+        }
+        return folders;
+      },
+
+      // `Cubes` of a view are not a part of Cube Symbols,
+      // but views can extend other views, so we need the ability to access parent view's cubes.
+      rawCubes() {
+        if (!cubes) {
+          if (cubeDefinition.extends) {
+            cubes = [
+              ...super.rawCubes(),
+              ...(cubeDefinition.cubes || [])
+            ];
+          } else {
+            cubes = [...(cubeDefinition.cubes || [])];
+          }
+        }
+        return cubes;
       },
 
       get preAggregations() {
@@ -222,7 +263,7 @@ export class CubeSymbols {
     if (cubeDefinition.extends) {
       const superCube = this.resolveSymbolsCall(cubeDefinition.extends, (name: string) => this.cubeReferenceProxy(name));
       // eslint-disable-next-line no-underscore-dangle
-      const parentCube = superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube;
+      const parentCube = superCube.__cubeName ? this.getCubeDefinition(superCube.__cubeName) : superCube as unknown as CubeDefinition;
       Object.setPrototypeOf(cubeObject, parentCube);
 
       // We have 2 different properties that are mutually exclusive: `sqlTable` & `sql`
@@ -285,7 +326,7 @@ export class CubeSymbols {
     };
   }
 
-  private camelCaseTypes(obj: Object) {
+  private camelCaseTypes(obj: Object | undefined) {
     if (!obj) {
       return;
     }
@@ -344,8 +385,9 @@ export class CubeSymbols {
     }
   }
 
-  protected prepareIncludes(cube: CubeDefinition, errorReporter: ErrorReporter, splitViews: SplitViews) {
-    if (!cube.cubes) {
+  protected prepareIncludes(cube: CubeDefinitionExtended, errorReporter: ErrorReporter, splitViews: SplitViews) {
+    const includedCubes = cube.rawCubes();
+    if (!includedCubes.length) {
       return;
     }
 
@@ -360,32 +402,31 @@ export class CubeSymbols {
 
     for (const type of types) {
       let cubeIncludes: any[] = [];
-      if (cube.cubes) {
-        // If the hierarchy is included all members from it should be included as well
-        // Extend `includes` with members from hierarchies that should be auto-included
-        const cubes = type === 'dimensions' ? cube.cubes.map((it) => {
-          // TODO recheck `it.joinPath` typing
-          const fullPath = this.evaluateReferences(null, it.joinPath as () => ToString, { collectJoinHints: true });
-          const split = fullPath.split('.');
-          const cubeRef = split[split.length - 1];
 
-          if (it.includes === '*') {
-            return it;
-          }
+      // If the hierarchy is included all members from it should be included as well
+      // Extend `includes` with members from hierarchies that should be auto-included
+      const cubes = type === 'dimensions' ? includedCubes.map((it) => {
+        // TODO recheck `it.joinPath` typing
+        const fullPath = this.evaluateReferences(null, it.joinPath as () => ToString, { collectJoinHints: true });
+        const split = fullPath.split('.');
+        const cubeRef = split[split.length - 1];
 
-          const currentCubeAutoIncludeMembers = Array.from(autoIncludeMembers)
-            .filter((path) => path.startsWith(`${cubeRef}.`))
-            .map((path) => path.split('.')[1])
-            .filter(memberName => !it.includes.find((include) => (include.name || include) === memberName));
+        if (it.includes === '*') {
+          return it;
+        }
 
-          return {
-            ...it,
-            includes: (it.includes || []).concat(currentCubeAutoIncludeMembers),
-          };
-        }) : cube.cubes;
+        const currentCubeAutoIncludeMembers = Array.from(autoIncludeMembers)
+          .filter((path) => path.startsWith(`${cubeRef}.`))
+          .map((path) => path.split('.')[1])
+          .filter(memberName => !it.includes.find((include) => (include.name || include) === memberName));
 
-        cubeIncludes = this.membersFromCubes(cube, cubes, type, errorReporter, splitViews, memberSets) || [];
-      }
+        return {
+          ...it,
+          includes: (it.includes || []).concat(currentCubeAutoIncludeMembers),
+        };
+      }) : includedCubes;
+
+      cubeIncludes = this.membersFromCubes(cube, cubes, type, errorReporter, splitViews, memberSets) || [];
 
       if (type === 'hierarchies') {
         for (const member of cubeIncludes) {
@@ -406,7 +447,7 @@ export class CubeSymbols {
       const includeMembers = this.generateIncludeMembers(cubeIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
 
-      cube.includedMembers = [...(cube.includedMembers || []), ...Array.from(new Set(cubeIncludes.map((it: any) => {
+      cube.includedMembers = R.uniqWith(R.equals, [...(cube.includedMembers || []), ...Array.from(new Set(cubeIncludes.map((it: any) => {
         const split = it.member.split('.');
         const memberPath = this.pathFromArray([split[split.length - 2], split[split.length - 1]]);
         return {
@@ -414,7 +455,7 @@ export class CubeSymbols {
           memberPath,
           name: it.name
         };
-      })))];
+      })))]);
     }
 
     [...memberSets.allMembers].filter(it => !memberSets.resolvedMembers.has(it)).forEach(it => {
@@ -433,7 +474,7 @@ export class CubeSymbols {
   }
 
   protected membersFromCubes(parentCube: CubeDefinition, cubes: any[], type: string, errorReporter: ErrorReporter, splitViews: SplitViews, memberSets: any) {
-    return R.unnest(cubes.map(cubeInclude => {
+    return R.uniqWith(R.equals, R.unnest(cubes.map(cubeInclude => {
       // TODO recheck `cubeInclude.joinPath` typing
       const fullPath = this.evaluateReferences(null, cubeInclude.joinPath as () => ToString, { collectJoinHints: true });
       const split = fullPath.split('.');
@@ -513,7 +554,7 @@ export class CubeSymbols {
       } else {
         return finalIncludes;
       }
-    }));
+    })));
   }
 
   protected diffByMember(includes: any[], excludes: any[]) {

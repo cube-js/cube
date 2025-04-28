@@ -138,8 +138,10 @@ all member names including pre-aggregation table names.
 
 ### `extends`
 
-You can extend cubes in order to reuse all declared members of a cube. In the
-example below, `extended_order_facts` will reuse the `sql` and `count` measures
+You can use the `extends` parameter to [extend cubes][ref-extension] in order to reuse
+all declared members of a cube.
+
+In the example below, `extended_order_facts` will reuse the `sql` and `count` measures
 from `order_facts`:
 
 <CodeTabs>
@@ -326,12 +328,14 @@ cubes:
 
 ### `title`
 
-Use `title` to change the display name of the cube. By default, Cube will
-humanize the cube's name, so for instance, `users_orders` would become
-`Users Orders`. If default humanizing doesn't work in your case, please use the
-title parameter. It is highly recommended to give human readable names to your
-cubes. It will help everyone on a team better understand the data structure and
-will help maintain a consistent set of definitions across an organization.
+Use the `title` parameter to change the display name of the cube.
+
+By default, Cube will humanize the cube's name, so for instance, `users_orders`
+would become `Users Orders`. If default humanizing doesn't work in your case,
+please use the `title` parameter. It is highly recommended to give human readable
+names to your cubes. It will help everyone on a team better understand the data
+structure and will help maintain a consistent set of definitions across an
+organization.
 
 <CodeTabs>
 
@@ -645,3 +649,4 @@ The `access_policy` parameter is used to configure [data access policies][ref-re
 [ref-ref-pre-aggs]: /reference/data-model/pre-aggregations
 [ref-ref-dap]: /reference/data-model/data-access-policies
 [ref-syntax-cube-sql]: /product/data-modeling/syntax#cubesql-function
+[ref-extension]: /product/data-modeling/concepts/code-reusability-extending-cubes

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { prepareCompiler, prepareJsCompiler } from './PrepareCompiler';
+import { prepareCompiler, prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaWithCustomGranularitiesAndTimeShift, createCubeSchemaWithAccessPolicy } from './utils';
 
 const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'accessPolicy'];
@@ -530,6 +530,22 @@ describe('Schema Testing', () => {
       const { measures, dimensions } = metaTransformer.cubeEvaluator.evaluatedCubes.orders_view;
       expect(dimensions.createdAt).toMatchSnapshot();
       expect(measures.count_shifted_year).toMatchSnapshot();
+    });
+
+    it('views extends views', async () => {
+      const modelContent = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/folders.yml'),
+        'utf8'
+      );
+      const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+      await compiler.compile();
+
+      const testView3 = metaTransformer.cubeEvaluator.evaluatedCubes.test_view3;
+      expect(testView3.dimensions).toMatchSnapshot();
+      expect(testView3.measures).toMatchSnapshot();
+      expect(testView3.measures).toMatchSnapshot();
+      expect(testView3.hierarchies).toMatchSnapshot();
+      expect(testView3.folders).toMatchSnapshot();
     });
 
     it('throws errors for incorrect referenced includes members', async () => {

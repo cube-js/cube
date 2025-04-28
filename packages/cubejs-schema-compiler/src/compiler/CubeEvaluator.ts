@@ -224,8 +224,9 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   private prepareFolders(cube: any, errorReporter: ErrorReporter) {
-    if (Array.isArray(cube.folders)) {
-      cube.folders = cube.folders.map(it => {
+    const folders = cube.rawFolders();
+    if (folders.length) {
+      cube.folders = folders.map(it => {
         const includedMembers = this.allMembersOrList(cube, it.includes);
         const includes = includedMembers.map(memberName => {
           if (memberName.includes('.')) {
@@ -252,8 +253,6 @@ export class CubeEvaluator extends CubeSymbols {
         });
       });
     }
-
-    return [];
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
