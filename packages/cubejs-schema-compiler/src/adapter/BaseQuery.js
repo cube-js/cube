@@ -1199,7 +1199,7 @@ export class BaseQuery {
   }
 
   fullKeyQueryAggregateMeasures(context) {
-    const measureToHierarchy = this.collectRootMeasureToHieararchy(context);
+    const measureToHierarchy = this.collectRootMeasureToHierarchy(context);
     const allMemberChildren = this.collectAllMemberChildren(context);
     const memberToIsMultiStage = this.collectAllMultiStageMembers(allMemberChildren);
 
@@ -1859,7 +1859,7 @@ export class BaseQuery {
     }]];
   }
 
-  collectRootMeasureToHieararchy(context) {
+  collectRootMeasureToHierarchy(context) {
     const notAddedMeasureFilters = R.flatten(this.measureFilters.map(f => f.getMembers()))
       .filter(f => R.none(m => m.measure === f.measure, this.measures));
 
