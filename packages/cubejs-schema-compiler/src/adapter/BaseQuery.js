@@ -3182,6 +3182,10 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * @param cubeName
+   * @returns Boolean
+   */
   multipliedJoinRowResult(cubeName) {
     // this.join not initialized on collectCubeNamesForSql
     return this.join && this.join.multiplicationFactor[cubeName];
