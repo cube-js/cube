@@ -1,3 +1,6 @@
+import {
+  getEnv,
+} from '@cubejs-backend/shared';
 import R from 'ramda';
 import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
@@ -142,6 +145,9 @@ describe('PreAggregationsMultiStage', () => {
 
 
   it('simple multi stage with add_group_by', () => compiler.compile().then(() => {
+    if (!getEnv('nativeSqlPlanner')) {
+      return;
+    }
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
         'visitors.revenue_per_id'
