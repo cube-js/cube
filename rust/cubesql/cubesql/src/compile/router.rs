@@ -12,6 +12,7 @@ use crate::{
         DatabaseVariable, DatabaseVariablesToUpdate,
     },
     sql::{
+        auth_service::SqlAuthServiceAuthenticateRequest,
         dataframe,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, DateTokenNormalizeReplacer,
@@ -447,12 +448,16 @@ impl QueryRouter {
                 })?
             {
                 self.state.set_user(Some(to_user.clone()));
+                let sql_auth_request = SqlAuthServiceAuthenticateRequest {
+                    protocol: "postgres".to_string(),
+                    method: "password".to_string(),
+                };
                 let authenticate_response = self
                     .session_manager
                     .server
                     .auth
                     // TODO do we want to send actual password here?
-                    .authenticate(Some(to_user.clone()), None)
+                    .authenticate(sql_auth_request, Some(to_user.clone()), None)
                     .await
                     .map_err(|e| {
                         CompilationError::internal(format!("Error calling authenticate: {}", e))
@@ -562,11 +567,15 @@ impl QueryRouter {
 
     async fn reauthenticate_if_needed(&self) -> CompilationResult<()> {
         if self.state.is_auth_context_expired() {
+            let sql_auth_request = SqlAuthServiceAuthenticateRequest {
+                protocol: "postgres".to_string(),
+                method: "password".to_string(),
+            };
             let authenticate_response = self
                 .session_manager
                 .server
                 .auth
-                .authenticate(self.state.user(), None)
+                .authenticate(sql_auth_request, self.state.user(), None)
                 .await
                 .map_err(|e| {
                     CompilationError::fatal(format!(
