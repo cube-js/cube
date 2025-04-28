@@ -21,6 +21,7 @@ export class PreAggregations {
    * @return {unknown[]}
    */
   preAggregationsDescription() {
+    return [];
     const preAggregations = [this.preAggregationsDescriptionLocal()].concat(
       this.query.subQueryDimensions.map(d => this.query.subQueryDescription(d).subQuery)
         .map(q => q.preAggregations.preAggregationsDescription())
@@ -311,8 +312,8 @@ export class PreAggregations {
     const dimensionsList = query.dimensions.map(dim => dim.expressionPath());
     const segmentsList = query.segments.map(s => s.expressionPath());
     const ownedDimensions = PreAggregations.ownedMembers(query, flattenDimensionMembers);
-    console.log("!!! dimensions", dimensionsList);
-    console.log("!!! ownedDimensions", ownedDimensions);
+    console.log('!!! dimensions', dimensionsList);
+    console.log('!!! ownedDimensions', ownedDimensions);
     const ownedTimeDimensions = query.timeDimensions.map(td => {
       const owned = PreAggregations.ownedMembers(query, [td]);
       let { dimension } = td;
@@ -833,6 +834,7 @@ export class PreAggregations {
    * @returns {Array<Object>}
    */
   rollupMatchResults() {
+    return [];
     const { query } = this;
 
     const canUsePreAggregation = this.canUsePreAggregationFn(query);

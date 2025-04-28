@@ -28,6 +28,7 @@ export class BaseDimension {
       const dimensionPath = dimension as string | null;
       if (dimensionPath !== null) {
         const { path, joinHint } = CubeSymbols.joinHintFromPath(dimensionPath);
+        console.log("!!! dimension", dimensionPath, path, joinHint);
         this.dimension = path;
         this.joinHint = joinHint;
       }

@@ -62,11 +62,11 @@ impl CompiledPreAggregation {
                 refs,
                 Self::check_if_time_dimension,
             )?;
-            if dims.len() != 1 {
+/*             if dims.len() != 1 {
                 return Err(CubeError::user(format!(
                     "Pre aggregation should contains only one time dimension"
                 )));
-            }
+            } */
             vec![(dims[0].clone(), static_data.granularity.clone())] //TODO remove unwrap
         } else {
             Vec::new()

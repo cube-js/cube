@@ -637,8 +637,8 @@ export class BaseQuery {
    */
   buildSqlAndParams(exportAnnotatedSql) {
     if (this.useNativeSqlPlanner) {
-      let isRelatedToPreAggregation = false;
-/*       if (this.options.preAggregationQuery) {
+      const isRelatedToPreAggregation = false;
+      /*       if (this.options.preAggregationQuery) {
         isRelatedToPreAggregation = true;
       } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
         if (this.externalPreAggregationQuery()) {
@@ -659,9 +659,11 @@ export class BaseQuery {
         return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
       } */
 
+      console.log("!!!!!! EEEEEEEEEE");
       return this.buildSqlAndParamsRust(exportAnnotatedSql);
     }
 
+      console.log("!!!!!! RRRRRRRRR");
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
@@ -726,7 +728,7 @@ export class BaseQuery {
     return res;
   }
 
-  //FIXME Temporary solution
+  // FIXME Temporary solution
   findPreAggregationForQueryRust() {
     if (!this.preAggregations.preAggregationForQuery) {
       let optionsOrder = this.options.order;
@@ -734,9 +736,7 @@ export class BaseQuery {
         optionsOrder = [optionsOrder];
       }
       const order = optionsOrder ? R.pipe(
-        R.map((hash) => {
-          return ((!hash || !hash.id) ? null : hash);
-        }),
+        R.map((hash) => ((!hash || !hash.id) ? null : hash)),
         R.reject(R.isNil),
       )(optionsOrder) : undefined;
 
@@ -769,7 +769,7 @@ export class BaseQuery {
         }
       }
 
-    const res = buildResult.result;
+      const res = buildResult.result;
       if (res[2]) {
         this.preAggregations.preAggregationForQuery = res[2];
       }
@@ -972,7 +972,6 @@ export class BaseQuery {
       withQueries,
       multiStageMembers,
     } = this.fullKeyQueryAggregateMeasures();
-
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length && !multiStageMembers.length) {
       return this.simpleQuery();
@@ -1211,7 +1210,6 @@ export class BaseQuery {
 
     const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
     const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
-
     const cumulativeMeasures =
       R.pipe(
         R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),
@@ -1335,6 +1333,7 @@ export class BaseQuery {
 
   childrenMultiStageContext(memberPath, queryContext, wouldNodeApplyFilters) {
     let member;
+    console.log("!!!! children ", memberPath);
     if (this.cubeEvaluator.isMeasure(memberPath)) {
       member = this.newMeasure(memberPath);
     } else if (this.cubeEvaluator.isDimension(memberPath)) {

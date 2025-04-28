@@ -669,6 +669,7 @@ export class CubeEvaluator extends CubeSymbols {
 
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
     if (!this.evaluatedCubes[cubeAndName[0]]) {
+      console.trace("!!!!");
       throw new UserError(`Cube '${cubeAndName[0]}' not found for path '${path}'`);
     }
 

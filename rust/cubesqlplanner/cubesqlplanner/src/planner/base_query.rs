@@ -49,6 +49,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn build_sql_and_params(&self) -> NativeObjectHandle<IT> {
         let build_result = self.build_sql_and_params_impl();
         let result = self.context.empty_struct().unwrap();
+        println!("!!!!! AAAAAAAAAA");
         match build_result {
             Ok(res) => {
                 result.set_field("result", res).unwrap();
