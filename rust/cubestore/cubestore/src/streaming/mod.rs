@@ -1503,7 +1503,7 @@ mod tests {
 
     #[tokio::test]
     async fn streaming_filter_kafka_concat() {
-        Config::test("streaming_filter_kafka").update_config(|mut c| {
+        Config::test("streaming_filter_kafka_concat").update_config(|mut c| {
             c.stream_replay_check_interval_secs = 1;
             c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
             c.partition_split_threshold = 1000000;
