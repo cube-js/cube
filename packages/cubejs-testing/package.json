@@ -134,24 +134,6 @@
     "typescript": "~5.2.2",
     "yaml": "^1.10.2"
   },
-  "jest": {
-    "coveragePathIgnorePatterns": [
-      ".*\\.d\\.ts"
-    ],
-    "testEnvironment": "node",
-    "testMatch": [
-      "<rootDir>/dist/test/**/*.(test|spec).(ts|js)"
-    ],
-    "moduleNameMapper": {
-      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js",
-      "^yaml$": "<rootDir>/../../node_modules/docker-compose/node_modules/yaml/dist/index.js"
-    },
-    "snapshotResolver": "<rootDir>/test/snapshotResolver.js",
-    "snapshotFormat": {
-      "escapeString": true,
-      "printBasicPrototype": true
-    }
-  },
   "publishConfig": {
     "access": "public"
   },

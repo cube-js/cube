@@ -79,22 +79,6 @@
   "eslintConfig": {
     "extends": "../cubejs-linter"
   },
-  "jest": {
-    "testMatch": [
-      "<rootDir>/dist/test/*.(test|spec).(ts|js)"
-    ],
-    "testEnvironment": "node",
-    "collectCoverage": true,
-    "coverageReporters": [
-      "text",
-      "html",
-      "lcov"
-    ],
-    "coverageDirectory": "coverage/",
-    "moduleNameMapper": {
-      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js"
-    }
-  },
   "oclif": {
     "commands": "./dist/src/command",
     "bin": "cubejs-server",

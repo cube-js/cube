@@ -54,12 +54,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "jest": {
-    "testMatch": [
-      "<rootDir>/dist/test/*.(test|spec).(ts|js)"
-    ],
-    "testEnvironment": "node"
-  },
   "eslintConfig": {
     "extends": "../cubejs-linter"
   }

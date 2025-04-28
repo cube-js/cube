@@ -40,15 +40,6 @@
   "eslintConfig": {
     "extends": "../cubejs-linter"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "transformIgnorePatterns": [
-      "node_modules/(?!axios)/"
-    ],
-    "moduleNameMapper": {
-      "^axios$": "<rootDir>/../../node_modules/axios/dist/node/axios.cjs"
-    }
-  },
   "devDependencies": {
     "@cubejs-backend/linter": "1.3.8",
     "typescript": "~5.2.2"

@@ -40,23 +40,5 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "collectCoverage": true,
-    "coverageReporters": [
-      "text",
-      "html",
-      "lcov"
-    ],
-    "coverageDirectory": "coverage/",
-    "moduleNameMapper": {
-      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js",
-      "^yaml$": "<rootDir>/../../node_modules/yaml/dist/index.js"
-    },
-    "testMatch": [
-      "**/__tests__/**/*.js?(x)",
-      "**/?(*.)+(spec|test|integration).js?(x)"
-    ]
   }
 }
