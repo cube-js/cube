@@ -1,8 +1,7 @@
 use crate::plan::{FilterGroup, FilterItem};
 use crate::planner::filter::FilterOperator;
-use crate::planner::sql_evaluator::MeasureTimeShift;
+use crate::planner::sql_evaluator::{MeasureTimeShift, MemberSymbol};
 use crate::planner::{BaseDimension, BaseMember, BaseTimeDimension};
-use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -80,6 +79,20 @@ impl MultiStageAppliedState {
         &self.time_dimensions_filters
     }
 
+    pub fn time_dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn dimensions_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
     pub fn dimensions_filters(&self) -> &Vec<FilterItem> {
         &self.dimensions_filters
     }
@@ -102,21 +115,6 @@ impl MultiStageAppliedState {
 
     pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<BaseTimeDimension>>) {
         self.time_dimensions = time_dimensions;
-    }
-
-    pub fn change_time_dimension_granularity(
-        &mut self,
-        time_dimension: &Rc<BaseTimeDimension>,
-        new_granularity: Option<String>,
-    ) -> Result<(), CubeError> {
-        if let Some(time_dimension) = self
-            .time_dimensions
-            .iter_mut()
-            .find(|dim| dim.full_name() == time_dimension.full_name())
-        {
-            *time_dimension = time_dimension.change_granularity(new_granularity)?;
-        }
-        Ok(())
     }
 
     pub fn remove_filter_for_member(&mut self, member_name: &String) {

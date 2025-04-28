@@ -11,6 +11,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct SqlCall {
     member_sql: Rc<dyn MemberSql>,
     deps: Vec<Dependency>,

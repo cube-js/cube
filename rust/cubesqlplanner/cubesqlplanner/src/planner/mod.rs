@@ -21,7 +21,7 @@ pub use base_cube::BaseCube;
 pub use base_dimension::BaseDimension;
 pub use base_join_condition::{BaseJoinCondition, SqlJoinCondition};
 pub use base_measure::BaseMeasure;
-pub use base_member::{BaseMember, BaseMemberHelper};
+pub use base_member::{BaseMember, BaseMemberHelper, MemberSymbolRef};
 pub use base_query::BaseQuery;
 pub use base_time_dimension::BaseTimeDimension;
 pub use params_allocator::ParamsAllocator;
