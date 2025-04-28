@@ -60,11 +60,12 @@ pub struct PPOptions {
     pub show_output_hints: bool,
     pub show_check_memory_nodes: bool,
     pub show_partitions: bool,
+    pub traverse_past_clustersend: bool,
 }
 
 impl PPOptions {
     #[allow(unused)]
-    pub fn everything() -> PPOptions {
+    pub fn show_all() -> PPOptions {
         PPOptions {
             show_filters: true,
             show_sort_by: true,
@@ -73,6 +74,7 @@ impl PPOptions {
             show_output_hints: true,
             show_check_memory_nodes: true,
             show_partitions: true,
+            traverse_past_clustersend: false,
         }
     }
 
@@ -495,7 +497,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
         return;
     }
     pp_instance(p, indent, o, out);
-    if p.as_any().is::<ClusterSendExec>() {
+    if !o.traverse_past_clustersend && p.as_any().is::<ClusterSendExec>() {
         // Do not show children of ClusterSend. This is a hack to avoid rewriting all tests.
         return;
     }
