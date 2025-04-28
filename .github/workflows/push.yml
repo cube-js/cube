@@ -19,6 +19,7 @@ on:
       - 'package.json'
       - 'lerna.json'
       - 'rollup.config.js'
+      - 'jest.base.config.js'
       - 'yarn.lock'
     branches:
       - 'master'
@@ -40,6 +41,7 @@ on:
       - 'package.json'
       - 'lerna.json'
       - 'rollup.config.js'
+      - 'jest.base.config.js'
       - 'yarn.lock'
 
 env:
