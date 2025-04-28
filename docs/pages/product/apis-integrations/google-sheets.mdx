@@ -10,15 +10,20 @@ above](https://cube.dev/pricing) product tiers.
 
 </SuccessBox>
 
-After [installing](#installation) and [authenticating](#authentication) this
-add-on, you will be able to [create reports via pivot
-table](#create-reports-via-pivot-table) and work with [saved
+After [configuring](#configuration), [installing](#installation), and
+[authenticating](#authentication) this add-on, you will be able to [create
+reports via pivot table](#create-reports-via-pivot-table) and work with [saved
 reports](#work-with-saved-reports).
 
 <YouTubeVideo
   url="https://www.youtube.com/embed/qPp9hroqd4g"
   aspectRatio={4/2.56}
 />
+
+## Configuration
+
+Cube Cloud for Sheets uses the SQL API internally. So, the SQL API has to be
+[enabled][ref-sql-api-enabled] in the Cube Cloud deployment settings.
 
 ## Installation
 
@@ -118,3 +123,4 @@ Click <Btn>Edit</Btn> to chnage the query or the location.
 [ref-playground]: /product/workspace/playground
 [ref-views]: /product/data-modeling/concepts#views
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-sql-api-enabled]: /product/apis-integrations/sql-api#cube-cloud

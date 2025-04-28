@@ -1,4 +1,5 @@
 use super::filter::compiler::FilterCompiler;
+use super::filter::BaseSegment;
 use super::query_tools::QueryTools;
 
 use super::sql_evaluator::MemberSymbol;
@@ -17,17 +18,24 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub struct OrderByItem {
-    name: String,
+    member_evaluator: Rc<MemberSymbol>,
     desc: bool,
 }
 
 impl OrderByItem {
-    pub fn new(name: String, desc: bool) -> Self {
-        Self { name, desc }
+    pub fn new(member_evaluator: Rc<MemberSymbol>, desc: bool) -> Self {
+        Self {
+            member_evaluator,
+            desc,
+        }
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
+    pub fn member_symbol(&self) -> Rc<MemberSymbol> {
+        self.member_evaluator.clone()
     }
 
     pub fn desc(&self) -> bool {
@@ -60,6 +68,7 @@ pub struct QueryProperties {
     dimensions_filters: Vec<FilterItem>,
     time_dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
+    segments: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
     order_by: Vec<OrderByItem>,
     row_limit: Option<usize>,
@@ -135,12 +144,102 @@ impl QueryProperties {
             Vec::new()
         };
 
-        let measures = if let Some(measures) = &options.static_data().measures {
+        let measures = if let Some(measures) = &options.measures()? {
             measures
                 .iter()
-                .map(|m| {
-                    let evaluator = evaluator_compiler.add_measure_evaluator(m.clone())?;
-                    BaseMeasure::try_new_required(evaluator, query_tools.clone())
+                .map(|d| match d {
+                    OptionsMember::MemberName(member_name) => {
+                        let evaluator =
+                            evaluator_compiler.add_measure_evaluator(member_name.clone())?;
+                        BaseMeasure::try_new_required(evaluator, query_tools.clone())
+                    }
+                    OptionsMember::MemberExpression(member_expression) => {
+                        let cube_name =
+                            if let Some(name) = &member_expression.static_data().cube_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let name =
+                            if let Some(name) = &member_expression.static_data().expression_name {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                        let expression_evaluator = evaluator_compiler
+                            .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                        BaseMeasure::try_new_from_expression(
+                            expression_evaluator,
+                            cube_name,
+                            name,
+                            member_expression.static_data().definition.clone(),
+                            query_tools.clone(),
+                        )
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?
+            /* measures
+            .iter()
+            .map(|m| {
+                let evaluator = evaluator_compiler.add_measure_evaluator(m.clone())?;
+                BaseMeasure::try_new_required(evaluator, query_tools.clone())
+            })
+            .collect::<Result<Vec<_>, _>>()? */
+        } else {
+            Vec::new()
+        };
+
+        let segments = if let Some(segments) = &options.segments()? {
+            segments
+                .iter()
+                .map(|d| -> Result<_, CubeError> {
+                    let segment = match d {
+                        OptionsMember::MemberName(member_name) => {
+                            let mut iter = query_tools
+                                .cube_evaluator()
+                                .parse_path("segments".to_string(), member_name.clone())?
+                                .into_iter();
+                            let cube_name = iter.next().unwrap();
+                            let name = iter.next().unwrap();
+                            let definition = query_tools
+                                .cube_evaluator()
+                                .segment_by_path(member_name.clone())?;
+                            let expression_evaluator = evaluator_compiler
+                                .compile_sql_call(&cube_name, definition.sql()?)?;
+                            BaseSegment::try_new(
+                                expression_evaluator,
+                                cube_name,
+                                name,
+                                Some(member_name.clone()),
+                                query_tools.clone(),
+                            )
+                        }
+                        OptionsMember::MemberExpression(member_expression) => {
+                            let cube_name =
+                                if let Some(name) = &member_expression.static_data().cube_name {
+                                    name.clone()
+                                } else {
+                                    "".to_string()
+                                };
+                            let name = if let Some(name) =
+                                &member_expression.static_data().expression_name
+                            {
+                                name.clone()
+                            } else {
+                                "".to_string()
+                            };
+                            let expression_evaluator = evaluator_compiler
+                                .compile_sql_call(&cube_name, member_expression.expression()?)?;
+                            BaseSegment::try_new(
+                                expression_evaluator,
+                                cube_name,
+                                name,
+                                None,
+                                query_tools.clone(),
+                            )
+                        }
+                    }?;
+                    Ok(FilterItem::Segment(segment))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {
@@ -168,8 +267,12 @@ impl QueryProperties {
         let order_by = if let Some(order) = &options.static_data().order {
             order
                 .iter()
-                .map(|o| OrderByItem::new(o.id.clone(), o.is_desc()))
-                .collect_vec()
+                .map(|o| -> Result<_, CubeError> {
+                    let member_evaluator =
+                        evaluator_compiler.add_auto_resolved_member_evaluator(o.id.clone())?;
+                    Ok(OrderByItem::new(member_evaluator, o.is_desc()))
+                })
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Self::default_order(&dimensions, &time_dimensions, &measures)
         };
@@ -194,11 +297,13 @@ impl QueryProperties {
             &time_dimensions_filters,
             &dimensions_filters,
             &measures_filters,
+            &segments,
         )?;
 
         Ok(Rc::new(Self {
             measures,
             dimensions,
+            segments,
             time_dimensions,
             time_dimensions_filters,
             dimensions_filters,
@@ -221,6 +326,7 @@ impl QueryProperties {
         time_dimensions_filters: Vec<FilterItem>,
         dimensions_filters: Vec<FilterItem>,
         measures_filters: Vec<FilterItem>,
+        segments: Vec<FilterItem>,
         order_by: Vec<OrderByItem>,
         row_limit: Option<usize>,
         offset: Option<usize>,
@@ -241,6 +347,7 @@ impl QueryProperties {
             &time_dimensions_filters,
             &dimensions_filters,
             &measures_filters,
+            &segments,
         )?;
 
         Ok(Rc::new(Self {
@@ -249,6 +356,7 @@ impl QueryProperties {
             time_dimensions,
             time_dimensions_filters,
             dimensions_filters,
+            segments,
             measures_filters,
             order_by,
             row_limit,
@@ -272,6 +380,7 @@ impl QueryProperties {
             &self.time_dimensions_filters,
             &self.dimensions_filters,
             &self.measures_filters,
+            &self.segments,
         )
     }
 
@@ -283,6 +392,7 @@ impl QueryProperties {
         time_dimensions_filters: &Vec<FilterItem>,
         dimensions_filters: &Vec<FilterItem>,
         measures_filters: &Vec<FilterItem>,
+        segments: &Vec<FilterItem>,
     ) -> Result<Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>, CubeError> {
         let dimensions_join_hints = query_tools
             .cached_data_mut()
@@ -296,6 +406,9 @@ impl QueryProperties {
         let dimensions_filters_join_hints = query_tools
             .cached_data_mut()
             .join_hints_for_filter_item_vec(&dimensions_filters)?;
+        let segments_join_hints = query_tools
+            .cached_data_mut()
+            .join_hints_for_filter_item_vec(&segments)?;
         let measures_filters_join_hints = query_tools
             .cached_data_mut()
             .join_hints_for_filter_item_vec(&measures_filters)?;
@@ -307,6 +420,7 @@ impl QueryProperties {
         dimension_and_filter_join_hints_concat
             .extend(time_dimensions_filters_join_hints.into_iter());
         dimension_and_filter_join_hints_concat.extend(dimensions_filters_join_hints.into_iter());
+        dimension_and_filter_join_hints_concat.extend(segments_join_hints.into_iter());
         // TODO This is not quite correct. Decide on how to handle it. Keeping it here just to blow up on unsupported case
         dimension_and_filter_join_hints_concat.extend(measures_filters_join_hints.into_iter());
 
@@ -379,6 +493,27 @@ impl QueryProperties {
         &self.dimensions
     }
 
+    pub fn dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn time_dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn measure_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.measures
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
     pub fn time_dimensions(&self) -> &Vec<Rc<BaseTimeDimension>> {
         &self.time_dimensions
     }
@@ -421,6 +556,7 @@ impl QueryProperties {
             .time_dimensions_filters
             .iter()
             .chain(self.dimensions_filters.iter())
+            .chain(self.segments.iter())
             .cloned()
             .collect_vec();
         if items.is_empty() {
@@ -428,6 +564,10 @@ impl QueryProperties {
         } else {
             Some(Filter { items })
         }
+    }
+
+    pub fn segments(&self) -> &Vec<FilterItem> {
+        &self.segments
     }
 
     pub fn all_dimensions_and_measures(
@@ -489,19 +629,42 @@ impl QueryProperties {
         }
     }
     pub fn all_member_symbols(&self, exclude_time_dimensions: bool) -> Vec<Rc<MemberSymbol>> {
-        let mut members = BaseMemberHelper::extract_symbols_from_members(
-            &self.all_members(exclude_time_dimensions),
-        );
-        for filter_item in self.dimensions_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        self.get_member_symbols(!exclude_time_dimensions, true, true, true, &vec![])
+    }
+
+    pub fn get_member_symbols(
+        &self,
+        include_time_dimensions: bool,
+        include_dimensions: bool,
+        include_measures: bool,
+        include_filters: bool,
+        additional_symbols: &Vec<Rc<MemberSymbol>>,
+    ) -> Vec<Rc<MemberSymbol>> {
+        let mut members = additional_symbols.clone();
+        if include_time_dimensions {
+            members.append(&mut self.time_dimension_symbols());
         }
-        for filter_item in self.measures_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        if include_dimensions {
+            members.append(&mut self.dimension_symbols());
+        }
+        if include_measures {
+            members.append(&mut self.measure_symbols());
+        }
+        if include_filters {
+            self.fill_all_filter_symbols(&mut members);
         }
         members
             .into_iter()
             .unique_by(|m| m.full_name())
             .collect_vec()
+    }
+
+    pub fn fill_all_filter_symbols(&self, members: &mut Vec<Rc<MemberSymbol>>) {
+        if let Some(all_filters) = self.all_filters() {
+            for filter_item in all_filters.items.iter() {
+                filter_item.find_all_member_evaluators(members);
+            }
+        }
     }
 
     pub fn group_by(&self) -> Vec<Expr> {
@@ -527,11 +690,20 @@ impl QueryProperties {
     ) -> Vec<OrderByItem> {
         let mut result = Vec::new();
         if let Some(granularity_dim) = time_dimensions.iter().find(|d| d.has_granularity()) {
-            result.push(OrderByItem::new(granularity_dim.full_name(), false));
+            result.push(OrderByItem::new(
+                granularity_dim.member_evaluator().clone(),
+                false,
+            ));
         } else if !measures.is_empty() && !dimensions.is_empty() {
-            result.push(OrderByItem::new(measures[0].full_name(), true));
+            result.push(OrderByItem::new(
+                measures[0].member_evaluator().clone(),
+                true,
+            ));
         } else if !dimensions.is_empty() {
-            result.push(OrderByItem::new(dimensions[0].full_name(), false));
+            result.push(OrderByItem::new(
+                dimensions[0].member_evaluator().clone(),
+                false,
+            ));
         }
         result
     }
@@ -560,6 +732,7 @@ impl QueryProperties {
             FilterItem::Item(item) => {
                 members.insert(item.member_name());
             }
+            FilterItem::Segment(_) => {}
         }
     }
 
@@ -652,6 +825,7 @@ impl QueryProperties {
                     )?);
                 }
             }
+            FilterItem::Segment(_) => {}
         }
         Ok(())
     }

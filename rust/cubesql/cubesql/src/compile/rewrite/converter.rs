@@ -46,11 +46,11 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields,
-        exprlist_to_fields_from_schema, normalize_cols,
+        exprlist_to_fields_from_schema, normalize_col as df_normalize_col,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
         replace_col_to_expr, Column, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct,
         EmptyRelation, Expr, ExprRewritable, ExprRewriter, GroupingSet, Like, Limit, LogicalPlan,
-        LogicalPlanBuilder, TableScan, Union,
+        LogicalPlanBuilder, Repartition, Subquery, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
@@ -352,8 +352,7 @@ impl LogicalPlanToLanguageConverter {
                 let expr = add_expr_list_node!(graph, expr, query_params, CaseExprExpr, flat_list);
                 let when_then_expr = when_then_expr
                     .iter()
-                    .map(|(when, then)| vec![when, then])
-                    .flatten()
+                    .flat_map(|(when, then)| [when, then])
                     .collect::<Vec<_>>();
                 let when_then_expr = add_expr_list_node!(
                     graph,
@@ -932,7 +931,7 @@ macro_rules! match_expr_list_node {
                     }
                 }
                 _ => {
-                    result.push(to_expr(id.clone())?);
+                    result.push(to_expr(id)?);
                 }
             }
             Ok(())
@@ -988,7 +987,7 @@ pub fn node_to_expr(
 ) -> Result<Expr, CubeError> {
     Ok(match node {
         LogicalPlanLanguage::AliasExpr(params) => {
-            let expr = to_expr(params[0].clone())?;
+            let expr = to_expr(params[0])?;
             let alias = match_data_node!(node_by_id, params[1], AliasExprAlias);
             Expr::Alias(Box::new(expr), alias)
         }
@@ -1011,9 +1010,9 @@ pub fn node_to_expr(
             Expr::Literal(value)
         }
         LogicalPlanLanguage::AnyExpr(params) => {
-            let left = Box::new(to_expr(params[0].clone())?);
+            let left = Box::new(to_expr(params[0])?);
             let op = match_data_node!(node_by_id, params[1], AnyExprOp);
-            let right = Box::new(to_expr(params[2].clone())?);
+            let right = Box::new(to_expr(params[2])?);
             let all = match_data_node!(node_by_id, params[3], AnyExprAll);
             Expr::AnyExpr {
                 left,
@@ -1023,16 +1022,16 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::BinaryExpr(params) => {
-            let left = Box::new(to_expr(params[0].clone())?);
+            let left = Box::new(to_expr(params[0])?);
             let op = match_data_node!(node_by_id, params[1], BinaryExprOp);
-            let right = Box::new(to_expr(params[2].clone())?);
+            let right = Box::new(to_expr(params[2])?);
             Expr::BinaryExpr { left, op, right }
         }
         LogicalPlanLanguage::LikeExpr(params) => {
             let like_type = match_data_node!(node_by_id, params[0], LikeExprLikeType);
             let negated = match_data_node!(node_by_id, params[1], LikeExprNegated);
-            let expr = Box::new(to_expr(params[2].clone())?);
-            let pattern = Box::new(to_expr(params[3].clone())?);
+            let expr = Box::new(to_expr(params[2])?);
+            let pattern = Box::new(to_expr(params[3])?);
             let escape_char = match_data_node!(node_by_id, params[4], LikeExprEscapeChar);
             let like_expr = Like {
                 negated,
@@ -1047,26 +1046,26 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::NotExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::Not(expr)
         }
         LogicalPlanLanguage::IsNotNullExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::IsNotNull(expr)
         }
         LogicalPlanLanguage::IsNullExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::IsNull(expr)
         }
         LogicalPlanLanguage::NegativeExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             Expr::Negative(expr)
         }
         LogicalPlanLanguage::BetweenExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let negated = match_data_node!(node_by_id, params[1], BetweenExprNegated);
-            let low = Box::new(to_expr(params[2].clone())?);
-            let high = Box::new(to_expr(params[3].clone())?);
+            let low = Box::new(to_expr(params[2])?);
+            let high = Box::new(to_expr(params[3])?);
             Expr::Between {
                 expr,
                 negated,
@@ -1096,17 +1095,17 @@ pub fn node_to_expr(
             }
         }
         LogicalPlanLanguage::CastExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let data_type = match_data_node!(node_by_id, params[1], CastExprDataType);
             Expr::Cast { expr, data_type }
         }
         LogicalPlanLanguage::TryCastExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let data_type = match_data_node!(node_by_id, params[1], TryCastExprDataType);
             Expr::TryCast { expr, data_type }
         }
         LogicalPlanLanguage::SortExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let asc = match_data_node!(node_by_id, params[1], SortExprAsc);
             let nulls_first = match_data_node!(node_by_id, params[2], SortExprNullsFirst);
             Expr::Sort {
@@ -1188,7 +1187,7 @@ pub fn node_to_expr(
             Expr::TableUDF { fun, args }
         }
         LogicalPlanLanguage::InListExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
             let list = match_expr_list_node!(node_by_id, to_expr, params[1], InListExprList);
             let negated = match_data_node!(node_by_id, params[2], InListExprNegated);
             Expr::InList {
@@ -1209,8 +1208,8 @@ pub fn node_to_expr(
             ));
         }
         LogicalPlanLanguage::InSubqueryExpr(params) => {
-            let expr = Box::new(to_expr(params[0].clone())?);
-            let subquery = Box::new(to_expr(params[1].clone())?);
+            let expr = Box::new(to_expr(params[0])?);
+            let subquery = Box::new(to_expr(params[1])?);
             let negated = match_data_node!(node_by_id, params[2], InSubqueryExprNegated);
             Expr::InSubquery {
                 expr,
@@ -1351,10 +1350,18 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Join(params) => {
                 let left_on = match_data_node!(node_by_id, params[2], JoinLeftOn);
                 let right_on = match_data_node!(node_by_id, params[3], JoinRightOn);
-                let left = self.to_logical_plan(params[0]);
-                let right = self.to_logical_plan(params[1]);
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
 
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                // It's OK to join two grouped queries: expected row count is not that high, so
+                // SQL API can, potentially, evaluate it completely
+                // We don't really want it, so cost function should make WrappedSelect preferable
+                // but still, we don't want to hard error on that
+                // But if any one of join sides is ungroued, SQL API does not have much of a choice
+                // but to process every row from ungrouped query, and that's Not Good
+                if Self::have_ungrouped_cube_scan_inside(&left)
+                    || Self::have_ungrouped_cube_scan_inside(&right)
+                {
                     if left_on.iter().any(|c| c.name == "__cubeJoinField")
                         || right_on.iter().any(|c| c.name == "__cubeJoinField")
                     {
@@ -1371,8 +1378,8 @@ impl LanguageToLogicalPlanConverter {
                     }
                 }
 
-                let left = Arc::new(left?);
-                let right = Arc::new(right?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
 
                 let join_type = match_data_node!(node_by_id, params[4], JoinJoinType);
                 let join_constraint = match_data_node!(node_by_id, params[5], JoinJoinConstraint);
@@ -1387,7 +1394,7 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlan::Join(Join {
                     left,
                     right,
-                    on: left_on.into_iter().zip_eq(right_on.into_iter()).collect(),
+                    on: left_on.into_iter().zip_eq(right_on).collect(),
                     join_type,
                     join_constraint,
                     schema,
@@ -1395,7 +1402,18 @@ impl LanguageToLogicalPlanConverter {
                 })
             }
             LogicalPlanLanguage::CrossJoin(params) => {
-                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                let left = self.to_logical_plan(params[0])?;
+                let right = self.to_logical_plan(params[1])?;
+
+                // See comment in Join conversion
+                // Note that DF can generate Filter(CrossJoin(...)) for complex join conditions
+                // But, from memory or dataset perspective it's the same: DF would buffer left side completely
+                // And then iterate over right side, evaluting predicate
+                // Regular join would use hash partitioning here, so it would be quicker, and utilize less CPU,
+                // but transfer and buffering will be the same
+                if Self::have_ungrouped_cube_scan_inside(&left)
+                    || Self::have_ungrouped_cube_scan_inside(&right)
+                {
                     return Err(CubeError::internal(
                         "Can not join Cubes. This is most likely due to one of the following reasons:\n\
                         • one of the cubes contains a group by\n\
@@ -1404,8 +1422,8 @@ impl LanguageToLogicalPlanConverter {
                     ));
                 }
 
-                let left = Arc::new(self.to_logical_plan(params[0])?);
-                let right = Arc::new(self.to_logical_plan(params[1])?);
+                let left = Arc::new(left);
+                let right = Arc::new(right);
                 let schema = Arc::new(left.schema().join(right.schema())?);
 
                 LogicalPlan::CrossJoin(CrossJoin {
@@ -1823,16 +1841,18 @@ impl LanguageToLogicalPlanConverter {
                                 let values =
                                     match_data_node!(node_by_id, params[2], FilterMemberValues);
                                 if !is_in_or && op == "inDateRange" {
-                                    let existing_time_dimension =
-                                        query_time_dimensions.iter_mut().find_map(|td| {
+                                    let existing_time_dimensions: Vec<_> = query_time_dimensions
+                                        .iter_mut()
+                                        .filter_map(|td| {
                                             if td.dimension == member && td.date_range.is_none() {
                                                 td.date_range = Some(json!(values));
                                                 Some(td)
                                             } else {
                                                 None
                                             }
-                                        });
-                                    if existing_time_dimension.is_none() {
+                                        })
+                                        .collect();
+                                    if existing_time_dimensions.len() == 0 {
                                         let dimension = V1LoadRequestQueryTimeDimension {
                                             dimension: member.to_string(),
                                             granularity: None,
@@ -2303,16 +2323,44 @@ impl LanguageToLogicalPlanConverter {
         })
     }
 
-    fn is_cube_scan_node(&self, node_id: Id) -> bool {
-        let node_by_id = &self.best_expr;
-        match node_by_id.index(node_id) {
-            LogicalPlanLanguage::CubeScan(_) | LogicalPlanLanguage::CubeScanWrapper(_) => {
-                return true
+    fn have_ungrouped_cube_scan_inside(node: &LogicalPlan) -> bool {
+        match node {
+            LogicalPlan::Projection(Projection { input, .. })
+            | LogicalPlan::Filter(Filter { input, .. })
+            | LogicalPlan::Window(Window { input, .. })
+            | LogicalPlan::Aggregate(Aggregate { input, .. })
+            | LogicalPlan::Sort(Sort { input, .. })
+            | LogicalPlan::Repartition(Repartition { input, .. })
+            | LogicalPlan::Limit(Limit { input, .. }) => {
+                Self::have_ungrouped_cube_scan_inside(input)
             }
-            _ => (),
+            LogicalPlan::Join(Join { left, right, .. })
+            | LogicalPlan::CrossJoin(CrossJoin { left, right, .. }) => {
+                Self::have_ungrouped_cube_scan_inside(left)
+                    || Self::have_ungrouped_cube_scan_inside(right)
+            }
+            LogicalPlan::Union(Union { inputs, .. }) => {
+                inputs.iter().any(Self::have_ungrouped_cube_scan_inside)
+            }
+            LogicalPlan::Subquery(Subquery {
+                input, subqueries, ..
+            }) => {
+                Self::have_ungrouped_cube_scan_inside(input)
+                    || subqueries.iter().any(Self::have_ungrouped_cube_scan_inside)
+            }
+            LogicalPlan::Extension(Extension { node }) => {
+                if let Some(cube_scan) = node.as_any().downcast_ref::<CubeScanNode>() {
+                    cube_scan.request.ungrouped == Some(true)
+                } else if let Some(cube_scan_wrapper) =
+                    node.as_any().downcast_ref::<CubeScanWrapperNode>()
+                {
+                    cube_scan_wrapper.has_ungrouped_scan()
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
-
-        return false;
     }
 }
 
@@ -2392,4 +2440,30 @@ fn replace_qualified_col_with_flat_name_if_missing(
             .map_err(|e| CubeError::from(e))
         })
         .collect::<Result<Vec<_>, _>>()
+}
+
+/// Recursively normalize all Column expressions in a list of expression trees
+fn normalize_cols(
+    exprs: impl IntoIterator<Item = impl Into<Expr>>,
+    plan: &LogicalPlan,
+) -> Result<Vec<Expr>, CubeError> {
+    exprs
+        .into_iter()
+        .map(|e| normalize_col(e.into(), plan))
+        .collect()
+}
+
+/// Recursively call [`df_normalize_col`] on all Column expressions
+/// in the `expr` expression tree, realiasing the expressions if the name is different.
+fn normalize_col(expr: Expr, plan: &LogicalPlan) -> Result<Expr, CubeError> {
+    if let Expr::Alias(_, _) = expr {
+        return Ok(df_normalize_col(expr, plan)?);
+    }
+    let original_expr_name = expr_name(&expr)?;
+    let mut normalized_expr = df_normalize_col(expr, plan)?;
+    let normalized_expr_name = expr_name(&normalized_expr)?;
+    if original_expr_name != normalized_expr_name {
+        normalized_expr = normalized_expr.alias(&original_expr_name);
+    }
+    Ok(normalized_expr)
 }

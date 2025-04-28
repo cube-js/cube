@@ -38,7 +38,7 @@ model
 Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
 JavaScript syntax. YAML data model files should have the `.yml` extension,
 whereas JavaScript data model files should end with `.js`. You can mix YAML and
-JavaScript files within a single data model. 
+JavaScript files within a single data model.
 
 <CodeTabs>
 
@@ -77,8 +77,9 @@ for dynamic data modeling.
 
 Common rules apply to names of entities within the data model. All names must:
 
-- start with a letter
-- consist of letters, numbers, and underscore (`_`) symbols only
+- Start with a letter.
+- Consist of letters, numbers, and underscore (`_`) symbols only.
+- Not be a [reserved keyword in Python][link-python-reserved-words], e.g., `from`, `return`, or `yield`.
 
 It is also recommended that names use [snake case][wiki-snake-case].
 
@@ -547,6 +548,8 @@ when defining [polymorphic cubes][ref-polymorphism] or using [data blending][ref
 
 Consider the following data model:
 
+<CodeTabs>
+
 ```javascript
 cube(`organisms`, {
   sql_table: `organisms`
@@ -564,7 +567,7 @@ cube(`dogs`, {
   sql: `
     SELECT *
     FROM ${animals.sql()}
-    WHERE species = 'dogs' 
+    WHERE species = 'dogs'
   `,
 
   measures: {
@@ -574,6 +577,30 @@ cube(`dogs`, {
   }
 })
 ```
+
+```yaml
+cubes:
+  - name: organisms
+    sql_table: organisms
+
+  - name: animals
+    sql: >
+      SELECT *
+      FROM {organisms.sql()}
+      WHERE kingdom = 'animals'
+
+  - name: dogs
+    sql: >
+      SELECT *
+      FROM {animals.sql()}
+      WHERE species = 'dogs'
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
 
 If you query for `dogs.count`, Cube will generate the following SQL:
 
@@ -590,17 +617,72 @@ FROM (
 ) AS "dogs"
 ```
 
-<ReferenceBox>
+### Curly braces and escaping
 
-Currently, `{cube.sql()}` function is only supported in JavaScript data models.
-It is not supported in YAML data models.
-Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+As you can see in the examples above, within [SQL expressions][self-sql-expressions],
+curly braces are used to reference cubes and members.
 
-As a workaround, you can use JavaScript data models, put a SQL query in a
-[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
-the [template context](/reference/python/cube#templatecontext-class).
+In YAML data models, use `{reference}`:
 
-</ReferenceBox>
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT id, created_at
+      FROM {other_cube.sql()}
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: status_x2
+        sql: "{status} || ' ' || {status}"
+        type: string
+```
+
+In JavaScript data models, use `${reference}` in [JavaScript template
+literals][link-js-template-literals] (mind the dollar sign):
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT id, created_at
+    FROM ${other_cube.sql()}
+  `,
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    },
+
+    status_x2: {
+      sql: `${status} || ' ' || ${status}`,
+      type: `string`
+    }
+  }
+})
+```
+
+If you need to use literal, non-referential curly braces in YAML, e.g.,
+to define a JSON object, you can escape them with a backslash:
+
+```yaml
+cubes:
+  - name: json_object_in_postgres
+    sql: SELECT CAST('\{"key":"value"\}'::JSON AS TEXT) AS json_column
+
+  - name: csv_from_s3_in_duckdb
+    sql: >
+      SELECT *
+      FROM read_csv(
+        's3://bbb/aaa.csv',
+        delim = ',',
+        header = true,
+        columns=\{'time':'DATE','count':'NUMERIC'\}
+      )
+```
 
 ### Non-SQL references
 
@@ -694,3 +776,5 @@ defining dynamic data models.
 [ref-style-guide]: /guides/style-guide
 [ref-polymorphism]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
+[link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
+[link-python-reserved-words]: https://docs.python.org/3/reference/lexical_analysis.html#keywords

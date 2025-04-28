@@ -85,9 +85,17 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.escapeColumnName(`${this.dimension}_series`);
   }
 
-  public dateSeriesSelectColumn(dateSeriesAliasName) {
+  public dateSeriesSelectColumn(dateSeriesAliasName: string | null, dateSeriesGranularity?: string) {
     if (!this.granularityObj) {
       return null;
+    }
+
+    // In case of query with more than one granularity, the time series table was generated
+    // with the minimal granularity among all. If this is our granularity, we can save
+    // some cpu cycles without 'date_from' truncation. But if this is not our granularity,
+    // we need to truncate it to desired.
+    if (dateSeriesGranularity && this.granularityObj?.granularity !== dateSeriesGranularity) {
+      return `${this.query.dimensionTimeGroupedColumn(`${dateSeriesAliasName || this.dateSeriesAliasName()}.${this.query.escapeColumnName('date_from')}`, this.granularityObj)} ${this.aliasName()}`;
     }
     return `${dateSeriesAliasName || this.dateSeriesAliasName()}.${this.query.escapeColumnName('date_from')} ${this.aliasName()}`;
   }
@@ -241,17 +249,15 @@ export class BaseTimeDimension extends BaseFilter {
               return this.dateRangeGranularity();
             }
 
-            if (!this.dateRange) {
-              return this.granularityObj.minGranularity();
-            }
-
             // If we have granularity and date range, we need to check
             // that the interval and the granularity offset are stacked/fits with date range
-            if (this.granularityObj.isPredefined() ||
-              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()])) {
+            if (this.dateRange && (this.granularityObj.isPredefined() ||
+              !this.granularityObj.isAlignedWithDateRange([this.dateFromFormatted(), this.dateToFormatted()]))) {
               return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
             }
 
+            // We return the granularity as-is, including custom ones,
+            // because baseQuery.granularityHierarchies correctly expands all custom granularities into hierarchies.
             return this.granularityObj.granularity;
           }
         );
@@ -273,7 +279,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public resolvedGranularity() {
-    return this.granularityObj ? this.granularityObj.resolvedGranularity() : this.dateRangeGranularity();
+    return this.granularityObj ? this.granularityObj.resolvedGranularity() : null;
   }
 
   public wildcardRange() {

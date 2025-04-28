@@ -52,7 +52,7 @@ with nested structure:
 ### Reserved elements
 
 Some features of Cube Cloud (e.g., [authentication integration][ref-auth-integration]
-and [LDAP integration][ref-ldap-integration]) use the `cloud` element in the security context.
+and [LDAP integration][ref-ldap-integration]) use the `cubeCloud` element in the security context.
 This element is reserved and should not be used for other purposes.
 
 ## Using query_rewrite
@@ -164,7 +164,7 @@ const cubeToken = jwt.sign({ user_id: 42 }, CUBE_API_SECRET, {
 Using this token, we authorize our request to the Cube API by passing it in the
 Authorization HTTP header.
 
-```bash{outputLines: 2-5}
+```bash
 curl \
   -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7ImlkIjo0Mn0sImlhdCI6MTU1NjAyNTM1MiwiZXhwIjoxNTU4NjE3MzUyfQ._8QBL6nip6SkIrFzZzGq2nSF8URhl5BSSSGZYp7IJZ4" \
   -G \

@@ -3,6 +3,175 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.7](https://github.com/cube-js/cube/compare/v1.3.6...v1.3.7) (2025-04-23)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.6](https://github.com/cube-js/cube/compare/v1.3.5...v1.3.6) (2025-04-22)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.5](/compare/v1.3.4...v1.3.5) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.3](https://github.com/cube-js/cube/compare/v1.3.2...v1.3.3) (2025-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.3.2](https://github.com/cube-js/cube/compare/v1.3.1...v1.3.2) (2025-04-16)
+
+### Features
+
+- **duckdb-driver:** Add support for installing and loading DuckDB Community Extensions ([#9169](https://github.com/cube-js/cube/issues/9169)) ([c97f99a](https://github.com/cube-js/cube/commit/c97f99a27f2c95b1a58ea4863dfe0c4227e4c42d))
+
+## [1.3.1](https://github.com/cube-js/cube/compare/v1.3.0...v1.3.1) (2025-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+### Features
+
+- **databricks-jdbc-driver:** Switch to the latest OSS Databricks JDBC driver ([#9450](https://github.com/cube-js/cube/issues/9450)) ([819edde](https://github.com/cube-js/cube/commit/819eddedc6024963b836d8090f6ca1c3ae1b5966))
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.32](/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.30](/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+### Features
+
+- **schema-compiler:** generate join sql using dimension refs when po… (#9413) 8fc4f7c, closes #9413
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+### Features
+
+- **clickhouse-driver:** Allow to enable compression, thanks @Graphmaxer ([#9341](https://github.com/cube-js/cube/issues/9341)) ([78ac7b2](https://github.com/cube-js/cube/commit/78ac7b2d93896bae0903ba5f8e4f055165791962))
+- **databricks-jdbc-driver:** Switch to the latest OSS Databricks JDBC driver ([#9376](https://github.com/cube-js/cube/issues/9376)) ([29fdd61](https://github.com/cube-js/cube/commit/29fdd615f7eb70690f5fc85897e0c93a5a0cc29a))
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
+
+### Features
+
+- **server-core,api-gateway:** Allow manual rebuilding pre-aggregation partitions within date Range ([#9342](https://github.com/cube-js/cube/issues/9342)) ([b5701e3](https://github.com/cube-js/cube/commit/b5701e35a92769e23acdbb2fe72549731cd21aba))
+
+## [1.2.24](/compare/v1.2.23...v1.2.24) (2025-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.23](https://github.com/cube-js/cube/compare/v1.2.22...v1.2.23) (2025-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.22](https://github.com/cube-js/cube/compare/v1.2.21...v1.2.22) (2025-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.21](https://github.com/cube-js/cube/compare/v1.2.20...v1.2.21) (2025-03-11)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.20](/compare/v1.2.19...v1.2.20) (2025-03-10)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.19](https://github.com/cube-js/cube/compare/v1.2.18...v1.2.19) (2025-03-08)
+
+### Features
+
+- **pinot-driver:** Add enableNullHandling to query options using env var ([#9310](https://github.com/cube-js/cube/issues/9310)) ([df763cc](https://github.com/cube-js/cube/commit/df763cc9a375eb656d6ac4dc10adbd9a68082a0e))
+
+## [1.2.18](https://github.com/cube-js/cube/compare/v1.2.17...v1.2.18) (2025-03-06)
+
+### Bug Fixes
+
+- **query-orchestrator:** Fix improper pre-aggregation buildRange construction for non UTC timezones ([#9284](https://github.com/cube-js/cube/issues/9284)) ([ef12d8d](https://github.com/cube-js/cube/commit/ef12d8d02702df7dcc1e6531c1b0aee6afa576ef))
+
+## [1.2.17](/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+### Bug Fixes
+
+- **api-gateway:** Support proxy when fetching jwk for token validation (#9286) 60870c8, closes #9286
+
+## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+### Features
+
+- **tesseract:** Pre-aggregation planning fallback ([#9230](https://github.com/cube-js/cube/issues/9230)) ([08650e2](https://github.com/cube-js/cube/commit/08650e241e2aa85705e3c68e4993098267f89c82))
+
+## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
+
+### Features
+
+- **server-core:** add fastReloadEnabled option to CompilerApi ([#9289](https://github.com/cube-js/cube/issues/9289)) ([122a3a3](https://github.com/cube-js/cube/commit/122a3a30e526f122d2bf2c0661f2b32fa070e824))
+
+## [1.2.13](https://github.com/cube-js/cube/compare/v1.2.12...v1.2.13) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
 ## [1.2.6](https://github.com/cube-js/cube/compare/v1.2.5...v1.2.6) (2025-02-18)
 
 ### Features

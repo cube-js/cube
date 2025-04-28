@@ -8,8 +8,9 @@ redirect_from:
 
 Choose a data source to get started with below.
 
-Note that Cube also supports connecting to [multiple data
-sources][ref-config-multi-data-src] out of the box.
+You can also connect [multiple data sources][ref-config-multi-data-src] at the same
+time and adjust the [concurrency settings][ref-data-source-concurrency] for data
+sources.
 
 ## Data warehouses
 
@@ -251,28 +252,9 @@ users on the [Enterprise Premier](https://cube.dev/pricing) product tier.
 
 </InfoBox>
 
-## Concurrency and pooling
-
-<InfoBox>
-
-All Cube database drivers come with presets for concurrency and pooling that
-work out-of-the-box. The following information is included as a reference.
-
-</InfoBox>
-
-For increased performance, Cube uses multiple concurrent connections to
-configured data sources. The `CUBEJS_CONCURRENCY` environment variable controls
-concurrency settings for query queues and the refresh scheduler as well as the
-maximum concurrent connections.
-
-For databases that support connection pooling,
-the maximum number of concurrent connections to the database can also be set by
-using the `CUBEJS_DB_MAX_POOL` environment variable; if changing this from the
-default, you must ensure that the new value is greater than the number of
-concurrent connections used by Cube's query queues and refresh scheduler.
-
 
 [ref-config-multi-data-src]: /product/configuration/advanced/multiple-data-sources
 [ref-driver-factory]: /reference/configuration/config#driver_factory
 [ref-duckdb]: /product/configuration/data-sources/duckdb
 [link-github-packages]: https://github.com/cube-js/cube/tree/master/packages
+[ref-data-source-concurrency]: /product/configuration/concurrency#data-sources

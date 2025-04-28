@@ -142,7 +142,7 @@ The same query using the REST API syntax looks as follows:
 ### Query with post-processing
 
 **Queries with post-processing are specific to the [SQL API][ref-sql-api].**
-They are structured in such a way that a [regular query](#regular-query) is
+Generally, they are structured in such a way that a [regular query](#regular-query) is
 part of a `FROM` clause or a common table expression (CTE):
 
 ```sql
@@ -178,8 +178,17 @@ limited set of SQL functions and operators.
 
 #### Example
 
-See an example of a query with post-processing. In this query, we derive new
-dimensions, post-aggregate measures, and perform additional filtering:
+The simplest example of a query with post-processing:
+
+```sql
+SELECT VERSION();
+```
+
+This query invokes a function that is implemented by the SQL API and executed without
+querying the upstream data source.
+
+Now, see a more complex example of a query with post-processing. In this query, we derive
+new dimensions, post-aggregate measures, and perform additional filtering:
 
 ```sql
 SELECT

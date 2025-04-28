@@ -1,7 +1,7 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
-use convert_case::{Case, Casing};
+use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
 use std::rc::Rc;
@@ -10,6 +10,18 @@ use std::rc::Rc;
 pub struct PlanSqlTemplates {
     render: Rc<dyn SqlTemplatesRender>,
 }
+pub const UNDERSCORE_UPPER_BOUND: Boundary = Boundary {
+    name: "LowerUpper",
+    condition: |s, _| {
+        s.get(0) == Some(&"_")
+            && s.get(1)
+                .map(|c| c.to_uppercase() != c.to_lowercase() && *c == c.to_uppercase())
+                == Some(true)
+    },
+    arg: None,
+    start: 0,
+    len: 0,
+};
 
 impl PlanSqlTemplates {
     pub fn new(render: Rc<dyn SqlTemplatesRender>) -> Self {
@@ -17,7 +29,16 @@ impl PlanSqlTemplates {
     }
 
     pub fn alias_name(name: &str) -> String {
-        name.to_case(Case::Snake).replace(".", "__")
+        let res = name
+            .with_boundaries(&[
+                UNDERSCORE_UPPER_BOUND,
+                Boundary::LOWER_UPPER,
+                Boundary::DIGIT_UPPER,
+                Boundary::ACRONYM,
+            ])
+            .to_case(Case::Snake)
+            .replace(".", "__");
+        res
     }
 
     pub fn memeber_alias_name(cube_name: &str, name: &str, suffix: &Option<String>) -> String {
@@ -32,6 +53,31 @@ impl PlanSqlTemplates {
             Self::alias_name(name),
             suffix
         )
+    }
+
+    //FIXME duplicated with filter templates
+    pub fn add_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/add_interval",
+            context! {
+                date => date,
+                interval => interval
+            },
+        )
+    }
+
+    pub fn sub_interval(&self, date: String, interval: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"expressions/sub_interval",
+            context! {
+                date => date,
+                interval => interval
+            },
+        )
+    }
+
+    pub fn quote_string(&self, string: &str) -> Result<String, CubeError> {
+        Ok(format!("'{}'", string))
     }
 
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
@@ -133,6 +179,16 @@ impl PlanSqlTemplates {
         )
     }
 
+    pub fn max(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template("functions/MAX", context! { args_concat => expr })
+    }
+
+    pub fn min(&self, expr: &str) -> Result<String, CubeError> {
+        self.render
+            .render_template("functions/MIN", context! { args_concat => expr })
+    }
+
     pub fn concat_strings(&self, strings: &Vec<String>) -> Result<String, CubeError> {
         self.render.render_template(
             "expressions/concat_strings",
@@ -163,8 +219,8 @@ impl PlanSqlTemplates {
 
     pub fn time_series_select(
         &self,
-        from_date: Option<String>,
-        to_date: Option<String>,
+        from_date: String,
+        to_date: String,
         seria: Vec<Vec<String>>,
     ) -> Result<String, CubeError> {
         self.render.render_template(
@@ -173,6 +229,28 @@ impl PlanSqlTemplates {
                 from_date => from_date,
                 to_date => to_date,
                 seria => seria
+            },
+        )
+    }
+
+    pub fn time_series_get_range(
+        &self,
+        max_expr: &str,
+        min_expr: &str,
+        max_name: &str,
+        min_name: &str,
+        from: &str,
+    ) -> Result<String, CubeError> {
+        let quoted_min_name = self.quote_identifier(min_name)?;
+        let quoted_max_name = self.quote_identifier(max_name)?;
+        self.render.render_template(
+            "expressions/time_series_get_range",
+            context! {
+                max_expr => max_expr,
+                min_expr => min_expr,
+                from_prepared => from,
+                quoted_min_name => quoted_min_name,
+                quoted_max_name => quoted_max_name
             },
         )
     }
@@ -270,9 +348,38 @@ impl PlanSqlTemplates {
             .contains_template("operators/is_not_distinct_from")
     }
 
+    pub fn supports_generated_time_series(&self) -> bool {
+        self.render
+            .contains_template("statements/generated_time_series_select")
+    }
+
+    pub fn generated_time_series_select(
+        &self,
+        start: &str,
+        end: &str,
+        granularity: &str,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "statements/generated_time_series_select",
+            context! { start => start, end => end, granularity => granularity },
+        )
+    }
+
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render
             .render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn case(
+        &self,
+        expr: Option<String>,
+        when_then: Vec<(String, String)>,
+        else_expr: Option<String>,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/case",
+            context! { expr => expr, when_then => when_then, else_expr => else_expr },
+        )
     }
 
     pub fn scalar_function(

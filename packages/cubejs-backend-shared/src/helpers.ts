@@ -74,3 +74,7 @@ export async function streamToArray<T>(stream: Readable): Promise<T[]> {
 export async function oldStreamToArray<T>(stream: NodeJS.ReadableStream): Promise<T[]> {
   return streamToArray(new Readable().wrap(stream));
 }
+
+export function notEmpty<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}

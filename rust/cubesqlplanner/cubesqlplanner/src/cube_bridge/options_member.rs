@@ -3,6 +3,7 @@ use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::serializer::NativeDeserialize;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
+use std::fmt::Debug;
 use std::rc::Rc;
 
 pub enum OptionsMember {
@@ -20,6 +21,18 @@ impl<IT: InnerTypes> NativeDeserialize<IT> for OptionsMember {
                     "Member name or member expression map expected"
                 ))),
             },
+        }
+    }
+}
+
+impl Debug for OptionsMember {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MemberName(name) => f.debug_tuple("MemberName").field(name).finish(),
+            Self::MemberExpression(member_expression) => f
+                .debug_tuple("MemberExpression")
+                .field(member_expression.static_data())
+                .finish(),
         }
     }
 }

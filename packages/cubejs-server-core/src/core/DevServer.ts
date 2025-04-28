@@ -611,6 +611,12 @@ export class DevServer {
     app.post('/playground/schema/pre-aggregation', catchErrors(async (req: Request, res: Response) => {
       const { cubeName, preAggregationName, code } = req.body;
 
+      /**
+       * Important note:
+       * JS code for pre-agg includes the content of the pre-aggregation object
+       * without name, which is passed as preAggregationName.
+       * While yaml code for pre-agg includes whole yaml object including name.
+       */
       const schemaConverter = new CubeSchemaConverter(this.cubejsServer.repository, [
         new CubePreAggregationConverter({
           cubeName,
@@ -620,17 +626,20 @@ export class DevServer {
       ]);
 
       try {
-        await schemaConverter.generate();
+        await schemaConverter.generate(cubeName);
       } catch (error) {
         return res.status(400).json({ error: (error as Error).message || error });
       }
 
-      schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
-        if (currentCubeName === cubeName) {
-          this.cubejsServer.repository.writeDataSchemaFile(fileName, source);
-        }
-      });
+      const file = schemaConverter.getSourceFiles().find(
+        ({ cubeName: currentCubeName }) => currentCubeName === cubeName
+      );
 
+      if (!file) {
+        return res.status(400).json({ error: `The schema file for "${cubeName}" cube was not found or could not be updated. Only JS and non-templated YAML files are supported.` });
+      }
+
+      this.cubejsServer.repository.writeDataSchemaFile(file.fileName, file.source);
       return res.json('ok');
     }));
   }

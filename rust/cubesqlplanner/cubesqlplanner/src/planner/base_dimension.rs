@@ -81,6 +81,23 @@ impl BaseDimension {
                     default_alias,
                 }))
             }
+            MemberSymbol::MemberExpression(expression_symbol) => {
+                let full_name = expression_symbol.full_name();
+                let cube_name = expression_symbol.cube_name().clone();
+                let name = expression_symbol.name().clone();
+                let member_expression_definition = expression_symbol.definition().clone();
+                let default_alias = PlanSqlTemplates::alias_name(&name);
+                Some(Rc::new(Self {
+                    dimension: full_name,
+                    query_tools: query_tools.clone(),
+                    member_evaluator: evaluation_node,
+                    definition: None,
+                    cube_name,
+                    name,
+                    member_expression_definition,
+                    default_alias,
+                }))
+            }
             _ => None,
         };
         Ok(result)
@@ -130,6 +147,10 @@ impl BaseDimension {
 
     pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
         self.member_evaluator.clone()
+    }
+
+    pub fn definition(&self) -> Option<Rc<dyn DimensionDefinition>> {
+        self.definition.clone()
     }
 
     pub fn sql_call(&self) -> Result<Rc<SqlCall>, CubeError> {

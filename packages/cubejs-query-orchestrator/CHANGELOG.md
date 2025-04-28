@@ -3,6 +3,166 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.8](https://github.com/cube-js/cube/compare/v1.3.7...v1.3.8) (2025-04-24)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.7](https://github.com/cube-js/cube/compare/v1.3.6...v1.3.7) (2025-04-23)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.6](https://github.com/cube-js/cube/compare/v1.3.5...v1.3.6) (2025-04-22)
+
+### Bug Fixes
+
+- **schema-compiler:** Use join paths from pre-aggregation declaration instead of building join tree from scratch ([#9471](https://github.com/cube-js/cube/issues/9471)) ([cd7e9fd](https://github.com/cube-js/cube/commit/cd7e9fddca8fa1c31335adbba6e79c4032841cbb))
+
+## [1.3.5](https://github.com/cube-js/cube/compare/v1.3.4...v1.3.5) (2025-04-17)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.4](https://github.com/cube-js/cube/compare/v1.3.3...v1.3.4) (2025-04-17)
+
+### Bug Fixes
+
+- **schema-compiler:** Make RefreshKeySql timezone-aware ([#9479](https://github.com/cube-js/cube/issues/9479)) ([fa2adb9](https://github.com/cube-js/cube/commit/fa2adb92e6fd87223f551b61d75f367dc8ea2524))
+
+## [1.3.3](https://github.com/cube-js/cube/compare/v1.3.2...v1.3.3) (2025-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.2](https://github.com/cube-js/cube/compare/v1.3.1...v1.3.2) (2025-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.3.1](https://github.com/cube-js/cube/compare/v1.3.0...v1.3.1) (2025-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+# [1.3.0](https://github.com/cube-js/cube/compare/v1.2.33...v1.3.0) (2025-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.33](https://github.com/cube-js/cube/compare/v1.2.32...v1.2.33) (2025-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.32](https://github.com/cube-js/cube/compare/v1.2.31...v1.2.32) (2025-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.31](https://github.com/cube-js/cube/compare/v1.2.30...v1.2.31) (2025-04-08)
+
+### Features
+
+- **schema-compiler:** Use LRUCache for js data models compiled vm.Scripts ([#9424](https://github.com/cube-js/cube/issues/9424)) ([e923a0f](https://github.com/cube-js/cube/commit/e923a0fb38f1cdc5bca1256bf868efca46e13cca))
+
+## [1.2.30](https://github.com/cube-js/cube/compare/v1.2.29...v1.2.30) (2025-04-04)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.29](https://github.com/cube-js/cube/compare/v1.2.28...v1.2.29) (2025-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.28](https://github.com/cube-js/cube/compare/v1.2.27...v1.2.28) (2025-04-01)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.27](https://github.com/cube-js/cube/compare/v1.2.26...v1.2.27) (2025-03-25)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.26](https://github.com/cube-js/cube/compare/v1.2.25...v1.2.26) (2025-03-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.25](https://github.com/cube-js/cube/compare/v1.2.24...v1.2.25) (2025-03-20)
+
+### Features
+
+- **server-core,api-gateway:** Allow manual rebuilding pre-aggregation partitions within date Range ([#9342](https://github.com/cube-js/cube/issues/9342)) ([b5701e3](https://github.com/cube-js/cube/commit/b5701e35a92769e23acdbb2fe72549731cd21aba))
+
+## [1.2.24](https://github.com/cube-js/cube/compare/v1.2.23...v1.2.24) (2025-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.23](https://github.com/cube-js/cube/compare/v1.2.22...v1.2.23) (2025-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.22](https://github.com/cube-js/cube/compare/v1.2.21...v1.2.22) (2025-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.21](https://github.com/cube-js/cube/compare/v1.2.20...v1.2.21) (2025-03-11)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.20](https://github.com/cube-js/cube/compare/v1.2.19...v1.2.20) (2025-03-10)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.19](https://github.com/cube-js/cube/compare/v1.2.18...v1.2.19) (2025-03-08)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.18](https://github.com/cube-js/cube/compare/v1.2.17...v1.2.18) (2025-03-06)
+
+### Bug Fixes
+
+- **query-orchestrator:** Fix improper pre-aggregation buildRange construction for non UTC timezones ([#9284](https://github.com/cube-js/cube/issues/9284)) ([ef12d8d](https://github.com/cube-js/cube/commit/ef12d8d02702df7dcc1e6531c1b0aee6afa576ef))
+
+## [1.2.17](https://github.com/cube-js/cube/compare/v1.2.16...v1.2.17) (2025-03-05)
+
+### Bug Fixes
+
+- **query-orchestrator:** Fix dropping temp tables during pre-agg creation ([#9295](https://github.com/cube-js/cube/issues/9295)) ([eb3d980](https://github.com/cube-js/cube/commit/eb3d980aee42b3077148cc93c56034b0471d2a33))
+
+## [1.2.16](https://github.com/cube-js/cube/compare/v1.2.15...v1.2.16) (2025-03-04)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.15](https://github.com/cube-js/cube/compare/v1.2.14...v1.2.15) (2025-03-03)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.14](https://github.com/cube-js/cube/compare/v1.2.13...v1.2.14) (2025-02-28)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.13](https://github.com/cube-js/cube/compare/v1.2.12...v1.2.13) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.12](https://github.com/cube-js/cube/compare/v1.2.11...v1.2.12) (2025-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.11](https://github.com/cube-js/cube/compare/v1.2.10...v1.2.11) (2025-02-25)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.10](https://github.com/cube-js/cube/compare/v1.2.9...v1.2.10) (2025-02-24)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.9](https://github.com/cube-js/cube/compare/v1.2.8...v1.2.9) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.8](https://github.com/cube-js/cube/compare/v1.2.7...v1.2.8) (2025-02-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.2.7](https://github.com/cube-js/cube/compare/v1.2.6...v1.2.7) (2025-02-20)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
 ## [1.2.6](https://github.com/cube-js/cube/compare/v1.2.5...v1.2.6) (2025-02-18)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

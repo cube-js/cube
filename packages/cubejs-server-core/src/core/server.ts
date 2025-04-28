@@ -1,7 +1,7 @@
 /* eslint-disable global-require,no-return-assign */
 import crypto from 'crypto';
 import fs from 'fs-extra';
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import isDocker from 'is-docker';
 import pLimit from 'p-limit';
 
@@ -203,8 +203,10 @@ export class CubejsServerCore {
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: this.options.compilerCacheSize || 250,
-      maxAge: this.options.maxCompilerCacheKeepAlive,
-      updateAgeOnGet: this.options.updateCompilerCacheKeepAlive
+      ttl: this.options.maxCompilerCacheKeepAlive,
+      updateAgeOnGet: this.options.updateCompilerCacheKeepAlive,
+      // needed to clear the setInterval timer for proactive cache internal cleanups
+      dispose: (v) => v.dispose(),
     });
 
     if (this.options.contextToAppId) {
@@ -224,7 +226,7 @@ export class CubejsServerCore {
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
       this.maxCompilerCacheKeep = setInterval(
-        () => this.compilerCache.prune(),
+        () => this.compilerCache.purgeStale(),
         this.options.maxCompilerCacheKeepAlive
       );
     }
@@ -539,6 +541,7 @@ export class CubejsServerCore {
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
+          fastReload: this.options.fastReload,
         },
       );
 
@@ -553,7 +556,7 @@ export class CubejsServerCore {
     await this.orchestratorStorage.releaseConnections();
 
     this.orchestratorStorage.clear();
-    this.compilerCache.reset();
+    this.compilerCache.clear();
 
     this.reloadEnvVariables();
 
@@ -712,6 +715,10 @@ export class CubejsServerCore {
         sqlCache: this.options.sqlCache,
         standalone: this.standalone,
         allowNodeRequire: options.allowNodeRequire,
+        fastReload: options.fastReload || getEnv('fastReload'),
+        compilerCacheSize: this.options.compilerCacheSize || 250,
+        maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
+        updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive
       },
     );
   }
@@ -869,6 +876,8 @@ export class CubejsServerCore {
       clearInterval(this.maxCompilerCacheKeep);
     }
 
+    this.compilerCache.clear();
+
     if (this.scheduledRefreshTimerInterval) {
       await this.scheduledRefreshTimerInterval.cancel();
     }
@@ -912,6 +921,8 @@ export class CubejsServerCore {
   };
 
   public async shutdown() {
+    this.compilerCache.clear();
+
     if (this.devServer) {
       if (!process.env.CI) {
         process.removeListener('uncaughtException', this.onUncaughtException);

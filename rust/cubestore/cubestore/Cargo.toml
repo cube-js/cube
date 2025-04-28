@@ -57,7 +57,9 @@ bigdecimal = { version = "0.2.0", features = ["serde"] }
 # Right now, it's not possible to use the 0.33 release because it has bugs
 # At the same time, 0.34-rc has a problem with large files uploading because it doesn't control number of parallels put(s)
 # Tracking PR with backports: https://github.com/cube-js/rust-s3/pull/1
-rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", branch = "cubestore-0.32.3-backport", default-features = false, features = ["tokio", "tokio-native-tls"] }
+# The fork also includes a fix for AWS_STS_REGIONAL_ENDPOINTS
+# See https://github.com/cube-js/rust-s3/pull/1/commits for more details
+rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", rev = "c662b9c66c2929da185c46084fc5f455030ad75f", default-features = false, features = ["tokio", "tokio-native-tls"] }
 deadqueue = "0.2.4"
 reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"

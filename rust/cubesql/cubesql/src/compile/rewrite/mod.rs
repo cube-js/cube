@@ -405,7 +405,10 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
         },
-        FilterSimplifyReplacer {
+        FilterSimplifyPushDownReplacer {
+            filters: Vec<LogicalPlan>,
+        },
+        FilterSimplifyPullUpReplacer {
             filters: Vec<LogicalPlan>,
         },
         OrderReplacer {
@@ -557,7 +560,7 @@ macro_rules! var_list_iter {
 #[macro_export]
 macro_rules! var {
     ($var_str:expr) => {
-        $var_str.parse().unwrap()
+        $var_str.parse::<::egg::Var>().unwrap()
     };
 }
 
@@ -691,7 +694,7 @@ impl LogicalPlanData {
         {
             {
                 let column_name = expr_column_name(&expr, &None);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -702,7 +705,7 @@ impl LogicalPlanData {
             }
             {
                 let column_name = expr_column_name_with_relation(&expr, &mut relation);
-                let equal = name == &column_name;
+                let equal = name == column_name;
                 let _ = member_names_to_expr
                     .cached_lookups
                     .try_insert(column_name, index);
@@ -1416,9 +1419,13 @@ fn window_fun_expr_var_arg(
 }
 
 fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "AggregateUDFExprFun:"
+    };
     format!(
-        "(AggregateUDFExpr {} {})",
-        fun_name,
+        "(AggregateUDFExpr {prefix}{fun_name} {})",
         list_expr("AggregateUDFExprArgs", args),
     )
 }
@@ -1722,8 +1729,7 @@ fn case_expr<D: Display>(
             "CaseExprWhenThenExpr",
             when_then
                 .into_iter()
-                .map(|(when, then)| vec![when, then])
-                .flatten()
+                .flat_map(|(when, then)| [when, then])
                 .collect(),
         ),
         case_expr_else_expr(else_expr),
@@ -1772,6 +1778,10 @@ fn literal_float(literal_float: f64) -> String {
 
 fn literal_bool(literal_bool: bool) -> String {
     format!("(LiteralExpr LiteralExprValue:b:{})", literal_bool)
+}
+
+fn literal_null() -> String {
+    format!("(LiteralExpr LiteralExprValue:null)")
 }
 
 fn projection(
@@ -1902,8 +1912,12 @@ fn filter_replacer(
     )
 }
 
-fn filter_simplify_replacer(members: impl Display) -> String {
-    format!("(FilterSimplifyReplacer {})", members)
+fn filter_simplify_push_down_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPushDownReplacer {})", members)
+}
+
+fn filter_simplify_pull_up_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyPullUpReplacer {})", members)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {

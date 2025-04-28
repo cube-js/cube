@@ -47,6 +47,9 @@ cubes:
                   operator: notEquals
                   values:
                     - 'San Francisco'
+                # This is to validate that unary filters are interpreted correctly
+                - member: "city"
+                  operator: set
               - member: "{CUBE}.city"
                 operator: equals
                 values:

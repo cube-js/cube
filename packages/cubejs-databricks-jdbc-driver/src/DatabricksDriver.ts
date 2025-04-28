@@ -4,27 +4,26 @@
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
 
+import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import {
-  getEnv,
-  assertDataSource,
-} from '@cubejs-backend/shared';
-import {
+  DatabaseStructure,
   DriverCapabilities,
+  GenericDataBaseType,
   QueryColumnsResult,
   QueryOptions,
   QuerySchemasResult,
   QueryTablesResult,
-  UnloadOptions,
-  GenericDataBaseType,
   TableColumn,
-  DatabaseStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
-import {
-  JDBCDriver,
-  JDBCDriverConfiguration,
-} from '@cubejs-backend/jdbc-driver';
+import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
+import {
+  extractAndRemoveUidPwdFromJdbcUrl,
+  resolveJDBCDriver
+} from './helpers';
+
+const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -103,6 +102,11 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Azure service principal client secret
      */
     azureClientSecret?: string,
+
+    /**
+     * GCS credentials JSON content
+     */
+    gcsCredentials?: string,
   };
 
 type ShowTableRow = {
@@ -132,7 +136,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Show warning message flag.
    */
-  private showSparkProtocolWarn: boolean;
+  private readonly showSparkProtocolWarn: boolean;
 
   /**
    * Driver Configuration.
@@ -186,20 +190,20 @@ export class DatabricksDriver extends JDBCDriver {
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
     }
 
+    const [uid, pwd, cleanedUrl] = extractAndRemoveUidPwdFromJdbcUrl(url);
+
     const config: DatabricksDriverConfiguration = {
       ...conf,
-      url,
+      url: cleanedUrl,
       dbType: 'databricks',
       drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
-        UID: extractUidFromJdbcUrl(url),
-        // PWD-parameter passed to the connection string has higher priority,
-        // so we can set this one to an empty string to avoid a Java error.
+        UID: uid,
         PWD:
           conf?.token ||
           getEnv('databrickToken', { dataSource }) ||
-          '',
+          pwd,
         UserAgentEntry: 'CubeDev_Cube',
       },
       catalog:
@@ -209,7 +213,7 @@ export class DatabricksDriver extends JDBCDriver {
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: ['s3', 'azure'], dataSource }),
+        getEnv('dbExportBucketType', { supported: SUPPORTED_BUCKET_TYPES, dataSource }),
       exportBucket:
         conf?.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -246,6 +250,10 @@ export class DatabricksDriver extends JDBCDriver {
       azureClientSecret:
         conf?.azureClientSecret ||
         getEnv('dbExportBucketAzureClientSecret', { dataSource }),
+      // GCS credentials
+      gcsCredentials:
+        conf?.gcsCredentials ||
+        getEnv('dbExportGCSCredentials', { dataSource }),
     };
     if (config.readOnly === undefined) {
       // we can set readonly to true if there is no bucket config provided
@@ -429,8 +437,7 @@ export class DatabricksDriver extends JDBCDriver {
         metadata[database] = {};
       }
 
-      const columns = await this.tableColumnTypes(`${database}.${tableName}`);
-      metadata[database][tableName] = columns;
+      metadata[database][tableName] = await this.tableColumnTypes(`${database}.${tableName}`);
     }));
 
     return metadata;
@@ -527,7 +534,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns table columns types.
    */
   public override async tableColumnTypes(table: string): Promise<TableColumn[]> {
-    let tableFullName = '';
+    let tableFullName: string;
     const tableArray = table.split('.');
 
     if (tableArray.length === 3) {
@@ -643,7 +650,7 @@ export class DatabricksDriver extends JDBCDriver {
    * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions) {
-    if (!['azure', 's3'].includes(this.config.bucketType as string)) {
+    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.bucketType as string)) {
       throw new Error(`Unsupported export bucket type: ${
         this.config.bucketType
       }`);
@@ -703,6 +710,9 @@ export class DatabricksDriver extends JDBCDriver {
     // wasbs://real-container-name@account.blob.core.windows.net
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
+    const prefix = url.pathname.slice(1);
+    const delimiter = (prefix && !prefix.endsWith('/')) ? '/' : '';
+    const objectSearchPrefix = `${prefix}${delimiter}${tableName}`;
 
     if (this.config.bucketType === 'azure') {
       const {
@@ -716,7 +726,7 @@ export class DatabricksDriver extends JDBCDriver {
         // Databricks uses different bucket address form, so we need to transform it
         // to the one understandable by extractFilesFromAzure implementation
         `${url.host}/${url.username}`,
-        tableName,
+        objectSearchPrefix,
       );
     } else if (this.config.bucketType === 's3') {
       return this.extractUnloadedFilesFromS3(
@@ -728,7 +738,13 @@ export class DatabricksDriver extends JDBCDriver {
           region: this.config.awsRegion || '',
         },
         url.host,
-        tableName,
+        objectSearchPrefix,
+      );
+    } else if (this.config.bucketType === 'gcs') {
+      return this.extractFilesFromGCS(
+        { credentials: this.config.gcsCredentials },
+        url.host,
+        objectSearchPrefix,
       );
     } else {
       throw new Error(`Unsupported export bucket type: ${
@@ -756,16 +772,22 @@ export class DatabricksDriver extends JDBCDriver {
    *
    * For Azure blob storage you need to configure account access key in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly)
+   * https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly
    *
    * `fs.azure.account.key.<storage-account-name>.blob.core.windows.net <storage-account-access-key>`
    *
    * For S3 bucket storage you need to configure AWS access key and secret in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly)
+   * https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly
    *
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
+   *
+   * For Google cloud storage you can configure storage credentials and create an external location to access it
+   * or configure account service key (legacy)
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/storage-credentials
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/external-locations
+   * https://docs.databricks.com/aws/en/connect/storage/gcs
    */
   private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[], columns: ColumnInfo[]) {
     let select = sql;
@@ -777,15 +799,15 @@ export class DatabricksDriver extends JDBCDriver {
     try {
       await this.query(
         `
-        CREATE TABLE ${tableFullName}
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        CREATE TABLE ${tableFullName}_tmp
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
         OPTIONS (escape = '"')
         AS (${select});
         `,
         params,
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${tableFullName};`, []);
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
     }
   }
 
@@ -795,30 +817,36 @@ export class DatabricksDriver extends JDBCDriver {
    *
    * For Azure blob storage you need to configure account access key in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly)
+   * https://docs.databricks.com/data/data-sources/azure/azure-storage.html#access-azure-blob-storage-directly
    *
    * `fs.azure.account.key.<storage-account-name>.blob.core.windows.net <storage-account-access-key>`
    *
    * For S3 bucket storage you need to configure AWS access key and secret in
    * Cluster -> Configuration -> Advanced options
-   * (https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly)
+   * https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-directly
    *
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
+   *
+   * For Google cloud storage you can configure storage credentials and create an external location to access it
+   * or configure account service key (legacy)
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/storage-credentials
+   * https://docs.databricks.com/gcp/en/connect/unity-catalog/cloud-storage/external-locations
+   * https://docs.databricks.com/aws/en/connect/storage/gcs
    */
   private async createExternalTableFromTable(tableFullName: string, columns: ColumnInfo[]) {
     try {
       await this.query(
         `
-        CREATE TABLE _${tableFullName}
-        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        CREATE TABLE ${tableFullName}_tmp
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}'
         OPTIONS (escape = '"')
         AS SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
         `,
         [],
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS _${tableFullName};`, []);
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName}_tmp;`, []);
     }
   }
 }

@@ -8,20 +8,40 @@ use super::{
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    timezone: Tz,
     /* (type, name) */
     members: HashMap<(String, String), Rc<MemberSymbol>>,
 }
 
 impl Compiler {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>, timezone: Tz) -> Self {
         Self {
             cube_evaluator,
+            timezone,
             members: HashMap::new(),
+        }
+    }
+
+    pub fn add_auto_resolved_member_evaluator(
+        &mut self,
+        name: String,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let path = name.split(".").map(|s| s.to_string()).collect::<Vec<_>>();
+        if self.cube_evaluator.is_measure(path.clone())? {
+            Ok(self.add_measure_evaluator(name)?)
+        } else if self.cube_evaluator.is_dimension(path.clone())? {
+            Ok(self.add_dimension_evaluator(name)?)
+        } else {
+            Err(CubeError::internal(format!(
+                "Cannot resolve evaluator of member {}. Only dimensions and measures can be autoresolved",
+                name
+            )))
         }
     }
 
@@ -94,7 +114,8 @@ impl Compiler {
         cube_name: &String,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
+        let dep_builder =
+            DependenciesBuilder::new(self, self.cube_evaluator.clone(), self.timezone.clone());
         let deps = dep_builder.build(cube_name.clone(), member_sql.clone())?;
         let sql_call = SqlCall::new(member_sql, deps);
         Ok(Rc::new(sql_call))

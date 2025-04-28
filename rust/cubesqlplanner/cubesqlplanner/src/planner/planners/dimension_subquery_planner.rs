@@ -1,11 +1,11 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::plan::{Expr, FilterItem, JoinBuilder, JoinCondition, QualifiedColumnName};
+use crate::logical_plan::DimensionSubQuery;
+use crate::plan::{FilterItem, QualifiedColumnName};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::collect_sub_query_dimensions;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, BaseMember};
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -51,44 +51,24 @@ impl DimensionSubqueryPlanner {
         })
     }
 
-    pub fn add_joins_for_cube(
+    pub fn plan_queries(
         &self,
-        builder: &mut JoinBuilder,
-        cube_name: &String,
-    ) -> Result<(), CubeError> {
-        if let Some(sub_query_dims) = self.sub_query_dims.get(cube_name) {
-            let primary_keys_dimensions = self.utils.primary_keys_dimensions(cube_name)?;
-            for dim in sub_query_dims.iter() {
-                self.add_join_impl(builder, cube_name, &primary_keys_dimensions, dim.clone())?
-            }
+        dimensions: &Vec<Rc<BaseDimension>>,
+    ) -> Result<Vec<Rc<DimensionSubQuery>>, CubeError> {
+        let mut result = Vec::new();
+        for subquery_dimension in dimensions.iter() {
+            result.push(self.plan_query(subquery_dimension.clone())?)
         }
-        Ok(())
+        Ok(result)
     }
 
-    pub fn add_join(
+    fn plan_query(
         &self,
-        builder: &mut JoinBuilder,
         subquery_dimension: Rc<BaseDimension>,
-    ) -> Result<(), CubeError> {
-        let cube_name = subquery_dimension.cube_name();
-        let primary_keys_dimensions = self.utils.primary_keys_dimensions(cube_name)?;
-        self.add_join_impl(
-            builder,
-            cube_name,
-            &primary_keys_dimensions,
-            subquery_dimension.clone(),
-        )
-    }
-
-    fn add_join_impl(
-        &self,
-        builder: &mut JoinBuilder,
-        cube_name: &String,
-        primary_keys_dimensions: &Vec<Rc<BaseDimension>>,
-        subquery_dimension: Rc<BaseDimension>,
-    ) -> Result<(), CubeError> {
+    ) -> Result<Rc<DimensionSubQuery>, CubeError> {
         let dim_name = subquery_dimension.name();
-        let dim_full_name = subquery_dimension.full_name();
+        let cube_name = subquery_dimension.cube_name().clone();
+        let primary_keys_dimensions = self.utils.primary_keys_dimensions(&cube_name)?;
         let expression = subquery_dimension.sql_call()?;
         let measure = BaseMeasure::try_new_from_expression(
             expression,
@@ -113,11 +93,12 @@ impl DimensionSubqueryPlanner {
 
         let sub_query_properties = QueryProperties::try_new_from_precompiled(
             self.query_tools.clone(),
-            vec![measure], //measures,
+            vec![measure.clone()], //measures,
             primary_keys_dimensions.clone(),
             vec![],
             time_dimensions_filters,
             dimensions_filters,
+            vec![],
             vec![],
             vec![],
             None,
@@ -127,41 +108,16 @@ impl DimensionSubqueryPlanner {
         )?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan()?;
-        let sub_query_alias = format!("{cube_name}_{dim_name}_subquery");
-
-        let conditions = primary_keys_dimensions
-            .iter()
-            .map(|dim| {
-                let dim = dim.clone().as_base_member();
-                let alias_in_sub_query = sub_query.schema().resolve_member_alias(&dim);
-                let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
-                    Some(sub_query_alias.clone()),
-                    alias_in_sub_query.clone(),
-                ));
-
-                vec![(sub_query_ref, Expr::new_member(dim))]
-            })
-            .collect_vec();
-
-        if let Some(dim_ref) = sub_query.schema().resolve_member_reference(&dim_full_name) {
-            let qualified_column_name =
-                QualifiedColumnName::new(Some(sub_query_alias.clone()), dim_ref);
-            self.dimensions_refs
-                .borrow_mut()
-                .insert(dim_full_name.clone(), qualified_column_name);
-        } else {
-            return Err(CubeError::internal(format!(
-                "Can't find source for subquery dimension {}",
-                dim_name
-            )));
-        }
-
-        builder.left_join_subselect(
-            sub_query,
-            sub_query_alias,
-            JoinCondition::new_dimension_join(conditions, false),
-        );
-        Ok(())
+        let result = Rc::new(DimensionSubQuery {
+            query: sub_query,
+            primary_keys_dimensions: primary_keys_dimensions
+                .into_iter()
+                .map(|d| d.member_evaluator())
+                .collect(),
+            subquery_dimension: subquery_dimension.member_evaluator(),
+            measure_for_subquery_dimension: measure.member_evaluator().clone(),
+        });
+        Ok(result)
     }
 
     fn extract_filters_without_subqueries(
@@ -189,6 +145,9 @@ impl DimensionSubqueryPlanner {
                 Ok(true)
             }
             FilterItem::Item(filter_item) => {
+                Ok(collect_sub_query_dimensions(&filter_item.member_evaluator())?.is_empty())
+            }
+            FilterItem::Segment(filter_item) => {
                 Ok(collect_sub_query_dimensions(&filter_item.member_evaluator())?.is_empty())
             }
         }

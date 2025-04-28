@@ -2,12 +2,13 @@ import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
 class HttpTransport {
-  constructor({ authorization, apiUrl, method, headers = {}, credentials }) {
+  constructor({ authorization, apiUrl, method, headers = {}, credentials, fetchTimeout }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.method = method;
     this.headers = headers;
     this.credentials = credentials;
+    this.fetchTimeout = fetchTimeout;
   }
 
   request(method, { baseRequestId, ...params }) {
@@ -36,7 +37,8 @@ class HttpTransport {
         ...this.headers
       },
       credentials: this.credentials,
-      body: requestMethod === 'POST' ? JSON.stringify(params) : null
+      body: requestMethod === 'POST' ? JSON.stringify(params) : null,
+      signal: this.fetchTimeout ? AbortSignal.timeout(this.fetchTimeout) : undefined,
     });
 
     return {

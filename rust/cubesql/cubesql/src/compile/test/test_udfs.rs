@@ -1279,3 +1279,34 @@ async fn test_redshift_charindex() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_extension_udf_xirr() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "extension_udf_xirr",
+        // XIRR result may differ between runs, so we truncate the result
+        execute_query(
+            r#"
+            SELECT LEFT(XIRR(payment, date)::text, 10) AS xirr
+            FROM (
+                SELECT '2014-01-01'::date AS date, -10000.0 AS payment
+                UNION ALL
+                SELECT '2014-03-01'::date AS date, 2750.0 AS payment
+                UNION ALL
+                SELECT '2014-10-30'::date AS date, 4250.0 AS payment
+                UNION ALL
+                SELECT '2015-02-15'::date AS date, 3250.0 AS payment
+                UNION ALL
+                SELECT '2015-04-01'::date AS date, 2750.0 AS payment
+            ) AS "t"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}

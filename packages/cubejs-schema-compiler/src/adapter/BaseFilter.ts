@@ -394,10 +394,10 @@ export class BaseFilter extends BaseDimension {
       } else {
         throw new Error(`Unsupported timestamp precision: ${this.query.timestampPrecision()}`);
       }
-    }
 
-    if (date && date.match(dateRegex)) {
-      return `${date}T00:00:00.${'0'.repeat(this.query.timestampPrecision())}`;
+      if (date.match(dateRegex)) {
+        return `${date}T00:00:00.${'0'.repeat(this.query.timestampPrecision())}`;
+      }
     }
 
     if (!date) {
@@ -434,10 +434,10 @@ export class BaseFilter extends BaseDimension {
       } else {
         throw new Error(`Unsupported timestamp precision: ${this.query.timestampPrecision()}`);
       }
-    }
 
-    if (date && date.match(dateRegex)) {
-      return `${date}T23:59:59.${'9'.repeat(this.query.timestampPrecision())}`;
+      if (date.match(dateRegex)) {
+        return `${date}T23:59:59.${'9'.repeat(this.query.timestampPrecision())}`;
+      }
     }
 
     if (!date) {

@@ -1,5 +1,7 @@
+import crypto from 'crypto';
 import vm from 'vm';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import syntaxCheck from 'syntax-error';
 import { parse } from '@babel/parser';
@@ -19,6 +21,21 @@ const NATIVE_IS_SUPPORTED = isNativeSupported();
 const moduleFileCache = {};
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
+
+const getThreadsCount = () => {
+  const envThreads = getEnv('transpilationWorkerThreadsCount');
+  if (envThreads > 0) {
+    return envThreads;
+  }
+
+  const cpuCount = os.cpus()?.length;
+  if (cpuCount) {
+    // there's no practical boost above 5 threads even if you have more cores.
+    return Math.min(Math.max(1, cpuCount - 1), 5);
+  }
+
+  return 3; // Default (like the workerpool do)
+};
 
 export class DataSchemaCompiler {
   constructor(repository, options = {}) {
@@ -47,6 +64,7 @@ export class DataSchemaCompiler {
     this.pythonContext = null;
     this.workerPool = null;
     this.compilerId = options.compilerId;
+    this.compiledScriptCache = options.compiledScriptCache;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -98,6 +116,7 @@ export class DataSchemaCompiler {
 
     const transpilationWorkerThreads = getEnv('transpilationWorkerThreads');
     const transpilationNative = getEnv('transpilationNative');
+    const transpilationNativeThreadsCount = getThreadsCount();
     const { compilerId } = this;
 
     if (!transpilationNative && transpilationWorkerThreads) {
@@ -108,7 +127,11 @@ export class DataSchemaCompiler {
       );
     }
 
-    const transpile = async () => {
+    /**
+     * @param stage Number
+     * @returns {Promise<*>}
+     */
+    const transpile = async (stage) => {
       let cubeNames;
       let cubeSymbols;
       let transpilerNames;
@@ -143,9 +166,32 @@ export class DataSchemaCompiler {
           content: ';',
         };
 
-        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId });
+        await this.transpileJsFile(dummyFile, errorsReport, { cubeNames, cubeSymbols, transpilerNames, contextSymbols: CONTEXT_SYMBOLS, compilerId, stage });
 
-        results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId })));
+        const nonJsFilesTasks = toCompile.filter(file => !file.fileName.endsWith('.js'))
+          .map(f => this.transpileFile(f, errorsReport, { transpilerNames, compilerId }));
+
+        const jsFiles = toCompile.filter(file => file.fileName.endsWith('.js'));
+        let JsFilesTasks = [];
+
+        if (jsFiles.length > 0) {
+          let jsChunks;
+          if (jsFiles.length < transpilationNativeThreadsCount * transpilationNativeThreadsCount) {
+            jsChunks = [jsFiles];
+          } else {
+            const baseSize = Math.floor(jsFiles.length / transpilationNativeThreadsCount);
+            jsChunks = [];
+            for (let i = 0; i < transpilationNativeThreadsCount; i++) {
+              // For the last part, we take the remaining files so we don't lose the extra ones.
+              const start = i * baseSize;
+              const end = (i === transpilationNativeThreadsCount - 1) ? jsFiles.length : start + baseSize;
+              jsChunks.push(jsFiles.slice(start, end));
+            }
+          }
+          JsFilesTasks = jsChunks.map(chunk => this.transpileJsFilesBulk(chunk, errorsReport, { transpilerNames, compilerId }));
+        }
+
+        results = (await Promise.all([...nonJsFilesTasks, ...JsFilesTasks])).flat();
       } else if (transpilationWorkerThreads) {
         results = await Promise.all(toCompile.map(f => this.transpileFile(f, errorsReport, { cubeNames, cubeSymbols, transpilerNames })));
       } else {
@@ -155,17 +201,17 @@ export class DataSchemaCompiler {
       return results.filter(f => !!f);
     };
 
-    const compilePhase = async (compilers) => this.compileCubeFiles(compilers, await transpile(), errorsReport);
+    const compilePhase = async (compilers, stage) => this.compileCubeFiles(compilers, await transpile(stage), errorsReport);
 
-    return compilePhase({ cubeCompilers: this.cubeNameCompilers })
-      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }))
+    return compilePhase({ cubeCompilers: this.cubeNameCompilers }, 0)
+      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers.concat([this.viewCompilationGate]) }, 1))
       .then(() => (this.viewCompilationGate.shouldCompileViews() ?
-        compilePhase({ cubeCompilers: this.viewCompilers })
+        compilePhase({ cubeCompilers: this.viewCompilers }, 2)
         : Promise.resolve()))
       .then(() => compilePhase({
         cubeCompilers: this.cubeCompilers,
         contextCompilers: this.contextCompilers,
-      }))
+      }, 3))
       .then(() => {
         if (transpilationNative) {
           // Clean up cache
@@ -177,7 +223,7 @@ export class DataSchemaCompiler {
           return this.transpileJsFile(
             dummyFile,
             errorsReport,
-            { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId }
+            { cubeNames: [], cubeSymbols: {}, transpilerNames: [], contextSymbols: {}, compilerId: this.compilerId, stage: 0 }
           );
         } else if (transpilationWorkerThreads && this.workerPool) {
           this.workerPool.terminate();
@@ -201,8 +247,8 @@ export class DataSchemaCompiler {
   }
 
   async transpileFile(file, errorsReport, options) {
-    if (R.endsWith('.jinja', file.fileName) ||
-      (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName))
+    if (file.fileName.endsWith('.jinja') ||
+      (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml'))
       // TODO do Jinja syntax check with jinja compiler
       && file.content.match(JINJA_SYNTAX)
     ) {
@@ -216,20 +262,59 @@ export class DataSchemaCompiler {
       this.yamlCompiler.getJinjaEngine().loadTemplate(file.fileName, file.content);
 
       return file;
-    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       return file;
-    } else if (R.endsWith('.js', file.fileName)) {
+    } else if (file.fileName.endsWith('.js')) {
       return this.transpileJsFile(file, errorsReport, options);
     } else {
       return file;
     }
   }
 
-  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId }) {
+  /**
+   * Right now it is used only for transpilation in native,
+   * so no checks for transpilation type inside this method
+   */
+  async transpileJsFilesBulk(files, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }) {
+    // for bulk processing this data may be optimized even more by passing transpilerNames, compilerId only once for a bulk
+    // but this requires more complex logic to be implemented in the native side.
+    // And comparing to the file content sizes, a few bytes of JSON data is not a big deal here
+    const reqDataArr = files.map(file => ({
+      fileName: file.fileName,
+      fileContent: file.content,
+      transpilers: transpilerNames,
+      compilerId,
+      ...(cubeNames && {
+        metaData: {
+          cubeNames,
+          cubeSymbols,
+          contextSymbols,
+          stage
+        },
+      }),
+    }));
+    const res = await transpileJs(reqDataArr);
+
+    return files.map((file, index) => {
+      errorsReport.inFile(file);
+      if (!res[index]) { // This should not happen in theory but just to be safe
+        errorsReport.error(`No transpilation result received for the file ${file.fileName}.`);
+        return undefined;
+      }
+      errorsReport.addErrors(res[index].errors);
+      errorsReport.addWarnings(res[index].warnings);
+      errorsReport.exitFile();
+
+      return { ...file, content: res[index].code };
+    });
+  }
+
+  async transpileJsFile(file, errorsReport, { cubeNames, cubeSymbols, contextSymbols, transpilerNames, compilerId, stage }) {
     try {
       if (getEnv('transpilationNative')) {
         const reqData = {
           fileName: file.fileName,
+          fileContent: file.content,
           transpilers: transpilerNames,
           compilerId,
           ...(cubeNames && {
@@ -237,17 +322,18 @@ export class DataSchemaCompiler {
               cubeNames,
               cubeSymbols,
               contextSymbols,
+              stage
             },
           }),
         };
 
         errorsReport.inFile(file);
-        const res = await transpileJs(file.content, reqData);
-        errorsReport.addErrors(res.errors);
-        errorsReport.addWarnings(res.warnings);
+        const res = await transpileJs([reqData]);
+        errorsReport.addErrors(res[0].errors);
+        errorsReport.addWarnings(res[0].warnings);
         errorsReport.exitFile();
 
-        return Object.assign({}, file, { content: res.code });
+        return { ...file, content: res[0].code };
       } else if (getEnv('transpilationWorkerThreads')) {
         const data = {
           fileName: file.fileName,
@@ -261,7 +347,7 @@ export class DataSchemaCompiler {
         errorsReport.addErrors(res.errors);
         errorsReport.addWarnings(res.warnings);
 
-        return Object.assign({}, file, { content: res.content });
+        return { ...file, content: res.content };
       } else {
         const ast = parse(
           file.content,
@@ -279,7 +365,7 @@ export class DataSchemaCompiler {
         errorsReport.exitFile();
 
         const content = babelGenerator(ast, {}, file.content).code;
-        return Object.assign({}, file, { content });
+        return { ...file, content };
       }
     } catch (e) {
       if (e.toString().indexOf('SyntaxError') !== -1) {
@@ -337,7 +423,7 @@ export class DataSchemaCompiler {
   }
 
   compileFile(
-    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules
+    file, errorsReport, cubes, exports, contexts, toCompile, compiledFiles, asyncModules, { doSyntaxCheck } = { doSyntaxCheck: false }
   ) {
     if (compiledFiles[file.fileName]) {
       return;
@@ -345,11 +431,11 @@ export class DataSchemaCompiler {
 
     compiledFiles[file.fileName] = true;
 
-    if (R.endsWith('.js', file.fileName)) {
-      this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
-    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName) ||
+    if (file.fileName.endsWith('.js')) {
+      this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck });
+    } else if (file.fileName.endsWith('.yml.jinja') || file.fileName.endsWith('.yaml.jinja') ||
       (
-        R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)
+        file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')
         // TODO do Jinja syntax check with jinja compiler
       ) && file.content.match(JINJA_SYNTAX)
     ) {
@@ -365,31 +451,50 @@ export class DataSchemaCompiler {
         this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
         this.pythonContext
       ));
-    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    } else if (file.fileName.endsWith('.yml') || file.fileName.endsWith('.yaml')) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }
   }
 
-  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
-    const err = syntaxCheck(file.content, file.fileName);
-    if (err) {
-      errorsReport.error(err.toString());
+  getJsScript(file) {
+    const cacheKey = crypto.createHash('md5').update(JSON.stringify(file.content)).digest('hex');
+
+    if (this.compiledScriptCache.has(cacheKey)) {
+      return this.compiledScriptCache.get(cacheKey);
+    }
+
+    const script = new vm.Script(file.content, { filename: file.fileName, timeout: 15000 });
+    this.compiledScriptCache.set(cacheKey, script);
+    return script;
+  }
+
+  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, { doSyntaxCheck } = { doSyntaxCheck: false }) {
+    if (doSyntaxCheck) {
+      // There is no need to run syntax check for data model files
+      // because they were checked during transpilation/transformation phase
+      // Only external files (included modules) might need syntax check
+      const err = syntaxCheck(file.content, file.fileName);
+      if (err) {
+        errorsReport.error(err.toString());
+      }
     }
 
     try {
-      vm.runInNewContext(file.content, {
+      const script = this.getJsScript(file);
+
+      script.runInNewContext({
         view: (name, cube) => (
           !cube ?
             this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
-            cubes.push(Object.assign({}, cube, { name, fileName: file.fileName, isView: true }))
+            cubes.push({ ...cube, name, fileName: file.fileName, isView: true })
         ),
         cube:
           (name, cube) => (
             !cube ?
               this.cubeFactory({ ...name, fileName: file.fileName }) :
-              cubes.push(Object.assign({}, cube, { name, fileName: file.fileName }))
+              cubes.push({ ...cube, name, fileName: file.fileName })
           ),
-        context: (name, context) => contexts.push(Object.assign({}, context, { name, fileName: file.fileName })),
+        context: (name, context) => contexts.push({ ...context, name, fileName: file.fileName }),
         addExport: (obj) => {
           exports[file.fileName] = exports[file.fileName] || {};
           exports[file.fileName] = Object.assign(exports[file.fileName], obj);
@@ -424,6 +529,8 @@ export class DataSchemaCompiler {
               contexts,
               toCompile,
               compiledFiles,
+              [],
+              { doSyntaxCheck: true }
             );
             exports[foundFile.fileName] = exports[foundFile.fileName] || {};
             return exports[foundFile.fileName];
@@ -469,7 +576,7 @@ export class DataSchemaCompiler {
       path.resolve('node_modules', path.dirname(currentFile.fileName), modulePath) :
       path.resolve('node_modules', modulePath);
 
-    if (absPath.indexOf(nodeModulesPath) !== 0) {
+    if (!absPath.startsWith(nodeModulesPath)) {
       if (this.allowNodeRequire) {
         return null;
       }

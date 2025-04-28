@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
-import { prepareCompiler } from '../../unit/PrepareCompiler';
+import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { MSSqlDbRunner } from './MSSqlDbRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
 
@@ -13,7 +13,7 @@ describe('MSSqlPreAggregations', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from ##visitors
@@ -175,7 +175,7 @@ describe('MSSqlPreAggregations', () => {
     })
     `);
 
-  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+  const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
   function replaceTableName(query, preAggregation, suffix) {
     const [toReplace, params] = query;
@@ -276,7 +276,7 @@ describe('MSSqlPreAggregations', () => {
 
       expect(preAggregationsDescription[0].invalidateKeyQueries[0][0].replace(/(\r\n|\n|\r)/gm, '')
         .replace(/\s+/g, ' '))
-        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIMEOFFSET)) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END');
+        .toMatch('SELECT CASE WHEN CURRENT_TIMESTAMP < DATEADD(day, 7, CAST(@_1 AS DATETIMEOFFSET)) THEN FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END');
 
       return dbRunner
         .evaluateQueryWithPreAggregations(query)

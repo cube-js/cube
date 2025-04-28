@@ -1,10 +1,11 @@
 import moment from 'moment-timezone';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError, CubeStoreQuery } from '../../src';
-import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import {
   createCubeSchema,
-  createCubeSchemaWithCustomGranularities,
+  createCubeSchemaWithCustomGranularitiesAndTimeShift,
   createCubeSchemaYaml,
+  createECommerceSchema,
   createJoinedCubesSchema,
   createSchemaYaml,
   createSchemaYamlForGroupFilterParamsTests
@@ -33,7 +34,7 @@ describe('SQL Generation', () => {
   });
 
   describe('Common - JS - syntax sugar', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         sqlTable: 'card_tbl'
@@ -360,11 +361,67 @@ describe('SQL Generation', () => {
       const expectedParams = ['type_value', 'not_type_value', '3'];
       expect(queryAndParams[1]).toEqual(expectedParams);
     });
+
+    it('Simple query - order by for query with filtered timeDimension', async () => {
+      const compilersLocal = prepareYamlCompiler(
+        createSchemaYaml(createECommerceSchema())
+      );
+
+      await compilersLocal.compiler.compile();
+
+      let query = new PostgresQuery(compilersLocal, {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.updated_at',
+            granularity: 'week'
+          },
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2016-01-01',
+              '2018-01-01'
+            ]
+          },
+        ],
+        order: [{ id: 'orders.updated_at', desc: false }],
+      });
+
+      let queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0].includes('ORDER BY 1')).toBeTruthy();
+
+      // The order of time dimensions should have no effect on the `ORDER BY` clause
+
+      query = new PostgresQuery(compilersLocal, {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2016-01-01',
+              '2018-01-01'
+            ]
+          },
+          {
+            dimension: 'orders.updated_at',
+            granularity: 'week'
+          }
+        ],
+        order: [{ id: 'orders.updated_at', desc: false }],
+      });
+
+      queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0].includes('ORDER BY 1')).toBeTruthy();
+    });
   });
 
   describe('Custom granularities', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
-      createCubeSchemaWithCustomGranularities('orders')
+    const compilers = /** @type Compilers */ prepareJsCompiler(
+      createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
     );
 
     const granularityQueries = [
@@ -876,7 +933,7 @@ describe('SQL Generation', () => {
   });
 
   describe('Base joins', () => {
-    const compilers = /** @type Compilers */ prepareCompiler([
+    const compilers = /** @type Compilers */ prepareJsCompiler([
       createCubeSchema({
         name: 'cardsA',
         sqlTable: 'card_tbl',
@@ -944,7 +1001,7 @@ describe('SQL Generation', () => {
     });
   });
   describe('Common - JS', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1126,7 +1183,7 @@ describe('SQL Generation', () => {
       const utcOffset = moment.tz('America/Los_Angeles').utcOffset() * 60;
       expect(query.everyRefreshKeySql({
         every: '1 hour'
-      })).toEqual(['FLOOR((EXTRACT(EPOCH FROM NOW())) / 3600)', false, expect.any(BaseQuery)]);
+      })).toEqual(['FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 3600)', false, expect.any(BaseQuery)]);
 
       // Standard syntax (minutes hours day month dow)
       expect(query.everyRefreshKeySql({ every: '0 * * * *', timezone }))
@@ -1167,7 +1224,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey from schema', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1233,7 +1290,7 @@ describe('SQL Generation', () => {
       expect(query.cacheKeyQueries()).toEqual([
         [
           // Postgres dialect
-          'SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
+          'SELECT FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
           [],
           {
             // false, because there is no externalQueryClass
@@ -1254,7 +1311,7 @@ describe('SQL Generation', () => {
         ],
         timeDimensions: [],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone: 'Europe/London',
         externalQueryClass: MssqlQuery
       });
 
@@ -1262,7 +1319,7 @@ describe('SQL Generation', () => {
       expect(query.cacheKeyQueries()).toEqual([
         [
           // MSSQL dialect, because externalQueryClass
-          'SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
+          'SELECT FLOOR((3600 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
           [],
           {
             // true, because externalQueryClass
@@ -1295,7 +1352,7 @@ describe('SQL Generation', () => {
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
           // MSSQL dialect
-          'SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) as refresh_key',
+          'SELECT FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) as refresh_key',
           [],
           {
             external: true,
@@ -1348,7 +1405,7 @@ describe('SQL Generation', () => {
           dateRange: ['2016-12-30', '2017-01-05']
         }],
         filters: [],
-        timezone: 'America/Los_Angeles',
+        timezone: 'Asia/Tokyo',
         externalQueryClass: MssqlQuery
       });
 
@@ -1356,7 +1413,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
+          'SELECT CASE\n    WHEN CURRENT_TIMESTAMP < CAST(@_1 AS DATETIMEOFFSET) THEN FLOOR((32400 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 3600) END as refresh_key',
           [
             '__TO_PARTITION_RANGE',
           ],
@@ -1373,7 +1430,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey only cube (immutable)', () => {
-    /** @type Compilers */ prepareCompiler(
+    /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1397,7 +1454,7 @@ describe('SQL Generation', () => {
   });
 
   describe('refreshKey only cube (every)', () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1439,7 +1496,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT FLOOR((EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
+          'SELECT FLOOR((-25200 + EXTRACT(EPOCH FROM NOW())) / 600) as refresh_key',
           [],
           {
             external: false,
@@ -1470,7 +1527,7 @@ describe('SQL Generation', () => {
       expect(preAggregations.length).toEqual(1);
       expect(preAggregations[0].invalidateKeyQueries).toEqual([
         [
-          'SELECT FLOOR((DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
+          'SELECT FLOOR((-25200 + DATEDIFF(SECOND,\'1970-01-01\', GETUTCDATE())) / 600) as refresh_key',
           [],
           {
             external: true,
@@ -1482,7 +1539,7 @@ describe('SQL Generation', () => {
   });
 
   it('refreshKey (sql + every) in cube', async () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: `
@@ -1531,7 +1588,7 @@ describe('SQL Generation', () => {
   });
 
   it('refreshKey (sql + every) in preAggregation', async () => {
-    const compilers = /** @type Compilers */ prepareCompiler(
+    const compilers = /** @type Compilers */ prepareJsCompiler(
       createCubeSchema({
         name: 'cards',
         refreshKey: '',
@@ -2274,7 +2331,7 @@ describe('SQL Generation', () => {
 
 describe('Class unit tests', () => {
   it('Test BaseQuery with unaliased cube', async () => {
-    const set = /** @type Compilers */ prepareCompiler(`
+    const set = /** @type Compilers */ prepareJsCompiler(`
       cube('CamelCaseCube', {
         sql: 'SELECT * FROM TABLE_NAME',
         measures: {
@@ -2321,7 +2378,7 @@ describe('Class unit tests', () => {
   });
 
   it('Test BaseQuery with aliased cube', async () => {
-    const set = /** @type Compilers */ prepareCompiler(`
+    const set = /** @type Compilers */ prepareJsCompiler(`
       cube('CamelCaseCube', {
         sql: 'SELECT * FROM TABLE_NAME',
         sqlAlias: 'T1',
@@ -2370,7 +2427,7 @@ describe('Class unit tests', () => {
   });
 
   it('Test BaseQuery columns order for the query with the sub-query', async () => {
-    const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+    const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();
     await joinedSchemaCompilers.compiler.compile();
     const query = new BaseQuery({

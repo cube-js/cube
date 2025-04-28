@@ -11,7 +11,6 @@ use crate::plan::FilterItem;
 use crate::planner::sql_evaluator::collectors::collect_join_hints;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
-use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -124,7 +123,7 @@ pub struct QueryTools {
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     evaluator_compiler: Rc<RefCell<Compiler>>,
     cached_data: RefCell<QueryToolsCachedData>,
-    timezone: Option<Tz>,
+    timezone: Tz,
 }
 
 impl QueryTools {
@@ -133,25 +132,30 @@ impl QueryTools {
         base_tools: Rc<dyn BaseTools>,
         join_graph: Rc<dyn JoinGraph>,
         timezone_name: Option<String>,
+        export_annotated_sql: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
-        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(cube_evaluator.clone())));
         let timezone = if let Some(timezone) = timezone_name {
-            Some(
-                timezone
-                    .parse::<Tz>()
-                    .map_err(|_| CubeError::user(format!("Incorrect timezone {}", timezone)))?,
-            )
+            timezone
+                .parse::<Tz>()
+                .map_err(|_| CubeError::user(format!("Incorrect timezone {}", timezone)))?
         } else {
-            None
+            Tz::UTC
         };
+        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
+            cube_evaluator.clone(),
+            timezone.clone(),
+        )));
         let sql_templates = PlanSqlTemplates::new(templates_render.clone());
         Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
             join_graph,
             templates_render,
-            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(sql_templates))),
+            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(
+                sql_templates,
+                export_annotated_sql,
+            ))),
             evaluator_compiler,
             cached_data: RefCell::new(QueryToolsCachedData::new()),
             timezone,
@@ -170,8 +174,8 @@ impl QueryTools {
         &self.join_graph
     }
 
-    pub fn timezone(&self) -> &Option<Tz> {
-        &self.timezone
+    pub fn timezone(&self) -> Tz {
+        self.timezone
     }
 
     pub fn cached_data(&self) -> Ref<'_, QueryToolsCachedData> {
@@ -187,7 +191,7 @@ impl QueryTools {
     }
 
     pub fn alias_name(&self, name: &str) -> String {
-        name.to_case(Case::Snake).replace(".", "__")
+        PlanSqlTemplates::alias_name(name)
     }
 
     pub fn escaped_alias_name(&self, name: &str) -> String {

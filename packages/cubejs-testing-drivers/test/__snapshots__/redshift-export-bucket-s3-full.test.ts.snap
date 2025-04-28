@@ -11190,6 +11190,71 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying BigECommerce: rolling window by 2 month 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "2",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "3",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "12",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "7",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "6",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "10",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "13",
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": "16",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying BigECommerce: rolling window by 2 week 1`] = `
 Array [
   Object {
@@ -15611,6 +15676,502 @@ Array [
     "ECommerce.orderDate": "2021-01-01T00:00:00.000",
     "ECommerce.orderDate.half_year": "2021-01-01T00:00:00.000",
     "ECommerce.totalQuantity": "103",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying custom granularities ECommerce: count by half_year + dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.city": "Detroit",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Lorain",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Auburn",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Baltimore",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Columbus",
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Decatur",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Houston",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Los Angeles",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Louisville",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "New York City",
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Olympia",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Omaha",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Arlington",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Bakersfield",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Bowling",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Columbus",
+    "ECommerce.count": "9",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Dallas",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Detroit",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Glendale",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Lafayette",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Lakewood",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Marion",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Morristown",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "New York City",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Oakland",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Provo",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "San Francisco",
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Vancouver",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying custom granularities ECommerce: count by half_year + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-01-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "16",
+    "ECommerce.customOrderDateNoPreAgg": "2020-07-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2020-07-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "26",
+    "ECommerce.customOrderDateNoPreAgg": "2021-01-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year": "2021-01-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying custom granularities ECommerce: count by half_year_by_1st_april + dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.city": "Decatur",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Detroit",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Houston",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Lorain",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "New York City",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Arlington",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Auburn",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Bakersfield",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Baltimore",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Columbus",
+    "ECommerce.count": "4",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Detroit",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Lakewood",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Los Angeles",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Louisville",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Morristown",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "New York City",
+    "ECommerce.count": "3",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Olympia",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Omaha",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Provo",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "San Francisco",
+    "ECommerce.count": "2",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Vancouver",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Bowling",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Columbus",
+    "ECommerce.count": "8",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Dallas",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Glendale",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Lafayette",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Marion",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "New York City",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Oakland",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.count": "1",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension 1`] = `
+Array [
+  Object {
+    "ECommerce.count": "6",
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-04-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "22",
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2020-10-01T00:00:00.000",
+  },
+  Object {
+    "ECommerce.count": "16",
+    "ECommerce.customOrderDateNoPreAgg": "2021-04-01T00:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.half_year_by_1st_april": "2021-04-01T00:00:00.000",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading 1`] = `
+Array [
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "8",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "12",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "6",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "19",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": "16",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
+    "ECommerce.rollingCountByLeading": null,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/redshift-driver export-bucket-s3 querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing 1`] = `
+Array [
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
+    "ECommerce.rollingCountByTrailing": "3",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
+    "ECommerce.rollingCountByTrailing": "3",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
+    "ECommerce.rollingCountByTrailing": "12",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
+    "ECommerce.rollingCountByTrailing": null,
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
+    "ECommerce.rollingCountByTrailing": "10",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
+    "ECommerce.rollingCountByTrailing": "16",
+  },
+  Object {
+    "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
+    "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
+    "ECommerce.rollingCountByTrailing": null,
   },
 ]
 `;

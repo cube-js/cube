@@ -1,10 +1,10 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { prepareCompiler } from './PrepareCompiler';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('Extensions', () => {
   const {
     compiler, joinGraph, cubeEvaluator
-  } = prepareCompiler(`
+  } = prepareJsCompiler(`
     const Funnels = require('Funnels');
     import { dynRef } from 'Reflection';
 
@@ -49,7 +49,7 @@ describe('Extensions', () => {
 
     cube(\`FooBar\`, {
       extends: VisitorsFunnel,
-      
+
       measures: {
         conversionsFraction: {
           sql: dynRef('conversions', (c) => \`\${c} / 100.0\`),

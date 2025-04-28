@@ -11,6 +11,13 @@ use crate::{
 };
 
 pub trait LogicalPlanTestUtils {
+    fn try_expect_root_cube_scan(&self) -> Option<&CubeScanNode>;
+
+    fn expect_root_cube_scan(&self) -> &CubeScanNode {
+        self.try_expect_root_cube_scan()
+            .expect("Root node is not CubeScan")
+    }
+
     fn find_cube_scan(&self) -> CubeScanNode;
 
     fn find_cube_scan_wrapped_sql(&self) -> CubeScanWrappedSqlNode;
@@ -21,6 +28,13 @@ pub trait LogicalPlanTestUtils {
 }
 
 impl LogicalPlanTestUtils for LogicalPlan {
+    fn try_expect_root_cube_scan(&self) -> Option<&CubeScanNode> {
+        let LogicalPlan::Extension(ext) = self else {
+            return None;
+        };
+        ext.node.as_any().downcast_ref::<CubeScanNode>()
+    }
+
     fn find_cube_scan(&self) -> CubeScanNode {
         let cube_scans = find_cube_scans_deep_search(Arc::new(self.clone()), true);
         if cube_scans.len() != 1 {
