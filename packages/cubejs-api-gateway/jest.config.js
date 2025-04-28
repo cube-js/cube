@@ -4,7 +4,5 @@ const base = require('../../jest.base.config');
 module.exports = {
   ...base,
   rootDir: '.',
-  setupFilesAfterEnv: [
-    '<rootDir>/dist/test/setup.js'
-  ],
+  snapshotResolver: '<rootDir>/test/snapshotResolver.js',
 };

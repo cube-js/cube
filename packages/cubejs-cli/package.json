@@ -65,26 +65,6 @@
     "jest": "^29",
     "typescript": "~5.2.2"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "collectCoverage": true,
-    "coverageReporters": [
-      "text",
-      "html",
-      "lcov"
-    ],
-    "coverageDirectory": "coverage/",
-    "collectCoverageFrom": [
-      "dist/src/**/*.js",
-      "dist/src/**/*.ts"
-    ],
-    "coveragePathIgnorePatterns": [
-      ".*\\.d\\.ts"
-    ],
-    "moduleNameMapper": {
-      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js"
-    }
-  },
   "license": "Apache-2.0",
   "eslintConfig": {
     "extends": "../cubejs-linter"

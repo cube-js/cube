@@ -36,22 +36,6 @@
     "eslint-plugin-node": "^10.0.0",
     "jest": "^29"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "collectCoverage": true,
-    "coverageReporters": [
-      "text",
-      "html",
-      "lcov"
-    ],
-    "coverageDirectory": "coverage/",
-    "transform": {
-      "^.+\\.js$": "babel-jest"
-    },
-    "moduleNameMapper": {
-      "^uuid$": "<rootDir>/../../node_modules/uuid/dist/index.js"
-    }
-  },
   "publishConfig": {
     "access": "public"
   }

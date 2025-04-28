@@ -4,7 +4,8 @@ const base = require('../../jest.base.config');
 module.exports = {
   ...base,
   rootDir: '.',
-  setupFilesAfterEnv: [
-    '<rootDir>/dist/test/setup.js'
-  ],
+  testMatch: [
+    '**/__tests__/**/*.js?(x)',
+    '**/?(*.)+(spec|test|integration).js?(x)'
+  ]
 };

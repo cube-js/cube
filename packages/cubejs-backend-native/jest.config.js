@@ -5,6 +5,10 @@ module.exports = {
   ...base,
   rootDir: '.',
   setupFilesAfterEnv: [
-    '<rootDir>/dist/test/setup.js'
+    '<rootDir>/dist/test/setup/index.js'
   ],
+  roots: [
+    '<rootDir>/dist/test/'
+  ],
+  snapshotResolver: '<rootDir>/test/snapshotResolver.js',
 };
