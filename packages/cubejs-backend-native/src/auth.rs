@@ -111,7 +111,7 @@ impl AuthContext for NativeSQLAuthContext {
 impl SqlAuthService for NodeBridgeAuthService {
     async fn authenticate(
         &self,
-        sql_auth_request: SqlAuthServiceAuthenticateRequest,
+        request: SqlAuthServiceAuthenticateRequest,
         user: Option<String>,
         password: Option<String>,
     ) -> Result<AuthenticateResponse, CubeError> {
@@ -123,8 +123,8 @@ impl SqlAuthService for NodeBridgeAuthService {
             request: TransportAuthRequest {
                 id: format!("{}-span-1", request_id),
                 meta: None,
-                protocol: sql_auth_request.protocol.clone(),
-                method: sql_auth_request.method.clone(),
+                protocol: request.protocol,
+                method: request.method,
             },
             user: user.clone(),
             password: password.clone(),

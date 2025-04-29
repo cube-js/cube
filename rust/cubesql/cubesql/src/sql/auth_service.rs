@@ -54,7 +54,7 @@ pub struct SqlAuthServiceAuthenticateRequest {
 pub trait SqlAuthService: Send + Sync + Debug {
     async fn authenticate(
         &self,
-        sql_auth_request: SqlAuthServiceAuthenticateRequest,
+        request: SqlAuthServiceAuthenticateRequest,
         user: Option<String>,
         password: Option<String>,
     ) -> Result<AuthenticateResponse, CubeError>;
