@@ -2998,13 +2998,7 @@ impl WrappedSelectNode {
             cube_scan_node
         };
 
-        let SqlGenerationResult {
-            data_source,
-            from_alias,
-            mut column_remapping,
-            mut sql,
-            request: _,
-        } = {
+        let data_source = {
             let data_sources = ungrouped_scan_node
                 .used_cubes
                 .iter()
@@ -3024,20 +3018,16 @@ impl WrappedSelectNode {
                     ungrouped_scan_node
                 )));
             }
-            let sql = SqlQuery::new("".to_string(), values.clone());
-            SqlGenerationResult {
-                data_source: Some(data_sources[0].clone()),
-                from_alias: ungrouped_scan_node
-                    .schema
-                    .fields()
-                    .iter()
-                    .next()
-                    .and_then(|f| f.qualifier().cloned()),
-                column_remapping: None,
-                sql,
-                request: ungrouped_scan_node.request.clone(),
-            }
+            Some(data_sources[0].clone())
         };
+        let from_alias = ungrouped_scan_node
+            .schema
+            .fields()
+            .iter()
+            .next()
+            .and_then(|f| f.qualifier().cloned());
+        let mut column_remapping = None;
+        let mut sql = SqlQuery::new("".to_string(), values.clone());
 
         let subqueries_sql = self
             .prepare_subqueries_sql(
