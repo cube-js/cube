@@ -915,7 +915,7 @@ impl CubeScanWrapperNode {
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
-        parent_data_source: Option<String>,
+        parent_data_source: Option<&str>,
     ) -> result::Result<SqlGenerationResult, CubeError> {
         match node.as_ref() {
             // LogicalPlan::Projection(_) => {}
@@ -969,7 +969,7 @@ impl CubeScanWrapperNode {
                 }
             }
             LogicalPlan::EmptyRelation(_) => Ok(SqlGenerationResult {
-                data_source: parent_data_source,
+                data_source: parent_data_source.map(|ds| ds.to_string()),
                 from_alias: None,
                 sql: SqlQuery::new("".to_string(), values.clone()),
                 column_remapping: None,
@@ -985,15 +985,15 @@ impl CubeScanWrapperNode {
         }
     }
 
-    fn generate_sql_for_node_rec(
-        meta: &MetaContext,
+    fn generate_sql_for_node_rec<'ctx>(
+        meta: &'ctx MetaContext,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
-        parent_data_source: Option<String>,
-    ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send + '_>>
+        parent_data_source: Option<&'ctx str>,
+    ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send + 'ctx>>
     {
         Self::generate_sql_for_node(
             meta,
@@ -1124,7 +1124,7 @@ impl WrappedSelectNode {
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         sql: &mut SqlQuery,
-        data_source: &Option<String>,
+        data_source: Option<&str>,
     ) -> result::Result<HashMap<String, String>, CubeError> {
         let mut subqueries_sql = HashMap::new();
         for subquery in self.subqueries.iter() {
@@ -1141,7 +1141,7 @@ impl WrappedSelectNode {
                 subquery.clone(),
                 true,
                 sql.values.clone(),
-                data_source.clone(),
+                data_source,
             )
             .await?;
 
@@ -3045,7 +3045,7 @@ impl WrappedSelectNode {
                 transport.clone(),
                 load_request_meta.clone(),
                 &mut sql,
-                &data_source,
+                data_source.as_deref(),
             )
             .await?;
         let subqueries_sql = &subqueries_sql;
@@ -3115,7 +3115,7 @@ impl WrappedSelectNode {
                     lp.clone(),
                     true,
                     sql.values.clone(),
-                    data_source.clone(),
+                    data_source.as_deref(),
                 )
                 .await?;
                 let (subq_sql_string, new_values) = subq_sql.sql.unpack();
@@ -3412,7 +3412,7 @@ impl WrappedSelectNode {
         node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
         can_rename_columns: bool,
         values: Vec<Option<String>>,
-        parent_data_source: Option<String>,
+        parent_data_source: Option<&str>,
     ) -> result::Result<SqlGenerationResult, CubeError> {
         if self.push_to_cube {
             return self
@@ -3440,7 +3440,7 @@ impl WrappedSelectNode {
             self.from.clone(),
             true,
             values.clone(),
-            parent_data_source.clone(),
+            parent_data_source,
         )
         .await?;
 
@@ -3450,7 +3450,7 @@ impl WrappedSelectNode {
                 transport.clone(),
                 load_request_meta.clone(),
                 &mut sql,
-                &data_source,
+                data_source.as_deref(),
             )
             .await?;
         let subqueries_sql = &subqueries_sql;
