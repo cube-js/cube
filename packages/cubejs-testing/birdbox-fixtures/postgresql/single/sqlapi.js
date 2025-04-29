@@ -13,6 +13,12 @@ module.exports = {
     return query;
   },
   checkSqlAuth: async (req, user, password) => {
+    console.log('MN CHECK: REQUEST:', { req });
+
+    if (req.protocol !== 'postgres') {
+      throw new Error('Protocol is not postgres');
+    }
+
     if (user === 'admin') {
       if (password && password !== 'admin_password') {
         throw new Error(`Password doesn't match for ${user}`);
