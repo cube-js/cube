@@ -60,7 +60,6 @@ pub struct PushToCubeContext<'l> {
     ungrouped_scan_node: &'l CubeScanNode,
     // Known join subquery qualifiers, to generate proper column expressions
     known_join_subqueries: HashSet<String>,
-    join_subqueries: Vec<JoinSubquery>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1720,7 +1719,6 @@ impl WrappedSelectNode {
                     ))
                 } else if let Some(PushToCubeContext {
                     ungrouped_scan_node,
-                    join_subqueries: _,
                     known_join_subqueries,
                 }) = push_to_cube_context
                 {
@@ -3041,7 +3039,7 @@ impl WrappedSelectNode {
         let subqueries_sql = &subqueries_sql;
         let alias = self.alias.clone().or(from_alias.clone());
 
-        let push_to_cube_context = {
+        let (push_to_cube_context, join_subqueries) = {
             let mut join_subqueries = vec![];
             let mut known_join_subqueries = HashSet::new();
             for (lp, cond, join_type) in &self.joins {
@@ -3138,11 +3136,13 @@ impl WrappedSelectNode {
                 known_join_subqueries.insert(alias.clone());
             }
 
-            PushToCubeContext {
-                ungrouped_scan_node,
+            (
+                PushToCubeContext {
+                    ungrouped_scan_node,
+                    known_join_subqueries,
+                },
                 join_subqueries,
-                known_join_subqueries,
-            }
+            )
         };
 
         // Drop mut, turn to ref
@@ -3178,7 +3178,6 @@ impl WrappedSelectNode {
 
         let PushToCubeContext {
             ungrouped_scan_node,
-            join_subqueries,
             known_join_subqueries: _,
         } = push_to_cube_context;
         let mut prepared_join_subqueries = vec![];
