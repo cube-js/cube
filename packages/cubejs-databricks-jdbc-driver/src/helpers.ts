@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { downloadJDBCDriver, OSS_DRIVER_VERSION } from './installer';
+import type { ParsedConnectionProperties } from './DatabricksDriver';
 
 async function fileExistsOr(
   fsPath: string,
@@ -50,4 +51,34 @@ export function extractAndRemoveUidPwdFromJdbcUrl(jdbcUrl: string): [uid: string
     .replace(/;?PWD=[^;]*/i, '');
 
   return [uid, pwd, cleanedUrl];
+}
+
+export function parseDatabricksJdbcUrl(jdbcUrl: string): ParsedConnectionProperties {
+  const jdbcPrefix = 'jdbc:databricks://';
+  const urlWithoutPrefix = jdbcUrl.slice(jdbcPrefix.length);
+
+  const [hostPortAndPath, ...params] = urlWithoutPrefix.split(';');
+  const [host] = hostPortAndPath.split(':');
+
+  const paramMap = new Map<string, string>();
+  for (const param of params) {
+    const [key, value] = param.split('=');
+    if (key && value) {
+      paramMap.set(key, value);
+    }
+  }
+
+  const httpPath = paramMap.get('httpPath');
+  if (!httpPath) {
+    throw new Error('Missing httpPath in JDBC URL');
+  }
+
+  const warehouseMatch = httpPath.match(/\/warehouses\/([a-zA-Z0-9]+)/);
+  if (!warehouseMatch) {
+    throw new Error('Could not extract warehouseId from httpPath');
+  }
+
+  const warehouseId = warehouseMatch[1];
+
+  return { host, warehouseId };
 }
