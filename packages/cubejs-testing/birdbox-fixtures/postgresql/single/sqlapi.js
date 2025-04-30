@@ -13,8 +13,6 @@ module.exports = {
     return query;
   },
   checkSqlAuth: async (req, user, password) => {
-    console.log('MN CHECK: REQUEST: ', { req });
-
     if (!req) {
       throw new Error('Request is not defined');
     }
