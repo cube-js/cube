@@ -169,7 +169,7 @@ fn finalize_physical_plan(
     let p = rewrite_physical_plan(p, &mut |p| add_check_memory_exec(p, memory_handler.clone()))?;
     let p = if let Some(data_loaded_size) = data_loaded_size {
         rewrite_physical_plan(p, &mut |p| {
-            add_trace_data_loaded_exec(p, data_loaded_size.clone())
+            add_trace_data_loaded_exec(p, &data_loaded_size)
         })?
     } else {
         p

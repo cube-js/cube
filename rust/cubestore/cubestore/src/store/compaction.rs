@@ -16,7 +16,7 @@ use crate::queryplanner::QueryPlannerImpl;
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{min_max_values_from_data, ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
-use crate::table::parquet::{arrow_schema, parquet_source, CubestoreMetadataCacheFactory, ParquetTableStore};
+use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
 use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::record_batch_buffer_size;
@@ -27,10 +27,11 @@ use datafusion::arrow::array::{ArrayRef, UInt64Array};
 use datafusion::arrow::compute::{concat_batches, lexsort_to_indices, SortColumn, SortOptions};
 use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::config::TableParquetOptions;
 use datafusion::cube_ext;
 use datafusion::datasource::listing::PartitionedFile;
-use datafusion::datasource::physical_plan::parquet::ParquetExecBuilder;
-use datafusion::datasource::physical_plan::FileScanConfig;
+use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
+use datafusion::datasource::physical_plan::{FileScanConfig, ParquetSource};
 use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::execution::TaskContext;
 use datafusion::functions_aggregate::count::count_udaf;
@@ -46,6 +47,7 @@ use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, SendableRecordBatchStream};
 use datafusion::scalar::ScalarValue;
 use datafusion_datasource::memory::MemoryExec;
+use datafusion_datasource::source::DataSourceExec;
 use futures::StreamExt;
 use futures_util::future::join_all;
 use itertools::{EitherOrBoth, Itertools};
@@ -671,22 +673,24 @@ impl CompactionService for CompactionServiceImpl {
         })
         .await??;
 
+        let session_config = self.metadata_cache_factory
+            .cache_factory()
+            .make_session_config();
+
         // Merge and write rows.
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
             Some(file) => {
-                let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), schema, parquet_source())
+                let parquet_source = ParquetSource::new(TableParquetOptions::default(), get_reader_options_customizer(&session_config))
+                    .with_parquet_file_reader_factory(self.metadata_cache_factory.cache_factory().make_noop_cache());
+
+                let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), schema, Arc::new(parquet_source))
                     .with_file(PartitionedFile::from_path(file.to_string())?);
-                let parquet_exec = ParquetExecBuilder::new(file_scan)
-                    .with_parquet_file_reader_factory(
-                        self.metadata_cache_factory
-                            .cache_factory()
-                            .make_noop_cache(),
-                    )
-                    .build();
+
+                let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
 
                 Arc::new(TraceDataLoadedExec::new(
-                    Arc::new(parquet_exec),
+                    Arc::new(data_source_exec),
                     data_loaded_size.clone(),
                 ))
             }
@@ -703,9 +707,7 @@ impl CompactionService for CompactionServiceImpl {
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
         };
         let task_context = QueryPlannerImpl::execution_context_helper(
-            self.metadata_cache_factory
-                .cache_factory()
-                .make_session_config(),
+            session_config,
         )
         .task_ctx();
         let records = merge_chunks(
@@ -1059,7 +1061,11 @@ async fn read_files(
 ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
     assert!(!files.is_empty());
     // let mut inputs = Vec::<Arc<dyn ExecutionPlan>>::with_capacity(files.len());
-    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), schema, parquet_source())
+    let session_config = metadata_cache_factory.make_session_config();
+    let parquet_source = ParquetSource::new(TableParquetOptions::default(), get_reader_options_customizer(&session_config))
+        .with_parquet_file_reader_factory(metadata_cache_factory.make_noop_cache());
+
+    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), schema, Arc::new(parquet_source))
         .with_file_group(
             files
                 .iter()
@@ -1067,9 +1073,9 @@ async fn read_files(
                 .collect::<Result<Vec<_>, _>>()?,
         )
         .with_projection(projection);
-    let plan = ParquetExecBuilder::new(file_scan)
-        .with_parquet_file_reader_factory(metadata_cache_factory.make_noop_cache())
-        .build();
+
+    let plan = DataSourceExec::new(Arc::new(file_scan));
+
     // TODO upgrade DF
     // for f in files {
     //     inputs.push(Arc::new(ParquetExec::try_from_files_with_cache(
@@ -1504,7 +1510,6 @@ mod tests {
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
     use crate::table::data::rows_to_columns;
-    use crate::table::parquet::parquet_source;
     use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use crate::table::{cmp_same_types, Row, TableValue};
     use cuberockstore::rocksdb::{Options, DB};
@@ -2073,16 +2078,20 @@ mod tests {
             .await
             .unwrap();
 
+        let task_ctx = Arc::new(TaskContext::default());
+
+        let parquet_source = ParquetSource::new(TableParquetOptions::default(), get_reader_options_customizer(task_ctx.session_config()));
+
         let file_scan = FileScanConfig::new(
             ObjectStoreUrl::local_filesystem(),
             Arc::new(arrow_schema(aggr_index.get_row())),
-            parquet_source(),
+            Arc::new(parquet_source),
         )
         .with_file(PartitionedFile::from_path(local.to_string()).unwrap());
-        let parquet_exec = ParquetExecBuilder::new(file_scan).build();
+        let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
 
-        let reader = Arc::new(parquet_exec);
-        let res_data = &collect(reader, Arc::new(TaskContext::default()))
+        let reader = Arc::new(data_source_exec);
+        let res_data = &collect(reader, task_ctx)
             .await
             .unwrap()[0];
 
