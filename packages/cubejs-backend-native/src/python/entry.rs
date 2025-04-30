@@ -6,6 +6,19 @@ use crate::python::runtime::py_runtime_init;
 use neon::prelude::*;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PyString, PyTuple};
+use std::path::Path;
+
+fn extend_sys_path(py: Python, file_name: &String) -> PyResult<()> {
+    let sys_path = py.import("sys")?.getattr("path")?.downcast::<PyList>()?;
+
+    let config_dir = Path::new(&file_name)
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    let config_dir_str = config_dir.to_str().unwrap_or(".");
+
+    sys_path.insert(0, PyString::new(py, config_dir_str))?;
+    Ok(())
+}
 
 fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let file_content_arg = cx.argument::<JsString>(0)?.value(&mut cx);
@@ -20,6 +33,8 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubeConfigPy> {
+        extend_sys_path(py, &options_file_name)?;
+
         let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
@@ -61,6 +76,8 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubePythonModel> {
+        extend_sys_path(py, &model_file_name)?;
+
         let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"

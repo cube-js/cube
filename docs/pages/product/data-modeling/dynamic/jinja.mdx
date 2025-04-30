@@ -155,13 +155,20 @@ class SafeString(str):
 
 ## Python
 
-You can declare and invoke Python functions from within a Jinja template. This
-allows the reuse of existing code to generate data models. Cube uses Python 3.9 to execute Python code. 
-It also installs packages listed in the `requirements.txt` with pip on the startup.
+### Template context
 
-These helper functions must be located in `model/globals.py` file or explicitly loaded from the YAML files.
-In the following example, we declare a function called `load_data()` which will load data from a remote
-API endpoint. We will then use the function to generate a data model in Cube.
+You can use Python to declare functions that can be invoked and variables that can be
+referenced from within a Jinja template. These functions and variables must be defined
+in `model/globals.py` file and registered in the `TemplateContext` instance.
+
+<ReferenceBox>
+
+See the [`TemplateContext` reference][ref-cube-template-context] for more details.
+
+</ReferenceBox>
+
+In the following example, we declare a function called `load_data` that supposedly loads
+data from a remote API endpoint. We will then use the function to generate a data model:
 
 ```python
 from cube import TemplateContext
@@ -237,12 +244,46 @@ cubes:
   {%- endfor %}
 ```
 
-<ReferenceBox>
+### Imports
 
-If you'd like to split your Python code into several files, see
-[this issue](https://github.com/cube-js/cube/issues/8443#issuecomment-2219804266).
+In the `model/globals.py` file (or the `cube.py` configuration file), you can
+import modules from the current directory. In the following example, we import a function
+from the `utils` module and use it to populate a variable in the template context:
 
-</ReferenceBox>
+```python filename="model/utils.py"
+def answer_to_main_question() -> str:
+  return "42"
+```
+
+```python filename="model/globals.py"
+from cube import TemplateContext
+from utils import answer_to_main_question
+
+template = TemplateContext()
+
+answer = answer_to_main_question()
+template.add_variable('answer', answer)
+```
+### Dependencies
+
+If you need to use dependencies in your dynamic data model (or your `cube.py`
+configuration file), you can list them in the `requirements.txt` file in the root
+directory of your Cube deployment. They will be automatically installed with `pip` on
+the startup.
+
+<InfoBox>
+
+[`cube` package][ref-cube-package] is available out of the box, it doesn't need to be
+listed in `requirements.txt`.
+
+</InfoBox>
+
+If you use dbt for data transformation, you might find the [`cube_dbt`
+package][ref-cube-dbt-package] useful. It provides a set of utilities that simplify
+defining the data model in YAML [based on dbt models][ref-cube-with-dbt].
+
+If you need to use dependencies with native extensions, build a [custom Docker
+image][ref-docker-image-extension].
 
 
 [jinja]: https://jinja.palletsprojects.com/
@@ -254,3 +295,8 @@ If you'd like to split your Python code into several files, see
 [jinja-docs-filters-safe]: https://jinja.palletsprojects.com/en/3.1.x/templates/#jinja-filters.safe
 [ref-cube-dbt]: /reference/python/cube_dbt
 [ref-visual-model]: /product/workspace/visual-model
+[ref-docker-image-extension]: /product/deployment/core#extend-the-docker-image
+[ref-cube-package]: /reference/python/cube
+[ref-cube-template-context]: /reference/python/cube#templatecontext-class
+[ref-cube-dbt-package]: /reference/python/cube_dbt
+[ref-cube-with-dbt]: /guides/dbt
