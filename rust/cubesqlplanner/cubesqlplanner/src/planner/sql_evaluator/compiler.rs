@@ -28,6 +28,23 @@ impl Compiler {
         }
     }
 
+    pub fn add_auto_resolved_member_evaluator(
+        &mut self,
+        name: String,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        let path = name.split(".").map(|s| s.to_string()).collect::<Vec<_>>();
+        if self.cube_evaluator.is_measure(path.clone())? {
+            Ok(self.add_measure_evaluator(name)?)
+        } else if self.cube_evaluator.is_dimension(path.clone())? {
+            Ok(self.add_dimension_evaluator(name)?)
+        } else {
+            Err(CubeError::internal(format!(
+                "Cannot resolve evaluator of member {}. Only dimensions and measures can be autoresolved",
+                name
+            )))
+        }
+    }
+
     pub fn add_measure_evaluator(
         &mut self,
         measure: String,

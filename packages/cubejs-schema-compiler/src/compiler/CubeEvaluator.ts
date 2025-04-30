@@ -82,7 +82,8 @@ type PreAggregationTimeDimensionReference = {
   granularity: string,
 };
 
-type PreAggregationReferences = {
+/// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
+export type PreAggregationReferences = {
   allowNonStrictDateRangeMatch?: boolean,
   dimensions: Array<string>,
   measures: Array<string>,
@@ -90,7 +91,7 @@ type PreAggregationReferences = {
   rollups: Array<string>,
 };
 
-type PreAggregationInfo = {
+export type PreAggregationInfo = {
   id: string,
   preAggregationName: string,
   preAggregation: unknown,
@@ -223,8 +224,9 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   private prepareFolders(cube: any, errorReporter: ErrorReporter) {
-    if (Array.isArray(cube.folders)) {
-      cube.folders = cube.folders.map(it => {
+    const folders = cube.rawFolders();
+    if (folders.length) {
+      cube.folders = folders.map(it => {
         const includedMembers = this.allMembersOrList(cube, it.includes);
         const includes = includedMembers.map(memberName => {
           if (memberName.includes('.')) {
@@ -251,12 +253,12 @@ export class CubeEvaluator extends CubeSymbols {
         });
       });
     }
-
-    return [];
   }
 
   private prepareHierarchies(cube: any, errorReporter: ErrorReporter): void {
-    if (Object.keys(cube.hierarchies).length) {
+    // Hierarchies from views are not fully populated at this moment and are processed later,
+    // so we should not pollute the cube hierarchies definition here.
+    if (!cube.isView && Object.keys(cube.hierarchies).length) {
       cube.evaluatedHierarchies = Object.entries(cube.hierarchies).map(([name, hierarchy]) => ({
         name,
         ...(typeof hierarchy === 'object' ? hierarchy : {}),
@@ -305,6 +307,8 @@ export class CubeEvaluator extends CubeSymbols {
                 throw new UserError(`Hierarchy '${it.name}' not found in cube '${cubeName}'`);
               }
               return {
+                // Title might be overridden in the view
+                title: cube.hierarchies?.[it.name]?.override?.title || it.title,
                 ...it,
                 name,
                 levels
@@ -467,7 +471,7 @@ export class CubeEvaluator extends CubeSymbols {
           ownedByCube = false;
         }
         // Aliases one to one some another member as in case of views
-        if (!ownedByCube && !member.filters && BaseQuery.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+        if (!ownedByCube && !member.filters && CubeSymbols.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
           aliasMember = this.pathFromArray(pathReferencesUsed[0]);
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);
@@ -631,7 +635,7 @@ export class CubeEvaluator extends CubeSymbols {
     return symbol !== undefined;
   }
 
-  public byPathAnyType(path: string[]) {
+  public byPathAnyType(path: string | string[]) {
     if (this.isInstanceOfType('measures', path)) {
       return this.byPath('measures', path);
     }
@@ -644,7 +648,7 @@ export class CubeEvaluator extends CubeSymbols {
       return this.byPath('segments', path);
     }
 
-    throw new UserError(`Can't resolve member '${path.join('.')}'`);
+    throw new UserError(`Can't resolve member '${Array.isArray(path) ? path.join('.') : path}'`);
   }
 
   public byPath(type: 'measures' | 'dimensions' | 'segments', path: string | string[]) {
@@ -735,14 +739,14 @@ export class CubeEvaluator extends CubeSymbols {
 
     if (aggregation.timeDimensionReference) {
       timeDimensions.push({
-        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
+        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference, { collectJoinHints: true }),
         granularity: aggregation.granularity
       });
     } else if (aggregation.timeDimensionReferences) {
       // eslint-disable-next-line guard-for-in
       for (const timeDimensionReference of aggregation.timeDimensionReferences) {
         timeDimensions.push({
-          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension),
+          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension, { collectJoinHints: true }),
           granularity: timeDimensionReference.granularity
         });
       }
@@ -751,12 +755,12 @@ export class CubeEvaluator extends CubeSymbols {
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
-        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
+        (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences, { collectJoinHints: true }) || [])
           .concat(
-            aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences) || []
+            aggregation.segmentReferences && this.evaluateReferences(cube, aggregation.segmentReferences, { collectJoinHints: true }) || []
           ),
       measures:
-        aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
+        (aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences, { collectJoinHints: true }) || []),
       timeDimensions,
       rollups:
         aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],

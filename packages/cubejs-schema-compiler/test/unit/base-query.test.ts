@@ -3,7 +3,7 @@ import { BaseQuery, PostgresQuery, MssqlQuery, UserError, CubeStoreQuery } from 
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import {
   createCubeSchema,
-  createCubeSchemaWithCustomGranularities,
+  createCubeSchemaWithCustomGranularitiesAndTimeShift,
   createCubeSchemaYaml,
   createECommerceSchema,
   createJoinedCubesSchema,
@@ -421,7 +421,7 @@ describe('SQL Generation', () => {
 
   describe('Custom granularities', () => {
     const compilers = /** @type Compilers */ prepareJsCompiler(
-      createCubeSchemaWithCustomGranularities('orders')
+      createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
     );
 
     const granularityQueries = [

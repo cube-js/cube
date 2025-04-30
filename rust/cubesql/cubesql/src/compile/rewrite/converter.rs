@@ -46,7 +46,7 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields,
-        exprlist_to_fields_from_schema, normalize_cols,
+        exprlist_to_fields_from_schema, normalize_col as df_normalize_col,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
         replace_col_to_expr, Column, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct,
         EmptyRelation, Expr, ExprRewritable, ExprRewriter, GroupingSet, Like, Limit, LogicalPlan,
@@ -2440,4 +2440,30 @@ fn replace_qualified_col_with_flat_name_if_missing(
             .map_err(|e| CubeError::from(e))
         })
         .collect::<Result<Vec<_>, _>>()
+}
+
+/// Recursively normalize all Column expressions in a list of expression trees
+fn normalize_cols(
+    exprs: impl IntoIterator<Item = impl Into<Expr>>,
+    plan: &LogicalPlan,
+) -> Result<Vec<Expr>, CubeError> {
+    exprs
+        .into_iter()
+        .map(|e| normalize_col(e.into(), plan))
+        .collect()
+}
+
+/// Recursively call [`df_normalize_col`] on all Column expressions
+/// in the `expr` expression tree, realiasing the expressions if the name is different.
+fn normalize_col(expr: Expr, plan: &LogicalPlan) -> Result<Expr, CubeError> {
+    if let Expr::Alias(_, _) = expr {
+        return Ok(df_normalize_col(expr, plan)?);
+    }
+    let original_expr_name = expr_name(&expr)?;
+    let mut normalized_expr = df_normalize_col(expr, plan)?;
+    let normalized_expr_name = expr_name(&normalized_expr)?;
+    if original_expr_name != normalized_expr_name {
+        normalized_expr = normalized_expr.alias(&original_expr_name);
+    }
+    Ok(normalized_expr)
 }

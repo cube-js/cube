@@ -6,6 +6,19 @@ use crate::python::runtime::py_runtime_init;
 use neon::prelude::*;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PyString, PyTuple};
+use std::path::Path;
+
+fn extend_sys_path(py: Python, file_name: &String) -> PyResult<()> {
+    let sys_path = py.import("sys")?.getattr("path")?.downcast::<PyList>()?;
+
+    let config_dir = Path::new(&file_name)
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    let config_dir_str = config_dir.to_str().unwrap_or(".");
+
+    sys_path.insert(0, PyString::new(py, config_dir_str))?;
+    Ok(())
+}
 
 fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let file_content_arg = cx.argument::<JsString>(0)?.value(&mut cx);
@@ -20,6 +33,8 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubeConfigPy> {
+        extend_sys_path(py, &options_file_name)?;
+
         let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
@@ -27,15 +42,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let config_module = PyModule::from_code(py, &file_content_arg, &options_file_name, "")?;
-        let settings_py = if config_module.hasattr("__execution_context_locals")? {
-            let execution_context_locals = config_module.getattr("__execution_context_locals")?;
-
-            if config_module.hasattr("config")? {
-                execution_context_locals.get_item("config")?
-            } else {
-                config_module.getattr("settings")?
-            }
-        } else if config_module.hasattr("config")? {
+        let settings_py = if config_module.hasattr("config")? {
             config_module.getattr("config")?
         } else {
             // backward compatibility
@@ -69,6 +76,8 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubePythonModel> {
+        extend_sys_path(py, &model_file_name)?;
+
         let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
@@ -108,25 +117,6 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                     local_key.to_string(),
                     CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
                 );
-            }
-
-            // TODO remove all other ways of defining functions
-        } else if model_module.hasattr("__execution_context_locals")? {
-            let execution_context_locals = model_module
-                .getattr("__execution_context_locals")?
-                .downcast::<PyDict>()?;
-
-            for (local_key, local_value) in execution_context_locals.iter() {
-                if local_value.is_instance_of::<PyFunction>() {
-                    let has_attr = local_value.hasattr("cube_context_func")?;
-                    if has_attr {
-                        let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
-                        collected_functions.insert(
-                            local_key.to_string(),
-                            CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
-                        );
-                    }
-                }
             }
         } else {
             let inspect_module = py.import("inspect")?;

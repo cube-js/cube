@@ -18,17 +18,24 @@ use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub struct OrderByItem {
-    name: String,
+    member_evaluator: Rc<MemberSymbol>,
     desc: bool,
 }
 
 impl OrderByItem {
-    pub fn new(name: String, desc: bool) -> Self {
-        Self { name, desc }
+    pub fn new(member_evaluator: Rc<MemberSymbol>, desc: bool) -> Self {
+        Self {
+            member_evaluator,
+            desc,
+        }
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
+    pub fn member_symbol(&self) -> Rc<MemberSymbol> {
+        self.member_evaluator.clone()
     }
 
     pub fn desc(&self) -> bool {
@@ -260,8 +267,12 @@ impl QueryProperties {
         let order_by = if let Some(order) = &options.static_data().order {
             order
                 .iter()
-                .map(|o| OrderByItem::new(o.id.clone(), o.is_desc()))
-                .collect_vec()
+                .map(|o| -> Result<_, CubeError> {
+                    let member_evaluator =
+                        evaluator_compiler.add_auto_resolved_member_evaluator(o.id.clone())?;
+                    Ok(OrderByItem::new(member_evaluator, o.is_desc()))
+                })
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Self::default_order(&dimensions, &time_dimensions, &measures)
         };
@@ -482,6 +493,27 @@ impl QueryProperties {
         &self.dimensions
     }
 
+    pub fn dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn time_dimension_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.time_dimensions
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
+    pub fn measure_symbols(&self) -> Vec<Rc<MemberSymbol>> {
+        self.measures
+            .iter()
+            .map(|d| d.member_evaluator().clone())
+            .collect()
+    }
+
     pub fn time_dimensions(&self) -> &Vec<Rc<BaseTimeDimension>> {
         &self.time_dimensions
     }
@@ -597,19 +629,42 @@ impl QueryProperties {
         }
     }
     pub fn all_member_symbols(&self, exclude_time_dimensions: bool) -> Vec<Rc<MemberSymbol>> {
-        let mut members = BaseMemberHelper::extract_symbols_from_members(
-            &self.all_members(exclude_time_dimensions),
-        );
-        for filter_item in self.dimensions_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        self.get_member_symbols(!exclude_time_dimensions, true, true, true, &vec![])
+    }
+
+    pub fn get_member_symbols(
+        &self,
+        include_time_dimensions: bool,
+        include_dimensions: bool,
+        include_measures: bool,
+        include_filters: bool,
+        additional_symbols: &Vec<Rc<MemberSymbol>>,
+    ) -> Vec<Rc<MemberSymbol>> {
+        let mut members = additional_symbols.clone();
+        if include_time_dimensions {
+            members.append(&mut self.time_dimension_symbols());
         }
-        for filter_item in self.measures_filters.iter() {
-            filter_item.find_all_member_evaluators(&mut members);
+        if include_dimensions {
+            members.append(&mut self.dimension_symbols());
+        }
+        if include_measures {
+            members.append(&mut self.measure_symbols());
+        }
+        if include_filters {
+            self.fill_all_filter_symbols(&mut members);
         }
         members
             .into_iter()
             .unique_by(|m| m.full_name())
             .collect_vec()
+    }
+
+    pub fn fill_all_filter_symbols(&self, members: &mut Vec<Rc<MemberSymbol>>) {
+        if let Some(all_filters) = self.all_filters() {
+            for filter_item in all_filters.items.iter() {
+                filter_item.find_all_member_evaluators(members);
+            }
+        }
     }
 
     pub fn group_by(&self) -> Vec<Expr> {
@@ -635,11 +690,20 @@ impl QueryProperties {
     ) -> Vec<OrderByItem> {
         let mut result = Vec::new();
         if let Some(granularity_dim) = time_dimensions.iter().find(|d| d.has_granularity()) {
-            result.push(OrderByItem::new(granularity_dim.full_name(), false));
+            result.push(OrderByItem::new(
+                granularity_dim.member_evaluator().clone(),
+                false,
+            ));
         } else if !measures.is_empty() && !dimensions.is_empty() {
-            result.push(OrderByItem::new(measures[0].full_name(), true));
+            result.push(OrderByItem::new(
+                measures[0].member_evaluator().clone(),
+                true,
+            ));
         } else if !dimensions.is_empty() {
-            result.push(OrderByItem::new(dimensions[0].full_name(), false));
+            result.push(OrderByItem::new(
+                dimensions[0].member_evaluator().clone(),
+                false,
+            ));
         }
         result
     }

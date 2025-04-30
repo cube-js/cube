@@ -1,6 +1,7 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
 import { MeasureDefinition } from '../compiler/CubeEvaluator';
+import { CubeSymbols } from '../compiler/CubeSymbols';
 
 export class BaseMeasure {
   public readonly expression: any;
@@ -12,6 +13,8 @@ export class BaseMeasure {
   public readonly isMemberExpression: boolean = false;
 
   protected readonly patchedMeasure: MeasureDefinition | null = null;
+
+  public readonly joinHint: Array<string> = [];
 
   protected preparePatchedMeasure(sourceMeasure: string, newMeasureType: string | null, addFilters: Array<{sql: Function}>): MeasureDefinition {
     const source = this.query.cubeEvaluator.measureByPath(sourceMeasure);
@@ -123,6 +126,12 @@ export class BaseMeasure {
           measure.expression.addFilters,
         );
       }
+    } else {
+      // TODO move this `as` to static types
+      const measurePath = measure as string;
+      const { path, joinHint } = CubeSymbols.joinHintFromPath(measurePath);
+      this.measure = path;
+      this.joinHint = joinHint;
     }
   }
 

@@ -4,6 +4,7 @@
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
 
+import fetch from 'node-fetch';
 import { assertDataSource, getEnv, } from '@cubejs-backend/shared';
 import {
   DatabaseStructure,
@@ -20,6 +21,7 @@ import { JDBCDriver, JDBCDriverConfiguration, } from '@cubejs-backend/jdbc-drive
 import { DatabricksQuery } from './DatabricksQuery';
 import {
   extractAndRemoveUidPwdFromJdbcUrl,
+  parseDatabricksJdbcUrl,
   resolveJDBCDriver
 } from './helpers';
 
@@ -124,6 +126,11 @@ type ColumnInfo = {
   type: GenericDataBaseType;
 };
 
+export type ParsedConnectionProperties = {
+  host: string,
+  warehouseId: string,
+};
+
 const DatabricksToGenericType: Record<string, string> = {
   binary: 'hll_datasketches',
   'decimal(10,0)': 'bigint',
@@ -142,6 +149,8 @@ export class DatabricksDriver extends JDBCDriver {
    * Driver Configuration.
    */
   protected readonly config: DatabricksDriverConfiguration;
+
+  private readonly parsedConnectionProperties: ParsedConnectionProperties;
 
   public static dialectClass() {
     return DatabricksQuery;
@@ -262,38 +271,50 @@ export class DatabricksDriver extends JDBCDriver {
 
     super(config);
     this.config = config;
+    this.parsedConnectionProperties = parseDatabricksJdbcUrl(url);
     this.showSparkProtocolWarn = showSparkProtocolWarn;
   }
 
-  /**
-   * @override
-   */
-  public readOnly() {
+  public override readOnly() {
     return !!this.config.readOnly;
   }
 
-  /**
-   * @override
-   */
-  public capabilities(): DriverCapabilities {
+  public override capabilities(): DriverCapabilities {
     return {
       unloadWithoutTempTable: true,
       incrementalSchemaLoading: true
     };
   }
 
-  /**
-   * @override
-   */
-  public setLogger(logger: any) {
+  public override setLogger(logger: any) {
     super.setLogger(logger);
     this.showDeprecations();
   }
 
-  /**
-   * @override
-   */
-  public async loadPreAggregationIntoTable(
+  public override async testConnection() {
+    const token = `Bearer ${this.config.properties.PWD}`;
+
+    const res = await fetch(`https://${this.parsedConnectionProperties.host}/api/2.0/sql/warehouses/${this.parsedConnectionProperties.warehouseId}`, {
+      headers: { Authorization: token },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Databricks API error: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+
+    if (['DELETING', 'DELETED'].includes(data.state)) {
+      throw new Error(`Warehouse is being deleted (current state: ${data.state})`);
+    }
+
+    // There is also DEGRADED status, but it doesn't mean that cluster is 100% not working...
+    if (data.health?.status === 'FAILED') {
+      throw new Error(`Warehouse is unhealthy: ${data.health?.summary}. Details: ${data.health?.details}`);
+    }
+  }
+
+  public override async loadPreAggregationIntoTable(
     preAggregationTableName: string,
     loadSql: string,
     params: unknown[],
@@ -320,10 +341,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
   }
 
-  /**
-   * @override
-   */
-  public async query<R = unknown>(
+  public override async query<R = unknown>(
     query: string,
     values: unknown[],
   ): Promise<R[]> {
@@ -357,10 +375,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
   }
 
-  /**
-   * @override
-   */
-  public dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
+  public override dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
     const tableFullName = `${
       this.config?.catalog ? `${this.config.catalog}.` : ''
     }${tableName}`;
@@ -392,10 +407,7 @@ export class DatabricksDriver extends JDBCDriver {
     }
   }
 
-  /**
-   * @override
-   */
-  protected async getCustomClassPath() {
+  protected override async getCustomClassPath() {
     return resolveJDBCDriver();
   }
 

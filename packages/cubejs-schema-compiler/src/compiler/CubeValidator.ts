@@ -110,6 +110,14 @@ const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day
 // Do not allow negative intervals for granularities, while offsets could be negative
 const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
 
+const formatSchema = Joi.alternatives([
+  Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
+  Joi.object().keys({
+    type: Joi.string().valid('link'),
+    label: Joi.string().required()
+  })
+]);
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -122,13 +130,7 @@ const BaseDimensionWithoutSubQuery = {
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
   enableSuggestions: Joi.boolean().strict(),
-  format: Joi.alternatives([
-    Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
-    Joi.object().keys({
-      type: Joi.string().valid('link'),
-      label: Joi.string().required()
-    })
-  ]),
+  format: formatSchema,
   meta: Joi.any(),
   granularities: Joi.when('type', {
     is: 'time',
@@ -732,12 +734,20 @@ const RolePolicySchema = Joi.object().keys({
  * and update CubePropContextTranspiler.transpiledFieldsPatterns
  **************************** */
 
+const hierarchySchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
+  title: Joi.string(),
+  public: Joi.boolean().strict(),
+  levels: Joi.func()
+}));
+
 const baseSchema = {
   name: identifier,
   refreshKey: CubeRefreshKeySchema,
   fileName: Joi.string().required(),
   extends: Joi.func(),
-  allDefinitions: Joi.func(),
+  allDefinitions: Joi.func(), // Helpers function for extending
+  rawFolders: Joi.func(), // Helpers function for extending
+  rawCubes: Joi.func(), // Helpers function for extending
   title: Joi.string(),
   sqlAlias: Joi.string(),
   dataSource: Joi.string(),
@@ -758,26 +768,13 @@ const baseSchema = {
   dimensions: DimensionsSchema,
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
-  folders: Joi.array().items(Joi.object().keys({
-    name: Joi.string().required(),
-    includes: Joi.alternatives([
-      Joi.string().valid('*'),
-      Joi.array().items(Joi.string().required())
-    ]).required(),
-  })),
   accessPolicy: Joi.array().items(RolePolicySchema.required()),
+  hierarchies: hierarchySchema,
 };
-
-const hierarchySchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
-  title: Joi.string(),
-  public: Joi.boolean().strict(),
-  levels: Joi.func()
-}));
 
 const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
-  hierarchies: hierarchySchema,
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
@@ -796,7 +793,11 @@ const viewSchema = inherit(baseSchema, {
           Joi.string().required(),
           Joi.object().keys({
             name: identifier.required(),
-            alias: identifier
+            alias: identifier,
+            title: Joi.string(),
+            description: Joi.string(),
+            format: formatSchema,
+            meta: Joi.any(),
           })
         ]))
       ]).required(),
@@ -805,8 +806,13 @@ const viewSchema = inherit(baseSchema, {
       'object.oxor': 'Using split together with prefix is not supported'
     })
   ),
-  accessPolicy: Joi.array().items(RolePolicySchema.required()),
-  hierarchies: hierarchySchema,
+  folders: Joi.array().items(Joi.object().keys({
+    name: Joi.string().required(),
+    includes: Joi.alternatives([
+      Joi.string().valid('*'),
+      Joi.array().items(Joi.string().required())
+    ]).required(),
+  })),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
