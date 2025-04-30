@@ -31,6 +31,11 @@ export type SQLServerConstructorOptions = {
   gatewayPort?: number,
 };
 
+export type SqlAuthServiceAuthenticateRequest = {
+  protocol: string;
+  method: string;
+};
+
 export class SQLServer {
   protected sqlInterfaceInstance: SqlInterfaceInstance | null = null;
 
@@ -88,10 +93,14 @@ export class SQLServer {
       let { securityContext } = session;
 
       if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+        const sqlAuthRequest: SqlAuthServiceAuthenticateRequest = {
+          protocol: request.meta.protocol,
+          method: 'password',
+        };
         const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
         if (canSwitch) {
           userForContext = request.meta.changeUser;
-          const current = await checkSqlAuth(request, userForContext, null);
+          const current = await checkSqlAuth({ ...request, ...sqlAuthRequest }, userForContext, null);
           securityContext = current.securityContext;
         } else {
           throw new Error(
