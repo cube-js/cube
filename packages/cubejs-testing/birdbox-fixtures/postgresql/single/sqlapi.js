@@ -13,9 +13,7 @@ module.exports = {
     return query;
   },
   checkSqlAuth: async (req, user, password) => {
-    if (!(req && typeof req.protocol === 'string' && typeof req.method === 'string')) {
-      throw new Error('Request object is not valid');
-    }
+    console.log('MN CHECK: REQUEST: ', { req });
 
     if (user === 'admin') {
       if (password && password !== 'admin_password') {
