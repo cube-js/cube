@@ -1349,6 +1349,21 @@ such as deserializing Cube Store result sets in native Rust code.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBEJS_TESSERACT_SQL_PLANNER`
+
+If `true`, enables Tesseract, the [next-generation data modeling engine][link-tesseract].
+Tesseract powers [multi-stage calculations][ref-multi-stage-calculations].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                 | `false`                |
+
+<WarningBox>
+
+Tesseract is currently in preview.
+
+</WarningBox>
+
 ## `CUBESTORE_AWS_ACCESS_KEY_ID`
 
 The Access Key ID for AWS. Required when using AWS S3.
@@ -1737,3 +1752,5 @@ The port for a Cube deployment to listen to API connections on.
 [ref-row-limit]: /product/apis-integrations/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-model/pre-aggregations#allow_non_strict_date_range_match
+[link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
+[ref-multi-stage-calculations]: /product/data-modeling/concepts/multi-stage-calculations
