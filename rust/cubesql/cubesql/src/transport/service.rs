@@ -539,6 +539,34 @@ impl SqlTemplates {
             })?)
     }
 
+    pub fn postgres_datetime_format_to_iso(format: String) -> String {
+        format
+            // Workaround for FM modifier
+            .replace("FMDay", "%A")
+            .replace("FMMonth", "%B")
+            .replace("Day", "%A")
+            .replace("Month", "%B")
+            .replace("%i", "%M")
+            .replace("%s", "%S")
+            .replace(".%f", "%.f")
+            .replace("YYYY", "%Y")
+            .replace("yyyy", "%Y")
+            // NOTE: "%q" is not a part of chrono
+            .replace("Q", "%q")
+            .replace("Mon", "%b")
+            .replace("DD", "%d")
+            .replace("dd", "%d")
+            .replace("HH24", "%H")
+            .replace("HH12", "%I")
+            .replace("MI", "%M")
+            .replace("mi", "%M")
+            .replace("SS", "%S")
+            .replace("ss", "%S")
+            .replace(".US", "%.f")
+            .replace("MM", "%m")
+            .replace(".MS", "%.3f")
+    }
+
     pub fn aggregate_function(
         &self,
         aggregate_function: AggregateFunction,
@@ -547,9 +575,10 @@ impl SqlTemplates {
     ) -> Result<String, CubeError> {
         let function = self.aggregate_function_name(aggregate_function, distinct);
         let args_concat = args.join(", ");
+        let formatted_args: Vec<String> = args.iter().map(|arg| SqlTemplates::postgres_datetime_format_to_iso(arg.clone())).collect();
         self.render_template(
             &format!("functions/{}", function),
-            context! { args_concat => args_concat, args => args, distinct => distinct },
+            context! { args_concat => args_concat, args => args, distinct => distinct, formatted_args => formatted_args },
         )
     }
 
@@ -562,11 +591,13 @@ impl SqlTemplates {
     ) -> Result<String, CubeError> {
         let function = scalar_function.to_string().to_uppercase();
         let args_concat = args.join(", ");
+        let formatted_args: Vec<String> = args.iter().map(|arg| SqlTemplates::postgres_datetime_format_to_iso(arg.clone())).collect();
         self.render_template(
             &format!("functions/{}", function),
             context! {
                 args_concat => args_concat,
                 args => args,
+                formatted_args => formatted_args,
                 date_part => date_part,
                 interval => interval,
             },
