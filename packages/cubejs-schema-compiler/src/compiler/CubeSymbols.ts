@@ -702,7 +702,7 @@ export class CubeSymbols {
     return options.originalSorting ? references : R.sortBy(R.identity, references) as any;
   }
 
-  public pathFromArray(array) {
+  public pathFromArray(array: string[]): string {
     return array.join('.');
   }
 

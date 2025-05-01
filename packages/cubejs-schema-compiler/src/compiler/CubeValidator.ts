@@ -533,7 +533,7 @@ const CubeRefreshKeySchema = condition(
     (s) => defined(s.sql),
     Joi.object().keys({
       sql: Joi.func().required(),
-      // We dont support timezone for this, because it's useless
+      // We don't support timezone for this, because it's useless
       // We cannot support cron interval
       every: everyInterval,
     }),

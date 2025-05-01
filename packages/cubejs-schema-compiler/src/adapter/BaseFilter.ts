@@ -47,11 +47,10 @@ export class BaseFilter extends BaseDimension {
   }
 
   // Evaluates filters on measures to whole where statement in query
-  // It used in drill downs
+  // It used in drill-downs
   public measureFilterToWhere() {
     const measureDefinition = this.measureDefinition();
-    if (measureDefinition.filters && measureDefinition.filters.length ||
-      measureDefinition.drillFilters && measureDefinition.drillFilters.length) {
+    if (measureDefinition.filters?.length || measureDefinition.drillFilters?.length) {
       return this.query.evaluateFiltersArray(
         (measureDefinition.filters || []).concat(measureDefinition.drillFilters || []),
         this.query.cubeEvaluator.cubeNameFromPath(this.measure)
