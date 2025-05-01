@@ -7,6 +7,7 @@ use datafusion::optimizer::OptimizerConfig;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+// TODO upgrade DF: Remove?  We have EliminateNestedUnion.
 #[derive(Debug)]
 pub struct FlattenUnion;
 
