@@ -392,7 +392,7 @@ describe(
         expect(query.indexOf('cube__hourly_data')).toBeGreaterThanOrEqual(0);
       });
 
-      it('minute query with the `week` granularity match `HourlyData` 11', async () => {
+      it('minute query with the `week` granularity match `HourlyData`', async () => {
         await compiler.compile();
         const [,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
         const [query] = request.buildSqlAndParams();
@@ -410,7 +410,7 @@ describe(
         expect(query.indexOf('cube__hourly_data')).toBeGreaterThanOrEqual(0);
       });
 
-      it('query with no granularity match HourlyData 2222', async () => {
+      it('query with no granularity match HourlyData', async () => {
         await compiler.compile();
         const [,,,,,, request] = getQueries(compiler, joinGraph, cubeEvaluator);
         const [query] = request.buildSqlAndParams();
