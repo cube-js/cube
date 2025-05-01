@@ -569,7 +569,6 @@ describe('PreAggregations', () => {
     });
   });
 
-
   if (getEnv('nativeSqlPlanner')) {
     it('simple pre-aggregation proxy time dimension', () => compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {

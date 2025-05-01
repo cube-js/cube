@@ -740,12 +740,13 @@ export class BaseQuery {
     }
 
     const res = buildResult.result;
+    const [query, params, preAggregation] = res;
     // FIXME
-    res[1] = [...res[1]];
-    if (res[2]) {
-      this.preAggregations.preAggregationForQuery = res[2];
+    const paramsArray = [...params];
+    if (preAggregation) {
+      this.preAggregations.preAggregationForQuery = preAggregation;
     }
-    return res;
+    return [query, paramsArray];
   }
 
   // FIXME Temporary solution
@@ -789,9 +790,9 @@ export class BaseQuery {
         }
       }
 
-      const res = buildResult.result;
-      if (res[2]) {
-        this.preAggregations.preAggregationForQuery = res[2];
+      const [, , preAggregation] = buildResult.result;
+      if (preAggregation) {
+        this.preAggregations.preAggregationForQuery = preAggregation;
       }
     }
     return this.preAggregations.preAggregationForQuery;

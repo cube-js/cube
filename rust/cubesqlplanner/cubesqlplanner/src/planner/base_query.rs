@@ -130,11 +130,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                         result,
                         pre_aggregation_optimizer.get_used_pre_aggregations(),
                     )
-                } else { //TODO multiple pre-aggregations sources required changes in BaseQuery
-                    (
-                        plan.clone(),
-                        Vec::new(),
-                    )
+                } else {
+                    //TODO multiple pre-aggregations sources required changes in BaseQuery
+                    (plan.clone(), Vec::new())
                 }
             } else {
                 (plan.clone(), Vec::new())
