@@ -955,7 +955,7 @@ describe('PreAggregations', () => {
     });
   });
 
-  it('non-additive view dimension', () => compiler.compile().then(() => {
+  it('non-additive view dimension', async () => {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
@@ -1009,8 +1009,8 @@ describe('PreAggregations', () => {
 
       );
     });
-  }));
-  it('non-additive proxy but not direct alias dimension', () => compiler.compile().then(() => {
+  });
+  it('non-additive proxy but not direct alias dimension', async () => {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [
@@ -1036,9 +1036,9 @@ describe('PreAggregations', () => {
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect((<any>preAggregationsDescription)[0].type).toEqual('originalSql');
-  }));
+  });
 
-  it('non-additive single value view filtered measure', () => compiler.compile().then(() => {
+  it('non-additive single value view filtered measure', async () => {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: [

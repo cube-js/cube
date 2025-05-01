@@ -477,16 +477,18 @@ export class BaseQuery {
   }
 
   newDimension(dimensionPath) {
-    const memberArr = dimensionPath.split('.');
-    if (memberArr.length > 3 &&
-          memberArr[memberArr.length - 2] === 'granularities' &&
-          this.cubeEvaluator.isDimension(memberArr.slice(0, -2))) {
-      return this.newTimeDimension(
-        {
-          dimension: this.cubeEvaluator.pathFromArray(memberArr.slice(0, -2)),
-          granularity: memberArr[memberArr.length - 1]
-        }
-      );
+    if (dimensionPath instanceof String || typeof dimensionPath === 'string') {
+      const memberArr = Array.isArray(dimensionPath) ? dimensionPath : dimensionPath.split('.');
+      if (memberArr.length > 3 &&
+            memberArr[memberArr.length - 2] === 'granularities' &&
+            this.cubeEvaluator.isDimension(memberArr.slice(0, -2))) {
+        return this.newTimeDimension(
+          {
+            dimension: this.cubeEvaluator.pathFromArray(memberArr.slice(0, -2)),
+            granularity: memberArr[memberArr.length - 1]
+          }
+        );
+      }
     }
     return new BaseDimension(this, dimensionPath);
   }
