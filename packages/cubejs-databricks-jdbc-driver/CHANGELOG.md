@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+### Features
+
+- **databricks-jdbc-driver:** Implement connection checking without waking up SQL warehouse ([#9529](https://github.com/cube-js/cube/issues/9529)) ([044341e](https://github.com/cube-js/cube/commit/044341ee1812c3a2c95c57fb20a2efeaa4e8d803))
+
 ## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

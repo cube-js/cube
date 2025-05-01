@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+### Features
+
+- **backend-native:** Allow importing modules from python files within `cube.py` and `globals.py` ([#9490](https://github.com/cube-js/cube/issues/9490)) ([b8ebf15](https://github.com/cube-js/cube/commit/b8ebf15294faa118303112a2d94990dac884e9dd))
+
 ## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
 
 **Note:** Version bump only for package @cubejs-backend/native

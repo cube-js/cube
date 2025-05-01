@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+### Bug Fixes
+
+- **cubesql:** Disable filter pushdown over Filter(CrossJoin) ([#9474](https://github.com/cube-js/cube/issues/9474)) ([940c30f](https://github.com/cube-js/cube/commit/940c30f81c0d0f73bcc58bc80d3b673d484cc067))
+
+### Features
+
+- **backend-native:** Allow importing modules from python files within `cube.py` and `globals.py` ([#9490](https://github.com/cube-js/cube/issues/9490)) ([b8ebf15](https://github.com/cube-js/cube/commit/b8ebf15294faa118303112a2d94990dac884e9dd))
+- **cubesql:** SQL push down complex window expressions ([#8788](https://github.com/cube-js/cube/issues/8788)) ([2b1bb28](https://github.com/cube-js/cube/commit/2b1bb284e1413a13f96df62fe712c61aee32fd68))
+- **cubesql:** Support trivial casts in member pushdown ([#9480](https://github.com/cube-js/cube/issues/9480)) ([85c27a9](https://github.com/cube-js/cube/commit/85c27a928a773245163406d0262c7a5bc69c69bb))
+- **databricks-jdbc-driver:** Implement connection checking without waking up SQL warehouse ([#9529](https://github.com/cube-js/cube/issues/9529)) ([044341e](https://github.com/cube-js/cube/commit/044341ee1812c3a2c95c57fb20a2efeaa4e8d803))
+
 ## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
 
 ### Bug Fixes

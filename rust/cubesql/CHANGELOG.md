@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
+
+### Bug Fixes
+
+- **cubesql:** Disable filter pushdown over Filter(CrossJoin) ([#9474](https://github.com/cube-js/cube/issues/9474)) ([940c30f](https://github.com/cube-js/cube/commit/940c30f81c0d0f73bcc58bc80d3b673d484cc067))
+
+### Features
+
+- **cubesql:** SQL push down complex window expressions ([#8788](https://github.com/cube-js/cube/issues/8788)) ([2b1bb28](https://github.com/cube-js/cube/commit/2b1bb284e1413a13f96df62fe712c61aee32fd68))
+- **cubesql:** Support trivial casts in member pushdown ([#9480](https://github.com/cube-js/cube/issues/9480)) ([85c27a9](https://github.com/cube-js/cube/commit/85c27a928a773245163406d0262c7a5bc69c69bb))
+
 ## [1.3.9](https://github.com/cube-js/cube/compare/v1.3.8...v1.3.9) (2025-04-28)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
