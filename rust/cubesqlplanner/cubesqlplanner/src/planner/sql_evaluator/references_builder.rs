@@ -36,7 +36,7 @@ impl ReferencesBuilder {
             }
         } else {
             if !self.has_source_for_leaf_memeber(&member, strict_source) {
-/*                 return Err(CubeError::internal(format!(
+                /*                 return Err(CubeError::internal(format!(
                     "Planning error: member {} has no source",
                     member_name
                 ))); */
@@ -66,7 +66,7 @@ impl ReferencesBuilder {
                 self.resolve_references_for_member(dep.clone(), strict_source, references)?
             }
         } else {
-/*             if !self.has_source_for_leaf_memeber(&member, strict_source) {
+            /*             if !self.has_source_for_leaf_memeber(&member, strict_source) {
                 return Err(CubeError::internal(format!(
                     "Planning error: member {} has no source",
                     member_name
@@ -88,7 +88,7 @@ impl ReferencesBuilder {
                 self.validete_member_for_leaf_query(dep.clone(), strict_source)?
             }
         } else {
-/*             if !self.has_source_for_leaf_memeber(&member, strict_source) {
+            /*             if !self.has_source_for_leaf_memeber(&member, strict_source) {
                 return Err(CubeError::internal(format!(
                     "Planning error: member {} has no source",
                     member.full_name()

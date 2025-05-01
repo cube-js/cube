@@ -1,12 +1,8 @@
 use super::*;
-use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::logical_plan::*;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
-use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct OriginalSqlOptimizer {
@@ -24,12 +20,12 @@ impl OriginalSqlOptimizer {
 
     pub fn try_optimize(&mut self, plan: &Rc<Query>) -> Result<Option<Rc<Query>>, CubeError> {
         let res = match plan.as_ref() {
-            Query::SimpleQuery(query) => self.try_optimize_simple_query(query)?.map(|optimized| {
-                Rc::new(Query::SimpleQuery(optimized))
-            }),
-            Query::FullKeyAggregateQuery(query) => self.try_optimize_full_key_aggregate_query(query)?.map(|optimized| {
-                Rc::new(Query::FullKeyAggregateQuery(optimized))
-            }),
+            Query::SimpleQuery(query) => self
+                .try_optimize_simple_query(query)?
+                .map(|optimized| Rc::new(Query::SimpleQuery(optimized))),
+            Query::FullKeyAggregateQuery(query) => self
+                .try_optimize_full_key_aggregate_query(query)?
+                .map(|optimized| Rc::new(Query::FullKeyAggregateQuery(optimized))),
         };
         Ok(res)
     }
@@ -59,34 +55,35 @@ impl OriginalSqlOptimizer {
         &mut self,
         full_key_aggregate: &Rc<FullKeyAggregate>,
     ) -> Result<Option<Rc<FullKeyAggregate>>, CubeError> {
-        let optimizes_sources = full_key_aggregate
-            .sources
-            .iter()
-            .map(|source| self.try_optimize_full_key_aggregate_source(source))
-            .collect::<Result<Vec<_>, _>>()?;
-        if optimizes_sources.iter().any(|source| source.is_some()) {
-            Ok(Some(Rc::new(FullKeyAggregate {
-                sources: optimizes_sources
-                    .into_iter()
-                    .zip(full_key_aggregate.sources.iter())
-                    .map(|(optimized, original)| optimized.unwrap_or_else(|| original.clone()))
-                    .collect(),
-                join_dimensions: full_key_aggregate.join_dimensions.clone(),
-                use_full_join_and_coalesce: full_key_aggregate.use_full_join_and_coalesce,
-            })))
+        let res = if let Some(resolver) = &full_key_aggregate.multiplied_measures_resolver {
+            if let Some(optimized_resolver) =
+                self.try_optimize_resolved_multiplied_measures(resolver)?
+            {
+                Some(Rc::new(FullKeyAggregate {
+                    multiplied_measures_resolver: Some(optimized_resolver),
+                    multi_stage_subquery_refs: full_key_aggregate.multi_stage_subquery_refs.clone(),
+                    join_dimensions: full_key_aggregate.join_dimensions.clone(),
+                    use_full_join_and_coalesce: full_key_aggregate.use_full_join_and_coalesce,
+                }))
+            } else {
+                None
+            }
         } else {
-            Ok(None)
-        }
+            None
+        };
+        Ok(res)
     }
-    fn try_optimize_full_key_aggregate_source(
+
+    fn try_optimize_resolved_multiplied_measures(
         &mut self,
-        source: &FullKeyAggregateSource,
-    ) -> Result<Option<FullKeyAggregateSource>, CubeError> {
+        source: &ResolvedMultipliedMeasures,
+    ) -> Result<Option<ResolvedMultipliedMeasures>, CubeError> {
         let res = match source {
-            FullKeyAggregateSource::ResolveMultipliedMeasures(resolve_multiplied_measures) => self
-                .try_optimize_multiplied_measures_resolver(resolve_multiplied_measures)?
-                .map(|resolver| FullKeyAggregateSource::ResolveMultipliedMeasures(resolver)),
-            FullKeyAggregateSource::MultiStageSubqueryRef(multi_stage_subquery_ref) => None,
+            ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
+                self.try_optimize_multiplied_measures_resolver(resolve_multiplied_measures)?
+                    .map(|resolver| ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolver))
+            }
+            ResolvedMultipliedMeasures::PreAggregation(_) => None,
         };
         Ok(res)
     }
@@ -113,10 +110,14 @@ impl OriginalSqlOptimizer {
                 .any(|subquery| subquery.is_some())
         {
             Some(Rc::new(ResolveMultipliedMeasures {
+                schema: resolver.schema.clone(),
+                filter: resolver.filter.clone(),
                 regular_measure_subqueries: optimized_regular_measure_subqueries
                     .into_iter()
                     .zip(resolver.regular_measure_subqueries.iter())
-                    .map(|(optimized, original)| optimized.map_or_else(|| original.clone(), |v| Rc::new(v)))
+                    .map(|(optimized, original)| {
+                        optimized.map_or_else(|| original.clone(), |v| Rc::new(v))
+                    })
                     .collect(),
                 aggregate_multiplied_subqueries: optimized_multiplied_subqueries
                     .into_iter()
@@ -284,23 +285,6 @@ impl OriginalSqlOptimizer {
         }
     }
 
-    fn try_optimiz_simple_query_source(
-        &mut self,
-        source: &SimpleQuerySource,
-    ) -> Result<Option<Rc<SimpleQuerySource>>, CubeError> {
-        let res = match source {
-            SimpleQuerySource::LogicalJoin(join) => {
-                if let Some(optimized) = self.try_optimize_logical_join(join)? {
-                    Some(Rc::new(SimpleQuerySource::LogicalJoin(optimized)))
-                } else {
-                    None
-                }
-            }
-            SimpleQuerySource::PreAggregation(_) => None,
-        };
-        Ok(res)
-    }
-
     fn try_optimize_logical_join(
         &mut self,
         join: &Rc<LogicalJoin>,
@@ -309,11 +293,7 @@ impl OriginalSqlOptimizer {
         let optimized_items = join
             .joins
             .iter()
-            .map(|join_item| match join_item {
-                LogicalJoinItem::CubeJoinItem(cube_join_item) => {
-                    self.try_optimize_join_item(join_item)
-                }
-            })
+            .map(|join_item| self.try_optimize_join_item(join_item))
             .collect::<Result<Vec<_>, _>>()?;
 
         let result =

@@ -1,6 +1,5 @@
 use super::pretty_print::*;
 use super::*;
-use crate::planner::BaseCube;
 use std::rc::Rc;
 
 pub enum AggregateMultipliedSubquerySouce {
@@ -35,7 +34,8 @@ impl PrettyPrint for AggregateMultipliedSubquery {
         match self.source.as_ref() {
             AggregateMultipliedSubquerySouce::Cube => {
                 result.println("Cube:", &details_state);
-                self.pk_cube.pretty_print(result, &details_state.new_level());
+                self.pk_cube
+                    .pretty_print(result, &details_state.new_level());
             }
             AggregateMultipliedSubquerySouce::MeasureSubquery(measure_subquery) => {
                 result.println(

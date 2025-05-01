@@ -88,12 +88,33 @@ impl MultipliedMeasuresQueryPlanner {
         if regular_measure_subqueries.is_empty() && aggregate_multiplied_subqueries.is_empty() {
             Ok(None)
         } else {
+            let all_measures = full_key_aggregate_measures
+                .regular_measures
+                .iter()
+                .chain(full_key_aggregate_measures.multiplied_measures.iter())
+                .map(|m| m.member_evaluator().clone())
+                .collect_vec();
+            let schema = Rc::new(LogicalSchema {
+                time_dimensions: self.query_properties.time_dimension_symbols(),
+                dimensions: self.query_properties.dimension_symbols(),
+                measures: all_measures,
+                multiplied_measures: full_key_aggregate_measures
+                    .rendered_as_multiplied_measures
+                    .clone(),
+            });
+            let logical_filter = Rc::new(LogicalFilter {
+                dimensions_filters: self.query_properties.dimensions_filters().clone(),
+                time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+                measures_filter: self.query_properties.measures_filters().clone(), //TODO may be reduce filters to only used measures here
+                segments: self.query_properties.segments().clone(),
+            });
             let result = Rc::new(ResolveMultipliedMeasures {
+                schema,
+                filter: logical_filter,
                 regular_measure_subqueries,
                 aggregate_multiplied_subqueries,
             });
             Ok(Some(result))
-
         }
     }
 

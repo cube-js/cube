@@ -23,7 +23,7 @@ impl RootSqlNode {
         measure_processor: Rc<dyn SqlNode>,
         cube_name_processor: Rc<dyn SqlNode>,
         cube_table_processor: Rc<dyn SqlNode>,
-            default_processor: Rc<dyn SqlNode>,
+        default_processor: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {
             dimension_processor,

@@ -1,8 +1,9 @@
 use super::{
     AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
-    GeoDimensionSqlNode, MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode,
+    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
+    MultiStageRankNode, MultiStageWindowNode, OriginalSqlPreAggregationSqlNode,
     RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
-    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode, FinalPreAggregationMeasureSqlNode, OriginalSqlPreAggregationSqlNode
+    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::plan::schema::QualifiedColumnName;
 use crate::planner::sql_evaluator::MeasureTimeShift;
@@ -101,11 +102,18 @@ impl SqlNodesFactory {
         self.multi_stage_window = Some(partition_by);
     }
 
-    pub fn set_pre_aggregation_measures_references(&mut self, value: HashMap<String, QualifiedColumnName>) {
+    pub fn set_pre_aggregation_measures_references(
+        &mut self,
+        value: HashMap<String, QualifiedColumnName>,
+    ) {
         self.pre_aggregation_measures_references = value;
     }
 
-    pub fn add_pre_aggregation_measure_reference(&mut self, key: String, value: QualifiedColumnName) {
+    pub fn add_pre_aggregation_measure_reference(
+        &mut self,
+        key: String,
+        value: QualifiedColumnName,
+    ) {
         self.pre_aggregation_measures_references.insert(key, value);
     }
 
@@ -152,7 +160,6 @@ impl SqlNodesFactory {
             .add_multi_stage_window_if_needed(measure_processor, measure_filter_processor.clone());
         let measure_processor = self.add_multi_stage_rank_if_needed(measure_processor);
 
-
         let root_node = RootSqlNode::new(
             self.dimension_processor(evaluate_sql_processor.clone()),
             self.time_dimension_processor(evaluate_sql_processor.clone()),
@@ -166,7 +173,10 @@ impl SqlNodesFactory {
 
     fn cube_table_processor(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
         if !self.original_sql_pre_aggregations.is_empty() {
-            OriginalSqlPreAggregationSqlNode::new(default, self.original_sql_pre_aggregations.clone())
+            OriginalSqlPreAggregationSqlNode::new(
+                default,
+                self.original_sql_pre_aggregations.clone(),
+            )
         } else {
             default
         }
@@ -213,8 +223,11 @@ impl SqlNodesFactory {
                 self.rendered_as_multiplied_measures.clone(),
                 self.count_approx_as_state,
             );
-            let final_processor = if !self.pre_aggregation_measures_references.is_empty() {   
-                FinalPreAggregationMeasureSqlNode::new(final_processor, self.pre_aggregation_measures_references.clone())
+            let final_processor = if !self.pre_aggregation_measures_references.is_empty() {
+                FinalPreAggregationMeasureSqlNode::new(
+                    final_processor,
+                    self.pre_aggregation_measures_references.clone(),
+                )
             } else {
                 final_processor
             };

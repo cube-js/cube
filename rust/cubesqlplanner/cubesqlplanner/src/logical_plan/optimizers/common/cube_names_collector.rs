@@ -45,14 +45,22 @@ impl CubeNamesCollector {
         Ok(())
     }
 
-    fn collect_from_multi_stage_member(&mut self, member: &Rc<LogicalMultiStageMember>) -> Result<(), CubeError> {
+    fn collect_from_multi_stage_member(
+        &mut self,
+        member: &Rc<LogicalMultiStageMember>,
+    ) -> Result<(), CubeError> {
         match &member.member_type {
-            MultiStageMemberLogicalType::LeafMeasure(leaf_measure) => self.collect_from_multi_stage_leaf_measure(leaf_measure),
+            MultiStageMemberLogicalType::LeafMeasure(leaf_measure) => {
+                self.collect_from_multi_stage_leaf_measure(leaf_measure)
+            }
             _ => Ok(()),
         }
     }
 
-    fn collect_from_multi_stage_leaf_measure(&mut self, leaf_measure: &MultiStageLeafMeasure) -> Result<(), CubeError> {
+    fn collect_from_multi_stage_leaf_measure(
+        &mut self,
+        leaf_measure: &MultiStageLeafMeasure,
+    ) -> Result<(), CubeError> {
         self.collect(&leaf_measure.query)?;
         Ok(())
     }
@@ -70,23 +78,25 @@ impl CubeNamesCollector {
         &mut self,
         full_key_aggregate: &Rc<FullKeyAggregate>,
     ) -> Result<(), CubeError> {
-        for source in full_key_aggregate.sources.iter() {
-            self.collect_from_full_key_aggregate_source(source)?;
+        if let Some(resolve_multiplied_measures) = &full_key_aggregate.multiplied_measures_resolver
+        {
+            self.collect_from_resolved_multiplied_measures(resolve_multiplied_measures)?;
         }
         Ok(())
     }
-    fn collect_from_full_key_aggregate_source(
-        &mut self,
-        source: &FullKeyAggregateSource,
-    ) -> Result<(), CubeError> {
-        match source {
-            FullKeyAggregateSource::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
-                self.collect_from_multiplied_measures_resolver(resolve_multiplied_measures)
-            }
-            FullKeyAggregateSource::MultiStageSubqueryRef(multi_stage_subquery_ref) => Ok(()),
-        }
-    }
 
+    fn collect_from_resolved_multiplied_measures(
+        &mut self,
+        resolved_multiplied_measures: &ResolvedMultipliedMeasures,
+    ) -> Result<(), CubeError> {
+        match resolved_multiplied_measures {
+            ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
+                self.collect_from_multiplied_measures_resolver(resolve_multiplied_measures)?
+            }
+            ResolvedMultipliedMeasures::PreAggregation(_) => {}
+        }
+        Ok(())
+    }
     fn collect_from_multiplied_measures_resolver(
         &mut self,
         resolver: &ResolveMultipliedMeasures,

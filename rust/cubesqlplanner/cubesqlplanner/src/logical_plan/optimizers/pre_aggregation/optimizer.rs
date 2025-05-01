@@ -3,9 +3,7 @@ use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
 use crate::logical_plan::*;
 use crate::plan::FilterItem;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::find_owned_by_cube_child;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::GranularityHelper;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -120,7 +118,7 @@ impl PreAggregationOptimizer {
             let source = SimpleQuerySource::PreAggregation(
                 self.make_pre_aggregation_source(pre_aggregation)?,
             );
-            let mut new_query = SimpleQuery {
+            let new_query = SimpleQuery {
                 schema: query.schema.clone(),
                 dimension_subqueries: vec![],
                 filter: query.filter.clone(),
@@ -157,30 +155,67 @@ impl PreAggregationOptimizer {
             )?;
         }
         let all_multi_stage_rewrited = rewrited_multistage.values().all(|v| *v);
-        //println!("!!! pre-aggr: {}, all_multi_stage_rewrited: {}, rewritten: {:#?}", pre_aggregation.name, all_multi_stage_rewrited, rewrited_multistage);
         if !all_multi_stage_rewrited {
             return Ok(None);
         }
 
-        let has_non_multistage = query.source.sources.iter().any(|s| matches!(s, FullKeyAggregateSource::ResolveMultipliedMeasures(_)));
-        if has_non_multistage {
-            //TODO
-            Ok(None)
-        } else {
-            let result = FullKeyAggregateQuery {
-                multistage_members: multi_stages_queries,
-                schema: query.schema.clone(),
-                filter: query.filter.clone(),
-                offset: query.offset,
-                limit: query.limit,
-                ungrouped: query.ungrouped,
-                order_by: query.order_by.clone(),
-                source: query.source.clone(),
-            };
-            Ok(Some(Rc::new(Query::FullKeyAggregateQuery(result))))
-        }
-    }
+        let source = if let Some(resolver_multiplied_measures) =
+            &query.source.multiplied_measures_resolver
+        {
+            if let ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
+                resolver_multiplied_measures,
+            ) = resolver_multiplied_measures
+            {
+                if self.is_schema_and_filters_match(
+                    &resolver_multiplied_measures.schema,
+                    &resolver_multiplied_measures.filter,
+                    &pre_aggregation,
+                )? {
+                    let pre_aggregation_source =
+                        self.make_pre_aggregation_source(pre_aggregation)?;
 
+                    let pre_aggregation_query = SimpleQuery {
+                        schema: resolver_multiplied_measures.schema.clone(),
+                        dimension_subqueries: vec![],
+                        filter: resolver_multiplied_measures.filter.clone(),
+                        offset: None,
+                        limit: None,
+                        ungrouped: false,
+                        order_by: vec![],
+                        source: SimpleQuerySource::PreAggregation(pre_aggregation_source),
+                    };
+                    Rc::new(FullKeyAggregate {
+                        join_dimensions: query.source.join_dimensions.clone(),
+                        use_full_join_and_coalesce: query.source.use_full_join_and_coalesce,
+                        multiplied_measures_resolver: Some(
+                            ResolvedMultipliedMeasures::PreAggregation(Rc::new(
+                                pre_aggregation_query,
+                            )),
+                        ),
+                        multi_stage_subquery_refs: query.source.multi_stage_subquery_refs.clone(),
+                    })
+                } else {
+                    return Ok(None);
+                }
+            } else {
+                query.source.clone()
+            }
+        } else {
+            query.source.clone()
+        };
+
+        let result = FullKeyAggregateQuery {
+            multistage_members: multi_stages_queries,
+            schema: query.schema.clone(),
+            filter: query.filter.clone(),
+            offset: query.offset,
+            limit: query.limit,
+            ungrouped: query.ungrouped,
+            order_by: query.order_by.clone(),
+            source,
+        };
+        Ok(Some(Rc::new(Query::FullKeyAggregateQuery(result))))
+    }
 
     fn try_rewrite_multistage(
         &mut self,
@@ -198,7 +233,8 @@ impl PreAggregationOptimizer {
         }
 
         if let Some(multi_stage_item) = multi_stage_queries
-            .iter().cloned()
+            .iter()
+            .cloned()
             .find(|query| &query.name == multi_stage_name)
         {
             match &multi_stage_item.member_type {
@@ -210,14 +246,15 @@ impl PreAggregationOptimizer {
                         rewrited_multistage,
                         pre_aggregation,
                     )?,
-                MultiStageMemberLogicalType::MeasureCalculation(multi_stage_measure_calculation) => self
-                    .try_rewrite_multistage_measure_calculation(
-                        multi_stage_name,
-                        multi_stage_measure_calculation,
-                        multi_stage_queries,
-                        rewrited_multistage,
-                        pre_aggregation,
-                    )?,
+                MultiStageMemberLogicalType::MeasureCalculation(
+                    multi_stage_measure_calculation,
+                ) => self.try_rewrite_multistage_measure_calculation(
+                    multi_stage_name,
+                    multi_stage_measure_calculation,
+                    multi_stage_queries,
+                    rewrited_multistage,
+                    pre_aggregation,
+                )?,
                 MultiStageMemberLogicalType::GetDateRange(multi_stage_get_date_range) => self
                     .try_rewrite_multistage_get_date_range(
                         multi_stage_name,
@@ -256,7 +293,8 @@ impl PreAggregationOptimizer {
         rewrited_multistage: &mut HashMap<String, bool>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<(), CubeError> {
-        let used_multi_stage_symbols = self.collect_multi_stage_symbols(&multi_stage_measure_calculation.source);
+        let used_multi_stage_symbols =
+            self.collect_multi_stage_symbols(&multi_stage_measure_calculation.source);
         for (_, multi_stage_name) in used_multi_stage_symbols.iter() {
             self.try_rewrite_multistage(
                 multi_stage_name,
@@ -315,13 +353,13 @@ impl PreAggregationOptimizer {
 
     fn try_rewrite_multistage_get_date_range(
         &mut self,
-        multi_stage_name: &String,
-        multi_stage_get_date_range: &MultiStageGetDateRange,
-        multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
-        rewrited_multistage: &mut HashMap<String, bool>,
-        pre_aggregation: &Rc<CompiledPreAggregation>,
+        _multi_stage_name: &String,
+        _multi_stage_get_date_range: &MultiStageGetDateRange,
+        _multi_stage_queries: &mut Vec<Rc<LogicalMultiStageMember>>,
+        _rewrited_multistage: &mut HashMap<String, bool>,
+        _pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<(), CubeError> {
-        Ok(()) //TODO!!!
+        Ok(()) //TODO
     }
 
     fn try_rewrite_multistage_leaf_measure(
@@ -364,14 +402,9 @@ impl PreAggregationOptimizer {
 
     fn collect_multi_stage_symbols(&self, source: &FullKeyAggregate) -> HashMap<String, String> {
         let mut symbols = HashMap::new();
-        for source in source.sources.iter() {
-            match source {
-                FullKeyAggregateSource::ResolveMultipliedMeasures(_) => {}
-                FullKeyAggregateSource::MultiStageSubqueryRef(subquery_ref) => {
-                    for symbol in subquery_ref.symbols.iter() {
-                        symbols.insert(symbol.full_name(), subquery_ref.name.clone());
-                    }
-                }
+        for source in source.multi_stage_subquery_refs.iter() {
+            for symbol in source.symbols.iter() {
+                symbols.insert(symbol.full_name(), source.name.clone());
             }
         }
         symbols
@@ -437,7 +470,6 @@ impl PreAggregationOptimizer {
     ) -> Result<bool, CubeError> {
         let helper = OptimizerHelper::new();
 
-        //println!("!!! ========");
         let match_state = self.match_dimensions(
             &schema.dimensions,
             &schema.time_dimensions,
@@ -446,27 +478,19 @@ impl PreAggregationOptimizer {
             &filters.segments,
             pre_aggregation,
         )?;
-        //println!("!!!! pre-agg-name: {}, match_state: {:?}", pre_aggregation.name, match_state);
 
         let all_measures = helper.all_measures(schema, filters);
-        /*         if !schema.multiplied_measures.is_empty() && match_state == MatchState::Partial {
-            return Ok(false);
-        }
-        if match_state == MatchState::NotMatched {
-            return Ok(false);
-        } */
-        let measures_match = self.try_match_measures(
-            &all_measures,
-            pre_aggregation,
-            match_state == MatchState::Partial,
-        )?;
-        //println!("!!!! pre-agg-name: {}, match_state: {:?}, measures_match: {}", pre_aggregation.name, match_state, measures_match);
         if !schema.multiplied_measures.is_empty() && match_state == MatchState::Partial {
             return Ok(false);
         }
         if match_state == MatchState::NotMatched {
             return Ok(false);
         }
+        let measures_match = self.try_match_measures(
+            &all_measures,
+            pre_aggregation,
+            match_state == MatchState::Partial,
+        )?;
         Ok(measures_match)
     }
 
@@ -495,9 +519,14 @@ impl PreAggregationOptimizer {
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<MatchState, CubeError> {
         let mut matcher = DimensionMatcher::new(self.query_tools.clone(), pre_aggregation);
-        matcher.try_match(dimensions, time_dimensions, filters, time_dimension_filters, segments)?;
+        matcher.try_match(
+            dimensions,
+            time_dimensions,
+            filters,
+            time_dimension_filters,
+            segments,
+        )?;
         let result = matcher.result();
         Ok(result)
     }
-
 }

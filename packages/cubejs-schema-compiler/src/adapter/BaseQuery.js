@@ -289,6 +289,12 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
+    if (this.useNativeSqlPlanner) {
+      const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
+      this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
+    } else {
+      this.useNativePreAggregations = false;
+    }
     this.prebuildJoin();
 
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
@@ -471,6 +477,17 @@ export class BaseQuery {
   }
 
   newDimension(dimensionPath) {
+    const memberArr = dimensionPath.split('.');
+    if (memberArr.length > 3 &&
+          memberArr[memberArr.length - 2] === 'granularities' &&
+          this.cubeEvaluator.isDimension(memberArr.slice(0, -2))) {
+      return this.newTimeDimension(
+        {
+          dimension: this.cubeEvaluator.pathFromArray(memberArr.slice(0, -2)),
+          granularity: memberArr[memberArr.length - 1]
+        }
+      );
+    }
     return new BaseDimension(this, dimensionPath);
   }
 
@@ -637,33 +654,34 @@ export class BaseQuery {
    */
   buildSqlAndParams(exportAnnotatedSql) {
     if (this.useNativeSqlPlanner) {
-      const isRelatedToPreAggregation = false;
-      /*       if (this.options.preAggregationQuery) {
-        isRelatedToPreAggregation = true;
-      } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
-        if (this.externalPreAggregationQuery()) {
+      let isRelatedToPreAggregation = false;
+
+      if (!this.canUseNativeSqlPlannerPreAggregation) {
+        if (this.options.preAggregationQuery) {
           isRelatedToPreAggregation = true;
+        } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
+          if (this.externalPreAggregationQuery()) {
+            isRelatedToPreAggregation = true;
+          }
+        } else {
+          let preAggForQuery =
+            this.preAggregations.findPreAggregationForQuery();
+          if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
+            preAggForQuery = undefined;
+          }
+          if (preAggForQuery) {
+            isRelatedToPreAggregation = true;
+          }
         }
-      } else {
-        let preAggForQuery =
-          this.preAggregations.findPreAggregationForQuery();
-        if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
-          preAggForQuery = undefined;
-        }
-        if (preAggForQuery) {
-          isRelatedToPreAggregation = true;
+
+        if (isRelatedToPreAggregation) {
+          return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
         }
       }
 
-      if (isRelatedToPreAggregation) {
-        return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
-      } */
-
-      console.log("!!!!!! EEEEEEEEEE");
       return this.buildSqlAndParamsRust(exportAnnotatedSql);
     }
 
-      console.log("!!!!!! RRRRRRRRR");
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
@@ -1333,7 +1351,6 @@ export class BaseQuery {
 
   childrenMultiStageContext(memberPath, queryContext, wouldNodeApplyFilters) {
     let member;
-    console.log("!!!! children ", memberPath);
     if (this.cubeEvaluator.isMeasure(memberPath)) {
       member = this.newMeasure(memberPath);
     } else if (this.cubeEvaluator.isDimension(memberPath)) {

@@ -6,8 +6,8 @@ use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 use std::any::Any;
-use std::rc::Rc;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub struct FinalPreAggregationMeasureSqlNode {
     input: Rc<dyn SqlNode>,
@@ -15,7 +15,10 @@ pub struct FinalPreAggregationMeasureSqlNode {
 }
 
 impl FinalPreAggregationMeasureSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>, references: HashMap<String, QualifiedColumnName>) -> Rc<Self> {
+    pub fn new(
+        input: Rc<dyn SqlNode>,
+        references: HashMap<String, QualifiedColumnName>,
+    ) -> Rc<Self> {
         Rc::new(Self { input, references })
     }
 
@@ -36,7 +39,6 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Measure(ev) => {
                 if let Some(reference) = self.references.get(&node.full_name()) {
-
                     let table_ref = reference.source().as_ref().map_or_else(
                         || format!(""),
                         |table_name| format!("{}.", query_tools.escape_column_name(table_name)),
@@ -46,15 +48,17 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                         table_ref,
                         query_tools.escape_column_name(&reference.name())
                     );
-                   if ev.measure_type() == "count" || ev.measure_type() == "sum" {
-                       format!("sum({})", pre_aggregation_measure)
-                   } else if ev.measure_type() == "countDistinctApprox" {
-                       query_tools.base_tools().count_distinct_approx(pre_aggregation_measure)?
-                   } else if ev.measure_type() == "min" || ev.measure_type() == "max" {
-                       format!("{}({})", ev.measure_type(), pre_aggregation_measure)
-                   } else {
-                       format!("sum({})", pre_aggregation_measure)
-                   }
+                    if ev.measure_type() == "count" || ev.measure_type() == "sum" {
+                        format!("sum({})", pre_aggregation_measure)
+                    } else if ev.measure_type() == "countDistinctApprox" {
+                        query_tools
+                            .base_tools()
+                            .count_distinct_approx(pre_aggregation_measure)?
+                    } else if ev.measure_type() == "min" || ev.measure_type() == "max" {
+                        format!("{}({})", ev.measure_type(), pre_aggregation_measure)
+                    } else {
+                        format!("sum({})", pre_aggregation_measure)
+                    }
                 } else {
                     self.input.to_sql(
                         visitor,

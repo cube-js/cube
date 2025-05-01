@@ -7,8 +7,8 @@ mod member_childs_collector;
 mod multiplied_measures_collector;
 mod sub_query_dimensions;
 
-pub use find_owned_by_cube::*;
 pub use cube_names_collector::*;
+pub use find_owned_by_cube::*;
 
 pub use has_cumulative_members::{has_cumulative_members, HasCumulativeMembersCollector};
 pub use has_multi_stage_members::{has_multi_stage_members, HasMultiStageMembersCollector};

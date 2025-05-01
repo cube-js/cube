@@ -1,6 +1,6 @@
+use super::*;
 use crate::planner::BaseCube;
 use std::rc::Rc;
-use super::*;
 
 #[derive(Clone)]
 pub struct OriginalSqlPreAggregation {
@@ -34,15 +34,18 @@ impl Cube {
         Rc::new(Self {
             name: cube.name().clone(),
             cube,
-            original_sql_pre_aggregation: None
+            original_sql_pre_aggregation: None,
         })
     }
 
-    pub fn with_original_sql_pre_aggregation(self: Rc<Self>, original_sql_pre_aggregation: OriginalSqlPreAggregation) -> Rc<Self> {
+    pub fn with_original_sql_pre_aggregation(
+        self: Rc<Self>,
+        original_sql_pre_aggregation: OriginalSqlPreAggregation,
+    ) -> Rc<Self> {
         Rc::new(Self {
             name: self.name.clone(),
             cube: self.cube.clone(),
-            original_sql_pre_aggregation: Some(original_sql_pre_aggregation)
+            original_sql_pre_aggregation: Some(original_sql_pre_aggregation),
         })
     }
 }

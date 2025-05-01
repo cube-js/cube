@@ -143,7 +143,7 @@ impl MemberSymbol {
             Self::Measure(m) => m.owned_by_cube(),
             Self::CubeName(_) => false,
             Self::CubeTable(_) => false,
-            Self::MemberExpression(e) => false,
+            Self::MemberExpression(_) => false,
         }
     }
 

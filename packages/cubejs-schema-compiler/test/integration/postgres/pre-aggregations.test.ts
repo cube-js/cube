@@ -1916,7 +1916,6 @@ describe('PreAggregations', () => {
     });
 
     const queryAndParams = query.buildSqlAndParams();
-    console.log('!!! ---', queryAndParams);
     const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect(query.preAggregations?.preAggregationForQuery?.canUsePreAggregation).toEqual(true);

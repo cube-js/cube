@@ -1,8 +1,8 @@
-use cubenativeutils::CubeError;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
+use cubenativeutils::CubeError;
 use std::fmt::Debug;
 use std::rc::Rc;
 #[derive(Clone)]
@@ -17,7 +17,6 @@ pub struct CompiledPreAggregation {
     pub allow_non_strict_date_range_match: bool,
 }
 
-
 impl Debug for CompiledPreAggregation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CompiledPreAggregation")
@@ -28,7 +27,10 @@ impl Debug for CompiledPreAggregation {
             .field("measures", &self.measures)
             .field("dimensions", &self.dimensions)
             .field("time_dimensions", &self.time_dimensions)
-            .field("allow_non_strict_date_range_match", &self.allow_non_strict_date_range_match)
+            .field(
+                "allow_non_strict_date_range_match",
+                &self.allow_non_strict_date_range_match,
+            )
             .finish()
     }
 }
@@ -62,7 +64,7 @@ impl CompiledPreAggregation {
                 refs,
                 Self::check_if_time_dimension,
             )?;
-/*             if dims.len() != 1 {
+            /*             if dims.len() != 1 {
                 return Err(CubeError::user(format!(
                     "Pre aggregation should contains only one time dimension"
                 )));
@@ -71,7 +73,10 @@ impl CompiledPreAggregation {
         } else {
             Vec::new()
         };
-        let allow_non_strict_date_range_match = description.static_data().allow_non_strict_date_range_match.unwrap_or(false);
+        let allow_non_strict_date_range_match = description
+            .static_data()
+            .allow_non_strict_date_range_match
+            .unwrap_or(false);
         let res = Rc::new(Self {
             name: static_data.name.clone(),
             cube_name: cube_name.clone(),
@@ -80,7 +85,7 @@ impl CompiledPreAggregation {
             measures,
             dimensions,
             time_dimensions,
-            allow_non_strict_date_range_match
+            allow_non_strict_date_range_match,
         });
         Ok(res)
     }

@@ -206,10 +206,10 @@ impl MultiStageMemberQueryPlanner {
             .input_cte_aliases()
             .into_iter()
             .map(|(name, symbols)| {
-                FullKeyAggregateSource::MultiStageSubqueryRef(Rc::new(MultiStageSubqueryRef {
+                Rc::new(MultiStageSubqueryRef {
                     name: name.clone(),
                     symbols: symbols.clone(),
-                }))
+                })
             })
             .collect_vec();
 
@@ -226,7 +226,8 @@ impl MultiStageMemberQueryPlanner {
                     .map(|d| d.member_evaluator().clone())
                     .collect(),
                 use_full_join_and_coalesce: true,
-                sources: input_sources,
+                multiplied_measures_resolver: None,
+                multi_stage_subquery_refs: input_sources,
             }),
         };
 

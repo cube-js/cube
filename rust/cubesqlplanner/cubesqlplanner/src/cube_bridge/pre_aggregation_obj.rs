@@ -1,8 +1,4 @@
-use super::member_sql::{MemberSql, NativeMemberSql};
-use cubenativeutils::wrappers::serializer::{
-    NativeDeserialize, NativeDeserializer, NativeSerialize,
-};
-use cubenativeutils::wrappers::NativeArray;
+use cubenativeutils::wrappers::serializer::{NativeDeserialize, NativeSerialize};
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
@@ -22,5 +18,4 @@ pub struct PreAggregationObjStatic {
 }
 
 #[nativebridge::native_bridge(PreAggregationObjStatic)]
-pub trait PreAggregationObj {
-}
+pub trait PreAggregationObj {}

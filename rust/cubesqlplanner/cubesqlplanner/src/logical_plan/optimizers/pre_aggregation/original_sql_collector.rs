@@ -1,10 +1,8 @@
-use super::*;
 use crate::logical_plan::*;
+use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::planner::query_tools::QueryTools;
 
 pub struct OriginalSqlCollector {
     query_tools: Rc<QueryTools>,
@@ -34,15 +32,13 @@ impl OriginalSqlCollector {
                 } else {
                     found_pre_aggregation.static_data().name.clone()
                 };
-                let table_name = self.query_tools.base_tools().pre_aggregation_table_name(
-                    cube_name.clone(),
-                    name,
-                )?;
+                let table_name = self
+                    .query_tools
+                    .base_tools()
+                    .pre_aggregation_table_name(cube_name.clone(), name)?;
                 result.insert(cube_name.clone(), table_name.clone());
             }
         }
         Ok(result)
     }
 }
-        
-    

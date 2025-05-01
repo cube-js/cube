@@ -3,4 +3,3 @@ mod helper;
 
 pub use cube_names_collector::*;
 pub use helper::*;
-

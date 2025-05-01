@@ -30,7 +30,7 @@ impl MeasureMatcher {
                     }
                 }
             }
-            MemberSymbol::MemberExpression(member_expression) => {
+            MemberSymbol::MemberExpression(_) => {
                 return Ok(false); //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it
             }
             _ => return Ok(false),

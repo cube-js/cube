@@ -1,13 +1,11 @@
 use super::filter_operator::FilterOperator;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{MemberSymbol, TimeDimensionSymbol};
+use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_templates::filter::FilterTemplates;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{evaluate_with_context, VisitorContext, FiltersContext};
 use crate::planner::QueryDateTimeHelper;
+use crate::planner::{evaluate_with_context, FiltersContext, VisitorContext};
 use cubenativeutils::CubeError;
-use lazy_static::lazy_static;
-use regex::Regex;
 use std::rc::Rc;
 
 const FROM_PARTITION_RANGE: &'static str = "__FROM_PARTITION_RANGE";
@@ -38,7 +36,6 @@ impl PartialEq for BaseFilter {
             && self.values == other.values
     }
 }
-
 
 impl BaseFilter {
     pub fn try_new(
@@ -92,7 +89,7 @@ impl BaseFilter {
 
     //FIXME Not very good solution, but suitable for check time dimension filters in pre-aggregations
     pub fn time_dimension_symbol(&self) -> Option<Rc<MemberSymbol>> {
-        if let Ok(time_dimension) = self.member_evaluator.as_time_dimension() {
+        if self.member_evaluator.as_time_dimension().is_ok() {
             Some(self.member_evaluator.clone())
         } else {
             None
@@ -135,16 +132,22 @@ impl BaseFilter {
                 plan_templates,
             )?;
             let filters_context = context.filters_context();
-            
+
             let res = match self.filter_operator {
                 FilterOperator::Equal => self.equals_where(&member_sql, filters_context)?,
                 FilterOperator::NotEqual => self.not_equals_where(&member_sql, filters_context)?,
                 FilterOperator::InDateRange => self.in_date_range(&member_sql, filters_context)?,
                 FilterOperator::BeforeDate => self.before_date(&member_sql, filters_context)?,
-                FilterOperator::BeforeOrOnDate => self.before_or_on_date(&member_sql, filters_context)?,
+                FilterOperator::BeforeOrOnDate => {
+                    self.before_or_on_date(&member_sql, filters_context)?
+                }
                 FilterOperator::AfterDate => self.after_date(&member_sql, filters_context)?,
-                FilterOperator::AfterOrOnDate => self.after_or_on_date(&member_sql, filters_context)?,
-                FilterOperator::NotInDateRange => self.not_in_date_range(&member_sql, filters_context)?,
+                FilterOperator::AfterOrOnDate => {
+                    self.after_or_on_date(&member_sql, filters_context)?
+                }
+                FilterOperator::NotInDateRange => {
+                    self.not_in_date_range(&member_sql, filters_context)?
+                }
                 FilterOperator::RegularRollingWindowDateRange => {
                     self.regular_rolling_window_date_range(&member_sql, filters_context)?
                 }
@@ -160,11 +163,19 @@ impl BaseFilter {
                 FilterOperator::Lt => self.lt_where(&member_sql, filters_context)?,
                 FilterOperator::Lte => self.lte_where(&member_sql, filters_context)?,
                 FilterOperator::Contains => self.contains_where(&member_sql, filters_context)?,
-                FilterOperator::NotContains => self.not_contains_where(&member_sql, filters_context)?,
-                FilterOperator::StartsWith => self.starts_with_where(&member_sql, filters_context)?,
-                FilterOperator::NotStartsWith => self.not_starts_with_where(&member_sql, filters_context)?,
+                FilterOperator::NotContains => {
+                    self.not_contains_where(&member_sql, filters_context)?
+                }
+                FilterOperator::StartsWith => {
+                    self.starts_with_where(&member_sql, filters_context)?
+                }
+                FilterOperator::NotStartsWith => {
+                    self.not_starts_with_where(&member_sql, filters_context)?
+                }
                 FilterOperator::EndsWith => self.ends_with_where(&member_sql, filters_context)?,
-                FilterOperator::NotEndsWith => self.not_ends_with_where(&member_sql, filters_context)?,
+                FilterOperator::NotEndsWith => {
+                    self.not_ends_with_where(&member_sql, filters_context)?
+                }
                 FilterOperator::MeasureFilter => {
                     return Err(CubeError::internal(format!(
                         "Measure filter should be processed separately"
@@ -214,7 +225,11 @@ impl BaseFilter {
         Ok(res)
     }
 
-    fn equals_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn equals_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let need_null_check = self.is_need_null_chek(false);
         if self.is_array_value() {
             self.templates.in_where(
@@ -230,7 +245,11 @@ impl BaseFilter {
         }
     }
 
-    fn not_equals_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn not_equals_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let need_null_check = self.is_need_null_chek(true);
         if self.is_array_value() {
             self.templates.not_in_where(
@@ -246,42 +265,66 @@ impl BaseFilter {
         }
     }
 
-    fn in_date_range(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn in_date_range(
+        &self,
+        member_sql: &str,
+        filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let (from, to) = self.allocate_date_params(use_db_time_zone)?;
         self.templates
             .time_range_filter(member_sql.to_string(), from, to)
     }
 
-    fn not_in_date_range(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn not_in_date_range(
+        &self,
+        member_sql: &str,
+        filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let (from, to) = self.allocate_date_params(use_db_time_zone)?;
         self.templates
             .time_not_in_range_filter(member_sql.to_string(), from, to)
     }
 
-    fn before_date(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn before_date(
+        &self,
+        member_sql: &str,
+        filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let value = self.first_timestamp_param(use_db_time_zone)?;
 
         self.templates.lt(member_sql.to_string(), value)
     }
 
-    fn before_or_on_date(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn before_or_on_date(
+        &self,
+        member_sql: &str,
+        filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let value = self.first_timestamp_param(use_db_time_zone)?;
 
         self.templates.lte(member_sql.to_string(), value)
     }
 
-    fn after_date(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn after_date(
+        &self,
+        member_sql: &str,
+        filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let value = self.first_timestamp_param(use_db_time_zone)?;
 
         self.templates.gt(member_sql.to_string(), value)
     }
 
-    fn after_or_on_date(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn after_or_on_date(
+        &self,
+        member_sql: &str,
+        filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
         let value = self.first_timestamp_param(use_db_time_zone)?;
 
@@ -309,7 +352,11 @@ impl BaseFilter {
         }
     }
 
-    fn regular_rolling_window_date_range(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn regular_rolling_window_date_range(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let (from, to) = self.allocate_date_params(false)?;
 
         let from = if self.values.len() >= 3 {
@@ -340,7 +387,11 @@ impl BaseFilter {
         }
     }
 
-    fn to_date_rolling_window_date_range(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn to_date_rolling_window_date_range(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let (from, to) = self.allocate_date_params(false)?;
 
         let from = if self.values.len() >= 3 {
@@ -366,7 +417,11 @@ impl BaseFilter {
         self.templates.time_range_filter(date_field, from, to)
     }
 
-    fn in_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn in_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let need_null_check = self.is_need_null_chek(false);
         self.templates.in_where(
             member_sql.to_string(),
@@ -375,7 +430,11 @@ impl BaseFilter {
         )
     }
 
-    fn not_in_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn not_in_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         let need_null_check = self.is_need_null_chek(true);
         self.templates.not_in_where(
             member_sql.to_string(),
@@ -384,55 +443,103 @@ impl BaseFilter {
         )
     }
 
-    fn set_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn set_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.templates.set_where(member_sql.to_string())
     }
 
-    fn not_set_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn not_set_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.templates.not_set_where(member_sql.to_string())
     }
 
-    fn gt_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn gt_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.templates
             .gt(member_sql.to_string(), self.first_param()?)
     }
 
-    fn gte_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn gte_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.templates
             .gte(member_sql.to_string(), self.first_param()?)
     }
 
-    fn lt_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn lt_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.templates
             .lt(member_sql.to_string(), self.first_param()?)
     }
 
-    fn lte_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn lte_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.templates
             .lte(member_sql.to_string(), self.first_param()?)
     }
 
-    fn contains_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn contains_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.like_or_where(member_sql, false, true, true)
     }
 
-    fn not_contains_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn not_contains_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.like_or_where(member_sql, true, true, true)
     }
 
-    fn starts_with_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn starts_with_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.like_or_where(member_sql, false, false, true)
     }
 
-    fn not_starts_with_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn not_starts_with_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.like_or_where(member_sql, true, false, true)
     }
 
-    fn ends_with_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn ends_with_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.like_or_where(member_sql, false, true, false)
     }
 
-    fn not_ends_with_where(&self, member_sql: &str, filters_context: &FiltersContext) -> Result<String, CubeError> {
+    fn not_ends_with_where(
+        &self,
+        member_sql: &str,
+        _filters_context: &FiltersContext,
+    ) -> Result<String, CubeError> {
         self.like_or_where(member_sql, true, true, false)
     }
 

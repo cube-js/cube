@@ -70,13 +70,15 @@ impl MultiStageQueryPlanner {
         let top_level_ctes = multi_stage_members
             .into_iter()
             .map(|memb| -> Result<_, CubeError> {
-                let description = self
-                    .make_queries_descriptions(
-                        memb.member_evaluator().clone(),
-                        state.clone(),
-                        &mut descriptions,
-                    )?;
-                let result = (description.alias().clone(), vec![description.member_node().clone()]);
+                let description = self.make_queries_descriptions(
+                    memb.member_evaluator().clone(),
+                    state.clone(),
+                    &mut descriptions,
+                )?;
+                let result = (
+                    description.alias().clone(),
+                    vec![description.member_node().clone()],
+                );
                 Ok(result)
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -99,7 +101,7 @@ impl MultiStageQueryPlanner {
             .map(|(alias, symbols)| {
                 Rc::new(MultiStageSubqueryRef {
                     name: alias.clone(),
-                    symbols: symbols.clone()
+                    symbols: symbols.clone(),
                 })
             })
             .collect_vec();

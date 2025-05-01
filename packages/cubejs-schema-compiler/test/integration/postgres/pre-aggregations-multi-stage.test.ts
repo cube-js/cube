@@ -86,13 +86,6 @@ describe('PreAggregationsMultiStage', () => {
       createdAt: {
         type: 'time',
         sql: 'created_at',
-        granularities: {
-            three_days: {
-              interval: '1 days',
-              title: '1 days',
-              origin: '2017-01-01'
-            }
-        }
       },
       checkinsCount: {
         type: 'number',
@@ -107,7 +100,7 @@ describe('PreAggregationsMultiStage', () => {
 
       createdAtDay: {
         type: 'time',
-        sql: \`\${createdAt.three_days}\`,
+        sql: \`\${createdAt.day}\`,
       },
 
 
@@ -129,9 +122,9 @@ describe('PreAggregationsMultiStage', () => {
             granularity: 'day',
             partitionGranularity: 'month',
         },
-        revenueAndTimeRollup: {
+        revenueAndTimeAndCountRollup: {
             type: 'rollup',
-            measureReferences: [revenue],
+            measureReferences: [revenue, count],
             dimensionReferences: [source],
             timeDimensionReference: createdAt,
             granularity: 'day',
@@ -200,7 +193,6 @@ describe('PreAggregationsMultiStage', () => {
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
       const sqlAndParams = query.buildSqlAndParams();
-      console.log('!!!! sqlAndParamsl', sqlAndParams);
       expect(preAggregationsDescription[0].tableName).toEqual('vis_revenue_per_id_rollup');
       expect(sqlAndParams[0]).toContain('vis_revenue_per_id_rollup');
 
@@ -228,9 +220,8 @@ describe('PreAggregationsMultiStage', () => {
         );
       });
     }));
-  }
 
-    it('simple multi stage with add_group_by and time proxy dimension 11', () => compiler.compile().then(() => {
+    it('simple multi stage with add_group_by and time proxy dimension', () => compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
           'visitors.revenueAndTime'
@@ -245,12 +236,10 @@ describe('PreAggregationsMultiStage', () => {
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
       const sqlAndParams = query.buildSqlAndParams();
-      console.log('!!!! sqlAndParamsl', sqlAndParams);
-      expect(preAggregationsDescription[0].tableName).toEqual('vis_revenue_and_time_rollup');
-      expect(sqlAndParams[0]).toContain('vis_revenue_and_time_rollup');
+      expect(preAggregationsDescription[0].tableName).toEqual('vis_revenue_and_time_and_count_rollup');
+      expect(sqlAndParams[0]).toContain('vis_revenue_and_time_and_count_rollup');
 
       return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-        console.log('!!!! res', res);
         expect(res).toEqual(
           [
             { vis__source: 'google', vis__revenue_and_time: '25' },
@@ -262,36 +251,40 @@ describe('PreAggregationsMultiStage', () => {
       });
     }));
 
-    it('simple multi stage with add_group_by and time proxy dimension tttmp', () => compiler.compile().then(() => {
+    it('multi stage with add_group_by and time proxy dimension and regular measure', () => compiler.compile().then(() => {
       const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
         measures: [
-          'visitors.testMeas'
+          'visitors.revenueAndTime',
+          'visitors.count'
         ],
-        dimensions: ['visitor_checkins.source'],
+        dimensions: ['visitors.source'],
         timezone: 'America/Los_Angeles',
         order: [{
-          id: 'visitor_checkins.source'
+          id: 'visitors.source'
         }],
         preAggregationsSchema: ''
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
       const sqlAndParams = query.buildSqlAndParams();
-     console.log('!!!! sqlAndParamsl', sqlAndParams);
-/*       console.log('!!!! sqlAndParamsl', sqlAndParams);
-      expect(preAggregationsDescription[0].tableName).toEqual('vis_revenue_and_time_rollup');
-      expect(sqlAndParams[0]).toContain('vis_revenue_and_time_rollup'); */
+      expect(preAggregationsDescription[0].tableName).toEqual('vis_revenue_and_time_and_count_rollup');
+      expect(sqlAndParams[0]).toContain('vis_revenue_and_time_and_count_rollup');
+      expect(sqlAndParams[0]).not.toContain('select * from visitors');
 
       return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
-        console.log('!!!! res', res);
         expect(res).toEqual(
           [
-            { vis__source: 'google', vis__revenue_and_time: '25' },
-            { vis__source: 'some', vis__revenue_and_time: '50' },
-            { vis__source: null, vis__revenue_and_time: '50' }
+            { vis__source: 'google', vis__count: '1', vis__revenue_and_time: '25' },
+            { vis__source: 'some', vis__count: '2', vis__revenue_and_time: '50' },
+            { vis__source: null, vis__count: '3', vis__revenue_and_time: '50' }
           ]
 
         );
       });
     }));
+  } else {
+    it.skip('multi stage pre-aggregations', () => {
+      // Skipping because it works only in Tesseract
+    });
+  }
 });

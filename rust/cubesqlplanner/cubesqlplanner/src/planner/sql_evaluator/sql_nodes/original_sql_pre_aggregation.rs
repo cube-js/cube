@@ -1,5 +1,4 @@
 use super::SqlNode;
-use crate::plan::QualifiedColumnName;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
@@ -19,7 +18,10 @@ impl OriginalSqlPreAggregationSqlNode {
         input: Rc<dyn SqlNode>,
         original_pre_aggregations: HashMap<String, String>,
     ) -> Rc<Self> {
-        Rc::new(Self { input, original_sql_pre_aggregations: original_pre_aggregations })
+        Rc::new(Self {
+            input,
+            original_sql_pre_aggregations: original_pre_aggregations,
+        })
     }
 
     pub fn input(&self) -> &Rc<dyn SqlNode> {
@@ -38,7 +40,9 @@ impl SqlNode for OriginalSqlPreAggregationSqlNode {
     ) -> Result<String, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::CubeTable(ev) => {
-                if let Some(original_sql_table_name) = self.original_sql_pre_aggregations.get(ev.cube_name()) {
+                if let Some(original_sql_table_name) =
+                    self.original_sql_pre_aggregations.get(ev.cube_name())
+                {
                     format!("{}", original_sql_table_name)
                 } else {
                     self.input.to_sql(

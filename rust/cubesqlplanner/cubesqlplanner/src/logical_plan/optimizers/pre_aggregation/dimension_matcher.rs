@@ -1,7 +1,7 @@
 use super::CompiledPreAggregation;
 use super::MatchState;
 use crate::plan::filter::FilterGroupOperator;
-use crate::plan::{Filter, FilterItem};
+use crate::plan::FilterItem;
 use crate::planner::filter::BaseFilter;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::DimensionSymbol;
@@ -37,7 +37,7 @@ impl<'a> DimensionMatcher<'a> {
             pre_aggregation,
             pre_aggregation_dimensions,
             pre_aggregation_time_dimensions,
-            result: MatchState::Full
+            result: MatchState::Full,
         }
     }
 
@@ -97,11 +97,12 @@ impl<'a> DimensionMatcher<'a> {
             MatchState::Partial
         };
         self.result = self.result.combine(&dimension_coverage_result);
-        let time_dimension_coverage_result = if self.pre_aggregation_time_dimensions.values().all(|v| v.1) {
-            MatchState::Full
-        } else {
-            MatchState::Partial
-        };
+        let time_dimension_coverage_result =
+            if self.pre_aggregation_time_dimensions.values().all(|v| v.1) {
+                MatchState::Full
+            } else {
+                MatchState::Partial
+            };
         self.result = self.result.combine(&time_dimension_coverage_result);
         self.result
     }

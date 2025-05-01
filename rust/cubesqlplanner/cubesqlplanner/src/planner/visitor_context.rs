@@ -8,22 +8,21 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct FiltersContext {
-    pub use_local_tz: bool
+    pub use_local_tz: bool,
 }
 
 impl Default for FiltersContext {
     fn default() -> Self {
         Self {
-            use_local_tz: false
+            use_local_tz: false,
         }
     }
 }
 
-
 pub struct VisitorContext {
     node_processor: Rc<dyn SqlNode>,
     all_filters: Option<Filter>, //To pass to FILTER_PARAMS and FILTER_GROUP
-    filters_context: FiltersContext
+    filters_context: FiltersContext,
 }
 
 impl VisitorContext {
@@ -49,7 +48,6 @@ impl VisitorContext {
     pub fn filters_context(&self) -> &FiltersContext {
         &self.filters_context
     }
-    
 }
 
 pub fn evaluate_with_context(

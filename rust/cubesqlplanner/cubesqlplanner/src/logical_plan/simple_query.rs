@@ -11,7 +11,9 @@ impl PrettyPrint for SimpleQuerySource {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         match self {
             SimpleQuerySource::LogicalJoin(join) => join.pretty_print(result, state),
-            SimpleQuerySource::PreAggregation(pre_aggregation) => pre_aggregation.pretty_print(result, state),
+            SimpleQuerySource::PreAggregation(pre_aggregation) => {
+                pre_aggregation.pretty_print(result, state)
+            }
         }
     }
 }

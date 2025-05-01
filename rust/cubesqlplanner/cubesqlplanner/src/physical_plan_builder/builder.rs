@@ -1,5 +1,4 @@
 use crate::logical_plan::*;
-use crate::planner::BaseMemberHelper;
 use crate::plan::schema::QualifiedColumnName;
 use crate::plan::*;
 use crate::planner::query_properties::OrderByItem;
@@ -9,6 +8,7 @@ use crate::planner::sql_evaluator::MeasureTimeShift;
 use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::ReferencesBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::BaseMemberHelper;
 use crate::planner::SqlJoinCondition;
 use crate::planner::{BaseMember, MemberSymbolRef};
 use cubenativeutils::CubeError;
@@ -63,7 +63,11 @@ impl PhysicalPlanBuilder {
         }
     }
 
-    pub fn build(&self, logical_plan: Rc<Query>, original_sql_pre_aggregations: HashMap<String, String>) -> Result<Rc<Select>, CubeError> {
+    pub fn build(
+        &self,
+        logical_plan: Rc<Query>,
+        original_sql_pre_aggregations: HashMap<String, String>,
+    ) -> Result<Rc<Select>, CubeError> {
         let mut context = PhysicalPlanBuilderContext::default();
         context.original_sql_pre_aggregations = original_sql_pre_aggregations;
         self.build_impl(logical_plan, &context)
@@ -91,22 +95,25 @@ impl PhysicalPlanBuilder {
         let mut measure_references = HashMap::new();
         let mut context_factory = context.make_sql_nodes_factory();
         let from = match &logical_plan.source {
-            SimpleQuerySource::LogicalJoin(join) => {
-                self.process_logical_join(
-                    &join,
-                    context,
-                    &logical_plan.dimension_subqueries,
-                    &mut render_references,
-                )?
-            },
+            SimpleQuerySource::LogicalJoin(join) => self.process_logical_join(
+                &join,
+                context,
+                &logical_plan.dimension_subqueries,
+                &mut render_references,
+            )?,
             SimpleQuerySource::PreAggregation(pre_aggregation) => {
-                let res = self.process_pre_aggregation(pre_aggregation, context, &mut render_references, &mut measure_references)?;
+                let res = self.process_pre_aggregation(
+                    pre_aggregation,
+                    context,
+                    &mut render_references,
+                    &mut measure_references,
+                )?;
                 for member in logical_plan.schema.time_dimensions.iter() {
                     context_factory.add_dimensions_with_ignored_timezone(member.full_name());
                 }
                 context_factory.set_use_local_tz_in_date_range(true);
                 res
-            },
+            }
         };
 
         let mut select_builder = SelectBuilder::new(from);
@@ -165,9 +172,19 @@ impl PhysicalPlanBuilder {
         Ok(res)
     }
 
-    fn process_pre_aggregation(&self, pre_aggregation: &Rc<PreAggregation>, context: &PhysicalPlanBuilderContext, render_references: &mut HashMap<String, QualifiedColumnName>, measure_references: &mut HashMap<String, QualifiedColumnName>) -> Result<Rc<From>, CubeError> {
+    fn process_pre_aggregation(
+        &self,
+        pre_aggregation: &Rc<PreAggregation>,
+        _context: &PhysicalPlanBuilderContext,
+        render_references: &mut HashMap<String, QualifiedColumnName>,
+        measure_references: &mut HashMap<String, QualifiedColumnName>,
+    ) -> Result<Rc<From>, CubeError> {
         let mut pre_aggregation_schema = Schema::empty();
-        let pre_aggregation_alias = PlanSqlTemplates::memeber_alias_name(&pre_aggregation.cube_name, &pre_aggregation.name, &None);
+        let pre_aggregation_alias = PlanSqlTemplates::memeber_alias_name(
+            &pre_aggregation.cube_name,
+            &pre_aggregation.name,
+            &None,
+        );
         for dim in pre_aggregation.dimensions.iter() {
             let alias = BaseMemberHelper::default_alias(
                 &dim.cube_name(),
@@ -175,7 +192,10 @@ impl PhysicalPlanBuilder {
                 &dim.alias_suffix(),
                 self.query_tools.clone(),
             )?;
-            render_references.insert(dim.full_name(), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+            render_references.insert(
+                dim.full_name(),
+                QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
+            );
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(dim.full_name())));
         }
         for (dim, granularity) in pre_aggregation.time_dimensions.iter() {
@@ -185,10 +205,15 @@ impl PhysicalPlanBuilder {
                 granularity,
                 self.query_tools.clone(),
             )?;
-            render_references.insert(dim.full_name(), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+            render_references.insert(
+                dim.full_name(),
+                QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
+            );
             if let Some(granularity) = &granularity {
-
-                render_references.insert(format!("{}_{}", dim.full_name(), granularity), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+                render_references.insert(
+                    format!("{}_{}", dim.full_name(), granularity),
+                    QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
+                );
             }
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(dim.full_name())));
         }
@@ -199,10 +224,17 @@ impl PhysicalPlanBuilder {
                 &meas.alias_suffix(),
                 self.query_tools.clone(),
             )?;
-            measure_references.insert(meas.full_name(), QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()));
+            measure_references.insert(
+                meas.full_name(),
+                QualifiedColumnName::new(Some(pre_aggregation_alias.clone()), alias.clone()),
+            );
             pre_aggregation_schema.add_column(SchemaColumn::new(alias, Some(meas.full_name())));
         }
-        let from = From::new_from_table_reference(pre_aggregation.table_name.clone(), Rc::new(pre_aggregation_schema), Some(pre_aggregation_alias));
+        let from = From::new_from_table_reference(
+            pre_aggregation.table_name.clone(),
+            Rc::new(pre_aggregation_schema),
+            Some(pre_aggregation_alias),
+        );
         Ok(from)
     }
 
@@ -344,27 +376,24 @@ impl PhysicalPlanBuilder {
         multi_stage_schemas: &HashMap<String, Rc<Schema>>,
     ) -> Result<(Rc<From>, usize), CubeError> {
         let mut joins = Vec::new();
-        for source in full_key_aggregate.sources.iter() {
-            match source {
-                FullKeyAggregateSource::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
-                    joins.append(&mut self.process_resolve_multiplied_measures(
-                        resolve_multiplied_measures,
-                        context,
-                    )?);
-                }
-                FullKeyAggregateSource::MultiStageSubqueryRef(subquery_ref) => {
-                    if let Some(schema) = multi_stage_schemas.get(&subquery_ref.name) {
-                        joins.push(SingleSource::TableReference(
-                            subquery_ref.name.clone(),
-                            schema.clone(),
-                        ));
-                    } else {
-                        return Err(CubeError::internal(format!(
-                            "MultiStageSubqueryRef not found: {}",
-                            subquery_ref.name
-                        )));
-                    }
-                }
+        if let Some(resolver_multiplied_measures) = &full_key_aggregate.multiplied_measures_resolver
+        {
+            joins.append(
+                &mut self
+                    .process_resolved_multiplied_measures(resolver_multiplied_measures, context)?,
+            );
+        }
+        for subquery_ref in full_key_aggregate.multi_stage_subquery_refs.iter() {
+            if let Some(schema) = multi_stage_schemas.get(&subquery_ref.name) {
+                joins.push(SingleSource::TableReference(
+                    subquery_ref.name.clone(),
+                    schema.clone(),
+                ));
+            } else {
+                return Err(CubeError::internal(format!(
+                    "MultiStageSubqueryRef not found: {}",
+                    subquery_ref.name
+                )));
             }
         }
 
@@ -425,6 +454,25 @@ impl PhysicalPlanBuilder {
 
         let result = From::new_from_join(join_builder.build());
         Ok((result, joins.len()))
+    }
+
+    fn process_resolved_multiplied_measures(
+        &self,
+        resolved_multiplied_measures: &ResolvedMultipliedMeasures,
+        context: &PhysicalPlanBuilderContext,
+    ) -> Result<Vec<SingleSource>, CubeError> {
+        match resolved_multiplied_measures {
+            ResolvedMultipliedMeasures::ResolveMultipliedMeasures(resolve_multiplied_measures) => {
+                self.process_resolve_multiplied_measures(resolve_multiplied_measures, context)
+            }
+            ResolvedMultipliedMeasures::PreAggregation(pre_aggregation_query) => {
+                let pre_aggregation_query =
+                    self.build_simple_query(pre_aggregation_query, context)?;
+                let source =
+                    SingleSource::Subquery(Rc::new(QueryPlan::Select(pre_aggregation_query)));
+                Ok(vec![source])
+            }
+        }
     }
 
     fn process_resolve_multiplied_measures(
@@ -589,8 +637,9 @@ impl PhysicalPlanBuilder {
             .keys_subquery
             .primary_keys_dimensions;
         let pk_cube = aggregate_multiplied_subquery.pk_cube.clone();
-        let pk_cube_alias =
-            pk_cube.cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube.default_alias())));
+        let pk_cube_alias = pk_cube
+            .cube
+            .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube.default_alias())));
         match aggregate_multiplied_subquery.source.as_ref() {
             AggregateMultipliedSubquerySouce::Cube => {
                 let conditions = primary_keys_dimensions

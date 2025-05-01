@@ -71,23 +71,21 @@ impl TimeDimensionSymbol {
     pub fn get_dependencies_as_time_dimensions(&self) -> Vec<Rc<MemberSymbol>> {
         self.get_dependencies()
             .into_iter()
-            .map(|s| {
-                match s.as_ref() {
-                    MemberSymbol::Dimension(dimension_symbol) => {
-                        if dimension_symbol.dimension_type() == "time" {
-                            let result = Self::new(
-                                s.clone(),
-                                self.granularity.clone(), 
-                                self.granularity_obj.clone(),
-                                self.date_range.clone(),
-                            );
-                            Rc::new(MemberSymbol::TimeDimension(result))
-                        } else {
-                            s.clone()
-                        }
-                    },
-                    _ => s.clone()
+            .map(|s| match s.as_ref() {
+                MemberSymbol::Dimension(dimension_symbol) => {
+                    if dimension_symbol.dimension_type() == "time" {
+                        let result = Self::new(
+                            s.clone(),
+                            self.granularity.clone(),
+                            self.granularity_obj.clone(),
+                            self.date_range.clone(),
+                        );
+                        Rc::new(MemberSymbol::TimeDimension(result))
+                    } else {
+                        s.clone()
+                    }
                 }
+                _ => s.clone(),
             })
             .collect()
     }

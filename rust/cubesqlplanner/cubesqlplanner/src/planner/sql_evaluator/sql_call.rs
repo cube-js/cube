@@ -46,22 +46,17 @@ impl SqlCall {
     }
 
     pub fn is_direct_reference(&self) -> Result<bool, CubeError> {
-
         let dependencies = self.get_dependencies();
         if dependencies.len() != 1 {
             return Ok(false);
         }
 
         let reference_candidate = dependencies[0].clone();
-        
+
         let args = self
             .deps
             .iter()
-            .map(|d| {
-                self.evaluate_single_dep_for_ref_check(
-                    &d,
-                )
-            })
+            .map(|d| self.evaluate_single_dep_for_ref_check(&d))
             .collect::<Result<Vec<_>, _>>()?;
         let eval_result = self.member_sql.call(args)?;
 
@@ -91,7 +86,7 @@ impl SqlCall {
                     for (_, granularity) in dep.granularities.iter() {
                         result.push(granularity.clone());
                     }
-                },
+                }
                 Dependency::ContextDependency(_) => {}
             }
         }
@@ -193,7 +188,6 @@ impl SqlCall {
             };
         }
     }
-    
 
     //TODO temporary solution, should be removed after refactoring
     fn evaluate_single_dep_for_ref_check(
@@ -205,12 +199,8 @@ impl SqlCall {
             Dependency::TimeDimensionDependency(dep) => {
                 self.evaluate_time_dimesion_dep_for_ref_check(dep)
             }
-            Dependency::CubeDependency(dep) => self.evaluate_cube_dep_for_ref_check(
-                dep,
-            ),
-            Dependency::ContextDependency(contex_symbol) => {
-                Ok(MemberSqlArg::String(format!("Context Symbol")))
-            }
+            Dependency::CubeDependency(dep) => self.evaluate_cube_dep_for_ref_check(dep),
+            Dependency::ContextDependency(_) => Ok(MemberSqlArg::String(format!("Context Symbol"))),
         }
     }
 
@@ -224,22 +214,19 @@ impl SqlCall {
             res.sql_fn = Some(sql_fn.full_name());
         }
         if let Some(to_string_fn) = &dep.to_string_fn {
-            res.to_string_fn =
-                Some(to_string_fn.full_name());
+            res.to_string_fn = Some(to_string_fn.full_name());
         }
         for (k, v) in dep.properties.iter() {
             let prop_res = match v {
-                CubeDepProperty::SymbolDependency(dep) => {
-                    MemberSqlArg::String(dep.full_name())
+                CubeDepProperty::SymbolDependency(dep) => MemberSqlArg::String(dep.full_name()),
+
+                CubeDepProperty::TimeDimensionDependency(dep) => {
+                    self.evaluate_time_dimesion_dep_for_ref_check(dep)?
                 }
 
-                CubeDepProperty::TimeDimensionDependency(dep) => self.evaluate_time_dimesion_dep_for_ref_check(
-                    dep,
-                )?,
-
-                CubeDepProperty::CubeDependency(dep) => self.evaluate_cube_dep_for_ref_check(
-                    &dep,
-                )?,
+                CubeDepProperty::CubeDependency(dep) => {
+                    self.evaluate_cube_dep_for_ref_check(&dep)?
+                }
             };
             res.properties.insert(k.clone(), prop_res);
         }
