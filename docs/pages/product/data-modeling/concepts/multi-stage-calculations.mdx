@@ -242,7 +242,7 @@ For example, comparing revenue sales to the overall average:
 
 - name: revenue_per_city_sq_feet
   multi_stage: true
-  sql: "{revenue} / NULLIF({occupied_sq_feet_per_city}, 0)"
+  sql: "CASE WHEN {occupied_sq_feet_per_city} = 0 THEN NULL ELSE {revenue} / (CASE WHEN {occupied_sq_feet_per_city} = 0 THEN 0.1 ELSE {occupied_sq_feet_per_city} END) END"
   type: number
 ```
 
