@@ -1,5 +1,4 @@
 use datafusion::{arrow::datatypes::DataType, logical_plan::Column};
-use itertools::Itertools;
 use std::{collections::HashMap, ops::RangeFrom, sync::Arc};
 use uuid::Uuid;
 
@@ -11,8 +10,6 @@ use super::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, V1CubeMetaExt};
 pub struct MetaContext {
     pub cubes: Vec<CubeMeta>,
     pub tables: Vec<CubeMetaTable>,
-    // TODO remove this in favor of `member_to_data_source`
-    pub cube_to_data_source: HashMap<String, String>,
     pub member_to_data_source: HashMap<String, String>,
     pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
     pub compiler_id: Uuid,
@@ -111,28 +108,11 @@ impl MetaContext {
         Self {
             cubes,
             tables,
-            cube_to_data_source,
             member_to_data_source,
             data_source_to_sql_generator,
             compiler_id,
             created_at: chrono::Utc::now(),
         }
-    }
-
-    // TODO remove this in favor of source-per-member
-    pub fn sql_generator_by_alias_to_cube(
-        &self,
-        alias_to_cube: &Vec<(String, String)>,
-    ) -> Option<Arc<dyn SqlGenerator + Send + Sync>> {
-        let data_source = alias_to_cube
-            .iter()
-            .map(|(_, c)| self.cube_to_data_source.get(c))
-            .all_equal_value();
-
-        // Don't care for non-equal data sources, nor for missing cube_to_data_source keys
-        let data_source = data_source.ok()??;
-
-        self.data_source_to_sql_generator.get(data_source).cloned()
     }
 
     pub fn data_source_for_member_name(&self, member: &str) -> Result<DataSource, DataSourceError> {
