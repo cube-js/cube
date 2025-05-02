@@ -11,7 +11,9 @@ use super::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, V1CubeMetaExt};
 pub struct MetaContext {
     pub cubes: Vec<CubeMeta>,
     pub tables: Vec<CubeMetaTable>,
+    // TODO remove this in favor of `member_to_data_source`
     pub cube_to_data_source: HashMap<String, String>,
+    pub member_to_data_source: HashMap<String, String>,
     pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
     pub compiler_id: Uuid,
     /// DateTime when MetaContext was created, but it can be used as last schema update when
@@ -42,6 +44,7 @@ impl MetaContext {
     pub fn new(
         cubes: Vec<CubeMeta>,
         cube_to_data_source: HashMap<String, String>,
+        member_to_data_source: HashMap<String, String>,
         data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
         compiler_id: Uuid,
     ) -> Self {
@@ -73,6 +76,7 @@ impl MetaContext {
             cubes,
             tables,
             cube_to_data_source,
+            member_to_data_source,
             data_source_to_sql_generator,
             compiler_id,
             created_at: chrono::Utc::now(),
@@ -251,8 +255,13 @@ mod tests {
         ];
 
         // TODO
-        let test_context =
-            MetaContext::new(test_cubes, HashMap::new(), HashMap::new(), Uuid::new_v4());
+        let test_context = MetaContext::new(
+            test_cubes,
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            Uuid::new_v4(),
+        );
 
         match test_context.find_cube_table_with_oid(18000) {
             Some(table) => assert_eq!(18000, table.oid),

@@ -142,7 +142,7 @@ impl TransportService for NodeBridgeTransport {
 
         let channel = self.channel.clone();
 
-        let (cube_to_data_source, data_source_to_sql_generator) =
+        let (cube_to_data_source, member_to_data_source, data_source_to_sql_generator) =
             call_raw_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.sql_generators.clone(),
@@ -160,6 +160,17 @@ impl TransportService for NodeBridgeTransport {
                         key_to_values(cx, cube_to_data_source_obj, |cx, v| {
                             let res = v.downcast::<JsString, _>(cx).map_cube_err(
                                 "Can't cast value to string in cube_to_data_source",
+                            )?;
+                            Ok(res.value(cx))
+                        })?;
+
+                    let member_to_data_source_obj = obj
+                        .get::<JsObject, _, _>(cx, "memberToDataSource")
+                        .map_cube_err("Can't cast memberToDataSource to object")?;
+                    let member_to_data_source =
+                        key_to_values(cx, member_to_data_source_obj, |cx, v| {
+                            let res = v.downcast::<JsString, _>(cx).map_cube_err(
+                                "Can't cast value to string in member_to_data_source",
                             )?;
                             Ok(res.value(cx))
                         })?;
@@ -183,7 +194,11 @@ impl TransportService for NodeBridgeTransport {
                             Ok(res)
                         })?;
 
-                    Ok((cube_to_data_source, data_source_to_sql_generator))
+                    Ok((
+                        cube_to_data_source,
+                        member_to_data_source,
+                        data_source_to_sql_generator,
+                    ))
                 }),
             )
             .await?;
@@ -209,6 +224,7 @@ impl TransportService for NodeBridgeTransport {
         Ok(Arc::new(MetaContext::new(
             response.cubes.unwrap_or_default(),
             cube_to_data_source,
+            member_to_data_source,
             data_source_to_sql_generator,
             compiler_id,
         )))
