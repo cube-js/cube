@@ -3883,11 +3883,11 @@ export class BaseQuery {
    * @returns {BaseQuery}
    */
   // eslint-disable-next-line consistent-return
-  preAggregationQueryForSqlEvaluation(cube, preAggregation) {
+  preAggregationQueryForSqlEvaluation(cube, preAggregation, context = {}) {
     if (preAggregation.type === 'autoRollup') {
       return this.preAggregations.autoRollupPreAggregationQuery(cube, preAggregation);
     } else if (preAggregation.type === 'rollup') {
-      return this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
+      return this.preAggregations.rollupPreAggregationQuery(cube, preAggregation, context);
     } else if (preAggregation.type === 'originalSql') {
       return this;
     }

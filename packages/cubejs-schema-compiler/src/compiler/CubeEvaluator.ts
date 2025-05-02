@@ -121,6 +121,7 @@ export type PreAggregationReferences = {
   measures: Array<string>,
   timeDimensions: Array<PreAggregationTimeDimensionReference>,
   rollups: Array<string>,
+  multipliedMeasures?: Array<string>,
 };
 
 export type PreAggregationInfo = {
