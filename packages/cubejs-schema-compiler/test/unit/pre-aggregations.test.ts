@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
@@ -446,5 +448,166 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription[0].loadSql[1]).toEqual(['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']);
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][0].includes('WHERE ((date(created_at) >= $1::timestamptz AND date(created_at) <= $2::timestamptz))')).toBeTruthy();
     expect(preAggregationsDescription[0].invalidateKeyQueries[0][1]).toEqual(['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']);
+  });
+
+  describe('rollup with multiplied measure', () => {
+    let compiler;
+    let cubeEvaluator;
+    let joinGraph;
+
+    beforeAll(async () => {
+      const modelContent = fs.readFileSync(
+        path.join(process.cwd(), '/test/unit/fixtures/orders_and_items_multiplied_pre_agg.yml'),
+        'utf8'
+      );
+      ({ compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(modelContent));
+      await compiler.compile();
+    });
+
+    it('measure is unmultiplied in query but multiplied in pre-agg', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'orders.total_qty'
+        ],
+        dimensions: [],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2017-05-01',
+              '2025-05-01'
+            ]
+          }
+        ]
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      // Pre-agg should not match
+      expect(preAggregationsDescription).toEqual([]);
+    });
+
+    it('measure is unmultiplied in query but multiplied in pre-agg + granularity', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'orders.total_qty'
+        ],
+        dimensions: [],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2017-05-01',
+              '2025-05-01'
+            ],
+            granularity: 'month'
+          }
+        ]
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      // Pre-agg should not match
+      expect(preAggregationsDescription).toEqual([]);
+    });
+
+    it('measure is unmultiplied in query but multiplied in pre-agg + granularity + local dimension', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'orders.total_qty'
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2017-05-01',
+              '2025-05-01'
+            ],
+            granularity: 'month'
+          }
+        ]
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      // Pre-agg should not match
+      expect(preAggregationsDescription).toEqual([]);
+    });
+
+    it('measure is unmultiplied in query but multiplied in pre-agg + granularity + external dimension', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'orders.total_qty'
+        ],
+        dimensions: [
+          'line_items.product_id'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2017-05-01',
+              '2025-05-01'
+            ],
+            granularity: 'month'
+          }
+        ]
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      // Pre-agg should not match
+      expect(preAggregationsDescription).toEqual([]);
+    });
+
+    it('partial-match of query with pre-agg: 1 measure + all dimensions, no granularity', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'orders.total_qty'
+        ],
+        dimensions: [
+          'orders.status',
+          'line_items.product_id'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2017-05-01',
+              '2025-05-01'
+            ]
+          }
+        ]
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      // Pre-agg should not match
+      expect(preAggregationsDescription).toEqual([]);
+    });
+
+    it('full-match of query with pre-agg: 1 measure + granularity + all dimensions', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [
+          'orders.total_qty'
+        ],
+        dimensions: [
+          'orders.status',
+          'line_items.product_id'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.created_at',
+            dateRange: [
+              '2017-05-01',
+              '2025-05-01'
+            ],
+            granularity: 'month'
+          }
+        ]
+      });
+
+      const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+      expect(preAggregationsDescription.length).toEqual(1);
+      expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.pre_agg_with_multiplied_measures');
+    });
   });
 });
