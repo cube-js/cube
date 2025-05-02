@@ -656,10 +656,6 @@ fn get_test_tenant_ctx_with_meta_and_templates(
     meta: Vec<CubeMeta>,
     custom_templates: Vec<(String, String)>,
 ) -> Arc<MetaContext> {
-    let cube_to_data_source = meta
-        .iter()
-        .map(|c| (c.name.clone(), "default".to_string()))
-        .collect();
     let member_to_data_source = meta
         .iter()
         .flat_map(|cube| {
@@ -673,7 +669,6 @@ fn get_test_tenant_ctx_with_meta_and_templates(
         .collect();
     Arc::new(MetaContext::new(
         meta,
-        cube_to_data_source,
         member_to_data_source,
         vec![("default".to_string(), sql_generator(custom_templates))]
             .into_iter()

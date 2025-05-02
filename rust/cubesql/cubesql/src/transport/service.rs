@@ -250,7 +250,6 @@ impl TransportService for HttpTransport {
             response.cubes.unwrap_or_else(Vec::new),
             HashMap::new(),
             HashMap::new(),
-            HashMap::new(),
             Uuid::new_v4(),
         ));
 
