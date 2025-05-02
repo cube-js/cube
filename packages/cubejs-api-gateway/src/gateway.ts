@@ -1486,7 +1486,6 @@ class ApiGateway {
       const query = {
         requestId: context.requestId,
       };
-      const cubeNameToDataSource = await compilerApi.cubeNameToDataSource(query);
       const memberToDataSource: Record<string, string> = await compilerApi.memberToDataSource(query);
 
       const dataSources = new Set(Object.values(memberToDataSource));
@@ -1494,7 +1493,7 @@ class ApiGateway {
         [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
-      res({ cubeNameToDataSource, memberToDataSource, dataSourceToSqlGenerator });
+      res({ memberToDataSource, dataSourceToSqlGenerator });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
