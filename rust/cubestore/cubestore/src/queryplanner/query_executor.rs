@@ -12,7 +12,7 @@ use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetad
 use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
 use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, pp_plan, PPOptions};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
@@ -204,7 +204,13 @@ impl QueryExecutor for QueryExecutorImpl {
             debug!(
                 "Slow Query Physical Plan ({:?}): {}",
                 execution_time,
-                pp_phys_plan(split_plan.as_ref())
+                pp_phys_plan_ext(
+                    split_plan.as_ref(),
+                    &PPOptions {
+                        show_metrics: true,
+                        ..PPOptions::none()
+                    }
+                ),
             );
         }
         if results.is_err() {
@@ -273,12 +279,18 @@ impl QueryExecutor for QueryExecutorImpl {
             warn!(
                 "Slow Partition Query ({:?}):\n{}",
                 execution_time.elapsed()?,
-                pp_plan(&logical_plan)
+                pp_plan(&logical_plan),
             );
             debug!(
                 "Slow Partition Query Physical Plan ({:?}): {}",
                 execution_time.elapsed()?,
-                pp_phys_plan(worker_plan.as_ref())
+                pp_phys_plan_ext(
+                    worker_plan.as_ref(),
+                    &PPOptions {
+                        show_metrics: true,
+                        ..PPOptions::none()
+                    }
+                ),
             );
         }
         if results.is_err() {
