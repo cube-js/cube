@@ -748,51 +748,46 @@ export class BaseQuery {
 
   // FIXME Temporary solution
   findPreAggregationForQueryRust() {
-    if (!this.preAggregations.preAggregationForQuery) {
-      let optionsOrder = this.options.order;
-      if (optionsOrder && !Array.isArray(optionsOrder)) {
-        optionsOrder = [optionsOrder];
-      }
-      const order = optionsOrder ? R.pipe(
-        R.map((hash) => ((!hash || !hash.id) ? null : hash)),
-        R.reject(R.isNil),
-      )(optionsOrder) : undefined;
+    let optionsOrder = this.options.order;
+    if (optionsOrder && !Array.isArray(optionsOrder)) {
+      optionsOrder = [optionsOrder];
+    }
+    const order = optionsOrder ? R.pipe(
+      R.map((hash) => ((!hash || !hash.id) ? null : hash)),
+      R.reject(R.isNil),
+    )(optionsOrder) : undefined;
 
-      const queryParams = {
-        measures: this.options.measures,
-        dimensions: this.options.dimensions,
-        segments: this.options.segments,
-        timeDimensions: this.options.timeDimensions,
-        timezone: this.options.timezone,
-        joinGraph: this.joinGraph,
-        cubeEvaluator: this.cubeEvaluator,
-        order,
-        filters: this.options.filters,
-        limit: this.options.limit ? this.options.limit.toString() : null,
-        rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
-        offset: this.options.offset ? this.options.offset.toString() : null,
-        baseTools: this,
-        ungrouped: this.options.ungrouped,
-        exportAnnotatedSql: false,
-        preAggregationQuery: this.options.preAggregationQuery
-      };
+    const queryParams = {
+      measures: this.options.measures,
+      dimensions: this.options.dimensions,
+      segments: this.options.segments,
+      timeDimensions: this.options.timeDimensions,
+      timezone: this.options.timezone,
+      joinGraph: this.joinGraph,
+      cubeEvaluator: this.cubeEvaluator,
+      order,
+      filters: this.options.filters,
+      limit: this.options.limit ? this.options.limit.toString() : null,
+      rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+      offset: this.options.offset ? this.options.offset.toString() : null,
+      baseTools: this,
+      ungrouped: this.options.ungrouped,
+      exportAnnotatedSql: false,
+      preAggregationQuery: this.options.preAggregationQuery
+    };
 
-      const buildResult = nativeBuildSqlAndParams(queryParams);
+    const buildResult = nativeBuildSqlAndParams(queryParams);
 
-      if (buildResult.error) {
-        if (buildResult.error.cause === 'User') {
-          throw new UserError(buildResult.error.message);
-        } else {
-          throw new Error(buildResult.error.message);
-        }
-      }
-
-      const [, , preAggregation] = buildResult.result;
-      if (preAggregation) {
-        this.preAggregations.preAggregationForQuery = preAggregation;
+    if (buildResult.error) {
+      if (buildResult.error.cause === 'User') {
+        throw new UserError(buildResult.error.message);
+      } else {
+        throw new Error(buildResult.error.message);
       }
     }
-    return this.preAggregations.preAggregationForQuery;
+
+    const [, , preAggregation] = buildResult.result;
+    return preAggregation;
   }
 
   allCubeMembers(path) {

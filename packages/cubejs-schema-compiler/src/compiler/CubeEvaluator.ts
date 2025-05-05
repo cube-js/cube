@@ -520,7 +520,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
-  public preAggregationsForCubeAsArray(path: string): Record<string, any> {
+  public preAggregationsForCubeAsArray(path: string) {
     return Object.entries(this.cubeFromPath(path).preAggregations || {}).map(([name, preAggregation]) => ({
       name,
       ...(preAggregation as Record<string, any>)

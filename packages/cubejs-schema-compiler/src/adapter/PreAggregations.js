@@ -783,7 +783,7 @@ export class PreAggregations {
   findPreAggregationForQuery() {
     if (!this.preAggregationForQuery) {
       if (this.query.useNativeSqlPlanner && this.query.canUseNativeSqlPlannerPreAggregation) {
-        this.query.findPreAggregationForQueryRust();
+        this.preAggregationForQuery = this.query.findPreAggregationForQueryRust();
       } else {
         this.preAggregationForQuery =
           this
@@ -875,7 +875,7 @@ export class PreAggregations {
     const preAggregation = R.pipe(
       R.toPairs,
       R.filter(([_, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
-      R.find(([_, a]) => a.name === preAggregationName)
+      R.find(([k, _]) => k === preAggregationName)
     )(this.query.cubeEvaluator.preAggregationsForCube(cube));
     if (preAggregation) {
       const tableName = this.preAggregationTableName(cube, preAggregation[0], preAggregation[1]);
