@@ -534,7 +534,7 @@ describe('PreAggregations', () => {
   });
 
   describe('partitionPreAggregations', () => {
-    test('should construct correct partitionPreAggregations for dateRange in UTC', async () => {
+    test('should construct correct partitionPreAggregations for dateRange in UTC (Day partitions)', async () => {
       const loader = createLoader({
         timezone: 'UTC',
       });
@@ -576,7 +576,7 @@ describe('PreAggregations', () => {
       expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
     });
 
-    test('should construct correct partitionPreAggregations for dateRange in America/New_York', async () => {
+    test('should construct correct partitionPreAggregations for dateRange in America/New_York (Day partitions)', async () => {
       const loader = createLoader({
         timezone: 'America/New_York', // UTC-5
       });
@@ -618,7 +618,7 @@ describe('PreAggregations', () => {
       expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-04T04:59:59.999');
     });
 
-    test('should construct correct partitionPreAggregations for dateRange in Asia/Tokyo', async () => {
+    test('should construct correct partitionPreAggregations for dateRange in Asia/Tokyo (Day partitions)', async () => {
       const loader = createLoader({
         timezone: 'Asia/Tokyo', // UTC+9
       });
@@ -657,6 +657,138 @@ describe('PreAggregations', () => {
       expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-03T14:59:59.999');
       expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240103')).toBeTruthy();
       expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-02T15:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T14:59:59.999');
+    });
+
+    test('should construct correct partitionPreAggregations for dateRange in UTC (Hour partitions)', async () => {
+      const loader = createLoader({
+        partitionGranularity: 'hour',
+        timezone: 'UTC',
+      });
+
+      const results = await loader.partitionPreAggregations();
+      expect(results.length).toEqual(72);
+
+      let [preAggDesc] = results;
+      expect(preAggDesc.tableName).toEqual('test_table2024010100'); // Partition tables are the same for all time zones
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T00:00:00.000'); // buildRange is the same for all time zones
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
+
+      [, preAggDesc] = results;
+      expect(preAggDesc.tableName).toEqual('test_table2024010101');
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
+
+      // eslint-disable-next-line prefer-destructuring
+      preAggDesc = results[71];
+      expect(preAggDesc.tableName).toEqual('test_table2024010323');
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
+    });
+
+    test('should construct correct partitionPreAggregations for dateRange in America/New_York (Hour partitions)', async () => {
+      const loader = createLoader({
+        partitionGranularity: 'hour',
+        timezone: 'America/New_York', // UTC-5
+      });
+
+      const results = await loader.partitionPreAggregations();
+      expect(results.length).toEqual(72);
+
+      let [preAggDesc] = results;
+      expect(preAggDesc.tableName).toEqual('test_table2024010100'); // Partition tables are the same for all time zones
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T00:00:00.000'); // buildRange is the same for all time zones
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T05:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T05:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T05:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T05:59:59.999');
+
+      [, preAggDesc] = results;
+      expect(preAggDesc.tableName).toEqual('test_table2024010101');
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T06:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T06:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T06:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T06:59:59.999');
+
+      // eslint-disable-next-line prefer-destructuring
+      preAggDesc = results[71];
+      expect(preAggDesc.tableName).toEqual('test_table2024010323');
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-04T04:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-04T04:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-04T04:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-04T04:59:59.999');
+    });
+
+    test('should construct correct partitionPreAggregations for dateRange in Asia/Tokyo (Hour partitions)', async () => {
+      const loader = createLoader({
+        partitionGranularity: 'hour',
+        timezone: 'Asia/Tokyo', // UTC+9
+      });
+
+      const results = await loader.partitionPreAggregations();
+      expect(results.length).toEqual(72);
+
+      let [preAggDesc] = results;
+      expect(preAggDesc.tableName).toEqual('test_table2024010100'); // Partition tables are the same for all time zones
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T00:00:00.000'); // buildRange is the same for all time zones
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2023-12-31T15:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2023-12-31T15:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2023-12-31T15:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2023-12-31T15:59:59.999');
+
+      [, preAggDesc] = results;
+      expect(preAggDesc.tableName).toEqual('test_table2024010101');
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2023-12-31T16:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2023-12-31T16:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2023-12-31T16:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2023-12-31T16:59:59.999');
+
+      // eslint-disable-next-line prefer-destructuring
+      preAggDesc = results[71];
+      expect(preAggDesc.tableName).toEqual('test_table2024010323');
+      expect(preAggDesc.buildRangeStart).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.buildRangeEnd).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T14:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-03T14:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T14:00:00.000');
       expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T14:59:59.999');
     });
   });
