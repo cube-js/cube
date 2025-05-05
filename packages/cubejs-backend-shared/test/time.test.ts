@@ -295,7 +295,7 @@ describe('extractDate', () => {
   it('should parse a date without timezone as UTC', () => {
     const input = [{ date: '2025-02-28 12:00:00' }];
     const result = parseUtcIntoLocalDate(input, timezone);
-    expect(result).toBe('2025-02-28T12:00:00.000');
+    expect(result).toBe('2025-02-28T14:00:00.000');
   });
 
   it('should handle multiple formats', () => {
@@ -304,8 +304,8 @@ describe('extractDate', () => {
     const input3 = [{ date: '2025-02-28T12:00:00Z' }];
     const input4 = [{ date: '2025-02-28T12:00:00+03:00' }];
 
-    expect(parseUtcIntoLocalDate(input1, timezone)).toBe('2025-02-28T12:00:00.000');
-    expect(parseUtcIntoLocalDate(input2, timezone)).toBe('2025-02-28T12:00:00.000');
+    expect(parseUtcIntoLocalDate(input1, timezone)).toBe('2025-02-28T14:00:00.000');
+    expect(parseUtcIntoLocalDate(input2, timezone)).toBe('2025-02-28T14:00:00.000');
     expect(parseUtcIntoLocalDate(input3, timezone)).toBe('2025-02-28T14:00:00.000');
     expect(parseUtcIntoLocalDate(input4, timezone)).toBe('2025-02-28T11:00:00.000');
   });
