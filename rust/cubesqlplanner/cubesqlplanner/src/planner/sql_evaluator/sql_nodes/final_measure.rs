@@ -59,9 +59,8 @@ impl SqlNode for FinalMeasureSqlNode {
                     node_processor.clone(),
                     templates,
                 )?;
-                //};
 
-                if ev.is_calculated() {
+                if ev.is_calculated() || ev.measure_type() == "numberAgg" {
                     input
                 } else if ev.measure_type() == "countDistinctApprox" {
                     if self.count_approx_as_state {

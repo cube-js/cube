@@ -289,11 +289,10 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
+    this.canUseNativeSqlPlannerPreAggregation = false;
     if (this.useNativeSqlPlanner) {
       const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
       this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
-    } else {
-      this.useNativePreAggregations = false;
     }
     this.prebuildJoin();
 
