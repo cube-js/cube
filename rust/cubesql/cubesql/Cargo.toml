@@ -24,7 +24,7 @@ serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.14.0"
 serde_json = "^1.0"
 bytes = "1.2"
-futures = "0.3.23"
+futures = "0.3.31"
 rand = "0.8.3"
 hashbrown = "0.14.3"
 log = "0.4.21"
@@ -50,8 +50,6 @@ egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.
 paste = "1.0.6"
 tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
-futures-core = "0.3.23"
-futures-util = "0.3.23"
 sha1_smol = "1.0.0"
 tera = { version = "1", default-features = false }
 minijinja = { version = "1", features = ["json", "loader"] }

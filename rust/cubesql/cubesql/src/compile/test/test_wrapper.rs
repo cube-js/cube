@@ -1154,14 +1154,20 @@ WHERE
     assert_eq!(
         logical_plan.find_cube_scan().member_fields,
         vec![
-            MemberField::Member("Logs.content".to_string()),
-            MemberField::Member("KibanaSampleDataEcommerce.last_mod.month".to_string()),
+            MemberField::regular("Logs.content".to_string()),
+            MemberField::time_dimension(
+                "KibanaSampleDataEcommerce.last_mod".to_string(),
+                "month".to_string()
+            ),
             MemberField::Literal(ScalarValue::Utf8(None)),
             MemberField::Literal(ScalarValue::Int64(Some(1))),
-            MemberField::Member("KibanaSampleDataEcommerce.order_date.month".to_string()),
+            MemberField::time_dimension(
+                "KibanaSampleDataEcommerce.order_date".to_string(),
+                "month".to_string()
+            ),
             MemberField::Literal(ScalarValue::Utf8(None)),
             MemberField::Literal(ScalarValue::Int64(Some(2))),
-            MemberField::Member("KibanaSampleDataEcommerce.sumPrice".to_string()),
+            MemberField::regular("KibanaSampleDataEcommerce.sumPrice".to_string()),
         ],
     );
 

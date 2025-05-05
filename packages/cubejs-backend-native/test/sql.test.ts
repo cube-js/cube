@@ -100,6 +100,7 @@ function interfaceMethods() {
 
       return {
         cubeNameToDataSource: {},
+        memberToDataSource: {},
         dataSourceToSqlGenerator: {},
       };
     }),

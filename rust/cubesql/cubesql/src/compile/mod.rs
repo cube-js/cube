@@ -1507,7 +1507,7 @@ ORDER BY \"COUNT(count)\" DESC"
         );
         assert_eq!(
             &cube_scan.member_fields,
-            &vec![MemberField::Member(
+            &vec![MemberField::regular(
                 "KibanaSampleDataEcommerce.count".to_string()
             )]
         );
