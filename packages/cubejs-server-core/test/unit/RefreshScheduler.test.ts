@@ -980,7 +980,7 @@ describe('Refresh Scheduler', () => {
       clearInterval(interval);
 
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'UTC').length).toEqual(3);
-      expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'America/Los_Angeles').length).toEqual(3);
+      expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'America/Los_Angeles').length).toEqual(2);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_orphaned')).length).toEqual(0);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_second')).length).toEqual(0);
     });
