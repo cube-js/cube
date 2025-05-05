@@ -697,23 +697,6 @@ describe('Refresh Scheduler', () => {
       { tableName: 'stb_pre_aggregations.foo_second20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'UTC', fromTable: 'bar' },
       {
-        tableName: 'stb_pre_aggregations.foo_first20201231',
-        timezone: 'America/Los_Angeles',
-        fromTable: 'foo_tenant1',
-      },
-      { tableName: 'stb_pre_aggregations.foo_orphaned20201231', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
-      {
-        tableName: 'stb_pre_aggregations.foo_second20201231',
-        timezone: 'America/Los_Angeles',
-        fromTable: 'foo_tenant1',
-      },
-      { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'America/Los_Angeles', fromTable: 'bar' },
-
-      { tableName: 'stb_pre_aggregations.foo_first20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_orphaned20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_second20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'UTC', fromTable: 'bar' },
-      {
         tableName: 'stb_pre_aggregations.foo_first20201230',
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
@@ -726,10 +709,10 @@ describe('Refresh Scheduler', () => {
       },
       { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'America/Los_Angeles', fromTable: 'bar' },
 
-      { tableName: 'stb_pre_aggregations.foo_first20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_orphaned20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_second20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'UTC', fromTable: 'bar' },
+      { tableName: 'stb_pre_aggregations.foo_first20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_second20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'UTC', fromTable: 'bar' },
       {
         tableName: 'stb_pre_aggregations.foo_first20201229',
         timezone: 'America/Los_Angeles',
@@ -743,9 +726,10 @@ describe('Refresh Scheduler', () => {
       },
       { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'America/Los_Angeles', fromTable: 'bar' },
 
-      { tableName: 'stb_pre_aggregations.foo_first20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_orphaned20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_second20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_first20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_second20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'UTC', fromTable: 'bar' },
       {
         tableName: 'stb_pre_aggregations.foo_first20201228',
         timezone: 'America/Los_Angeles',
@@ -757,10 +741,11 @@ describe('Refresh Scheduler', () => {
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
       },
+      { tableName: 'stb_pre_aggregations.bar_first20201228', timezone: 'America/Los_Angeles', fromTable: 'bar' },
 
-      { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_orphaned20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_second20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_first20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_second20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_first20201227',
         timezone: 'America/Los_Angeles',
@@ -769,6 +754,21 @@ describe('Refresh Scheduler', () => {
       { tableName: 'stb_pre_aggregations.foo_orphaned20201227', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_second20201227',
+        timezone: 'America/Los_Angeles',
+        fromTable: 'foo_tenant1',
+      },
+
+      { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_second20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      {
+        tableName: 'stb_pre_aggregations.foo_first20201226',
+        timezone: 'America/Los_Angeles',
+        fromTable: 'foo_tenant1',
+      },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201226', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
+      {
+        tableName: 'stb_pre_aggregations.foo_second20201226',
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
       },
