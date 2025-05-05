@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
+
+### Features
+
+- **cubesql:** Data source per member ([#9537](https://github.com/cube-js/cube/issues/9537)) ([c0be00c](https://github.com/cube-js/cube/commit/c0be00cd4e5239b52116e38e0f5bf8d846e57090))
+- **snowflake-driver:** Upgrade snowflake-sdk from 2.0.3 to 2.0.4 ([#9527](https://github.com/cube-js/cube/issues/9527)) ([8cc6346](https://github.com/cube-js/cube/commit/8cc6346a0daaf35706155671f34bf2cb387b6ad7))
+
 ## [1.3.10](https://github.com/cube-js/cube/compare/v1.3.9...v1.3.10) (2025-05-01)
 
 ### Bug Fixes
