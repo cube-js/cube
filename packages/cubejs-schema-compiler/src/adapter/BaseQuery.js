@@ -476,8 +476,8 @@ export class BaseQuery {
   }
 
   newDimension(dimensionPath) {
-    if (dimensionPath instanceof String || typeof dimensionPath === 'string') {
-      const memberArr = Array.isArray(dimensionPath) ? dimensionPath : dimensionPath.split('.');
+    if (typeof dimensionPath === 'string') {
+      const memberArr = dimensionPath.split('.');
       if (memberArr.length > 3 &&
             memberArr[memberArr.length - 2] === 'granularities' &&
             this.cubeEvaluator.isDimension(memberArr.slice(0, -2))) {
@@ -660,10 +660,8 @@ export class BaseQuery {
       if (!this.canUseNativeSqlPlannerPreAggregation) {
         if (this.options.preAggregationQuery) {
           isRelatedToPreAggregation = true;
-        } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
-          if (this.externalPreAggregationQuery()) {
-            isRelatedToPreAggregation = true;
-          }
+        } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass && this.externalPreAggregationQuery()) {
+          isRelatedToPreAggregation = true;
         } else {
           let preAggForQuery =
             this.preAggregations.findPreAggregationForQuery();
@@ -782,7 +780,7 @@ export class BaseQuery {
       const buildResult = nativeBuildSqlAndParams(queryParams);
 
       if (buildResult.error) {
-        if (buildResult.error.cause && buildResult.error.cause === 'User') {
+        if (buildResult.error.cause === 'User') {
           throw new UserError(buildResult.error.message);
         } else {
           throw new Error(buildResult.error.message);
