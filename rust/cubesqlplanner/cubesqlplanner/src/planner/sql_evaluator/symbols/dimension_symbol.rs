@@ -32,7 +32,7 @@ pub struct DimensionSymbol {
     longitude: Option<Rc<SqlCall>>,
     case: Option<DimensionCaseDefinition>,
     definition: Rc<dyn DimensionDefinition>,
-    is_reference: bool, // Is symbol is direct reference to another symbol without any calculations
+    is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
 }
 
 impl DimensionSymbol {
@@ -248,7 +248,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             None
         };
 
-        let is_sql_is_direct_ref = if let Some(sql) = &sql {
+        let is_sql_direct_ref = if let Some(sql) = &sql {
             sql.is_direct_reference()?
         } else {
             false
@@ -304,7 +304,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
         let is_reference = !owned_by_cube
             && !is_sub_query
-            && is_sql_is_direct_ref
+            && is_sql_direct_ref
             && case.is_none()
             && latitude.is_none()
             && longitude.is_none()

@@ -43,7 +43,7 @@ impl CompiledPreAggregation {
     ) -> Result<Rc<Self>, CubeError> {
         let static_data = description.static_data();
         let measures = if let Some(refs) = description.measure_references()? {
-            Self::symbols_from_ref(query_tools.clone(), cube_name, refs, Self::check_if_measure)?
+            Self::symbols_from_ref(query_tools.clone(), cube_name, refs, Self::check_is_measure)?
         } else {
             Vec::new()
         };
@@ -52,7 +52,7 @@ impl CompiledPreAggregation {
                 query_tools.clone(),
                 cube_name,
                 refs,
-                Self::check_if_dimension,
+                Self::check_is_dimension,
             )?
         } else {
             Vec::new()
@@ -62,7 +62,7 @@ impl CompiledPreAggregation {
                 query_tools.clone(),
                 cube_name,
                 refs,
-                Self::check_if_time_dimension,
+                Self::check_is_time_dimension,
             )?;
             /*             if dims.len() != 1 {
                 return Err(CubeError::user(format!(
@@ -107,21 +107,21 @@ impl CompiledPreAggregation {
         Ok(res)
     }
 
-    fn check_if_measure(symbol: &MemberSymbol) -> Result<(), CubeError> {
+    fn check_is_measure(symbol: &MemberSymbol) -> Result<(), CubeError> {
         symbol
             .as_measure()
             .map_err(|_| CubeError::user(format!("Pre-aggregation measure must be a measure")))?;
         Ok(())
     }
 
-    fn check_if_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
+    fn check_is_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
         symbol.as_dimension().map_err(|_| {
             CubeError::user(format!("Pre-aggregation dimension must be a dimension"))
         })?;
         Ok(())
     }
 
-    fn check_if_time_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
+    fn check_is_time_dimension(symbol: &MemberSymbol) -> Result<(), CubeError> {
         let dimension = symbol.as_dimension().map_err(|_| {
             CubeError::user(format!(
                 "Pre-aggregation time dimension must be a dimension"

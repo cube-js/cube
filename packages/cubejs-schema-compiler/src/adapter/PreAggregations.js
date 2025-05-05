@@ -874,12 +874,8 @@ export class PreAggregations {
     const canUsePreAggregation = () => true;
     const preAggregation = R.pipe(
       R.toPairs,
-      // eslint-disable-next-line no-unused-vars
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      R.filter(([k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
-      // eslint-disable-next-line no-unused-vars
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      R.find(([k, a]) => k === preAggregationName)
+      R.filter(([_, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
+      R.find(([_, a]) => a.name === preAggregationName)
     )(this.query.cubeEvaluator.preAggregationsForCube(cube));
     if (preAggregation) {
       const tableName = this.preAggregationTableName(cube, preAggregation[0], preAggregation[1]);

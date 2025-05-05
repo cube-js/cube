@@ -370,7 +370,7 @@ impl PreAggregationOptimizer {
         rewrited_multistage: &mut HashMap<String, bool>,
         pre_aggregation: &Rc<CompiledPreAggregation>,
     ) -> Result<(), CubeError> {
-        if let Some(rewrited) =
+        if let Some(rewritten) =
             self.try_rewrite_query(multi_stage_leaf_measure.query.clone(), pre_aggregation)?
         {
             let new_leaf = MultiStageLeafMeasure {
@@ -380,7 +380,7 @@ impl PreAggregationOptimizer {
                     .render_measure_for_ungrouped
                     .clone(),
                 time_shifts: multi_stage_leaf_measure.time_shifts.clone(),
-                query: rewrited,
+                query: rewritten,
             };
             let new_multistage = Rc::new(LogicalMultiStageMember {
                 name: multi_stage_name.clone(),

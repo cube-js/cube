@@ -119,7 +119,7 @@ impl<'a> DimensionMatcher<'a> {
             MemberSymbol::TimeDimension(time_dimension) => {
                 self.try_match_time_dimension(time_dimension, add_to_matched_dimension)
             }
-            MemberSymbol::MemberExpression(_member_expression) => Ok(MatchState::NotMatched), //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it
+            MemberSymbol::MemberExpression(_member_expression) => Ok(MatchState::NotMatched), //TODO We don't allow to use pre-aggregations with member expressions before SQL API is ready for it
             _ => Ok(MatchState::NotMatched),
         }
     }

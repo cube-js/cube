@@ -3487,8 +3487,7 @@ export class BaseQuery {
           });
         } else if (preAggregation.type === 'rollup') {
           const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
-          const params = query.buildSqlAndParams();
-          return query.evaluateSymbolSqlWithContext(() => params, {
+          return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
             collectOriginalSqlPreAggregations
           });
         } else if (preAggregation.type === 'originalSql') {

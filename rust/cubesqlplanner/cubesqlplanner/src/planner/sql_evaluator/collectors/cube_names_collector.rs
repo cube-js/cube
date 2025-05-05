@@ -77,7 +77,7 @@ pub fn collect_cube_names(node: &Rc<MemberSymbol>) -> Result<Vec<String>, CubeEr
     Ok(visitor.extract_result())
 }
 
-pub fn collect_cube_names_from_vec(
+pub fn collect_cube_names_from_symbols(
     nodes: &Vec<Rc<MemberSymbol>>,
 ) -> Result<Vec<String>, CubeError> {
     let mut visitor = CubeNamesCollector::new();
