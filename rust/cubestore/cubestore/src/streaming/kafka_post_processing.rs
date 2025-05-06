@@ -456,7 +456,7 @@ impl KafkaPostProcessPlanner {
     ) -> Result<(Arc<dyn ExecutionPlan>, Option<Arc<dyn ExecutionPlan>>), CubeError> {
         fn only_certain_plans_allowed_error(plan: &LogicalPlan) -> CubeError {
             CubeError::user(
-                format!("Only Projection > [Filter] > TableScan plans are allowed for streaming; got plan {}", pp_plan_ext(plan, &PPOptions::show_all())),
+                format!("Only Projection > [Filter] > TableScan plans are allowed for streaming; got plan {}", pp_plan_ext(plan, &PPOptions::show_most())),
             )
         }
         fn remove_subquery_alias_around_table_scan(plan: &LogicalPlan) -> &LogicalPlan {
