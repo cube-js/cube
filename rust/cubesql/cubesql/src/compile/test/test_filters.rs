@@ -1,4 +1,6 @@
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadRequestQueryFilterBase, V1LoadRequestQueryFilterItem,
+};
 use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
 
@@ -42,20 +44,20 @@ GROUP BY
             segments: Some(vec![]),
             order: Some(vec![]),
             filters: Some(vec![
-                V1LoadRequestQueryFilterItem {
-                    member: Some("MultiTypeCube.dim_date0".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                },
-                V1LoadRequestQueryFilterItem {
-                    member: Some("MultiTypeCube.dim_date0".to_string()),
-                    operator: Some("afterDate".to_string()),
-                    values: Some(vec!["2019-01-01 00:00:00".to_string()]),
-                    or: None,
-                    and: None,
-                },
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("MultiTypeCube.dim_date0".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                    }
+                )),
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                    V1LoadRequestQueryFilterBase {
+                        member: Some("MultiTypeCube.dim_date0".to_string()),
+                        operator: Some("afterDate".to_string()),
+                        values: Some(vec!["2019-01-01 00:00:00".to_string()]),
+                    }
+                )),
             ],),
             ..Default::default()
         }

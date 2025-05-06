@@ -44,8 +44,9 @@ mod tests {
     };
     use chrono::Datelike;
     use cubeclient::models::{
-        V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
-        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
+        V1LoadRequestQuery, V1LoadRequestQueryFilterBase, V1LoadRequestQueryFilterItem,
+        V1LoadRequestQueryFilterLogicalAnd, V1LoadRequestQueryFilterLogicalOr,
+        V1LoadRequestQueryTimeDimension, V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
     };
     use datafusion::{arrow::datatypes::DataType, physical_plan::displayable};
     use itertools::Itertools;
@@ -278,13 +279,15 @@ mod tests {
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("startsWith".to_string()),
-                    values: Some(vec!["fe".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("startsWith".to_string()),
+                            values: Some(vec!["fe".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -310,13 +313,15 @@ mod tests {
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("endsWith".to_string()),
-                    values: Some(vec!["emale".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("endsWith".to_string()),
+                            values: Some(vec!["emale".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -896,13 +901,15 @@ mod tests {
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1014,13 +1021,15 @@ mod tests {
                 segments: Some(vec!["KibanaSampleDataEcommerce.is_female".to_string()]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
-                    operator: Some("gt".to_string()),
-                    values: Some(vec!["0".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["0".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1039,20 +1048,20 @@ mod tests {
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["false".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.count".to_string()),
-                        operator: Some("gt".to_string()),
-                        values: Some(vec!["0".to_string()]),
-                        or: None,
-                        and: None,
-                    }
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["false".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["0".to_string()]),
+                        }
+                    ))
                 ]),
                 ..Default::default()
             }
@@ -1078,13 +1087,17 @@ mod tests {
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1216,13 +1229,15 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1265,19 +1280,21 @@ ORDER BY \"COUNT(count)\" DESC LIMIT 10000"
                     "desc".to_string()
                 ]]),
                 limit: Some(10000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.notes".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec![
-                        "1".to_string(),
-                        "2".to_string(),
-                        "3".to_string(),
-                        "4".to_string(),
-                        "5".to_string()
-                    ]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec![
+                                "1".to_string(),
+                                "2".to_string(),
+                                "3".to_string(),
+                                "4".to_string(),
+                                "5".to_string()
+                            ]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1324,34 +1341,34 @@ ORDER BY \"COUNT(count)\" DESC"
                     "desc".to_string()
                 ]]),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["female".to_string()]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("contains".to_string()),
-                        values: Some(vec!["fem".to_string()]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("contains".to_string()),
-                        values: Some(vec!["fe".to_string()]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("contains".to_string()),
-                        values: Some(vec!["f".to_string()]),
-                        or: None,
-                        and: None
-                    }
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["fem".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["fe".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["f".to_string()]),
+                        }
+                    ))
                 ]),
                 ..Default::default()
             }
@@ -1401,47 +1418,49 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
-                            and: Some(vec![
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("set".to_string()),
-                                    values: None,
-                                    or: None,
-                                    and: None,
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("notEquals".to_string()),
-                                    values: Some(vec!["".to_string()]),
-                                    or: None,
-                                    and: None,
-                                })
-                            ])
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        })
-                    ]),
-                    and: None,
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(
+                                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalAnd(
+                                        Box::new(V1LoadRequestQueryFilterLogicalAnd {
+                                            and: Some(vec![
+                                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                                    Box::new(V1LoadRequestQueryFilterBase {
+                                                        member: Some(
+                                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                                        ),
+                                                        operator: Some("set".to_string()),
+                                                        values: None,
+                                                    })
+                                                )),
+                                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                                    Box::new(V1LoadRequestQueryFilterBase {
+                                                        member: Some(
+                                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                                        ),
+                                                        operator: Some("notEquals".to_string()),
+                                                        values: Some(vec!["".to_string()]),
+                                                    })
+                                                ))
+                                            ])
+                                        })
+                                    )
+                                ),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                ))
+                            ]),
+                        }
+                    )),
+                ]),
                 ..Default::default()
             }
         );
@@ -1485,13 +1504,15 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
-                    operator: Some("gt".to_string()),
-                    values: Some(vec!["0".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["0".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1655,13 +1676,15 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1684,13 +1707,15 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["fem".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["fem".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1713,13 +1738,15 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
-                    operator: Some("gt".to_string()),
-                    values: Some(vec!["0".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["0".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -1812,13 +1839,15 @@ GROUP BY
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(1000001),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["fem".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["fem".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -2031,49 +2060,47 @@ limit
                 order: Some(vec![]),
                 limit: Some(1000001),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("WideCube.dim1".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["Jewelry".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: None,
-                        operator: None,
-                        values: None,
-                        or: Some(vec![
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: Some("WideCube.measure1".to_string()),
-                                operator: Some("set".to_string()),
-                                values: None,
-                                or: None,
-                                and: None,
-                            }),
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: Some("WideCube.measure2".to_string()),
-                                operator: Some("set".to_string()),
-                                values: None,
-                                or: None,
-                                and: None,
-                            }),
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: Some("WideCube.measure3".to_string()),
-                                operator: Some("set".to_string()),
-                                values: None,
-                                or: None,
-                                and: None,
-                            }),
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: Some("WideCube.measure4".to_string()),
-                                operator: Some("set".to_string()),
-                                values: None,
-                                or: None,
-                                and: None,
-                            })
-                        ]),
-                        and: None,
-                    },
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("WideCube.dim1".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["Jewelry".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some("WideCube.measure1".to_string()),
+                                        operator: Some("set".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some("WideCube.measure2".to_string()),
+                                        operator: Some("set".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some("WideCube.measure3".to_string()),
+                                        operator: Some("set".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some("WideCube.measure4".to_string()),
+                                        operator: Some("set".to_string()),
+                                        values: None,
+                                    })
+                                ))
+                            ]),
+                        }
+                    )),
                 ]),
                 ..Default::default()
             }
@@ -2396,13 +2423,15 @@ from
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(1000001),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -2473,13 +2502,15 @@ limit
                 }]),
                 order: Some(vec![]),
                 limit: Some(1000001),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -3068,28 +3099,32 @@ limit
                 .find_cube_scan()
                 .request
                 .filters,
-            Some(vec![V1LoadRequestQueryFilterItem {
-                member: None,
-                operator: None,
-                values: None,
-                or: Some(vec![
-                    json!(V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                        operator: Some("afterOrOnDate".to_string()),
-                        values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
-                        or: None,
-                        and: None,
-                    }),
-                    json!(V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                        operator: Some("beforeDate".to_string()),
-                        values: Some(vec!["2021-09-07T00:00:00.000Z".to_string()]),
-                        or: None,
-                        and: None,
-                    })
-                ]),
-                and: None,
-            },])
+            Some(vec![
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                    V1LoadRequestQueryFilterLogicalOr {
+                        or: Some(vec![
+                            json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                Box::new(V1LoadRequestQueryFilterBase {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.order_date".to_string()
+                                    ),
+                                    operator: Some("afterOrOnDate".to_string()),
+                                    values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+                                })
+                            )),
+                            json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                Box::new(V1LoadRequestQueryFilterBase {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.order_date".to_string()
+                                    ),
+                                    operator: Some("beforeDate".to_string()),
+                                    values: Some(vec!["2021-09-07T00:00:00.000Z".to_string()]),
+                                })
+                            ))
+                        ]),
+                    }
+                )),
+            ])
         )
     }
 
@@ -3101,148 +3136,186 @@ limit
             // Binary expression with Measures
             (
                 "maxPrice = 5".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["5".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["5".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "maxPrice > 5".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                    operator: Some("gt".to_string()),
-                    values: Some(vec!["5".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["5".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             // Binary expression with Dimensions
             (
                 "customer_gender = 'FEMALE'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["FEMALE".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["FEMALE".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "taxful_total_price > 5".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("gt".to_string()),
-                    values: Some(vec!["5".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                            ),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["5".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "taxful_total_price >= 5".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("gte".to_string()),
-                    values: Some(vec!["5".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                            ),
+                            operator: Some("gte".to_string()),
+                            values: Some(vec!["5".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "taxful_total_price < 5".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("lt".to_string()),
-                    values: Some(vec!["5".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                            ),
+                            operator: Some("lt".to_string()),
+                            values: Some(vec!["5".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "taxful_total_price <= 5".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("lte".to_string()),
-                    values: Some(vec!["5".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                            ),
+                            operator: Some("lte".to_string()),
+                            values: Some(vec!["5".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "taxful_total_price = -1".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["-1".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                            ),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["-1".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "taxful_total_price <> -1".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                    operator: Some("notEquals".to_string()),
-                    values: Some(vec!["-1".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                            ),
+                            operator: Some("notEquals".to_string()),
+                            values: Some(vec!["-1".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             // IN
             (
                 "customer_gender IN ('FEMALE', 'MALE')".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["FEMALE".to_string(), "MALE".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["FEMALE".to_string(), "MALE".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender NOT IN ('FEMALE', 'MALE')".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notEquals".to_string()),
-                    values: Some(vec!["FEMALE".to_string(), "MALE".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notEquals".to_string()),
+                            values: Some(vec!["FEMALE".to_string(), "MALE".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             // NULL
             (
                 "customer_gender IS NULL".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notSet".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender IS NOT NULL".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        },
+                    )),
+                ]),
                 None,
             ),
             // Date
@@ -3328,90 +3401,106 @@ limit
             // LIKE
             (
                 "customer_gender LIKE 'female'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender LIKE 'female%'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("startsWith".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("startsWith".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender LIKE '%female'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("endsWith".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("endsWith".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender LIKE '%female%'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender NOT LIKE 'male'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notEquals".to_string()),
-                    values: Some(vec!["male".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notEquals".to_string()),
+                            values: Some(vec!["male".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender NOT LIKE 'male%'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notStartsWith".to_string()),
-                    values: Some(vec!["male".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notStartsWith".to_string()),
+                            values: Some(vec!["male".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender NOT LIKE '%male'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notEndsWith".to_string()),
-                    values: Some(vec!["male".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notEndsWith".to_string()),
+                            values: Some(vec!["male".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             (
                 "customer_gender NOT LIKE '%male%'".to_string(),
-                Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notContains".to_string()),
-                    values: Some(vec!["male".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notContains".to_string()),
+                            values: Some(vec!["male".to_string()]),
+                        },
+                    )),
+                ]),
                 None,
             ),
             // Segment
@@ -3527,191 +3616,174 @@ limit
             (
                 "customer_gender = 'FEMALE' AND customer_gender = 'MALE'".to_string(),
                 vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["FEMALE".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["MALE".to_string()]),
-                        or: None,
-                        and: None,
-                    }
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["FEMALE".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["MALE".to_string()]),
+                        }
+                    ))
                 ],
             ),
             (
                 "customer_gender = 'FEMALE' OR customer_gender = 'MALE'".to_string(),
-                vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
+                vec![V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                    V1LoadRequestQueryFilterLogicalOr {
                     or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["FEMALE".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["MALE".to_string()]),
-                            or: None,
-                            and: None,
-                        })
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                operator: Some("equals".to_string()),
+                                values: Some(vec!["FEMALE".to_string()]),
+                            }
+                        ))),
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                operator: Some("equals".to_string()),
+                                values: Some(vec!["MALE".to_string()]),
+                            }
+                        )))
                     ]),
-                    and: None,
-                }],
+                }))],
             ),
             (
                 "customer_gender = 'FEMALE' AND customer_gender = 'MALE' AND customer_gender = 'UNKNOWN'".to_string(),
                 vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["FEMALE".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["MALE".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["UNKNOWN".to_string()]),
-                        or: None,
-                        and: None,
-                    }
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["FEMALE".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["MALE".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["UNKNOWN".to_string()]),
+                        }
+                    ))
                 ],
             ),
             (
                 "customer_gender = 'FEMALE' OR customer_gender = 'MALE' OR customer_gender = 'UNKNOWN'".to_string(),
-                vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
+                vec![V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                    V1LoadRequestQueryFilterLogicalOr {
                     or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["FEMALE".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["MALE".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["UNKNOWN".to_string()]),
-                            or: None,
-                            and: None,
-                        })
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                operator: Some("equals".to_string()),
+                                values: Some(vec!["FEMALE".to_string()]),
+                            }
+                        ))),
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                operator: Some("equals".to_string()),
+                                values: Some(vec!["MALE".to_string()]),
+                            }
+                        ))),
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                operator: Some("equals".to_string()),
+                                values: Some(vec!["UNKNOWN".to_string()]),
+                            }
+                        )))
                     ]),
-                    and: None,
-                }],
+                }))],
             ),
             (
                 "customer_gender = 'FEMALE' OR (customer_gender = 'MALE' AND taxful_total_price > 5)".to_string(),
-                vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
+                vec![V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                    V1LoadRequestQueryFilterLogicalOr {
                     or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["FEMALE".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
-                            and: Some(vec![
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                                    operator: Some("equals".to_string()),
-                                    values: Some(vec!["MALE".to_string()]),
-                                    or: None,
-                                    and: None,
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                                    operator: Some("gt".to_string()),
-                                    values: Some(vec!["5".to_string()]),
-                                    or: None,
-                                    and: None,
-                                })
-                            ]),
-                        })
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                operator: Some("equals".to_string()),
+                                values: Some(vec!["FEMALE".to_string()]),
+                            }
+                        ))),
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalAnd(Box::new(
+                            V1LoadRequestQueryFilterLogicalAnd {
+                                and: Some(vec![
+                                    json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                                        V1LoadRequestQueryFilterBase {
+                                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                            operator: Some("equals".to_string()),
+                                            values: Some(vec!["MALE".to_string()]),
+                                        }
+                                    ))),
+                                    json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                                        V1LoadRequestQueryFilterBase {
+                                            member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                                            operator: Some("gt".to_string()),
+                                            values: Some(vec!["5".to_string()]),
+                                        }
+                                    )))
+                                ]),
+                            }
+                        )))
                     ]),
-                    and: None,
-                }],
+                }))],
             ),
             (
                 "customer_gender = 'FEMALE' OR (customer_gender = 'MALE' AND taxful_total_price > 5 AND taxful_total_price < 100)".to_string(),
-                vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
+                vec![V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                    V1LoadRequestQueryFilterLogicalOr {
                     or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("equals".to_string()),
-                            values: Some(vec!["FEMALE".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                operator: Some("equals".to_string()),
+                                values: Some(vec!["FEMALE".to_string()]),
+                            }
+                        ))),
+                        json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalAnd(Box::new(
+                        V1LoadRequestQueryFilterLogicalAnd {
                             and: Some(vec![
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                                    operator: Some("equals".to_string()),
-                                    values: Some(vec!["MALE".to_string()]),
-                                    or: None,
-                                    and: None,
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                                    operator: Some("gt".to_string()),
-                                    values: Some(vec!["5".to_string()]),
-                                    or: None,
-                                    and: None,
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                                    operator: Some("lt".to_string()),
-                                    values: Some(vec!["100".to_string()]),
-                                    or: None,
-                                    and: None,
-                                })
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                                    V1LoadRequestQueryFilterBase {
+                                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                                        operator: Some("equals".to_string()),
+                                        values: Some(vec!["MALE".to_string()]),
+                                    }
+                                ))),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                                    V1LoadRequestQueryFilterBase {
+                                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                                        operator: Some("gt".to_string()),
+                                        values: Some(vec!["5".to_string()]),
+                                    }
+                                ))),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                                    V1LoadRequestQueryFilterBase {
+                                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                                        operator: Some("lt".to_string()),
+                                        values: Some(vec!["100".to_string()]),
+                                    }
+                                )))
                             ]),
-                        })
+                        })))
                     ]),
-                    and: None,
-                }]
+                }))]
             ),
         ];
 
@@ -4485,13 +4557,15 @@ limit
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 order: Some(vec![]),
                 limit: Some(1000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["male".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["male".to_string()]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -6905,13 +6979,15 @@ ORDER BY
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["100".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["100".to_string()]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -6996,20 +7072,20 @@ ORDER BY
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                        operator: Some("gt".to_string()),
-                        values: Some(vec!["100".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                        operator: Some("lt".to_string()),
-                        values: Some(vec!["150".to_string()]),
-                        or: None,
-                        and: None,
-                    }
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["100".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("lt".to_string()),
+                            values: Some(vec!["150".to_string()]),
+                        }
+                    ))
                 ]),
                 ungrouped: Some(true),
                 ..Default::default()
@@ -7036,7 +7112,13 @@ ORDER BY
             .filters
             .unwrap_or_default();
         let filter_vals = if filters.len() > 0 {
-            filters[0].values.clone()
+            let filter = &filters[0];
+            match filter {
+                V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(filter) => {
+                    filter.values.clone()
+                }
+                _ => None,
+            }
         } else {
             None
         };
@@ -7048,13 +7130,15 @@ ORDER BY
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("afterOrOnDate".to_string()),
-                    values: filter_vals,
-                    or: None,
-                    and: None,
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("afterOrOnDate".to_string()),
+                            values: filter_vals,
+                        }
+                    )),
+                ]),
                 ..Default::default()
             }
         )
@@ -7129,13 +7213,15 @@ ORDER BY
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(1000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["fem".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["fem".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -7313,13 +7399,15 @@ ORDER BY
                     vec!["dim4".to_string(), "asc".to_string(),],
                     vec!["pivot_grouping".to_string(), "asc".to_string(),],
                 ]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("WideCube.dim1".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["foo".to_string()]),
-                    or: None,
-                    and: None,
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("WideCube.dim1".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["foo".to_string()]),
+                        }
+                    )),
+                ]),
                 ..Default::default()
             }
         );
@@ -7663,13 +7751,15 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(10),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["female".to_string()]),
-                    or: None,
-                    and: None,
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        }
+                    )),
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -7694,28 +7784,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(10),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notContains".to_string()),
-                            values: Some(vec!["female".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        })
-                    ]),
-                    and: None,
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notContains".to_string()),
+                                        values: Some(vec!["female".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                ))
+                            ]),
+                        }
+                    )),
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -7749,20 +7843,24 @@ ORDER BY "source"."str0" ASC
                 order: Some(vec![]),
                 limit: Some(10),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                        operator: Some("gte".to_string()),
-                        values: Some(vec!["1".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
-                        operator: Some("lte".to_string()),
-                        values: Some(vec!["2".to_string()]),
-                        or: None,
-                        and: None,
-                    }
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("gte".to_string()),
+                            values: Some(vec!["1".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("lte".to_string()),
+                            values: Some(vec!["2".to_string()]),
+                        }
+                    ))
                 ]),
                 ungrouped: Some(true),
                 ..Default::default()
@@ -7788,32 +7886,34 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(10),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some(
-                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                            ),
-                            operator: Some("lt".to_string()),
-                            values: Some(vec!["1".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some(
-                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                            ),
-                            operator: Some("gt".to_string()),
-                            values: Some(vec!["2".to_string()]),
-                            or: None,
-                            and: None,
-                        })
-                    ]),
-                    and: None,
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.taxful_total_price"
+                                                .to_string()
+                                        ),
+                                        operator: Some("lt".to_string()),
+                                        values: Some(vec!["1".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.taxful_total_price"
+                                                .to_string()
+                                        ),
+                                        operator: Some("gt".to_string()),
+                                        values: Some(vec!["2".to_string()]),
+                                    })
+                                ))
+                            ]),
+                        }
+                    )),
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -8060,13 +8160,15 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("startsWith".to_string()),
-                    values: Some(vec!["test".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("startsWith".to_string()),
+                            values: Some(vec!["test".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -8746,13 +8848,15 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(100000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notContains".to_string()),
-                    values: Some(vec!["test".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notContains".to_string()),
+                            values: Some(vec!["test".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -8941,16 +9045,18 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(100000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec![
-                        "2022-06-06T13:30:46.000Z".to_string(),
-                        "2022-06-06T13:30:47.000Z".to_string()
-                    ]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec![
+                                "2022-06-06T13:30:46.000Z".to_string(),
+                                "2022-06-06T13:30:47.000Z".to_string()
+                            ]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -9132,13 +9238,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("startsWith".to_string()),
-                    values: Some(vec!["f".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("startsWith".to_string()),
+                            values: Some(vec!["f".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -9171,13 +9279,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("endsWith".to_string()),
-                    values: Some(vec!["le".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("endsWith".to_string()),
+                            values: Some(vec!["le".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -9214,13 +9324,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["al".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["al".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -9259,20 +9371,20 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("notContains".to_string()),
-                        values: Some(vec!["al".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None,
-                    },
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notContains".to_string()),
+                            values: Some(vec!["al".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        }
+                    )),
                 ]),
                 ..Default::default()
             }
@@ -9309,13 +9421,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                    operator: Some("startsWith".to_string()),
-                    values: Some(vec!["1".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("startsWith".to_string()),
+                            values: Some(vec!["1".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -9351,13 +9465,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                    operator: Some("endsWith".to_string()),
-                    values: Some(vec!["23".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("endsWith".to_string()),
+                            values: Some(vec!["23".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -9397,13 +9513,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["45".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["45".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -9445,20 +9563,20 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                        operator: Some("notContains".to_string()),
-                        values: Some(vec!["67".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None,
-                    },
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("notContains".to_string()),
+                            values: Some(vec!["67".to_string()]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        }
+                    )),
                 ]),
                 ..Default::default()
             }
@@ -9687,13 +9805,15 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["female".to_string(), "male".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["female".to_string(), "male".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -10058,28 +10178,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("contains".to_string()),
-                            values: Some(vec!["el".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("contains".to_string()),
+                                        values: Some(vec!["el".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10116,28 +10240,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notContains".to_string()),
-                            values: Some(vec!["ale".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notContains".to_string()),
+                                        values: Some(vec!["ale".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10174,28 +10302,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("startsWith".to_string()),
-                            values: Some(vec!["fe".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("startsWith".to_string()),
+                                        values: Some(vec!["fe".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10232,28 +10364,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notStartsWith".to_string()),
-                            values: Some(vec!["fe".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notStartsWith".to_string()),
+                                        values: Some(vec!["fe".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10290,28 +10426,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("endsWith".to_string()),
-                            values: Some(vec!["ale".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("endsWith".to_string()),
+                                        values: Some(vec!["ale".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10348,28 +10488,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notEndsWith".to_string()),
-                            values: Some(vec!["ale".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notEndsWith".to_string()),
+                                        values: Some(vec!["ale".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10428,49 +10572,49 @@ ORDER BY "source"."str0" ASC
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
-                            and: Some(vec![
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                                    ),
-                                    operator: Some("gte".to_string()),
-                                    values: Some(vec!["500".to_string()]),
-                                    or: None,
-                                    and: None,
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                                    ),
-                                    operator: Some("lte".to_string()),
-                                    values: Some(vec!["10000".to_string()]),
-                                    or: None,
-                                    and: None,
-                                }),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalAnd(Box::new(
+                        V1LoadRequestQueryFilterLogicalAnd {
+                                    and: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.taxful_total_price"
+                                                .to_string()
+                                        ),
+                                        operator: Some("gte".to_string()),
+                                        values: Some(vec!["500".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.taxful_total_price"
+                                                .to_string()
+                                        ),
+                                        operator: Some("lte".to_string()),
+                                        values: Some(vec!["10000".to_string()]),
+                                    })
+                                )),
                             ]),
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some(
-                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                            ),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                                }))),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.taxful_total_price"
+                                                .to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10508,32 +10652,34 @@ ORDER BY "source"."str0" ASC
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some(
-                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                            ),
-                            operator: Some("notEquals".to_string()),
-                            values: Some(vec!["1".to_string(), "1.1".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some(
-                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
-                            ),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.taxful_total_price"
+                                                .to_string()
+                                        ),
+                                        operator: Some("notEquals".to_string()),
+                                        values: Some(vec!["1".to_string(), "1.1".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.taxful_total_price"
+                                                .to_string()
+                                        ),
+                                        operator: Some("notSet".to_string()),
+                                        values: None,
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -10814,13 +10960,15 @@ ORDER BY "source"."str0" ASC
                     ]))
                 }]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        }
+                    )),
+                ]),
                 ..Default::default()
             }
         )
@@ -10869,13 +11017,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("set".to_string()),
+                            values: None,
+                        }
+                    )),
+                ]),
                 ..Default::default()
             }
         )
@@ -10914,16 +11064,18 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(10001),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec![
-                        "2019-01-17T15:25:48.000Z".to_string(),
-                        "2019-09-09T00:00:00.000Z".to_string(),
-                    ]),
-                    or: None,
-                    and: None
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec![
+                                "2019-01-17T15:25:48.000Z".to_string(),
+                                "2019-09-09T00:00:00.000Z".to_string(),
+                            ]),
+                        }
+                    )),
+                ]),
                 ..Default::default()
             }
         )
@@ -11033,13 +11185,15 @@ ORDER BY "source"."str0" ASC
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("contains".to_string()),
-                    values: Some(vec!["male".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("contains".to_string()),
+                            values: Some(vec!["male".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -11082,13 +11236,15 @@ ORDER BY "source"."str0" ASC
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notStartsWith".to_string()),
-                    values: Some(vec!["test".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notStartsWith".to_string()),
+                            values: Some(vec!["test".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         );
@@ -11131,13 +11287,15 @@ ORDER BY "source"."str0" ASC
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notEndsWith".to_string()),
-                    values: Some(vec!["known".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notEndsWith".to_string()),
+                            values: Some(vec!["known".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -11531,13 +11689,15 @@ ORDER BY "source"."str0" ASC
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
-                    operator: Some("lt".to_string()),
-                    values: Some(vec!["10".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                            operator: Some("lt".to_string()),
+                            values: Some(vec!["10".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -12674,13 +12834,15 @@ ORDER BY "source"."str0" ASC
                     dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                     segments: Some(vec![]),
                     order: Some(vec![]),
-                    filters: Some(vec![V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                        operator: Some(filter_operator.to_string()),
-                        values: Some(vec![filter_value.to_string()]),
-                        or: None,
-                        and: None
-                    }]),
+                    filters: Some(vec![
+                        V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                            V1LoadRequestQueryFilterBase {
+                                member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                                operator: Some(filter_operator.to_string()),
+                                values: Some(vec![filter_value.to_string()]),
+                            }
+                        ))
+                    ]),
                     ungrouped: Some(true),
                     ..Default::default()
                 }
@@ -14022,13 +14184,15 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(25000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("afterOrOnDate".to_string()),
-                    values: Some(vec!["2020-01-02T00:00:00.000Z".to_string()]),
-                    or: None,
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("afterOrOnDate".to_string()),
+                            values: Some(vec!["2020-01-02T00:00:00.000Z".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -14115,28 +14279,32 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 limit: Some(25000),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("beforeDate".to_string()),
-                            values: Some(vec!["2019-01-01T00:00:00.000Z".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("afterOrOnDate".to_string()),
-                            values: Some(vec!["2019-01-02T00:00:00.000Z".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("beforeDate".to_string()),
+                                        values: Some(vec!["2019-01-01T00:00:00.000Z".to_string()]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("afterOrOnDate".to_string()),
+                                        values: Some(vec!["2019-01-02T00:00:00.000Z".to_string()]),
+                                    })
+                                )),
+                            ]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -15208,13 +15376,15 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.notes".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["HHHH-444JJJ\\Admin".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["HHHH-444JJJ\\Admin".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -15455,13 +15625,15 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("NumberCube.someNumber".into()),
-                    operator: Some("equals".into()),
-                    values: Some((1..=N).map(|x| x.to_string()).collect()),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("NumberCube.someNumber".into()),
+                            operator: Some("equals".into()),
+                            values: Some((1..=N).map(|x| x.to_string()).collect()),
+                        }
+                    ))
+                ]),
                 ungrouped: Some(true),
                 ..Default::default()
             }
@@ -15501,34 +15673,38 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("inDateRange".to_string()),
-                            values: Some(vec![
-                                "2019-01-01 00:00:00.0".to_string(),
-                                "2020-01-01 00:00:00.0".to_string(),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("inDateRange".to_string()),
+                                        values: Some(vec![
+                                            "2019-01-01 00:00:00.0".to_string(),
+                                            "2020-01-01 00:00:00.0".to_string(),
+                                        ]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("inDateRange".to_string()),
+                                        values: Some(vec![
+                                            "2021-01-01 00:00:00.0".to_string(),
+                                            "2022-01-01 00:00:00.0".to_string(),
+                                        ]),
+                                    })
+                                )),
                             ]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("inDateRange".to_string()),
-                            values: Some(vec![
-                                "2021-01-01 00:00:00.0".to_string(),
-                                "2022-01-01 00:00:00.0".to_string(),
-                            ]),
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None
-                }]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -15622,64 +15798,74 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("inDateRange".to_string()),
-                            values: Some(vec![
-                                "2019-01-01 00:00:00.000".to_string(),
-                                "2019-03-31 23:59:59.999".to_string(),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterLogicalOr(Box::new(
+                        V1LoadRequestQueryFilterLogicalOr {
+                            or: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("inDateRange".to_string()),
+                                        values: Some(vec![
+                                            "2019-01-01 00:00:00.000".to_string(),
+                                            "2019-03-31 23:59:59.999".to_string(),
+                                        ]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("inDateRange".to_string()),
+                                        values: Some(vec![
+                                            "2020-01-01 00:00:00.000".to_string(),
+                                            "2020-03-31 23:59:59.999".to_string(),
+                                        ]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("inDateRange".to_string()),
+                                        values: Some(vec![
+                                            "2021-01-01 00:00:00.000".to_string(),
+                                            "2021-03-31 23:59:59.999".to_string(),
+                                        ]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("inDateRange".to_string()),
+                                        values: Some(vec![
+                                            "2022-01-01 00:00:00.000".to_string(),
+                                            "2022-03-31 23:59:59.999".to_string(),
+                                        ]),
+                                    })
+                                )),
+                                json!(V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(
+                                    Box::new(V1LoadRequestQueryFilterBase {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.order_date".to_string()
+                                        ),
+                                        operator: Some("inDateRange".to_string()),
+                                        values: Some(vec![
+                                            "2023-01-01 00:00:00.000".to_string(),
+                                            "2023-03-31 23:59:59.999".to_string(),
+                                        ]),
+                                    })
+                                )),
                             ]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("inDateRange".to_string()),
-                            values: Some(vec![
-                                "2020-01-01 00:00:00.000".to_string(),
-                                "2020-03-31 23:59:59.999".to_string(),
-                            ]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("inDateRange".to_string()),
-                            values: Some(vec![
-                                "2021-01-01 00:00:00.000".to_string(),
-                                "2021-03-31 23:59:59.999".to_string(),
-                            ]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("inDateRange".to_string()),
-                            values: Some(vec![
-                                "2022-01-01 00:00:00.000".to_string(),
-                                "2022-03-31 23:59:59.999".to_string(),
-                            ]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                            operator: Some("inDateRange".to_string()),
-                            values: Some(vec![
-                                "2023-01-01 00:00:00.000".to_string(),
-                                "2023-03-31 23:59:59.999".to_string(),
-                            ]),
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None
-                }]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
@@ -16094,24 +16280,24 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 }]),
                 order: Some(vec![]),
                 filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec![
-                            "male".to_string(),
-                            "female".to_string(),
-                            "other".to_string()
-                        ]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["female".to_string()]),
-                        or: None,
-                        and: None
-                    },
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec![
+                                "male".to_string(),
+                                "female".to_string(),
+                                "other".to_string()
+                            ]),
+                        }
+                    )),
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                        }
+                    )),
                 ]),
                 ..Default::default()
             }
@@ -16377,13 +16563,15 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ]))
                 }]),
                 order: Some(vec![]),
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
-                    operator: Some("gte".to_string()),
-                    values: Some(vec!["5".to_string()]),
-                    or: None,
-                    and: None
-                }]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem::V1LoadRequestQueryFilterBase(Box::new(
+                        V1LoadRequestQueryFilterBase {
+                            member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+                            operator: Some("gte".to_string()),
+                            values: Some(vec!["5".to_string()]),
+                        }
+                    ))
+                ]),
                 ..Default::default()
             }
         )
