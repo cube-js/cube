@@ -23,6 +23,7 @@ pub mod now;
 pub mod providers;
 #[cfg(test)]
 mod test_utils;
+pub mod udf_xirr;
 pub mod udfs;
 
 use crate::cachestore::CacheStore;
@@ -429,6 +430,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
         // TODO: case-insensitive names.
         let kind = match name {
             "merge" | "MERGE" => CubeAggregateUDFKind::MergeHll,
+            "xirr" | "XIRR" => CubeAggregateUDFKind::Xirr,
             _ => return None,
         };
         return Some(Arc::new(aggregate_udf_by_kind(kind).descriptor()));
