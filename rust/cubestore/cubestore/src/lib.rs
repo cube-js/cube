@@ -1,14 +1,6 @@
-// #![feature(test)]
 #![feature(async_closure)]
 #![feature(box_patterns)]
 #![feature(hash_set_entry)]
-// TODO upgrade DF
-// #![feature(vec_into_raw_parts)]
-// #![feature(hash_set_entry)]
-// #![feature(is_sorted)]
-// #![feature(result_flattening)]
-// #![feature(extract_if)]
-// #![feature(trace_macros)]
 
 // trace_macros!(true);
 #[macro_use]
@@ -269,8 +261,12 @@ impl From<Elapsed> for CubeError {
 impl From<datafusion::error::DataFusionError> for CubeError {
     fn from(v: datafusion::error::DataFusionError) -> Self {
         match v {
-            // TODO upgrade DF
-            // datafusion::error::DataFusionError::Panic(msg) => CubeError::panic(msg),
+            datafusion::error::DataFusionError::ExecutionJoin(join_error)
+                if join_error.is_panic() =>
+            {
+                let payload = join_error.into_panic();
+                CubeError::from_panic_payload(payload)
+            }
             v => CubeError::from_error(v),
         }
     }
