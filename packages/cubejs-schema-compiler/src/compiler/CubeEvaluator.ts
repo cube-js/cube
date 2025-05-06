@@ -28,13 +28,13 @@ export type DimensionDefinition = {
 };
 
 export type TimeShiftDefinition = {
-  timeDimension: (...args: Array<unknown>) => ToString,
+  timeDimension?: (...args: Array<unknown>) => ToString,
   interval: string,
   type: 'next' | 'prior',
 };
 
 export type TimeShiftDefinitionReference = {
-  timeDimension: string,
+  timeDimension?: string,
   interval: string,
   type: 'next' | 'prior',
 };
@@ -353,8 +353,13 @@ export class CubeEvaluator extends CubeSymbols {
           member.addGroupByReferences = this.evaluateReferences(cubeName, member.addGroupBy);
         }
         if (member.timeShift) {
-          member.timeShiftReferences = member.timeShift
-            .map(s => ({ ...s, timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }));
+          member.timeShiftReferences = member.timeShift.map((s): TimeShiftDefinitionReference => ({
+            interval: s.interval,
+            type: s.type,
+            ...(typeof s.timeDimension === 'function'
+              ? { timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }
+              : {}),
+          }));
         }
       }
     }
