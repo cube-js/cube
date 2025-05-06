@@ -1291,7 +1291,7 @@ export class BaseQuery {
       queryContext = {
         ...queryContext,
         timeDimensions: queryContext.timeDimensions.map(td => {
-          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension);
+          const timeShift = memberDef.timeShiftReferences?.find(r => r.timeDimension === td.dimension);
           if (timeShift) {
             if (td.shiftInterval) {
               throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
