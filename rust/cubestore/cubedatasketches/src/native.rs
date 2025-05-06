@@ -97,7 +97,16 @@ impl HLLUnionDataSketch {
 
     /// Allocated size, not including size_of::<Self>().  Must be exact.
     pub fn allocated_size(&self) -> usize {
-        // TODO upgrade DF: How should we (how can we) implement this?
-        1
+        let lg_k = self.get_lg_config_k();
+        let k = 1 << lg_k;
+
+        // HLL union starts with an hll sketch with HLL_8, and the storage footprint according to
+        // hll.hpp (in datasketches-rs) is k bytes.  We are assuming we're using maximum memory
+        // usage, even though the HLL implementation internally starts out with smaller buffers
+        // (until you add enough rows).  Also, we're eyeballing the C++ struct overhead as 32 bytes.
+        //
+        // This function is supposed to be exact, but it is not exact.
+
+        return 32 + k;
     }
 }
