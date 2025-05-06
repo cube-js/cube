@@ -22,7 +22,6 @@ pub use topk::MIN_TOPK_STREAM_ROWS;
 use udf_xirr::XIRR_UDAF_NAME;
 use udfs::{registerable_aggregate_udfs, registerable_scalar_udfs};
 mod filter_by_key_range;
-mod flatten_union;
 pub mod info_schema;
 pub mod merge_sort;
 pub mod metadata_cache;
