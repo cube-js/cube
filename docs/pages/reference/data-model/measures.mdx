@@ -94,6 +94,12 @@ cubes:
 
 ### `drill_members`
 
+<WarningBox>
+
+`drill_members` is used for creating custom applications. It does not affect the behavior drilling in BI tools.
+
+</WarningBox>
+
 Using the `drill_members` parameter, you can define a set of [drill
 down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
 array of dimensions. Cube automatically injects dimensions’ names and other
@@ -173,6 +179,12 @@ cubes:
 </CodeTabs>
 
 ### `format`
+
+<WarningBox>
+
+`format` does not affect the format of the data in an API response. It is used in the Cube Playground and for custom applications. It does not affect the display format of a field when viewed in a BI tool.
+
+</WarningBox>
 
 `format` is an optional parameter. It is used to format the output of measures
 in different ways, for example, as currency for `revenue`. Please refer to the
