@@ -90,6 +90,17 @@ export class BaseFilter extends BaseDimension {
     }
   }
 
+  /**
+   * BaseFilter inherits from BaseDimension while Filter may be measure-based !!
+   */
+  public override dateFieldType() {
+    if (this.measure) {
+      return this.measureDefinition().type; // There is no fieldType in measure, but it seems that it's enough
+    } else {
+      return this.dimensionDefinition().fieldType;
+    }
+  }
+
   public cube() {
     return this.query.cubeEvaluator.cubeFromPath(this.measure || this.dimension);
   }
