@@ -12,7 +12,9 @@ pub struct CubeJoinItem {
 
 impl PrettyPrint for CubeJoinItem {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(&format!("CubeJoinItem for cube: {}", self.cube.name), state);
+        result.println(&format!("CubeJoinItem: "), state);
+        let details_state = state.new_level();
+        self.cube.pretty_print(result, &details_state);
     }
 }
 
@@ -64,7 +66,9 @@ impl PrettyPrint for LogicalJoin {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(&format!("Join: "), state);
         let state = state.new_level();
-        result.println(&format!("root: {}", self.root.name), &state);
+        let details_state = state.new_level();
+        result.println(&format!("root: "), &state);
+        self.root.pretty_print(result, &details_state);
         result.println(&format!("joins: "), &state);
         let state = state.new_level();
         for join in self.joins.iter() {

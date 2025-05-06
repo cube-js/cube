@@ -1,6 +1,7 @@
 use super::{
     AutoPrefixSqlNode, CaseDimensionSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
-    GeoDimensionSqlNode, MeasureFilterSqlNode, MultiStageRankNode, MultiStageWindowNode,
+    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MeasureFilterSqlNode,
+    MultiStageRankNode, MultiStageWindowNode, OriginalSqlPreAggregationSqlNode,
     RenderReferencesSqlNode, RollingWindowNode, RootSqlNode, SqlNode, TimeDimensionNode,
     TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
@@ -16,6 +17,7 @@ pub struct SqlNodesFactory {
     ungrouped_measure: bool,
     count_approx_as_state: bool,
     render_references: HashMap<String, QualifiedColumnName>,
+    pre_aggregation_measures_references: HashMap<String, QualifiedColumnName>,
     rendered_as_multiplied_measures: HashSet<String>,
     ungrouped_measure_references: HashMap<String, QualifiedColumnName>,
     cube_name_references: HashMap<String, String>,
@@ -23,6 +25,8 @@ pub struct SqlNodesFactory {
     multi_stage_window: Option<Vec<String>>, //partition_by
     rolling_window: bool,
     dimensions_with_ignored_timezone: HashSet<String>,
+    use_local_tz_in_date_range: bool,
+    original_sql_pre_aggregations: HashMap<String, String>,
 }
 
 impl SqlNodesFactory {
@@ -33,6 +37,7 @@ impl SqlNodesFactory {
             ungrouped_measure: false,
             count_approx_as_state: false,
             render_references: HashMap::new(),
+            pre_aggregation_measures_references: HashMap::new(),
             ungrouped_measure_references: HashMap::new(),
             cube_name_references: HashMap::new(),
             rendered_as_multiplied_measures: HashSet::new(),
@@ -40,6 +45,8 @@ impl SqlNodesFactory {
             multi_stage_window: None,
             rolling_window: false,
             dimensions_with_ignored_timezone: HashSet::new(),
+            use_local_tz_in_date_range: false,
+            original_sql_pre_aggregations: HashMap::new(),
         }
     }
 
@@ -49,6 +56,14 @@ impl SqlNodesFactory {
 
     pub fn set_ungrouped(&mut self, value: bool) {
         self.ungrouped = value;
+    }
+
+    pub fn set_use_local_tz_in_date_range(&mut self, value: bool) {
+        self.use_local_tz_in_date_range = value;
+    }
+
+    pub fn use_local_tz_in_date_range(&self) -> bool {
+        self.use_local_tz_in_date_range
     }
 
     pub fn set_ungrouped_measure(&mut self, value: bool) {
@@ -67,6 +82,10 @@ impl SqlNodesFactory {
         self.rendered_as_multiplied_measures = value;
     }
 
+    pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<String, String>) {
+        self.original_sql_pre_aggregations = value;
+    }
+
     pub fn add_render_reference(&mut self, key: String, value: QualifiedColumnName) {
         self.render_references.insert(key, value);
     }
@@ -81,6 +100,21 @@ impl SqlNodesFactory {
 
     pub fn set_multi_stage_window(&mut self, partition_by: Vec<String>) {
         self.multi_stage_window = Some(partition_by);
+    }
+
+    pub fn set_pre_aggregation_measures_references(
+        &mut self,
+        value: HashMap<String, QualifiedColumnName>,
+    ) {
+        self.pre_aggregation_measures_references = value;
+    }
+
+    pub fn add_pre_aggregation_measure_reference(
+        &mut self,
+        key: String,
+        value: QualifiedColumnName,
+    ) {
+        self.pre_aggregation_measures_references.insert(key, value);
     }
 
     pub fn set_rolling_window(&mut self, value: bool) {
@@ -131,11 +165,22 @@ impl SqlNodesFactory {
             self.time_dimension_processor(evaluate_sql_processor.clone()),
             measure_processor.clone(),
             auto_prefix_processor.clone(),
+            self.cube_table_processor(evaluate_sql_processor.clone()),
             evaluate_sql_processor.clone(),
         );
         RenderReferencesSqlNode::new(root_node, self.render_references.clone())
     }
 
+    fn cube_table_processor(&self, default: Rc<dyn SqlNode>) -> Rc<dyn SqlNode> {
+        if !self.original_sql_pre_aggregations.is_empty() {
+            OriginalSqlPreAggregationSqlNode::new(
+                default,
+                self.original_sql_pre_aggregations.clone(),
+            )
+        } else {
+            default
+        }
+    }
     fn add_ungrouped_measure_reference_if_needed(
         &self,
         default: Rc<dyn SqlNode>,
@@ -173,11 +218,19 @@ impl SqlNodesFactory {
         } else if self.ungrouped {
             UngroupedQueryFinalMeasureSqlNode::new(input)
         } else {
-            let final_processor = FinalMeasureSqlNode::new(
+            let final_processor: Rc<dyn SqlNode> = FinalMeasureSqlNode::new(
                 input.clone(),
                 self.rendered_as_multiplied_measures.clone(),
                 self.count_approx_as_state,
             );
+            let final_processor = if !self.pre_aggregation_measures_references.is_empty() {
+                FinalPreAggregationMeasureSqlNode::new(
+                    final_processor,
+                    self.pre_aggregation_measures_references.clone(),
+                )
+            } else {
+                final_processor
+            };
             if self.rolling_window {
                 RollingWindowNode::new(input, final_processor)
             } else {

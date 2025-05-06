@@ -77,6 +77,7 @@ pub struct QueryProperties {
     ignore_cumulative: bool,
     ungrouped: bool,
     multi_fact_join_groups: Vec<(Rc<dyn JoinDefinition>, Vec<Rc<BaseMeasure>>)>,
+    pre_aggregation_query: bool,
 }
 
 impl QueryProperties {
@@ -300,6 +301,8 @@ impl QueryProperties {
             &segments,
         )?;
 
+        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+
         Ok(Rc::new(Self {
             measures,
             dimensions,
@@ -315,6 +318,7 @@ impl QueryProperties {
             ignore_cumulative: false,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
         }))
     }
 
@@ -332,6 +336,7 @@ impl QueryProperties {
         offset: Option<usize>,
         ignore_cumulative: bool,
         ungrouped: bool,
+        pre_aggregation_query: bool,
     ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
@@ -365,6 +370,7 @@ impl QueryProperties {
             ignore_cumulative,
             ungrouped,
             multi_fact_join_groups,
+            pre_aggregation_query,
         }))
     }
 
@@ -549,6 +555,10 @@ impl QueryProperties {
 
     pub fn ungrouped(&self) -> bool {
         self.ungrouped
+    }
+
+    pub fn is_pre_aggregation_query(&self) -> bool {
+        self.pre_aggregation_query
     }
 
     pub fn all_filters(&self) -> Option<Filter> {
@@ -761,7 +771,10 @@ impl QueryProperties {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.all_used_measures()?;
         for m in measures.iter() {
-            if has_multi_stage_members(m.member_evaluator(), self.ignore_cumulative)? {
+            if has_multi_stage_members(
+                m.member_evaluator(),
+                self.ignore_cumulative || self.pre_aggregation_query,
+            )? {
                 result.multi_stage_measures.push(m.clone())
             } else {
                 let join = self

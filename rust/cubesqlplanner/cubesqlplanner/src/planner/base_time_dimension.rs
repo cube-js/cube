@@ -92,10 +92,17 @@ impl BaseTimeDimension {
             granularity.clone(),
         )?;
 
+        let date_range_tuple = if let Some(date_range) = &date_range {
+            assert!(date_range.len() == 2);
+            Some((date_range[0].clone(), date_range[1].clone()))
+        } else {
+            None
+        };
         let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
             member_evaluator.clone(),
             granularity.clone(),
             granularity_obj.clone(),
+            date_range_tuple,
         )));
         Ok(Rc::new(Self {
             dimension,
@@ -120,10 +127,17 @@ impl BaseTimeDimension {
             &self.dimension.cube_name(),
             new_granularity.clone(),
         )?;
+        let date_range_tuple = if let Some(date_range) = &self.date_range {
+            assert!(date_range.len() == 2);
+            Some((date_range[0].clone(), date_range[1].clone()))
+        } else {
+            None
+        };
         let member_evaluator = Rc::new(MemberSymbol::TimeDimension(TimeDimensionSymbol::new(
             self.dimension.member_evaluator(),
             new_granularity.clone(),
             new_granularity_obj.clone(),
+            date_range_tuple,
         )));
         Ok(Rc::new(Self {
             dimension: self.dimension.clone(),

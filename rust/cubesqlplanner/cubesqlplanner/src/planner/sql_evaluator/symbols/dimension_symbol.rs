@@ -31,8 +31,8 @@ pub struct DimensionSymbol {
     latitude: Option<Rc<SqlCall>>,
     longitude: Option<Rc<SqlCall>>,
     case: Option<DimensionCaseDefinition>,
-    #[allow(dead_code)]
     definition: Rc<dyn DimensionDefinition>,
+    is_reference: bool, // Symbol is a direct reference to another symbol without any calculations
 }
 
 impl DimensionSymbol {
@@ -40,6 +40,7 @@ impl DimensionSymbol {
         cube_name: String,
         name: String,
         member_sql: Option<Rc<SqlCall>>,
+        is_reference: bool,
         latitude: Option<Rc<SqlCall>>,
         longitude: Option<Rc<SqlCall>>,
         case: Option<DimensionCaseDefinition>,
@@ -49,6 +50,7 @@ impl DimensionSymbol {
             cube_name,
             name,
             member_sql,
+            is_reference,
             latitude,
             longitude,
             definition,
@@ -108,6 +110,10 @@ impl DimensionSymbol {
 
     pub fn dimension_type(&self) -> &String {
         &self.definition.static_data().dimension_type
+    }
+
+    pub fn is_reference(&self) -> bool {
+        self.is_reference
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
@@ -241,6 +247,13 @@ impl SymbolFactory for DimensionSymbolFactory {
         } else {
             None
         };
+
+        let is_sql_direct_ref = if let Some(sql) = &sql {
+            sql.is_direct_reference()?
+        } else {
+            false
+        };
+
         let (latitude, longitude) = if definition.static_data().dimension_type == "geo" {
             if let (Some(latitude_item), Some(longitude_item)) =
                 (definition.latitude()?, definition.longitude()?)
@@ -286,8 +299,25 @@ impl SymbolFactory for DimensionSymbolFactory {
         } else {
             None
         };
+        let owned_by_cube = definition.static_data().owned_by_cube.unwrap_or(true);
+        let is_sub_query = definition.static_data().sub_query.unwrap_or(false);
+        let is_multi_stage = definition.static_data().multi_stage.unwrap_or(false);
+        let is_reference = !owned_by_cube
+            && !is_sub_query
+            && is_sql_direct_ref
+            && case.is_none()
+            && latitude.is_none()
+            && longitude.is_none()
+            && !is_multi_stage;
         Ok(MemberSymbol::new_dimension(DimensionSymbol::new(
-            cube_name, name, sql, latitude, longitude, case, definition,
+            cube_name,
+            name,
+            sql,
+            is_reference,
+            latitude,
+            longitude,
+            case,
+            definition,
         )))
     }
 }

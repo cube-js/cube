@@ -18,15 +18,16 @@ impl FullKeyAggregateQueryPlanner {
         resolve_multiplied_measures: Option<Rc<ResolveMultipliedMeasures>>,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
     ) -> Result<Rc<FullKeyAggregate>, CubeError> {
-        let mut sources = Vec::new();
-        if let Some(resolve_multiplied_measures) = resolve_multiplied_measures {
-            sources.push(FullKeyAggregateSource::ResolveMultipliedMeasures(
-                resolve_multiplied_measures,
-            ));
-        }
+        let mut multi_stage_subquery_refs = Vec::new();
         for subquery in multi_stage_subqueries {
-            sources.push(FullKeyAggregateSource::MultiStageSubqueryRef(subquery));
+            multi_stage_subquery_refs.push(subquery);
         }
+        let resolved_multiplied_source =
+            resolve_multiplied_measures.map(|resolve_multiplied_measures| {
+                ResolvedMultipliedMeasures::ResolveMultipliedMeasures(
+                    resolve_multiplied_measures.clone(),
+                )
+            });
         let join_dimensions = self
             .query_properties
             .dimension_symbols()
@@ -35,7 +36,8 @@ impl FullKeyAggregateQueryPlanner {
             .cloned()
             .collect_vec();
         Ok(Rc::new(FullKeyAggregate {
-            sources,
+            multiplied_measures_resolver: resolved_multiplied_source,
+            multi_stage_subquery_refs,
             use_full_join_and_coalesce: true,
             join_dimensions,
         }))
@@ -64,7 +66,7 @@ impl FullKeyAggregateQueryPlanner {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
             measures_filter: self.query_properties.measures_filters().clone(),
-            segments: vec![],
+            segments: self.query_properties.segments().clone(),
         });
         let result = FullKeyAggregateQuery {
             schema,

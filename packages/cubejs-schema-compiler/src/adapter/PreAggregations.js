@@ -559,7 +559,7 @@ export class PreAggregations {
             transformedQuery.filterDimensionsSingleValueEqual || {},
           )
         ));
-
+    
     const backAlias = (references) => references.map(r => (
       Array.isArray(r) ?
         [transformedQuery.allBackAliasMembers[r[0]] || r[0], r[1]] :
@@ -782,11 +782,15 @@ export class PreAggregations {
    */
   findPreAggregationForQuery() {
     if (!this.preAggregationForQuery) {
-      this.preAggregationForQuery =
-        this
-          .rollupMatchResults()
-          // Refresh worker can access specific pre-aggregations even in case those hidden by others
-          .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
+      if (this.query.useNativeSqlPlanner && this.query.canUseNativeSqlPlannerPreAggregation) {
+        this.preAggregationForQuery = this.query.findPreAggregationForQueryRust();
+      } else {
+        this.preAggregationForQuery =
+          this
+            .rollupMatchResults()
+            // Refresh worker can access specific pre-aggregations even in case those hidden by others
+            .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
+      }
     }
     return this.preAggregationForQuery;
   }
@@ -864,6 +868,25 @@ export class PreAggregations {
       R.filter(([k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
       R.map(([preAggregationName, preAggregation]) => this.evaluatedPreAggregationObj(cube, preAggregationName, preAggregation, canUsePreAggregation))
     )(preAggregations);
+  }
+
+  getRollupPreAggregationByName(cube, preAggregationName) {
+    const canUsePreAggregation = () => true;
+    const preAggregation = R.pipe(
+      R.toPairs,
+      R.filter(([_, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
+      R.find(([k, _]) => k === preAggregationName)
+    )(this.query.cubeEvaluator.preAggregationsForCube(cube));
+    if (preAggregation) {
+      const tableName = this.preAggregationTableName(cube, preAggregation[0], preAggregation[1]);
+      const preAggObj = preAggregation ? this.evaluatedPreAggregationObj(cube, preAggregation[0], preAggregation[1], canUsePreAggregation) : {};
+      return {
+        tableName,
+        ...preAggObj
+      };
+    } else {
+      return {};
+    }
   }
 
   // TODO check multiplication factor didn't change

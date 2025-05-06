@@ -37,7 +37,7 @@ impl QueryPlanner {
                 multi_stage_query_planner.plan_queries()?;
 
             let result = full_key_aggregate_planner.plan_logical_plan(
-                Some(multiplied_resolver),
+                multiplied_resolver,
                 multi_stage_refs,
                 multi_stage_members,
             )?;

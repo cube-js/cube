@@ -61,6 +61,8 @@ pub struct BaseQueryOptionsStatic {
     pub ungrouped: Option<bool>,
     #[serde(rename = "exportAnnotatedSql")]
     pub export_annotated_sql: bool,
+    #[serde(rename = "preAggregationQuery")]
+    pub pre_aggregation_query: Option<bool>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

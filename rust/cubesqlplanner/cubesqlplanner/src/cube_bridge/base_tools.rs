@@ -1,6 +1,7 @@
 use super::base_query_options::FilterItem;
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
+use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use super::sql_utils::{NativeSqlUtils, SqlUtils};
@@ -58,4 +59,15 @@ pub trait BaseTools {
         source: String,
         origin: String,
     ) -> Result<String, CubeError>;
+
+    fn get_pre_aggregation_by_name(
+        &self,
+        cube_name: String,
+        name: String,
+    ) -> Result<Rc<dyn PreAggregationObj>, CubeError>;
+    fn pre_aggregation_table_name(
+        &self,
+        cube_name: String,
+        name: String,
+    ) -> Result<String, CubeError>; //TODO move to rust
 }

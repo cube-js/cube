@@ -289,6 +289,11 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
+    this.canUseNativeSqlPlannerPreAggregation = false;
+    if (this.useNativeSqlPlanner) {
+      const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
+      this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
+    }
     this.prebuildJoin();
 
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
@@ -471,6 +476,19 @@ export class BaseQuery {
   }
 
   newDimension(dimensionPath) {
+    if (typeof dimensionPath === 'string') {
+      const memberArr = dimensionPath.split('.');
+      if (memberArr.length > 3 &&
+            memberArr[memberArr.length - 2] === 'granularities' &&
+            this.cubeEvaluator.isDimension(memberArr.slice(0, -2))) {
+        return this.newTimeDimension(
+          {
+            dimension: this.cubeEvaluator.pathFromArray(memberArr.slice(0, -2)),
+            granularity: memberArr[memberArr.length - 1]
+          }
+        );
+      }
+    }
     return new BaseDimension(this, dimensionPath);
   }
 
@@ -636,36 +654,37 @@ export class BaseQuery {
    * @returns {[string, Array<unknown>]}
    */
   buildSqlAndParams(exportAnnotatedSql) {
+    if (this.useNativeSqlPlanner) {
+      let isRelatedToPreAggregation = false;
+
+      if (!this.canUseNativeSqlPlannerPreAggregation) {
+        if (this.options.preAggregationQuery) {
+          isRelatedToPreAggregation = true;
+        } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass && this.externalPreAggregationQuery()) {
+          isRelatedToPreAggregation = true;
+        } else {
+          let preAggForQuery =
+            this.preAggregations.findPreAggregationForQuery();
+          if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
+            preAggForQuery = undefined;
+          }
+          if (preAggForQuery) {
+            isRelatedToPreAggregation = true;
+          }
+        }
+
+        if (isRelatedToPreAggregation) {
+          return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
+        }
+      }
+
+      return this.buildSqlAndParamsRust(exportAnnotatedSql);
+    }
+
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
-    }
-
-    if (this.useNativeSqlPlanner) {
-      let isRelatedToPreAggregation = false;
-      if (this.options.preAggregationQuery) {
-        isRelatedToPreAggregation = true;
-      } else if (!this.options.disableExternalPreAggregations && this.externalQueryClass) {
-        if (this.externalPreAggregationQuery()) {
-          isRelatedToPreAggregation = true;
-        }
-      } else {
-        let preAggForQuery =
-          this.preAggregations.findPreAggregationForQuery();
-        if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
-          preAggForQuery = undefined;
-        }
-        if (preAggForQuery) {
-          isRelatedToPreAggregation = true;
-        }
-      }
-
-      if (isRelatedToPreAggregation) {
-        return this.newQueryWithoutNative().buildSqlAndParams(exportAnnotatedSql);
-      }
-
-      return this.buildSqlAndParamsRust(exportAnnotatedSql);
     }
 
     return this.compilers.compiler.withQuery(
@@ -703,8 +722,8 @@ export class BaseQuery {
       offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
       ungrouped: this.options.ungrouped,
-      exportAnnotatedSql: exportAnnotatedSql === true
-
+      exportAnnotatedSql: exportAnnotatedSql === true,
+      preAggregationQuery: this.options.preAggregationQuery
     };
 
     const buildResult = nativeBuildSqlAndParams(queryParams);
@@ -718,9 +737,57 @@ export class BaseQuery {
     }
 
     const res = buildResult.result;
+    const [query, params, preAggregation] = res;
     // FIXME
-    res[1] = [...res[1]];
-    return res;
+    const paramsArray = [...params];
+    if (preAggregation) {
+      this.preAggregations.preAggregationForQuery = preAggregation;
+    }
+    return [query, paramsArray];
+  }
+
+  // FIXME Temporary solution
+  findPreAggregationForQueryRust() {
+    let optionsOrder = this.options.order;
+    if (optionsOrder && !Array.isArray(optionsOrder)) {
+      optionsOrder = [optionsOrder];
+    }
+    const order = optionsOrder ? R.pipe(
+      R.map((hash) => ((!hash || !hash.id) ? null : hash)),
+      R.reject(R.isNil),
+    )(optionsOrder) : undefined;
+
+    const queryParams = {
+      measures: this.options.measures,
+      dimensions: this.options.dimensions,
+      segments: this.options.segments,
+      timeDimensions: this.options.timeDimensions,
+      timezone: this.options.timezone,
+      joinGraph: this.joinGraph,
+      cubeEvaluator: this.cubeEvaluator,
+      order,
+      filters: this.options.filters,
+      limit: this.options.limit ? this.options.limit.toString() : null,
+      rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+      offset: this.options.offset ? this.options.offset.toString() : null,
+      baseTools: this,
+      ungrouped: this.options.ungrouped,
+      exportAnnotatedSql: false,
+      preAggregationQuery: this.options.preAggregationQuery
+    };
+
+    const buildResult = nativeBuildSqlAndParams(queryParams);
+
+    if (buildResult.error) {
+      if (buildResult.error.cause === 'User') {
+        throw new UserError(buildResult.error.message);
+      } else {
+        throw new Error(buildResult.error.message);
+      }
+    }
+
+    const [, , preAggregation] = buildResult.result;
+    return preAggregation;
   }
 
   allCubeMembers(path) {
@@ -741,6 +808,10 @@ export class BaseQuery {
   // FIXME helper for native generator, maybe should be moved entirely to rust
   generateCustomTimeSeries(granularityInterval, dateRange, origin) {
     return timeSeriesFromCustomInterval(granularityInterval, dateRange, moment(origin), { timestampPrecision: 3 });
+  }
+
+  getPreAggregationByName(cube, preAggregationName) {
+    return this.preAggregations.getRollupPreAggregationByName(cube, preAggregationName);
   }
 
   get shouldReuseParams() {
@@ -922,7 +993,6 @@ export class BaseQuery {
     const renderedWithQueries = withQueries.map(q => this.renderWithQuery(q));
 
     let toJoin;
-
     if (this.options.preAggregationQuery) {
       const allRegular = regularMeasures.concat(
         cumulativeMeasures
@@ -1153,7 +1223,6 @@ export class BaseQuery {
 
     const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
     const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
-
     const cumulativeMeasures =
       R.pipe(
         R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),
@@ -3228,7 +3297,7 @@ export class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    options = { ...options, useNativeSqlPlanner: false }; // We don't use tesseract for pre-aggregations generation yet
+    options = { ...options };
     if (this.options.queryFactory) {
       // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
       // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)

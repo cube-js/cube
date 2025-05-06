@@ -115,6 +115,12 @@ impl QueryDateTime {
         self.add_interval(&interval.inverse())
     }
 
+    pub fn add_duration(&self, duration: Duration) -> Result<Self, CubeError> {
+        let mut native = self.naive_local();
+        native = native + duration;
+        Self::from_local_date_time(self.date_time.timezone(), native)
+    }
+
     pub fn granularity(&self) -> String {
         let time = self.date_time.time();
 

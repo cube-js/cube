@@ -36,7 +36,7 @@ impl MultipliedMeasuresQueryPlanner {
         })
     }
 
-    pub fn plan_queries(&self) -> Result<Rc<ResolveMultipliedMeasures>, CubeError> {
+    pub fn plan_queries(&self) -> Result<Option<Rc<ResolveMultipliedMeasures>>, CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
                 "MultipliedMeasuresQueryPlanner should not be used for simple query"
@@ -85,11 +85,37 @@ impl MultipliedMeasuresQueryPlanner {
             )?;
             aggregate_multiplied_subqueries.push(aggregate_subquery_logical_plan);
         }
-        let result = Rc::new(ResolveMultipliedMeasures {
-            regular_measure_subqueries,
-            aggregate_multiplied_subqueries,
-        });
-        Ok(result)
+        if regular_measure_subqueries.is_empty() && aggregate_multiplied_subqueries.is_empty() {
+            Ok(None)
+        } else {
+            let all_measures = full_key_aggregate_measures
+                .regular_measures
+                .iter()
+                .chain(full_key_aggregate_measures.multiplied_measures.iter())
+                .map(|m| m.member_evaluator().clone())
+                .collect_vec();
+            let schema = Rc::new(LogicalSchema {
+                time_dimensions: self.query_properties.time_dimension_symbols(),
+                dimensions: self.query_properties.dimension_symbols(),
+                measures: all_measures,
+                multiplied_measures: full_key_aggregate_measures
+                    .rendered_as_multiplied_measures
+                    .clone(),
+            });
+            let logical_filter = Rc::new(LogicalFilter {
+                dimensions_filters: self.query_properties.dimensions_filters().clone(),
+                time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+                measures_filter: self.query_properties.measures_filters().clone(), //TODO may be reduce filters to only used measures here
+                segments: self.query_properties.segments().clone(),
+            });
+            let result = Rc::new(ResolveMultipliedMeasures {
+                schema,
+                filter: logical_filter,
+                regular_measure_subqueries,
+                aggregate_multiplied_subqueries,
+            });
+            Ok(Some(result))
+        }
     }
 
     fn aggregate_subquery_plan(
@@ -149,9 +175,10 @@ impl MultipliedMeasuresQueryPlanner {
         } else {
             Rc::new(AggregateMultipliedSubquerySouce::Cube)
         };
+        let cube = Cube::new(pk_cube);
         Ok(Rc::new(AggregateMultipliedSubquery {
             schema,
-            pk_cube,
+            pk_cube: cube,
             keys_subquery,
             dimension_subqueries: subquery_dimension_queries,
             source,
@@ -275,7 +302,7 @@ impl MultipliedMeasuresQueryPlanner {
             limit: self.query_properties.row_limit(),
             ungrouped: self.query_properties.ungrouped(),
             dimension_subqueries: subquery_dimension_queries,
-            source,
+            source: SimpleQuerySource::LogicalJoin(source),
             order_by: vec![],
         };
         Ok(Rc::new(query))

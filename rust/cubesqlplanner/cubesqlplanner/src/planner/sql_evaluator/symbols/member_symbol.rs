@@ -125,6 +125,28 @@ impl MemberSymbol {
         }
     }
 
+    pub fn is_reference(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.is_reference(),
+            Self::TimeDimension(d) => d.is_reference(),
+            Self::Measure(m) => m.is_reference(),
+            Self::CubeName(_) => false,
+            Self::CubeTable(_) => false,
+            Self::MemberExpression(e) => e.is_reference(),
+        }
+    }
+
+    pub fn owned_by_cube(&self) -> bool {
+        match self {
+            Self::Dimension(d) => d.owned_by_cube(),
+            Self::TimeDimension(d) => d.owned_by_cube(),
+            Self::Measure(m) => m.owned_by_cube(),
+            Self::CubeName(_) => false,
+            Self::CubeTable(_) => false,
+            Self::MemberExpression(_) => false,
+        }
+    }
+
     pub fn as_time_dimension(&self) -> Result<&TimeDimensionSymbol, CubeError> {
         match self {
             Self::TimeDimension(d) => Ok(d),

@@ -1,15 +1,19 @@
 use super::MemberSymbol;
+use crate::planner::query_tools::QueryTools;
 use crate::planner::time_dimension::Granularity;
-use crate::planner::QueryDateTime;
+use crate::planner::{GranularityHelper, QueryDateTime, QueryDateTimeHelper};
+use chrono::Duration;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct TimeDimensionSymbol {
     base_symbol: Rc<MemberSymbol>,
     full_name: String,
     granularity: Option<String>,
     granularity_obj: Option<Granularity>,
+    date_range: Option<(String, String)>,
     alias_suffix: String,
 }
 
@@ -18,6 +22,7 @@ impl TimeDimensionSymbol {
         base_symbol: Rc<MemberSymbol>,
         granularity: Option<String>,
         granularity_obj: Option<Granularity>,
+        date_range: Option<(String, String)>,
     ) -> Self {
         let name_suffix = if let Some(granularity) = &granularity {
             granularity.clone()
@@ -30,6 +35,7 @@ impl TimeDimensionSymbol {
             granularity,
             granularity_obj,
             full_name,
+            date_range,
             alias_suffix: name_suffix,
         }
     }
@@ -58,6 +64,32 @@ impl TimeDimensionSymbol {
         self.base_symbol.get_dependencies()
     }
 
+    pub fn owned_by_cube(&self) -> bool {
+        self.base_symbol.owned_by_cube()
+    }
+
+    pub fn get_dependencies_as_time_dimensions(&self) -> Vec<Rc<MemberSymbol>> {
+        self.get_dependencies()
+            .into_iter()
+            .map(|s| match s.as_ref() {
+                MemberSymbol::Dimension(dimension_symbol) => {
+                    if dimension_symbol.dimension_type() == "time" {
+                        let result = Self::new(
+                            s.clone(),
+                            self.granularity.clone(),
+                            self.granularity_obj.clone(),
+                            self.date_range.clone(),
+                        );
+                        Rc::new(MemberSymbol::TimeDimension(result))
+                    } else {
+                        s.clone()
+                    }
+                }
+                _ => s.clone(),
+            })
+            .collect()
+    }
+
     pub fn get_dependencies_with_path(&self) -> Vec<(Rc<MemberSymbol>, Vec<String>)> {
         self.base_symbol.get_dependencies_with_path()
     }
@@ -70,8 +102,49 @@ impl TimeDimensionSymbol {
         self.base_symbol.is_multi_stage()
     }
 
+    pub fn is_reference(&self) -> bool {
+        self.base_symbol.is_reference()
+    }
+
     pub fn name(&self) -> String {
         self.base_symbol.name()
+    }
+
+    pub fn date_range_granularity(
+        &self,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Option<String>, CubeError> {
+        if let Some(date_range) = &self.date_range {
+            let tz = query_tools.timezone();
+            let from_date_str =
+                QueryDateTimeHelper::format_from_date(&date_range.0, query_tools.clone())?;
+            let to_date_str =
+                QueryDateTimeHelper::format_to_date(&date_range.1, query_tools.clone())?;
+            let start = QueryDateTime::from_date_str(tz, &from_date_str)?;
+            let end = QueryDateTime::from_date_str(tz, &to_date_str)?;
+            let end = end.add_duration(Duration::milliseconds(1))?;
+            let start_granularity = start.granularity();
+            let end_granularity = end.granularity();
+            GranularityHelper::min_granularity(&Some(start_granularity), &Some(end_granularity))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn rollup_granularity(
+        &self,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Option<String>, CubeError> {
+        if let Some(granularity_obj) = &self.granularity_obj {
+            let date_range_granularity = self.date_range_granularity(query_tools.clone())?;
+            let self_granularity = granularity_obj.min_granularity()?;
+
+            GranularityHelper::min_granularity(&date_range_granularity, &self_granularity)
+        } else {
+            let date_range_granularity = self.date_range_granularity(query_tools.clone())?;
+
+            Ok(date_range_granularity)
+        }
     }
 
     pub fn get_range_for_time_series(
