@@ -1287,11 +1287,23 @@ export class BaseQuery {
     if (memberDef.addGroupByReferences) {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
-    if (memberDef.timeShiftReferences) {
-      queryContext = {
-        ...queryContext,
-        timeDimensions: queryContext.timeDimensions.map(td => {
-          const timeShift = memberDef.timeShiftReferences?.find(r => r.timeDimension === td.dimension);
+    if (memberDef.timeShiftReferences?.length) {
+      let mapFn;
+
+      if (memberDef.timeShiftReferences.length === 1 && !memberDef.timeShiftReferences[0].timeDimension) {
+        const timeShift = memberDef.timeShiftReferences[0];
+        mapFn = (td) => {
+          if (td.shiftInterval) {
+            throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
+          }
+          return {
+            ...td,
+            shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
+          };
+        };
+      } else {
+        mapFn = (td) => {
+          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension);
           if (timeShift) {
             if (td.shiftInterval) {
               throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
@@ -1302,7 +1314,12 @@ export class BaseQuery {
             };
           }
           return td;
-        })
+        };
+      }
+
+      queryContext = {
+        ...queryContext,
+        timeDimensions: queryContext.timeDimensions.map(mapFn)
       };
     }
     queryContext = {
