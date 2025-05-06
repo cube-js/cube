@@ -34,7 +34,7 @@ use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{
     ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
 };
-use crate::queryplanner::rolling::RollingWindowAggregate;
+use crate::queryplanner::rolling::{RollingWindowAggExec, RollingWindowAggregate};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::SortColumn;
@@ -67,9 +67,8 @@ pub struct PPOptions {
 }
 
 impl PPOptions {
-    // TODO upgrade DF: Rename
     #[allow(unused)]
-    pub fn show_all() -> PPOptions {
+    pub fn show_most() -> PPOptions {
         PPOptions {
             show_filters: true,
             show_sort_by: true,
@@ -361,9 +360,6 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                         self.output += &format!("PanicWorker")
                     } else if let Some(_) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
                         self.output += &format!("RollingWindowAggreagate");
-                    // TODO upgrade DF
-                    // } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
-                    //     self.output += &format!("LogicalAlias, alias: {}", alias.alias);
                     } else {
                         log::error!("unknown extension node")
                     }
@@ -732,12 +728,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             } else {
                 *out += &format!("{}", DefaultDisplay(dse));
             }
-
-            // TODO upgrade DF
-            // } else if let Some(_) = a.downcast_ref::<SkipExec>() {
-            //     *out += "SkipRows";
-            // } else if let Some(_) = a.downcast_ref::<RollingWindowAggExec>() {
-            //     *out += "RollingWindowAgg";
+        } else if let Some(_) = a.downcast_ref::<RollingWindowAggExec>() {
+            *out += "RollingWindowAgg";
         } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
             *out += "LastRowByUniqueKey";
         } else if a.is::<MemoryExec>() {
