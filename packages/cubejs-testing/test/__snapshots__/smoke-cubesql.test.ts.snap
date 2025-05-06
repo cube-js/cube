@@ -520,6 +520,17 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) join with grouped query and empty members: join grouped empty members 1`] = `
+Array [
+  Object {
+    "status": "processed",
+  },
+  Object {
+    "status": "shipped",
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) join with grouped query on coalesce: join grouped on coalesce 1`] = `
 Array [
   Object {
