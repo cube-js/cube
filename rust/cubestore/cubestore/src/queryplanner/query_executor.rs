@@ -411,20 +411,44 @@ impl QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<PreSerializedPlan>,
     ) -> Result<Arc<SessionContext>, CubeError> {
+        self.make_context(
+            CubeQueryPlanner::new_on_router(cluster, serialized_plan, self.memory_handler.clone()),
+            None,
+        )
+    }
+
+    fn worker_context(
+        &self,
+        serialized_plan: Arc<PreSerializedPlan>,
+        worker_planning_params: WorkerPlanningParams,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
+    ) -> Result<Arc<SessionContext>, CubeError> {
+        self.make_context(
+            CubeQueryPlanner::new_on_worker(
+                serialized_plan,
+                worker_planning_params,
+                self.memory_handler.clone(),
+                data_loaded_size.clone(),
+            ),
+            data_loaded_size,
+        )
+    }
+
+    fn make_context(
+        &self,
+        query_planner: CubeQueryPlanner,
+        data_loaded_size: Option<Arc<DataLoadedSize>>, // None on router
+    ) -> Result<Arc<SessionContext>, CubeError> {
         let runtime = Arc::new(RuntimeEnv::default());
         let config = self.session_config();
         let session_state = SessionStateBuilder::new()
             .with_config(config)
             .with_runtime_env(runtime)
             .with_default_features()
-            .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
-                cluster,
-                serialized_plan,
-                self.memory_handler.clone(),
-            )))
-            .with_physical_optimizer_rules(self.optimizer_rules(None))
+            .with_query_planner(Arc::new(query_planner))
             .with_aggregate_functions(registerable_arc_aggregate_udfs())
             .with_scalar_functions(registerable_arc_scalar_udfs())
+            .with_physical_optimizer_rules(self.optimizer_rules(data_loaded_size))
             .build();
         let ctx = SessionContext::new_with_state(session_state);
         Ok(Arc::new(ctx))
@@ -457,32 +481,6 @@ impl QueryExecutorImpl {
             Arc::new(LimitPushdown::new()),
             Arc::new(SanityCheckPlan::new()),
         ]
-    }
-
-    fn worker_context(
-        &self,
-        serialized_plan: Arc<PreSerializedPlan>,
-        worker_planning_params: WorkerPlanningParams,
-        data_loaded_size: Option<Arc<DataLoadedSize>>,
-    ) -> Result<Arc<SessionContext>, CubeError> {
-        let runtime = Arc::new(RuntimeEnv::default());
-        let config = self.session_config();
-        let session_state = SessionStateBuilder::new()
-            .with_config(config)
-            .with_runtime_env(runtime)
-            .with_default_features()
-            .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
-                serialized_plan,
-                worker_planning_params,
-                self.memory_handler.clone(),
-                data_loaded_size.clone(),
-            )))
-            .with_aggregate_functions(registerable_arc_aggregate_udfs())
-            .with_scalar_functions(registerable_arc_scalar_udfs())
-            .with_physical_optimizer_rules(self.optimizer_rules(data_loaded_size))
-            .build();
-        let ctx = SessionContext::new_with_state(session_state);
-        Ok(Arc::new(ctx))
     }
 
     fn session_config(&self) -> SessionConfig {
