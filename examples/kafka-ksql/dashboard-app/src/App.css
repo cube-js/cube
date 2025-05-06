@@ -1,0 +1,105 @@
+body {
+  background-color: #f3f3fb !important;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ant-layout, .ant-layout-header {
+  background-color: #f3f3fb;
+}
+
+.ant-layout-header .stats {
+  font-size: 17px;
+  color: #b1b7c5;
+  display: inline-block;
+  margin-left: 8px;
+  position: relative;
+  bottom: -2px;
+}
+
+.ant-card {
+  border-radius: 15px;
+}
+
+.ant-card-head {
+  border-bottom: 1px solid #e5e5f6!important;
+}
+
+.ant-card-head-title {
+  color: #141446;
+}
+
+.ant-statistic-content-value-int {
+  font-size: 40px;
+}
+
+.top-menu {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+}
+
+.top-menu a {
+  color: #43436B;
+  font-size: 16px;
+  height: 32px;
+  line-height: 1;
+  padding: 0 15px;
+  border: 0.5px solid rgba(67,67,107,0.4);
+  box-sizing: border-box;
+  border-radius: 4px;
+  transition: border-color .25s ease-in-out;
+  display: flex;
+  align-items: center;
+}
+
+.top-menu a i {
+  opacity: 0.4;
+}
+
+.top-menu .ant-divider {
+  margin: 0 15px;
+}
+
+.top-menu a:last-child {
+  margin-left: 10px;
+}
+
+.top-menu a:hover i {
+  opacity: 0.6;
+}
+
+.top-menu a:hover {
+  color: #141446;
+  border: 0.5px solid #141446;
+}
+
+.top-menu a i {
+  margin-right: 5px;
+}
+
+@media only screen and (max-width: 600px) {
+  .ant-layout-header {
+    height: 100%;
+  }
+
+  .top-menu {
+    display: block;
+  }
+
+  .top-menu a {
+    padding: 0;
+    border: 0;
+    font-size: 20px;
+    display: inline;
+  }
+
+  .top-menu a span  {
+    display: none;
+  }
+}
