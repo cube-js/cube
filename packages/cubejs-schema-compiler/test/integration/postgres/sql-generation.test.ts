@@ -231,6 +231,10 @@ describe('SQL Generation', () => {
           sql: \`\${revenue}\`,
           type: 'sum',
           group_by: [id]
+        },
+        min_created_at: {
+          type: 'time',
+          sql: 'MIN(created_at)'
         }
       },
 
@@ -1557,6 +1561,45 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
           visitors__visitor_count: '3'
         }]
       );
+    });
+  });
+
+  it('having filter (time measure)', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.min_created_at'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.min_created_at',
+        operator: 'inDateRange',
+        values: ['2017-01-01', '2018-01-01']
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual([
+        {
+          visitors__min_created_at: '2017-01-06T00:00:00.000Z',
+          visitors__source: 'google',
+        },
+        {
+          visitors__min_created_at: '2017-01-03T00:00:00.000Z',
+          visitors__source: 'some',
+        },
+      ]);
     });
   });
 
