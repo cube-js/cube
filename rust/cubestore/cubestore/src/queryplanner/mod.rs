@@ -245,7 +245,7 @@ impl QueryPlannerImpl {
 impl QueryPlannerImpl {
     pub fn make_execution_context(config: SessionConfig) -> SessionContext {
         let context = SessionContext::new_with_config(config);
-        // TODO upgrade DF: build SessionContexts consistently -- that now means check all appropriate SessionContext constructors use this make_execution_context or execution_context function.
+        // TODO upgrade DF: build SessionContexts consistently
         for udaf in registerable_aggregate_udfs() {
             context.register_udaf(udaf);
         }
@@ -527,9 +527,9 @@ impl ContextProvider for MetaStoreSchemaProvider {
         self.session_state.aggregate_functions().get(&name).cloned()
     }
 
-    fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
-        // TODO upgrade DF: Should this also use .to_ascii_lowercase?
-        self.session_state.window_functions().get(name).cloned()
+    fn get_window_meta(&self, name_param: &str) -> Option<Arc<WindowUDF>> {
+        let name = name_param.to_ascii_lowercase();
+        self.session_state.window_functions().get(&name).cloned()
     }
 
     fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
@@ -541,21 +541,19 @@ impl ContextProvider for MetaStoreSchemaProvider {
     }
 
     fn udf_names(&self) -> Vec<String> {
-        // TODO upgrade DF: Because we register the scalar functions (see get_function_meta) we shouldn't need to prepend the list here.
-        let mut res = vec![
-            "date_add".to_string(),
-            "date_sub".to_string(),
-            "date_bin".to_string(),
-        ];
-        res.extend(self.session_state.scalar_functions().keys().cloned());
-        res
+        self.session_state
+            .scalar_functions()
+            .keys()
+            .cloned()
+            .collect()
     }
 
     fn udaf_names(&self) -> Vec<String> {
-        // TODO upgrade DF: We shouldn't need "merge" or "xirr" here because we registered it (see get_aggregate_meta).
-        let mut res = vec!["merge".to_string(), XIRR_UDAF_NAME.to_string()];
-        res.extend(self.session_state.aggregate_functions().keys().cloned());
-        res
+        self.session_state
+            .aggregate_functions()
+            .keys()
+            .cloned()
+            .collect()
     }
 
     fn udwf_names(&self) -> Vec<String> {
