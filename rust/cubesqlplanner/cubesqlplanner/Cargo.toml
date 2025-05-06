@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1a612fc26f762f3837ecf26df2e83ba38f11a8a2", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
-tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
+tokio = { version = "^1.38", features = ["full", "rt", "tracing"] }
 itertools = "0.10.2"
 cubeclient = { path = "../../cubesql/cubeclient" }
 nativebridge = { path = "../nativebridge/" }
