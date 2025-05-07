@@ -4,6 +4,7 @@ use crate::python::neon_py::*;
 use crate::python::python_model::CubePythonModel;
 use crate::python::runtime::py_runtime_init;
 use neon::prelude::*;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PyString, PyTuple};
 use std::path::Path;
@@ -45,8 +46,15 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let settings_py = if config_module.hasattr("config")? {
             config_module.getattr("config")?
         } else {
-            // backward compatibility
-            config_module.getattr("settings")?
+            // backward compatibility, was used in private preview, not as Public API
+            // TODO: Remove after 1.4
+            if config_module.hasattr("settings")? {
+                config_module.getattr("settings")?
+            } else {
+                return Err(PyErr::new::<PyException, String>(
+                    "`cube.py` configuration file must define the 'config' attribute. Did you forget to add the `from cube import config` import?".to_string(),
+                ));
+            }
         };
 
         let mut cube_conf = CubeConfigPy::new();
@@ -119,6 +127,8 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 );
             }
         } else {
+            // backward compatibility, was used in private preview, not as Public API
+            // TODO: Remove after 1.4
             let inspect_module = py.import("inspect")?;
             let args = (model_module, inspect_module.getattr("isfunction")?);
             let functions_with_names = inspect_module
