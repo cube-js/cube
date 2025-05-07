@@ -122,6 +122,8 @@ type SubqueryJoins = {
   alias: string,
 };
 
+type JoinHint = Array<string>;
+
 /**
  * Incoming network query data type.
  */
@@ -143,6 +145,8 @@ interface Query {
 
   // TODO incoming query, query with parsed exprs and query with evaluated exprs are all different types
   subqueryJoins?: Array<SubqueryJoins>,
+
+  joinHints?: Array<JoinHint>
 }
 
 /**
