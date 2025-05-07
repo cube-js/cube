@@ -52,7 +52,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 config_module.getattr("settings")?
             } else {
                 return Err(PyErr::new::<PyException, String>(
-                    "Configuration file `cube.py` must define 'config' attribute. Did you forget to add import?".to_string(),
+                    "`cube.py` configuration file must define the 'config' attribute. Did you forget to add the `from cube import config` import?".to_string(),
                 ));
             }
         };
