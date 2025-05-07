@@ -15,6 +15,7 @@ pub mod respawn;
 pub mod strings;
 pub mod time_span;
 
+pub use logger::string_to_level;
 pub use malloc_trim_loop::spawn_malloc_trim_loop;
 
 use crate::CubeError;
