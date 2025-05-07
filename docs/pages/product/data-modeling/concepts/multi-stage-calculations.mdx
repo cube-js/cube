@@ -15,6 +15,13 @@ engine][link-tesseract]. Tesseract is currently in preview. Use the
 
 </WarningBox>
 
+<WarningBox>
+
+Multi-stage calculations are not currently accelerated by pre-aggregations.
+Please track [this issue](https://github.com/cube-js/cube/issues/8487).
+
+</WarningBox>
+
 Common uses of multi-stage calculations:
 
 - [Period-to-date](#period-to-date) calculations, e.g., year-to-date (YTD) analysis.
@@ -331,6 +338,8 @@ data across various dimensions.
     - product
   type: rank
 ```
+
+You can reduce by one or more dimensions.
 
 ### Example
 
