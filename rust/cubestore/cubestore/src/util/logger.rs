@@ -3,25 +3,35 @@ use log::{Level, Log, Metadata, Record};
 use simple_logger::SimpleLogger;
 use std::env;
 
-/// Logger will add 'CUBESTORE_LOG_CONTEXT' to all messages.
-/// Set it during `procspawn` to help distinguish processes in the logs.
-pub fn init_cube_logger(enable_telemetry: bool) {
-    let log_level = match env::var("CUBESTORE_LOG_LEVEL")
-        .unwrap_or("info".to_string())
-        .to_lowercase()
-        .as_str()
-    {
+pub fn string_to_level(text: String) -> std::result::Result<Level, String> {
+    let level = match text.as_str() {
         "error" => Level::Error,
         "warn" => Level::Warn,
         "info" => Level::Info,
         "debug" => Level::Debug,
         "trace" => Level::Trace,
-        x => panic!("Unrecognized log level: {}", x),
+        _ => return Err(text),
     };
+    Ok(level)
+}
+
+/// Logger will add 'CUBESTORE_LOG_CONTEXT' to all messages.
+/// Set it during `procspawn` to help distinguish processes in the logs.
+pub fn init_cube_logger(enable_telemetry: bool) {
+    let global_level = env::var("CUBESTORE_GLOBAL_LOG_LEVEL").map_or(Level::Error, |x| {
+        string_to_level(x).unwrap_or_else(|x| panic!("Unrecognized log level: {}", x))
+    });
+    let cubestore_log_level = env::var("CUBESTORE_LOG_LEVEL").map_or(Level::Info, |x| {
+        string_to_level(x).unwrap_or_else(|x| panic!("Unrecognized log level: {}", x))
+    });
+    let df_log_level = env::var("CUBESTORE_DATAFUSION_LOG_LEVEL").map_or(global_level, |x| {
+        string_to_level(x).unwrap_or_else(|x| panic!("Unrecognized log level: {}", x))
+    });
 
     let logger = SimpleLogger::new()
-        .with_level(Level::Error.to_level_filter())
-        .with_module_level("cubestore", log_level.to_level_filter());
+        .with_level(global_level.to_level_filter())
+        .with_module_level("cubestore", cubestore_log_level.to_level_filter())
+        .with_module_level("datafusion", df_log_level.to_level_filter());
 
     let mut ctx = format!("pid:{}", std::process::id());
     if let Ok(extra) = env::var("CUBESTORE_LOG_CONTEXT") {
@@ -34,7 +44,7 @@ pub fn init_cube_logger(enable_telemetry: bool) {
     }
 
     log::set_boxed_logger(logger).expect("Failed to initialize logger");
-    log::set_max_level(log_level.to_level_filter());
+    log::set_max_level(cubestore_log_level.to_level_filter());
 }
 
 /// Adds the same 'context' string to all log messages.
