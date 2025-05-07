@@ -9,7 +9,7 @@ import structuredClone from '@ungap/structured-clone';
 import {
   getEnv,
   getRealType,
-  parseLocalDate,
+  parseUtcIntoLocalDate,
   QueryAlias,
 } from '@cubejs-backend/shared';
 import {
@@ -921,8 +921,8 @@ class ApiGateway {
     // It's expected that selector.dateRange is provided in local time (without timezone)
     // At the same time it is ok to get timestamps with `Z` (in UTC).
     if (selector.dateRange) {
-      const start = parseLocalDate([{ val: selector.dateRange[0] }], 'UTC');
-      const end = parseLocalDate([{ val: selector.dateRange[1] }], 'UTC');
+      const start = parseUtcIntoLocalDate([{ val: selector.dateRange[0] }], 'UTC');
+      const end = parseUtcIntoLocalDate([{ val: selector.dateRange[1] }], 'UTC');
       if (!start || !end) {
         throw new UserError(`Cannot parse selector date range ${selector.dateRange}`);
       }

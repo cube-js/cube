@@ -134,13 +134,12 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public seriesSql(timeDimension) {
-    const values = timeDimension.timeSeries().map(
+    return timeDimension.timeSeries().map(
       ([from, to]) => `select to_timestamp('${from}') date_from, to_timestamp('${to}') date_to`
     ).join(' UNION ALL ');
-    return values;
   }
 
-  public concatStringsSql(strings) {
+  public concatStringsSql(strings: string[]) {
     return `CONCAT(${strings.join(', ')})`;
   }
 
@@ -148,7 +147,7 @@ export class CubeStoreQuery extends BaseQuery {
     return 'UNIX_TIMESTAMP()';
   }
 
-  public wrapSegmentForDimensionSelect(sql) {
+  public wrapSegmentForDimensionSelect(sql: string) {
     return `IF(${sql}, 1, 0)`;
   }
 
@@ -156,19 +155,19 @@ export class CubeStoreQuery extends BaseQuery {
     return `merge(${sql})`;
   }
 
-  public hllCardinalityMerge(sql) {
+  public hllCardinalityMerge(sql: string) {
     return `cardinality(merge(${sql}))`;
   }
 
-  public hllCardinality(sql) {
+  public hllCardinality(sql: string) {
     return `cardinality(${sql})`;
   }
 
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as VARCHAR)`;
   }
 
-  public countDistinctApprox(sql) {
+  public countDistinctApprox(sql: string) {
     // TODO: We should throw an error, but this gets called even when only `hllMerge` result is used.
     return `approx_distinct_is_unsupported_in_cubestore(${sql}))`;
   }

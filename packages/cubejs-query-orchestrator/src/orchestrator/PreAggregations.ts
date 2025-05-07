@@ -718,7 +718,7 @@ export class PreAggregations {
   public async getVersionEntries(preAggregations: PreAggregationDescription[], requestId): Promise<VersionEntry[][]> {
     const loadCacheByDataSource = {};
 
-    const getLoadCacheByDataSource = (dataSource = 'default', preAggregationSchema) => {
+    const getLoadCacheByDataSource = (preAggregationSchema, dataSource = 'default') => {
       if (!loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`]) {
         loadCacheByDataSource[`${dataSource}_${preAggregationSchema}`] =
           new PreAggregationLoadCache(
@@ -740,9 +740,9 @@ export class PreAggregations {
       preAggregations.map(
         async preAggregation => {
           const { dataSource, preAggregationsSchema } = preAggregation;
-          const cacheKey = getLoadCacheByDataSource(dataSource, preAggregationsSchema).tablesCachePrefixKey(preAggregation);
+          const cacheKey = getLoadCacheByDataSource(preAggregationsSchema, dataSource).tablesCachePrefixKey(preAggregation);
           if (!firstByCacheKey[cacheKey]) {
-            firstByCacheKey[cacheKey] = getLoadCacheByDataSource(dataSource, preAggregationsSchema).getVersionEntries(preAggregation);
+            firstByCacheKey[cacheKey] = getLoadCacheByDataSource(preAggregationsSchema, dataSource).getVersionEntries(preAggregation);
             const res = await firstByCacheKey[cacheKey];
             return res.versionEntries;
           }
