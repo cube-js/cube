@@ -385,9 +385,6 @@ crate::plan_to_language! {
             old_members: Arc<LogicalPlan>,
             alias_to_cube: Vec<((String, String), String)>,
         },
-        MergedMembersReplacer {
-            members: Vec<LogicalPlan>,
-        },
         ListConcatPushdownReplacer {
             members: Arc<LogicalPlan>,
         },
@@ -1899,10 +1896,6 @@ fn member_pushdown_replacer(
         "(MemberPushdownReplacer {} {} {})",
         members, old_members, alias_to_cube
     )
-}
-
-fn merged_members_replacer(members: impl Display) -> String {
-    format!("(MergedMembersReplacer {})", members)
 }
 
 fn list_concat_pushdown_replacer(members: impl Display) -> String {
