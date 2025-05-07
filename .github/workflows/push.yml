@@ -122,7 +122,7 @@ jobs:
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
-        if: (matrix.node-version == '22.x')
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./packages/*/coverage/*
