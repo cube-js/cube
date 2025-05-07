@@ -129,6 +129,15 @@ describe('SQL Generation', () => {
             type: 'prior',
           }]
         },
+        revenue_day_ago_no_td: {
+          multi_stage: true,
+          type: 'sum',
+          sql: \`\${revenue}\`,
+          time_shift: [{
+            interval: '1 day',
+            type: 'prior',
+          }]
+        },
         cagr_day: {
           multi_stage: true,
           sql: \`ROUND(100 * \${revenue} / NULLIF(\${revenue_day_ago}, 0))\`,
@@ -1345,6 +1354,26 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   }, [
     { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
     { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
+  ]));
+
+  it('CAGR (no td in time_shift)', async () => runQueryTest({
+    measures: [
+      'visitors.revenue',
+      'visitors.revenue_day_ago_no_td',
+      'visitors.cagr_day'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago_no_td: '200' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago_no_td: '300' }
   ]));
 
   it('sql utils', async () => runQueryTest({
