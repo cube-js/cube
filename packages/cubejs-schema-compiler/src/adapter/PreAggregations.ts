@@ -923,7 +923,7 @@ export class PreAggregations {
     )(preAggregations);
   }
 
-  getRollupPreAggregationByName(cube, preAggregationName) {
+  public getRollupPreAggregationByName(cube, preAggregationName) {
     const canUsePreAggregation = () => true;
     const preAggregation = R.pipe(
       R.toPairs,
