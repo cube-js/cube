@@ -118,7 +118,6 @@ impl BestCubePlan {
             LogicalPlanLanguage::GroupAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::MemberPushdownReplacer(_) => 1,
             LogicalPlanLanguage::EventNotification(_) => 1,
-            LogicalPlanLanguage::MergedMembersReplacer(_) => 1,
             LogicalPlanLanguage::CaseExprReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPushdownReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPullupReplacer(_) => 1,
