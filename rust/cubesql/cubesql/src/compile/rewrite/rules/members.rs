@@ -336,32 +336,42 @@ impl RewriteRules for MemberRules {
                 "?left_members",
                 "?right_members",
             ),
+            // It is incorrect to merge two CubeScan's into one after grouping
+            // __cubeJoinField is a representation of join from data model,
+            // and it is valid only for ungrouped queries to data source
+            // So CubeScanCanPushdownJoin and CubeScanUngrouped are fixed to true
+            // Limit and offset are not allowed
+            // Consider plan like Join(CubeScan(limit = 1), CubeScan(limit = 1))
+            // Join would check only one row from left scan and only one from right
+            // And if they mismatch it will produce empty table
+            // There's no way to represent this as a single CubeScan
+            // Join does not guarantee ordering, so there's no point in keeping orders in RHS
             transforming_rewrite(
-                "join-to-cross-join",
+                "push-down-cube-join",
                 join(
                     cube_scan(
                         "?left_alias_to_cube",
                         "?left_members",
                         "?left_filters",
                         "?left_orders",
-                        "?left_limit",
-                        "?left_offset",
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
                         "?left_split",
-                        "?left_can_pushdown_join",
+                        "CubeScanCanPushdownJoin:true",
                         "CubeScanWrapped:false",
-                        "?left_ungrouped",
+                        "CubeScanUngrouped:true",
                     ),
                     cube_scan(
                         "?right_alias_to_cube",
                         "?right_members",
                         "?right_filters",
                         "?right_orders",
-                        "?right_limit",
-                        "?right_offset",
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
                         "?right_split",
-                        "?right_can_pushdown_join",
+                        "CubeScanCanPushdownJoin:true",
                         "CubeScanWrapped:false",
-                        "?right_ungrouped",
+                        "CubeScanUngrouped:true",
                     ),
                     "?left_on",
                     "?right_on",
@@ -369,33 +379,28 @@ impl RewriteRules for MemberRules {
                     "?join_constraint",
                     "?null_equals_null",
                 ),
-                cross_join(
-                    cube_scan(
-                        "?left_alias_to_cube",
-                        "?left_members",
-                        "?left_filters",
-                        "?left_orders",
-                        "?left_limit",
-                        "?left_offset",
-                        "?left_split",
-                        "?left_can_pushdown_join",
-                        "CubeScanWrapped:false",
-                        "?left_ungrouped",
-                    ),
-                    cube_scan(
-                        "?right_alias_to_cube",
-                        "?right_members",
-                        "?right_filters",
-                        "?right_orders",
-                        "?right_limit",
-                        "?right_offset",
-                        "?right_split",
-                        "?right_can_pushdown_join",
-                        "CubeScanWrapped:false",
-                        "?right_ungrouped",
-                    ),
+                cube_scan(
+                    "?out_alias_to_cube",
+                    cube_scan_members("?left_members", "?right_members"),
+                    cube_scan_filters("?left_filters", "?right_filters"),
+                    cube_scan_order_empty_tail(),
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
+                    // New CubeScan is treated as "not yet split", to give split rules one more chance
+                    "CubeScanSplit:false",
+                    "CubeScanCanPushdownJoin:true",
+                    "CubeScanWrapped:false",
+                    "CubeScanUngrouped:true",
                 ),
-                self.join_to_cross_join("?left_on", "?right_on", "?left_members", "?right_members"),
+                self.push_down_cube_join(
+                    "?left_alias_to_cube",
+                    "?right_alias_to_cube",
+                    "?out_alias_to_cube",
+                    "?left_members",
+                    "?right_members",
+                    "?left_on",
+                    "?right_on",
+                ),
             ),
         ];
 
@@ -2620,26 +2625,59 @@ impl MemberRules {
         }
     }
 
-    fn join_to_cross_join(
+    fn push_down_cube_join(
         &self,
+        left_alias_to_cube_var: &'static str,
+        right_alias_to_cube_var: &'static str,
+        out_alias_to_cube_var: &'static str,
+        left_members_var: &'static str,
+        right_members_var: &'static str,
         left_on_var: &'static str,
         right_on_var: &'static str,
-        left_aliases_var: &'static str,
-        right_aliases_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let left_alias_to_cube_var = var!(left_alias_to_cube_var);
+        let right_alias_to_cube_var = var!(right_alias_to_cube_var);
+        let out_alias_to_cube_var = var!(out_alias_to_cube_var);
+        let left_members_var = var!(left_members_var);
+        let right_members_var = var!(right_members_var);
         let left_on_var = var!(left_on_var);
         let right_on_var = var!(right_on_var);
-        let left_aliases_var = var!(left_aliases_var);
-        let right_aliases_var = var!(right_aliases_var);
         move |egraph, subst| {
-            is_proper_cube_join_condition(
+            if !is_proper_cube_join_condition(
                 egraph,
                 subst,
-                left_aliases_var,
+                left_members_var,
                 left_on_var,
-                right_aliases_var,
+                right_members_var,
                 right_on_var,
-            )
+            ) {
+                return false;
+            }
+
+            for left_alias_to_cube in
+                var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube)
+            {
+                for right_alias_to_cube in
+                    var_iter!(egraph[subst[right_alias_to_cube_var]], CubeScanAliasToCube)
+                {
+                    subst.insert(
+                        out_alias_to_cube_var,
+                        egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
+                            CubeScanAliasToCube(
+                                left_alias_to_cube
+                                    .iter()
+                                    .chain(right_alias_to_cube.iter())
+                                    .cloned()
+                                    .collect(),
+                            ),
+                        )),
+                    );
+
+                    return true;
+                }
+            }
+
+            false
         }
     }
 
