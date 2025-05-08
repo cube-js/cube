@@ -3048,14 +3048,14 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
-                                \n            Filter\
-                                \n              Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n            Filter\
-                                \n              Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
-
+                                \n          Projection, [foo.a.a:a, foo.a.b:b, foo.a.c:c]\
+                                \n            Union, schema: fields:[foo.a1.a, foo.a1.b, foo.a1.c], metadata:{}\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
                                 );
                 }
                 _ => assert!(false),
