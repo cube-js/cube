@@ -101,6 +101,33 @@ const SecondsDurations = {
  * and {@code CompilerApi} configuration.
  */
 export class BaseQuery {
+  /** @type {import('./PreAggregations').PreAggregations} */
+  preAggregations;
+
+  /** @type {import('./BaseMeasure').BaseMeasure[]} */
+  measures;
+
+  /** @type {import('./BaseDimension').BaseDimension[]} */
+  dimensions;
+
+  /** @type {import('./BaseDimension').BaseDimension[]} */
+  multiStageDimensions;
+
+  /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
+  multiStageTimeDimensions;
+
+  /** @type {import('./BaseSegment').BaseSegment[]} */
+  segments;
+
+  /** @type {(BaseFilter|BaseGroupFilter)[]} */
+  filters;
+
+  /** @type {(BaseFilter|BaseGroupFilter)[]} */
+  measureFilters;
+
+  /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
+  timeDimensions;
+
   /**
    * BaseQuery class constructor.
    * @param {Compilers|*} compilers
@@ -237,7 +264,7 @@ export class BaseQuery {
       rowLimit: this.options.rowLimit,
       preAggregationsSchema: this.options.preAggregationsSchema,
       className: this.constructor.name,
-      externalClassName: this.options.externalQueryClass && this.options.externalQueryClass.name,
+      externalClassName: this.options.externalQueryClass?.name,
       preAggregationQuery: this.options.preAggregationQuery,
       disableExternalPreAggregations: this.options.disableExternalPreAggregations,
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
@@ -258,20 +285,28 @@ export class BaseQuery {
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
     this.offset = this.options.offset;
+    /** @type {import('./PreAggregations').PreAggregations} */
     this.preAggregations = this.newPreAggregations();
+    /** @type {import('./BaseMeasure').BaseMeasure[]} */
     this.measures = (this.options.measures || []).map(this.newMeasure.bind(this));
+    /** @type {import('./BaseDimension').BaseDimension[]} */
     this.dimensions = (this.options.dimensions || []).map(this.newDimension.bind(this));
+    /** @type {import('./BaseDimension').BaseDimension[]} */
     this.multiStageDimensions = (this.options.multiStageDimensions || []).map(this.newDimension.bind(this));
+    /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
     this.multiStageTimeDimensions = (this.options.multiStageTimeDimensions || []).map(this.newTimeDimension.bind(this));
+    /** @type {import('./BaseSegment').BaseSegment[]} */
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
 
     const filters = this.extractFiltersAsTree(this.options.filters || []);
 
     // measure_filter (the one extracted from filters parameter on measure and
-    // used in drill downs) should go to WHERE instead of HAVING
+    // used in drill-downs) should go to WHERE instead of HAVING
     /** @type {(BaseFilter|BaseGroupFilter)[]} */
     this.filters = filters.filter(f => f.dimensionGroup || f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
+    /** @type {(BaseFilter|BaseGroupFilter)[]} */
     this.measureFilters = filters.filter(f => (f.measureGroup || f.measure) && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
+    /** @type {import('./BaseTimeDimension').BaseTimeDimension[]} */
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
         const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
@@ -471,10 +506,20 @@ export class BaseQuery {
     return res;
   }
 
+  /**
+   *
+   * @param measurePath
+   * @returns {BaseMeasure}
+   */
   newMeasure(measurePath) {
     return new BaseMeasure(this, measurePath);
   }
 
+  /**
+   *
+   * @param dimensionPath
+   * @returns {BaseDimension}
+   */
   newDimension(dimensionPath) {
     if (typeof dimensionPath === 'string') {
       const memberArr = dimensionPath.split('.');
@@ -492,6 +537,11 @@ export class BaseQuery {
     return new BaseDimension(this, dimensionPath);
   }
 
+  /**
+   *
+   * @param segmentPath
+   * @returns {BaseSegment}
+   */
   newSegment(segmentPath) {
     return new BaseSegment(this, segmentPath);
   }
@@ -515,6 +565,11 @@ export class BaseQuery {
     return new BaseFilter(this, filter);
   }
 
+  /**
+   *
+   * @param filter
+   * @returns {BaseGroupFilter}
+   */
   newGroupFilter(filter) {
     return new BaseGroupFilter(filter);
   }
@@ -527,10 +582,19 @@ export class BaseQuery {
     return new BaseTimeDimension(this, timeDimension);
   }
 
+  /**
+   *
+   * @param expressionParams
+   * @returns {ParamAllocator}
+   */
   newParamAllocator(expressionParams) {
     return new ParamAllocator(expressionParams);
   }
 
+  /**
+   *
+   * @returns {PreAggregations}
+   */
   newPreAggregations() {
     return new PreAggregations(this, this.options.historyQueries || [], this.options.cubeLatticeCache);
   }
@@ -558,7 +622,7 @@ export class BaseQuery {
     if (!this.options.preAggregationQuery) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
-      if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
+      if (this.options.disableExternalPreAggregations && preAggForQuery?.preAggregation.external) {
         preAggForQuery = undefined;
       }
     }
@@ -1199,7 +1263,7 @@ export class BaseQuery {
   }
 
   fullKeyQueryAggregateMeasures(context) {
-    const measureToHierarchy = this.collectRootMeasureToHieararchy(context);
+    const measureToHierarchy = this.collectRootMeasureToHierarchy(context);
     const allMemberChildren = this.collectAllMemberChildren(context);
     const memberToIsMultiStage = this.collectAllMultiStageMembers(allMemberChildren);
 
@@ -1859,7 +1923,7 @@ export class BaseQuery {
     }]];
   }
 
-  collectRootMeasureToHieararchy(context) {
+  collectRootMeasureToHierarchy(context) {
     const notAddedMeasureFilters = R.flatten(this.measureFilters.map(f => f.getMembers()))
       .filter(f => R.none(m => m.measure === f.measure, this.measures));
 
@@ -2291,9 +2355,13 @@ export class BaseQuery {
     }
   }
 
-  collectCubeNames(excludeTimeDimensions) {
+  /**
+   *
+   * @returns {Array<string>}
+   */
+  collectCubeNames() {
     return this.collectFromMembers(
-      excludeTimeDimensions,
+      [],
       this.collectCubeNamesFor.bind(this),
       'collectCubeNamesFor'
     );
@@ -2413,6 +2481,11 @@ export class BaseQuery {
     return this.rollupGroupByClause(dimensionNames);
   }
 
+  /**
+   * XXX: String as return value is added because of HiveQuery.getFieldIndex()
+   * @param id
+   * @returns {number|string|null}
+   */
   getFieldIndex(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
@@ -2884,6 +2957,11 @@ export class BaseQuery {
     );
   }
 
+  /**
+   *
+   * @param fn
+   * @returns {Array<string>}
+   */
   collectCubeNamesFor(fn) {
     const context = { cubeNames: [] };
     this.evaluateSymbolSqlWithContext(
@@ -2903,6 +2981,11 @@ export class BaseQuery {
     return context.joinHints;
   }
 
+  /**
+   *
+   * @param fn
+   * @returns {Array<string>}
+   */
   collectMemberNamesFor(fn) {
     const context = { memberNames: [] };
     this.evaluateSymbolSqlWithContext(
@@ -3182,6 +3265,10 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * @param cubeName
+   * @returns Boolean
+   */
   multipliedJoinRowResult(cubeName) {
     // this.join not initialized on collectCubeNamesForSql
     return this.join && this.join.multiplicationFactor[cubeName];
@@ -3312,6 +3399,11 @@ export class BaseQuery {
     return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');
   }
 
+  /**
+   *
+   * @param options
+   * @returns {BaseQuery}
+   */
   newSubQuery(options) {
     const QueryClass = this.constructor;
     return new QueryClass(this.compilers, this.subQueryOptions(options));
@@ -3784,6 +3876,12 @@ export class BaseQuery {
     };
   }
 
+  /**
+   *
+   * @param cube
+   * @param preAggregation
+   * @returns {BaseQuery}
+   */
   // eslint-disable-next-line consistent-return
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {

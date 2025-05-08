@@ -66,7 +66,33 @@ export type PreAggregationFilters = {
   scheduled?: boolean,
 };
 
-type PreAggregationDefinition = {
+export type EveryInterval = string;
+type EveryCronInterval = string;
+type EveryCronTimeZone = string;
+
+export type CubeRefreshKeySqlVariant = {
+  sql: () => string;
+  every?: EveryInterval;
+};
+
+export type CubeRefreshKeyEveryVariant = {
+  every: EveryInterval | EveryCronInterval;
+  timezone?: EveryCronTimeZone;
+  incremental?: boolean;
+  updateWindow?: EveryInterval;
+};
+
+export type CubeRefreshKeyImmutableVariant = {
+  immutable: true;
+};
+
+export type CubeRefreshKey =
+  | CubeRefreshKeySqlVariant
+  | CubeRefreshKeyEveryVariant
+  | CubeRefreshKeyImmutableVariant;
+
+export type PreAggregationDefinition = {
+  type: 'autoRollup' | 'originalSql' | 'rollupJoin' | 'rollupLambda' | 'rollup',
   allowNonStrictDateRangeMatch?: boolean,
   timeDimensionReference?: () => ToString,
   granularity: string,
@@ -75,9 +101,15 @@ type PreAggregationDefinition = {
   segmentReferences: () => Array<ToString>,
   measureReferences: () => Array<ToString>,
   rollupReferences: () => Array<ToString>,
+  indexes?: Record<string, any>,
+  refreshKey?: CubeRefreshKey,
+  scheduledRefresh: boolean,
+  external: boolean,
 };
 
-type PreAggregationTimeDimensionReference = {
+export type PreAggregationDefinitions = Record<string, PreAggregationDefinition>;
+
+export type PreAggregationTimeDimensionReference = {
   dimension: string,
   granularity: string,
 };
@@ -521,7 +553,7 @@ export class CubeEvaluator extends CubeSymbols {
     );
   }
 
-  public preAggregationsForCube(path: string) {
+  public preAggregationsForCube(path: string): Record<string, PreAggregationDefinition> {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
@@ -663,7 +695,7 @@ export class CubeEvaluator extends CubeSymbols {
     throw new UserError(`Can't resolve member '${Array.isArray(path) ? path.join('.') : path}'`);
   }
 
-  public byPath(type: 'measures' | 'dimensions' | 'segments', path: string | string[]) {
+  public byPath(type: 'measures' | 'dimensions' | 'segments' | 'preAggregations', path: string | string[]) {
     if (!type) {
       throw new Error(`Type can't be undefined for '${path}'`);
     }
@@ -688,7 +720,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 
-  public parsePath(type, path) {
+  public parsePath(type: 'measures' | 'dimensions' | 'segments' | 'preAggregations', path: string): string[] {
     // Should throw UserError in case of parse error
     this.byPath(type, path);
     return path.split('.');
@@ -707,7 +739,7 @@ export class CubeEvaluator extends CubeSymbols {
     return this.isRbacEnabledCache;
   }
 
-  protected parsePathAnyType(path) {
+  public parsePathAnyType(path: string): string[] {
     // Should throw UserError in case of parse error
     this.byPathAnyType(path);
     return path.split('.');
@@ -746,7 +778,7 @@ export class CubeEvaluator extends CubeSymbols {
     return { cubeReferencesUsed, pathReferencesUsed, evaluatedSql };
   }
 
-  protected evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinition): PreAggregationReferences {
+  public evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinition): PreAggregationReferences {
     const timeDimensions: Array<PreAggregationTimeDimensionReference> = [];
 
     if (aggregation.timeDimensionReference) {

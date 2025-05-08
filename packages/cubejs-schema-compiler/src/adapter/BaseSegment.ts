@@ -92,6 +92,6 @@ export class BaseSegment {
     if (this.expression) {
       return `expr:${this.expression.expressionName}`;
     }
-    return this.query.cubeEvaluator.pathFromArray(this.path());
+    return this.query.cubeEvaluator.pathFromArray(this.path() as string[]);
   }
 }

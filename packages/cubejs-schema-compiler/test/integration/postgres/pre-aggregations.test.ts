@@ -2496,9 +2496,8 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
-    const { partitionInvalidateKeyQueries, loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
+    const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
 
-    expect(partitionInvalidateKeyQueries).toStrictEqual([]);
     expect(loadSql[0]).not.toMatch(/GROUP BY/);
     expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
   });

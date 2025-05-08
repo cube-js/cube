@@ -3,6 +3,8 @@ import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
+import { BaseSegment } from './BaseSegment';
+import { BaseGroupFilter } from './BaseGroupFilter';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -191,9 +193,9 @@ export class CubeStoreQuery extends BaseQuery {
     const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
     const commonDateCondition =
       this.rollingWindowDateJoinCondition(maxRollingWindow.trailing, maxRollingWindow.leading, maxRollingWindow.offset);
-    const filters = this.segments.concat(this.filters).concat(
+    const filters: (BaseSegment | BaseFilter | BaseGroupFilter)[] = [...this.segments, ...this.filters, ...(
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(commonDateCondition, true, true) || []
-    );
+    )];
     const rollupGranularity = this.preAggregations?.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
     const granularityOverride = timeDimensionWithGranularity &&
       cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimensionWithGranularity.granularity) || rollupGranularity;
