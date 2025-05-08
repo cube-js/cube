@@ -125,7 +125,7 @@ jobs:
         if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./packages/*/coverage/*
+          files: ./packages/*/coverage/lcov.info
           verbose: true
           flags: cube-backend
           fail_ci_if_error: false
@@ -501,7 +501,7 @@ jobs:
         if: (matrix.node-version == '22.x')
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./packages/*/coverage/*
+          files: ./packages/*/coverage/lcov.info
           verbose: true
           flags: cube-backend
           fail_ci_if_error: false
