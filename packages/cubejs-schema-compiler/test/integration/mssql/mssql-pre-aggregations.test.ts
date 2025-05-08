@@ -90,12 +90,6 @@ describe('MSSqlPreAggregations', () => {
           timeDimensionReference: createdAt,
           granularity: 'day',
         },
-        approx: {
-          type: 'rollup',
-          measureReferences: [countDistinctApprox],
-          timeDimensionReference: createdAt,
-          granularity: 'day'
-        },
         ratioRollup: {
           type: 'rollup',
           measureReferences: [checkinsTotal, uniqueSourceCount],
