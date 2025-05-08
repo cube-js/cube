@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+### Bug Fixes
+
+- Throw a user-friendly error on an empty cube.py file ([#9550](https://github.com/cube-js/cube/issues/9550)) ([d69222c](https://github.com/cube-js/cube/commit/d69222cecdf4b3bdfebfaaadc18bbd665d005757))
+
 ## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
 
 ### Features

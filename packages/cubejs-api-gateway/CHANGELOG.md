@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+### Bug Fixes
+
+- **query-orchestrator:** Correct local date parsing for partition start/end queries ([#9543](https://github.com/cube-js/cube/issues/9543)) ([20dd8ad](https://github.com/cube-js/cube/commit/20dd8ad10f6ad0fc2538aecd0ff82cd43f6ff680))
+
 ## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
 
 ### Features

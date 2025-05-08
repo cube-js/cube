@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+### Bug Fixes
+
+- **query-orchestrator:** Correct local date parsing for partition start/end queries ([#9543](https://github.com/cube-js/cube/issues/9543)) ([20dd8ad](https://github.com/cube-js/cube/commit/20dd8ad10f6ad0fc2538aecd0ff82cd43f6ff680))
+- **schema-compiler:** Fix filtering by time measure ([#9544](https://github.com/cube-js/cube/issues/9544)) ([00a589f](https://github.com/cube-js/cube/commit/00a589fa3fb324ee3dde36fead0de7ced3d19e5b))
+- **schema-compiler:** Fix rendered references for preaggregations with join paths ([#9528](https://github.com/cube-js/cube/issues/9528)) ([98ef928](https://github.com/cube-js/cube/commit/98ef928ece7385c2b41a359dfe0ebcc78dfaf8ee))
+- **schema-compiler:** Fix view queries with timeShift members ([#9556](https://github.com/cube-js/cube/issues/9556)) ([ef3a04b](https://github.com/cube-js/cube/commit/ef3a04b28c9e0b804a2a24fb4046e3d4755e8abe))
+- **schema-compiler:** Reject pre-agg if measure is unmultiplied in query but multiplied in pre-agg ([#9541](https://github.com/cube-js/cube/issues/9541)) ([f094d09](https://github.com/cube-js/cube/commit/f094d09e25b606001cbb699b82427dc43f19a6dc))
+- Throw a user-friendly error on an empty cube.py file ([#9550](https://github.com/cube-js/cube/issues/9550)) ([d69222c](https://github.com/cube-js/cube/commit/d69222cecdf4b3bdfebfaaadc18bbd665d005757))
+
+### Features
+
+- **cubestore:** Add `XIRR` aggregate function to Cube Store ([#9520](https://github.com/cube-js/cube/issues/9520)) ([785142d](https://github.com/cube-js/cube/commit/785142d1c8ecc89cadaa7696c9f58b34115d929b))
+- **schema-compiler:** Allow one measure timeShift without time dimension ([#9545](https://github.com/cube-js/cube/issues/9545)) ([320484f](https://github.com/cube-js/cube/commit/320484fc03f0c49efe0ada2ac9d3dce443011ab9))
+- **tesseract:** Basic pre-aggregations support ([#9434](https://github.com/cube-js/cube/issues/9434)) ([1deddcc](https://github.com/cube-js/cube/commit/1deddcc4e37795bf2f775770798acefdbeb24c71))
+
 ## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
 
 ### Features

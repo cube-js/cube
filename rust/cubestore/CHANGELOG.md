@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.12](https://github.com/cube-js/cube/compare/v1.3.11...v1.3.12) (2025-05-08)
+
+### Features
+
+- **cubestore:** Add `XIRR` aggregate function to Cube Store ([#9520](https://github.com/cube-js/cube/issues/9520)) ([785142d](https://github.com/cube-js/cube/commit/785142d1c8ecc89cadaa7696c9f58b34115d929b))
+
 ## [1.3.11](https://github.com/cube-js/cube/compare/v1.3.10...v1.3.11) (2025-05-05)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
