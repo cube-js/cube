@@ -45,16 +45,24 @@
     "@angular-devkit/core" "18.2.18"
     rxjs "7.8.1"
 
+"@angular-devkit/architect@0.1802.19":
+  version "0.1802.19"
+  resolved "https://registry.yarnpkg.com/@angular-devkit/architect/-/architect-0.1802.19.tgz#8111ce2ba8f88c16e277b7af2a7fa4171531cca8"
+  integrity sha512-M4B1tzxGX1nWCZr9GMM8OO0yBJO2HFSdK8M8P74vEFQfKIeq3y16IQ5zlEveJrkCOFVtmlIy2C9foMCdNyBRMA==
+  dependencies:
+    "@angular-devkit/core" "18.2.19"
+    rxjs "7.8.1"
+
 "@angular-devkit/build-angular@^18.2.16":
-  version "18.2.18"
-  resolved "https://registry.yarnpkg.com/@angular-devkit/build-angular/-/build-angular-18.2.18.tgz#a173feb442974b927a15ad19205a46d7f3082c87"
-  integrity sha512-yNw5b46BB27YW2lgP9pAt15xtfTS8F1JdWR79bLci0MYL7VPmRBrRtZk+sozRCziit1+oNAVpOUT8QyvDmvAZA==
+  version "18.2.19"
+  resolved "https://registry.yarnpkg.com/@angular-devkit/build-angular/-/build-angular-18.2.19.tgz#bdff059bf38d86070787fdc7efdea7d3d12ae140"
+  integrity sha512-xwY7v+nGE7TXOc4pgY6u57bLzIPSHuecosYr3TiWHAl9iEcKHzkCCFKsLZyunohHmq/i1uA6g3cC6iwp2xNYyg==
   dependencies:
     "@ampproject/remapping" "2.3.0"
-    "@angular-devkit/architect" "0.1802.18"
-    "@angular-devkit/build-webpack" "0.1802.18"
-    "@angular-devkit/core" "18.2.18"
-    "@angular/build" "18.2.18"
+    "@angular-devkit/architect" "0.1802.19"
+    "@angular-devkit/build-webpack" "0.1802.19"
+    "@angular-devkit/core" "18.2.19"
+    "@angular/build" "18.2.19"
     "@babel/core" "7.26.10"
     "@babel/generator" "7.26.10"
     "@babel/helper-annotate-as-pure" "7.25.9"
@@ -65,7 +73,7 @@
     "@babel/preset-env" "7.26.9"
     "@babel/runtime" "7.26.10"
     "@discoveryjs/json-ext" "0.6.1"
-    "@ngtools/webpack" "18.2.18"
+    "@ngtools/webpack" "18.2.19"
     ansi-colors "4.1.3"
     autoprefixer "10.4.20"
     babel-loader "9.1.3"
@@ -75,7 +83,7 @@
     css-loader "7.1.2"
     esbuild-wasm "0.23.0"
     fast-glob "3.3.2"
-    http-proxy-middleware "3.0.3"
+    http-proxy-middleware "3.0.5"
     https-proxy-agent "7.0.5"
     istanbul-lib-instrument "6.0.3"
     jsonc-parser "3.3.1"
@@ -113,18 +121,30 @@
   optionalDependencies:
     esbuild "0.23.0"
 
-"@angular-devkit/build-webpack@0.1802.18":
-  version "0.1802.18"
-  resolved "https://registry.yarnpkg.com/@angular-devkit/build-webpack/-/build-webpack-0.1802.18.tgz#112bbe64e5c1c197ff6b8dca8f7017a158fb88c5"
-  integrity sha512-xSiUC2EeELKgs70aceet/iK57y2nk6VobgeeQzGzTtE5HXWX0n5/g9FIOVM1rznv/tj+9VFZpQKCdLqiP7JmCQ==
+"@angular-devkit/build-webpack@0.1802.19":
+  version "0.1802.19"
+  resolved "https://registry.yarnpkg.com/@angular-devkit/build-webpack/-/build-webpack-0.1802.19.tgz#a9c3af3ae5fcd7b0f3b37d6423e0fac5df90fa47"
+  integrity sha512-axz1Sasn+c+GJpJexBL+B3Rh1w3wJrQq8k8gkniodjJ594p4ti2qGk7i9Tj8A4cXx5fGY+EpuZvKfI/9Tr7QwA==
   dependencies:
-    "@angular-devkit/architect" "0.1802.18"
+    "@angular-devkit/architect" "0.1802.19"
     rxjs "7.8.1"
 
 "@angular-devkit/core@18.2.18":
   version "18.2.18"
   resolved "https://registry.yarnpkg.com/@angular-devkit/core/-/core-18.2.18.tgz#52a663c72a8cb15a081c44f7ddf2e803f28e0ecc"
   integrity sha512-gncn8QN73mi4in7oAfoWnJglLx5iI8d87796h1LTuAxULSkfzhW3E03NZU764FBiIAWFxuty4PWmrHxMlmbtbw==
+  dependencies:
+    ajv "8.17.1"
+    ajv-formats "3.0.1"
+    jsonc-parser "3.3.1"
+    picomatch "4.0.2"
+    rxjs "7.8.1"
+    source-map "0.7.4"
+
+"@angular-devkit/core@18.2.19":
+  version "18.2.19"
+  resolved "https://registry.yarnpkg.com/@angular-devkit/core/-/core-18.2.19.tgz#cca229fa212e59667a9ce49cceef1cc7a0ca13d2"
+  integrity sha512-Ptf92Zomc6FCr7GWmHKdgOUbA1GpctZwH/hRcpYpU3tM56MG2t5FOFpufnE595GgolOCktabkFEoODMG8PBVDQ==
   dependencies:
     ajv "8.17.1"
     ajv-formats "3.0.1"
@@ -144,13 +164,13 @@
     ora "5.4.1"
     rxjs "7.8.1"
 
-"@angular/build@18.2.18":
-  version "18.2.18"
-  resolved "https://registry.yarnpkg.com/@angular/build/-/build-18.2.18.tgz#d48f696a186f7f9d890b3344f728cc966cbd2c23"
-  integrity sha512-8PEhrkS1t9xpvBLaLVgi0OWt/0B72ENKKVc6BAKEZ5gg+SD7uf47sJcT1d23r7d/V6FaOJnWim6BrqgFs4rW9A==
+"@angular/build@18.2.19":
+  version "18.2.19"
+  resolved "https://registry.yarnpkg.com/@angular/build/-/build-18.2.19.tgz#efc483fe256705e496742cba571acc7d4d2f058b"
+  integrity sha512-dTqR+mhcZWtCRyOafvzHNVpYxMQnt8HHHqNM0kyEMzcztXL2L9zDlKr0H9d+AgGGq/v4qwCh+1gFDxsHByZwMQ==
   dependencies:
     "@ampproject/remapping" "2.3.0"
-    "@angular-devkit/architect" "0.1802.18"
+    "@angular-devkit/architect" "0.1802.19"
     "@babel/core" "7.25.2"
     "@babel/helper-annotate-as-pure" "7.24.7"
     "@babel/helper-split-export-declaration" "7.24.7"
@@ -4479,10 +4499,10 @@
     "@emnapi/runtime" "^1.1.0"
     "@tybys/wasm-util" "^0.9.0"
 
-"@ngtools/webpack@18.2.18":
-  version "18.2.18"
-  resolved "https://registry.yarnpkg.com/@ngtools/webpack/-/webpack-18.2.18.tgz#d0fc682fcaaa982bf3578f6ede12e6123c4136e7"
-  integrity sha512-rFTf3zrAMp7KJF8F/sOn0SNits+HhRaNKw4g20Pxk4QG5XZsXChsQIKrrzAnmlCfMb3nQmBnElAhr1rvBmzZWQ==
+"@ngtools/webpack@18.2.19":
+  version "18.2.19"
+  resolved "https://registry.yarnpkg.com/@ngtools/webpack/-/webpack-18.2.19.tgz#b5ba332a47bdf8660abbfb5369f2d4d0588bfefc"
+  integrity sha512-bExj5JrByKPibsqBbn5Pjn8lo91AUOTsyP2hgKpnOnmSr62rhWSiRwXltgz2MCiZRmuUznpt93WiOLixgYfYvQ==
 
 "@node-ipc/js-queue@2.0.3":
   version "2.0.3"
@@ -15503,10 +15523,10 @@ http-proxy-agent@^7.0.0, http-proxy-agent@^7.0.1, http-proxy-agent@^7.0.2:
     agent-base "^7.1.0"
     debug "^4.3.4"
 
-http-proxy-middleware@3.0.3, http-proxy-middleware@^3.0.0:
-  version "3.0.3"
-  resolved "https://registry.yarnpkg.com/http-proxy-middleware/-/http-proxy-middleware-3.0.3.tgz#dc1313c75bd00d81e103823802551ee30130ebd1"
-  integrity sha512-usY0HG5nyDUwtqpiZdETNbmKtw3QQ1jwYFZ9wi5iHzX2BcILwQKtYDJPo7XHTsu5Z0B2Hj3W9NNnbd+AjFWjqg==
+http-proxy-middleware@3.0.5, http-proxy-middleware@^3.0.0:
+  version "3.0.5"
+  resolved "https://registry.yarnpkg.com/http-proxy-middleware/-/http-proxy-middleware-3.0.5.tgz#9dcde663edc44079bc5a9c63e03fe5e5d6037fab"
+  integrity sha512-GLZZm1X38BPY4lkXA01jhwxvDoOkkXqjgVyUzVxiEK4iuRu03PZoYHhHRwxnfhQMDuaxi3vVri0YgSro/1oWqg==
   dependencies:
     "@types/http-proxy" "^1.17.15"
     debug "^4.3.6"
