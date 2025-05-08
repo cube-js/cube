@@ -327,52 +327,6 @@ impl RewriteRules for MemberRules {
                 self.transform_like_expr("?like_type", "?negated", "?escape_char", "?op"),
             ),
             // Join
-            transforming_rewrite(
-                "push-down-cross-join-to-empty-scan",
-                cross_join(
-                    cube_scan(
-                        "?left_alias_to_cube",
-                        cube_scan_members_empty_tail(),
-                        cube_scan_filters_empty_tail(),
-                        cube_scan_order_empty_tail(),
-                        "?limit",
-                        "?offset",
-                        "CubeScanSplit:false",
-                        "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
-                        "CubeScanUngrouped:false",
-                    ),
-                    cube_scan(
-                        "?right_alias_to_cube",
-                        cube_scan_members_empty_tail(),
-                        cube_scan_filters_empty_tail(),
-                        cube_scan_order_empty_tail(),
-                        "?limit",
-                        "?offset",
-                        "CubeScanSplit:false",
-                        "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
-                        "CubeScanUngrouped:false",
-                    ),
-                ),
-                cube_scan(
-                    "?joined_alias_to_cube",
-                    cube_scan_members_empty_tail(),
-                    cube_scan_filters_empty_tail(),
-                    cube_scan_order_empty_tail(),
-                    "?limit",
-                    "?offset",
-                    "CubeScanSplit:false",
-                    "CubeScanCanPushdownJoin:true",
-                    "CubeScanWrapped:false",
-                    "CubeScanUngrouped:false",
-                ),
-                self.push_down_cross_join_to_empty_scan(
-                    "?left_alias_to_cube",
-                    "?right_alias_to_cube",
-                    "?joined_alias_to_cube",
-                ),
-            ),
             self.push_down_cross_join_to_cubescan_rewrite(
                 "not-merged-cubescans",
                 "?left_members".to_string(),
@@ -2606,40 +2560,6 @@ impl MemberRules {
         "count".to_string()
     }
 
-    fn push_down_cross_join_to_empty_scan(
-        &self,
-        left_alias_to_cube_var: &'static str,
-        right_alias_to_cube_var: &'static str,
-        joined_alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let left_alias_to_cube_var = var!(left_alias_to_cube_var);
-        let right_alias_to_cube_var = var!(right_alias_to_cube_var);
-        let joined_alias_to_cube_var = var!(joined_alias_to_cube_var);
-        move |egraph, subst| {
-            for left_alias_to_cube in
-                var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube).cloned()
-            {
-                for right_alias_to_cube in
-                    var_iter!(egraph[subst[right_alias_to_cube_var]], CubeScanAliasToCube).cloned()
-                {
-                    let joined_alias_to_cube = egraph.add(
-                        LogicalPlanLanguage::CubeScanAliasToCube(CubeScanAliasToCube(
-                            left_alias_to_cube
-                                .into_iter()
-                                .chain(right_alias_to_cube.into_iter())
-                                .collect(),
-                        )),
-                    );
-                    subst.insert(joined_alias_to_cube_var, joined_alias_to_cube);
-
-                    return true;
-                }
-            }
-
-            false
-        }
-    }
-
     fn push_down_cross_join_to_cube_scan(
         &self,
         left_alias_to_cube_var: &'static str,
@@ -2689,12 +2609,17 @@ impl MemberRules {
                     for left_members in
                         var_list_iter!(egraph[subst[left_members_var]], CubeScanMembers).cloned()
                     {
+                        // This should not happen. If it did - investigate how
+                        if left_members.is_empty() {
+                            continue;
+                        }
+
                         for right_members in
                             var_list_iter!(egraph[subst[right_members_var]], CubeScanMembers)
                                 .cloned()
                         {
-                            // push_down_cross_join_to_empty_scan works in this case
-                            if left_members.is_empty() && right_members.is_empty() {
+                            // This should not happen. If it did - investigate how
+                            if right_members.is_empty() {
                                 continue;
                             }
 
