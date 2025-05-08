@@ -1310,14 +1310,14 @@ export class BaseQuery {
     // TODO calculate based on remove_filter in future
     const wouldNodeApplyFilters = !memberChildren[member];
     let memberFrom = memberChildren[member]
-      ?.map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, queryContext, wouldNodeApplyFilters), memberChildren, withQueries));
+      ?.map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, queryContext), memberChildren, withQueries));
     const unionFromDimensions = memberFrom ? R.uniq(R.flatten(memberFrom.map(f => f.dimensions))) : queryContext.dimensions;
     const unionDimensionsContext = { ...queryContext, dimensions: unionFromDimensions.filter(d => !this.newDimension(d).isMultiStage()) };
     // TODO is calling multiStageWithQueries twice optimal?
     memberFrom = memberChildren[member] &&
       R.uniqBy(
         f => f.alias,
-        memberChildren[member].map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, unionDimensionsContext, wouldNodeApplyFilters), memberChildren, withQueries))
+        memberChildren[member].map(child => this.multiStageWithQueries(child, this.childrenMultiStageContext(member, unionDimensionsContext), memberChildren, withQueries))
       );
     const selfContext = this.selfMultiStageContext(member, queryContext, wouldNodeApplyFilters);
     const subQuery = {
@@ -1344,7 +1344,7 @@ export class BaseQuery {
     member.memberFrom?.forEach(m => this.collectUsedWithQueries(usedQueries, m));
   }
 
-  childrenMultiStageContext(memberPath, queryContext, wouldNodeApplyFilters) {
+  childrenMultiStageContext(memberPath, queryContext) {
     let member;
     if (this.cubeEvaluator.isMeasure(memberPath)) {
       member = this.newMeasure(memberPath);
@@ -1371,10 +1371,14 @@ export class BaseQuery {
           };
         };
       } else {
+        const allBackAliasMembers = this.allBackAliasTimeDimensions();
         mapFn = (td) => {
-          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension);
+          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension || td.dimension === allBackAliasMembers[r.timeDimension]);
           if (timeShift) {
-            if (td.shiftInterval) {
+            // We need to ignore aliased td, because it will match and insert shiftInterval on first
+            // occurrence, but later during recursion it will hit the original td but shiftInterval will be
+            // present and simple check for td.shiftInterval will always result in error.
+            if (td.shiftInterval && !td.dimension === allBackAliasMembers[timeShift.timeDimension]) {
               throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
             }
             return {
@@ -4409,10 +4413,24 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * @returns {Record<string, string>}
+   */
+  allBackAliasTimeDimensions() {
+    const members = R.flatten(this.timeDimensions.map(m => m.getMembers()));
+    return this.backAliasMembers(members);
+  }
+
+  /**
+   * @returns {Record<string, string>}
+   */
   allBackAliasMembersExceptSegments() {
     return this.backAliasMembers(this.flattenAllMembers(true));
   }
 
+  /**
+   * @returns {Record<string, string>}
+   */
   allBackAliasMembers() {
     return this.backAliasMembers(this.flattenAllMembers());
   }
