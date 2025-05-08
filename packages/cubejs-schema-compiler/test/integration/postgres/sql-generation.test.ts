@@ -17,6 +17,34 @@ describe('SQL Generation', () => {
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
     }
 
+    cube(\`visitors_create_dates\`, {
+      sql: \`
+      select id AS create_date_id, created_at from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
+      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
+      \`,
+
+      rewriteQueries: true,
+
+      dimensions: {
+        create_date_id: {
+          type: 'number',
+          sql: 'id',
+          primaryKey: true
+        },
+        create_date_created_at: {
+          type: 'time',
+          sql: 'created_at',
+          granularities: {
+            three_days: {
+              interval: '3 days',
+              title: '3 days',
+              origin: '2017-01-01'
+            }
+          }
+        }
+      }
+    })
+
     cube(\`visitors\`, {
       sql: \`
       select * from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
@@ -33,6 +61,10 @@ describe('SQL Generation', () => {
         visitor_checkins: {
           relationship: 'hasMany',
           sql: \`\${CUBE}.id = \${visitor_checkins}.visitor_id\`
+        },
+        visitors_create_dates: {
+          relationship: 'one_to_one',
+          sql: \`\${CUBE}.id = \${visitors_create_dates}.create_date_id\`
         }
       },
 
@@ -134,6 +166,16 @@ describe('SQL Generation', () => {
           type: 'sum',
           sql: \`\${revenue}\`,
           time_shift: [{
+            interval: '1 day',
+            type: 'prior',
+          }]
+        },
+        revenue_day_ago_via_join: {
+          multi_stage: true,
+          type: 'sum',
+          sql: \`\${revenue}\`,
+          time_shift: [{
+            time_dimension: visitors_create_dates.create_date_created_at,
             interval: '1 day',
             type: 'prior',
           }]
@@ -338,6 +380,10 @@ describe('SQL Generation', () => {
     view('visitors_multi_stage', {
       cubes: [{
         join_path: 'visitors',
+        includes: '*'
+      },
+      {
+        join_path: 'visitors.visitors_create_dates',
         includes: '*'
       }]
     })
@@ -1378,6 +1424,45 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   }, [
     { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago_no_td: '200' },
     { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago_no_td: '300' }
+  ]));
+
+  it('CAGR via view (td from main cube)', async () => runQueryTest({
+    measures: [
+      'visitors_multi_stage.revenue',
+      'visitors_multi_stage.revenue_day_ago',
+      'visitors_multi_stage.cagr_day'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors_multi_stage.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors_multi_stage.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors_multi_stage__created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__cagr_day: '150', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago: '200' },
+    { visitors_multi_stage__created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__cagr_day: '300', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago: '300' }
+  ]));
+
+  it('CAGR via view (td from joined cube)', async () => runQueryTest({
+    measures: [
+      'visitors_multi_stage.revenue',
+      'visitors_multi_stage.revenue_day_ago_via_join',
+    ],
+    timeDimensions: [{
+      dimension: 'visitors_multi_stage.create_date_created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors_multi_stage.create_date_created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z', visitors_multi_stage__revenue: '300', visitors_multi_stage__revenue_day_ago_via_join: '200' },
+    { visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago_via_join: '300' }
   ]));
 
   it('sql utils', async () => runQueryTest({
