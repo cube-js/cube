@@ -1,12 +1,12 @@
 import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
-import type { BaseQuery } from '../../../src';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
+import { testWithPreAggregation } from './pre-aggregation-utils';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
@@ -883,27 +883,6 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     expect(res).toEqual(
       expectedResult
     );
-  }
-
-  type QueryWithParams = [string, Array<unknown>];
-
-  async function testWithPreAgg(
-    preAggregationsDescription: { loadSql: QueryWithParams, invalidateKeyQueries: Array<QueryWithParams> },
-    query: BaseQuery,
-  ) {
-    const preAggSql = preAggregationsDescription
-      .loadSql[0]
-      // Without `ON COMMIT DROP` temp tables are session-bound, and can live across multiple transactions
-      .replace(/CREATE TABLE (.+) AS SELECT/, 'CREATE TEMP TABLE $1 ON COMMIT DROP AS SELECT');
-    const preAggParams = preAggregationsDescription.loadSql[1];
-
-    const queries = [
-      ...preAggregationsDescription.invalidateKeyQueries,
-      [preAggSql, preAggParams],
-      query.buildSqlAndParams(),
-    ];
-
-    return dbRunner.testQueries(queries);
   }
 
   it('simple join total', async () => runQueryTest({
@@ -2184,7 +2163,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
 
-    const res = await testWithPreAgg(preAggregationsDescription, query);
+    const res = await testWithPreAggregation(preAggregationsDescription, query);
     expect(res).toEqual(
       // Empty result set, only segments in query
       [{}]
@@ -2225,7 +2204,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
-    const res = await testWithPreAgg(preAggregationsDescription, query);
+    const res = await testWithPreAggregation(preAggregationsDescription, query);
     console.log(JSON.stringify(res));
     expect(res).toEqual(
       [
@@ -2266,7 +2245,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     console.log(preAggregationsDescription);
 
-    const res = await testWithPreAgg(preAggregationsDescription, query);
+    const res = await testWithPreAggregation(preAggregationsDescription, query);
     console.log(JSON.stringify(res));
     expect(res).toEqual(
       [{
