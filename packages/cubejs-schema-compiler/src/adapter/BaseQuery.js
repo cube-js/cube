@@ -3876,6 +3876,12 @@ export class BaseQuery {
     };
   }
 
+  /**
+   *
+   * @param cube
+   * @param preAggregation
+   * @returns {BaseQuery}
+   */
   // eslint-disable-next-line consistent-return
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {

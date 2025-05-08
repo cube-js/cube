@@ -1,4 +1,3 @@
-// @ts-nocheck
 import R from 'ramda';
 
 import { CubeSymbols } from '../compiler/CubeSymbols';
