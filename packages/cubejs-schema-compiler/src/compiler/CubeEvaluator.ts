@@ -94,6 +94,7 @@ export type CubeRefreshKey =
 export type PreAggregationDefinition = {
   type: 'autoRollup' | 'originalSql' | 'rollupJoin' | 'rollupLambda' | 'rollup',
   allowNonStrictDateRangeMatch?: boolean,
+  useOriginalSqlPreAggregations?: boolean,
   timeDimensionReference?: () => ToString,
   granularity: string,
   timeDimensionReferences: Array<{ dimension: () => ToString, granularity: string }>,

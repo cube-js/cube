@@ -17,7 +17,13 @@ import { BaseSegment } from './BaseSegment';
 
 export type RollupJoin = any;
 
-export type PreAggregationDefinitionExtended = PreAggregationDefinition & {
+export type PartitionTimeDimension = {
+  dimension: string;
+  dateRange: [string, string];
+  boundaryDateRange: [string, string];
+};
+
+export type PreAggregationDefinitionExtended = PreAggregationDefinition & PreAggregationReferences & {
   unionWithSourceData: boolean;
   rollupLambdaId: string;
   lastRollupLambda: boolean;
@@ -27,6 +33,7 @@ export type PreAggregationDefinitionExtended = PreAggregationDefinition & {
   streamOffset: 'earliest' | 'latest';
   uniqueKeyColumns: string;
   sqlAlias?: string;
+  partitionTimeDimensions?: PartitionTimeDimension[];
 };
 
 export type PreAggregationForQuery = {
@@ -587,7 +594,7 @@ export class PreAggregations {
         .dimensions
         .map(d => CubeSymbols.joinHintFromPath(d).path);
       const multipliedMeasuresTrimmed = references
-        .multipliedMeasures?.map(m => CubeSymbols.joinHintFromPath(m).path);
+        .multipliedMeasures?.map(m => CubeSymbols.joinHintFromPath(m).path) || [];
 
       return {
         ...references,
@@ -735,7 +742,7 @@ export class PreAggregations {
       if (referencesTrimmed.multipliedMeasures) {
         const backAliasMultipliedMeasures = backAlias(referencesTrimmed.multipliedMeasures);
 
-        if (transformedQuery.leafMeasures.some(m => referencesTrimmed.multipliedMeasures.includes(m)) ||
+        if (transformedQuery.leafMeasures.some(m => referencesTrimmed.multipliedMeasures?.includes(m)) ||
           transformedQuery.measures.some(m => backAliasMultipliedMeasures.includes(m))
         ) {
           return false;
@@ -1213,7 +1220,7 @@ export class PreAggregations {
     );
   }
 
-  public rollupPreAggregationQuery(cube: string, aggregation: PreAggregationDefinition, context: EvaluateReferencesContext = {}): BaseQuery {
+  public rollupPreAggregationQuery(cube: string, aggregation: PreAggregationDefinitionExtended, context: EvaluateReferencesContext = {}): BaseQuery {
     // `this.evaluateAllReferences` will retain not only members, but their join path as well, and pass join hints
     // to subquery. Otherwise, members in subquery would regenerate new join tree from clean state,
     // and it can be different from expected by join path in pre-aggregation declaration
@@ -1245,7 +1252,7 @@ export class PreAggregations {
     });
   }
 
-  public autoRollupPreAggregationQuery(cube: string, aggregation: PreAggregationDefinition): BaseQuery {
+  public autoRollupPreAggregationQuery(cube: string, aggregation: PreAggregationDefinitionExtended): BaseQuery {
     return this.query.newSubQueryForCube(
       cube,
       {
@@ -1261,7 +1268,7 @@ export class PreAggregations {
     );
   }
 
-  private mergePartitionTimeDimensions(aggregation: PreAggregationReferences, partitionTimeDimensions: BaseTimeDimension[]) {
+  private mergePartitionTimeDimensions(aggregation: PreAggregationReferences, partitionTimeDimensions?: PartitionTimeDimension[]) {
     if (!partitionTimeDimensions) {
       return aggregation.timeDimensions;
     }
@@ -1286,7 +1293,7 @@ export class PreAggregations {
       .toLowerCase();
   }
 
-  private evaluateAllReferences(cube: string, aggregation: PreAggregationDefinition, preAggregationName: string | null = null, context: EvaluateReferencesOptions = {}): PreAggregationReferences {
+  private evaluateAllReferences(cube: string, aggregation: PreAggregationDefinition, preAggregationName: string | null = null, context: EvaluateReferencesContext = {}): PreAggregationReferences {
     // TODO build a join tree for all references, so they would always include full join path
     //  Even for preaggregation references without join path
     //  It is necessary to be able to match query and preaggregation based on full join tree
