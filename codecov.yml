@@ -13,7 +13,3 @@ coverage:
 
 github_checks:
   annotations: false
-
-fixes:
-  - "packages/([^/]*)/src/::packages/\\1/src/"
-

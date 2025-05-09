@@ -120,15 +120,19 @@ jobs:
         run: yarn build
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
+      - name: Fix lcov paths
+        run: |
+          ./.github/actions/codecov-fix.sh
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./packages/*/coverage/lcov.info
+          files: ./packages/*/coverage/lcov.fixed.info
           verbose: true
           flags: cube_backend
           fail_ci_if_error: false
+          plugins: noop
 
   lint:
     runs-on: ubuntu-24.04
@@ -496,15 +500,19 @@ jobs:
           # Snowflake
           DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           DRIVERS_TESTS_SNOWFLAKE_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
+      - name: Fix lcov paths
+        run: |
+          ./.github/actions/codecov-fix.sh
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         if: (matrix.node-version == '22.x')
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./packages/*/coverage/lcov.info
+          files: ./packages/*/coverage/lcov.fixed.info
           verbose: true
           flags: cube_backend
           fail_ci_if_error: false
+          plugins: noop
 
   integration-smoke:
     needs: [latest-tag-sha, build-cubestore, build-native-linux]
