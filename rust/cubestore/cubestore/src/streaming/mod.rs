@@ -130,7 +130,9 @@ impl StreamingServiceImpl {
                 user,
                 password,
                 url,
-            } => Ok(Arc::new(KSqlStreamingSource {
+            } => {
+                log::debug!("source_by: KSql: table columns: {:?}", table.get_row().get_columns());
+                Ok(Arc::new(KSqlStreamingSource {
                 user: user.clone(),
                 password: password.clone(),
                 table: table_name,
@@ -143,13 +145,16 @@ impl StreamingServiceImpl {
                 columns: table.get_row().get_columns().clone(),
                 seq_column_index: seq_column.get_index(),
 
-            })),
+            })) },
             SourceCredentials::Kafka {
                 user,
                 password,
                 host,
                 use_ssl,
-            } => Ok(Arc::new(KafkaStreamingSource::try_new(
+            } => {
+                log::debug!("source_by: Kafka: table columns: {:?}, source columns: {:?}", table.get_row().get_columns(), table.get_row().source_columns());
+
+                Ok(Arc::new(KafkaStreamingSource::try_new(
                 table.get_id(),
                 table.get_row().unique_key_columns()
                     .ok_or_else(|| CubeError::internal(format!("Streaming table without unique key columns: {:?}", table)))?
@@ -170,7 +175,7 @@ impl StreamingServiceImpl {
                 *use_ssl,
                 trace_obj,
                 self.metadata_cache_factory.clone(),
-            ).await?)),
+            ).await?)) },
         }
     }
 
@@ -317,6 +322,7 @@ impl StreamingService for StreamingServiceImpl {
             let rows = new_rows;
             debug!("Received {} rows for {}", rows.len(), location);
             let table_cols = source.source_columns().as_slice();
+            log::debug!("stream_table: table_cols (source_columns): {:?}, table columns: {:?}", table_cols, table.get_row().get_columns());
             let mut builders = create_array_builders(table_cols);
 
             let mut start_seq: Option<i64> = None;
@@ -350,7 +356,9 @@ impl StreamingService for StreamingServiceImpl {
                 .create_replay_handle(table.get_id(), location_index, seq_pointer)
                 .await?;
             let data = finish(builders);
+            log::debug!("stream_table: after finish data.len(): {}, table columns: {:?}", data.len(), table.get_row().get_columns());
             let data = source.apply_post_processing(data).await?;
+            log::debug!("stream_table: after apply_post_processing data.len(): {}, table columns: {:?}", data.len(), table.get_row().get_columns());
 
             let partition_started_at = SystemTime::now();
             let new_chunks = self

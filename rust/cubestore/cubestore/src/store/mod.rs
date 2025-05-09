@@ -1446,6 +1446,7 @@ impl ChunkStore {
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let mut rows = rows.0;
+        log::debug!("build_index_chunks rows.len(): {}, columns: {:?}", rows.len(), columns);
         let mut futures = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();
@@ -1492,7 +1493,7 @@ fn remap_columns(
     old_columns: &[Column],
     new_columns: &[Column],
 ) -> Result<Vec<ArrayRef>, CubeError> {
-    assert_eq!(old_columns.len(), old.len());
+    assert_eq!(old_columns.len(), old.len(), "old_columns: {}", old_columns.iter().map(|c| c.get_name()).join(", "));
     let mut new = Vec::with_capacity(new_columns.len());
     for new_column in new_columns.iter() {
         let old_column = old_columns
