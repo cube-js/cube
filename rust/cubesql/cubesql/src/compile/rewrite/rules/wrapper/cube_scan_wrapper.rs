@@ -31,6 +31,7 @@ impl WrapperRules {
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
                     "?ungrouped",
+                    "?join_hints",
                 ),
                 cube_scan_wrapper(
                     wrapper_pullup_replacer(
@@ -45,6 +46,7 @@ impl WrapperRules {
                             "?can_pushdown_join",
                             "CubeScanWrapped:true",
                             "?ungrouped",
+                            "?join_hints",
                         ),
                         wrapper_replacer_context(
                             "?alias_to_cube_out",

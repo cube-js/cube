@@ -193,6 +193,10 @@ async fn test_user_with_join() {
             segments: Some(vec![]),
             order: Some(vec![]),
             ungrouped: Some(true),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     );

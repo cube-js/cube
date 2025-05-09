@@ -303,6 +303,7 @@ crate::plan_to_language! {
             can_pushdown_join: bool,
             wrapped: bool,
             ungrouped: bool,
+            join_hints: Vec<Vec<String>>,
         },
         CubeScanWrapper {
             input: Arc<LogicalPlan>,
@@ -2177,19 +2178,22 @@ fn cube_scan(
     can_pushdown_join: impl Display,
     wrapped: impl Display,
     ungrouped: impl Display,
+    join_hints: impl Display,
 ) -> String {
     format!(
-        "(CubeScan {} {} {} {} {} {} {} {} {} {})",
-        alias_to_cube,
-        members,
-        filters,
-        orders,
-        limit,
-        offset,
-        split,
-        can_pushdown_join,
-        wrapped,
-        ungrouped
+        r#"(CubeScan
+            {alias_to_cube}
+            {members}
+            {filters}
+            {orders}
+            {limit}
+            {offset}
+            {split}
+            {can_pushdown_join}
+            {wrapped}
+            {ungrouped}
+            {join_hints}
+        )"#
     )
 }
 

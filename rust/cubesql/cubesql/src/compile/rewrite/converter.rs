@@ -12,11 +12,11 @@ use crate::{
             AggregateFunctionExprDistinct, AggregateFunctionExprFun, AggregateSplit,
             AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp, BetweenExprNegated,
             BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
-            CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, CubeScanWrapped,
-            DimensionName, EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
-            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-            FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
-            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
+            CubeScanAliasToCube, CubeScanJoinHints, CubeScanLimit, CubeScanOffset,
+            CubeScanUngrouped, CubeScanWrapped, DimensionName, EmptyRelationDerivedSourceTableName,
+            EmptyRelationIsWrappable, EmptyRelationProduceOneRow, FilterMemberMember,
+            FilterMemberOp, FilterMemberValues, FilterOpOp, GroupingSetExprType, GroupingSetType,
+            InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
             JoinNullEqualsNull, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
             LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
             LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
@@ -2000,6 +2000,12 @@ impl LanguageToLogicalPlanConverter {
 
                 if ungrouped {
                     query.ungrouped = Some(true);
+                }
+
+                let join_hints =
+                    match_data_node!(node_by_id, cube_scan_params[10], CubeScanJoinHints);
+                if join_hints.len() > 0 {
+                    query.join_hints = Some(join_hints);
                 }
 
                 query.order = if !query_order.is_empty() {
