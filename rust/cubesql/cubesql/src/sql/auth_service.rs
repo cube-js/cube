@@ -2,6 +2,7 @@ use std::{any::Any, env, fmt::Debug, sync::Arc};
 
 use crate::CubeError;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // We cannot use generic here. It's why there is this trait
@@ -43,10 +44,17 @@ pub struct AuthenticateResponse {
     pub skip_password_check: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SqlAuthServiceAuthenticateRequest {
+    pub protocol: String,
+    pub method: String,
+}
+
 #[async_trait]
 pub trait SqlAuthService: Send + Sync + Debug {
     async fn authenticate(
         &self,
+        request: SqlAuthServiceAuthenticateRequest,
         user: Option<String>,
         password: Option<String>,
     ) -> Result<AuthenticateResponse, CubeError>;
@@ -61,6 +69,7 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 impl SqlAuthService for SqlAuthDefaultImpl {
     async fn authenticate(
         &self,
+        _request: SqlAuthServiceAuthenticateRequest,
         _user: Option<String>,
         password: Option<String>,
     ) -> Result<AuthenticateResponse, CubeError> {

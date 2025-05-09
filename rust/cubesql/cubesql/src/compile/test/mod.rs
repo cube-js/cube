@@ -8,9 +8,10 @@ use crate::{
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe,
-        pg_auth_service::PostgresAuthServiceDefaultImpl, AuthContextRef, AuthenticateResponse,
-        HttpAuthContext, ServerManager, Session, SessionManager, SqlAuthService,
+        auth_service::SqlAuthServiceAuthenticateRequest, compiler_cache::CompilerCacheImpl,
+        dataframe::batches_to_dataframe, pg_auth_service::PostgresAuthServiceDefaultImpl,
+        AuthContextRef, AuthenticateResponse, HttpAuthContext, ServerManager, Session,
+        SessionManager, SqlAuthService,
     },
     transport::{
         CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
@@ -747,6 +748,7 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     impl SqlAuthService for TestSqlAuth {
         async fn authenticate(
             &self,
+            _request: SqlAuthServiceAuthenticateRequest,
             _user: Option<String>,
             password: Option<String>,
         ) -> Result<AuthenticateResponse, CubeError> {
