@@ -123,10 +123,6 @@ jobs:
       - name: Fix lcov paths
         run: |
           ./.github/actions/codecov-fix.sh
-      - name: Debug coverage files
-        run: |
-          ls -al ./packages/*/coverage/lcov.fixed.info
-          cat ./packages/*/coverage/lcov.fixed.info || true
       - name: Install Codecov CLI
         run: |
           curl -Os https://uploader.codecov.io/latest/linux/codecov
@@ -144,9 +140,8 @@ jobs:
         run: |
           codecov --token "$CODECOV_TOKEN" \
             --file ./combined.lcov \
-            --flags cube_backend \
+            --flags cube-backend \
             --name "cube backend coverage" \
-            --verbose
 
   lint:
     runs-on: ubuntu-24.04
@@ -521,10 +516,6 @@ jobs:
         run: |
           ls -al ./packages/*/coverage/lcov.fixed.info
           cat ./packages/*/coverage/lcov.fixed.info || true
-      - name: Debug coverage files
-        run: |
-          ls -al ./packages/*/coverage/lcov.fixed.info
-          cat ./packages/*/coverage/lcov.fixed.info || true
       - name: Install Codecov CLI
         run: |
           curl -Os https://uploader.codecov.io/latest/linux/codecov
@@ -542,9 +533,8 @@ jobs:
         run: |
           codecov --token "$CODECOV_TOKEN" \
             --file ./combined.lcov \
-            --flags cube_backend \
+            --flags cube-backend \
             --name "cube backend coverage" \
-            --verbose
 
   integration-smoke:
     needs: [latest-tag-sha, build-cubestore, build-native-linux]
