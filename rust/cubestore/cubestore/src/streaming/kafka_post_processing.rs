@@ -143,6 +143,33 @@ impl KafkaPostProcessPlanner {
         }
     }
 
+    /// Compares schemas for equality, including metadata, except that physical_schema is allowed to
+    /// have non-nullable versions of the target schema's field.  This function is defined this way
+    /// (instead of some perhaps more generalizable way) because it conservatively replaces an
+    /// equality comparison.
+    fn is_compatible_schema(target_schema: &Schema, physical_schema: &Schema) -> bool {
+        if target_schema.metadata != physical_schema.metadata
+            || target_schema.fields.len() != physical_schema.fields.len()
+        {
+            return false;
+        }
+        for (target_field, physical_field) in target_schema
+            .fields
+            .iter()
+            .zip(physical_schema.fields.iter())
+        {
+            // See the >= there on is_nullable.
+            if !(target_field.name() == physical_field.name()
+                && target_field.data_type() == physical_field.data_type()
+                && target_field.is_nullable() >= physical_field.is_nullable()
+                && target_field.metadata() == physical_field.metadata())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     pub async fn build(
         &self,
         select_statement: String,
@@ -169,7 +196,7 @@ impl KafkaPostProcessPlanner {
         let (projection_plan, filter_plan) = self
             .make_projection_and_filter_physical_plans(&logical_plan)
             .await?;
-        if target_schema != projection_plan.schema() {
+        if !Self::is_compatible_schema(target_schema.as_ref(), projection_plan.schema().as_ref()) {
             return Err(CubeError::user(format!(
                 "Table schema: {:?} don't match select_statement result schema: {:?}",
                 target_schema,
