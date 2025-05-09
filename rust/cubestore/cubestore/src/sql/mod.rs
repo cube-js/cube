@@ -312,6 +312,7 @@ impl SqlServiceImpl {
         );
         for rows_chunk in data.chunks(self.rows_per_chunk) {
             let rows = parse_chunk(rows_chunk, &real_col)?;
+            log::debug!("SqlServiceImpl::insert_data with rows.len() {}, columns {}", rows.len(), table.get_row().get_columns().iter().map(|c| c.get_name()).join(", "));
             ingestion.queue_data_frame(rows).await?;
         }
         ingestion.wait_completion().await?;

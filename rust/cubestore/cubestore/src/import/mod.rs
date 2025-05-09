@@ -738,6 +738,7 @@ impl ImportServiceImpl {
                         data_loaded_size.add(columns_vec_buffer_size(&builded_rows));
                     }
 
+                    log::debug!("ImportServiceImpl::do_import (loop) with builded_rows.len() {}, columns.len() {}, columns: {}, location: {}", builded_rows.len(), table.get_row().get_columns().len(), table.get_row().get_columns().iter().map(|c| c.get_name()).join(", "), location);
                     ingestion.queue_data_frame(builded_rows).await?;
                 }
             }
@@ -745,7 +746,9 @@ impl ImportServiceImpl {
 
         mem::drop(tmp_path);
 
-        ingestion.queue_data_frame(finish(builders)).await?;
+        let rows = finish(builders);
+        log::debug!("ImportServiceImpl::do_import (last) with rows.len() {}, columns.len() {}, columns: {}, location: {}", rows.len(), table.get_row().get_columns().len(), table.get_row().get_columns().iter().map(|c| c.get_name()).join(", "), location);
+        ingestion.queue_data_frame(rows).await?;
         ingestion.wait_completion().await
     }
 
@@ -951,6 +954,7 @@ impl Ingestion {
         let table_id = self.table.get_id();
         // TODO In fact it should be only for inserts. Batch imports should still go straight to disk.
         let in_memory = self.table.get_row().in_memory_ingest();
+        log::debug!("queue_data_frame: pushing job with rows.len() {}, columns: {}", rows.len(), columns.iter().map(|c| c.get_name()).join(", "));
         self.partition_jobs.push(cube_ext::spawn(async move {
             let new_chunks = chunk_store
                 .partition_data(table_id, rows, &columns, in_memory)
