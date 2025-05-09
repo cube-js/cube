@@ -802,6 +802,9 @@ jobs:
     name: Upload merged coverage to Codecov
     needs: [unit, integration]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Install Codecov CLI
         run: |
