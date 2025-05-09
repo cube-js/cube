@@ -127,7 +127,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./packages/*/coverage/lcov.info
           verbose: true
-          flags: cube-backend
+          flags: cube_backend
           fail_ci_if_error: false
 
   lint:
@@ -503,7 +503,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./packages/*/coverage/lcov.info
           verbose: true
-          flags: cube-backend
+          flags: cube_backend
           fail_ci_if_error: false
 
   integration-smoke:
