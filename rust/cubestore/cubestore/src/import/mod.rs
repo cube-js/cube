@@ -827,6 +827,7 @@ impl ImportService for ImportServiceImpl {
             )));
         }
         if Table::is_stream_location(location) {
+            log::debug!("ImportService::import_table_part to stream table for table id {}, location {:?}", table.get_id(), location);
             self.streaming_service.stream_table(table, location).await?;
         } else {
             self.do_import(&table, *format, location, data_loaded_size.clone())
@@ -844,6 +845,7 @@ impl ImportService for ImportServiceImpl {
     ) -> Result<(), CubeError> {
         let table = self.meta_store.get_table_by_id(table_id).await?;
         if Table::is_stream_location(location) {
+            log::debug!("ImportService::validate_table_location for table id {}, location {:?}", table.get_id(), location);
             self.streaming_service
                 .validate_table_location(table, location)
                 .await?;

@@ -131,7 +131,7 @@ impl StreamingServiceImpl {
                 password,
                 url,
             } => {
-                log::debug!("source_by: KSql: table columns: {:?}", table.get_row().get_columns());
+                log::debug!("source_by: KSql: table id: {}, table columns: [{}]", table.get_id(), table.get_row().get_columns().iter().map(|c| c.get_name()).join(", "));
                 Ok(Arc::new(KSqlStreamingSource {
                 user: user.clone(),
                 password: password.clone(),
@@ -152,7 +152,7 @@ impl StreamingServiceImpl {
                 host,
                 use_ssl,
             } => {
-                log::debug!("source_by: Kafka: table columns: {:?}, source columns: {:?}", table.get_row().get_columns(), table.get_row().source_columns());
+                log::debug!("source_by: Kafka: table id: {}, table columns: [{}], source columns: {:?}", table.get_id(), table.get_row().get_columns().iter().map(|c| c.get_name()).join(", "), table.get_row().source_columns().as_ref().map(|cvec| cvec.iter().map(|c| c.get_name()).join(", ")));
 
                 Ok(Arc::new(KafkaStreamingSource::try_new(
                 table.get_id(),
@@ -242,7 +242,7 @@ impl StreamingService for StreamingServiceImpl {
             .meta_store
             .get_trace_obj_by_table_id(table.get_id())
             .await?;
-
+        log::debug!("StreamingServiceImpl::stream_table for table id {}", table.get_id());
         let source = self.source_by(&table, location, trace_obj).await?;
         let seq_column = table.get_row().seq_column().ok_or_else(|| {
             CubeError::internal(format!(
@@ -425,6 +425,7 @@ impl StreamingService for StreamingServiceImpl {
         table: IdRow<Table>,
         location: &str,
     ) -> Result<(), CubeError> {
+        log::debug!("StreamingServiceImpl::validate_location for table id {}", table.get_id());
         let source = self.source_by(&table, location, None).await?;
         source.validate_table_location()?;
         Ok(())
