@@ -121,15 +121,18 @@ jobs:
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - name: Fix lcov paths
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
         run: |
           ./.github/actions/codecov-fix.sh
       - name: Combine all fixed LCOV files
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
         run: |
           echo "" > ./combined-unit.lcov
           for f in ./packages/*/coverage/lcov.fixed.info; do
             cat "$f" >> ./combined-unit.lcov
           done
       - name: Upload coverage artifact
+        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
         uses: actions/upload-artifact@v4
         with:
           name: coverage-unit
