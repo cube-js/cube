@@ -123,16 +123,30 @@ jobs:
       - name: Fix lcov paths
         run: |
           ./.github/actions/codecov-fix.sh
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        if: (matrix.node-version == '22.x' && matrix.transpile-worker-threads == true)
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./packages/*/coverage/lcov.fixed.info
-          verbose: true
-          flags: cube_backend
-          fail_ci_if_error: false
-          plugins: noop
+      - name: Debug coverage files
+        run: |
+          ls -al ./packages/*/coverage/lcov.fixed.info
+          cat ./packages/*/coverage/lcov.fixed.info || true
+      - name: Install Codecov CLI
+        run: |
+          curl -Os https://uploader.codecov.io/latest/linux/codecov
+          chmod +x codecov
+          mv codecov /usr/local/bin/
+      - name: Combine all fixed LCOV files
+        run: |
+          echo "" > ./combined.lcov
+          for f in ./packages/*/coverage/lcov.fixed.info; do
+            cat "$f" >> ./combined.lcov
+          done
+      - name: Upload coverage to Codecov
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          codecov --token "$CODECOV_TOKEN" \
+            --file ./combined.lcov \
+            --flags cube_backend \
+            --name "cube backend coverage" \
+            --verbose
 
   lint:
     runs-on: ubuntu-24.04
@@ -503,16 +517,34 @@ jobs:
       - name: Fix lcov paths
         run: |
           ./.github/actions/codecov-fix.sh
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        if: (matrix.node-version == '22.x')
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./packages/*/coverage/lcov.fixed.info
-          verbose: true
-          flags: cube_backend
-          fail_ci_if_error: false
-          plugins: noop
+      - name: Debug coverage files
+        run: |
+          ls -al ./packages/*/coverage/lcov.fixed.info
+          cat ./packages/*/coverage/lcov.fixed.info || true
+      - name: Debug coverage files
+        run: |
+          ls -al ./packages/*/coverage/lcov.fixed.info
+          cat ./packages/*/coverage/lcov.fixed.info || true
+      - name: Install Codecov CLI
+        run: |
+          curl -Os https://uploader.codecov.io/latest/linux/codecov
+          chmod +x codecov
+          mv codecov /usr/local/bin/
+      - name: Combine all fixed LCOV files
+        run: |
+          echo "" > ./combined.lcov
+          for f in ./packages/*/coverage/lcov.fixed.info; do
+            cat "$f" >> ./combined.lcov
+          done
+      - name: Upload coverage to Codecov
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          codecov --token "$CODECOV_TOKEN" \
+            --file ./combined.lcov \
+            --flags cube_backend \
+            --name "cube backend coverage" \
+            --verbose
 
   integration-smoke:
     needs: [latest-tag-sha, build-cubestore, build-native-linux]
