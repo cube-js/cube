@@ -48,6 +48,10 @@ async fn powerbi_join() {
             dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            join_hints: Some(vec![vec![
+                "Logs".to_string(),
+                "KibanaSampleDataEcommerce".to_string(),
+            ],]),
             ..Default::default()
         }
     );
@@ -118,6 +122,13 @@ async fn powerbi_transitive_join() {
             dimensions: Some(vec!["Logs.content".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            join_hints: Some(vec![
+                vec!["NumberCube".to_string(), "Logs".to_string(),],
+                vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "NumberCube".to_string(),
+                ],
+            ]),
             ..Default::default()
         }
     );
@@ -171,6 +182,10 @@ async fn test_join_three_cubes() {
             segments: Some(vec![]),
             order: Some(vec![]),
             ungrouped: Some(true),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
+            ]),
             ..Default::default()
         }
     )
@@ -217,6 +232,10 @@ async fn test_join_three_cubes_split() {
                 or: None,
                 and: None
             }]),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
+            ]),
             ..Default::default()
         }
     )
@@ -246,10 +265,7 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -266,6 +282,10 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
                     and: None
                 }
             ]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     )
@@ -301,10 +321,7 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                 granularity: Some("month".to_owned()),
                 date_range: None
             }]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -320,6 +337,10 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                     or: None,
                     and: None
                 }
+            ]),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
             ]),
             ..Default::default()
         }
@@ -350,10 +371,7 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -370,6 +388,10 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
                     and: None
                 }
             ]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     )
@@ -405,10 +427,7 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                 granularity: Some("month".to_owned()),
                 date_range: None
             }]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -424,6 +443,10 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                     or: None,
                     and: None
                 }
+            ]),
+            join_hints: Some(vec![
+                vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                vec!["Logs".to_string(), "NumberCube".to_string(),],
             ]),
             ..Default::default()
         }
@@ -486,6 +509,10 @@ async fn test_join_two_subqueries_filter_push_down() {
                     and: None
                 }
             ]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     )
@@ -605,6 +632,10 @@ FROM
         ]),
         order: Some(vec![]),
         ungrouped: Some(true),
+        join_hints: Some(vec![vec![
+            "KibanaSampleDataEcommerce".to_string(),
+            "Logs".to_string(),
+        ]]),
         ..Default::default()
     };
 

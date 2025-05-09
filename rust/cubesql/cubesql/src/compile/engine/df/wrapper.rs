@@ -3368,6 +3368,8 @@ impl WrappedSelectNode {
             time_dimensions: load_request.time_dimensions.clone(),
             subquery_joins: (!prepared_join_subqueries.is_empty())
                 .then_some(prepared_join_subqueries),
+
+            join_hints: load_request.join_hints.clone(),
         };
 
         // TODO time dimensions, filters, segments

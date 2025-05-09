@@ -30,6 +30,8 @@ pub struct V1LoadRequestQuery {
     pub ungrouped: Option<bool>,
     #[serde(rename = "subqueryJoins", skip_serializing_if = "Option::is_none")]
     pub subquery_joins: Option<Vec<crate::models::V1LoadRequestQueryJoinSubquery>>,
+    #[serde(rename = "joinHints", skip_serializing_if = "Option::is_none")]
+    pub join_hints: Option<Vec<Vec<String>>>,
 }
 
 impl V1LoadRequestQuery {
@@ -45,6 +47,7 @@ impl V1LoadRequestQuery {
             filters: None,
             ungrouped: None,
             subquery_joins: None,
+            join_hints: None,
         }
     }
 }

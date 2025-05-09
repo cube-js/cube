@@ -303,6 +303,7 @@ crate::plan_to_language! {
             can_pushdown_join: bool,
             wrapped: bool,
             ungrouped: bool,
+            join_hints: Vec<Vec<String>>,
         },
         CubeScanWrapper {
             input: Arc<LogicalPlan>,
@@ -384,9 +385,6 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             old_members: Arc<LogicalPlan>,
             alias_to_cube: Vec<((String, String), String)>,
-        },
-        MergedMembersReplacer {
-            members: Vec<LogicalPlan>,
         },
         ListConcatPushdownReplacer {
             members: Arc<LogicalPlan>,
@@ -1901,10 +1899,6 @@ fn member_pushdown_replacer(
     )
 }
 
-fn merged_members_replacer(members: impl Display) -> String {
-    format!("(MergedMembersReplacer {})", members)
-}
-
 fn list_concat_pushdown_replacer(members: impl Display) -> String {
     format!("(ListConcatPushdownReplacer {})", members)
 }
@@ -2184,19 +2178,22 @@ fn cube_scan(
     can_pushdown_join: impl Display,
     wrapped: impl Display,
     ungrouped: impl Display,
+    join_hints: impl Display,
 ) -> String {
     format!(
-        "(CubeScan {} {} {} {} {} {} {} {} {} {})",
-        alias_to_cube,
-        members,
-        filters,
-        orders,
-        limit,
-        offset,
-        split,
-        can_pushdown_join,
-        wrapped,
-        ungrouped
+        r#"(CubeScan
+            {alias_to_cube}
+            {members}
+            {filters}
+            {orders}
+            {limit}
+            {offset}
+            {split}
+            {can_pushdown_join}
+            {wrapped}
+            {ungrouped}
+            {join_hints}
+        )"#
     )
 }
 

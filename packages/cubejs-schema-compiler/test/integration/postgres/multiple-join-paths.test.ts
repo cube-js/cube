@@ -641,4 +641,32 @@ describe('Multiple join paths', () => {
       });
     }
   });
+
+  describe('Query level join hints', () => {
+    it('should respect query level join hints', async () => {
+      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        dimensions: [
+          'A.a_id',
+          'X.x_name_ref',
+        ],
+        joinHints: [
+          ['A', 'D'],
+          ['D', 'E'],
+          ['E', 'X'],
+        ],
+      });
+
+      const [sql, _params] = query.buildSqlAndParams();
+
+      expect(sql).toMatch(/ON 'A' = 'D'/);
+      expect(sql).toMatch(/ON 'D' = 'E'/);
+      expect(sql).toMatch(/ON 'E' = 'X'/);
+      expect(sql).not.toMatch(/ON 'A' = 'B'/);
+      expect(sql).not.toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'C' = 'X'/);
+      expect(sql).not.toMatch(/ON 'A' = 'F'/);
+      expect(sql).not.toMatch(/ON 'F' = 'X'/);
+    });
+  });
 });
