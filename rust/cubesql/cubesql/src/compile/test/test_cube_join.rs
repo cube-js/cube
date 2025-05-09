@@ -246,10 +246,7 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -301,10 +298,7 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                 granularity: Some("month".to_owned()),
                 date_range: None
             }]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -350,10 +344,7 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -405,10 +396,7 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                 granularity: Some("month".to_owned()),
                 date_range: None
             }]),
-            order: Some(vec![vec![
-                "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                "asc".to_string(),
-            ]]),
+            order: Some(vec![]),
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),

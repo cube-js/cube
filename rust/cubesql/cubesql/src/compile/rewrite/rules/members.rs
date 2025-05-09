@@ -2567,9 +2567,6 @@ impl MemberRules {
         left_alias_to_cube_var: &'static str,
         right_alias_to_cube_var: &'static str,
         joined_alias_to_cube_var: &'static str,
-        left_order_var: &'static str,
-        right_order_var: &'static str,
-        new_order_var: &'static str,
         left_ungrouped_var: &'static str,
         right_ungrouped_var: &'static str,
         new_ungrouped_var: &'static str,
@@ -2577,9 +2574,6 @@ impl MemberRules {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
         let joined_alias_to_cube_var = var!(joined_alias_to_cube_var);
-        let left_order_var = var!(left_order_var);
-        let right_order_var = var!(right_order_var);
-        let new_order_var = var!(new_order_var);
         let left_ungrouped_var = var!(left_ungrouped_var);
         let right_ungrouped_var = var!(right_ungrouped_var);
         let new_ungrouped_var = var!(new_ungrouped_var);
@@ -2601,16 +2595,6 @@ impl MemberRules {
                 for right_alias_to_cube in
                     var_iter!(egraph[subst[right_alias_to_cube_var]], CubeScanAliasToCube).cloned()
                 {
-                    let is_left_order_empty =
-                        Some(true) == egraph[subst[left_order_var]].data.is_empty_list;
-
-                    let is_right_order_empty =
-                        Some(true) == egraph[subst[right_order_var]].data.is_empty_list;
-
-                    if !is_left_order_empty && !is_right_order_empty {
-                        continue;
-                    }
-
                     subst.insert(
                         joined_alias_to_cube_var,
                         egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
@@ -2622,14 +2606,6 @@ impl MemberRules {
                             ),
                         )),
                     );
-
-                    let orders = if is_left_order_empty {
-                        subst[right_order_var]
-                    } else {
-                        subst[left_order_var]
-                    };
-
-                    subst.insert(new_order_var, orders);
 
                     let joined_ungrouped = egraph.add(LogicalPlanLanguage::CubeScanUngrouped(
                         CubeScanUngrouped(left_ungrouped && right_ungrouped),
@@ -2708,7 +2684,7 @@ impl MemberRules {
                 "?joined_alias_to_cube",
                 cube_scan_members(left_members, right_members),
                 cube_scan_filters("?left_filters", "?right_filters"),
-                "?new_order",
+                cube_scan_order_empty_tail(),
                 "CubeScanLimit:None",
                 "CubeScanOffset:None",
                 "CubeScanSplit:false",
@@ -2720,9 +2696,6 @@ impl MemberRules {
                 "?left_alias_to_cube",
                 "?right_alias_to_cube",
                 "?joined_alias_to_cube",
-                "?left_order",
-                "?right_order",
-                "?new_order",
                 "?left_ungrouped",
                 "?right_ungrouped",
                 "?new_ungrouped",
