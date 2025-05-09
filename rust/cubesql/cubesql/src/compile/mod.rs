@@ -4665,6 +4665,13 @@ ORDER BY "ca_4" ASC
                 segments: Some(vec![]),
                 dimensions: Some(vec!["Logs.read".to_string()]),
                 order: Some(vec![]),
+                join_hints: Some(vec![
+                    vec!["KibanaSampleDataEcommerce".to_string(), "Logs".to_string(),],
+                    vec![
+                        "KibanaSampleDataEcommerce".to_string(),
+                        "NumberCube".to_string(),
+                    ],
+                ]),
                 ..Default::default()
             }
         );
@@ -4726,6 +4733,10 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
+                join_hints: Some(vec![vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "Logs".to_string(),
+                ],]),
                 ..Default::default()
             }
         );
@@ -8218,6 +8229,10 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
+                join_hints: Some(vec![vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "Logs".to_string(),
+                ],]),
                 ..Default::default()
             }
         )
@@ -9794,6 +9809,10 @@ ORDER BY "source"."str0" ASC
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
+                join_hints: Some(vec![vec![
+                    "Logs".to_string(),
+                    "KibanaSampleDataEcommerce".to_string(),
+                ],]),
                 ..Default::default()
             },
         );
@@ -11845,6 +11864,12 @@ ORDER BY "source"."str0" ASC
                     }).to_string(),
                 ]),
                 order: Some(vec![]),
+                join_hints: Some(vec![
+                    vec![
+                        "KibanaSampleDataEcommerce".to_string(),
+                        "Logs".to_string(),
+                    ],
+                ]),
                 ..Default::default()
             }
         );
@@ -12271,6 +12296,10 @@ ORDER BY "source"."str0" ASC
                 ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
+                join_hints: Some(vec![vec![
+                    "KibanaSampleDataEcommerce".to_string(),
+                    "Logs".to_string(),
+                ],]),
                 ..Default::default()
             }
         )

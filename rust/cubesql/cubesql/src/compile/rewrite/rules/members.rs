@@ -21,11 +21,11 @@ use crate::{
             udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
             BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliasToCube,
-            CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset, CubeScanUngrouped,
-            DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType,
-            LikeExprNegated, LikeType, LimitFetch, LimitSkip, ListType, LiteralExprValue,
-            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-            MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
+            CubeScanCanPushdownJoin, CubeScanJoinHints, CubeScanLimit, CubeScanOffset,
+            CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
+            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, ListType,
+            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
+            MeasureName, MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
             MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
             TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
             TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
@@ -49,6 +49,7 @@ use itertools::{EitherOrBoth, Itertools};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
+    iter,
     ops::{Index, IndexMut},
     sync::{Arc, LazyLock},
 };
@@ -83,6 +84,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanCanPushdownJoin:true",
                     "CubeScanWrapped:false",
                     format!("CubeScanUngrouped:{}", self.enable_ungrouped),
+                    "?cube_scan_join_hints",
                 ),
                 self.transform_table_scan(
                     "?source_table_name",
@@ -92,6 +94,7 @@ impl RewriteRules for MemberRules {
                     "?fetch",
                     "?alias_to_cube",
                     "?cube_scan_members",
+                    "?cube_scan_join_hints",
                 ),
             ),
             self.measure_rewrite(
@@ -152,6 +155,7 @@ impl RewriteRules for MemberRules {
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
                         "?ungrouped",
+                        "?join_hints",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -179,6 +183,7 @@ impl RewriteRules for MemberRules {
                     "?new_pushdown_join",
                     "CubeScanWrapped:false",
                     "CubeScanUngrouped:false",
+                    "?join_hints",
                 ),
                 self.push_down_non_empty_aggregate(
                     "?alias_to_cube",
@@ -207,6 +212,7 @@ impl RewriteRules for MemberRules {
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
                         "?ungrouped",
+                        "?join_hints",
                     ),
                     "?alias",
                     "?projection_split",
@@ -226,6 +232,7 @@ impl RewriteRules for MemberRules {
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
                     "?ungrouped",
+                    "?join_hints",
                 ),
                 self.push_down_projection(
                     "?expr",
@@ -252,6 +259,7 @@ impl RewriteRules for MemberRules {
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
                         "?ungrouped",
+                        "?join_hints",
                     ),
                 ),
                 cube_scan(
@@ -265,6 +273,7 @@ impl RewriteRules for MemberRules {
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
                     "?ungrouped",
+                    "?join_hints",
                 ),
                 self.push_down_limit(
                     "?skip",
@@ -288,6 +297,7 @@ impl RewriteRules for MemberRules {
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
                     "?left_ungrouped",
+                    "?join_hints",
                 )),
                 cube_scan(
                     "?alias_to_cube",
@@ -300,6 +310,7 @@ impl RewriteRules for MemberRules {
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
                     "CubeScanUngrouped:false",
+                    "?join_hints",
                 ),
                 self.select_distinct_dimensions(
                     "?alias_to_cube",
@@ -360,6 +371,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanCanPushdownJoin:true",
                         "CubeScanWrapped:false",
                         "CubeScanUngrouped:true",
+                        "?left_join_hints",
                     ),
                     cube_scan(
                         "?right_alias_to_cube",
@@ -372,6 +384,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanCanPushdownJoin:true",
                         "CubeScanWrapped:false",
                         "CubeScanUngrouped:true",
+                        "?right_join_hints",
                     ),
                     "?left_on",
                     "?right_on",
@@ -391,6 +404,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanCanPushdownJoin:true",
                     "CubeScanWrapped:false",
                     "CubeScanUngrouped:true",
+                    "?out_join_hints",
                 ),
                 self.push_down_cube_join(
                     "?left_alias_to_cube",
@@ -400,6 +414,9 @@ impl RewriteRules for MemberRules {
                     "?right_members",
                     "?left_on",
                     "?right_on",
+                    "?left_join_hints",
+                    "?right_join_hints",
+                    "?out_join_hints",
                 ),
             ),
         ];
@@ -1159,6 +1176,7 @@ impl MemberRules {
         table_scan_fetch_var: &'static str,
         alias_to_cube_var: &'static str,
         cube_scan_members_var: &'static str,
+        cube_scan_join_hints_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let source_table_name_var = var!(source_table_name_var);
         let table_name_var = var!(table_name_var);
@@ -1167,6 +1185,7 @@ impl MemberRules {
         let table_scan_fetch_var = var!(table_scan_fetch_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let cube_scan_members_var = var!(cube_scan_members_var);
+        let cube_scan_join_hints_var = var!(cube_scan_join_hints_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for table_projection in var_iter!(
@@ -1233,6 +1252,13 @@ impl MemberRules {
                                 all_members_cube,
                                 all_members_alias,
                             ])),
+                        );
+
+                        subst.insert(
+                            cube_scan_join_hints_var,
+                            egraph.add(LogicalPlanLanguage::CubeScanJoinHints(CubeScanJoinHints(
+                                vec![],
+                            ))),
                         );
 
                         return true;
@@ -2575,6 +2601,9 @@ impl MemberRules {
         left_ungrouped_var: &'static str,
         right_ungrouped_var: &'static str,
         new_ungrouped_var: &'static str,
+        left_join_hints_var: &'static str,
+        right_join_hints_var: &'static str,
+        out_join_hints_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
@@ -2582,6 +2611,9 @@ impl MemberRules {
         let left_ungrouped_var = var!(left_ungrouped_var);
         let right_ungrouped_var = var!(right_ungrouped_var);
         let new_ungrouped_var = var!(new_ungrouped_var);
+        let left_join_hints_var = var!(left_join_hints_var);
+        let right_join_hints_var = var!(right_join_hints_var);
+        let out_join_hints_var = var!(out_join_hints_var);
         move |egraph, subst| {
             let Some(left_ungrouped) =
                 singular_eclass!(egraph[subst[left_ungrouped_var]], CubeScanUngrouped).copied()
@@ -2600,24 +2632,69 @@ impl MemberRules {
                 for right_alias_to_cube in
                     var_iter!(egraph[subst[right_alias_to_cube_var]], CubeScanAliasToCube).cloned()
                 {
-                    subst.insert(
-                        joined_alias_to_cube_var,
-                        egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
-                            CubeScanAliasToCube(
-                                left_alias_to_cube
-                                    .into_iter()
-                                    .chain(right_alias_to_cube.into_iter())
+                    for left_join_hints in
+                        var_iter!(egraph[subst[left_join_hints_var]], CubeScanJoinHints)
+                    {
+                        for right_join_hints in
+                            var_iter!(egraph[subst[right_join_hints_var]], CubeScanJoinHints)
+                        {
+                            // This is CrossJoin(CubeScan,CubeScan), so there's no way to determine proper join hint
+                            // It means that when there are several cubes on each side, we have to choose one
+                            // When there are several cubes on the left, we should just choose last
+                            // For a chained join query (cube1 CROSS JOIN cube2 CROSS JOIN ...) right CubeScan would always have single cube
+                            // So this would choose last cube from last join hint on the left, and first cube on the right
+
+                            let Some(left_cube) = left_join_hints
+                                .iter()
+                                .filter(|hint| !hint.is_empty())
+                                .last()
+                                .and_then(|hint| hint.last())
+                                .or_else(|| left_alias_to_cube.first().map(|(_, cube)| cube))
+                                .cloned()
+                            else {
+                                continue;
+                            };
+                            let Some(right_cube) =
+                                right_alias_to_cube.first().map(|(_, cube)| cube).cloned()
+                            else {
+                                continue;
+                            };
+
+                            let out_join_hints = CubeScanJoinHints(
+                                left_join_hints
+                                    .iter()
+                                    .chain(right_join_hints.iter())
+                                    .cloned()
+                                    .chain(iter::once(vec![left_cube, right_cube]))
                                     .collect(),
-                            ),
-                        )),
-                    );
+                            );
 
-                    let joined_ungrouped = egraph.add(LogicalPlanLanguage::CubeScanUngrouped(
-                        CubeScanUngrouped(left_ungrouped && right_ungrouped),
-                    ));
-                    subst.insert(new_ungrouped_var, joined_ungrouped);
+                            subst.insert(
+                                joined_alias_to_cube_var,
+                                egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
+                                    CubeScanAliasToCube(
+                                        left_alias_to_cube
+                                            .into_iter()
+                                            .chain(right_alias_to_cube.into_iter())
+                                            .collect(),
+                                    ),
+                                )),
+                            );
 
-                    return true;
+                            let joined_ungrouped =
+                                egraph.add(LogicalPlanLanguage::CubeScanUngrouped(
+                                    CubeScanUngrouped(left_ungrouped && right_ungrouped),
+                                ));
+                            subst.insert(new_ungrouped_var, joined_ungrouped);
+
+                            subst.insert(
+                                out_join_hints_var,
+                                egraph.add(LogicalPlanLanguage::CubeScanJoinHints(out_join_hints)),
+                            );
+
+                            return true;
+                        }
+                    }
                 }
             }
 
@@ -2634,6 +2711,9 @@ impl MemberRules {
         right_members_var: &'static str,
         left_on_var: &'static str,
         right_on_var: &'static str,
+        left_join_hints_var: &'static str,
+        right_join_hints_var: &'static str,
+        out_join_hints_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
@@ -2642,17 +2722,20 @@ impl MemberRules {
         let right_members_var = var!(right_members_var);
         let left_on_var = var!(left_on_var);
         let right_on_var = var!(right_on_var);
+        let left_join_hints_var = var!(left_join_hints_var);
+        let right_join_hints_var = var!(right_join_hints_var);
+        let out_join_hints_var = var!(out_join_hints_var);
         move |egraph, subst| {
-            if !is_proper_cube_join_condition(
+            let Some((left_cube, right_cube)) = is_proper_cube_join_condition(
                 egraph,
                 subst,
                 left_members_var,
                 left_on_var,
                 right_members_var,
                 right_on_var,
-            ) {
+            ) else {
                 return false;
-            }
+            };
 
             for left_alias_to_cube in
                 var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube)
@@ -2660,20 +2743,44 @@ impl MemberRules {
                 for right_alias_to_cube in
                     var_iter!(egraph[subst[right_alias_to_cube_var]], CubeScanAliasToCube)
                 {
-                    subst.insert(
-                        out_alias_to_cube_var,
-                        egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
-                            CubeScanAliasToCube(
+                    for left_join_hints in
+                        var_iter!(egraph[subst[left_join_hints_var]], CubeScanJoinHints)
+                    {
+                        for right_join_hints in
+                            var_iter!(egraph[subst[right_join_hints_var]], CubeScanJoinHints)
+                        {
+                            let out_alias_to_cube = CubeScanAliasToCube(
                                 left_alias_to_cube
                                     .iter()
                                     .chain(right_alias_to_cube.iter())
                                     .cloned()
                                     .collect(),
-                            ),
-                        )),
-                    );
+                            );
 
-                    return true;
+                            let out_join_hints = CubeScanJoinHints(
+                                left_join_hints
+                                    .iter()
+                                    .chain(right_join_hints.iter())
+                                    .cloned()
+                                    .chain(iter::once(vec![left_cube, right_cube]))
+                                    .collect(),
+                            );
+
+                            subst.insert(
+                                out_alias_to_cube_var,
+                                egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
+                                    out_alias_to_cube,
+                                )),
+                            );
+
+                            subst.insert(
+                                out_join_hints_var,
+                                egraph.add(LogicalPlanLanguage::CubeScanJoinHints(out_join_hints)),
+                            );
+
+                            return true;
+                        }
+                    }
                 }
             }
 
@@ -2704,6 +2811,7 @@ impl MemberRules {
                     "CubeScanCanPushdownJoin:true",
                     "CubeScanWrapped:false",
                     "?left_ungrouped",
+                    "?left_join_hints",
                 ),
                 cube_scan(
                     "?right_alias_to_cube",
@@ -2716,6 +2824,7 @@ impl MemberRules {
                     "CubeScanCanPushdownJoin:true",
                     "CubeScanWrapped:false",
                     "?right_ungrouped",
+                    "?right_join_hints",
                 ),
             ),
             cube_scan(
@@ -2729,6 +2838,7 @@ impl MemberRules {
                 "CubeScanCanPushdownJoin:true",
                 "CubeScanWrapped:false",
                 "?new_ungrouped",
+                "?out_join_hints",
             ),
             self.push_down_cross_join_to_cube_scan(
                 "?left_alias_to_cube",
@@ -2737,6 +2847,9 @@ impl MemberRules {
                 "?left_ungrouped",
                 "?right_ungrouped",
                 "?new_ungrouped",
+                "?left_join_hints",
+                "?right_join_hints",
+                "?out_join_hints",
             ),
         )
     }
@@ -2830,28 +2943,32 @@ pub fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option
     }
 }
 
+// Return None if `join_on` is not a __cubeJoinField
+// Return Some(cube_name) if it is
 fn is_join_on_cube_join_field(
     egraph: &mut CubeEGraph,
     subst: &Subst,
     cube_members_var: Var,
     join_on: &[Column],
-) -> bool {
+) -> Option<String> {
     if join_on.len() != 1 {
-        return false;
+        return None;
     }
     let join_on = &join_on[0];
-    let Some(((_, join_member, _), _)) = egraph[subst[cube_members_var]]
+    let ((_, join_member, _), _) = egraph[subst[cube_members_var]]
         .data
-        .find_member_by_column(join_on)
-    else {
-        return false;
+        .find_member_by_column(join_on)?;
+    let Member::VirtualField { name, cube, .. } = join_member else {
+        return None;
     };
-    let Member::VirtualField { name, .. } = join_member else {
-        return false;
-    };
-    name == "__cubeJoinField"
+    if name != "__cubeJoinField" {
+        return None;
+    }
+    Some(cube.clone())
 }
 
+// Return None if condition is not a left.__cubeJoinField = right.__cubeJoinField
+// Return Some((left_cube_name, right_cube_name)) if it is
 fn is_proper_cube_join_condition(
     egraph: &mut CubeEGraph,
     subst: &Subst,
@@ -2859,22 +2976,16 @@ fn is_proper_cube_join_condition(
     left_on_var: Var,
     right_cube_members_var: Var,
     right_on_var: Var,
-) -> bool {
-    if egraph[subst[left_cube_members_var]]
+) -> Option<(String, String)> {
+    egraph[subst[left_cube_members_var]]
         .data
         .member_name_to_expr
-        .is_none()
-    {
-        return false;
-    }
+        .as_ref()?;
 
-    if egraph[subst[right_cube_members_var]]
+    egraph[subst[right_cube_members_var]]
         .data
         .member_name_to_expr
-        .is_none()
-    {
-        return false;
-    }
+        .as_ref()?;
 
     let left_join_ons = var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
         .cloned()
@@ -2886,19 +2997,21 @@ fn is_proper_cube_join_condition(
     // For now this allows only exact left.__cubeJoinField = right.__cubeJoinField
     // TODO implement more complex conditions
 
-    if left_join_ons.iter().all(|left_join_on| {
-        !is_join_on_cube_join_field(egraph, subst, left_cube_members_var, left_join_on)
-    }) {
-        return false;
-    }
+    let left_cube = left_join_ons
+        .iter()
+        .filter_map(|left_join_on| {
+            is_join_on_cube_join_field(egraph, subst, left_cube_members_var, left_join_on)
+        })
+        .next()?;
 
-    if right_join_ons.iter().all(|right_join_on| {
-        !is_join_on_cube_join_field(egraph, subst, right_cube_members_var, right_join_on)
-    }) {
-        return false;
-    }
+    let right_cube = right_join_ons
+        .iter()
+        .filter_map(|right_join_on| {
+            is_join_on_cube_join_field(egraph, subst, right_cube_members_var, right_join_on)
+        })
+        .next()?;
 
-    true
+    Some((left_cube, right_cube))
 }
 
 #[cfg(test)]
