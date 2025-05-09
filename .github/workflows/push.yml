@@ -123,25 +123,17 @@ jobs:
       - name: Fix lcov paths
         run: |
           ./.github/actions/codecov-fix.sh
-      - name: Install Codecov CLI
-        run: |
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
-          mv codecov /usr/local/bin/
       - name: Combine all fixed LCOV files
         run: |
-          echo "" > ./combined.lcov
+          echo "" > ./combined-unit.lcov
           for f in ./packages/*/coverage/lcov.fixed.info; do
-            cat "$f" >> ./combined.lcov
+            cat "$f" >> ./combined-unit.lcov
           done
-      - name: Upload coverage to Codecov
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          codecov --token "$CODECOV_TOKEN" \
-            --file ./combined.lcov \
-            --flags cube-backend \
-            --name "cube backend coverage" \
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: ./combined-unit.lcov
 
   lint:
     runs-on: ubuntu-24.04
@@ -512,29 +504,17 @@ jobs:
       - name: Fix lcov paths
         run: |
           ./.github/actions/codecov-fix.sh
-      - name: Debug coverage files
-        run: |
-          ls -al ./packages/*/coverage/lcov.fixed.info
-          cat ./packages/*/coverage/lcov.fixed.info || true
-      - name: Install Codecov CLI
-        run: |
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
-          mv codecov /usr/local/bin/
       - name: Combine all fixed LCOV files
         run: |
-          echo "" > ./combined.lcov
+          echo "" > ./combined-integration.lcov
           for f in ./packages/*/coverage/lcov.fixed.info; do
-            cat "$f" >> ./combined.lcov
+            cat "$f" >> ./combined-integration.lcov
           done
-      - name: Upload coverage to Codecov
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          codecov --token "$CODECOV_TOKEN" \
-            --file ./combined.lcov \
-            --flags cube-backend \
-            --name "cube backend coverage" \
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: ./combined-integration.lcov
 
   integration-smoke:
     needs: [latest-tag-sha, build-cubestore, build-native-linux]
@@ -817,3 +797,26 @@ jobs:
         with:
           name: cypress-screenshots-docker-dev-${{ matrix.name }}
           path: packages/cubejs-testing/cypress/screenshots
+
+  upload-coverage:
+    name: Upload merged coverage to Codecov
+    needs: [unit, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Codecov CLI
+        run: |
+          curl -Os https://uploader.codecov.io/latest/linux/codecov
+          chmod +x codecov
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-coverage
+      - name: Merge all coverage files
+        run: |
+          find all-coverage -name '*.lcov' -exec cat {} + > merged-coverage.info
+      - name: Upload merged coverage to Codecov
+        run: |
+          ./codecov --token "${{ secrets.CODECOV_TOKEN }}" \
+              --file ./merged-coverage.info \
+              --flags cube-backend \
+              --name "cube backend coverage"
