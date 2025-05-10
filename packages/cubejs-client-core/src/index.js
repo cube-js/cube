@@ -52,7 +52,9 @@ class CubeApi {
       apiUrl: this.apiUrl,
       method: this.method,
       headers: this.headers,
-      credentials: this.credentials
+      credentials: this.credentials,
+      fetchTimeout: options.fetchTimeout,
+      signal: options.signal
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
@@ -332,6 +334,7 @@ class CubeApi {
       () => this.request('load', {
         query,
         queryType: 'multi',
+        signal: options.signal
       }),
       (response) => this.loadResponseInternal(response, options),
       options,
@@ -356,6 +359,7 @@ class CubeApi {
       () => this.request('subscribe', {
         query,
         queryType: 'multi',
+        signal: options.signal
       }),
       (response) => this.loadResponseInternal(response, options),
       { ...options, subscribe: true },
@@ -365,7 +369,10 @@ class CubeApi {
 
   sql(query, options, callback) {
     return this.loadMethod(
-      () => this.request('sql', { query }),
+      () => this.request('sql', {
+        query,
+        signal: options?.signal
+      }),
       (response) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
       options,
       callback
@@ -374,7 +381,9 @@ class CubeApi {
 
   meta(options, callback) {
     return this.loadMethod(
-      () => this.request('meta'),
+      () => this.request('meta', {
+        signal: options?.signal
+      }),
       (body) => new Meta(body),
       options,
       callback
@@ -383,7 +392,10 @@ class CubeApi {
 
   dryRun(query, options, callback) {
     return this.loadMethod(
-      () => this.request('dry-run', { query }),
+      () => this.request('dry-run', {
+        query,
+        signal: options?.signal
+      }),
       (response) => response,
       options,
       callback

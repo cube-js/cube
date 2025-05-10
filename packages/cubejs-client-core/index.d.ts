@@ -27,6 +27,10 @@ declare module '@cubejs-client/core' {
      * Fetch timeout in milliseconds. Would be passed as AbortSignal.timeout()
      */
     fetchTimeout?: number;
+    /**
+     * AbortSignal to cancel requests
+     */
+    signal?: AbortSignal;
   };
 
   export interface ITransportResponse<R> {
@@ -64,6 +68,10 @@ declare module '@cubejs-client/core' {
      * @hidden
      */
     protected credentials: TransportOptions['credentials'];
+    /**
+     * @hidden
+     */
+    protected signal?: TransportOptions['signal'];
 
     constructor(options: TransportOptions);
 
@@ -89,6 +97,10 @@ declare module '@cubejs-client/core' {
      * How many network errors would be retried before returning to users. Default to 0.
      */
     networkErrorRetries?: number;
+    /**
+     * AbortSignal to cancel requests
+     */
+    signal?: AbortSignal;
   };
 
   export type LoadMethodOptions = {
@@ -116,6 +128,10 @@ declare module '@cubejs-client/core' {
      * Function that receives `ProgressResult` on each `Continue wait` message.
      */
     progressCallback?(result: ProgressResult): void;
+    /**
+     * AbortSignal to cancel the request
+     */
+    signal?: AbortSignal;
   };
 
   export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
