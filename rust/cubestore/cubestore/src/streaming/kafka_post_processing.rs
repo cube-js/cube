@@ -1,6 +1,6 @@
 use crate::metastore::Column;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
-use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
+use crate::queryplanner::pretty_printers::{pp_phys_plan_ext, pp_plan_ext, PPOptions};
 use crate::queryplanner::{sql_to_rel_options, QueryPlannerImpl};
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
@@ -75,7 +75,7 @@ impl KafkaPostProcessPlan {
         &self.source_unique_columns
     }
 
-    pub async fn apply(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
+    pub async fn apply(&self, table_id: u64, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
         let batch = RecordBatch::try_new(self.source_schema.clone(), data)?;
         let input = Arc::new(MemoryExec::try_new(
             &[vec![batch]],
@@ -98,10 +98,19 @@ impl KafkaPostProcessPlan {
         )
         .task_ctx();
 
+        log::debug!("post-processing {}: applying plan, source schema = {}, projection schema = {}, plan = {:?}", table_id, self.source_schema, projection.schema(), pp_phys_plan_ext(projection.as_ref(), &PPOptions { show_filters: true, show_schema: true, ..PPOptions::none() }));
+
         let mut out_batches = collect(projection, task_context).await?;
+        log::debug!("post-processing {}: out_batches with length {}", table_id, out_batches.len());
         let res = if out_batches.len() == 1 {
+            log::debug!("post-processing {}: out_batches.len() = 1, batch schema = {}", table_id, out_batches[0].schema_ref().as_ref());
             out_batches.pop().unwrap()
         } else {
+            if out_batches.is_empty() {
+                log::debug!("post-processing {}: out_batches is empty", table_id);
+            } else {
+                log::debug!("post-processing {}: out_batches.len() = {}, first batch schema = {}", table_id, out_batches.len(), out_batches[0].schema_ref().as_ref());
+            }
             concat_batches(&self.source_schema, &out_batches)?
         };
 

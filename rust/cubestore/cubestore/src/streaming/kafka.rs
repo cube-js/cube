@@ -382,8 +382,9 @@ impl StreamingSource for KafkaStreamingSource {
     }
 
     async fn apply_post_processing(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
+        log::debug!("apply_post_processing: self.table_id = {}, data.len() = {}, plan.is_some() = {}", self.table_id, data.len(), self.post_processing_plan.is_some());
         if let Some(post_processing_plan) = &self.post_processing_plan {
-            post_processing_plan.apply(data).await
+            post_processing_plan.apply(self.table_id, data).await
         } else {
             Ok(data)
         }
