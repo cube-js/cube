@@ -13,7 +13,7 @@ use datafusion::common;
 use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::config::ConfigOptions;
 use datafusion::logical_expr::expr::{Alias, ScalarFunction};
-use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection, SubqueryAlias};
+use datafusion::logical_expr::{projection_schema, Expr, Filter, LogicalPlan, Projection, SubqueryAlias};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::sql::parser::Statement as DFStatement;
@@ -100,6 +100,7 @@ impl KafkaPostProcessPlan {
 
         log::debug!("post-processing {}: applying plan, source schema = {}, projection schema = {}, plan = {:?}", table_id, self.source_schema, projection.schema(), pp_phys_plan_ext(projection.as_ref(), &PPOptions { show_filters: true, show_schema: true, ..PPOptions::none() }));
 
+        let projection_schema: Arc<Schema> = projection.schema();
         let mut out_batches = collect(projection, task_context).await?;
         log::debug!("post-processing {}: out_batches with length {}", table_id, out_batches.len());
         let res = if out_batches.len() == 1 {
@@ -111,7 +112,8 @@ impl KafkaPostProcessPlan {
             } else {
                 log::debug!("post-processing {}: out_batches.len() = {}, first batch schema = {}", table_id, out_batches.len(), out_batches[0].schema_ref().as_ref());
             }
-            concat_batches(&self.source_schema, &out_batches)?
+            // This was passing source_schema in old cube.  Is that a bug in old cube?
+            concat_batches(&projection_schema, &out_batches)?
         };
 
         Ok(res.columns().to_vec())
