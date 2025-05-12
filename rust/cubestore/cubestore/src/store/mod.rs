@@ -380,7 +380,7 @@ impl ChunkDataStore for ChunkStore {
             .meta_store
             .get_table_indexes_out_of_queue(table_id)
             .await?;
-        self.build_index_chunks(&indexes, rows.into(), columns, in_memory)
+        self.build_index_chunks(table_id, &indexes, rows.into(), columns, in_memory)
             .await
     }
 
@@ -1440,6 +1440,7 @@ impl ChunkStore {
     /// Returns a list of newly added chunks.
     async fn build_index_chunks(
         &self,
+        table_id: u64,
         indexes: &[IdRow<Index>],
         rows: VecArrayRef,
         columns: &[Column],
@@ -1453,7 +1454,7 @@ impl ChunkStore {
             let index_columns_copy = index_columns.clone();
             let columns = columns.to_vec();
             let (rows_again, remapped) = cube_ext::spawn_blocking(move || {
-                let remapped = remap_columns(&rows, &columns, &index_columns_copy);
+                let remapped = remap_columns(table_id, &rows, &columns, &index_columns_copy);
                 (rows, remapped)
             })
             .await?;
@@ -1489,11 +1490,12 @@ fn min_max_values_from_data(data: &[ArrayRef], key_size: usize) -> (Option<Row>,
 }
 
 fn remap_columns(
+    table_id: u64,
     old: &[ArrayRef],
     old_columns: &[Column],
     new_columns: &[Column],
 ) -> Result<Vec<ArrayRef>, CubeError> {
-    assert_eq!(old_columns.len(), old.len(), "old_columns: {}", old_columns.iter().map(|c| c.get_name()).join(", "));
+    assert_eq!(old_columns.len(), old.len(), "table_id: {}, old_columns: {}", table_id, old_columns.iter().map(|c| c.get_name()).join(", "));
     let mut new = Vec::with_capacity(new_columns.len());
     for new_column in new_columns.iter() {
         let old_column = old_columns
