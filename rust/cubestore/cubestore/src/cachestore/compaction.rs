@@ -103,9 +103,9 @@ impl MetaStoreCacheCompactionFilter {
             return CompactionDecision::Keep;
         }
 
-        match chrono::NaiveDateTime::from_timestamp_opt(expire.as_i64(), 0) {
+        match DateTime::from_timestamp(expire.as_i64(), 0) {
             Some(expire) => {
-                if DateTime::<Utc>::from_utc(expire, Utc) <= self.current {
+                if expire <= self.current {
                     self.removed += 1;
 
                     CompactionDecision::Remove
