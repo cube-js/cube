@@ -13,7 +13,9 @@ use datafusion::common;
 use datafusion::common::{DFSchema, DFSchemaRef};
 use datafusion::config::ConfigOptions;
 use datafusion::logical_expr::expr::{Alias, ScalarFunction};
-use datafusion::logical_expr::{Expr, Filter, LogicalPlan, Projection, SubqueryAlias};
+use datafusion::logical_expr::{
+    projection_schema, Expr, Filter, LogicalPlan, Projection, SubqueryAlias,
+};
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::sql::parser::Statement as DFStatement;
@@ -98,11 +100,12 @@ impl KafkaPostProcessPlan {
         )
         .task_ctx();
 
+        let projection_schema: Arc<Schema> = projection.schema();
         let mut out_batches = collect(projection, task_context).await?;
         let res = if out_batches.len() == 1 {
             out_batches.pop().unwrap()
         } else {
-            concat_batches(&self.source_schema, &out_batches)?
+            concat_batches(&projection_schema, &out_batches)?
         };
 
         Ok(res.columns().to_vec())
