@@ -322,7 +322,7 @@ impl StreamingService for StreamingServiceImpl {
             let rows = new_rows;
             debug!("Received {} rows for {}", rows.len(), location);
             let table_cols = source.source_columns().as_slice();
-            log::debug!("stream_table: table_cols (source_columns): {:?}, table columns: {:?}", table_cols, table.get_row().get_columns());
+            log::debug!("stream_table: table_id: {}, table_cols (source_columns): {:?}, table columns: {:?}", table.get_id(), table_cols, table.get_row().get_columns());
             let mut builders = create_array_builders(table_cols);
 
             let mut start_seq: Option<i64> = None;
@@ -356,9 +356,9 @@ impl StreamingService for StreamingServiceImpl {
                 .create_replay_handle(table.get_id(), location_index, seq_pointer)
                 .await?;
             let data = finish(builders);
-            log::debug!("stream_table: after finish data.len(): {}, table columns: {:?}", data.len(), table.get_row().get_columns());
+            log::debug!("stream_table: after finish table_id: {}, data.len(): {}, table columns: {:?}", table.get_id(), data.len(), table.get_row().get_columns());
             let data = source.apply_post_processing(data).await?;
-            log::debug!("stream_table: after apply_post_processing data.len(): {}, table columns: {:?}", data.len(), table.get_row().get_columns());
+            log::debug!("stream_table: after apply_post_processing table_id: {}, data.len(): {}, table columns: {:?}", table.get_id(), data.len(), table.get_row().get_columns());
 
             let partition_started_at = SystemTime::now();
             let new_chunks = self

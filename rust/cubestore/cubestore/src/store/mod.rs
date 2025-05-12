@@ -1447,7 +1447,7 @@ impl ChunkStore {
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let mut rows = rows.0;
-        log::debug!("build_index_chunks rows.len(): {}, columns: {:?}", rows.len(), columns);
+        log::debug!("build_index_chunks table_id: {}, rows.len(): {}, columns: {:?}", table_id, rows.len(), columns);
         let mut futures = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();

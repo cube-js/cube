@@ -956,7 +956,7 @@ impl Ingestion {
         let table_id = self.table.get_id();
         // TODO In fact it should be only for inserts. Batch imports should still go straight to disk.
         let in_memory = self.table.get_row().in_memory_ingest();
-        log::debug!("queue_data_frame: pushing job with rows.len() {}, columns: {}", rows.len(), columns.iter().map(|c| c.get_name()).join(", "));
+        log::debug!("queue_data_frame: pushing job with table_id: {}, rows.len() {}, columns: {}", table_id, rows.len(), columns.iter().map(|c| c.get_name()).join(", "));
         self.partition_jobs.push(cube_ext::spawn(async move {
             let new_chunks = chunk_store
                 .partition_data(table_id, rows, &columns, in_memory)
