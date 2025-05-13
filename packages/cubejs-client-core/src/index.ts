@@ -658,7 +658,7 @@ class CubeApi {
 
 export default (apiToken: string | (() => Promise<string>), options: CubeApiOptions) => new CubeApi(apiToken, options);
 
-export { CubeApi };
+export { CubeApi, Meta, ProgressResult, HttpTransport, SqlQuery };
 export * from './Meta';
 export * from './SqlQuery';
 export * from './RequestError';
