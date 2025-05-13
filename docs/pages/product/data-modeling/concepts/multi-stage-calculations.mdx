@@ -5,7 +5,8 @@ or arbitrary SQL expressions.
 
 _Multi-stage calculations_ enable data modeling of more sophisticated _multi-stage measures_.
 They are calculated in two or more stages and often involve manipulations on already
-aggregated data.
+aggregated data. Each stage results in one or more [common table expressions][link-cte]
+(CTEs) in the generated SQL query.
 
 <WarningBox>
 
@@ -24,10 +25,78 @@ Please track [this issue](https://github.com/cube-js/cube/issues/8487).
 
 Common uses of multi-stage calculations:
 
+- [Rolling window](#rolling-window) calculations.
 - [Period-to-date](#period-to-date) calculations, e.g., year-to-date (YTD) analysis.
 - [Prior date](#prior-date) calculations, e.g., year-over-year sales growth.
 - [Fixed dimension](#fixed-dimension) calculations, e.g., comparing individual items to a broader dataset or calculating percent of total.
 - [Ranking](#ranking) calculations.
+
+## Rolling window
+
+Rolling window calculations are used to calculate metrics over a moving window of time.
+Use the [`rolling_window` parameter][ref-rolling-window] of a measure to define
+a rolling window.
+
+### Stages
+
+Here's how the rolling window calculation is performed:
+
+- **Date range.** First, the date range for the query is determined.
+If there's a time dimension with a date range filter in the query, it's used.
+Otherwise, the date range is determined by selecting the minimum and maximum
+values for the time dimension.
+
+<WarningBox>
+
+Tesseract enables rolling window calculations without the date range for the time dimension.
+If Tesseract is not used, the date range must be provided. Otherwise, the query would
+fail with the following error: `Time series queries without dateRange aren't supported`.
+
+</WarningBox>
+
+- **Time windows.** Then, the series of time windows is calculated. The size of the
+window is defined by the time dimension granularity and the `trailing` and
+`leading` parameters.
+- **Measure.** Finally, the measure is calculated for each window.
+
+### Example
+
+Data model:
+
+```yaml
+
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, '2025-01-01'::TIMESTAMP AS time UNION ALL
+      SELECT 2 AS id, '2025-01-11'::TIMESTAMP AS time UNION ALL
+      SELECT 3 AS id, '2025-01-21'::TIMESTAMP AS time UNION ALL
+      SELECT 4 AS id, '2025-01-31'::TIMESTAMP AS time UNION ALL
+      SELECT 5 AS id, '2025-02-01'::TIMESTAMP AS time UNION ALL
+      SELECT 6 AS id, '2025-02-11'::TIMESTAMP AS time UNION ALL
+      SELECT 7 AS id, '2025-02-21'::TIMESTAMP AS time UNION ALL
+      SELECT 8 AS id, '2025-03-01'::TIMESTAMP AS time UNION ALL
+      SELECT 9 AS id, '2025-03-11'::TIMESTAMP AS time UNION ALL
+      SELECT 10 AS id, '2025-03-21'::TIMESTAMP AS time UNION ALL
+      SELECT 11 AS id, '2025-03-31'::TIMESTAMP AS time UNION ALL
+      SELECT 12 AS id, '2025-04-01'::TIMESTAMP AS time
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+ 
+    measures:
+      - name: rolling_count_month
+        sql: id
+        type: count
+        rolling_window:
+          trailing: unbounded
+```
+
+Query and result:
+
+<Screenshot src="https://ucarecdn.com/40179d09-3e10-4ada-8456-1deca6a5035d/" />
 
 ## Period-to-date
 
@@ -389,3 +458,5 @@ Query and result:
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-measures]: /product/data-modeling/concepts#measures
 [ref-dimensions]: /product/data-modeling/concepts#dimensions
+[ref-rolling-window]: /reference/data-model/measures#rolling_window
+[link-cte]: https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression
