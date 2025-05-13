@@ -1,10 +1,12 @@
+/* globals describe, test, expect */
+
 import 'jest';
 
-import ResultSet from '../ResultSet';
+import ResultSet from '../src/ResultSet';
 import { loadResponse, loadResponseWithoutDateRange } from './fixtures/datablending/load-responses.json';
 
 describe('data blending', () => {
-  const resultSet1 = new ResultSet(loadResponse);
+  const resultSet1 = new ResultSet(loadResponse as any);
 
   describe('with different dimensions', () => {
     test('normalized pivotConfig', () => {
@@ -210,7 +212,7 @@ describe('data blending', () => {
         ],
         dimensions: [],
       },
-    });
+    } as any);
 
     expect(resultSet.chartPivot()).toEqual([
       {
@@ -247,7 +249,7 @@ describe('data blending', () => {
   });
 
   test('query without date range', () => {
-    const resultSet = new ResultSet(loadResponseWithoutDateRange);
+    const resultSet = new ResultSet(loadResponseWithoutDateRange as any);
 
     expect(resultSet.chartPivot()).toEqual([
       {
@@ -394,7 +396,7 @@ describe('data blending', () => {
         ],
         dimensions: [],
       },
-    });
+    } as any);
 
     expect(resultSet.chartPivot({ aliasSeries: ['one', 'two'] })).toEqual([
       {

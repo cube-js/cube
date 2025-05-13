@@ -1,5 +1,7 @@
+/* globals jest, describe, expect, it */
+
 import 'jest';
-import { defaultHeuristics } from '../utils';
+import { defaultHeuristics } from '../src/utils';
 
 jest.mock('moment-range', () => {
   const Moment = jest.requireActual('moment');
@@ -40,7 +42,7 @@ describe('default heuristics', () => {
             return 'Orders.ts';
           },
         },
-      })
+      } as any)
     ).toStrictEqual({
       pivotConfig: null,
       query: {
@@ -73,7 +75,7 @@ describe('default heuristics', () => {
 
     const oldQuery = {};
 
-    expect(defaultHeuristics(newState, oldQuery, { meta })).toMatchObject({
+    expect(defaultHeuristics(newState, oldQuery, { meta } as any)).toMatchObject({
       query: {
         timeDimensions: [
           {
@@ -104,7 +106,7 @@ describe('default heuristics', () => {
       },
     };
 
-    expect(defaultHeuristics(newState, {}, { meta })).toMatchObject({
+    expect(defaultHeuristics(newState, {}, { meta } as any)).toMatchObject({
       query: {
         timeDimensions: [
           {

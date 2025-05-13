@@ -1,5 +1,7 @@
+/* globals jest, describe, expect, it */
+
 import 'jest';
-import ResultSet from '../ResultSet';
+import ResultSet from '../src/ResultSet';
 
 jest.mock('moment-range', () => {
   const Moment = jest.requireActual('moment');
@@ -218,11 +220,11 @@ const loadResponse2 = {
 };
 
 describe('drill down query', () => {
-  const resultSet1 = new ResultSet(loadResponse());
+  const resultSet1 = new ResultSet(loadResponse() as any);
   const resultSet2 = new ResultSet(
     loadResponse({
       timezone: 'America/Los_Angeles',
-    })
+    }) as any
   );
   const resultSet3 = new ResultSet(
     loadResponse({
@@ -233,13 +235,13 @@ describe('drill down query', () => {
           values: ['Los Angeles'],
         },
       ],
-    })
+    }) as any
   );
   const resultSet4 = new ResultSet(
     loadResponse({
       dimensions: ['Statuses.potential'],
       timeDimensions: [],
-    })
+    }) as any
   );
   const resultSet5 = new ResultSet(
     loadResponse({
@@ -249,7 +251,7 @@ describe('drill down query', () => {
           granularity: 'week',
         }
       ]
-    })
+    }) as any
   );
 
   it('handles a query with a time dimension', () => {
@@ -333,7 +335,7 @@ describe('drill down query', () => {
   });
 
   it('handles null values', () => {
-    expect(resultSet4.drillDown({ xvalues: [null] })).toEqual({
+    expect(resultSet4.drillDown({ xValues: [] })).toEqual({
       measures: [],
       segments: [],
       dimensions: ['Orders.id', 'Orders.title'],
@@ -353,7 +355,7 @@ describe('drill down query', () => {
   });
 
   it('respects the parent time dimension date range', () => {
-    const resultSet = new ResultSet(loadResponse2);
+    const resultSet = new ResultSet(loadResponse2 as any);
 
     expect(
       resultSet.drillDown({ xValues: ['2023-05-08T00:00:00.000'] })

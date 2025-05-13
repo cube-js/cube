@@ -7,16 +7,17 @@
 /* globals describe,test,expect */
 
 import 'jest';
-import ResultSet from '../ResultSet';
+import ResultSet from '../src/ResultSet';
+import { TimeDimension } from '../src';
 
 describe('ResultSet', () => {
   describe('timeSeries', () => {
     test('it generates array of dates - granularity month', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2015-01-01', '2015-12-31'],
         granularity: 'month',
-        timeDimension: 'Events.time'
+        dimension: 'Events.time'
       };
       const output = [
         '2015-01-01T00:00:00.000',
@@ -36,11 +37,11 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - granularity quarter', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2015-01-01', '2015-12-31'],
         granularity: 'quarter',
-        timeDimension: 'Events.time'
+        dimension: 'Events.time'
       };
       const output = [
         '2015-01-01T00:00:00.000',
@@ -52,11 +53,11 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - granularity hour', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2015-01-01', '2015-01-01'],
         granularity: 'hour',
-        timeDimension: 'Events.time'
+        dimension: 'Events.time'
       };
       const output = [
         '2015-01-01T00:00:00.000',
@@ -88,11 +89,11 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - granularity hour - not full day', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2015-01-01T10:30:00.000', '2015-01-01T13:59:00.000'],
         granularity: 'hour',
-        timeDimension: 'Events.time'
+        dimension: 'Events.time'
       };
       const output = [
         '2015-01-01T10:00:00.000',
@@ -104,8 +105,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 1 year, origin - 2020-01-01', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2023-12-31'],
         granularity: 'one_year',
         dimension: 'Events.time'
@@ -131,8 +132,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 1 year, origin - 2025-03-01', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2022-12-31'],
         granularity: 'one_year',
         dimension: 'Events.time'
@@ -158,8 +159,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 1 year, offset - 2 months', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2022-12-31'],
         granularity: 'one_year',
         dimension: 'Events.time'
@@ -185,8 +186,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 2 months, origin - 2019-01-01', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2021-12-31'],
         granularity: 'two_months',
         dimension: 'Events.time'
@@ -215,8 +216,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 2 months, no offset', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2021-12-31'],
         granularity: 'two_months',
         dimension: 'Events.time'
@@ -244,8 +245,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 2 months, origin - 2019-03-15', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2021-12-31'],
         granularity: 'two_months',
         dimension: 'Events.time'
@@ -275,8 +276,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 1 months 2 weeks 3 days, origin - 2021-01-25', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2021-12-31'],
         granularity: 'one_mo_two_we_three_d',
         dimension: 'Events.time'
@@ -308,8 +309,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 3 weeks, origin - 2020-12-15', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2021-03-01'],
         granularity: 'three_weeks',
         dimension: 'Events.time'
@@ -336,8 +337,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 2 months 3 weeks 4 days 5 hours 6 minutes 7 seconds, origin - 2021-01-01', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-01-01', '2021-12-31'],
         granularity: 'two_mo_3w_4d_5h_6m_7s',
         dimension: 'Events.time'
@@ -365,8 +366,8 @@ describe('ResultSet', () => {
     });
 
     test('it generates array of dates - custom interval - 10 minutes 15 seconds, origin - 2021-02-01 09:59:45', () => {
-      const resultSet = new ResultSet({});
-      const timeDimension = {
+      const resultSet = new ResultSet({} as any);
+      const timeDimension: TimeDimension = {
         dateRange: ['2021-02-01 10:00:00', '2021-02-01 12:00:00'],
         granularity: 'ten_min_fifteen_sec',
         dimension: 'Events.time'
@@ -437,7 +438,7 @@ describe('ResultSet', () => {
           segments: {},
           timeDimensions: {}
         }
-      });
+      } as any);
 
       expect(resultSet.chartPivot()).toEqual([
         {
@@ -486,7 +487,7 @@ describe('ResultSet', () => {
           segments: {},
           timeDimensions: {}
         }
-      });
+      } as any);
 
       expect(resultSet.chartPivot()).toEqual([
         {
@@ -535,7 +536,7 @@ describe('ResultSet', () => {
           segments: {},
           timeDimensions: {}
         }
-      });
+      } as any);
 
       expect(resultSet.chartPivot()).toEqual([
         {
@@ -583,7 +584,7 @@ describe('ResultSet', () => {
           segments: {},
           timeDimensions: {}
         }
-      });
+      } as any);
 
       expect(resultSet.chartPivot()).toEqual([
         {
@@ -633,7 +634,7 @@ describe('ResultSet', () => {
             segments: {},
             timeDimensions: {}
           }
-        },
+        } as any,
         { parseDateMeasures: true }
       );
 
@@ -758,7 +759,7 @@ describe('ResultSet', () => {
           ],
           dimensions: [],
         },
-      });
+      } as any);
 
       expect(resultSet.seriesNames({ aliasSeries: ['one', 'two'] })).toEqual([
         {
@@ -882,7 +883,7 @@ describe('ResultSet', () => {
           ],
           dimensions: [],
         },
-      });
+      } as any);
 
       expect(resultSet.seriesNames()).toEqual([
         {
@@ -913,7 +914,7 @@ describe('ResultSet', () => {
             }
           ]
         }
-      });
+      } as any);
 
       expect(resultSet.normalizePivotConfig({ y: ['Foo.bar'] })).toEqual({
         x: ['Foo.createdAt.day'],
@@ -934,7 +935,7 @@ describe('ResultSet', () => {
             }
           ]
         }
-      });
+      } as any);
 
       expect(
         resultSet.normalizePivotConfig({ x: ['Foo.createdAt'], y: ['Foo.bar'] })
@@ -960,7 +961,7 @@ describe('ResultSet', () => {
           filters: [],
           timezone: 'UTC'
         }
-      });
+      } as any);
 
       expect(
         resultSet.normalizePivotConfig(resultSet.normalizePivotConfig({}))
@@ -986,7 +987,7 @@ describe('ResultSet', () => {
           filters: [],
           timezone: 'UTC'
         }
-      });
+      } as any);
 
       expect(
         resultSet.normalizePivotConfig(resultSet.normalizePivotConfig())
@@ -1013,7 +1014,7 @@ describe('ResultSet', () => {
           filters: [],
           timezone: 'UTC'
         }
-      });
+      } as any);
 
       expect(
         resultSet.normalizePivotConfig(resultSet.normalizePivotConfig({}))
@@ -1214,7 +1215,7 @@ describe('ResultSet', () => {
             }
           }
         }
-      });
+      } as any);
 
       expect(resultSet.tablePivot()).toEqual([
         {
@@ -1406,7 +1407,7 @@ describe('ResultSet', () => {
             }
           }
         }
-      });
+      } as any);
 
       expect(resultSet.tablePivot()).toEqual([
         {
@@ -1419,124 +1420,124 @@ describe('ResultSet', () => {
     });
 
     test('fill missing dates with custom value', () => {
-          const resultSet = new ResultSet({
-            query: {
-              measures: ['Orders.total'],
-              timeDimensions: [
-                {
-                  dimension: 'Orders.createdAt',
-                  granularity: 'day',
-                  dateRange: ['2020-01-08T00:00:00.000', '2020-01-11T23:59:59.999']
-                }
-              ],
-              filters: [],
-              timezone: 'UTC'
-            },
-            data: [
-              {
-                'Orders.createdAt': '2020-01-08T00:00:00.000',
-                'Orders.total': 1
-              },
-              {
-                'Orders.createdAt': '2020-01-10T00:00:00.000',
-                'Orders.total': 10
-              }
-            ],
-            annotation: {
-              measures: {},
-              dimensions: {},
-              segments: {},
-              timeDimensions: {
-                'Orders.createdAt': {
-                  title: 'Orders Created at',
-                  shortTitle: 'Created at',
-                  type: 'time'
-                }
-              }
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.total'],
+          timeDimensions: [
+            {
+              dimension: 'Orders.createdAt',
+              granularity: 'day',
+              dateRange: ['2020-01-08T00:00:00.000', '2020-01-11T23:59:59.999']
             }
-          });
+          ],
+          filters: [],
+          timezone: 'UTC'
+        },
+        data: [
+          {
+            'Orders.createdAt': '2020-01-08T00:00:00.000',
+            'Orders.total': 1
+          },
+          {
+            'Orders.createdAt': '2020-01-10T00:00:00.000',
+            'Orders.total': 10
+          }
+        ],
+        annotation: {
+          measures: {},
+          dimensions: {},
+          segments: {},
+          timeDimensions: {
+            'Orders.createdAt': {
+              title: 'Orders Created at',
+              shortTitle: 'Created at',
+              type: 'time'
+            }
+          }
+        }
+      } as any);
 
-          expect(resultSet.tablePivot({
-            'fillWithValue': 5
-          })).toEqual([
-            {
-              'Orders.createdAt.day': '2020-01-08T00:00:00.000',
-              'Orders.total': 1
-            },
-            {
-              'Orders.createdAt.day': '2020-01-09T00:00:00.000',
-              'Orders.total': 5
-            },
-            {
-              'Orders.createdAt.day': '2020-01-10T00:00:00.000',
-              'Orders.total': 10
-            },
-            {
-              'Orders.createdAt.day': '2020-01-11T00:00:00.000',
-              'Orders.total': 5
-            }
-          ]);
-        });
+      expect(resultSet.tablePivot({
+        fillWithValue: 5
+      })).toEqual([
+        {
+          'Orders.createdAt.day': '2020-01-08T00:00:00.000',
+          'Orders.total': 1
+        },
+        {
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.total': 5
+        },
+        {
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+          'Orders.total': 10
+        },
+        {
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.total': 5
+        }
+      ]);
+    });
 
     test('fill missing dates with custom string', () => {
-              const resultSet = new ResultSet({
-                query: {
-                  measures: ['Orders.total'],
-                  timeDimensions: [
-                    {
-                      dimension: 'Orders.createdAt',
-                      granularity: 'day',
-                      dateRange: ['2020-01-08T00:00:00.000', '2020-01-11T23:59:59.999']
-                    }
-                  ],
-                  filters: [],
-                  timezone: 'UTC'
-                },
-                data: [
-                  {
-                    'Orders.createdAt': '2020-01-08T00:00:00.000',
-                    'Orders.total': 1
-                  },
-                  {
-                    'Orders.createdAt': '2020-01-10T00:00:00.000',
-                    'Orders.total': 10
-                  }
-                ],
-                annotation: {
-                  measures: {},
-                  dimensions: {},
-                  segments: {},
-                  timeDimensions: {
-                    'Orders.createdAt': {
-                      title: 'Orders Created at',
-                      shortTitle: 'Created at',
-                      type: 'time'
-                    }
-                  }
-                }
-              });
+      const resultSet = new ResultSet({
+        query: {
+          measures: ['Orders.total'],
+          timeDimensions: [
+            {
+              dimension: 'Orders.createdAt',
+              granularity: 'day',
+              dateRange: ['2020-01-08T00:00:00.000', '2020-01-11T23:59:59.999']
+            }
+          ],
+          filters: [],
+          timezone: 'UTC'
+        },
+        data: [
+          {
+            'Orders.createdAt': '2020-01-08T00:00:00.000',
+            'Orders.total': 1
+          },
+          {
+            'Orders.createdAt': '2020-01-10T00:00:00.000',
+            'Orders.total': 10
+          }
+        ],
+        annotation: {
+          measures: {},
+          dimensions: {},
+          segments: {},
+          timeDimensions: {
+            'Orders.createdAt': {
+              title: 'Orders Created at',
+              shortTitle: 'Created at',
+              type: 'time'
+            }
+          }
+        }
+      } as any);
 
-              expect(resultSet.tablePivot({
-                'fillWithValue': 'N/A'
-              })).toEqual([
-                {
-                  'Orders.createdAt.day': '2020-01-08T00:00:00.000',
-                  'Orders.total': 1
-                },
-                {
-                  'Orders.createdAt.day': '2020-01-09T00:00:00.000',
-                  'Orders.total': "N/A"
-                },
-                {
-                  'Orders.createdAt.day': '2020-01-10T00:00:00.000',
-                  'Orders.total': 10
-                },
-                {
-                  'Orders.createdAt.day': '2020-01-11T00:00:00.000',
-                  'Orders.total': "N/A"
-                }
-              ]);
-            });
+      expect(resultSet.tablePivot({
+        fillWithValue: 'N/A'
+      })).toEqual([
+        {
+          'Orders.createdAt.day': '2020-01-08T00:00:00.000',
+          'Orders.total': 1
+        },
+        {
+          'Orders.createdAt.day': '2020-01-09T00:00:00.000',
+          'Orders.total': 'N/A'
+        },
+        {
+          'Orders.createdAt.day': '2020-01-10T00:00:00.000',
+          'Orders.total': 10
+        },
+        {
+          'Orders.createdAt.day': '2020-01-11T00:00:00.000',
+          'Orders.total': 'N/A'
+        }
+      ]);
+    });
 
     test('same dimension and time dimension without granularity', () => {
       const resultSet = new ResultSet({
@@ -1580,7 +1581,7 @@ describe('ResultSet', () => {
           segments: {},
           timeDimensions: {}
         }
-      });
+      } as any);
 
       expect(resultSet.tablePivot()).toEqual([
         { 'Orders.createdAt': '2020-01-08T17:04:43.000' },
@@ -1640,7 +1641,7 @@ describe('ResultSet', () => {
           segments: {},
           timeDimensions: {}
         }
-      });
+      } as any);
 
       expect(resultSet.pivot()).toEqual(
         [

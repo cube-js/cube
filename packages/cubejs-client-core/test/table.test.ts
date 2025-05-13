@@ -1,5 +1,8 @@
+/* globals describe, expect, test */
+
 import 'jest';
-import ResultSet from '../ResultSet';
+import ResultSet from '../src/ResultSet';
+import { PivotConfig } from '../src/types';
 
 describe('resultSet tablePivot and tableColumns', () => {
   describe('it works with one measure', () => {
@@ -62,10 +65,10 @@ describe('resultSet tablePivot and tableColumns', () => {
         segments: {},
         timeDimensions: {},
       },
-    });
+    } as any);
 
     describe('all dimensions on `x` axis', () => {
-      const pivotConfig = {
+      const pivotConfig: PivotConfig = {
         x: ['Users.country', 'Users.gender'],
         y: ['measures'],
       };
@@ -129,7 +132,7 @@ describe('resultSet tablePivot and tableColumns', () => {
     });
 
     describe('one dimension on `x` and one one `y` axis', () => {
-      const pivotConfig = {
+      const pivotConfig: PivotConfig = {
         x: ['Users.country'],
         y: ['Users.gender', 'measures'],
       };
@@ -477,7 +480,7 @@ describe('resultSet tablePivot and tableColumns', () => {
         segments: {},
         timeDimensions: {},
       },
-    });
+    } as any);
 
     test('all dimensions on `x` axis', () => {
       const pivotConfig = {
@@ -622,7 +625,7 @@ describe('resultSet tablePivot and tableColumns', () => {
         segments: {},
         timeDimensions: {},
       },
-    });
+    } as any);
 
     test('all dimensions on `x` axis', () => {
       const pivotConfig = {
@@ -697,16 +700,16 @@ describe('resultSet tablePivot and tableColumns', () => {
   test('order of values is preserved', () => {
     const resultSet = new ResultSet({
       query: {
-        measures:  [
+        measures: [
           'Branch.count'
         ],
         dimensions: [
           'Tenant.number'
         ],
-        'order': [
+        order: [
           {
-            'id': 'Tenant.number',
-            'desc': true
+            id: 'Tenant.number',
+            desc: true
           }
         ],
         filters: [],
@@ -738,54 +741,54 @@ describe('resultSet tablePivot and tableColumns', () => {
         segments: {},
         timeDimensions: {}
       }
-    });
+    } as any);
 
     expect(resultSet.tableColumns({
-      'x': [],
-      'y': [
+      x: [],
+      y: [
         'Tenant.number'
       ]
     })).toEqual(
-        [
-          {
-            'key': '6',
-            'type': 'string',
-            'title': 'Tenant Number 6',
-            'shortTitle': '6',
-            'format': undefined,
-            'meta': undefined,
-            'children': [
-              {
-                'key': 'Branch.count',
-                'type': 'number',
-                'dataIndex': '6,Branch.count',
-                'title': 'Branch.count',
-                'shortTitle': 'Branch.count',
-                'format': undefined,
-                'meta': undefined,
-              }
-            ]
-          },
-          {
-            'key': '1',
-            'type': 'string',
-            'title': 'Tenant Number 1',
-            'shortTitle': '1',
-            'format': undefined,
-            'meta': undefined,
-            'children': [
-              {
-                'key': 'Branch.count',
-                'type': 'number',
-                'dataIndex': '1,Branch.count',
-                'title': 'Branch.count',
-                'shortTitle': 'Branch.count',
-                'format': undefined,
-                "meta": undefined,
-              }
-            ]
-          }
-        ]
+      [
+        {
+          key: '6',
+          type: 'string',
+          title: 'Tenant Number 6',
+          shortTitle: '6',
+          format: undefined,
+          meta: undefined,
+          children: [
+            {
+              key: 'Branch.count',
+              type: 'number',
+              dataIndex: '6,Branch.count',
+              title: 'Branch.count',
+              shortTitle: 'Branch.count',
+              format: undefined,
+              meta: undefined,
+            }
+          ]
+        },
+        {
+          key: '1',
+          type: 'string',
+          title: 'Tenant Number 1',
+          shortTitle: '1',
+          format: undefined,
+          meta: undefined,
+          children: [
+            {
+              key: 'Branch.count',
+              type: 'number',
+              dataIndex: '1,Branch.count',
+              title: 'Branch.count',
+              shortTitle: 'Branch.count',
+              format: undefined,
+              meta: undefined,
+            }
+          ]
+        }
+      ]
     );
   });
 });

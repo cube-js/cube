@@ -1,10 +1,12 @@
 /* eslint-disable import/first */
-/* eslint-disable import/newline-after-import */
 /* globals describe,test,expect,jest,afterEach,beforeAll,beforeEach */
-import '@babel/runtime/regenerator';
-jest.mock('cross-fetch');
 import fetch from 'cross-fetch';
-import HttpTransport from './HttpTransport';
+
+jest.mock('cross-fetch');
+
+import HttpTransport from '../src/HttpTransport';
+
+const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
 
 describe('HttpTransport', () => {
   const apiUrl = 'http://localhost:3000/cubejs-api/v1';
@@ -31,11 +33,11 @@ describe('HttpTransport', () => {
   const largeQueryJson = `{"query":{"measures":["Orders.count"],"dimensions":["Users.country"],"filters":[{"member":"Users.id","operator":"equals","values":${JSON.stringify(ids)}}]}}`;
 
   beforeAll(() => {
-    fetch.mockReturnValue(Promise.resolve({ ok: true }));
+    mockedFetch.mockReturnValue(Promise.resolve({ ok: true } as Response));
   });
 
   afterEach(() => {
-    fetch.mockClear();
+    mockedFetch.mockClear();
   });
 
   test('it serializes the query object and sends it in the query string', async () => {
@@ -44,7 +46,7 @@ describe('HttpTransport', () => {
       apiUrl,
     });
     const req = transport.request('load', { query });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load?query=${queryUrlEncoded}`, {
       method: 'GET',
@@ -66,7 +68,7 @@ describe('HttpTransport', () => {
       }
     });
     const req = transport.request('meta', { extraParams });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/meta?extraParams=${serializedExtraParams}`, {
       method: 'GET',
@@ -85,7 +87,7 @@ describe('HttpTransport', () => {
       method: 'POST'
     });
     const req = transport.request('load', { query });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
@@ -103,7 +105,7 @@ describe('HttpTransport', () => {
       apiUrl
     });
     const req = transport.request('load', { query: LargeQuery });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
