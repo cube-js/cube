@@ -44,9 +44,9 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
         ],
       }),
       alias({
-        entries: {
-          '@cubejs-client/core': '../cubejs-client-core/src/index.js',
-        },
+        // entries: {
+        //   '@cubejs-client/core': '../cubejs-client-core/src/index.js',
+        // },
       }),
     ],
   };
@@ -133,21 +133,21 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
   ];
 };
 
-export default bundle(
-  'cubejs-client-core',
-  'cubejs',
-  {
-    input: 'packages/cubejs-client-core/src/index.js',
-  },
-  {
-    input: 'packages/cubejs-client-core/src/index.umd.js',
-  }
-)
-  .concat(
-    bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
+// export default bundle(
+//   'cubejs-client-core',
+//   'cubejs',
+//   {
+//     input: 'packages/cubejs-client-core/src/index.js',
+//   },
+//   {
+//     input: 'packages/cubejs-client-core/src/index.umd.js',
+//   }
+// )
+//   .concat(
+
+export default bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
       input: 'packages/cubejs-client-ws-transport/src/index.ts',
     })
-  )
   .concat(
     bundle('cubejs-client-react', 'cubejsReact', {
       input: 'packages/cubejs-client-react/src/index.js',
