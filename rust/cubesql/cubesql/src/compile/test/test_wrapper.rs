@@ -1147,6 +1147,10 @@ WHERE
             ]),
             segments: Some(vec![]),
             order: Some(vec![]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ],]),
             ..Default::default()
         }
     );

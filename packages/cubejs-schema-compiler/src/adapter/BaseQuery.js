@@ -279,6 +279,7 @@ export class BaseQuery {
       multiStageDimensions: this.options.multiStageDimensions,
       multiStageTimeDimensions: this.options.multiStageTimeDimensions,
       subqueryJoins: this.options.subqueryJoins,
+      joinHints: this.options.joinHints,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -329,6 +330,7 @@ export class BaseQuery {
       const hasMultiStageMeasures = this.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multiStageMembers.length > 0;
       this.canUseNativeSqlPlannerPreAggregation = hasMultiStageMeasures;
     }
+    this.queryLevelJoinHints = this.options.joinHints ?? [];
     this.prebuildJoin();
 
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
@@ -410,7 +412,10 @@ export class BaseQuery {
    */
   get allJoinHints() {
     if (!this.collectedJoinHints) {
-      this.collectedJoinHints = this.collectJoinHints();
+      this.collectedJoinHints = [
+        ...this.queryLevelJoinHints,
+        ...this.collectJoinHints(),
+      ];
     }
     return this.collectedJoinHints;
   }
