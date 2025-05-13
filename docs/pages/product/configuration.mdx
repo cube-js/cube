@@ -87,16 +87,32 @@ module.exports = {
         member: 'orders_view.id',
         operator: 'equals',
         values: [securityContext.order_id]
-      });
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 ```
 
 </CodeTabs>
 
 Both ways are equivalent; when in doubt, use Python.
+
+Here is a minimal correct `cube.py` file. Note that the `config` object must be imported:
+
+```python
+from cube import config
+
+# Configuration goes here...
+```
+
+Here is a minimal correct `cube.js` file. Note that the `module.exports` object must be defined:
+
+```javascript
+module.exports = {
+  // Configuration goes here...
+}
+```
 
 You can read more about [Python][ref-python] and [JavaScript][ref-javascript] support
 in the dynamic data modeling section of the documentation.
