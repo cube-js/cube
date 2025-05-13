@@ -34,8 +34,6 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.24",
-    "@babel/preset-env": "^7.24",
     "@types/jest": "^29",
     "@types/ramda": "^0.27.34",
     "@types/moment-range": "^4.0.0",
