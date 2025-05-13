@@ -26,7 +26,6 @@
     "ws": "^7.3.1"
   },
   "files": [
-    "src",
     "dist"
   ],
   "license": "MIT",
