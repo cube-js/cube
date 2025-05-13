@@ -29,6 +29,9 @@
       "path": "packages/cubejs-cubestore-driver"
     },
     {
+      "path": "packages/cubejs-client-core"
+    },
+    {
       "path": "packages/cubejs-query-orchestrator"
     },
     {
