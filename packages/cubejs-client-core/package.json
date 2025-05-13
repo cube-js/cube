@@ -30,7 +30,7 @@
     "lint:fix": "eslint --fix src/* test/ --ext .ts,js"
   },
   "files": [
-    "dist/src"
+    "dist"
   ],
   "license": "MIT",
   "devDependencies": {
