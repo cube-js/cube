@@ -1428,10 +1428,15 @@ export class BaseQuery {
     if (memberDef.timeShiftReferences?.length) {
       let mapFn;
 
+      const allBackAliasMembers = this.allBackAliasTimeDimensions();
+
       if (memberDef.timeShiftReferences.length === 1 && !memberDef.timeShiftReferences[0].timeDimension) {
         const timeShift = memberDef.timeShiftReferences[0];
         mapFn = (td) => {
-          if (td.shiftInterval) {
+          // We need to ignore aliased td, because it will match and insert shiftInterval on first
+          // occurrence, but later during recursion it will hit the original td but shiftInterval will be
+          // present and simple check for td.shiftInterval will always result in error.
+          if (td.shiftInterval && !td.dimension === allBackAliasMembers[timeShift.timeDimension]) {
             throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
           }
           return {
@@ -1440,7 +1445,6 @@ export class BaseQuery {
           };
         };
       } else {
-        const allBackAliasMembers = this.allBackAliasTimeDimensions();
         mapFn = (td) => {
           const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension || td.dimension === allBackAliasMembers[r.timeDimension]);
           if (timeShift) {
