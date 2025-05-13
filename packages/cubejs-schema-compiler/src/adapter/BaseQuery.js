@@ -1301,8 +1301,26 @@ export class BaseQuery {
     const multiStageMembers = R.uniq(
       this.allMembersConcat(false)
         // TODO boolean logic filter support
-        .filter(m => m.expressionPath && hasMultiStageMembers(m.expressionPath()))
-        .map(m => m.expressionPath())
+        .reduce((acc, m) => {
+          if (m.isMemberExpression) {
+            let refMemberPath;
+            this.evaluateSql(m.cube().name, m.definition().sql, {
+              sqlResolveFn: (_symbol, cube, prop) => {
+                const path = this.cubeEvaluator.pathFromArray([cube, prop]);
+                refMemberPath = path;
+                return path;
+              }
+            });
+
+            if (hasMultiStageMembers(refMemberPath)) {
+              acc.push(refMemberPath);
+            }
+          } else if (m.expressionPath && hasMultiStageMembers(m.expressionPath())) {
+            acc.push(m.expressionPath());
+          }
+
+          return acc;
+        }, [])
     ).map(m => this.multiStageWithQueries(
       m,
       {
