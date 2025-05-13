@@ -1444,6 +1444,33 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     { visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z', visitors_multi_stage__revenue: '900', visitors_multi_stage__revenue_day_ago_via_join: '300' }
   ]));
 
+  it('CAGR (no td in time_shift via view)', async () => runQueryTest({
+    measures: [
+      'visitors_multi_stage.revenue',
+      'visitors_multi_stage.revenue_day_ago_no_td',
+    ],
+    timeDimensions: [{
+      dimension: 'visitors_multi_stage.create_date_created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors_multi_stage.create_date_created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    {
+      visitors_multi_stage__create_date_created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors_multi_stage__revenue: '300',
+      visitors_multi_stage__revenue_day_ago_no_td: '200',
+    },
+    {
+      visitors_multi_stage__create_date_created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors_multi_stage__revenue: '900',
+      visitors_multi_stage__revenue_day_ago_no_td: '300',
+    }
+  ]));
+
   it('sql utils', async () => runQueryTest({
     measures: [
       'visitors.visitor_count'
