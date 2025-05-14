@@ -1446,9 +1446,6 @@ export class BaseQuery {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
     if (memberDef.timeShiftReferences?.length) {
-      let mapFn;
-
-      const allBackAliasMembers = this.allBackAliasTimeDimensions();
       let { commonTimeShift } = queryContext;
       const timeShifts = queryContext.timeShifts || {};
       const memberOfCube = !this.cubeEvaluator.cubeFromPath(memberPath).isView;
@@ -1459,49 +1456,15 @@ export class BaseQuery {
         if (memberOfCube) {
           commonTimeShift = timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval;
         }
-
-        mapFn = (td) => {
-          // We need to ignore aliased td, because it will match and insert shiftInterval on first
-          // occurrence, but later during recursion it will hit the original td but shiftInterval will be
-          // present and simple check for td.shiftInterval will always result in error.
-          if (td.shiftInterval && !td.dimension === allBackAliasMembers[timeShift.timeDimension]) {
-            throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
-          }
-          return {
-            ...td,
-            shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
-          };
-        };
-      } else {
+      } else if (memberOfCube) {
         // We avoid view's timeshift evaluation as there will be another round of underlying cube's member evaluation
-        if (memberOfCube) {
-          memberDef.timeShiftReferences.forEach((r) => {
-            timeShifts[r.timeDimension] = r.type === 'next' ? this.negateInterval(r.interval) : r.interval;
-          });
-        }
-
-        mapFn = (td) => {
-          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension || td.dimension === allBackAliasMembers[r.timeDimension]);
-          if (timeShift) {
-            // We need to ignore aliased td, because it will match and insert shiftInterval on first
-            // occurrence, but later during recursion it will hit the original td but shiftInterval will be
-            // present and simple check for td.shiftInterval will always result in error.
-            if (td.shiftInterval && !td.dimension === allBackAliasMembers[timeShift.timeDimension]) {
-              throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
-            }
-            return {
-              ...td,
-              shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
-            };
-          }
-          return td;
-        };
+        memberDef.timeShiftReferences.forEach((r) => {
+          timeShifts[r.timeDimension] = r.type === 'next' ? this.negateInterval(r.interval) : r.interval;
+        });
       }
 
       queryContext = {
         ...queryContext,
-        // TODO: Switch to one more general flow with commonTimeShift + timeShifts ?
-        timeDimensions: queryContext.timeDimensions.map(mapFn),
         commonTimeShift,
         timeShifts,
       };
@@ -2921,16 +2884,20 @@ export class BaseQuery {
           return td.dimensionSql();
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
-          const mp = this.cubeEvaluator.pathFromArray([cubeName, name]);
+          const memPath = this.cubeEvaluator.pathFromArray([cubeName, name]);
 
           // Skip view's member evaluation as there will be underlying cube's same member evaluation
-          if (symbol.type === 'time' && !this.cubeEvaluator.cubeFromPath(mp).isView) {
-            if (this.safeEvaluateSymbolContext().commonTimeShift) {
+          if (symbol.type === 'time' && !this.cubeEvaluator.cubeFromPath(memPath).isView) {
+            if (this.safeEvaluateSymbolContext().timeShifts?.[memPath]) {
+              if (symbol.shiftInterval) {
+                throw new UserError(`Hierarchical time shift is not supported but was provided for '${memPath}'. Parent time shift is '${symbol.shiftInterval}' and current is '${this.safeEvaluateSymbolContext().timeShifts?.[memPath]}'`);
+              }
+              res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().timeShifts?.[memPath])})`;
+            } else if (this.safeEvaluateSymbolContext().commonTimeShift) {
+              if (symbol.shiftInterval) {
+                throw new UserError(`Hierarchical time shift is not supported but was provided for '${memPath}'. Parent time shift is '${symbol.shiftInterval}' and current is '${this.safeEvaluateSymbolContext().commonTimeShift}'`);
+              }
               res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().commonTimeShift)})`;
-            } else if (this.safeEvaluateSymbolContext().timeShifts?.[this.cubeEvaluator.pathFromArray([cubeName, name])]) {
-              res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().timeShifts?.[this.cubeEvaluator.pathFromArray([cubeName, name])])})`;
-            } else if (symbol.shiftInterval) {
-              res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
             }
           }
 
