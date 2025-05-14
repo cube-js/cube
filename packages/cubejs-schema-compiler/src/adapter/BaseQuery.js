@@ -1448,9 +1448,13 @@ export class BaseQuery {
       let mapFn;
 
       const allBackAliasMembers = this.allBackAliasTimeDimensions();
+      let { commonTimeShift } = queryContext;
+      const timeShifts = queryContext.timeShifts || {};
 
       if (memberDef.timeShiftReferences.length === 1 && !memberDef.timeShiftReferences[0].timeDimension) {
         const timeShift = memberDef.timeShiftReferences[0];
+        commonTimeShift = timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval;
+
         mapFn = (td) => {
           // We need to ignore aliased td, because it will match and insert shiftInterval on first
           // occurrence, but later during recursion it will hit the original td but shiftInterval will be
@@ -1464,6 +1468,10 @@ export class BaseQuery {
           };
         };
       } else {
+        memberDef.timeShiftReferences.forEach((r) => {
+          timeShifts[r.timeDimension] = r.type === 'next' ? this.negateInterval(r.interval) : r.interval;
+        });
+
         mapFn = (td) => {
           const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension || td.dimension === allBackAliasMembers[r.timeDimension]);
           if (timeShift) {
@@ -1484,7 +1492,10 @@ export class BaseQuery {
 
       queryContext = {
         ...queryContext,
-        timeDimensions: queryContext.timeDimensions.map(mapFn)
+        // TODO: Switch to one more general flow with commonTimeShift + timeShifts ?
+        timeDimensions: queryContext.timeDimensions.map(mapFn),
+        commonTimeShift,
+        timeShifts,
       };
     }
     queryContext = {
@@ -1550,12 +1561,16 @@ export class BaseQuery {
           return [m, measure.aliasName()];
         }).concat(from.dimensions.map(m => {
           const member = this.newDimension(m);
-          return [m, member.aliasName()];
+          // In case of request coming from the SQL API, member could be expression-based
+          const mPath = typeof m === 'string' ? m : this.cubeEvaluator.pathFromArray([m.cubeName, m.name]);
+          return [mPath, member.aliasName()];
         })).concat(from.timeDimensions.map(m => {
           const member = this.newTimeDimension(m);
           return member.granularity ? [`${member.dimension}.${member.granularity}`, member.aliasName()] : [];
         }))))
-      )
+      ),
+      commonTimeShift: withQuery.commonTimeShift,
+      timeShifts: withQuery.timeShifts,
     };
 
     const fromSubQuery = fromMeasures && this.newSubQuery({
@@ -2894,9 +2909,16 @@ export class BaseQuery {
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
 
-          if (symbol.shiftInterval) {
-            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+          if (symbol.type === 'time') {
+            if (this.safeEvaluateSymbolContext().commonTimeShift) {
+              res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().commonTimeShift)})`;
+            } else if (this.safeEvaluateSymbolContext().timeShifts?.[this.cubeEvaluator.pathFromArray([cubeName, name])]) {
+              res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().timeShifts?.[this.cubeEvaluator.pathFromArray([cubeName, name])])})`;
+            } else if (symbol.shiftInterval) {
+              res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+            }
           }
+
           if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
             !this.safeEvaluateSymbolContext().ignoreConvertTzForTimeDimension &&
             !memberExpressionType &&
