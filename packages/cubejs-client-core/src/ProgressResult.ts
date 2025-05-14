@@ -1,13 +1,17 @@
+import { ProgressResponse } from './types';
+
 export default class ProgressResult {
-  constructor(progressResponse) {
+  progressResponse: ProgressResponse;
+
+  public constructor(progressResponse: ProgressResponse) {
     this.progressResponse = progressResponse;
   }
 
-  stage() {
+  public stage(): string {
     return this.progressResponse.stage;
   }
 
-  timeElapsed() {
+  public timeElapsed(): number {
     return this.progressResponse.timeElapsed;
   }
 }

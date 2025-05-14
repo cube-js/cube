@@ -1,8 +1,9 @@
-import cube from './index';
-import * as clientCoreExports from './index';
+import cube, * as clientCoreExports from './index';
+
+const cubeAll: any = cube;
 
 Object.keys(clientCoreExports).forEach((key) => {
-  cube[key] = clientCoreExports[key];
+  cubeAll[key] = (clientCoreExports as Record<string, any>)[key];
 });
 
-export default cube;
+export default cubeAll;

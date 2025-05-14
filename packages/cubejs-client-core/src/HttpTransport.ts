@@ -1,8 +1,61 @@
 import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
-class HttpTransport {
-  constructor({ authorization, apiUrl, method, headers = {}, credentials, fetchTimeout, signal }) {
+export interface ErrorResponse {
+  error: string;
+}
+
+export type TransportOptions = {
+  /**
+   * [jwt auth token](security)
+   */
+  authorization?: string;
+  /**
+   * path to `/cubejs-api/v1`
+   */
+  apiUrl: string;
+  /**
+   * custom headers
+   */
+  headers: Record<string, string>;
+  credentials?: 'omit' | 'same-origin' | 'include';
+  method?: 'GET' | 'PUT' | 'POST' | 'PATCH';
+  /**
+   * Fetch timeout in milliseconds. Would be passed as AbortSignal.timeout()
+   */
+  fetchTimeout?: number;
+};
+
+export interface ITransportResponse<R> {
+  subscribe: <CBResult>(cb: (result: R | ErrorResponse, resubscribe: () => Promise<CBResult>) => CBResult) => Promise<CBResult>;
+  // Optional, supported in WebSocketTransport
+  unsubscribe?: () => Promise<void>;
+}
+
+export interface ITransport<R> {
+  request(method: string, params: Record<string, unknown>): ITransportResponse<R>;
+  authorization: TransportOptions['authorization'];
+}
+
+/**
+ * Default transport implementation.
+ */
+class HttpTransport implements ITransport<Response> {
+  public authorization: TransportOptions['authorization'];
+
+  protected apiUrl: TransportOptions['apiUrl'];
+
+  protected method: TransportOptions['method'];
+
+  protected headers: TransportOptions['headers'];
+
+  protected credentials: TransportOptions['credentials'];
+
+  protected fetchTimeout: number | undefined;
+  
+  private signal: any;
+
+  public constructor({ authorization, apiUrl, method, headers = {}, credentials, fetchTimeout, signal }: Omit<TransportOptions, 'headers'> & { headers?: TransportOptions['headers'] }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.method = method;
@@ -12,7 +65,7 @@ class HttpTransport {
     this.signal = signal;
   }
 
-  request(method, { baseRequestId, signal, ...params }) {
+  public request(method: string, { baseRequestId, signal, ...params }: any): ITransportResponse<Response> {
     let spanCounter = 1;
     const searchParams = new URLSearchParams(
       params && Object.keys(params)
@@ -36,7 +89,7 @@ class HttpTransport {
         Authorization: this.authorization,
         'x-request-id': baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
         ...this.headers
-      },
+      } as HeadersInit,
       credentials: this.credentials,
       body: requestMethod === 'POST' ? JSON.stringify(params) : null,
       signal: signal || this.signal || (this.fetchTimeout ? AbortSignal.timeout(this.fetchTimeout) : undefined),
@@ -45,12 +98,11 @@ class HttpTransport {
     return {
       /* eslint no-unsafe-finally: off */
       async subscribe(callback) {
-        let result = {
-          error: 'network Error' // add default error message
-        };
         try {
-          result = await runRequest();
-        } finally {
+          const result = await runRequest();
+          return callback(result, () => this.subscribe(callback));
+        } catch (e) {
+          const result: ErrorResponse = { error: 'network Error' };
           return callback(result, () => this.subscribe(callback));
         }
       }

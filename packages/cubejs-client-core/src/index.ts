@@ -3,42 +3,205 @@ import ResultSet from './ResultSet';
 import SqlQuery from './SqlQuery';
 import Meta from './Meta';
 import ProgressResult from './ProgressResult';
-import HttpTransport from './HttpTransport';
+import HttpTransport, { ErrorResponse, ITransport, TransportOptions } from './HttpTransport';
 import RequestError from './RequestError';
+import {
+  ExtractTimeMembers,
+  LoadResponse,
+  MetaResponse,
+  PivotQuery,
+  ProgressResponse,
+  Query,
+  QueryOrder,
+  QueryType,
+  TransformedQuery
+} from './types';
+
+export type LoadMethodCallback<T> = (error: Error | null, resultSet: T) => void;
+
+export type LoadMethodOptions = {
+  /**
+   * Key to store the current request's MUTEX inside the `mutexObj`. MUTEX object is used to reject orphaned queries results when new queries are sent. For example: if two queries are sent with the same `mutexKey` only the last one will return results.
+   */
+  mutexKey?: string;
+  /**
+   * Object to store MUTEX
+   */
+  mutexObj?: { [key: string]: any };
+  /**
+   * Pass `true` to use continuous fetch behavior.
+   */
+  subscribe?: boolean;
+  /**
+   * A Cube API instance. If not provided will be taken from `CubeProvider`
+   */
+  // eslint-disable-next-line no-use-before-define
+  cubeApi?: CubeApi;
+  /**
+   * If enabled, all members of the 'number' type will be automatically converted to numerical values on the client side
+   */
+  castNumerics?: boolean;
+  /**
+   * Function that receives `ProgressResult` on each `Continue wait` message.
+   */
+  progressCallback?(result: ProgressResult): void;
+};
+
+export type DeeplyReadonly<T> = {
+  readonly [K in keyof T]: DeeplyReadonly<T[K]>;
+};
+
+export type ExtractMembers<T extends DeeplyReadonly<Query>> =
+  | (T extends { dimensions: readonly (infer Names)[]; } ? Names : never)
+  | (T extends { measures: readonly (infer Names)[]; } ? Names : never)
+  | (T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never);
+
+// If we can't infer any members at all, then return any.
+export type SingleQueryRecordType<T extends DeeplyReadonly<Query>> = ExtractMembers<T> extends never
+  ? any
+  : { [K in string & ExtractMembers<T>]: string | number | boolean | null };
+
+export type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
+  T extends readonly [infer First, ...infer Rest]
+    ? SingleQueryRecordType<DeeplyReadonly<First>> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
+    : never;
+
+export type QueryRecordType<T extends DeeplyReadonly<Query | Query[]>> =
+  T extends DeeplyReadonly<Query[]> ? QueryArrayRecordType<T> :
+    T extends DeeplyReadonly<Query> ? SingleQueryRecordType<T> :
+      never;
+
+export interface UnsubscribeObj {
+  /**
+   * Allows to stop requests in-flight in long polling or web socket subscribe loops.
+   * It doesn't cancel any submitted requests to the underlying databases.
+   */
+  unsubscribe(): Promise<void>;
+}
+
+/**
+ * @deprecated use DryRunResponse
+ */
+export type TDryRunResponse = {
+  queryType: QueryType;
+  normalizedQueries: Query[];
+  pivotQuery: PivotQuery;
+  queryOrder: Array<{ [k: string]: QueryOrder }>;
+  transformedQueries: TransformedQuery[];
+};
+
+export type DryRunResponse = {
+  queryType: QueryType;
+  normalizedQueries: Query[];
+  pivotQuery: PivotQuery;
+  queryOrder: Array<{ [k: string]: QueryOrder }>;
+  transformedQueries: TransformedQuery[];
+};
+
+interface BodyResponse {
+  error?: string;
+  [key: string]: any;
+}
 
 let mutexCounter = 0;
 
 const MUTEX_ERROR = 'Mutex has been changed';
 
-/**
- * Query result dataset formats enum.
- */
-const ResultType = {
-  DEFAULT: 'default',
-  COMPACT: 'compact'
-};
-
-function mutexPromise(promise) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      resolve(await promise);
-    } catch (error) {
+function mutexPromise(promise: Promise<any>) {
+  return promise
+    .then((result) => result)
+    .catch((error) => {
       if (error !== MUTEX_ERROR) {
-        reject(error);
+        throw error;
       }
-    }
-  });
+    });
 }
 
+export type ResponseFormat = 'compact' | 'default' | undefined;
+
+export type CubeApiOptions = {
+  /**
+   * URL of your Cube.js Backend. By default, in the development environment it is `http://localhost:4000/cubejs-api/v1`
+   */
+  apiUrl: string;
+  /**
+   * Transport implementation to use. [HttpTransport](#http-transport) will be used by default.
+   */
+  transport?: ITransport<any>;
+  method?: TransportOptions['method'];
+  headers?: TransportOptions['headers'];
+  pollInterval?: number;
+  credentials?: TransportOptions['credentials'];
+  parseDateMeasures?: boolean;
+  resType?: 'default' | 'compact';
+  castNumerics?: boolean;
+  /**
+   * How many network errors would be retried before returning to users. Default to 0.
+   */
+  networkErrorRetries?: number;
+};
+
+/**
+ * Main class for accessing Cube API
+ */
 class CubeApi {
-  constructor(apiToken, options) {
-    if (apiToken !== null && !Array.isArray(apiToken) && typeof apiToken === 'object') {
+  apiToken: string | (() => Promise<string>) | (CubeApiOptions & any[]) | undefined;
+
+  apiUrl: string;
+
+  method: TransportOptions['method'];
+
+  headers: TransportOptions['headers'];
+
+  credentials: TransportOptions['credentials'];
+
+  transport: ITransport<any>;
+
+  pollInterval: number;
+
+  parseDateMeasures: boolean | undefined;
+
+  castNumerics: boolean;
+
+  networkErrorRetries: number;
+
+  updateAuthorizationPromise: Promise<any> | null;
+
+  public constructor(apiToken: string | (() => Promise<string>) | undefined, options: CubeApiOptions);
+
+  public constructor(options: CubeApiOptions);
+
+  /**
+   * Creates an instance of the `CubeApi`. The API entry point.
+   *
+   * ```js
+   * import cube from '@cubejs-client/core';
+   * const cubeApi = cube(
+   *   'CUBE-API-TOKEN',
+   *   { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+   * );
+   * ```
+   *
+   * You can also pass an async function or a promise that will resolve to the API token
+   *
+   * ```js
+   * import cube from '@cubejs-client/core';
+   * const cubeApi = cube(
+   *   async () => await Auth.getJwtToken(),
+   *   { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
+   * );
+   * ```
+   */
+  public constructor(
+    apiToken: string | (() => Promise<string>) | undefined | CubeApiOptions,
+    options?: CubeApiOptions
+  ) {
+    if (apiToken && !Array.isArray(apiToken) && typeof apiToken === 'object') {
       options = apiToken;
       apiToken = undefined;
     }
-    options = options || {};
 
-    if (!options.transport && !options.apiUrl) {
+    if (!options || (!options.transport && !options.apiUrl)) {
       throw new Error('The `apiUrl` option is required');
     }
 
@@ -47,8 +210,9 @@ class CubeApi {
     this.method = options.method;
     this.headers = options.headers || {};
     this.credentials = options.credentials;
+
     this.transport = options.transport || new HttpTransport({
-      authorization: typeof apiToken === 'function' ? undefined : apiToken,
+      authorization: typeof apiToken === 'string' ? apiToken : undefined,
       apiUrl: this.apiUrl,
       method: this.method,
       headers: this.headers,
@@ -56,6 +220,7 @@ class CubeApi {
       fetchTimeout: options.fetchTimeout,
       signal: options.signal
     });
+
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
     this.castNumerics = typeof options.castNumerics === 'boolean' ? options.castNumerics : false;
@@ -64,14 +229,14 @@ class CubeApi {
     this.updateAuthorizationPromise = null;
   }
 
-  request(method, params) {
+  private request(method: string, params?: any) {
     return this.transport.request(method, {
       baseRequestId: uuidv4(),
       ...params
     });
   }
 
-  loadMethod(request, toResult, options, callback) {
+  private loadMethod(request: CallableFunction, toResult: CallableFunction, options?: LoadMethodOptions, callback?: CallableFunction) {
     const mutexValue = ++mutexCounter;
     if (typeof options === 'function' && !callback) {
       callback = options;
@@ -95,10 +260,7 @@ class CubeApi {
     const checkMutex = async () => {
       const requestInstance = await requestPromise;
 
-      if (
-        options.mutexObj &&
-        options.mutexObj[mutexKey] !== mutexValue
-      ) {
+      if (options?.mutexObj?.[mutexKey] !== mutexValue) {
         unsubscribed = true;
         if (requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
@@ -109,47 +271,48 @@ class CubeApi {
 
     let networkRetries = this.networkErrorRetries;
 
-    const loadImpl = async (response, next) => {
+    const loadImpl = async (response: Response | ErrorResponse, next: CallableFunction) => {
       const requestInstance = await requestPromise;
 
       const subscribeNext = async () => {
-        if (options.subscribe && !unsubscribed) {
+        if (options?.subscribe && !unsubscribed) {
           if (requestInstance.unsubscribe) {
             return next();
           } else {
-            await new Promise(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
+            await new Promise<void>(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
             return next();
           }
         }
         return null;
       };
 
-      const continueWait = async (wait) => {
+      const continueWait = async (wait: boolean = false) => {
         if (!unsubscribed) {
           if (wait) {
-            await new Promise(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
+            await new Promise<void>(resolve => setTimeout(() => resolve(), this.pollInterval * 1000));
           }
           return next();
         }
         return null;
       };
 
-      if (options.subscribe && !skipAuthorizationUpdate) {
+      if (options?.subscribe && !skipAuthorizationUpdate) {
         await this.updateTransportAuthorization();
       }
 
       skipAuthorizationUpdate = false;
 
-      if (response.status === 502 ||
-        response.error &&
-        response.error.toLowerCase() === 'network error' &&
+      if (('status' in response && response.status === 502) ||
+        ('error' in response && response.error?.toLowerCase() === 'network error') &&
         --networkRetries >= 0
       ) {
         await checkMutex();
         return continueWait(true);
       }
 
-      let body = {};
+      // From here we're sure that response is only fetch Response
+      response = (response as Response);
+      let body: BodyResponse = {};
       let text = '';
       try {
         text = await response.text();
@@ -160,19 +323,19 @@ class CubeApi {
 
       if (body.error === 'Continue wait') {
         await checkMutex();
-        if (options.progressCallback) {
-          options.progressCallback(new ProgressResult(body));
+        if (options?.progressCallback) {
+          options.progressCallback(new ProgressResult(body as ProgressResponse));
         }
         return continueWait();
       }
 
       if (response.status !== 200) {
         await checkMutex();
-        if (!options.subscribe && requestInstance.unsubscribe) {
+        if (!options?.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
         }
 
-        const error = new RequestError(body.error, body, response.status); // TODO error class
+        const error = new RequestError(body.error || '', body, response.status);
         if (callback) {
           callback(error);
         } else {
@@ -182,7 +345,7 @@ class CubeApi {
         return subscribeNext();
       }
       await checkMutex();
-      if (!options.subscribe && requestInstance.unsubscribe) {
+      if (!options?.subscribe && requestInstance.unsubscribe) {
         await requestInstance.unsubscribe();
       }
       const result = toResult(body);
@@ -214,46 +377,43 @@ class CubeApi {
     }
   }
 
-  async updateTransportAuthorization() {
+  private async updateTransportAuthorization() {
     if (this.updateAuthorizationPromise) {
       await this.updateAuthorizationPromise;
       return;
     }
 
-    if (typeof this.apiToken === 'function') {
-      this.updateAuthorizationPromise = new Promise(async (resolve, reject) => {
+    const tokenFetcher = this.apiToken;
+
+    if (typeof tokenFetcher === 'function') {
+      const promise = (async () => {
         try {
-          const token = await this.apiToken();
+          const token = await tokenFetcher();
+
           if (this.transport.authorization !== token) {
             this.transport.authorization = token;
           }
-          resolve();
-        } catch (error) {
-          reject(error);
         } finally {
           this.updateAuthorizationPromise = null;
         }
-      });
+      })();
 
-      await this.updateAuthorizationPromise;
+      this.updateAuthorizationPromise = promise;
+      await promise;
     }
   }
 
   /**
    * Add system properties to a query object.
-   * @param {Query} query
-   * @param {string} responseFormat
-   * @returns {void}
-   * @private
    */
-  patchQueryInternal(query, responseFormat) {
+  private patchQueryInternal(query: DeeplyReadonly<Query>, responseFormat: ResponseFormat): DeeplyReadonly<Query> {
     if (
-      responseFormat === ResultType.COMPACT &&
-      query.responseFormat !== ResultType.COMPACT
+      responseFormat === 'compact' &&
+      query.responseFormat !== 'compact'
     ) {
       return {
         ...query,
-        responseFormat: ResultType.COMPACT,
+        responseFormat: 'compact',
       };
     } else {
       return query;
@@ -263,26 +423,22 @@ class CubeApi {
   /**
    * Process result fetched from the gateway#load method according
    * to the network protocol.
-   * @param {*} response
-   * @returns ResultSet
-   * @private
    */
-  loadResponseInternal(response, options = {}) {
+  protected loadResponseInternal(response: LoadResponse<any>, options: LoadMethodOptions | null = {}): ResultSet<any> {
     if (
       response.results.length
     ) {
-      if (options.castNumerics) {
+      if (options?.castNumerics) {
         response.results.forEach((result) => {
           const numericMembers = Object.entries({
             ...result.annotation.measures,
             ...result.annotation.dimensions,
-          }).map(([k, v]) => {
+          }).reduce<string[]>((acc, [k, v]) => {
             if (v.type === 'number') {
-              return k;
+              acc.push(k);
             }
-
-            return undefined;
-          }).filter(Boolean);
+            return acc;
+          }, []);
 
           result.data = result.data.map((row) => {
             numericMembers.forEach((key) => {
@@ -297,12 +453,13 @@ class CubeApi {
       }
 
       if (response.results[0].query.responseFormat &&
-        response.results[0].query.responseFormat === ResultType.COMPACT) {
+        response.results[0].query.responseFormat === 'compact') {
         response.results.forEach((result, j) => {
-          const data = [];
-          result.data.dataset.forEach((r) => {
-            const row = {};
-            result.data.members.forEach((m, i) => {
+          const data: Record<string, any>[] = [];
+          const { dataset, members } = result.data as unknown as { dataset: any[]; members: string[] };
+          dataset.forEach((r) => {
+            const row: Record<string, any> = {};
+            members.forEach((m, i) => {
               row[m] = r[i];
             });
             data.push(row);
@@ -317,94 +474,197 @@ class CubeApi {
     });
   }
 
-  load(query, options, callback, responseFormat = ResultType.DEFAULT) {
-    options = {
-      castNumerics: this.castNumerics,
-      ...options
-    };
+  public load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+    query: QueryType,
+    options?: LoadMethodOptions,
+  ): Promise<ResultSet<QueryRecordType<QueryType>>>;
 
-    if (responseFormat === ResultType.COMPACT) {
-      if (Array.isArray(query)) {
-        query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
-      } else {
-        query = this.patchQueryInternal(query, ResultType.COMPACT);
-      }
-    }
+  public load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+    query: QueryType,
+    options?: LoadMethodOptions,
+    callback?: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
+  ): UnsubscribeObj;
+
+  public load<QueryType extends DeeplyReadonly<Query | Query[]>>(
+    query: QueryType,
+    options?: LoadMethodOptions,
+    callback?: LoadMethodCallback<ResultSet<any>>,
+    responseFormat?: string
+  ): Promise<ResultSet<QueryRecordType<QueryType>>>;
+
+  /**
+   * Fetch data for the passed `query`.
+   *
+   * ```js
+   * import cube from '@cubejs-client/core';
+   * import Chart from 'chart.js';
+   * import chartjsConfig from './toChartjsData';
+   *
+   * const cubeApi = cube('CUBEJS_TOKEN');
+   *
+   * const resultSet = await cubeApi.load({
+   *  measures: ['Stories.count'],
+   *  timeDimensions: [{
+   *    dimension: 'Stories.time',
+   *    dateRange: ['2015-01-01', '2015-12-31'],
+   *    granularity: 'month'
+   *   }]
+   * });
+   *
+   * const context = document.getElementById('myChart');
+   * new Chart(context, chartjsConfig(resultSet));
+   * ```
+   * @param query - [Query object](/product/apis-integrations/rest-api/query-format)
+   * @param options
+   * @param callback
+   * @param responseFormat
+   */
+  public load<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions, callback?: CallableFunction, responseFormat: ResponseFormat = 'default') {
+    [query, options] = this.prepareQueryOptions(query, options, responseFormat);
     return this.loadMethod(
       () => this.request('load', {
         query,
         queryType: 'multi',
         signal: options.signal
       }),
-      (response) => this.loadResponseInternal(response, options),
+      (response: any) => this.loadResponseInternal(response, options),
       options,
       callback
     );
   }
 
-  subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
+  private prepareQueryOptions<QueryType extends DeeplyReadonly<Query | Query[]>>(query: QueryType, options?: LoadMethodOptions | null, responseFormat: ResponseFormat = 'default'): [query: QueryType, options: LoadMethodOptions] {
     options = {
       castNumerics: this.castNumerics,
       ...options
     };
 
-    if (responseFormat === ResultType.COMPACT) {
+    if (responseFormat === 'compact') {
       if (Array.isArray(query)) {
-        query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
+        const patched = query.map((q) => this.patchQueryInternal(q, 'compact'));
+        return [patched as unknown as QueryType, options];
       } else {
-        query = this.patchQueryInternal(query, ResultType.COMPACT);
+        const patched = this.patchQueryInternal(query as DeeplyReadonly<Query>, 'compact');
+        return [patched as QueryType, options];
       }
     }
+
+    return [query, options];
+  }
+
+  /**
+   * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](/product/apis-integrations/rest-api/real-time-data-fetch)
+   *
+   * ```js
+   * // Subscribe to a query's updates
+   * const subscription = await cubeApi.subscribe(
+   *   {
+   *     measures: ['Logs.count'],
+   *     timeDimensions: [
+   *       {
+   *         dimension: 'Logs.time',
+   *         granularity: 'hour',
+   *         dateRange: 'last 1440 minutes',
+   *       },
+   *     ],
+   *   },
+   *   options,
+   *   (error, resultSet) => {
+   *     if (!error) {
+   *       // handle the update
+   *     }
+   *   }
+   * );
+   *
+   * // Unsubscribe from a query's updates
+   * subscription.unsubscribe();
+   * ```
+   */
+  public subscribe<QueryType extends DeeplyReadonly<Query | Query[]>>(
+    query: QueryType,
+    options: LoadMethodOptions | null,
+    callback: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
+    responseFormat: ResponseFormat = 'default'
+  ): UnsubscribeObj {
+    [query, options] = this.prepareQueryOptions(query, options, responseFormat);
     return this.loadMethod(
       () => this.request('subscribe', {
         query,
         queryType: 'multi',
         signal: options.signal
       }),
-      (response) => this.loadResponseInternal(response, options),
+      (response: any) => this.loadResponseInternal(response, options),
       { ...options, subscribe: true },
       callback
-    );
+    ) as UnsubscribeObj;
   }
 
-  sql(query, options, callback) {
+  public sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<SqlQuery>;
+
+  public sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): UnsubscribeObj;
+
+  /**
+   * Get generated SQL string for the given `query`.
+   */
+  public sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): Promise<SqlQuery> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('sql', {
         query,
         signal: options?.signal
       }),
-      (response) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
+      (response: any) => (Array.isArray(response) ? response.map((body) => new SqlQuery(body)) : new SqlQuery(response)),
       options,
       callback
     );
   }
 
-  meta(options, callback) {
+  public meta(options?: LoadMethodOptions): Promise<Meta>;
+
+  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
+
+  /**
+   * Get meta description of cubes available for querying.
+   */
+  public meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): Promise<Meta> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('meta', {
         signal: options?.signal
       }),
-      (body) => new Meta(body),
+      (body: MetaResponse) => new Meta(body),
       options,
       callback
     );
   }
 
-  dryRun(query, options, callback) {
+  public dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<DryRunResponse>;
+
+  public dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): UnsubscribeObj;
+
+  /**
+   * Get query related meta without query execution
+   */
+  public dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): Promise<DryRunResponse> | UnsubscribeObj {
     return this.loadMethod(
       () => this.request('dry-run', {
         query,
         signal: options?.signal
       }),
-      (response) => response,
+      (response: DryRunResponse) => response,
       options,
       callback
     );
   }
 }
 
-export default (apiToken, options) => new CubeApi(apiToken, options);
+export default (apiToken: string | (() => Promise<string>), options: CubeApiOptions) => new CubeApi(apiToken, options);
 
-export { CubeApi, HttpTransport, ResultSet, RequestError, Meta };
+export { CubeApi };
+export * from './Meta';
+export * from './SqlQuery';
+export * from './RequestError';
+export * from './ProgressResult';
+export { default as ResultSet } from './ResultSet';
+export * from './HttpTransport';
 export * from './utils';
 export * from './time';
+export * from './types';

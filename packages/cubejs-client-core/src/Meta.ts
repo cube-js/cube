@@ -1,10 +1,37 @@
-/**
- * @module @cubejs-client/core
- */
-
 import { unnest, fromPairs } from 'ramda';
+import {
+  Cube,
+  CubesMap,
+  MemberType,
+  MetaResponse,
+  TCubeMeasure,
+  TCubeDimension,
+  TCubeMember,
+  TCubeMemberByType,
+  Query,
+  FilterOperator,
+  TCubeSegment, NotFoundMember
+} from './types';
+import { DeeplyReadonly } from './index';
 
-const memberMap = (memberArray) => fromPairs(memberArray.map((m) => [m.name, m]));
+export interface CubeMemberWrapper<T> {
+  cubeName: string;
+  cubeTitle: string;
+  type?: 'view' | 'cube';
+  public?: boolean;
+  members: T[];
+}
+
+export type AggregatedMembers = {
+  measures: CubeMemberWrapper<TCubeMeasure>[];
+  dimensions: CubeMemberWrapper<TCubeDimension>[];
+  segments: CubeMemberWrapper<TCubeSegment>[];
+  timeDimensions: CubeMemberWrapper<TCubeDimension>[];
+};
+
+const memberMap = (memberArray: any[]) => fromPairs(
+  memberArray.map((m) => [m.name, m])
+);
 
 const operators = {
   string: [
@@ -44,8 +71,23 @@ const operators = {
 /**
  * Contains information about available cubes and it's members.
  */
-class Meta {
-  constructor(metaResponse) {
+export default class Meta {
+  /**
+   * Raw meta response
+   */
+  public readonly meta: MetaResponse;
+
+  /**
+   * An array of all available cubes with their members
+   */
+  public readonly cubes: Cube[];
+
+  /**
+   * A map of all cubes where the key is a cube name
+   */
+  public readonly cubesMap: CubesMap;
+
+  public constructor(metaResponse: MetaResponse) {
     this.meta = metaResponse;
     const { cubes } = this.meta;
     this.cubes = cubes;
@@ -61,33 +103,64 @@ class Meta {
     );
   }
 
-  membersForQuery(query, memberType) {
-    return unnest(this.cubes.map((c) => c[memberType])).sort((a, b) => (a.title > b.title ? 1 : -1));
+  /**
+   * Get all members of a specific type for a given query.
+   * If empty query is provided no filtering is done based on query context and all available members are retrieved.
+   * @param _query - context query to provide filtering of members available to add to this query
+   * @param memberType
+   */
+  public membersForQuery(_query: DeeplyReadonly<Query> | null, memberType: MemberType): (TCubeMeasure | TCubeDimension | TCubeMember | TCubeSegment)[] {
+    return unnest(this.cubes.map((c) => c[memberType]))
+      .sort((a, b) => (a.title > b.title ? 1 : -1));
   }
 
-  membersGroupedByCube() {
+  public membersGroupedByCube() {
     const memberKeys = ['measures', 'dimensions', 'segments', 'timeDimensions'];
 
-    return this.cubes.reduce(
+    return this.cubes.reduce<AggregatedMembers>(
       (memo, cube) => {
         memberKeys.forEach((key) => {
-          let members = cube[key];
+          let members: TCubeMeasure[] | TCubeDimension[] | TCubeSegment[] = [];
 
-          if (key === 'timeDimensions') {
-            members = cube.dimensions.filter((m) => m.type === 'time');
+          // eslint-disable-next-line default-case
+          switch (key) {
+            case 'measures':
+              members = cube.measures || [];
+              break;
+            case 'dimensions':
+              members = cube.dimensions || [];
+              break;
+            case 'segments':
+              members = cube.segments || [];
+              break;
+            case 'timeDimensions':
+              members = cube.dimensions.filter((m) => m.type === 'time') || [];
+              break;
           }
 
-          memo[key] = [
-            ...memo[key],
-            {
-              cubeName: cube.name,
-              cubeTitle: cube.title,
-              type: cube.type,
-              public: cube.public,
-              members
-            },
-          ];
+          // TODO: Convince TS this is working
+          // @ts-ignore
+          memo[key].push({
+            cubeName: cube.name,
+            cubeTitle: cube.title,
+            type: cube.type,
+            public: cube.public,
+            members,
+          });
         });
+
+        const timeDimensionMembers = cube.dimensions.filter((m) => m.type === 'time');
+
+        memo.timeDimensions = [
+          ...memo.timeDimensions,
+          {
+            cubeName: cube.name,
+            cubeTitle: cube.title,
+            type: cube.type,
+            public: cube.public,
+            members: timeDimensionMembers,
+          },
+        ];
 
         return memo;
       },
@@ -100,7 +173,27 @@ class Meta {
     );
   }
 
-  resolveMember(memberName, memberType) {
+  /**
+   * Get meta information for a cube member
+   * meta information contains:
+   * ```javascript
+   * {
+   *   name,
+   *   title,
+   *   shortTitle,
+   *   type,
+   *   description,
+   *   format
+   * }
+   * ```
+   * @param memberName - Fully qualified member name in a form `Cube.memberName`
+   * @param memberType
+   * @return An object containing meta information about member
+   */
+  public resolveMember<T extends MemberType>(
+    memberName: string,
+    memberType: T | T[]
+  ): NotFoundMember | TCubeMemberByType<T> {
     const [cube] = memberName.split('.');
 
     if (!this.cubesMap[cube]) {
@@ -119,10 +212,10 @@ class Meta {
       };
     }
 
-    return member;
+    return member as TCubeMemberByType<T>;
   }
 
-  defaultTimeDimensionNameFor(memberName) {
+  public defaultTimeDimensionNameFor(memberName: string): string | null | undefined {
     const [cube] = memberName.split('.');
     if (!this.cubesMap[cube]) {
       return null;
@@ -132,11 +225,13 @@ class Meta {
     );
   }
 
-  filterOperatorsForMember(memberName, memberType) {
+  public filterOperatorsForMember(memberName: string, memberType: MemberType | MemberType[]): FilterOperator[] {
     const member = this.resolveMember(memberName, memberType);
+
+    if ('error' in member || !('type' in member) || member.type === 'boolean') {
+      return operators.string;
+    }
 
     return operators[member.type] || operators.string;
   }
 }
-
-export default Meta;
