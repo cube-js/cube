@@ -1,5 +1,6 @@
 import Meta from './Meta';
 import { TimeDimensionGranularity } from './time';
+import { TransportOptions } from './HttpTransport';
 
 export type QueryOrder = 'asc' | 'desc' | 'none';
 
@@ -245,11 +246,11 @@ export type PivotConfig = {
   /**
    * Dimensions to put on **x** or **rows** axis.
    */
-  x: string[];
+  x?: string[];
   /**
    * Dimensions to put on **y** or **columns** axis.
    */
-  y: string[];
+  y?: string[];
   /**
    * If `true` missing dates on the time dimensions will be filled with fillWithValue or `0` by default for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query
    */
@@ -262,6 +263,11 @@ export type PivotConfig = {
    * Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#result-set-chart-pivot)
    */
   aliasSeries?: string[];
+};
+
+export type PivotConfigFull = Omit<PivotConfig, 'x' | 'y'> & {
+  x: string[];
+  y: string[];
 };
 
 export type DrillDownLocator = {

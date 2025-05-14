@@ -10,15 +10,16 @@ import {
   TCubeMemberByType,
   Query,
   FilterOperator,
-  TCubeSegment, NotFoundMember
+  TCubeSegment,
+  NotFoundMember,
 } from './types';
 import { DeeplyReadonly } from './index';
 
 export interface CubeMemberWrapper<T> {
   cubeName: string;
   cubeTitle: string;
-  type?: 'view' | 'cube';
-  public?: boolean;
+  type: 'view' | 'cube';
+  public: boolean;
   members: T[];
 }
 
@@ -149,19 +150,6 @@ export default class Meta {
           });
         });
 
-        const timeDimensionMembers = cube.dimensions.filter((m) => m.type === 'time');
-
-        memo.timeDimensions = [
-          ...memo.timeDimensions,
-          {
-            cubeName: cube.name,
-            cubeTitle: cube.title,
-            type: cube.type,
-            public: cube.public,
-            members: timeDimensionMembers,
-          },
-        ];
-
         return memo;
       },
       {
@@ -169,7 +157,7 @@ export default class Meta {
         dimensions: [],
         segments: [],
         timeDimensions: [],
-      }
+      } as AggregatedMembers
     );
   }
 

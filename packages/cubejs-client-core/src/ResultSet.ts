@@ -20,7 +20,7 @@ import {
   DrillDownLocator,
   LoadResponse,
   LoadResponseResult, Pivot,
-  PivotConfig,
+  PivotConfig, PivotConfigFull,
   PivotQuery,
   PivotRow,
   Query,
@@ -72,7 +72,7 @@ export type ResultSetOptions = {
 /**
  * Provides a convenient interface for data manipulation.
  */
-export default class ResultSet<T extends Record<string, any>> {
+export default class ResultSet<T extends Record<string, any> = any> {
   private readonly loadResponse: LoadResponse<T>;
 
   private readonly loadResponses: LoadResponseResult<T>[];
@@ -365,7 +365,7 @@ export default class ResultSet<T extends Record<string, any>> {
     return axisValues.map(formatValue).join(delimiter);
   }
 
-  public static getNormalizedPivotConfig(query: PivotQuery, pivotConfig?: Partial<PivotConfig>): PivotConfig {
+  public static getNormalizedPivotConfig(query: PivotQuery, pivotConfig?: PivotConfig): PivotConfigFull {
     const defaultPivotConfig: PivotConfig = {
       x: [],
       y: [],
@@ -388,7 +388,7 @@ export default class ResultSet<T extends Record<string, any>> {
       y: []
     });
 
-    const normalizedPivotConfig = mergeDeepLeft(pivotConfig, defaultPivotConfig) as PivotConfig;
+    const normalizedPivotConfig = mergeDeepLeft(pivotConfig, defaultPivotConfig) as PivotConfigFull;
 
     const substituteTimeDimensionMembers = (axis: string[]) => axis.map(
       subDim => (
@@ -431,7 +431,7 @@ export default class ResultSet<T extends Record<string, any>> {
     return normalizedPivotConfig;
   }
 
-  public normalizePivotConfig(pivotConfig?: Partial<PivotConfig>): PivotConfig {
+  public normalizePivotConfig(pivotConfig?: PivotConfig): PivotConfigFull {
     return ResultSet.getNormalizedPivotConfig(this.loadResponse.pivotQuery, pivotConfig);
   }
 
@@ -527,7 +527,7 @@ export default class ResultSet<T extends Record<string, any>> {
    * ```
    * @returns An array of pivoted rows.
    */
-  public pivot(pivotConfig?: Partial<PivotConfig>): PivotRow[] {
+  public pivot(pivotConfig?: PivotConfig): PivotRow[] {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const { pivotQuery: query } = this.loadResponse;
 
@@ -716,7 +716,7 @@ export default class ResultSet<T extends Record<string, any>> {
    * ]
    * ```
    */
-  public chartPivot(pivotConfig?: Partial<PivotConfig>): ChartPivotRow[] {
+  public chartPivot(pivotConfig?: PivotConfig): ChartPivotRow[] {
     const validate = (value: string) => {
       if (this.parseDateMeasures && LocalDateRegex.test(value)) {
         return new Date(value);
@@ -776,7 +776,7 @@ export default class ResultSet<T extends Record<string, any>> {
    * ```
    * @returns An array of pivoted rows
    */
-  public tablePivot(pivotConfig?: Partial<PivotConfig>): Array<{ [key: string]: string | number | boolean }> {
+  public tablePivot(pivotConfig?: PivotConfig): Array<{ [key: string]: string | number | boolean }> {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig || {});
     const isMeasuresPresent = normalizedPivotConfig.x.concat(normalizedPivotConfig.y).includes('measures');
 
@@ -1043,7 +1043,7 @@ export default class ResultSet<T extends Record<string, any>> {
    * ```
    * @returns An array of series names
    */
-  public seriesNames(pivotConfig?: Partial<PivotConfig>): SeriesNamesColumn[] {
+  public seriesNames(pivotConfig?: PivotConfig): SeriesNamesColumn[] {
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
     const measures = this.loadResponses
       .map(r => r.annotation.measures)

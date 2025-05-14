@@ -287,10 +287,10 @@ export function movePivotItem(
 ): PivotConfig {
   const nextPivotConfig = {
     ...pivotConfig,
-    x: [...pivotConfig.x],
-    y: [...pivotConfig.y],
+    x: [...(pivotConfig.x || [])],
+    y: [...(pivotConfig.y || [])],
   };
-  const id = pivotConfig[sourceAxis][sourceIndex];
+  const id = pivotConfig[sourceAxis]![sourceIndex];
   const lastIndex = nextPivotConfig[destinationAxis].length - 1;
 
   if (id === 'measures') {
