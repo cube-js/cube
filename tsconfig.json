@@ -2,6 +2,9 @@
   "extends": "./tsconfig.base.json",
   "references": [
     {
+      "path": "packages/cubejs-client-core"
+    },
+    {
       "path": "packages/cubejs-client-ws-transport"
     },
     {
@@ -27,9 +30,6 @@
     },
     {
       "path": "packages/cubejs-cubestore-driver"
-    },
-    {
-      "path": "packages/cubejs-client-core"
     },
     {
       "path": "packages/cubejs-query-orchestrator"
