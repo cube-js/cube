@@ -1331,7 +1331,8 @@ export class BaseQuery {
         timeDimensions: this.options.timeDimensions || [],
         multiStageTimeDimensions: (this.options.timeDimensions || []).filter(td => !!td.granularity),
         // TODO accessing filters directly from options might miss some processing logic
-        filters: this.options.filters || []
+        filters: this.options.filters || [],
+        segments: this.options.segments || [],
       },
       allMemberChildren,
       withQueries
@@ -1450,10 +1451,14 @@ export class BaseQuery {
       const allBackAliasMembers = this.allBackAliasTimeDimensions();
       let { commonTimeShift } = queryContext;
       const timeShifts = queryContext.timeShifts || {};
+      const memberOfCube = !this.cubeEvaluator.cubeFromPath(memberPath).isView;
 
       if (memberDef.timeShiftReferences.length === 1 && !memberDef.timeShiftReferences[0].timeDimension) {
         const timeShift = memberDef.timeShiftReferences[0];
-        commonTimeShift = timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval;
+        // We avoid view's timeshift evaluation as there will be another round of underlying cube's member evaluation
+        if (memberOfCube) {
+          commonTimeShift = timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval;
+        }
 
         mapFn = (td) => {
           // We need to ignore aliased td, because it will match and insert shiftInterval on first
@@ -1468,9 +1473,12 @@ export class BaseQuery {
           };
         };
       } else {
-        memberDef.timeShiftReferences.forEach((r) => {
-          timeShifts[r.timeDimension] = r.type === 'next' ? this.negateInterval(r.interval) : r.interval;
-        });
+        // We avoid view's timeshift evaluation as there will be another round of underlying cube's member evaluation
+        if (memberOfCube) {
+          memberDef.timeShiftReferences.forEach((r) => {
+            timeShifts[r.timeDimension] = r.type === 'next' ? this.negateInterval(r.interval) : r.interval;
+          });
+        }
 
         mapFn = (td) => {
           const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension || td.dimension === allBackAliasMembers[r.timeDimension]);
@@ -1538,11 +1546,15 @@ export class BaseQuery {
         ...queryContext,
         // TODO make it same way as keepFilters
         timeDimensions: queryContext.timeDimensions.map(td => ({ ...td, dateRange: undefined })),
+        // TODO keep segments related to this multistage (if applicable)
+        segments: [],
         filters: this.keepFilters(queryContext.filters, filterMember => filterMember === memberPath),
       };
     } else {
       queryContext = {
         ...queryContext,
+        // TODO remove not related segments
+        // segments: queryContext.segments,
         filters: this.keepFilters(queryContext.filters, filterMember => !this.memberInstanceByPath(filterMember).isMultiStage()),
       };
     }
@@ -1602,6 +1614,7 @@ export class BaseQuery {
       multiStageDimensions: withQuery.multiStageDimensions,
       multiStageTimeDimensions: withQuery.multiStageTimeDimensions,
       filters: withQuery.filters,
+      segments: withQuery.segments,
       from: fromSql && {
         sql: fromSql,
         alias: `${withQuery.alias}_join`,
@@ -2908,8 +2921,10 @@ export class BaseQuery {
           return td.dimensionSql();
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+          const mp = this.cubeEvaluator.pathFromArray([cubeName, name]);
 
-          if (symbol.type === 'time') {
+          // Skip view's member evaluation as there will be underlying cube's same member evaluation
+          if (symbol.type === 'time' && !this.cubeEvaluator.cubeFromPath(mp).isView) {
             if (this.safeEvaluateSymbolContext().commonTimeShift) {
               res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().commonTimeShift)})`;
             } else if (this.safeEvaluateSymbolContext().timeShifts?.[this.cubeEvaluator.pathFromArray([cubeName, name])]) {
