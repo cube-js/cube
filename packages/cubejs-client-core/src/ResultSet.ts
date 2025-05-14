@@ -73,17 +73,17 @@ export type ResultSetOptions = {
  * Provides a convenient interface for data manipulation.
  */
 export default class ResultSet<T extends Record<string, any>> {
-  loadResponse: LoadResponse<T>;
+  private readonly loadResponse: LoadResponse<T>;
 
-  loadResponses: LoadResponseResult<T>[];
+  private readonly loadResponses: LoadResponseResult<T>[];
 
-  queryType: QueryType;
+  private readonly queryType: QueryType;
 
-  parseDateMeasures: boolean | undefined;
+  private readonly parseDateMeasures: boolean | undefined;
 
-  options: {};
+  private readonly options: {};
 
-  backwardCompatibleData: Record<string, any>[][];
+  private readonly backwardCompatibleData: Record<string, any>[][];
 
   public static measureFromAxis(axisValues: string[]): string {
     return axisValues[axisValues.length - 1];

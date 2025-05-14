@@ -1,7 +1,7 @@
 import { ProgressResponse } from './types';
 
 export default class ProgressResult {
-  progressResponse: ProgressResponse;
+  private progressResponse: ProgressResponse;
 
   public constructor(progressResponse: ProgressResponse) {
     this.progressResponse = progressResponse;

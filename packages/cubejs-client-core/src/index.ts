@@ -145,27 +145,27 @@ export type CubeApiOptions = {
  * Main class for accessing Cube API
  */
 class CubeApi {
-  apiToken: string | (() => Promise<string>) | (CubeApiOptions & any[]) | undefined;
+  private readonly apiToken: string | (() => Promise<string>) | (CubeApiOptions & any[]) | undefined;
 
-  apiUrl: string;
+  private readonly apiUrl: string;
 
-  method: TransportOptions['method'];
+  private readonly method: TransportOptions['method'];
 
-  headers: TransportOptions['headers'];
+  private readonly headers: TransportOptions['headers'];
 
-  credentials: TransportOptions['credentials'];
+  private readonly credentials: TransportOptions['credentials'];
 
-  transport: ITransport<any>;
+  private readonly transport: ITransport<any>;
 
-  pollInterval: number;
+  private readonly pollInterval: number;
 
-  parseDateMeasures: boolean | undefined;
+  private readonly parseDateMeasures: boolean | undefined;
 
-  castNumerics: boolean;
+  private readonly castNumerics: boolean;
 
-  networkErrorRetries: number;
+  private readonly networkErrorRetries: number;
 
-  updateAuthorizationPromise: Promise<any> | null;
+  private updateAuthorizationPromise: Promise<any> | null;
 
   public constructor(apiToken: string | (() => Promise<string>) | undefined, options: CubeApiOptions);
 
