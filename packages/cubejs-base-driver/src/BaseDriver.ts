@@ -375,9 +375,9 @@ export abstract class BaseDriver implements DriverInterface {
     return undefined;
   }
 
-  abstract testConnection(): Promise<void>;
+  public abstract testConnection(): Promise<void>;
 
-  abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
+  public abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async streamQuery(sql: string, values: string[]): Promise<stream.Readable> {
