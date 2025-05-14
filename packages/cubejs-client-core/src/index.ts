@@ -663,7 +663,6 @@ export * from './Meta';
 export * from './SqlQuery';
 export * from './RequestError';
 export * from './ProgressResult';
-export * from './ProgressResult';
 export { default as ResultSet } from './ResultSet';
 export * from './HttpTransport';
 export * from './utils';
