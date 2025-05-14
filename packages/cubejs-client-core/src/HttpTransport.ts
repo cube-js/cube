@@ -40,7 +40,7 @@ export interface ITransport<R> {
 /**
  * Default transport implementation.
  */
-class HttpTransport implements ITransport<Response> {
+export class HttpTransport implements ITransport<Response> {
   public authorization: TransportOptions['authorization'];
 
   protected apiUrl: TransportOptions['apiUrl'];

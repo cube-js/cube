@@ -328,7 +328,7 @@ export type TOrderMember = {
   order: QueryOrder | 'none';
 };
 
-type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
+export type TCubeMemberType = 'time' | 'number' | 'string' | 'boolean';
 
 // @see BaseCubeMember
 // @deprecated

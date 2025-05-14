@@ -1,5 +1,5 @@
 import { clone, equals, fromPairs, indexBy, prop, toPairs } from 'ramda';
-import { DeeplyReadonly } from 'src';
+import { DeeplyReadonly } from './index';
 import { DEFAULT_GRANULARITY } from './time';
 import {
   Filter,

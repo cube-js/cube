@@ -664,7 +664,7 @@ export { default as SqlQuery } from './SqlQuery';
 export { default as RequestError } from './RequestError';
 export { default as ProgressResult } from './ProgressResult';
 export { default as ResultSet } from './ResultSet';
-export { default as HttpTransport } from './HttpTransport';
+export * from './HttpTransport';
 export * from './utils';
 export * from './time';
 export * from './types';
