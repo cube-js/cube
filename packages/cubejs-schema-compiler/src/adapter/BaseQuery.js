@@ -1308,6 +1308,7 @@ export class BaseQuery {
               sqlResolveFn: (_symbol, cube, prop) => {
                 const path = this.cubeEvaluator.pathFromArray([cube, prop]);
                 refMemberPath = path;
+                // We don't need real SQL here, so just returning something.
                 return path;
               }
             });
