@@ -1,9 +1,9 @@
-import babel from "@rollup/plugin-babel";
-import resolve from "@rollup/plugin-node-resolve";
-import commonjs from "@rollup/plugin-commonjs";
-import alias from "@rollup/plugin-alias";
-import tsconfigPaths from "rollup-plugin-tsconfig-paths";
-import peerDepsExternal from "rollup-plugin-peer-deps-external";
+import babel from '@rollup/plugin-babel';
+import resolve from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import alias from '@rollup/plugin-alias';
+import tsconfigPaths from 'rollup-plugin-tsconfig-paths';
+import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import json from '@rollup/plugin-json';
 
 const bundle = (
@@ -16,31 +16,31 @@ const bundle = (
     ...(umdConfig || baseConfig),
     plugins: [
       commonjs({
-        extensions: [".js"],
+        extensions: ['.js'],
       }),
       resolve({
-        extensions: [".ts", ".js", ".json"],
-        mainFields: ["browser", "module", "main"],
+        extensions: ['.ts', '.js', '.json'],
+        mainFields: ['browser', 'module', 'main'],
       }),
       babel({
-        extensions: [".js", ".jsx", ".ts", ".tsx"],
-        exclude: ["node_modules/**", /\/core-js\//],
-        babelHelpers: "runtime",
+        extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        exclude: ['node_modules/**', /\/core-js\//],
+        babelHelpers: 'runtime',
         presets: [
-          "@babel/preset-react",
-          "@babel/preset-typescript",
+          '@babel/preset-react',
+          '@babel/preset-typescript',
           [
-            "@babel/preset-env",
+            '@babel/preset-env',
             {
               shippedProposals: true,
-              useBuiltIns: "usage",
+              useBuiltIns: 'usage',
               corejs: 3,
             },
           ],
         ],
         plugins: [
           [
-            "@babel/plugin-transform-runtime",
+            '@babel/plugin-transform-runtime',
             {
               corejs: false,
               helpers: true,
@@ -52,7 +52,7 @@ const bundle = (
       }),
       alias({
         entries: {
-          "@cubejs-client/core": "../cubejs-client-core/src/index.ts",
+          '@cubejs-client/core': '../cubejs-client-core/src/index.ts',
         },
       }),
     ],
@@ -79,31 +79,31 @@ const bundle = (
         json(),
         tsconfigPaths(),
         resolve({
-          extensions: [".mjs", ".js", ".jsx", ".ts", ".tsx", ".json"],
+          extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
           browser: false,
           preferBuiltins: true,
         }),
         commonjs(),
         peerDepsExternal(),
         babel({
-          extensions: [".js", ".jsx", ".ts", ".tsx"],
-          exclude: "node_modules/**",
-          babelHelpers: "runtime",
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+          exclude: 'node_modules/**',
+          babelHelpers: 'runtime',
           presets: [
-            "@babel/preset-react",
-            "@babel/preset-typescript",
+            '@babel/preset-react',
+            '@babel/preset-typescript',
             [
-              "@babel/preset-env",
+              '@babel/preset-env',
               {
                 shippedProposals: true,
-                useBuiltIns: "usage",
+                useBuiltIns: 'usage',
                 corejs: 3,
               },
             ],
           ],
           plugins: [
             [
-              "@babel/plugin-transform-runtime",
+              '@babel/plugin-transform-runtime',
               {
                 corejs: false,
                 helpers: true,
@@ -117,7 +117,7 @@ const bundle = (
       output: [
         {
           file: `packages/${name}/dist/${name}.js`,
-          format: "cjs",
+          format: 'cjs',
           sourcemap: true,
         },
       ],
@@ -128,7 +128,7 @@ const bundle = (
       plugins: [
         tsconfigPaths(),
         resolve({
-          extensions: [".mjs", ".js", ".jsx", ".ts", ".tsx", ".json"],
+          extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
           browser: true,
           preferBuiltins: false,
         }),
@@ -156,41 +156,41 @@ const bundle = (
 };
 
 export default bundle(
-  "cubejs-client-core",
-  "cubejs",
+  'cubejs-client-core',
+  'cubejs',
   {
-    input: "packages/cubejs-client-core/src/index.ts",
+    input: 'packages/cubejs-client-core/src/index.ts',
   },
   {
     input: 'packages/cubejs-client-core/src/index.umd.ts',
   }
 )
-.concat(
-  bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
-    input: 'packages/cubejs-client-ws-transport/src/index.ts',
-  })
-)
-.concat(
-  bundle('cubejs-client-react', 'cubejsReact', {
-    input: 'packages/cubejs-client-react/src/index.js',
-    external: ['react', 'prop-types'],
-  })
-)
-.concat(
-  bundle('cubejs-client-vue', 'cubejsVue', {
-    input: 'packages/cubejs-client-vue/src/index.js',
-    external: ['vue'],
-    globals: {
-      vue: 'Vue',
-    },
-  })
-)
-.concat(
-  bundle('cubejs-client-vue3', 'cubejsVue3', {
-    input: 'packages/cubejs-client-vue3/src/index.js',
-    external: ['vue'],
-    globals: {
-      vue: 'Vue',
-    },
-  })
-);
+  .concat(
+    bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
+      input: 'packages/cubejs-client-ws-transport/src/index.ts',
+    })
+  )
+  .concat(
+    bundle('cubejs-client-react', 'cubejsReact', {
+      input: 'packages/cubejs-client-react/src/index.js',
+      external: ['react', 'prop-types'],
+    })
+  )
+  .concat(
+    bundle('cubejs-client-vue', 'cubejsVue', {
+      input: 'packages/cubejs-client-vue/src/index.js',
+      external: ['vue'],
+      globals: {
+        vue: 'Vue',
+      },
+    })
+  )
+  .concat(
+    bundle('cubejs-client-vue3', 'cubejsVue3', {
+      input: 'packages/cubejs-client-vue3/src/index.js',
+      external: ['vue'],
+      globals: {
+        vue: 'Vue',
+      },
+    })
+  );
