@@ -9,7 +9,6 @@
   },
   "description": "Cube client",
   "main": "dist/cubejs-client-core.cjs.js",
-  "module": "dist/src/index.js",
   "browser": "dist/cubejs-client-core.umd.js",
   "typings": "dist/src/index.d.ts",
   "author": "Cube Dev, Inc.",
