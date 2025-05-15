@@ -80,6 +80,7 @@ Common rules apply to names of entities within the data model. All names must:
 - Start with a letter.
 - Consist of letters, numbers, and underscore (`_`) symbols only.
 - Not be a [reserved keyword in Python][link-python-reserved-words], e.g., `from`, `return`, or `yield`.
+- When using the DAX API, not clash with the names of columns in [date hierarchies][ref-dax-api-date-hierarchies].
 
 It is also recommended that names use [snake case][wiki-snake-case].
 
@@ -778,3 +779,4 @@ defining dynamic data models.
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
 [link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
 [link-python-reserved-words]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
+[ref-dax-api-date-hierarchies]: /product/apis-integrations/dax-api#date-hierarchies

@@ -576,12 +576,6 @@ In order to be able to work with time series data, Cube needs to identify
 a time dimension which is a timestamp column in your database. You can define
 several time dimensions in a single cube.
 
-Note that the type of the target column should be `TIMESTAMP`. 
-If your time-based column is type `DATE` or another temporal type, 
-you should cast it to a timestamp in the `sql` parameter of the dimension. Please see
-[this recipe][ref-string-time-dims] if your datetime information is stored
-as a string.
-
 <CodeTabs>
 
 ```javascript
@@ -609,6 +603,17 @@ cubes:
 ```
 
 </CodeTabs>
+
+Note that the type of the target column should be `TIMESTAMP`. 
+If your time-based column is type `DATE` or another temporal type, 
+you should cast it to a timestamp in the `sql` parameter of the dimension.
+
+<ReferenceBox>
+
+Please see [this recipe][ref-string-time-dims] if your datetime information is stored
+as a string.
+
+</ReferenceBox>
 
 ### `string`
 
