@@ -1,5 +1,5 @@
 /**
- * @license Apache-2.0
+ * @license MIT License
  * @copyright Cube Dev, Inc.
  * @fileoverview Test signal parameter in CubeApi
  */
