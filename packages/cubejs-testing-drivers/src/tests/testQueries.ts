@@ -2025,5 +2025,19 @@ from
       `);
       expect(res.rows).toMatchSnapshot('nulls_first_last_sql_push_down');
     });
+
+    executePg('SQL API: Timeshift measure from cube', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          DATE_TRUNC('month', orderDate) AS "orderDate",
+          MEASURE(totalQuantity) AS "totalQuantity",
+          MEASURE(totalQuantityPriorMonth) AS "totalQuantityPriorMonth"
+        FROM "ECommerce"
+        WHERE orderDate >= CAST('2020-01-01' AS DATE) AND orderDate < CAST('2021-01-01' AS DATE)
+        GROUP BY 1
+        ORDER BY 1 ASC NULLS FIRST;
+      `);
+      expect(res.rows).toMatchSnapshot();
+    });
   });
 }
