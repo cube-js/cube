@@ -23,7 +23,7 @@
     "dayjs": "^1.10.4",
     "ramda": "^0.27.2",
     "url-search-params-polyfill": "^7.0.0",
-    "uuid": "^8.3.2"
+    "uuid": "^11.1.0"
   },
   "scripts": {
     "build:client-core": "rm -rf dist && npm run tsc",
@@ -43,7 +43,6 @@
     "@types/jest": "^29",
     "@types/moment-range": "^4.0.0",
     "@types/ramda": "^0.27.34",
-    "@types/uuid": "^8.3.0",
     "babel-jest": "^29",
     "jest": "^29",
     "typescript": "~5.2.2"
