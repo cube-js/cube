@@ -365,7 +365,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
     return axisValues.map(formatValue).join(delimiter);
   }
 
-  public static getNormalizedPivotConfig(query: PivotQuery, pivotConfig?: PivotConfig): PivotConfigFull {
+  public static getNormalizedPivotConfig(query?: PivotQuery, pivotConfig?: PivotConfig): PivotConfigFull {
     const defaultPivotConfig: PivotConfig = {
       x: [],
       y: [],
@@ -376,9 +376,9 @@ export default class ResultSet<T extends Record<string, any> = any> {
     const {
       measures = [],
       dimensions = []
-    } = query;
+    } = query || {};
 
-    const timeDimensions = (query.timeDimensions || []).filter(td => !!td.granularity);
+    const timeDimensions = (query?.timeDimensions || []).filter(td => !!td.granularity);
 
     pivotConfig = pivotConfig || (timeDimensions.length ? {
       x: timeDimensions.map(td => ResultSet.timeDimensionMember(td)),
@@ -396,7 +396,7 @@ export default class ResultSet<T extends Record<string, any> = any> {
           timeDimensions.find(td => td.dimension === subDim) &&
           !dimensions.find(d => d === subDim)
         ) ?
-          ResultSet.timeDimensionMember((query.timeDimensions || []).find(td => td.dimension === subDim)!) :
+          ResultSet.timeDimensionMember((query?.timeDimensions || []).find(td => td.dimension === subDim)!) :
           subDim
       )
     );
