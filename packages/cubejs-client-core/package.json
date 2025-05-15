@@ -21,7 +21,7 @@
     "uuid": "^8.3.2"
   },
   "scripts": {
-    "build": "rm -rf dist && npm run tsc",
+    "build:client-core": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",

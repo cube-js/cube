@@ -14,7 +14,7 @@
     ]
   },
   "scripts": {
-    "build": "rollup -c",
+    "build": "yarn lerna run build:client-core && rollup -c",
     "watch": "rollup -c -w",
     "watch-local": "CUBEJS_API_URL=http://localhost:6020/cubejs-api/v1 rollup -c -w",
     "lint:npm": "yarn npmPkgJsonLint packages/*/package.json rust/package.json",
