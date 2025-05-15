@@ -7,11 +7,16 @@
     "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-core"
   },
-  "description": "cube.js client",
-  "main": "dist/src/index.js",
-  "module": "dist/cubejs-client-core.esm.js",
+  "description": "Cube client",
+  "main": "dist/cubejs-client-core.cjs.js",
+  "module": "dist/src/index.js",
+  "browser": "dist/cubejs-client-core.umd.js",
   "typings": "dist/src/index.d.ts",
   "author": "Cube Dev, Inc.",
+  "exports": {
+    "import": "./dist/src/index.js",
+    "require": "./dist/cubejs-client-core.cjs.js"
+  },
   "dependencies": {
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
