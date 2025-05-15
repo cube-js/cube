@@ -4,4 +4,5 @@ const base = require('../../jest.base.config');
 module.exports = {
   ...base,
   rootDir: '.',
+  collectCoverageFrom: [...base.collectCoverageFrom, '!dist/src/index.umd.js']
 };
