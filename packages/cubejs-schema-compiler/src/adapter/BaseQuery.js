@@ -324,6 +324,10 @@ export class BaseQuery {
       return dimension;
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
+    /**
+     * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
+     */
+    this.customSubQueryJoins = this.options.subqueryJoins ?? [];
     this.useNativeSqlPlanner = this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner');
     this.canUseNativeSqlPlannerPreAggregation = false;
     if (this.useNativeSqlPlanner) {
@@ -336,11 +340,6 @@ export class BaseQuery {
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
-
-    /**
-     * @type {Array<{sql: string, on: {expression: Function}, joinType: 'LEFT' | 'INNER', alias: string}>}
-     */
-    this.customSubQueryJoins = this.options.subqueryJoins ?? [];
 
     // Set the default order only when options.order is not provided at all
     // if options.order is set (empty array [] or with data) - use it as is
@@ -2392,14 +2391,34 @@ export class BaseQuery {
    * @returns {Array<Array<string>>}
    */
   collectJoinHints(excludeTimeDimensions = false) {
-    const membersToCollectFrom = this.allMembersConcat(excludeTimeDimensions)
-      .concat(this.join ? this.join.joins.map(j => ({
-        getMembers: () => [{
-          path: () => null,
-          cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
-          definition: () => j.join,
-        }]
-      })) : []);
+    const customSubQueryJoinMembers = this.customSubQueryJoins.map(j => {
+      const res = {
+        path: () => null,
+        cube: () => this.cubeEvaluator.cubeFromPath(j.on.cubeName),
+        definition: () => ({
+          sql: j.on.expression,
+          // TODO use actual type even though it isn't used right now
+          type: 'number'
+        }),
+      };
+      return {
+        getMembers: () => [res],
+      };
+    });
+
+    const joinMembers = this.join ? this.join.joins.map(j => ({
+      getMembers: () => [{
+        path: () => null,
+        cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
+        definition: () => j.join,
+      }]
+    })) : [];
+
+    const membersToCollectFrom = [
+      ...this.allMembersConcat(excludeTimeDimensions),
+      ...joinMembers,
+      ...customSubQueryJoinMembers,
+    ];
 
     return this.collectJoinHintsFromMembers(membersToCollectFrom);
   }
