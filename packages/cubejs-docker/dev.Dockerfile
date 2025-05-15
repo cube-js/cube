@@ -29,6 +29,7 @@ COPY package.json .
 COPY lerna.json .
 COPY yarn.lock .
 COPY tsconfig.base.json .
+COPY tsconfig.json .
 COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
 
@@ -41,6 +42,7 @@ COPY packages/cubejs-base-driver/package.json packages/cubejs-base-driver/packag
 COPY packages/cubejs-backend-native/package.json packages/cubejs-backend-native/package.json
 COPY packages/cubejs-testing-shared/package.json packages/cubejs-testing-shared/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
+COPY packages/cubejs-backend-maven/package.json packages/cubejs-backend-maven/package.json
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
 COPY packages/cubejs-bigquery-driver/package.json packages/cubejs-bigquery-driver/package.json
@@ -118,6 +120,7 @@ COPY packages/cubejs-base-driver/ packages/cubejs-base-driver/
 COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
 COPY packages/cubejs-testing-shared/ packages/cubejs-testing-shared/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
+COPY packages/cubejs-backend-maven/ packages/cubejs-backend-maven/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
 COPY packages/cubejs-bigquery-driver/ packages/cubejs-bigquery-driver/
