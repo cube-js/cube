@@ -1301,8 +1301,27 @@ export class BaseQuery {
     const multiStageMembers = R.uniq(
       this.allMembersConcat(false)
         // TODO boolean logic filter support
-        .filter(m => m.expressionPath && hasMultiStageMembers(m.expressionPath()))
-        .map(m => m.expressionPath())
+        .reduce((acc, m) => {
+          if (m.isMemberExpression) {
+            let refMemberPath;
+            this.evaluateSql(m.cube().name, m.definition().sql, {
+              sqlResolveFn: (_symbol, cube, prop) => {
+                const path = this.cubeEvaluator.pathFromArray([cube, prop]);
+                refMemberPath = path;
+                // We don't need real SQL here, so just returning something.
+                return path;
+              }
+            });
+
+            if (hasMultiStageMembers(refMemberPath)) {
+              acc.push(refMemberPath);
+            }
+          } else if (m.expressionPath && hasMultiStageMembers(m.expressionPath())) {
+            acc.push(m.expressionPath());
+          }
+
+          return acc;
+        }, [])
     ).map(m => this.multiStageWithQueries(
       m,
       {
@@ -1312,7 +1331,8 @@ export class BaseQuery {
         timeDimensions: this.options.timeDimensions || [],
         multiStageTimeDimensions: (this.options.timeDimensions || []).filter(td => !!td.granularity),
         // TODO accessing filters directly from options might miss some processing logic
-        filters: this.options.filters || []
+        filters: this.options.filters || [],
+        segments: this.options.segments || [],
       },
       allMemberChildren,
       withQueries
@@ -1426,46 +1446,27 @@ export class BaseQuery {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
     if (memberDef.timeShiftReferences?.length) {
-      let mapFn;
-
-      const allBackAliasMembers = this.allBackAliasTimeDimensions();
+      let { commonTimeShift } = queryContext;
+      const timeShifts = queryContext.timeShifts || {};
+      const memberOfCube = !this.cubeEvaluator.cubeFromPath(memberPath).isView;
 
       if (memberDef.timeShiftReferences.length === 1 && !memberDef.timeShiftReferences[0].timeDimension) {
         const timeShift = memberDef.timeShiftReferences[0];
-        mapFn = (td) => {
-          // We need to ignore aliased td, because it will match and insert shiftInterval on first
-          // occurrence, but later during recursion it will hit the original td but shiftInterval will be
-          // present and simple check for td.shiftInterval will always result in error.
-          if (td.shiftInterval && !td.dimension === allBackAliasMembers[timeShift.timeDimension]) {
-            throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
-          }
-          return {
-            ...td,
-            shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
-          };
-        };
-      } else {
-        mapFn = (td) => {
-          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension || td.dimension === allBackAliasMembers[r.timeDimension]);
-          if (timeShift) {
-            // We need to ignore aliased td, because it will match and insert shiftInterval on first
-            // occurrence, but later during recursion it will hit the original td but shiftInterval will be
-            // present and simple check for td.shiftInterval will always result in error.
-            if (td.shiftInterval && !td.dimension === allBackAliasMembers[timeShift.timeDimension]) {
-              throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
-            }
-            return {
-              ...td,
-              shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
-            };
-          }
-          return td;
-        };
+        // We avoid view's timeshift evaluation as there will be another round of underlying cube's member evaluation
+        if (memberOfCube) {
+          commonTimeShift = timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval;
+        }
+      } else if (memberOfCube) {
+        // We avoid view's timeshift evaluation as there will be another round of underlying cube's member evaluation
+        memberDef.timeShiftReferences.forEach((r) => {
+          timeShifts[r.timeDimension] = r.type === 'next' ? this.negateInterval(r.interval) : r.interval;
+        });
       }
 
       queryContext = {
         ...queryContext,
-        timeDimensions: queryContext.timeDimensions.map(mapFn)
+        commonTimeShift,
+        timeShifts,
       };
     }
     queryContext = {
@@ -1508,11 +1509,15 @@ export class BaseQuery {
         ...queryContext,
         // TODO make it same way as keepFilters
         timeDimensions: queryContext.timeDimensions.map(td => ({ ...td, dateRange: undefined })),
+        // TODO keep segments related to this multistage (if applicable)
+        segments: [],
         filters: this.keepFilters(queryContext.filters, filterMember => filterMember === memberPath),
       };
     } else {
       queryContext = {
         ...queryContext,
+        // TODO remove not related segments
+        // segments: queryContext.segments,
         filters: this.keepFilters(queryContext.filters, filterMember => !this.memberInstanceByPath(filterMember).isMultiStage()),
       };
     }
@@ -1531,12 +1536,16 @@ export class BaseQuery {
           return [m, measure.aliasName()];
         }).concat(from.dimensions.map(m => {
           const member = this.newDimension(m);
-          return [m, member.aliasName()];
+          // In case of request coming from the SQL API, member could be expression-based
+          const mPath = typeof m === 'string' ? m : this.cubeEvaluator.pathFromArray([m.cubeName, m.name]);
+          return [mPath, member.aliasName()];
         })).concat(from.timeDimensions.map(m => {
           const member = this.newTimeDimension(m);
           return member.granularity ? [`${member.dimension}.${member.granularity}`, member.aliasName()] : [];
         }))))
-      )
+      ),
+      commonTimeShift: withQuery.commonTimeShift,
+      timeShifts: withQuery.timeShifts,
     };
 
     const fromSubQuery = fromMeasures && this.newSubQuery({
@@ -1568,6 +1577,7 @@ export class BaseQuery {
       multiStageDimensions: withQuery.multiStageDimensions,
       multiStageTimeDimensions: withQuery.multiStageTimeDimensions,
       filters: withQuery.filters,
+      segments: withQuery.segments,
       from: fromSql && {
         sql: fromSql,
         alias: `${withQuery.alias}_join`,
@@ -2874,10 +2884,23 @@ export class BaseQuery {
           return td.dimensionSql();
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+          const memPath = this.cubeEvaluator.pathFromArray([cubeName, name]);
 
-          if (symbol.shiftInterval) {
-            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+          // Skip view's member evaluation as there will be underlying cube's same member evaluation
+          if (symbol.type === 'time' && !this.cubeEvaluator.cubeFromPath(memPath).isView) {
+            if (this.safeEvaluateSymbolContext().timeShifts?.[memPath]) {
+              if (symbol.shiftInterval) {
+                throw new UserError(`Hierarchical time shift is not supported but was provided for '${memPath}'. Parent time shift is '${symbol.shiftInterval}' and current is '${this.safeEvaluateSymbolContext().timeShifts?.[memPath]}'`);
+              }
+              res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().timeShifts?.[memPath])})`;
+            } else if (this.safeEvaluateSymbolContext().commonTimeShift) {
+              if (symbol.shiftInterval) {
+                throw new UserError(`Hierarchical time shift is not supported but was provided for '${memPath}'. Parent time shift is '${symbol.shiftInterval}' and current is '${this.safeEvaluateSymbolContext().commonTimeShift}'`);
+              }
+              res = `(${this.addTimestampInterval(res, this.safeEvaluateSymbolContext().commonTimeShift)})`;
+            }
           }
+
           if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
             !this.safeEvaluateSymbolContext().ignoreConvertTzForTimeDimension &&
             !memberExpressionType &&

@@ -140,7 +140,7 @@ export class BaseDimension {
 
   public expressionPath(): string {
     if (this.expression) {
-      return `expr:${this.expression.expressionName}`;
+      return `expr:${this.expressionName}`;
     }
     return this.query.cubeEvaluator.pathFromArray(this.path() as string[]);
   }
