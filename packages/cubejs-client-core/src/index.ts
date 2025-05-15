@@ -260,7 +260,10 @@ class CubeApi {
     const checkMutex = async () => {
       const requestInstance = await requestPromise;
 
-      if (options?.mutexObj?.[mutexKey] !== mutexValue) {
+      if (options &&
+        options.mutexObj &&
+          options.mutexObj[mutexKey] !== mutexValue
+      ) {
         unsubscribed = true;
         if (requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();
