@@ -261,13 +261,24 @@ export class BigqueryQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     delete templates.expressions.ilike;
     delete templates.expressions.like_escape;
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, LOWER({{ value }}), {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
+    templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';
     templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
     templates.types.binary = 'BYTES';
+    templates.expressions.cast_to_string = 'CAST({{ expr }} AS STRING)';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.join_types.full = 'FULL';
+    templates.statements.time_series_select = 'SELECT DATETIME(TIMESTAMP(f)) date_from, DATETIME(TIMESTAMP(t)) date_to \n' +
+    'FROM (\n' +
+    '{% for time_item in seria  %}' +
+    '    select \'{{ time_item[0] }}\' f, \'{{ time_item[1] }}\' t \n' +
+    '{% if not loop.last %} UNION ALL\n{% endif %}' +
+    '{% endfor %}' +
+    ') AS dates';
+      
     return templates;
   }
 }

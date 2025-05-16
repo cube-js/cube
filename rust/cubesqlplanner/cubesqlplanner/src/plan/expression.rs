@@ -34,6 +34,7 @@ pub enum Expr {
     Member(MemberExpression),
     Reference(QualifiedColumnName),
     Function(FunctionExpression),
+    Asterisk,
 }
 
 impl Expr {
@@ -65,6 +66,7 @@ impl Expr {
                 None,
                 None,
             ),
+            Self::Asterisk => Ok("*".to_string()),
         }
     }
 }
