@@ -825,7 +825,58 @@ We can then query the cube as follows:
 }
 ```
 
-## Transitive join pitfalls
+## Troubleshooting
+
+### `Can't find join path`
+
+Sometimes, you might come across the following error message: `Can't find join path to
+join 'cube_a', 'cube_b'`.
+
+It indicates that a query failed because it includes members from cubes that can't be
+joined in order to generate a valid query to the upstream data source.
+Please check that you've defined necessary joins and that they have [correct
+directions](#transitive-join-pitfalls).
+
+Also, please consider using [views][ref-schema-ref-view] since they
+incapsulate join paths and completely remove the possibility of the error in question.
+You might also consider setting the [`public` parameter][ref-cube-public] to `false`
+on your cubes to hide them from end users.
+
+If you’re building a custom data application, you might use the [`meta` endpoint][ref-rest-meta]
+of the REST API. It groups cubes into `connectedComponents` to help select those ones
+that can be joined together.
+
+### `Primary key is required when join is defined`
+
+Sometimes, you might come across the following error message: `cube_a cube: primary key
+for 'cube_a' is required when join is defined in order to make aggregates work properly`.
+
+It indicates that you have a [cube][ref-cube] with joins and [pre-aggregations][ref-preaggs].
+However, that cube doesn't have a primary key.
+
+When generating SQL queries, Cube uses primary keys to avoid fanouts. A fanout happens
+when two tables are joined and a single value gets duplicated in the end result, meaning
+that some values can be double counted.
+
+Please define a [primary key][ref-primary-key] dimension in this cube to make joins and
+pre-aggregations work correctly.
+
+If your data doesn't have a natural primary key, e.g., `id`, you can define a composite
+primary key by concatenating most or all of the columns in the table. Example:
+
+```yml
+cubes:
+  - name: cube_a
+    # ...
+
+    dimensions:
+      - name: composite_key
+        sql: CONCAT(column_a, '-', column_b, '-', column_c)
+        type: string
+        primary_key: true
+```
+
+### Transitive join pitfalls
 
 Let's consider an example where we have a many-to-many relationship between
 `users` and `companies` through the `companies_to_users` cube:
@@ -912,47 +963,47 @@ cubes:
       SELECT 1 AS id, 'Ali' AS name UNION ALL
       SELECT 2 AS id, 'Bob' AS name UNION ALL
       SELECT 3 AS id, 'Eve' AS name
- 
+
     measures:
       - name: count
         type: count
- 
+
     dimensions:
       - name: id
         sql: id
         type: string
         primary_key: true
- 
+
   - name: companies
     sql: >
       SELECT 11 AS id, 'Acme Corporation' AS name UNION ALL
       SELECT 12 AS id, 'Stark Industries' AS name
- 
+
     dimensions:
       - name: id
         sql: id
         type: string
         primary_key: true
- 
+
       - name: name
         sql: name
         type: string
- 
+
   - name: companies_to_users
     sql: >
       SELECT 11 AS company_id, 1 AS user_id UNION ALL
       SELECT 11 AS company_id, 2 AS user_id UNION ALL
       SELECT 12 AS company_id, 3 AS user_id
- 
+
     joins:
       - name: users
         sql: "{CUBE}.user_id = {users.id}"
         relationship: one_to_many
- 
+
       - name: companies
         sql: "{CUBE}.company_id = {companies.id}"
         relationship: one_to_many
- 
+
     dimensions:
       - name: id
         # Joins require a primary key, so we'll create one on-the-fly
@@ -1029,7 +1080,7 @@ cubes:
       # - name: users
       #   sql: "{CUBE}.user_id = {users.id}"
       #   relationship: one_to_many
- 
+
       - name: companies
         sql: "{CUBE}.company_id = {companies.id}"
         relationship: one_to_many
@@ -1051,3 +1102,8 @@ also shows that you can reach `companies` from `cubes` by going left to right.
 [self-many-to-many-no-assoc-table]: #many-to-many-relationship-without-an-associative-table
 [self-join-direction]: /product/data-modeling/concepts/working-with-joins#directions-of-joins
 [ref-visual-model]: /product/workspace/visual-model
+[ref-cube]: /product/data-modeling/reference/cube
+[ref-cube-public]: /product/data-modeling/reference/cube#public
+[ref-rest-meta]: /product/apis-integrations/rest-api/reference#v1meta
+[ref-preaggs]: /product/data-modeling/concepts#pre-aggregations
+[ref-primary-key]: /product/data-modeling/reference/dimensions#primary_key
