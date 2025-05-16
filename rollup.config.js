@@ -30,6 +30,7 @@ const bundle = (
       resolve({
         extensions: ['.ts', '.js', '.json'],
         mainFields: ['browser', 'module', 'main'],
+        resolveOnly: [/^\.\.?/],
       }),
       babel({
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
@@ -93,8 +94,7 @@ const bundle = (
         tsconfigPaths(),
         resolve({
           extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
-          browser: true,
-          preferBuiltins: true,
+          resolveOnly: [/^\.\.?/],
         }),
         commonjs(),
         peerDepsExternal(),
@@ -145,8 +145,7 @@ const bundle = (
         tsconfigPaths(),
         resolve({
           extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
-          browser: true,
-          preferBuiltins: false,
+          resolveOnly: [/^\.\.?/],
         }),
         commonjs(),
         peerDepsExternal(),
