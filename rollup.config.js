@@ -7,14 +7,6 @@ import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import json from '@rollup/plugin-json';
 import { builtinModules } from 'module';
 
-const external = [
-  'ws',
-  'isomorphic-ws',
-  'bufferutil',
-  'utf-8-validate',
-  ...builtinModules,
-];
-
 const bundle = (
   name,
   globalName,
@@ -88,7 +80,6 @@ const bundle = (
 
     {
       ...baseConfig,
-      external,
       plugins: [
         json(),
         tsconfigPaths(),
