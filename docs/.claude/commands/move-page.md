@@ -3,9 +3,9 @@
 I need to move a documentation page from its current location to a new one within our documentation site. Please help me with the full process including:
 
 1. Moving the source file to the destination directory:
-   - First, copy the file to the new location
-   - Only delete the original file after all other steps are completed and verified
-   
+   - Use the `mv` command to move the file to the new location
+   - Don't leave the original file
+
 2. Updating relevant _meta.js files to maintain proper navigation:
    - Add the page to the destination directory's _meta.js file
    - Remove the page from the source directory's _meta.js file
