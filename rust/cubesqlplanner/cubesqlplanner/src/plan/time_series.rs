@@ -96,9 +96,12 @@ impl TimeSeries {
             )
         } else {
             let (from_date, to_date, raw_from_date, raw_to_date) = match &self.date_range {
-                TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    (format!("'{}'", from_date), format!("'{}'", to_date), from_date.clone(), to_date.clone())
-                }
+                TimeSeriesDateRange::Filter(from_date, to_date) => (
+                    format!("'{}'", from_date),
+                    format!("'{}'", to_date),
+                    from_date.clone(),
+                    to_date.clone(),
+                ),
                 TimeSeriesDateRange::Generated(_) => {
                     return Err(CubeError::user(
                         "Date range is required for time series in drivers where generated time series is not supported".to_string(),

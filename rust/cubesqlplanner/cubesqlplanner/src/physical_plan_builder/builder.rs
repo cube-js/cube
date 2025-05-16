@@ -82,7 +82,11 @@ impl PhysicalPlanBuilder {
         Ok(query)
     }
 
-    fn build_total_count(&self, source: Rc<Select>, context: &PhysicalPlanBuilderContext) -> Result<Rc<Select>, CubeError> {
+    fn build_total_count(
+        &self,
+        source: Rc<Select>,
+        context: &PhysicalPlanBuilderContext,
+    ) -> Result<Rc<Select>, CubeError> {
         let from = From::new_from_subselect(source.clone(), ORIGINAL_QUERY.to_string());
         let mut select_builder = SelectBuilder::new(from);
         select_builder.add_count_all(TOTAL_COUNT.to_string());

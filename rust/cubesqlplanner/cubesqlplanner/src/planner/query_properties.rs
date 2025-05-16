@@ -270,7 +270,9 @@ impl QueryProperties {
             order
                 .iter()
                 .map(|o| -> Result<_, CubeError> {
-                    let evaluator = if let Some(found) = dimensions.iter().find(|d| d.name() == &o.id) {
+                    let evaluator = if let Some(found) =
+                        dimensions.iter().find(|d| d.name() == &o.id)
+                    {
                         found.member_evaluator().clone()
                     } else if let Some(found) = time_dimensions.iter().find(|d| d.name() == &o.id) {
                         found.member_evaluator().clone()
@@ -328,7 +330,7 @@ impl QueryProperties {
             ungrouped,
             multi_fact_join_groups,
             pre_aggregation_query,
-            total_query
+            total_query,
         }))
     }
 
