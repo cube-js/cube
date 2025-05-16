@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/analytics/cohort-retention",
+    "destination": "/product/data-modeling/recipes/cohort-retention",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/analytics/event-analytics",
     "destination": "/product/data-modeling/recipes/event-analytics",
     "permanent": true
