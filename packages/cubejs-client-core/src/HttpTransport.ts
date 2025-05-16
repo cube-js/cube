@@ -24,6 +24,10 @@ export type TransportOptions = {
    * Fetch timeout in milliseconds. Would be passed as AbortSignal.timeout()
    */
   fetchTimeout?: number;
+  /**
+   * AbortSignal to cancel requests
+   */
+  signal?: AbortSignal;
 };
 
 export interface ITransportResponse<R> {
@@ -52,8 +56,8 @@ export class HttpTransport implements ITransport<Response> {
   protected credentials: TransportOptions['credentials'];
 
   protected fetchTimeout: number | undefined;
-  
-  private signal: any;
+
+  private readonly signal: AbortSignal | undefined;
 
   public constructor({ authorization, apiUrl, method, headers = {}, credentials, fetchTimeout, signal }: Omit<TransportOptions, 'headers'> & { headers?: TransportOptions['headers'] }) {
     this.authorization = authorization;

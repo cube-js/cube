@@ -120,13 +120,16 @@ describe('HttpTransport', () => {
   // Signal tests from src/tests/HttpTransport.test.js
   describe('Signal functionality', () => {
     beforeEach(() => {
-      fetch.mockClear();
       // Default mock implementation for signal tests
-      fetch.mockImplementation(() => Promise.resolve({
+      mockedFetch.mockImplementation(() => Promise.resolve({
         json: () => Promise.resolve({ data: 'test data' }),
         ok: true,
         status: 200
-      }));
+      }) as any);
+    });
+
+    afterEach(() => {
+      mockedFetch.mockClear();
     });
 
     test('should pass the signal to fetch when provided in constructor', async () => {
@@ -148,8 +151,8 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(signal);
 
       await promise;
     });
@@ -175,8 +178,8 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(signal);
 
       await promise;
     });
@@ -203,9 +206,9 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the request signal, not the constructor signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(controller2.signal);
-      expect(fetch.mock.calls[0][1].signal).not.toBe(controller1.signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(controller2.signal);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).not.toBe(controller1.signal);
 
       await promise;
     });
@@ -233,8 +236,8 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the timeout signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(mockTimeoutSignal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(mockTimeoutSignal);
       expect(AbortSignal.timeout).toHaveBeenCalledWith(5000);
 
       // Restore original implementation
@@ -246,12 +249,12 @@ describe('HttpTransport', () => {
     test('should handle request abortion', async () => {
       // Create a mock Promise and resolver function to control Promise completion
       let resolveFetch;
-      const fetchPromise = new Promise(resolve => {
+      const fetchPromise = new Promise<Response>(resolve => {
         resolveFetch = resolve;
       });
 
       // Mock fetch to return our controlled Promise
-      fetch.mockImplementationOnce(() => fetchPromise);
+      mockedFetch.mockImplementationOnce(() => fetchPromise);
 
       const controller = new AbortController();
       const { signal } = controller;
@@ -273,14 +276,14 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(signal);
 
       // Abort the request
       controller.abort();
 
       // Resolve the fetch Promise, simulating request completion
-      resolveFetch({
+      resolveFetch!({
         json: () => Promise.resolve({ data: 'aborted data' }),
         ok: true,
         status: 200

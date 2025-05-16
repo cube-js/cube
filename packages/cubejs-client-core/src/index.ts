@@ -45,6 +45,10 @@ export type LoadMethodOptions = {
    * Function that receives `ProgressResult` on each `Continue wait` message.
    */
   progressCallback?(result: ProgressResult): void;
+  /**
+   * AbortSignal to cancel requests
+   */
+  signal?: AbortSignal;
 };
 
 export type DeeplyReadonly<T> = {
@@ -139,6 +143,14 @@ export type CubeApiOptions = {
    * How many network errors would be retried before returning to users. Default to 0.
    */
   networkErrorRetries?: number;
+  /**
+   * AbortSignal to cancel requests
+   */
+  signal?: AbortSignal;
+  /**
+   * Fetch timeout in milliseconds. Would be passed as AbortSignal.timeout()
+   */
+  fetchTimeout?: number;
 };
 
 /**
@@ -528,7 +540,7 @@ class CubeApi {
       () => this.request('load', {
         query,
         queryType: 'multi',
-        signal: options.signal
+        signal: options?.signal
       }),
       (response: any) => this.loadResponseInternal(response, options),
       options,
@@ -594,7 +606,7 @@ class CubeApi {
       () => this.request('subscribe', {
         query,
         queryType: 'multi',
-        signal: options.signal
+        signal: options?.signal
       }),
       (response: any) => this.loadResponseInternal(response, options),
       { ...options, subscribe: true },
