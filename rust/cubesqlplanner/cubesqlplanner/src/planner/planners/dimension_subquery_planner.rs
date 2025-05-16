@@ -106,6 +106,7 @@ impl DimensionSubqueryPlanner {
             true,
             false,
             false,
+            false,
         )?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan()?;

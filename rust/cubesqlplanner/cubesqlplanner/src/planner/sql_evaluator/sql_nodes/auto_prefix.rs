@@ -8,6 +8,9 @@ use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
+use lazy_static::lazy_static;
+use regex::Regex;
+
 
 pub struct AutoPrefixSqlNode {
     input: Rc<dyn SqlNode>,
@@ -55,6 +58,23 @@ impl AutoPrefixSqlNode {
             name.clone()
         }
     }
+
+    pub fn auto_prefix_with_cube_name(&self, cube_name: &str, sql: &str, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
+        lazy_static! {
+            static ref SINGLE_MEMBER_RE: Regex = Regex::new(r"^[_a-zA-Z][_a-zA-Z0-9]*$").unwrap();
+        }
+        let res = if SINGLE_MEMBER_RE.is_match(sql) {
+            format!(
+                "{}.{}",
+                templates.quote_identifier(&PlanSqlTemplates::alias_name(&cube_name))?,
+                sql
+            )
+        } else {
+            sql.to_string()
+        };
+        Ok(res)
+    }
+
 }
 
 impl SqlNode for AutoPrefixSqlNode {
@@ -76,15 +96,15 @@ impl SqlNode for AutoPrefixSqlNode {
         let res = match node.as_ref() {
             MemberSymbol::Dimension(ev) => {
                 let cube_alias = self.resolve_cube_alias(&ev.cube_name());
-                query_tools.auto_prefix_with_cube_name(&cube_alias, &input)
+                self.auto_prefix_with_cube_name(&cube_alias, &input, templates)?
             }
             MemberSymbol::Measure(ev) => {
                 let cube_alias = self.resolve_cube_alias(&ev.cube_name());
-                query_tools.auto_prefix_with_cube_name(&cube_alias, &input)
+                self.auto_prefix_with_cube_name(&cube_alias, &input, templates)?
             }
             MemberSymbol::CubeName(_) => {
                 let cube_alias = self.resolve_cube_alias(&input);
-                query_tools.escape_column_name(&cube_alias)
+                templates.quote_identifier(&cube_alias)?
             }
             _ => input,
         };

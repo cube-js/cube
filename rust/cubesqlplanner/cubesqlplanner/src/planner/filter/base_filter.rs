@@ -271,7 +271,7 @@ impl BaseFilter {
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let (from, to) = self.allocate_date_params(use_db_time_zone)?;
+        let (from, to) = self.allocate_date_params(use_db_time_zone, false)?;
         self.templates
             .time_range_filter(member_sql.to_string(), from, to)
     }
@@ -282,7 +282,7 @@ impl BaseFilter {
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let (from, to) = self.allocate_date_params(use_db_time_zone)?;
+        let (from, to) = self.allocate_date_params(use_db_time_zone, false)?;
         self.templates
             .time_not_in_range_filter(member_sql.to_string(), from, to)
     }
@@ -293,7 +293,7 @@ impl BaseFilter {
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let value = self.first_timestamp_param(use_db_time_zone)?;
+        let value = self.first_timestamp_param(use_db_time_zone, false)?;
 
         self.templates.lt(member_sql.to_string(), value)
     }
@@ -304,7 +304,7 @@ impl BaseFilter {
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let value = self.first_timestamp_param(use_db_time_zone)?;
+        let value = self.first_timestamp_param(use_db_time_zone, false)?;
 
         self.templates.lte(member_sql.to_string(), value)
     }
@@ -315,7 +315,7 @@ impl BaseFilter {
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let value = self.first_timestamp_param(use_db_time_zone)?;
+        let value = self.first_timestamp_param(use_db_time_zone, false)?;
 
         self.templates.gt(member_sql.to_string(), value)
     }
@@ -326,7 +326,7 @@ impl BaseFilter {
         filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
         let use_db_time_zone = !filters_context.use_local_tz;
-        let value = self.first_timestamp_param(use_db_time_zone)?;
+        let value = self.first_timestamp_param(use_db_time_zone, false)?;
 
         self.templates.gte(member_sql.to_string(), value)
     }
@@ -340,9 +340,9 @@ impl BaseFilter {
         if let Some(interval) = interval {
             if interval != "unbounded" {
                 if is_sub {
-                    Ok(Some(self.templates.sub_interval(date, interval.clone())?))
+                    Ok(Some(self.query_tools.base_tools().subtract_interval(date, interval.clone())?))
                 } else {
-                    Ok(Some(self.templates.add_interval(date, interval.clone())?))
+                    Ok(Some(self.query_tools.base_tools().add_interval(date, interval.clone())?))
                 }
             } else {
                 Ok(None)
@@ -357,7 +357,7 @@ impl BaseFilter {
         member_sql: &str,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params(false)?;
+        let (from, to) = self.allocate_date_params(false, true)?;
 
         let from = if self.values.len() >= 3 {
             self.extend_date_range_bound(from, &self.values[2], true)?
@@ -392,7 +392,7 @@ impl BaseFilter {
         member_sql: &str,
         _filters_context: &FiltersContext,
     ) -> Result<String, CubeError> {
-        let (from, to) = self.allocate_date_params(false)?;
+        let (from, to) = self.allocate_date_params(false, true)?;
 
         let from = if self.values.len() >= 3 {
             if let Some(granularity) = &self.values[2] {
@@ -607,7 +607,7 @@ impl BaseFilter {
         Ok(res)
     }
 
-    fn allocate_date_params(&self, use_db_time_zone: bool) -> Result<(String, String), CubeError> {
+    fn allocate_date_params(&self, use_db_time_zone: bool, as_date_time: bool) -> Result<(String, String), CubeError> {
         if self.values.len() >= 2 {
             let from = if let Some(from_str) = &self.values[0] {
                 self.from_date_in_db_time_zone(from_str, use_db_time_zone)?
@@ -624,8 +624,8 @@ impl BaseFilter {
                     "Arguments for date range is not valid"
                 )));
             };
-            let from = self.allocate_timestamp_param(&from);
-            let to = self.allocate_timestamp_param(&to);
+            let from = self.allocate_timestamp_param(&from, as_date_time)?;
+            let to = self.allocate_timestamp_param(&to, as_date_time)?;
             Ok((from, to))
         } else {
             Err(CubeError::user(format!(
@@ -647,12 +647,16 @@ impl BaseFilter {
         self.query_tools.allocate_param(param)
     }
 
-    fn allocate_timestamp_param(&self, param: &str) -> String {
+    fn allocate_timestamp_param(&self, param: &str, as_date_time: bool) -> Result<String, CubeError> {
         if self.use_raw_values {
-            return param.to_string();
+            return Ok(param.to_string());
         }
         let placeholder = self.query_tools.allocate_param(param);
-        format!("{}::timestamptz", placeholder)
+        if as_date_time {
+            self.query_tools.base_tools().date_time_cast(placeholder)
+        } else {
+            self.query_tools.base_tools().time_stamp_cast(placeholder)
+        }
     }
 
     fn first_param(&self) -> Result<String, CubeError> {
@@ -669,16 +673,17 @@ impl BaseFilter {
         }
     }
 
-    fn first_timestamp_param(&self, use_db_time_zone: bool) -> Result<String, CubeError> {
+    fn first_timestamp_param(&self, use_db_time_zone: bool, as_date_time: bool) -> Result<String, CubeError> {
         if self.values.is_empty() {
             Err(CubeError::user(format!(
                 "Expected at least one parameter but nothing found"
             )))
         } else {
             if let Some(value) = &self.values[0] {
-                Ok(self.allocate_timestamp_param(
+                self.allocate_timestamp_param(
                     &self.from_date_in_db_time_zone(value, use_db_time_zone)?,
-                ))
+                    as_date_time
+                )
             } else {
                 return Err(CubeError::user(format!(
                     "Arguments for timestamp parameter for operator {} is not valid",

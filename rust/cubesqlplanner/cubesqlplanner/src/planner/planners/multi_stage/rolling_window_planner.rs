@@ -6,7 +6,7 @@ use super::{
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::MemberSymbol;
-use crate::planner::sql_templates::{PlanSqlTemplates, TemplateProjectionColumn};
+use crate::planner::sql_templates::TemplateProjectionColumn;
 use crate::planner::BaseMeasure;
 use crate::planner::{BaseMember, BaseTimeDimension, GranularityHelper, QueryProperties};
 use cubenativeutils::CubeError;
@@ -262,7 +262,7 @@ impl RollingWindowPlanner {
         &self,
         time_series_cte_name: &str,
     ) -> Result<(String, String), CubeError> {
-        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+        let templates = self.query_tools.plan_sql_templates();
         let from_expr = format!("min(date_from)");
         let to_expr = format!("max(date_to)");
         let alias = format!("value");
@@ -324,7 +324,7 @@ impl RollingWindowPlanner {
             &time_dimension.resolve_granularity()?,
         )?;
 
-        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+        let templates = self.query_tools.plan_sql_templates();
 
         if templates.supports_generated_time_series() {
             let (from, to) =

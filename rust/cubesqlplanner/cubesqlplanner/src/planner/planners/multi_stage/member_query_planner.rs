@@ -72,6 +72,7 @@ impl MultiStageMemberQueryPlanner {
             true,
             true,
             false,
+            false
         )?;
 
         let simple_query_planer =
@@ -263,6 +264,7 @@ impl MultiStageMemberQueryPlanner {
             None,
             true,
             self.description.member().is_ungrupped(),
+            false,
             false,
         )?;
 

@@ -17,7 +17,8 @@
       "CUBESQL_SQL_PUSH_DOWN": "true",
 
       "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
-      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp"
+      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp",
+      "_CUBEJS_TESSERACT_SQL_PLANNER": "true"
     },
     "ports" : ["4000", "5656"]
   },

@@ -95,9 +95,9 @@ impl TimeSeries {
                 &self.granularity.granularity_interval(),
             )
         } else {
-            let (from_date, to_date) = match &self.date_range {
+            let (from_date, to_date, raw_from_date, raw_to_date) = match &self.date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    (format!("'{}'", from_date), format!("'{}'", to_date))
+                    (format!("'{}'", from_date), format!("'{}'", to_date), from_date.clone(), to_date.clone())
                 }
                 TimeSeriesDateRange::Generated(_) => {
                     return Err(CubeError::user(
@@ -108,12 +108,12 @@ impl TimeSeries {
             let series = if self.granularity.is_predefined_granularity() {
                 self.query_tools.base_tools().generate_time_series(
                     self.granularity.granularity().clone(),
-                    vec![from_date.clone(), to_date.clone()],
+                    vec![raw_from_date.clone(), raw_to_date.clone()],
                 )?
             } else {
                 self.query_tools.base_tools().generate_custom_time_series(
                     self.granularity.granularity_interval().clone(),
-                    vec![from_date.clone(), to_date.clone()],
+                    vec![raw_from_date.clone(), raw_to_date.clone()],
                     self.granularity.origin_local_formatted(),
                 )?
             };

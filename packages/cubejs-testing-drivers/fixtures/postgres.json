@@ -12,7 +12,8 @@
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
-      "CUBESQL_SQL_PUSH_DOWN": "true"
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+      "_CUBEJS_TESSERACT_SQL_PLANNER": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
