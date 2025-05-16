@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/python/lkml2cube",
+    "destination": "/product/data-modeling/reference/lkml2cube",
+    "permanent": true
+  },
+  {
     "source": "/reference/python/cube_dbt",
     "destination": "/product/data-modeling/reference/cube_dbt",
     "permanent": true
