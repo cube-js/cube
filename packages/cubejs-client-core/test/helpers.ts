@@ -1,3 +1,66 @@
+export const DescriptiveQueryRequest = {
+  timeDimensions: [
+    {
+      dimension: 'base_orders.created_at',
+      granularity: 'month'
+    },
+    {
+      dimension: 'base_orders.completed_at',
+      dateRange: [
+        '2023-05-16',
+        '2025-05-16'
+      ]
+    }
+  ],
+  filters: [
+    {
+      member: 'base_orders.fiscal_event_date_label',
+      operator: 'set'
+    }
+  ],
+  dimensions: [
+    'base_orders.status'
+  ],
+  measures: [
+    'base_orders.count'
+  ],
+  segments: [
+    'users.sf_users'
+  ]
+};
+
+export const DescriptiveQueryRequestCompact = {
+  timeDimensions: [
+    {
+      dimension: 'base_orders.created_at',
+      granularity: 'month'
+    },
+    {
+      dimension: 'base_orders.completed_at',
+      dateRange: [
+        '2023-05-16',
+        '2025-05-16'
+      ]
+    }
+  ],
+  filters: [
+    {
+      member: 'base_orders.fiscal_event_date_label',
+      operator: 'set'
+    }
+  ],
+  dimensions: [
+    'base_orders.status'
+  ],
+  measures: [
+    'base_orders.count'
+  ],
+  segments: [
+    'users.sf_users'
+  ],
+  responseFormat: 'compact',
+};
+
 export const DescriptiveQueryResponse = {
   queryType: 'regularQuery',
   results: [
@@ -907,3 +970,8 @@ export const DescriptiveQueryResponse = {
   },
   slowQuery: false
 };
+
+export const NumericCastedData = DescriptiveQueryResponse.results[0].data.map(r => ({
+  ...r,
+  'base_orders.count': Number(r['base_orders.count'])
+}));

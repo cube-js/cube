@@ -7,8 +7,15 @@
 /* globals describe,test,expect,jest,beforeEach */
 /* eslint-disable import/first */
 
-import { CubeApi as CubeApiOriginal } from '../src';
+import { CubeApi as CubeApiOriginal, Query } from '../src';
 import HttpTransport from '../src/HttpTransport';
+import {
+  DescriptiveQueryRequest,
+  DescriptiveQueryRequestCompact,
+  DescriptiveQueryResponse,
+  NumericCastedData
+} from './helpers';
+import ResultSet from '../src/ResultSet';
 
 class CubeApi extends CubeApiOriginal {
   public getTransport(): any {
@@ -20,8 +27,126 @@ class CubeApi extends CubeApiOriginal {
   }
 }
 
-describe('CubeApi with Signal', () => {
-  beforeEach(() => {
+describe('CubeApi Constructor', () => {
+  test('throw error if no api url', async () => {
+    try {
+      const _cubeApi = new CubeApi('token', {} as any);
+      throw new Error('Should not get here');
+    } catch (e: any) {
+      expect(e.message).toBe('The `apiUrl` option is required');
+    }
+  });
+});
+
+describe('CubeApi Load', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  test('simple query, no options', async () => {
+    // Create a spy on the request method
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query);
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
+  });
+
+  test('simple query + { mutexKey, castNumerics }', async () => {
+    // Create a spy on the request method
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi({
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load(DescriptiveQueryRequest as Query, { mutexKey: 'mutexKey', castNumerics: true });
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(res.rawData()).toEqual(NumericCastedData);
+  });
+
+  test('simple query + compact response format', async () => {
+    // Create a spy on the request method
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load(DescriptiveQueryRequestCompact as Query, undefined, undefined, 'compact');
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
+  });
+
+  test('2 queries', async () => {
+    // Create a spy on the request method
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load([DescriptiveQueryRequest as Query, DescriptiveQueryRequest as Query]);
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
+  });
+
+  test('2 queries + compact response format', async () => {
+    // Create a spy on the request method
+    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(DescriptiveQueryResponse)),
+        json: () => Promise.resolve(DescriptiveQueryResponse)
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const res = await cubeApi.load([DescriptiveQueryRequestCompact as Query, DescriptiveQueryRequestCompact as Query], undefined, undefined, 'compact');
+    expect(res).toBeInstanceOf(ResultSet);
+    expect(res.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
+  });
+});
+
+describe('CubeApi with Abort Signal', () => {
+  afterEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
   });
