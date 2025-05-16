@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/configuration/environment-variables",
+    "destination": "/product/configuration/reference/environment-variables",
+    "permanent": true
+  },
+  {
     "source": "/product/configuration/advanced/multiple-data-sources",
     "destination": "/product/configuration/multiple-data-sources",
     "permanent": true
