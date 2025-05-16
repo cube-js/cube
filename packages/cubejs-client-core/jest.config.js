@@ -11,8 +11,7 @@ module.exports = {
     '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.jest.json' }],
   },
   collectCoverageFrom: [
-    ...base.collectCoverageFrom,
-    '!<rootDir>/dist/index.umd.ts',
-    '!<rootDir>/dist/index.cjs.ts',
+    '<rootDir>/src/**/*.{ts,tsx}',
+    '!<rootDir>/src/**/*.d.ts',
   ],
 };
