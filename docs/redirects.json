@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/analytics/event-analytics",
+    "destination": "/product/data-modeling/recipes/event-analytics",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/analytics/active-users",
     "destination": "/product/data-modeling/recipes/active-users",
     "permanent": true
