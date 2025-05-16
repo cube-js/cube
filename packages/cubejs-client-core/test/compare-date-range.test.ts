@@ -1,5 +1,7 @@
+/* globals describe, test, expect */
+
 import 'jest';
-import ResultSet from '../ResultSet';
+import ResultSet from '../src/ResultSet';
 
 const loadResponses = [
   {
@@ -289,8 +291,8 @@ const loadResponses = [
 ];
 
 describe('compare date range', () => {
-  const resultSet1 = new ResultSet(loadResponses[0]);
-  const resultSet2 = new ResultSet(loadResponses[1]);
+  const resultSet1 = new ResultSet(loadResponses[0] as any);
+  const resultSet2 = new ResultSet(loadResponses[1] as any);
 
   describe('series and seriesNames', () => {
     test('with a single time dimension', () => {

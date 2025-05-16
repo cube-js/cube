@@ -1,10 +1,12 @@
 /* eslint-disable import/first */
-/* eslint-disable import/newline-after-import */
 /* globals describe,test,expect,jest,afterEach,beforeAll,beforeEach */
-import '@babel/runtime/regenerator';
-jest.mock('cross-fetch');
 import fetch from 'cross-fetch';
-import HttpTransport from './HttpTransport';
+
+jest.mock('cross-fetch');
+
+import HttpTransport from '../src/HttpTransport';
+
+const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
 
 describe('HttpTransport', () => {
   const apiUrl = 'http://localhost:3000/cubejs-api/v1';
@@ -31,11 +33,11 @@ describe('HttpTransport', () => {
   const largeQueryJson = `{"query":{"measures":["Orders.count"],"dimensions":["Users.country"],"filters":[{"member":"Users.id","operator":"equals","values":${JSON.stringify(ids)}}]}}`;
 
   beforeAll(() => {
-    fetch.mockReturnValue(Promise.resolve({ ok: true }));
+    mockedFetch.mockReturnValue(Promise.resolve({ ok: true } as Response));
   });
 
   afterEach(() => {
-    fetch.mockClear();
+    mockedFetch.mockClear();
   });
 
   test('it serializes the query object and sends it in the query string', async () => {
@@ -44,7 +46,7 @@ describe('HttpTransport', () => {
       apiUrl,
     });
     const req = transport.request('load', { query });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load?query=${queryUrlEncoded}`, {
       method: 'GET',
@@ -66,7 +68,7 @@ describe('HttpTransport', () => {
       }
     });
     const req = transport.request('meta', { extraParams });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/meta?extraParams=${serializedExtraParams}`, {
       method: 'GET',
@@ -85,7 +87,7 @@ describe('HttpTransport', () => {
       method: 'POST'
     });
     const req = transport.request('load', { query });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
@@ -103,7 +105,7 @@ describe('HttpTransport', () => {
       apiUrl
     });
     const req = transport.request('load', { query: LargeQuery });
-    await req.subscribe(() => { });
+    await req.subscribe(() => { console.log('subscribe cb'); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(`${apiUrl}/load`, {
       method: 'POST',
@@ -118,13 +120,16 @@ describe('HttpTransport', () => {
   // Signal tests from src/tests/HttpTransport.test.js
   describe('Signal functionality', () => {
     beforeEach(() => {
-      fetch.mockClear();
       // Default mock implementation for signal tests
-      fetch.mockImplementation(() => Promise.resolve({
+      mockedFetch.mockImplementation(() => Promise.resolve({
         json: () => Promise.resolve({ data: 'test data' }),
         ok: true,
         status: 200
-      }));
+      }) as any);
+    });
+
+    afterEach(() => {
+      mockedFetch.mockClear();
     });
 
     test('should pass the signal to fetch when provided in constructor', async () => {
@@ -146,8 +151,8 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(signal);
 
       await promise;
     });
@@ -173,8 +178,8 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(signal);
 
       await promise;
     });
@@ -201,9 +206,9 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the request signal, not the constructor signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(controller2.signal);
-      expect(fetch.mock.calls[0][1].signal).not.toBe(controller1.signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(controller2.signal);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).not.toBe(controller1.signal);
 
       await promise;
     });
@@ -231,8 +236,8 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the timeout signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(mockTimeoutSignal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(mockTimeoutSignal);
       expect(AbortSignal.timeout).toHaveBeenCalledWith(5000);
 
       // Restore original implementation
@@ -244,12 +249,12 @@ describe('HttpTransport', () => {
     test('should handle request abortion', async () => {
       // Create a mock Promise and resolver function to control Promise completion
       let resolveFetch;
-      const fetchPromise = new Promise(resolve => {
+      const fetchPromise = new Promise<Response>(resolve => {
         resolveFetch = resolve;
       });
 
       // Mock fetch to return our controlled Promise
-      fetch.mockImplementationOnce(() => fetchPromise);
+      mockedFetch.mockImplementationOnce(() => fetchPromise);
 
       const controller = new AbortController();
       const { signal } = controller;
@@ -271,14 +276,14 @@ describe('HttpTransport', () => {
       await Promise.resolve();
 
       // Ensure fetch was called with the signal
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][1].signal).toBe(signal);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedFetch.mock.calls[0]?.[1]?.signal).toBe(signal);
 
       // Abort the request
       controller.abort();
 
       // Resolve the fetch Promise, simulating request completion
-      resolveFetch({
+      resolveFetch!({
         json: () => Promise.resolve({ data: 'aborted data' }),
         ok: true,
         status: 200

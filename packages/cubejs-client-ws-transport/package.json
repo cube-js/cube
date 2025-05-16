@@ -8,7 +8,7 @@
     "directory": "packages/cubejs-client-ws-transport"
   },
   "description": "Cube.js WebSocket transport",
-  "main": "dist/cubejs-client-ws-transport.js",
+  "main": "dist/cubejs-client-ws-transport.cjs.js",
   "typings": "dist/index.d.ts",
   "author": "Cube Dev, Inc.",
   "scripts": {
