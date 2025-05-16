@@ -3,5 +3,6 @@ module.exports = {
   "concepts": "Concepts",
   "syntax": "Syntax",
   "dynamic": "Dynamic data models",
-  "reference": "Reference"
+  "reference": "Reference",
+  "recipes": "Recipes"
 }
