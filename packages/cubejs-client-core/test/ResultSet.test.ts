@@ -9,6 +9,7 @@
 import 'jest';
 import ResultSet from '../src/ResultSet';
 import { TimeDimension } from '../src';
+import { DescriptiveQueryResponse } from './helpers';
 
 describe('ResultSet', () => {
   describe('timeSeries', () => {
@@ -649,6 +650,160 @@ describe('ResultSet', () => {
         }
       ]);
     });
+  });
+
+  test('tableColumns', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    expect(resultSet.tableColumns()).toEqual([
+      {
+        dataIndex: 'base_orders.created_at.month',
+        format: undefined,
+        key: 'base_orders.created_at.month',
+        meta: undefined,
+        shortTitle: 'Created at',
+        title: 'Base Orders Created at',
+        type: 'time',
+      },
+      {
+        dataIndex: 'base_orders.status',
+        format: undefined,
+        key: 'base_orders.status',
+        meta: {
+          addDesc: 'The status of order',
+          moreNum: 42,
+        },
+        shortTitle: 'Status',
+        title: 'Base Orders Status',
+        type: 'string',
+      },
+      {
+        dataIndex: 'base_orders.count',
+        format: undefined,
+        key: 'base_orders.count',
+        meta: undefined,
+        shortTitle: 'Count',
+        title: 'Base Orders Count',
+        type: 'number',
+      },
+    ]);
+  });
+
+  test('totalRow', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    expect(resultSet.totalRow()).toEqual({
+      'completed,base_orders.count': 2,
+      'processing,base_orders.count': 0,
+      'shipped,base_orders.count': 0,
+      x: '2023-04-01T00:00:00.000',
+      xValues: [
+        '2023-04-01T00:00:00.000',
+      ],
+    });
+  });
+
+  test('pivotQuery', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    expect(resultSet.pivotQuery()).toEqual(DescriptiveQueryResponse.pivotQuery);
+  });
+
+  test('totalRows', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    expect(resultSet.totalRows()).toEqual(19);
+  });
+
+  test('rawData', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    expect(resultSet.rawData()).toEqual(DescriptiveQueryResponse.results[0].data);
+  });
+
+  test('annotation', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    expect(resultSet.annotation()).toEqual(DescriptiveQueryResponse.results[0].annotation);
+  });
+
+  test('categories', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    expect(resultSet.categories()).toEqual([
+      {
+        'completed,base_orders.count': 2,
+        'processing,base_orders.count': 0,
+        'shipped,base_orders.count': 0,
+        x: '2023-04-01T00:00:00.000',
+        xValues: [
+          '2023-04-01T00:00:00.000',
+        ],
+      },
+      {
+        'completed,base_orders.count': 6,
+        'processing,base_orders.count': 6,
+        'shipped,base_orders.count': 9,
+        x: '2023-05-01T00:00:00.000',
+        xValues: [
+          '2023-05-01T00:00:00.000',
+        ],
+      },
+      {
+        'completed,base_orders.count': 5,
+        'processing,base_orders.count': 5,
+        'shipped,base_orders.count': 13,
+        x: '2023-06-01T00:00:00.000',
+        xValues: [
+          '2023-06-01T00:00:00.000',
+        ],
+      },
+      {
+        'completed,base_orders.count': 5,
+        'processing,base_orders.count': 7,
+        'shipped,base_orders.count': 5,
+        x: '2023-07-01T00:00:00.000',
+        xValues: [
+          '2023-07-01T00:00:00.000',
+        ],
+      },
+      {
+        'completed,base_orders.count': 11,
+        'processing,base_orders.count': 3,
+        'shipped,base_orders.count': 4,
+        x: '2023-08-01T00:00:00.000',
+        xValues: [
+          '2023-08-01T00:00:00.000',
+        ],
+      },
+      {
+        'completed,base_orders.count': 5,
+        'processing,base_orders.count': 10,
+        'shipped,base_orders.count': 9,
+        x: '2023-09-01T00:00:00.000',
+        xValues: [
+          '2023-09-01T00:00:00.000',
+        ],
+      },
+      {
+        'completed,base_orders.count': 4,
+        'processing,base_orders.count': 5,
+        'shipped,base_orders.count': 9,
+        x: '2023-10-01T00:00:00.000',
+        xValues: [
+          '2023-10-01T00:00:00.000',
+        ],
+      },
+    ]);
+  });
+
+  test('serialize/deserialize', () => {
+    const resultSet = new ResultSet(DescriptiveQueryResponse as any);
+
+    const serialized = resultSet.serialize();
+    const restoredResultSet = ResultSet.deserialize(serialized);
+
+    expect(restoredResultSet).toEqual(resultSet);
   });
 
   describe('seriesNames', () => {
