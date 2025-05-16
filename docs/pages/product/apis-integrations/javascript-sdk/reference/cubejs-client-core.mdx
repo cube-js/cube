@@ -26,6 +26,27 @@ const cubeApi = cube(
 );
 ```
 
+If you need to set up cancellation for all requests made by this API instance:
+
+```js
+import cube from '@cubejs-client/core';
+
+// Create a controller for managing request cancellation
+const controller = new AbortController();
+const { signal } = controller;
+
+const cubeApi = cube(
+  'CUBE-API-TOKEN',
+  {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    signal: signal
+  }
+);
+
+// Later when you need to cancel all pending requests:
+// controller.abort();
+```
+
 **Parameters:**
 
 Name | Type | Description |
@@ -85,6 +106,41 @@ const resultSet = await cubeApi.load({
 
 const context = document.getElementById('myChart');
 new Chart(context, chartjsConfig(resultSet));
+```
+
+You can also use AbortController to cancel a request:
+
+```js
+import cube from '@cubejs-client/core';
+
+const cubeApi = cube('CUBE_TOKEN');
+
+// Create an AbortController instance
+const controller = new AbortController();
+const { signal } = controller;
+
+try {
+  // Pass the signal to the load method
+  const resultSetPromise = cubeApi.load(
+    {
+      measures: ['Orders.count'],
+      dimensions: ['Orders.status']
+    },
+    { signal }
+  );
+
+  // To cancel the request at any time:
+  // controller.abort();
+
+  const resultSet = await resultSetPromise;
+  // Process the result
+} catch (error) {
+  if (error.name === 'AbortError') {
+    console.log('Request was cancelled');
+  } else {
+    console.error('Error loading data:', error);
+  }
+}
 ```
 
 **Parameters:**
@@ -728,6 +784,7 @@ headers? | Record‹string, string› | - |
 parseDateMeasures? | boolean | - |
 pollInterval? | number | - |
 transport? | [ITransport](#i-transport) | Transport implementation to use. [HttpTransport](#http-transport) will be used by default. |
+signal? | AbortSignal | AbortSignal to cancel requests |
 
 ### `DateRange`
 
@@ -757,6 +814,7 @@ Name | Type | Optional? | Description |
 `mutexObj` | `Object` | ✅ Yes | Object to store MUTEX |
 `progressCallback` |  | ✅ Yes |  |
 `subscribe` | `boolean` | ✅ Yes | Pass `true` to use continuous fetch behavior. |
+`signal` | `AbortSignal` | ✅ Yes | AbortSignal to cancel the request. This allows you to manually abort requests using AbortController. |
 
 ### `LoadResponse`
 
@@ -1035,6 +1093,7 @@ apiUrl | string | path to `/cubejs-api/v1` |
 authorization | string | [jwt auth token][ref-security] |
 credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
 headers? | Record‹string, string› | custom headers |
+signal? | AbortSignal | AbortSignal to cancel requests |
 
 ### `UnaryFilter`
 

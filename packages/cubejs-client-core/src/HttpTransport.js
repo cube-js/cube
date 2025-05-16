@@ -2,16 +2,17 @@ import fetch from 'cross-fetch';
 import 'url-search-params-polyfill';
 
 class HttpTransport {
-  constructor({ authorization, apiUrl, method, headers = {}, credentials, fetchTimeout }) {
+  constructor({ authorization, apiUrl, method, headers = {}, credentials, fetchTimeout, signal }) {
     this.authorization = authorization;
     this.apiUrl = apiUrl;
     this.method = method;
     this.headers = headers;
     this.credentials = credentials;
     this.fetchTimeout = fetchTimeout;
+    this.signal = signal;
   }
 
-  request(method, { baseRequestId, ...params }) {
+  request(method, { baseRequestId, signal, ...params }) {
     let spanCounter = 1;
     const searchParams = new URLSearchParams(
       params && Object.keys(params)
@@ -38,7 +39,7 @@ class HttpTransport {
       },
       credentials: this.credentials,
       body: requestMethod === 'POST' ? JSON.stringify(params) : null,
-      signal: this.fetchTimeout ? AbortSignal.timeout(this.fetchTimeout) : undefined,
+      signal: signal || this.signal || (this.fetchTimeout ? AbortSignal.timeout(this.fetchTimeout) : undefined),
     });
 
     return {
