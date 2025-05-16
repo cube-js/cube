@@ -10,5 +10,6 @@ module.exports = {
   "data-access-policies": "Data access policies",
   "types-and-formats": "Types and formats",
   "context-variables": "Context variables",
-  "cube_dbt": "cube_dbt package"
+  "cube_dbt": "cube_dbt package",
+  "lkml2cube": "lkml2cube package"
 }
