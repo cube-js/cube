@@ -27,7 +27,7 @@ click <Btn>API credentials</Btn>, and choose the <Btn>AI API</Btn> tab.
 
 ### Data modeling
 
-The AI API currently requires [views](/reference/data-model/view) in order to generate queries. This is because:
+The AI API currently requires [views](/product/data-modeling/reference/view) in order to generate queries. This is because:
 
 1. Views let you create carefully-curated datasets, resulting in better outputs from LLMs. That is, you can choose exactly what is "ready" for the AI to see and what is not.
 2. Views define deterministic joins between Cubes, so the LLM does not have to "guess" at join ordering
@@ -170,7 +170,7 @@ To use a custom prompt, set the `CUBE_CLOUD_AI_API_PROMPT` environment variable 
 
 ### Meta tags
 
-The AI API can read [meta tags](/reference/data-model/view#meta) on your dimensions, measures, 
+The AI API can read [meta tags](/product/data-modeling/reference/view#meta) on your dimensions, measures, 
 segments, and views.
 
 Use the `ai` meta tag to give context that is specific to AI and goes beyond what is 

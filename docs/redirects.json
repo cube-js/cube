@@ -1,5 +1,65 @@
 [
   {
+    "source": "/reference/data-model",
+    "destination": "/product/data-modeling/reference",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/cube",
+    "destination": "/product/data-modeling/reference/cube",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/dimensions",
+    "destination": "/product/data-modeling/reference/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/measures",
+    "destination": "/product/data-modeling/reference/measures",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/joins",
+    "destination": "/product/data-modeling/reference/joins",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/segments",
+    "destination": "/product/data-modeling/reference/segments",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/types-and-formats",
+    "destination": "/product/data-modeling/reference/types-and-formats",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/view",
+    "destination": "/product/data-modeling/reference/view",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/hierarchies",
+    "destination": "/product/data-modeling/reference/hierarchies",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/context-variables",
+    "destination": "/product/data-modeling/reference/context-variables",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/data-access-policies",
+    "destination": "/product/data-modeling/reference/data-access-policies",
+    "permanent": true
+  },
+  {
+    "source": "/reference/data-model/pre-aggregations",
+    "destination": "/product/data-modeling/reference/pre-aggregations",
+    "permanent": true
+  },
+  {
     "source": "/reference/configuration/environment-variables",
     "destination": "/product/configuration/reference/environment-variables",
     "permanent": true

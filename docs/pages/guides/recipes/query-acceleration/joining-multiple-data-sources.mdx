@@ -5,7 +5,7 @@
 Let's imagine we store information about products and their suppliers in
 separate databases. We want to aggregate data from these data sources while
 having decent performance. In the recipe below, we'll learn how to create a
-[rollup join](/reference/data-model/pre-aggregations#rollup_join)
+[rollup join](/product/data-modeling/reference/pre-aggregations#rollup_join)
 between two databases to achieve our goal.
 
 ## Configuration
@@ -46,7 +46,7 @@ module.exports = {
 ## Data modeling
 
 First, we'll define
-[rollup](/reference/data-model/pre-aggregations#rollup)
+[rollup](/product/data-modeling/reference/pre-aggregations#rollup)
 pre-aggregations for `products` and `suppliers`. Note that these
 pre-aggregations should contain the dimension on which they're joined. In this
 case, it's the `supplier_id` dimension in the `products` cube, and the `id`
