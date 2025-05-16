@@ -1,3 +1,4 @@
 module.exports = {
-  "config": "Configuration options"
+  "config": "Configuration options",
+  "environment-variables": "Environment variables"
 }
