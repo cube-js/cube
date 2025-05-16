@@ -72,7 +72,7 @@ impl MultiStageMemberQueryPlanner {
             true,
             true,
             false,
-            false
+            false,
         )?;
 
         let simple_query_planer =

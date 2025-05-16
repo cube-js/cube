@@ -5,12 +5,11 @@ use crate::planner::sql_evaluator::MemberSymbol;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
-use lazy_static::lazy_static;
-use regex::Regex;
-
 
 pub struct AutoPrefixSqlNode {
     input: Rc<dyn SqlNode>,
@@ -59,7 +58,12 @@ impl AutoPrefixSqlNode {
         }
     }
 
-    pub fn auto_prefix_with_cube_name(&self, cube_name: &str, sql: &str, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
+    pub fn auto_prefix_with_cube_name(
+        &self,
+        cube_name: &str,
+        sql: &str,
+        templates: &PlanSqlTemplates,
+    ) -> Result<String, CubeError> {
         lazy_static! {
             static ref SINGLE_MEMBER_RE: Regex = Regex::new(r"^[_a-zA-Z][_a-zA-Z0-9]*$").unwrap();
         }
@@ -74,7 +78,6 @@ impl AutoPrefixSqlNode {
         };
         Ok(res)
     }
-
 }
 
 impl SqlNode for AutoPrefixSqlNode {

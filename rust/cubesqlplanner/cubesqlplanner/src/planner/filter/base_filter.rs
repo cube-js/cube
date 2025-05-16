@@ -340,9 +340,17 @@ impl BaseFilter {
         if let Some(interval) = interval {
             if interval != "unbounded" {
                 if is_sub {
-                    Ok(Some(self.query_tools.base_tools().subtract_interval(date, interval.clone())?))
+                    Ok(Some(
+                        self.query_tools
+                            .base_tools()
+                            .subtract_interval(date, interval.clone())?,
+                    ))
                 } else {
-                    Ok(Some(self.query_tools.base_tools().add_interval(date, interval.clone())?))
+                    Ok(Some(
+                        self.query_tools
+                            .base_tools()
+                            .add_interval(date, interval.clone())?,
+                    ))
                 }
             } else {
                 Ok(None)
@@ -607,7 +615,11 @@ impl BaseFilter {
         Ok(res)
     }
 
-    fn allocate_date_params(&self, use_db_time_zone: bool, as_date_time: bool) -> Result<(String, String), CubeError> {
+    fn allocate_date_params(
+        &self,
+        use_db_time_zone: bool,
+        as_date_time: bool,
+    ) -> Result<(String, String), CubeError> {
         if self.values.len() >= 2 {
             let from = if let Some(from_str) = &self.values[0] {
                 self.from_date_in_db_time_zone(from_str, use_db_time_zone)?
@@ -647,7 +659,11 @@ impl BaseFilter {
         self.query_tools.allocate_param(param)
     }
 
-    fn allocate_timestamp_param(&self, param: &str, as_date_time: bool) -> Result<String, CubeError> {
+    fn allocate_timestamp_param(
+        &self,
+        param: &str,
+        as_date_time: bool,
+    ) -> Result<String, CubeError> {
         if self.use_raw_values {
             return Ok(param.to_string());
         }
@@ -673,7 +689,11 @@ impl BaseFilter {
         }
     }
 
-    fn first_timestamp_param(&self, use_db_time_zone: bool, as_date_time: bool) -> Result<String, CubeError> {
+    fn first_timestamp_param(
+        &self,
+        use_db_time_zone: bool,
+        as_date_time: bool,
+    ) -> Result<String, CubeError> {
         if self.values.is_empty() {
             Err(CubeError::user(format!(
                 "Expected at least one parameter but nothing found"
@@ -682,7 +702,7 @@ impl BaseFilter {
             if let Some(value) = &self.values[0] {
                 self.allocate_timestamp_param(
                     &self.from_date_in_db_time_zone(value, use_db_time_zone)?,
-                    as_date_time
+                    as_date_time,
                 )
             } else {
                 return Err(CubeError::user(format!(

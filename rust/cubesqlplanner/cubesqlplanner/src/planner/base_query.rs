@@ -91,8 +91,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         } else {
             HashMap::new()
         };
-        let physical_plan =
-            physical_plan_builder.build(optimized_plan, original_sql_pre_aggregations, self.request.is_total_query())?;
+        let physical_plan = physical_plan_builder.build(
+            optimized_plan,
+            original_sql_pre_aggregations,
+            self.request.is_total_query(),
+        )?;
 
         let sql = physical_plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;

@@ -1,10 +1,10 @@
 use super::{TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn};
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::plan::join::JoinType;
 use convert_case::{Boundary, Case, Casing};
 use cubenativeutils::CubeError;
 use minijinja::context;
-use crate::cube_bridge::base_tools::BaseTools;
 use std::rc::Rc;
 
 #[derive(Clone)]

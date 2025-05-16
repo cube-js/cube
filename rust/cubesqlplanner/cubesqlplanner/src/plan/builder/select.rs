@@ -85,7 +85,8 @@ impl SelectBuilder {
             alias: alias.clone(),
         };
         self.projection_columns.push(aliased_expr);
-        self.result_schema.add_column(SchemaColumn::new(alias.clone(), None));
+        self.result_schema
+            .add_column(SchemaColumn::new(alias.clone(), None));
     }
     pub fn add_projection_function_expression(
         &mut self,
