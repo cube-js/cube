@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/python/cube_dbt",
+    "destination": "/product/data-modeling/reference/cube_dbt",
+    "permanent": true
+  },
+  {
     "source": "/reference/data-model",
     "destination": "/product/data-modeling/reference",
     "permanent": true
