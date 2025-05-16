@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference/python/cube",
+    "destination": "/product/data-modeling/reference/cube-package",
+    "permanent": true
+  },
+  {
     "source": "/reference/python/lkml2cube",
     "destination": "/product/data-modeling/reference/lkml2cube",
     "permanent": true
@@ -195,11 +200,6 @@
     "permanent": true
   },
   {
-    "source": "/product/data-modeling/reference/pre-aggregations",
-    "destination": "/reference/data-model/pre-aggregations",
-    "permanent": true
-  },
-  {
     "source": "/product/data-modeling/advanced/jinja",
     "destination": "/product/data-modeling/dynamic/jinja",
     "permanent": true
@@ -215,16 +215,6 @@
     "permanent": true
   },
   {
-    "source": "/product/data-modeling/reference/measures",
-    "destination": "/reference/data-model/measures",
-    "permanent": true
-  },
-  {
-    "source": "/product/data-modeling/reference/joins",
-    "destination": "/reference/data-model/joins",
-    "permanent": true
-  },
-  {
     "source": "/product/data-modeling/fundamentals/syntax",
     "destination": "/product/data-modeling/syntax",
     "permanent": true
@@ -235,28 +225,8 @@
     "permanent": true
   },
   {
-    "source": "/product/data-modeling/reference/types-and-formats",
-    "destination": "/reference/data-model/types-and-formats",
-    "permanent": true
-  },
-  {
-    "source": "/product/data-modeling/reference/cube",
-    "destination": "/reference/data-model/cube",
-    "permanent": true
-  },
-  {
     "source": "/product/data-modeling/fundamentals/concepts",
     "destination": "/product/data-modeling/concepts",
-    "permanent": true
-  },
-  {
-    "source": "/product/data-modeling/reference/dimensions",
-    "destination": "/reference/data-model/dimensions",
-    "permanent": true
-  },
-  {
-    "source": "/product/data-modeling/reference/view",
-    "destination": "/reference/data-model/view",
     "permanent": true
   },
   {
