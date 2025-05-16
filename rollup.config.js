@@ -5,6 +5,15 @@ import alias from '@rollup/plugin-alias';
 import tsconfigPaths from 'rollup-plugin-tsconfig-paths';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import json from '@rollup/plugin-json';
+import { builtinModules } from 'module';
+
+const external = [
+  'ws',
+  'isomorphic-ws',
+  'bufferutil',
+  'utf-8-validate',
+  ...builtinModules,
+];
 
 const bundle = (
   name,
@@ -78,12 +87,13 @@ const bundle = (
 
     {
       ...baseConfig,
+      external,
       plugins: [
         json(),
         tsconfigPaths(),
         resolve({
           extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json'],
-          browser: false,
+          browser: true,
           preferBuiltins: true,
         }),
         commonjs(),
