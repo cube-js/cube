@@ -5,10 +5,20 @@
  */
 
 /* globals describe,test,expect,jest,beforeEach */
+/* eslint-disable import/first */
 
-import 'jest';
-import { CubeApi } from '../index';
-import HttpTransport from '../HttpTransport';
+import { CubeApi as CubeApiOriginal } from '../src';
+import HttpTransport from '../src/HttpTransport';
+
+class CubeApi extends CubeApiOriginal {
+  public getTransport(): any {
+    return this.transport;
+  }
+
+  public makeRequest(method: string, params?: any): any {
+    return this.request(method, params);
+  }
+}
 
 describe('CubeApi with Signal', () => {
   beforeEach(() => {
@@ -26,7 +36,8 @@ describe('CubeApi with Signal', () => {
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
         json: () => Promise.resolve({ results: [] })
-      }))
+      } as any,
+      async () => undefined as any))
     }));
 
     const cubeApi = new CubeApi('token', {
@@ -45,13 +56,13 @@ describe('CubeApi with Signal', () => {
 
     // The request method should receive the signal in the call
     // Create a request in the same way as CubeApi.load does
-    cubeApi.request('load', {
+    cubeApi.makeRequest('load', {
       query: { measures: ['Orders.count'] },
       queryType: 'multi'
     });
 
     // Verify the transport is using the signal
-    expect(cubeApi.transport.signal).toBe(signal);
+    expect(cubeApi.getTransport().signal).toBe(signal);
   });
 
   test('should pass signal from options to request', async () => {
@@ -59,12 +70,13 @@ describe('CubeApi with Signal', () => {
     const { signal } = controller;
 
     // Mock for this specific test
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
         json: () => Promise.resolve({ results: [] })
-      }))
+      } as any,
+      async () => undefined as any))
     }));
 
     const cubeApi = new CubeApi('token', {
@@ -76,8 +88,8 @@ describe('CubeApi with Signal', () => {
       { signal }
     );
 
-    expect(HttpTransport.prototype.request).toHaveBeenCalled();
-    expect(HttpTransport.prototype.request.mock.calls[0][1].signal).toBe(signal);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
   });
 
   test('options signal should override constructor signal', async () => {
@@ -85,12 +97,13 @@ describe('CubeApi with Signal', () => {
     const optionsController = new AbortController();
 
     // Mock for this specific test
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"results":[]}'),
         json: () => Promise.resolve({ results: [] })
-      }))
+      } as any,
+      async () => undefined as any))
     }));
 
     const cubeApi = new CubeApi('token', {
@@ -103,9 +116,9 @@ describe('CubeApi with Signal', () => {
       { signal: optionsController.signal }
     );
 
-    expect(HttpTransport.prototype.request).toHaveBeenCalled();
-    expect(HttpTransport.prototype.request.mock.calls[0][1].signal).toBe(optionsController.signal);
-    expect(HttpTransport.prototype.request.mock.calls[0][1].signal).not.toBe(constructorController.signal);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(optionsController.signal);
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).not.toBe(constructorController.signal);
   });
 
   test('should pass signal to meta request', async () => {
@@ -113,7 +126,7 @@ describe('CubeApi with Signal', () => {
     const { signal } = controller;
 
     // Mock for meta with proper format - include dimensions, segments, and measures with required properties
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve(JSON.stringify({
@@ -152,7 +165,8 @@ describe('CubeApi with Signal', () => {
             segments: []
           }]
         })
-      }))
+      } as any,
+      async () => undefined as any))
     }));
 
     const cubeApi = new CubeApi('token', {
@@ -161,8 +175,8 @@ describe('CubeApi with Signal', () => {
 
     await cubeApi.meta({ signal });
 
-    expect(HttpTransport.prototype.request).toHaveBeenCalled();
-    expect(HttpTransport.prototype.request.mock.calls[0][1].signal).toBe(signal);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
   });
 
   test('should pass signal to sql request', async () => {
@@ -170,12 +184,13 @@ describe('CubeApi with Signal', () => {
     const { signal } = controller;
 
     // Mock for SQL response
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"sql":{"sql":"SELECT * FROM orders"}}'),
         json: () => Promise.resolve({ sql: { sql: 'SELECT * FROM orders' } })
-      }))
+      } as any,
+      async () => undefined as any))
     }));
 
     const cubeApi = new CubeApi('token', {
@@ -187,8 +202,8 @@ describe('CubeApi with Signal', () => {
       { signal }
     );
 
-    expect(HttpTransport.prototype.request).toHaveBeenCalled();
-    expect(HttpTransport.prototype.request.mock.calls[0][1].signal).toBe(signal);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
   });
 
   test('should pass signal to dryRun request', async () => {
@@ -196,12 +211,13 @@ describe('CubeApi with Signal', () => {
     const { signal } = controller;
 
     // Mock for dryRun response
-    jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+    const requestSpy = jest.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({
         status: 200,
         text: () => Promise.resolve('{"queryType":"regular"}'),
         json: () => Promise.resolve({ queryType: 'regular' })
-      }))
+      } as any,
+      async () => undefined as any))
     }));
 
     const cubeApi = new CubeApi('token', {
@@ -213,7 +229,7 @@ describe('CubeApi with Signal', () => {
       { signal }
     );
 
-    expect(HttpTransport.prototype.request).toHaveBeenCalled();
-    expect(HttpTransport.prototype.request.mock.calls[0][1].signal).toBe(signal);
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]?.signal).toBe(signal);
   });
 });

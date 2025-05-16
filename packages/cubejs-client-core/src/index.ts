@@ -167,7 +167,7 @@ class CubeApi {
 
   private readonly credentials: TransportOptions['credentials'];
 
-  private readonly transport: ITransport<any>;
+  protected readonly transport: ITransport<any>;
 
   private readonly pollInterval: number;
 
@@ -241,7 +241,7 @@ class CubeApi {
     this.updateAuthorizationPromise = null;
   }
 
-  private request(method: string, params?: any) {
+  protected request(method: string, params?: any) {
     return this.transport.request(method, {
       baseRequestId: uuidv4(),
       ...params
