@@ -1,5 +1,10 @@
 [
   {
+    "source": "/reference",
+    "destination": "/",
+    "permanent": true
+  },
+  {
     "source": "/reference/python/cube",
     "destination": "/product/data-modeling/reference/cube-package",
     "permanent": true

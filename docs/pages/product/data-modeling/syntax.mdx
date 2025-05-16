@@ -746,6 +746,25 @@ variables][ref-context-variables] within your data model. They are
 generally useful for two purposes: optimizing generated SQL queries and
 defining dynamic data models.
 
+## Troubleshooting
+
+### `Can't parse timestamp`
+
+Sometimes, you might come across the following error message: `Can't parse timestamp:
+2023-11-07T14:33:23.16.000`.
+
+It indicates that the data source was unable to recognize the value of a [time
+dimension][ref-time-dimension] as a timestamp. Please check that the [SQL
+expression](#sql-expressions) of this time dimension evaluates to a `TIMESTAMP` type.
+
+<ReferenceBox>
+
+Check [this recipe][ref-recipe-string-time-dimensions] to see how you can work around
+string values in time dimensions.
+
+</ReferenceBox>
+
+
 [self-folder-structure]: #folder-structure
 [self-naming]: #naming
 [self-syntax]: #code-syntax
@@ -773,3 +792,5 @@ defining dynamic data models.
 [link-js-template-literals]: https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Scripting/Strings#embedding_javascript
 [link-python-reserved-words]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 [ref-dax-api-date-hierarchies]: /product/apis-integrations/dax-api#date-hierarchies
+[ref-time-dimension]: /product/data-modeling/concepts#time-dimensions
+[ref-recipe-string-time-dimensions]: /guides/recipes/data-modeling/string-time-dimensions
