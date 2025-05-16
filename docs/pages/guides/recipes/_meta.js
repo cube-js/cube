@@ -1,5 +1,4 @@
 module.exports = {
-  "analytics": "Analytics",
   "access-control": "Access control",
   "auth": "Authentication & Authorization",
   "data-modeling": "Data modeling",
