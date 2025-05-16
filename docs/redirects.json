@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/analytics/funnels",
+    "destination": "/product/data-modeling/recipes/funnels",
+    "permanent": true
+  },
+  {
     "source": "/guides/recipes/analytics/cohort-retention",
     "destination": "/product/data-modeling/recipes/cohort-retention",
     "permanent": true
