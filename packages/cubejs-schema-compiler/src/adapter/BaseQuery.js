@@ -752,8 +752,7 @@ export class BaseQuery {
         }
       }
 
-      const res = this.buildSqlAndParamsRust(exportAnnotatedSql);
-      return res;
+      return this.buildSqlAndParamsRust(exportAnnotatedSql);
     }
 
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
@@ -762,7 +761,7 @@ export class BaseQuery {
       }
     }
 
-    const res = this.compilers.compiler.withQuery(
+    return this.compilers.compiler.withQuery(
       this,
       () => this.cacheValue(
         ['buildSqlAndParams', exportAnnotatedSql],
@@ -774,7 +773,6 @@ export class BaseQuery {
         { cache: this.queryCache }
       )
     );
-    return res;
   }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
