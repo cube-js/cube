@@ -1298,5 +1298,10 @@
     "source": "/recipes/column-based-access",
     "destination": "/guides/recipes/access-control/column-based-access",
     "permanent": true
+  },
+  {
+    "source": "/reference/configuration/config",
+    "destination": "/product/configuration/reference/config",
+    "permanent": true
   }
 ]

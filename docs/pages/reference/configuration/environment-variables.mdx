@@ -17,7 +17,7 @@ The secret key used to sign and verify JWTs. Generated on project scaffold with
 | A valid string  | N/A                    | N/A                   |
 
 See also the [`check_auth` configuration
-option](/reference/configuration/config#check_auth).
+option](/product/configuration/reference/config#check_auth).
 
 ## `CUBEJS_APP`
 
@@ -95,7 +95,7 @@ The cache and queue driver to use for the Cube deployment.
 | `cubestore`, `memory` | `memory`               | `cubestore`           |
 
 It can be also set using the [`cache_and_queue_driver` configuration
-option](/reference/configuration/config#cache_and_queue_driver).
+option](/product/configuration/reference/config#cache_and_queue_driver).
 
 ## `CUBEJS_CONCURRENCY`
 
@@ -106,7 +106,7 @@ The number of concurrent connections each query queue has to the database.
 | A valid number  | [See database-specific page][ref-config-db] | [See database-specific page][ref-config-db] |
 
 It can be also set as `concurrency` in the [`orchestrator_options` configuration
-option](/reference/configuration/config#orchestrator_options).
+option](/product/configuration/reference/config#orchestrator_options).
 
 If you'd like to adjust the concurrency for the refresh worker, use
 `CUBEJS_REFRESH_WORKER_CONCURRENCY`.
@@ -874,7 +874,7 @@ endpoints.
 | A comma-delimited string with any combination of [API scopes][ref-rest-scopes] | `meta,data,graphql,sql`| `meta,data,graphql,sql`|
 
 See also the [`context_to_api_scopes` configuration
-option](/reference/configuration/config#context_to_api_scopes).
+option](/product/configuration/reference/config#context_to_api_scopes).
 
 ## `CUBEJS_DEV_MODE`
 
@@ -941,7 +941,7 @@ Enables [JSON Web Key (JWK)][ietf-jwk-ref]-based authentication in Cube.
 | A valid URL to a JSON Web Key Set | N/A                    | N/A                   |
 
 It can be also set as `jwkUrl` in the [`jwt` configuration
-option](/reference/configuration/config#jwt).
+option](/product/configuration/reference/config#jwt).
 
 ## `CUBEJS_JWT_ALGS`
 
@@ -952,7 +952,7 @@ option](/reference/configuration/config#jwt).
 | `HS256`, `RS256` | N/A                    | N/A                   |
 
 It can be also set as `algorithms` in the [`jwt` configuration
-option](/reference/configuration/config#jwt).
+option](/product/configuration/reference/config#jwt).
 
 ## `CUBEJS_JWT_AUDIENCE`
 
@@ -964,7 +964,7 @@ JWTs][ietf-jwt-ref-aud].
 | A valid `aud` claim | N/A                    | N/A                   |
 
 It can be also set as `audience` in the [`jwt` configuration
-option](/reference/configuration/config#jwt).
+option](/product/configuration/reference/config#jwt).
 
 ## `CUBEJS_JWT_CLAIMS_NAMESPACE`
 
@@ -975,7 +975,7 @@ A namespace within the decoded JWT under which any custom claims can be found.
 | A valid string  | N/A                    | N/A                   |
 
 It can be also set as `claimsNamespace` in the [`jwt` configuration
-option](/reference/configuration/config#jwt).
+option](/product/configuration/reference/config#jwt).
 
 ## `CUBEJS_JWT_ISSUER`
 
@@ -987,7 +987,7 @@ JWTs][ietf-jwt-ref-iss].
 | A valid `iss` claim | N/A                    | N/A                   |
 
 It can be also set as `issuer` in the [`jwt` configuration
-option](/reference/configuration/config#jwt).
+option](/product/configuration/reference/config#jwt).
 
 ## `CUBEJS_JWT_KEY`
 
@@ -999,7 +999,7 @@ The secret key used to sign and verify JWTs. Similar to
 | A valid string  | N/A                    | N/A                   |
 
 It can be also set as `key` in the [`jwt` configuration
-option](/reference/configuration/config#jwt).
+option](/product/configuration/reference/config#jwt).
 
 ## `CUBEJS_JWT_SUBJECT`
 
@@ -1011,7 +1011,7 @@ JWTs][ietf-jwt-ref-sub].
 | A valid `sub` claim | N/A                    | N/A                   |
 
 It can be also set as `subject` in the [`jwt` configuration
-option](/reference/configuration/config#jwt).
+option](/product/configuration/reference/config#jwt).
 
 ## `CUBEJS_LOG_LEVEL`
 
@@ -1022,7 +1022,7 @@ The logging level for Cube.
 | `error`, `info`, `trace`, `warn` | `warn`                 | `warn`                |
 
 See also `CUBESTORE_LOG_LEVEL`.
-See also the [`logger` configuration option](/reference/configuration/config#logger).
+See also the [`logger` configuration option](/product/configuration/reference/config#logger).
 
 ## `CUBEJS_MAX_PARTITIONS_PER_CUBE`
 
@@ -1058,7 +1058,7 @@ If Cube is configured to act as a refresh worker instance using
 
 ## `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
 
-The [database schema name](/reference/configuration/config#pre_aggregations_schema)
+The [database schema name](/product/configuration/reference/config#pre_aggregations_schema)
 to use for storing pre-aggregations.
 
 | Possible Values | Default in Development | Default in Production   |
@@ -1066,7 +1066,7 @@ to use for storing pre-aggregations.
 | A valid string  | `dev_pre_aggregations` | `prod_pre_aggregations` |
 
 It can be also set using the [`pre_aggregations_schema` configuration
-option](/reference/configuration/config#pre_aggregations_schema).
+option](/product/configuration/reference/config#pre_aggregations_schema).
 
 ## `CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH`
 
@@ -1097,7 +1097,7 @@ mode](/product/caching/using-pre-aggregations#rollup-only-mode) for details.
 | `true`, `false` | `false`                | `false`               |
 
 It can be also set using the [`orchestrator_options.rollupOnlyMode` configuration
-option](/reference/configuration/config#orchestrator_options).
+option](/product/configuration/reference/config#orchestrator_options).
 
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 
@@ -1109,7 +1109,7 @@ for][ref-config-sched-refresh-timer].
 | [A valid timezone from the tz database][wiki-tz-database] | N/A                    | N/A                   |
 
 It can be also set using the [`scheduled_refresh_time_zones` configuration
-option](/reference/configuration/config#scheduled_refresh_time_zones).
+option](/product/configuration/reference/config#scheduled_refresh_time_zones).
 
 ## `CUBEJS_SCHEMA_PATH`
 
@@ -1126,7 +1126,7 @@ Until v0.35, the default value was `schema`.
 </InfoBox>
 
 It can be also set using the [`schema_path` configuration
-option](/reference/configuration/config#schema_path).
+option](/product/configuration/reference/config#schema_path).
 
 ## `CUBEJS_SQL_USER`
 
@@ -1137,7 +1137,7 @@ A username required to access the [SQL API][ref-sql-api].
 | A valid string  | N/A                    | N/A                   |
 
 See also the [`check_sql_auth` configuration
-option](/reference/configuration/config#check_sql_auth).
+option](/product/configuration/reference/config#check_sql_auth).
 
 ## `CUBEJS_SQL_PASSWORD`
 
@@ -1148,7 +1148,7 @@ A password required to access the [SQL API][ref-sql-api].
 | A valid string  | N/A                    | N/A                   |
 
 See also the [`check_sql_auth` configuration
-option](/reference/configuration/config#check_sql_auth).
+option](/product/configuration/reference/config#check_sql_auth).
 
 ## `CUBEJS_SQL_SUPER_USER`
 
@@ -1160,7 +1160,7 @@ session.
 | A valid string  | N/A                    | N/A                   |
 
 See also the [`can_switch_sql_user` configuration
-option](/reference/configuration/config#can_switch_sql_user).
+option](/product/configuration/reference/config#can_switch_sql_user).
 
 ## `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY`
 
@@ -1172,7 +1172,7 @@ If `true`, disables the primary key inclusion check for
 | `true`, `false` | `false`                | `false`               |
 
 It can be also set using the [`allow_ungrouped_without_primary_key` configuration
-option](/reference/configuration/config#allow_ungrouped_without_primary_key).
+option](/product/configuration/reference/config#allow_ungrouped_without_primary_key).
 
 <InfoBox>
 
@@ -1723,13 +1723,13 @@ The port for a Cube deployment to listen to API connections on.
 [ietf-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
-[ref-config]: /reference/configuration/config
-[ref-config-conf-ctx-to-appid]: /reference/configuration/config#context_to_app_id
+[ref-config]: /product/configuration/reference/config
+[ref-config-conf-ctx-to-appid]: /product/configuration/reference/config#context_to_app_id
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-multiple-ds-decorating-env]:
   /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-config-sched-refresh-timer]:
-  /reference/configuration/config#scheduled_refresh_timer
+  /product/configuration/reference/config#scheduled_refresh_timer
 [ref-rest-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
 [snowflake-docs-account-id]:
   https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
