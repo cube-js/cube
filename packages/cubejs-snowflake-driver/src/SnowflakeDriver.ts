@@ -163,6 +163,8 @@ interface SnowflakeDriverOptions {
   executionTimeout?: number,
   identIgnoreCase?: boolean,
   application: string,
+  snowflakeExecutionProcedure?: string,
+  snowflakeInformationSchemaProcedure?: string,
   readOnly?: boolean,
 
   /**
@@ -208,6 +210,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS',
       'CUBEJS_DB_SNOWFLAKE_QUOTED_IDENTIFIERS_IGNORE_CASE',
+      'CUBEJS_DB_SNOWFLAKE_EXECUTION_PROCEDURE',
+      'CUBEJS_DB_SNOWFLAKE_INFORMATION_SCHEMA_PROCEDURE',
     ];
   }
 
@@ -296,6 +300,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       identIgnoreCase: getEnv('snowflakeQuotedIdentIgnoreCase', { dataSource }),
       exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
       application: 'CubeDev_Cube',
+      snowflakeExecutionProcedure: getEnv('snowflakeExecutionProcedure', { dataSource }),
+      snowflakeInformationSchemaProcedure: getEnv('snowflakeInformationSchemaProcedure', { dataSource }),
       ...config
     };
   }
@@ -879,6 +885,24 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     values?: unknown[],
     rehydrate: boolean = true
   ): Promise<R> {
+    if (
+      this.config.snowflakeExecutionProcedure &&
+      query.toUpperCase().startsWith('SELECT')
+    ) {
+      const escapedQuery = query.replace(/'/g, "\\'");
+      const serializedBinds = `ARRAY_CONSTRUCT(${(values ?? [])
+        .map((v) =>
+          typeof v === 'string'
+            ? `'${String(v).replace(/'/g, "''")}'`
+            : v === null || v === undefined
+              ? "NULL"
+              : v
+        )
+        .join(", ")})`;
+
+      query = `CALL ${this.config.snowflakeExecutionProcedure}('${escapedQuery}', ${serializedBinds})`;
+    }
+
     return new Promise((resolve, reject) => connection.execute({
       sqlText: query,
       binds: <string[] | undefined>values,
@@ -908,6 +932,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
+    if (this.config.snowflakeInformationSchemaProcedure) {
+      return `
+        SELECT COLUMN_NAME as "column_name", 
+               TABLE_NAME as "table_name", 
+               TABLE_SCHEMA as "table_schema", 
+               DATA_TYPE as "data_type" 
+        FROM TABLE(${this.config.snowflakeInformationSchemaProcedure}())`;
+    }
+
     return `
         SELECT COLUMNS.COLUMN_NAME as "column_name",
                COLUMNS.TABLE_NAME as "table_name",
