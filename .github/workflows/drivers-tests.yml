@@ -57,9 +57,19 @@ on:
       # To test SQL API Push down
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
+  workflow_dispatch:
+    inputs:
+      use_tesseract_sql_planner:
+        description: 'Enable TESSERACT_SQL_PLANNER?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 env:
-  DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: false
+  USE_TESSERACT_SQL_PLANNER: false
 
 jobs:
   latest-tag-sha:
@@ -316,6 +326,8 @@ jobs:
           (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
           (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
+          DRIVERS_TESTS_CUBEJS_TESSERACT_SQL_PLANNER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.use_tesseract_sql_planner || env.USE_TESSERACT_SQL_PLANNER }}
+
           # Athena
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET }}
