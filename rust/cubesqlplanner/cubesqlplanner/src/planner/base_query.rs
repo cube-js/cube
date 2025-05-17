@@ -6,7 +6,6 @@ use crate::cube_bridge::pre_aggregation_obj::{NativePreAggregationObj, PreAggreg
 use crate::logical_plan::optimizers::*;
 use crate::logical_plan::Query;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
@@ -79,7 +78,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+        let templates = self.query_tools.plan_sql_templates();
         let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
         let logical_plan = query_planner.plan()?;
 
@@ -92,8 +91,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         } else {
             HashMap::new()
         };
-        let physical_plan =
-            physical_plan_builder.build(optimized_plan, original_sql_pre_aggregations)?;
+        let physical_plan = physical_plan_builder.build(
+            optimized_plan,
+            original_sql_pre_aggregations,
+            self.request.is_total_query(),
+        )?;
 
         let sql = physical_plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;

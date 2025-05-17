@@ -38,14 +38,15 @@ impl SqlNode for RenderReferencesSqlNode {
     ) -> Result<String, CubeError> {
         let full_name = node.full_name();
         if let Some(reference) = self.references.get(&full_name) {
-            let table_ref = reference.source().as_ref().map_or_else(
-                || format!(""),
-                |table_name| format!("{}.", query_tools.escape_column_name(table_name)),
-            );
+            let table_ref = if let Some(table_name) = reference.source() {
+                format!("{}.", templates.quote_identifier(table_name)?)
+            } else {
+                format!("")
+            };
             Ok(format!(
                 "{}{}",
                 table_ref,
-                query_tools.escape_column_name(&reference.name())
+                templates.quote_identifier(&reference.name())?
             ))
         } else {
             self.input.to_sql(

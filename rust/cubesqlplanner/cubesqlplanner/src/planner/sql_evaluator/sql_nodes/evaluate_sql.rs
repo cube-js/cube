@@ -25,12 +25,15 @@ impl SqlNode for EvaluateSqlNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         match node.as_ref() {
-            MemberSymbol::Dimension(ev) => ev.evaluate_sql(
-                visitor,
-                node_processor.clone(),
-                query_tools.clone(),
-                templates,
-            ),
+            MemberSymbol::Dimension(ev) => {
+                let res = ev.evaluate_sql(
+                    visitor,
+                    node_processor.clone(),
+                    query_tools.clone(),
+                    templates,
+                )?;
+                Ok(res)
+            }
             MemberSymbol::TimeDimension(ev) => {
                 let res = visitor.apply(&ev.base_symbol(), node_processor.clone(), templates)?;
                 Ok(res)

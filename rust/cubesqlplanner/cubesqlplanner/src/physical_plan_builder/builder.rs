@@ -16,6 +16,8 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
+const TOTAL_COUNT: &'static str = "total_count";
+const ORIGINAL_QUERY: &'static str = "original_query";
 
 #[derive(Clone, Debug)]
 struct PhysicalPlanBuilderContext {
@@ -56,7 +58,7 @@ pub struct PhysicalPlanBuilder {
 
 impl PhysicalPlanBuilder {
     pub fn new(query_tools: Rc<QueryTools>) -> Self {
-        let plan_sql_templates = PlanSqlTemplates::new(query_tools.templates_render());
+        let plan_sql_templates = query_tools.plan_sql_templates();
         Self {
             query_tools,
             plan_sql_templates,
@@ -67,10 +69,29 @@ impl PhysicalPlanBuilder {
         &self,
         logical_plan: Rc<Query>,
         original_sql_pre_aggregations: HashMap<String, String>,
+        total_query: bool,
     ) -> Result<Rc<Select>, CubeError> {
         let mut context = PhysicalPlanBuilderContext::default();
         context.original_sql_pre_aggregations = original_sql_pre_aggregations;
-        self.build_impl(logical_plan, &context)
+        let query = self.build_impl(logical_plan, &context)?;
+        let query = if total_query {
+            self.build_total_count(query, &context)?
+        } else {
+            query
+        };
+        Ok(query)
+    }
+
+    fn build_total_count(
+        &self,
+        source: Rc<Select>,
+        context: &PhysicalPlanBuilderContext,
+    ) -> Result<Rc<Select>, CubeError> {
+        let from = From::new_from_subselect(source.clone(), ORIGINAL_QUERY.to_string());
+        let mut select_builder = SelectBuilder::new(from);
+        select_builder.add_count_all(TOTAL_COUNT.to_string());
+        let context_factory = context.make_sql_nodes_factory();
+        Ok(Rc::new(select_builder.build(context_factory)))
     }
 
     fn build_impl(
@@ -957,7 +978,7 @@ impl PhysicalPlanBuilder {
             ));
         };
 
-        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+        let templates = self.query_tools.plan_sql_templates();
 
         let ts_date_range = if templates.supports_generated_time_series() {
             if let Some(date_range) = time_dimension_symbol
