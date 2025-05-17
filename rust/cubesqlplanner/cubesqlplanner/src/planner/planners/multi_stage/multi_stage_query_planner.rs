@@ -171,6 +171,7 @@ impl MultiStageQueryPlanner {
         state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        let member = member.resolve_reference_chain();
         let member_name = member.full_name();
         if let Some(exists) = descriptions
             .iter()
@@ -187,7 +188,7 @@ impl MultiStageQueryPlanner {
             return Ok(rolling_window_query);
         }
 
-        let childs = member_childs(&member)?;
+        let childs = member_childs(&member, true)?;
         let has_multi_stage_members = has_multi_stage_members(&member, false)?;
         let description = if childs.is_empty() || !has_multi_stage_members {
             if has_multi_stage_members {
